@@ -44,7 +44,7 @@ For a new repository, this is the preferred setup:
 mkdir my-project
 cd my-project
 cp -R <extracted-archive>/packages .
-jit init --profile path:packages/jit-dogfood
+jit init --profile packages/jit-dogfood
 ```
 
 When working from a source checkout rather than a release extraction, first
@@ -61,7 +61,7 @@ cd my-project
 jit init
 jit profile add --archive /tmp/jit-default.jitprof --destination packages/jit-default
 jit profile add --archive /tmp/jit-dogfood.jitprof --destination packages/jit-dogfood
-jit init --profile path:packages/jit-dogfood
+jit init --profile packages/jit-dogfood
 ```
 
 The initial plain `jit init` only creates the structural repository needed by
@@ -215,12 +215,10 @@ treating repository-local vocabulary as an engine default.
 
 ## Commands
 
-Inspect one or more profiles — either profiles this repository's own records
-name, or packages at locations:
+Inspect one or more packages at their locations:
 
 ```bash
-jit profile show --profile id:jit-dogfood
-jit profile show --profile path:packages/jit-dogfood
+jit profile show --profile packages/jit-dogfood
 ```
 
 Report what a selection would change here, including the targets and registry
@@ -228,19 +226,14 @@ declarations it could not publish and who claims each of them, before publishing
 any of it:
 
 ```bash
-jit profile diff --profile path:packages/jit-dogfood
-jit profile diff --profile id:jit-dogfood
+jit profile diff --profile packages/jit-dogfood
 ```
 
 Preview and apply a profile to an existing JIT repository:
 
 ```bash
-# A first application names where the package was placed
-jit profile apply --profile path:packages/jit-dogfood --dry-run
-jit profile apply --profile path:packages/jit-dogfood
-
-# Later runs need no location: the applied-profile record names it
-jit profile apply --profile id:jit-dogfood --dry-run
+jit profile apply --profile packages/jit-dogfood --dry-run
+jit profile apply --profile packages/jit-dogfood
 ```
 
 Author a package by creating and editing its manifest and declared sources in
@@ -329,9 +322,9 @@ selectors. Lifecycle rehearsals and runs report the same ordered observations:
 dependency-only packages once before the selected roots, then every selected
 root occurrence in selector order. A repeated root's later observations are
 `unchanged` and carry no decisions. Each show entry carries the manifest, package
-identity, target hashes, size, and stored provenance record when present.
-Showing that record does not re-verify current target bytes. Use
-`jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state
+identity, target hashes, and size. Showing a package does not re-verify current
+target bytes. Use
+`jit profile apply --profile packages/jit-dogfood --dry-run` for exact current-state
 verification of the named package and its dependency closure: it returns every
 package's target and declaration decisions without writing. Successful
 reapplication of an exact installation returns `unchanged` for every package of
@@ -389,10 +382,9 @@ messages across every conflict in the refusal, in first-occurrence order.
 
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
-run `jit profile show --profile path:packages/jit-dogfood --json` for the
+run `jit profile show --profile packages/jit-dogfood --json` for the
 exact version, dependencies, contributions, assets, managed regions, hashes, and
-executable declarations the resolved package carries. Once the repository has
-applied it, its own record can be selected with `id:jit-dogfood`. It also declares the repository roots from which
+executable declarations the resolved package carries. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
 is caught rather than silently left out of the package.

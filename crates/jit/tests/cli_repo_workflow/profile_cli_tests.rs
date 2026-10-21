@@ -1,6 +1,6 @@
 use serde_json::Value;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
@@ -104,14 +104,6 @@ fn package_with_shared_namespace<'a>(
     location
 }
 
-pub(super) fn path_selector(location: &str) -> String {
-    format!("path:{location}")
-}
-
-pub(super) fn id_selector(id: &str) -> String {
-    format!("id:{id}")
-}
-
 /// The record this repository stores for the fixture package.
 fn stored_record(repo: &Path) -> Value {
     let path = repo.join(format!(".jit/profiles/{FIXTURE_PROFILE}.json"));
@@ -119,22 +111,6 @@ fn stored_record(repo: &Path) -> Value {
         panic!("failed to read {}: {error}", path.display());
     }))
     .expect("a stored record is JSON")
-}
-
-/// Republish the package tree at `location` under `version`.
-///
-/// Two copies of one fixture are byte-identical and therefore indistinguishable
-/// in everything a resolution reports, so a test that asks which copy was read
-/// edits one of them first. The published asset is left alone: identical target
-/// bytes are what keeps the second application an ordinary re-application
-/// rather than a target conflict.
-fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
-    let manifest = repo.join(location).join("manifest.toml");
-    let declared = fs::read_to_string(&manifest)
-        .unwrap()
-        .replace("version = \"1.0.0\"", &format!("version = \"{version}\""));
-    fs::write(&manifest, declared).unwrap();
-    manifest
 }
 
 /// Write a small v2 package whose templated asset makes the resolved value
@@ -199,18 +175,13 @@ fn test_profile_show_works_without_repository() {
     let location = crate::repository_package_at(repo.path(), "jit-dogfood");
     let show = jit(
         repo.path(),
-        &[
-            "profile",
-            "show",
-            "--profile",
-            &format!("path:{location}"),
-            "--json",
-        ],
+        &["profile", "show", "--profile", &location, "--json"],
     );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
     assert_eq!(show["count"], 1);
     assert_eq!(show["profiles"][0]["manifest"]["id"], "jit-dogfood");
+    assert!(show["profiles"][0].get("applied").is_none());
     assert_eq!(
         show["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": location })
@@ -227,13 +198,7 @@ fn test_profile_apply_preserves_interleaved_selector_order() {
     package_with_id(repo.path(), "packages/second", "second");
     let seeded = jit(
         repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            "path:packages/first",
-            "--json",
-        ],
+        &["profile", "apply", "--profile", "packages/first", "--json"],
     );
     assert!(seeded.status.success(), "{seeded:?}");
     let output = jit(
@@ -242,11 +207,11 @@ fn test_profile_apply_preserves_interleaved_selector_order() {
             "profile",
             "apply",
             "--profile",
-            "path:packages/first",
+            "packages/first",
             "--profile",
-            "id:first",
+            "packages/first",
             "--profile",
-            "path:packages/second",
+            "packages/second",
             "--json",
         ],
     );
@@ -255,44 +220,8 @@ fn test_profile_apply_preserves_interleaved_selector_order() {
     assert_eq!(
         applied_ids(&json(&output)),
         vec!["first", "first", "second"],
-        "the selected path/id/path occurrence order must reach runtime results"
+        "the selected occurrence order, repeats included, must reach runtime results"
     );
-}
-
-#[test]
-fn test_profile_apply_rejects_a_path_that_shadows_a_selected_profile_id() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let recorded = package_at(repo.path(), "packages/recorded");
-    let apply = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &format!("path:{recorded}"),
-            "--json",
-        ],
-    );
-    assert!(apply.status.success(), "{apply:?}");
-
-    let shadow = package_at(repo.path(), "packages/shadow");
-    let output = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &format!("path:{shadow}"),
-            "--profile",
-            &format!("id:{FIXTURE_PROFILE}"),
-            "--json",
-        ],
-    );
-    assert!(!output.status.success(), "{output:?}");
-    let error_json = json(&output);
-    let message = error_json["error"]["message"].as_str().unwrap_or_default();
-    assert!(message.contains(FIXTURE_PROFILE), "{message}");
 }
 
 #[test]
@@ -321,9 +250,9 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
                 "profile",
                 "apply",
                 "--profile",
-                &path_selector(first),
+                first,
                 "--profile",
-                &path_selector(second),
+                second,
                 "--json",
             ],
         );
@@ -350,14 +279,14 @@ fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
         "Shared definition",
     );
 
-    let selectors = [path_selector(base), path_selector(workflow)];
+    let selectors = [base, workflow];
     let args = [
         "profile",
         "apply",
         "--profile",
-        selectors[0].as_str(),
+        selectors[0],
         "--profile",
-        selectors[1].as_str(),
+        selectors[1],
         "--json",
     ];
     let first = jit(repo.path(), &args);
@@ -388,72 +317,6 @@ fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
 }
 
 #[test]
-fn test_profile_show_accepts_a_bare_applied_profile_id() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
-    let selector = path_selector(location);
-    let apply = jit(
-        repo.path(),
-        &["profile", "apply", "--profile", &selector, "--json"],
-    );
-    assert!(apply.status.success(), "{apply:?}");
-
-    let show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE, "--json"]);
-    assert!(show.status.success(), "{show:?}");
-    let show = json(&show);
-    assert_eq!(show["count"], 1);
-    assert_eq!(show["profiles"][0]["id"], FIXTURE_PROFILE);
-}
-
-#[test]
-fn test_profile_show_rejects_bare_and_tagged_selectors_together() {
-    let repo = TempDir::new().unwrap();
-    let show = jit(
-        repo.path(),
-        &[
-            "profile",
-            "show",
-            FIXTURE_PROFILE,
-            "--profile",
-            "id:another-profile",
-        ],
-    );
-
-    assert_eq!(show.status.code(), Some(2), "{show:?}");
-    let stderr = String::from_utf8_lossy(&show.stderr);
-    assert!(stderr.contains("bare ID"), "{stderr}");
-    assert!(stderr.contains("--profile"), "{stderr}");
-}
-
-#[test]
-fn test_profile_show_invalid_bare_id_names_accepted_selector_forms() {
-    let repo = TempDir::new().unwrap();
-    let show = jit(repo.path(), &["profile", "show", "not_a_profile"]);
-
-    assert_eq!(show.status.code(), Some(2), "{show:?}");
-    let stderr = String::from_utf8_lossy(&show.stderr);
-    assert!(stderr.contains("bare ID"), "{stderr}");
-    assert!(stderr.contains("--profile id:ID or path:DIR"), "{stderr}");
-    assert!(!stderr.contains("unexpected argument"), "{stderr}");
-}
-
-#[test]
-fn test_profile_show_invalid_bare_id_preserves_the_json_error_envelope() {
-    let repo = TempDir::new().unwrap();
-    let show = jit(repo.path(), &["profile", "show", "not_a_profile", "--json"]);
-
-    assert_eq!(show.status.code(), Some(2), "{show:?}");
-    let error = json(&show);
-    assert_eq!(error["error"]["code"], "INVALID_ARGUMENT");
-    let message = error["error"]["message"]
-        .as_str()
-        .expect("an invalid positional id error has a message");
-    assert!(message.contains("bare ID"), "{message}");
-    assert!(message.contains("--profile id:ID or path:DIR"), "{message}");
-}
-
-#[test]
 fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_surface() {
     let repo = TempDir::new().unwrap();
 
@@ -464,7 +327,7 @@ fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_sur
             "apply",
             FIXTURE_PROFILE,
             "--profile",
-            "id:missing",
+            "packages/missing",
         ],
     );
     assert!(!positional.status.success());
@@ -476,34 +339,38 @@ fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_sur
             "profile",
             "apply",
             "--profile",
-            "id:missing",
+            "packages/missing",
             "--from",
             "packages",
         ],
     );
     assert!(!apply.status.success());
     assert!(String::from_utf8_lossy(&apply.stderr).contains("unexpected argument"));
+
+    let show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE]);
+    assert!(!show.status.success());
+    assert!(String::from_utf8_lossy(&show.stderr).contains("unexpected argument"));
 }
 
 #[test]
-fn test_profile_commands_require_a_tagged_selector() {
+fn test_profile_commands_refuse_a_tagged_selector_naming_the_bare_path_form() {
     let repo = TempDir::new().unwrap();
-    let invalid = jit(
-        repo.path(),
-        &["profile", "show", "--profile", "profile:planner"],
-    );
+    assert!(jit(repo.path(), &["init"]).status.success());
+    for command in ["show", "diff", "apply"] {
+        for selector in ["id:planner", "path:packages/planner"] {
+            let refused = jit(
+                repo.path(),
+                &["profile", command, "--profile", selector, "--json"],
+            );
 
-    assert_eq!(invalid.status.code(), Some(2), "{invalid:?}");
-    assert!(
-        String::from_utf8_lossy(&invalid.stderr).contains("expected id:ID or path:DIR"),
-        "{}",
-        String::from_utf8_lossy(&invalid.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&invalid.stderr).contains("path:packages/<PROFILE_ID>"),
-        "{}",
-        String::from_utf8_lossy(&invalid.stderr)
-    );
+            assert_eq!(refused.status.code(), Some(2), "{refused:?}");
+            let error = json(&refused);
+            assert_eq!(error["error"]["code"], "INVALID_ARGUMENT");
+            let message = error["error"]["message"].as_str().unwrap();
+            assert!(message.contains(selector), "{message}");
+            assert!(message.contains("bare package directory path"), "{message}");
+        }
+    }
 }
 
 #[test]
@@ -514,13 +381,7 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
     let show = jit(
         repo.path(),
-        &[
-            "profile",
-            "show",
-            "--profile",
-            &path_selector(location),
-            "--json",
-        ],
+        &["profile", "show", "--profile", location, "--json"],
     );
 
     assert!(show.status.success(), "{show:?}");
@@ -540,7 +401,7 @@ fn test_profile_show_json_preserves_repeated_selectors_in_order() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     let location = package_at(repo.path(), "vendor/planner");
-    let selector = path_selector(location);
+    let selector = location;
 
     let show = jit(
         repo.path(),
@@ -548,9 +409,9 @@ fn test_profile_show_json_preserves_repeated_selectors_in_order() {
             "profile",
             "show",
             "--profile",
-            &selector,
+            selector,
             "--profile",
-            &selector,
+            selector,
             "--json",
         ],
     );
@@ -574,7 +435,7 @@ fn test_profile_show_human_renders_each_selected_occurrence() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     let location = package_at(repo.path(), "vendor/planner");
-    let selector = path_selector(location);
+    let selector = location;
 
     let show = jit(
         repo.path(),
@@ -582,9 +443,9 @@ fn test_profile_show_human_renders_each_selected_occurrence() {
             "profile",
             "show",
             "--profile",
-            &selector,
+            selector,
             "--profile",
-            &selector,
+            selector,
         ],
     );
 
@@ -612,7 +473,7 @@ fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
             "profile",
             "show",
             "--profile",
-            &path_selector(elsewhere.path().join("planner").to_str().unwrap()),
+            elsewhere.path().join("planner").to_str().unwrap(),
             "--json",
         ],
     );
@@ -636,13 +497,7 @@ fn test_profile_show_refuses_a_supplied_location_under_the_data_root() {
 
     let show = jit(
         repo.path(),
-        &[
-            "profile",
-            "show",
-            "--profile",
-            &path_selector(location),
-            "--json",
-        ],
+        &["profile", "show", "--profile", location, "--json"],
     );
 
     assert!(!show.status.success(), "{show:?}");
@@ -668,7 +523,7 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
             "profile",
             "apply",
             "--profile",
-            &path_selector(location),
+            location,
             "--dry-run",
             "--json",
         ],
@@ -716,7 +571,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         &[
             "init",
             "--profile",
-            "path:packages/init-vars",
+            "packages/init-vars",
             "--values-file",
             init_values,
             "--set",
@@ -763,7 +618,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
     let values = apply_repo.path().join("values.toml");
     fs::write(&values, "[variables]\nNAME = \"from-file\"\n").unwrap();
     let values = values.to_str().unwrap();
-    let selector = "path:packages/root-vars";
+    let selector = "packages/root-vars";
     let preview = jit(
         apply_repo.path(),
         &[
@@ -841,7 +696,7 @@ fn test_profile_variable_record_keeps_the_resolved_value_out_of_events_and_valid
             "profile",
             "apply",
             "--profile",
-            "path:packages/recorded-vars",
+            "packages/recorded-vars",
             "--set",
             &format!("NAME={resolved_value}"),
             "--json",
@@ -884,32 +739,26 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
 
     let seeded = jit(
         repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &path_selector(first),
-            "--json",
-        ],
+        &["profile", "apply", "--profile", first, "--json"],
     );
     assert!(seeded.status.success(), "{seeded:?}");
     let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
-    let second_selector = path_selector(second);
-    let first_selector = path_selector(first);
+    let second_selector = second;
+    let first_selector = first;
     let output = jit(
         repo.path(),
         &[
             "profile",
             "apply",
             "--profile",
-            &second_selector,
+            second_selector,
             "--profile",
-            "id:first",
+            first_selector,
             "--profile",
-            &first_selector,
+            first_selector,
             "--profile",
-            &second_selector,
+            second_selector,
             "--dry-run",
             "--json",
         ],
@@ -950,13 +799,13 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
             "profile",
             "apply",
             "--profile",
-            &second_selector,
+            second_selector,
             "--profile",
-            "id:first",
+            first_selector,
             "--profile",
-            &first_selector,
+            first_selector,
             "--profile",
-            &second_selector,
+            second_selector,
             "--dry-run",
         ],
     );
@@ -976,120 +825,11 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
 }
 
 #[test]
-fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
-
-    let applied = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &path_selector(location),
-            "--json",
-        ],
-    );
-    assert!(applied.status.success(), "{applied:?}");
-    assert_eq!(requested_profile(&json(&applied))["status"], "applied");
-    assert_eq!(
-        stored_record(repo.path())["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
-    );
-
-    // No location is named this time: the record is the repository's own
-    // statement of where the bytes are, and reading them back from there is
-    // what makes the second application an exact no-op.
-    let reapplied = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &id_selector(FIXTURE_PROFILE),
-            "--json",
-        ],
-    );
-    assert!(reapplied.status.success(), "{reapplied:?}");
-    assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
-}
-
-#[test]
-fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let recorded = package_at(repo.path(), "vendor/recorded");
-    assert!(jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &path_selector(recorded),
-            "--json"
-        ]
-    )
-    .status
-    .success());
-
-    // A second copy of the same profile, distinguishable from the recorded one
-    // by the version it declares.
-    let supplied = package_at(repo.path(), "vendor/supplied");
-    set_package_version(repo.path(), supplied, "2.0.0");
-
-    let shown = jit(
-        repo.path(),
-        &[
-            "profile",
-            "show",
-            "--profile",
-            &path_selector(supplied),
-            "--json",
-        ],
-    );
-    assert!(shown.status.success(), "{shown:?}");
-    let shown = json(&shown);
-    assert_eq!(shown["count"], 1);
-    assert_eq!(shown["profiles"][0]["manifest"]["version"], "2.0.0");
-    assert_eq!(
-        shown["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": supplied })
-    );
-
-    // Supplying nothing falls back to the record, which still names the copy it
-    // was applied from.
-    let recorded_show = jit(
-        repo.path(),
-        &[
-            "profile",
-            "show",
-            "--profile",
-            &id_selector(FIXTURE_PROFILE),
-            "--json",
-        ],
-    );
-    assert!(recorded_show.status.success(), "{recorded_show:?}");
-    let recorded_show = json(&recorded_show);
-    assert_eq!(recorded_show["count"], 1);
-    assert_eq!(recorded_show["profiles"][0]["manifest"]["version"], "1.0.0");
-    assert_eq!(
-        recorded_show["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": recorded })
-    );
-}
-
-#[test]
 fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     let repo = TempDir::new().unwrap();
     let location = package_at(repo.path(), "vendor/planner");
 
-    // A repository being created has no record to read, so the location is the
-    // only statement of where its package is.
-    let init = jit(
-        repo.path(),
-        &["init", "--profile", &path_selector(location), "--json"],
-    );
+    let init = jit(repo.path(), &["init", "--profile", location, "--json"]);
 
     assert!(init.status.success(), "{init:?}");
     assert_eq!(
@@ -1101,37 +841,22 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
         stored_record(repo.path())["origin"],
         serde_json::json!({ "source": "directory", "location": location })
     );
-
-    // The record initialization wrote is readable as the location it names: a
-    // later application that supplies nothing resolves the same package.
-    let reapplied = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &id_selector(FIXTURE_PROFILE),
-            "--json",
-        ],
-    );
-    assert!(reapplied.status.success(), "{reapplied:?}");
-    assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
 }
 
 #[test]
 fn test_init_profile_json_preserves_repeated_root_occurrences_in_order() {
     let repo = TempDir::new().unwrap();
     let location = package_at(repo.path(), "vendor/planner");
-    let selector = path_selector(location);
+    let selector = location;
 
     let init = jit(
         repo.path(),
         &[
             "init",
             "--profile",
-            &selector,
+            selector,
             "--profile",
-            &selector,
+            selector,
             "--json",
         ],
     );
@@ -1167,10 +892,7 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
     jit::test_utils::capture_repository_package("jit-default", &repo.path().join(dependency))
         .expect("this repository's jit-default package captures");
 
-    let init = jit(
-        repo.path(),
-        &["init", "--profile", &path_selector(location), "--json"],
-    );
+    let init = jit(repo.path(), &["init", "--profile", location, "--json"]);
 
     assert!(
         init.status.success(),
@@ -1230,7 +952,7 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
             "profile",
             "show",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1300,15 +1022,15 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
 }
 
 #[test]
-fn test_profile_unknown_id_has_typed_json_error_without_mutation() {
+fn test_profile_missing_package_directory_has_typed_json_error_without_mutation() {
     let repo = TempDir::new().unwrap();
     let output = jit(
         repo.path(),
-        &["init", "--profile", "id:missing-profile", "--json"],
+        &["init", "--profile", "packages/missing-profile", "--json"],
     );
 
-    assert_eq!(output.status.code(), Some(3));
-    assert_eq!(json(&output)["error"]["code"], "PROFILE_NOT_FOUND");
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(json(&output)["error"]["code"], "PROFILE_ERROR");
     assert!(!repo.path().join(".jit").exists());
 }
 
@@ -1320,7 +1042,7 @@ fn test_profiled_init_publishes_a_valid_repo() {
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1366,7 +1088,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-default")),
+            &crate::repository_package_at(repo.path(), "jit-default"),
         ]
     )
     .status
@@ -1379,7 +1101,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1406,7 +1128,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1420,7 +1142,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1440,7 +1162,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1464,7 +1186,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1487,7 +1209,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1512,7 +1234,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1544,7 +1266,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             "profile",
             "apply",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1565,7 +1287,7 @@ fn test_profiled_init_conflict_preserves_the_occupant_and_publishes_no_conflicti
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1597,7 +1319,7 @@ fn test_existing_partial_profiled_init_conflict_preserves_authored_bytes_and_the
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1625,7 +1347,7 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
         &[
             "init",
             "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -2071,7 +1793,7 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
             "profile",
             "show",
             "--profile",
-            "path:packages/synthetic",
+            "packages/synthetic",
             "--json",
         ],
     );

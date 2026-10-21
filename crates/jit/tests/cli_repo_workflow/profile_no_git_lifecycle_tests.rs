@@ -1,8 +1,8 @@
 //! One public profile-lifecycle journey through a repository Git never touches.
 
 use super::profile_cli_tests::{
-    applied_ids, id_selector, jit, json, live_asset_package, only_profile, path_selector,
-    requested_profile, write_lifecycle_package,
+    applied_ids, jit, json, live_asset_package, only_profile, requested_profile,
+    write_lifecycle_package,
 };
 use serde_json::Value;
 use std::path::Path;
@@ -62,11 +62,11 @@ fn test_profile_lifecycle_completes_without_git() {
         "gitless-workflow",
         &["gitless-base"],
     );
-    let workflow_selector = path_selector("packages/gitless-workflow");
+    let workflow_selector = "packages/gitless-workflow";
     let shown = successful_lifecycle_json(
         repo,
         "select workflow package",
-        &["profile", "show", "--profile", &workflow_selector, "--json"],
+        &["profile", "show", "--profile", workflow_selector, "--json"],
     );
     assert_eq!(shown["count"], 1);
     assert_eq!(shown["profiles"][0]["manifest"]["id"], "gitless-workflow");
@@ -74,13 +74,7 @@ fn test_profile_lifecycle_completes_without_git() {
     let resolved = successful_lifecycle_json(
         repo,
         "resolve and apply workflow dependency closure",
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &workflow_selector,
-            "--json",
-        ],
+        &["profile", "apply", "--profile", workflow_selector, "--json"],
     );
     assert_eq!(resolved["count"], 2);
     assert_eq!(
@@ -96,7 +90,7 @@ fn test_profile_lifecycle_completes_without_git() {
 
     let lifecycle_id = "gitless-lifecycle";
     write_lifecycle_package(repo, "packages/lifecycle", lifecycle_id, "1.0.0");
-    let lifecycle_selector = path_selector("packages/lifecycle");
+    let lifecycle_selector = "packages/lifecycle";
     let lifecycle = successful_lifecycle_json(
         repo,
         "apply lifecycle package",
@@ -104,13 +98,11 @@ fn test_profile_lifecycle_completes_without_git() {
             "profile",
             "apply",
             "--profile",
-            &lifecycle_selector,
+            lifecycle_selector,
             "--json",
         ],
     );
     assert_eq!(requested_profile(&lifecycle)["status"], "applied");
-
-    let lifecycle_id_selector = id_selector(lifecycle_id);
 
     live_asset_package(repo, "packages/capture-source");
     let packed = successful_lifecycle_json(
@@ -145,11 +137,11 @@ fn test_profile_lifecycle_completes_without_git() {
         only_profile(&added)["package_hash"],
         only_profile(&packed)["package_hash"]
     );
-    let imported_selector = path_selector("packages/imported");
+    let imported_selector = "packages/imported";
     let imported = successful_lifecycle_json(
         repo,
         "select added profile package",
-        &["profile", "show", "--profile", &imported_selector, "--json"],
+        &["profile", "show", "--profile", imported_selector, "--json"],
     );
     assert_eq!(imported["count"], 1);
     assert_eq!(
@@ -160,13 +152,7 @@ fn test_profile_lifecycle_completes_without_git() {
     let difference = successful_lifecycle_json(
         repo,
         "report lifecycle package difference",
-        &[
-            "profile",
-            "diff",
-            "--profile",
-            &lifecycle_id_selector,
-            "--json",
-        ],
+        &["profile", "diff", "--profile", lifecycle_selector, "--json"],
     );
     assert_eq!(difference["count"], 1);
     assert_eq!(difference["profiles"][0]["id"], lifecycle_id);

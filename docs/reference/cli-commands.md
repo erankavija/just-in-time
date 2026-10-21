@@ -545,14 +545,11 @@ vocabulary. Read a package directory's `manifest.toml` to see which taxonomy it
 declares before choosing one.
 
 `--profile <SELECTOR>` applies a profile package as part of initialization.
-Selectors are repeatable and preserve occurrence order: `id:<PROFILE_ID>` reads
-the repository's applied-profile record, while `path:<DIR>` reads a package
-directory relative to the worktree. `jit init --profile
-path:packages/jit-dogfood` is the preferred setup for JIT's portable workflow;
-plain init remains methodology-neutral. On a first application from a
-repository package, use a `path:` selector because a fresh repository has no
-applied-profile record to read. The
-resolution and recorded-location failure behavior are defined below. For a
+Selectors are repeatable and preserve occurrence order; each is a package
+directory path relative to the worktree. `jit init --profile
+packages/jit-dogfood` is the preferred setup for JIT's portable workflow;
+plain init remains methodology-neutral. The
+resolution behavior is defined below. For a
 fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT writes the
 complete root beside its destination and publishes it with a no-replace rename,
@@ -632,48 +629,36 @@ Profile inspection works without an initialized repository. Application targets
 the current JIT repository and applies a leftover redo record before planning or
 writing.
 
-Profile commands that select packages take one or more repeatable `--profile <SELECTOR>` flags.
-`id:<PROFILE_ID>` reads the location named by the repository's applied-profile
-record; `path:<DIR>` reads a package directory relative to the worktree.
-`jit init` accepts the same ordered selector stream. A path selector is confined
-to the worktree, including when the data root is nested there. A path package
-whose declared id shadows a selected recorded id is rejected. The applied-profile record is
-defined in [Repository Profiles](profiles.md#publication-and-recovery),
-including where it lives and what it stores, so a package obtained from a
-repository directory can be found again on later runs. A recorded location is
-confined to the worktree. If it no longer holds a readable package, the command
-fails naming the record and path; it does not replay stored digests or treat the
-profile as absent.
+Profile commands that select packages take one or more repeatable `--profile <DIR>` flags,
+each a package directory path relative to the worktree; an `id:` or `path:`
+prefix is refused.
+`jit init` accepts the same ordered selector stream. A selector is confined
+to the worktree, including when the data root is nested there.
 
 A package the resolved one declares a dependency on is looked for beside it,
-in a directory named by that dependency's own ID, before the record answers.
+in a directory named by that dependency's own ID.
 One obtained directory of packages therefore applies as a set:
-`jit profile apply --profile path:packages/<PROFILE_ID>` reaches
+`jit profile apply --profile packages/<PROFILE_ID>` reaches
 `packages/<DEPENDENCY_ID>` without naming it. Multiple selectors are resolved
-and applied in their occurrence order, including interleaved `id:` and `path:`
-selectors.
+and applied in their occurrence order.
 
 ### `jit profile show`
 
 Show one or more profile manifests and package identities from repository packages:
 
 ```bash
-jit profile show <ID> [--json]
-jit profile show --profile <SELECTOR>... [--json]
+jit profile show --profile <DIR>... [--json]
 ```
 
-The bare `ID` form selects exactly one recorded profile by its canonical id.
-Use repeatable tagged `--profile` selectors (`id:ID` or `path:DIR`) for one or
-more explicit selections; the bare and tagged forms cannot be combined.
+Each repeatable `--profile` selector is a package directory path.
 
 Human output summarizes each package's identity, compatibility, hashes,
-contribution and asset counts, and installed state. JSON returns the
+and contribution and asset counts. JSON returns the
 count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
 each entry carries `id`, `version`, the complete parsed manifest, `origin`, `package_hash`,
-`target_hashes`, `file_count`, `byte_size`, and the parseable stored `applied`
-provenance record when one is present. Entries preserve every `--profile`
-occurrence in order, including repeated selectors. `show` does not compare that
-record with current target bytes; use `jit profile apply --profile <SELECTOR>
+`target_hashes`, `file_count`, and `byte_size`. Entries preserve every `--profile`
+occurrence in order, including repeated selectors. `show` does not compare the
+package with current target bytes; use `jit profile apply --profile <DIR>
 --dry-run` to rehearse one package's application.
 
 ### `jit profile diff`
@@ -707,7 +692,7 @@ list means no package claims it, so its content is the repository's own; more
 than one owner names every owner of shared content.
 
 A package this repository has not applied is reported as readily as one it has:
-select it with a `path:` selector to inspect it before applying it.
+select its directory to inspect it before applying it.
 
 `--values-file` and `--set` supply the same variable inputs as
 [`jit profile apply`](#jit-profile-apply).

@@ -52,7 +52,7 @@ source checkout, and installing the CLI from that checkout.
 ```bash
 # Preferred setup: initialize with JIT's portable workflow package
 # (Repository Profiles, linked below, covers obtaining it and placing it here)
-jit init --profile path:packages/jit-dogfood
+jit init --profile packages/jit-dogfood
 
 # Create work; -q prints just the issue id for capture
 EPIC=$(jit issue create --title "User authentication" --label type:epic --priority high -q)

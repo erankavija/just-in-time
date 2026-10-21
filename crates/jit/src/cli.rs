@@ -41,8 +41,8 @@ pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
     Init {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        /// Select a worktree package directory by its path.
+        /// Repeatable; occurrence order is preserved.
         #[arg(
             long,
             value_name = "SELECTOR",
@@ -2864,13 +2864,9 @@ pub enum HooksCommands {
 pub enum ProfileCommands {
     /// Show one profile manifest and package identity from a repository package
     Show {
-        /// Select one recorded profile by its bare canonical id.
-        #[arg(value_name = "ID")]
-        id: Option<String>,
-
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(long, value_name = "SELECTOR", action = ArgAction::Append)]
+        /// Select a worktree package directory by its path.
+        /// Repeatable; occurrence order is preserved.
+        #[arg(long, value_name = "SELECTOR", action = ArgAction::Append, required = true)]
         profile: Vec<String>,
 
         /// Output as JSON
@@ -2894,19 +2890,19 @@ pub enum ProfileCommands {
     /// difference from `--dry-run` on the lifecycle commands: a rehearsal fails
     /// where its publication would, this report states the whole decision. A
     /// package that is not installed is reported as readily as one that is, so
-    /// a `path:` selector inspects a package before applying it.
+    /// a package path inspects a package before applying it.
     ///
     /// The report writes nothing and exits 4 when any profile decided a target
     /// or a declaration that cannot be published.
     ///
     /// Examples:
-    ///   jit profile diff --profile path:profiles/my-profile
-    ///   jit profile diff --profile id:my-profile --json
+    ///   jit profile diff --profile profiles/my-profile
+    ///   jit profile diff --profile profiles/my-profile --json
     ///
     /// JSON output uses the list envelope `{"count": N, "profiles": [...]}`.
     Diff {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        /// Select a worktree package directory by its path.
+        /// Repeatable; occurrence order is preserved.
         #[arg(
             long,
             value_name = "SELECTOR",
@@ -2930,8 +2926,8 @@ pub enum ProfileCommands {
 
     /// Apply a profile package read from a repository location through one multi-target redo record
     Apply {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        /// Select a worktree package directory by its path.
+        /// Repeatable; occurrence order is preserved.
         #[arg(
             long,
             value_name = "SELECTOR",

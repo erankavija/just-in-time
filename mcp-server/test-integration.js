@@ -130,7 +130,7 @@ const PROFILE_PACKAGE_FIXTURE = new URL(
  * scenario is authored here; renaming the asset target after the id is what
  * keeps two staged packages from publishing the same file.
  *
- * @returns {string} the repository-relative location used by a `path:` selector
+ * @returns {string} the repository-relative location used as a package selector
  */
 function stagePackage(repo, location, id, dependencies = []) {
   const root = join(repo, location);
@@ -613,7 +613,7 @@ async function main() {
           profileTester.testDir, 'packages/workflow', 'workflow', ['base']);
 
         const shown = await profileCall('jit_profile_show', {
-          profile: [`path:${workflowLocation}`],
+          profile: [workflowLocation],
         });
         assert.strictEqual(shown.count, 1);
         assert.strictEqual(shown.profiles.length, shown.count);
@@ -624,7 +624,7 @@ async function main() {
         });
 
         const repeatedShown = await profileCall('jit_profile_show', {
-          profile: [`path:${workflowLocation}`, `path:${workflowLocation}`],
+          profile: [workflowLocation, workflowLocation],
         });
         assert.strictEqual(repeatedShown.count, 2);
         assert.deepStrictEqual(
@@ -636,7 +636,7 @@ async function main() {
         // front of it, so the package a repository declaring nothing can be
         // shown is the self-contained one.
         const basePreview = await profileCall('jit_profile_apply', {
-          profile: [`path:${baseLocation}`],
+          profile: [baseLocation],
           'dry-run': true,
         });
         assert.strictEqual(basePreview.count, 1);
@@ -646,7 +646,7 @@ async function main() {
         // An application reports the aggregate observations: dependency-only
         // packages before the selected root occurrences.
         const applied = await profileCall('jit_profile_apply', {
-          profile: [`path:${workflowLocation}`],
+          profile: [workflowLocation],
         });
         assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
@@ -665,7 +665,7 @@ async function main() {
 
         // The aggregate preview names the target under the package that owns it.
         const preview = await profileCall('jit_profile_apply', {
-          profile: ['id:workflow'],
+          profile: [workflowLocation],
           'dry-run': true,
         });
         assert.strictEqual(preview.count, preview.profiles.length);
@@ -674,16 +674,16 @@ async function main() {
         assert.ok(preview.profiles.every(profile => profile.status === 'unchanged'));
 
         // The bridge preserves one repeated --profile occurrence stream,
-        // including interleaved path and recorded-id selectors.
+        // including repeated and interleaved package paths.
         const alphaLocation = stagePackage(profileTester.testDir, 'packages/alpha', 'alpha');
         const betaLocation = stagePackage(profileTester.testDir, 'packages/beta', 'beta');
         const seeded = await profileCall('jit_profile_apply', {
-          profile: [`path:${alphaLocation}`, `path:${betaLocation}`],
+          profile: [alphaLocation, betaLocation],
         });
         const seededProfileIds = seeded.profiles.map(profile => profile.id);
         assert.deepStrictEqual(seededProfileIds, ['alpha', 'beta']);
         const orderedPreview = await profileCall('jit_profile_apply', {
-          profile: [`path:${betaLocation}`, 'id:alpha', `path:${betaLocation}`],
+          profile: [betaLocation, alphaLocation, betaLocation],
           'dry-run': true,
         });
         assert.strictEqual(orderedPreview.count, 3);
@@ -692,7 +692,7 @@ async function main() {
           ['beta', 'alpha', 'beta']
         );
         const ordered = await profileCall('jit_profile_apply', {
-          profile: [`path:${alphaLocation}`, 'id:alpha', `path:${betaLocation}`],
+          profile: [alphaLocation, alphaLocation, betaLocation],
         });
         const orderedProfileIds = ordered.profiles.map(profile => profile.id);
         assert.deepStrictEqual(orderedProfileIds, ['alpha', 'alpha', 'beta']);

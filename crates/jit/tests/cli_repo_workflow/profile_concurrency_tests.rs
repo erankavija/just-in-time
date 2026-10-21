@@ -81,13 +81,7 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
 
     pause.wait_until_reached();
     let contender = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args([
-            "profile",
-            "apply",
-            "--profile",
-            &format!("path:{PACKAGE_LOCATION}"),
-            "--json",
-        ])
+        .args(["profile", "apply", "--profile", PACKAGE_LOCATION, "--json"])
         .env("JIT_LOCK_TIMEOUT", "1")
         .current_dir(repository.path())
         .output()
