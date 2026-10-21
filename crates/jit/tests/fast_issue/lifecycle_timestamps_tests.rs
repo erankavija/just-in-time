@@ -6,11 +6,11 @@
 //! domain layer (`Issue::mark_*`, `derive_lifecycle_timestamps`); here we verify
 //! the command paths wire those helpers in.
 
-use crate::harness::TestHarness;
 use chrono::{TimeZone, Utc};
 use jit::commands::CommandExecutor;
 use jit::domain::{Event, State};
 use jit::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
+use jit::test_harness::TestHarness;
 
 /// Append a synthetic `issue_state_changed` event with a fixed timestamp.
 fn append_state_changed(h: &TestHarness, issue_id: &str, to: State, day: u32) {
@@ -21,7 +21,7 @@ fn append_state_changed(h: &TestHarness, issue_id: &str, to: State, day: u32) {
         from: State::Backlog,
         to,
     };
-    crate::harness::seed_memory_event(&h.storage, &event);
+    jit::test_harness::seed_memory_event(&h.storage, &event);
 }
 
 /// Strip the lifecycle timestamps off an issue to simulate a record written
@@ -31,7 +31,7 @@ fn clear_lifecycle_fields(h: &TestHarness, id: &str) {
     issue.first_ready_at = None;
     issue.claimed_at = None;
     issue.done_at = None;
-    crate::harness::seed_memory_issue(&h.storage, &issue);
+    jit::test_harness::seed_memory_issue(&h.storage, &issue);
 }
 
 fn backfill_candidate() -> (TestHarness, String) {
@@ -130,7 +130,7 @@ fn test_backlog_to_ready_transition_stamps_first_ready() {
     let mut issue = h.get_issue(&id);
     issue.state = State::Backlog;
     issue.first_ready_at = None;
-    crate::harness::seed_memory_issue(&h.storage, &issue);
+    jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
     h.executor.update_issue_state(&id, State::Ready).unwrap();
 
@@ -224,7 +224,7 @@ fn test_backfill_derives_timestamps_from_events() {
 
     append_state_changed(&h, &id, State::Ready, 1);
     let claimed = Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap();
-    crate::harness::seed_memory_event(
+    jit::test_harness::seed_memory_event(
         &h.storage,
         &Event::IssueClaimed {
             id: uuid::Uuid::new_v4().to_string(),

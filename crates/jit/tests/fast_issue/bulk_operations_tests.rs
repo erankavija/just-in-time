@@ -1,6 +1,6 @@
 //! Tests for bulk operations (multiple gates, dependencies, labels in single command)
-use crate::harness::TestHarness;
 use jit::storage::IssueStore;
+use jit::test_harness::TestHarness;
 
 // ========================================
 // GATE BULK OPERATIONS TESTS

@@ -3,12 +3,10 @@
 //! Provides a fluent API for testing CLI commands without spawning processes.
 //! Uses in-memory storage for 10-100x faster test execution.
 
-#![allow(dead_code)]
+use crate::commands::CommandExecutor;
+use crate::domain::{Issue, Priority, State};
 
-use jit::commands::CommandExecutor;
-use jit::domain::{Issue, Priority, State};
-
-use jit::storage::{InMemoryStorage, IssueStore};
+use crate::storage::{InMemoryStorage, IssueStore};
 
 /// Test harness that provides isolated environment for each test
 pub struct TestHarness {
@@ -35,7 +33,7 @@ impl TestHarness {
 
     fn from_storage(storage: InMemoryStorage) -> Self {
         // Disable worktree divergence checks in tests
-        jit::test_mode::enable();
+        crate::test_mode::enable();
 
         // Session-backed declaration mutations capture config from the same
         // aggregate image as gates/events; an empty file is the minimal valid
@@ -46,7 +44,7 @@ impl TestHarness {
         // in-memory backend models its state in one aggregate map keyed by
         // virtual path and never touches these paths on the real filesystem
         // unless a case roots the store somewhere it wants read.
-        let executor = jit::commands::test_helpers::memory_executor(storage.clone());
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         Self { executor, storage }
     }
 
@@ -54,7 +52,6 @@ impl TestHarness {
     /// this harness's repo, so item indexing and link resolution recognize the
     /// shipped kinds. The engine bakes in no kinds, so tests that exercise
     /// addressable items must opt in. Call before creating issues.
-    #[allow(dead_code)]
     pub fn with_item_kinds(self) -> Self {
         const CANONICAL_ITEM_KINDS: &str = "\
 [item_kinds.requirement]
@@ -126,7 +123,6 @@ source-of-truth = \"registry-first\"
     }
 
     /// Create an issue with description
-    #[allow(dead_code)]
     pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String {
         let (id, _) = self
             .executor
@@ -145,7 +141,6 @@ source-of-truth = \"registry-first\"
     }
 
     /// Create an issue with priority
-    #[allow(dead_code)]
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         let (id, _) = self
             .executor
@@ -164,7 +159,6 @@ source-of-truth = \"registry-first\"
     }
 
     /// Create an issue that's ready to work on
-    #[allow(dead_code)]
     pub fn create_ready_issue(&self, title: &str) -> String {
         let id = self.create_issue(title);
         let _ = self
@@ -186,7 +180,6 @@ source-of-truth = \"registry-first\"
     }
 
     /// Create an issue with gates
-    #[allow(dead_code)]
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
         let (id, _) = self
             .executor
@@ -205,7 +198,6 @@ source-of-truth = \"registry-first\"
     }
 
     /// Add a gate definition to the registry
-    #[allow(dead_code)]
     pub fn add_gate(&self, key: &str, title: &str, description: &str, auto: bool) {
         self.executor
             .add_gate_definition(
@@ -214,19 +206,17 @@ source-of-truth = \"registry-first\"
                 description.to_string(),
                 auto,
                 None,
-                jit::declarations::GateStage::Postcheck,
+                crate::declarations::GateStage::Postcheck,
             )
             .unwrap();
     }
 
     /// Get all issues
-    #[allow(dead_code)]
     pub fn all_issues(&self) -> Vec<Issue> {
         self.storage.list_issues().unwrap()
     }
 
     /// Get issue by ID
-    #[allow(dead_code)]
     pub fn get_issue(&self, id: &str) -> Issue {
         self.storage.load_issue(id).unwrap()
     }
@@ -234,12 +224,12 @@ source-of-truth = \"registry-first\"
 
 /// Seed one exact issue preimage into the in-memory aggregate without exercising
 /// a repository publisher that the test is not about.
-pub(crate) fn seed_memory_issue(storage: &InMemoryStorage, issue: &Issue) {
+pub fn seed_memory_issue(storage: &InMemoryStorage, issue: &Issue) {
     storage.seed_issue_fixture(issue);
 }
 
 /// Seed one exact event-log preimage into the in-memory aggregate.
-pub(crate) fn seed_memory_event(storage: &InMemoryStorage, event: &jit::domain::Event) {
+pub fn seed_memory_event(storage: &InMemoryStorage, event: &crate::domain::Event) {
     let mut events = storage
         .read_repo_file(".jit/events.jsonl")
         .unwrap()
@@ -247,18 +237,18 @@ pub(crate) fn seed_memory_event(storage: &InMemoryStorage, event: &jit::domain::
     if !events.is_empty() && !events.ends_with('\n') {
         events.push('\n');
     }
-    let event = jit::repository_state::serialize_event(event).unwrap();
+    let event = crate::repository_state::serialize_event(event).unwrap();
     events.push_str(std::str::from_utf8(&event).unwrap());
     events.push('\n');
     storage.add_data_file("events.jsonl", &events);
 }
 
 /// Seed an exact authored gate registry into the in-memory aggregate.
-pub(crate) fn seed_memory_gate_registry(
+pub fn seed_memory_gate_registry(
     storage: &InMemoryStorage,
-    registry: &jit::declarations::GateRegistry,
+    registry: &crate::declarations::GateRegistry,
 ) {
-    let bytes = jit::declarations::serialize_gate_registry(registry).unwrap();
+    let bytes = crate::declarations::serialize_gate_registry(registry).unwrap();
     storage.add_data_file("gates.toml", std::str::from_utf8(&bytes).unwrap());
 }
 
@@ -268,7 +258,7 @@ pub(crate) fn seed_memory_gate_registry(
 /// its own gate registry, so a case that applies a template declares these in
 /// the repository first. Reading them from the template is what keeps a changed
 /// declaration from needing an edit beside it.
-pub(crate) fn template_gate_keys(template: &jit::templates::GraphTemplate) -> Vec<String> {
+pub fn template_gate_keys(template: &crate::templates::GraphTemplate) -> Vec<String> {
     let mut keys: Vec<String> = template
         .nodes
         .iter()
@@ -287,9 +277,9 @@ pub(crate) fn template_gate_keys(template: &jit::templates::GraphTemplate) -> Ve
 }
 
 /// Declare every gate key `template` names in the in-memory gate registry.
-pub(crate) fn seed_memory_template_gates(
+pub fn seed_memory_template_gates(
     storage: &InMemoryStorage,
-    template: &jit::templates::GraphTemplate,
+    template: &crate::templates::GraphTemplate,
 ) {
     let keys = template_gate_keys(template);
     seed_memory_gate_keys(
@@ -305,18 +295,18 @@ pub(crate) fn seed_memory_template_gates(
 /// declares them through this one seeder rather than authoring a registry per
 /// case (`@/invariant/shared-test-contracts`). The whole registry is replaced,
 /// so a case that needs a specific definition seeds one itself.
-pub(crate) fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
-    let mut registry = jit::declarations::GateRegistry::default();
+pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
+    let mut registry = crate::declarations::GateRegistry::default();
     registry.gates.extend(keys.iter().map(|key| {
         (
             (*key).to_string(),
-            jit::declarations::GateDefinition {
+            crate::declarations::GateDefinition {
                 version: 1,
                 key: (*key).to_string(),
                 title: format!("{key} gate"),
                 description: format!("Repository-declared {key} gate"),
-                stage: jit::declarations::GateStage::Postcheck,
-                mode: jit::declarations::GateMode::Manual,
+                stage: crate::declarations::GateStage::Postcheck,
+                mode: crate::declarations::GateMode::Manual,
                 checker: None,
                 inputs: None,
                 priority: 100,

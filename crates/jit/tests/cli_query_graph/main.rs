@@ -5,9 +5,6 @@
 use std::ops::Deref;
 use tempfile::TempDir;
 
-#[path = "../common/harness.rs"]
-mod harness;
-
 mod batch_export_cli_tests;
 mod check_links_tests;
 mod dep_add_redundancy_cli_tests;

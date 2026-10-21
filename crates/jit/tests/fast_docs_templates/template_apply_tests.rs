@@ -14,11 +14,11 @@
 //! pre-apply upstream deps move onto P), yielding the acyclic, transitively
 //! reduced spine C→B→P→upstream.
 
-use crate::harness::TestHarness;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
+use jit::test_harness::TestHarness;
 use jit::CommandExecutor;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -115,7 +115,7 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
     // and its own gate registry, so the fixture declares every key the `plan`
     // template names — the `container` anchor's `repo-validate` and the bracket
     // node gates — before a template that names them is applied.
-    for key in crate::harness::template_gate_keys(&plan_template()) {
+    for key in jit::test_harness::template_gate_keys(&plan_template()) {
         h.add_gate(
             &key,
             &format!("{key} gate"),

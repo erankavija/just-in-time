@@ -23,12 +23,12 @@
 //! `*_with_template` core methods (mirroring the apply-engine tests), so no
 //! on-disk `templates.toml` is needed.
 
-use crate::harness::TestHarness;
 use jit::commands::{BracketChild, CommandExecutor};
 use jit::domain::{Issue, Priority, State};
 use jit::labels::parse_label;
 use jit::storage::{InMemoryStorage, IssueStore};
 use jit::templates::{GraphTemplate, TemplateRegistry};
+use jit::test_harness::TestHarness;
 use std::collections::BTreeMap;
 
 const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
@@ -83,7 +83,7 @@ applies_to  = ["epic"]
 /// for before applying it.
 fn harness() -> TestHarness {
     let h = TestHarness::new();
-    crate::harness::seed_memory_template_gates(&h.storage, &plan_template());
+    jit::test_harness::seed_memory_template_gates(&h.storage, &plan_template());
     h
 }
 
@@ -109,7 +109,7 @@ fn approve_plan(h: &TestHarness, planning_id: &str) {
         .get_mut("plan-review")
         .expect("planning node carries the plan gate");
     gate.status = jit::domain::GateStatus::Passed;
-    crate::harness::seed_memory_issue(&h.storage, &p);
+    jit::test_harness::seed_memory_issue(&h.storage, &p);
 }
 
 /// Scaffold a breakable container `C` via the apply engine into `C → B → P`, with
@@ -663,7 +663,7 @@ fn executor_with_templates() -> CommandExecutor<InMemoryStorage> {
         .expect("the on-disk template registry parses")
         .templates
     {
-        crate::harness::seed_memory_template_gates(&storage, &template);
+        jit::test_harness::seed_memory_template_gates(&storage, &template);
     }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
@@ -693,7 +693,7 @@ fn test_bracket_breakdown_reads_template_from_disk() {
     // Approve P's plan-review gate: breakdown consumes an approved plan.
     let mut p = executor.storage().load_issue(&planning_id).unwrap();
     p.gates_status.get_mut("plan-review").unwrap().status = jit::domain::GateStatus::Passed;
-    crate::harness::seed_memory_issue(executor.storage(), &p);
+    jit::test_harness::seed_memory_issue(executor.storage(), &p);
 
     // The public wrapper resolves the template from templates.toml; none injected.
     let result = executor.bracket_breakdown(&c, vec![child("only")]).unwrap();

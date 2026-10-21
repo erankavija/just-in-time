@@ -2,10 +2,6 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
-// Shared in-process test harness (below the auto-discovery boundary).
-#[path = "../common/harness.rs"]
-mod harness;
-
 mod ai_review_verdict_tests;
 mod archive_path_layout_tests;
 mod artifact_discovery_tests;

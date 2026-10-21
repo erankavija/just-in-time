@@ -5,9 +5,9 @@
 //! - All issue commands work
 //! - No coordinator commands exist
 //! - Core functionality is intact
-use crate::harness::TestHarness;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
+use jit::test_harness::TestHarness;
 
 #[test]
 fn test_query_interface_works_without_coordinator() {
@@ -120,7 +120,7 @@ fn test_gates_work_without_coordinator() {
     let id = h.create_ready_issue("Task");
     let mut issue = h.storage.load_issue(&id).unwrap();
     issue.gates_required.push("test-gate".to_string());
-    crate::harness::seed_memory_issue(&h.storage, &issue);
+    jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
     // Issue should NOT be blocked by pending gate (gates don't block Ready state)
     let blocked = h.executor.query_blocked().unwrap();

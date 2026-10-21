@@ -118,7 +118,7 @@ fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStor
             .expect("the seeded template registry parses")
             .templates
     {
-        crate::harness::seed_memory_template_gates(&storage, &template);
+        jit::test_harness::seed_memory_template_gates(&storage, &template);
     }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
@@ -148,7 +148,7 @@ fn approve_plan(executor: &CommandExecutor<InMemoryStorage>, planning_id: &str) 
         .get_mut("plan-review")
         .expect("the planning node carries the plan gate")
         .status = GateStatus::Passed;
-    crate::harness::seed_memory_issue(executor.storage(), &p);
+    jit::test_harness::seed_memory_issue(executor.storage(), &p);
 }
 
 /// The issue's `type:` label value, if any.
@@ -229,7 +229,7 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     // --- forced refresh ---
     let mut c = executor.storage().load_issue(&container).unwrap();
     c.title = "Auth epic (revised)".to_string();
-    crate::harness::seed_memory_issue(executor.storage(), &c);
+    jit::test_harness::seed_memory_issue(executor.storage(), &c);
 
     let (refreshed, _) = executor
         .apply_template("plan", &container, &bindings, true)

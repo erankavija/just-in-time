@@ -9,10 +9,10 @@
 //! the export reads real membership, bracket-type, and identity-namespace
 //! configuration.
 
-use crate::harness::TestHarness;
 use jit::commands::BatchIssueDef;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
+use jit::test_harness::TestHarness;
 
 const CONFIG_TOML: &str = r#"
 [version]
