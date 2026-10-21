@@ -9,6 +9,7 @@
   ],
   "description": "Replace emoji status markers in CLI human-readable output with words.\n\n## Background\n\nHuman-readable command output marks status with emoji and pictographs (for example ❌ ⚠ ✓ ✗ ✅ ℹ 🌐). They render inconsistently across terminals, add width ambiguity, and carry no information that the adjacent text does not. Configurable type icons are a separate, repository-declared feature, used only by the web UI, and stay as they are.\n\nThe markers sit in two source files as of 2026-10-20:\n\n- About 59 literal sites in `crates/jit/src/main.rs`, across invariant check, issue create and update, apply, dependency add and remove, gate add, gate preset apply, document assets and link checking, configuration validation, hook installation, four copies of the validation report block, claim, and snapshot export.\n- Five sites in `crates/jit/src/commands/validate.rs` (validation repair).\n\nInitialization output carries no marker, and gate evaluation and status output already use words. The profile agreement renderer's markers go with the removal of that command, not here.\n\nTwo state glyphs are borderline. In `issue show` the dependency state glyph (`MinimalIssue::state_symbol`) is redundant, because the state word follows on the same line. In `graph deps` its twin (`DependencyTreeNode::state_symbol`) is the only state information, so it becomes a word.\n\nTests pin a marker in `crates/jit/tests/cli_repo_workflow/project_config_tests.rs:222`, loosely in `label_hierarchy_e2e_test.rs:298`, and in `crates/jit/src/output.rs:2924,2930`.\n\n## Success Criteria\n\n- [hard] REQ-01: No command's human-readable status output contains an emoji or pictographic status marker; each is replaced by a word such as `error`, `warning` or `ok`, or removed where the text already states the status, and the `graph deps` state glyph becomes the state word.\n- [hard] REQ-02: Type icons declared by a repository or defaulted by hierarchy level are unchanged.\n- [hard] REQ-03: One test fails when a pictographic status marker is reintroduced into CLI output outside the type-icon mechanism.\n\n## Notes\n\n- Criterion ID REQ-04 is retired here; documentation examples of command output are separate work.\n",
   "documents": [],
+  "done_at": "2026-10-21T20:31:40.503036410Z",
   "first_ready_at": "2026-10-15T11:05:37.716806462Z",
   "gates_required": [
     "cargo-ci",
@@ -35,7 +36,7 @@
     "satisfies:3d9a0ce3/REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Replace emoji status markers in CLI output with words",
-  "updated_at": "2026-10-21T17:20:01.793084282Z"
+  "updated_at": "2026-10-21T20:31:40.503036410Z"
 }

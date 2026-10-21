@@ -23,7 +23,7 @@
     "satisfies:3d9a0ce3/REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Show word status markers in documented command output",
-  "updated_at": "2026-10-21T01:07:35.260589393Z"
+  "updated_at": "2026-10-21T20:31:40.601700697Z"
 }
