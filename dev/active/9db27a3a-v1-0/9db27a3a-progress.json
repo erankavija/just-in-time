@@ -444,7 +444,8 @@
     "2026-10-21 ~09:20: gate rules. (1) cargo-ci reuses failed runs by input digest, so load-only failures are rerun with `jit gate evaluate <id> cargo-ci --force` under the turnstile and exclusive flock (load-only failures only). (2) The external code-review reviewer is at capacity: retry with back-off, keep issues gated, never pass manually. 3d9a0ce3's lead was asked to ensure 72d89161/fd9bfab8 never reuse infrastructure or environmental failures as verdicts.",
     "2026-10-21 ~09:35: df129d9e's first execution lead stopped after wave 1a (3 done, 1874e265 in flight; handoff-2.md). A continuation execution-lead subagent was dispatched from that handoff. External blockers: d8176fd3 waits on 2d10f1dd/16d63038/3754095f/8673dc5e; 083c9a91 on d759d606; handler tasks on 2195c98f cli-issue-id-boundary; 0eca332a on error-code-vocabulary.",
     "2026-10-21 ~10:00-13:30: third shared usage-limit stall; leads were resumed at 13:31. 8376299c is at 14/15 with 16d63038 running last.",
-    "2026-10-21: f8a6b298 planned (62 issues, 84 edges; P 5e615dc2 and B b06cee74 done). Roots are wired to specific 2195c98f tasks. Execution waits on 2195c98f. just-in-time-59 was assigned to plan f4d9502a next."
+    "2026-10-21: f8a6b298 planned (62 issues, 84 edges; P 5e615dc2 and B b06cee74 done). Roots are wired to specific 2195c98f tasks. Execution waits on 2195c98f. just-in-time-59 was assigned to plan f4d9502a next.",
+    "2026-10-21 14:00: the steward reinstalled the dogfood binary (~/.cargo/bin/jit) from main 582b1cc92 under the exclusive CI lock, at 3d9a0ce3's request: gate-engine changes merged today (ae2e3739, 72d89161, fd9bfab8) and 5a3a886f's '.' gate roots need it. The previous binary is backed up in the steward scratchpad as jit-2026-10-03.bak. Reinstall after each further gate-engine merge."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
