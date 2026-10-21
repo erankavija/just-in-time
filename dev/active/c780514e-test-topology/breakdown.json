@@ -50,337 +50,6 @@
     }
   },
   {
-    "key": "shared-taxonomy-repo",
-    "title": "One shared taxonomy repository for CLI tests",
-    "description": "Define the taxonomy-initialised CLI test repository once in shared test support instead of once per suite.\n\n## Background\n\n`TaxonomyRepo` and its constructor `setup_test_repo_with_taxonomy` are defined twice, in `crates/jit/tests/cli_issue/main.rs` and `crates/jit/tests/cli_query_graph/main.rs`. Each is a thin wrapper over `jit::test_utils::setup_test_repo_with_taxonomy` that pairs a temporary repository with the `TestTaxonomy` declaration that authored its vocabulary, so a subprocess test reads type names from that declaration. `cli_query_graph/main.rs` adds `type_label`, `membership_label` and `membership_namespace` helpers. Three `cli_issue` files and 14 `cli_query_graph` files call them.\n\n## Success Criteria\n\n- [hard] REQ-01: `TaxonomyRepo`, its constructor and its label helpers are defined once, in shared test support beside `TestTaxonomy`.\n- [hard] REQ-02: Neither suite root defines a taxonomy repository type or a label helper.\n- [hard] REQ-03: Each former caller uses the shared definition, and its assertions are unchanged.\n\n## Notes\n\nThe CLI process fixture can take ownership of this repository; the taxonomy stays with the test that reads it.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-06",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [],
-    "planning": {
-      "outcome": "The taxonomy-initialised CLI test repository has one definition in shared test support.",
-      "contract_refs": [],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-06",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "taxonomy repository callers",
-        "test_boundary": "cli_issue integration target",
-        "worker_sized_reason": "Moving one small type and its helpers changes only import paths at its callers.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/test_taxonomy.rs",
-            "crates/jit/tests/cli_issue/batch_create_tests.rs",
-            "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
-            "crates/jit/tests/cli_issue/issue_create_positional_type_tests.rs",
-            "crates/jit/tests/cli_issue/main.rs",
-            "crates/jit/tests/cli_query_graph/batch_export_cli_tests.rs",
-            "crates/jit/tests/cli_query_graph/dep_add_redundancy_cli_tests.rs",
-            "crates/jit/tests/cli_query_graph/dependency_display_tests.rs",
-            "crates/jit/tests/cli_query_graph/graph_depth_tests.rs",
-            "crates/jit/tests/cli_query_graph/graph_json_tests.rs",
-            "crates/jit/tests/cli_query_graph/hierarchy_tree_tests.rs",
-            "crates/jit/tests/cli_query_graph/label_constraints_tests.rs",
-            "crates/jit/tests/cli_query_graph/label_filter_repeatable_query_tests.rs",
-            "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
-            "crates/jit/tests/cli_query_graph/label_query_json_tests.rs",
-            "crates/jit/tests/cli_query_graph/main.rs",
-            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
-            "crates/jit/tests/cli_query_graph/query_tests.rs",
-            "crates/jit/tests/cli_query_graph/scope_validation_tests.rs",
-            "crates/jit/tests/cli_query_graph/search_tests.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "shared-fixture-issue",
-    "title": "One shared issue-construction fixture",
-    "description": "Give tests one definition of the issue-construction fixture instead of five identical copies.\n\n## Background\n\n`fixture_issue(title, description)` drafts an issue and assigns it a random UUID. It is defined five times with the same body: in `crates/jit/src/domain/types.rs` as a `pub(crate)` function for library unit tests, and in the suite roots of `fast_issue`, `fast_docs_templates`, `cli_query_graph` and `fast_rules`. About 499 calls use it, across `src/commands`, `src/domain`, `src/graph`, `src/validation`, `src/storage`, `src/repository_state` and those suites. `crate::test_utils` is compiled for library unit tests and, under `test-support`, for every integration target.\n\n## Success Criteria\n\n- [hard] REQ-01: `fixture_issue` is defined once, in `crate::test_utils`, and both library unit tests and integration suites call that definition.\n- [hard] REQ-02: No suite root and no production module defines an issue-construction fixture.\n- [hard] REQ-03: Call sites change only their import path, and each test asserts what it asserted before.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-06",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [],
-    "planning": {
-      "outcome": "Tests build fixture issues through one definition in shared test support.",
-      "contract_refs": [],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-06",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "fixture issue callers",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "One function moves, and its callers change only an import path.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/test_utils.rs",
-            "crates/jit/src/commands/archive.rs",
-            "crates/jit/src/commands/claim.rs",
-            "crates/jit/src/commands/dependency.rs",
-            "crates/jit/src/commands/document.rs",
-            "crates/jit/src/commands/gate.rs",
-            "crates/jit/src/commands/gate_check.rs",
-            "crates/jit/src/commands/issue.rs",
-            "crates/jit/src/commands/item.rs",
-            "crates/jit/src/commands/mod.rs",
-            "crates/jit/src/commands/snapshot.rs",
-            "crates/jit/src/commands/template.rs",
-            "crates/jit/src/commands/template_expand.rs",
-            "crates/jit/src/commands/validate.rs",
-            "crates/jit/src/commands/worktree.rs",
-            "crates/jit/src/declarations/rules.rs",
-            "crates/jit/src/domain/artifact_classifier.rs",
-            "crates/jit/src/domain/artifact_conformance.rs",
-            "crates/jit/src/domain/artifact_directory.rs",
-            "crates/jit/src/domain/item.rs",
-            "crates/jit/src/domain/projection.rs",
-            "crates/jit/src/domain/queries.rs",
-            "crates/jit/src/domain/store_divergence.rs",
-            "crates/jit/src/domain/type_taxonomy.rs",
-            "crates/jit/src/domain/types.rs",
-            "crates/jit/src/graph/hierarchy.rs",
-            "crates/jit/src/graph/mod.rs",
-            "crates/jit/src/output.rs",
-            "crates/jit/src/repository_state/archive.rs",
-            "crates/jit/src/repository_state/default_rules.rs",
-            "crates/jit/src/repository_state/mutation.rs",
-            "crates/jit/src/storage/json.rs",
-            "crates/jit/src/storage/reference.rs",
-            "crates/jit/src/storage/repository_state_store_tests.rs",
-            "crates/jit/src/validation/desugar.rs",
-            "crates/jit/src/validation/graph.rs",
-            "crates/jit/src/validation/local.rs",
-            "crates/jit/src/visualization.rs",
-            "crates/jit/tests/fast_issue/main.rs",
-            "crates/jit/tests/fast_docs_templates/main.rs",
-            "crates/jit/tests/cli_query_graph/main.rs",
-            "crates/jit/tests/fast_rules/main.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "shared-memory-executor",
-    "title": "Memory executor initialised through product initialisation",
-    "description": "Give in-process tests one memory executor that is set up by the product's own initialisation, so no test support restates configuration or index bytes.\n\n## Background\n\nTwo memory executors exist. `crate::commands::test_helpers::memory_executor` seeds `[worktree] enforce_leases = \"off\"` and the data-root ignore file. `memory_executor` in `crates/jit/tests/fast_rules/main.rs` seeds an empty configuration and a literal index body carrying `\"schema_version\": 2`, then delegates to the first. `TestHarness` (`crate::test_harness`) builds on the first.\n\nProduct initialisation exists only on `impl CommandExecutor<JsonFileStorage>` (`initialize_fresh_repository` and `run_initialization` in `crates/jit/src/commands/init.rs`), although both go through the generic `with_mutation_session`. `repository_state::initialize::structural_minimum_config` is the pure minimal configuration.\n\nUsers of the library executor: `commands/{batch_create,bulk_update,dependency,gate_check,gate,issue,mod,validate}.rs` and `test_harness.rs`. Users of the `fast_rules` copy: `fast_rules/{example_rulesets,label_query,label_strategic,validate_rule_runner,validation}_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: Product initialisation runs over any repository-state store, and the in-memory backend is initialised through the same code path as the JSON backend.\n- [hard] REQ-02: `memory_executor` has one definition in shared test support. It seeds configuration and index by running product initialisation over the memory store, and no test support writes a literal schema version or index body.\n- [hard] REQ-03: `fast_rules` defines no executor fixture, and `TestHarness` builds on the shared one.\n- [hard] REQ-04: A test that relied on a fixture-specific configuration value declares that value itself and keeps the property it asserted.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "component:core",
-      "satisfies:c780514e/REQ-06",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts",
-      "enforces:@/invariant/architecture-dependency-direction"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [],
-    "planning": {
-      "outcome": "One memory executor in shared test support seeds configuration and index through product initialisation.",
-      "contract_refs": [],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-06",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "in-process command tests",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Generalising one initialisation entry point and collapsing two fixtures that share a caller set.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/commands/init.rs",
-            "crates/jit/src/commands/test_helpers.rs",
-            "crates/jit/src/test_harness.rs",
-            "crates/jit/tests/fast_rules/main.rs",
-            "crates/jit/tests/fast_rules/example_rulesets_tests.rs",
-            "crates/jit/tests/fast_rules/label_query_tests.rs",
-            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
-            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
-            "crates/jit/tests/fast_rules/validation_tests.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "harness-shipped-item-kinds",
-    "title": "Shared test support derives shipped item kinds from the default package",
-    "description": "Make shared test support read the shipped item-kind declarations from the default profile package instead of carrying hand-made copies.\n\n## Background\n\nThe shipped item kinds are the `[[contribution]] target = \"item-kinds\"` section of `profiles/jit-default/manifest.toml`. `TestHarness::with_item_kinds` (`crates/jit/src/test_harness.rs`) hand-copies them as `CANONICAL_ITEM_KINDS`, and `SUITE_TABLES` in `crates/jit/src/test_taxonomy.rs` restates them again. Two further copies live in command unit tests, and the `D-[0-9]+` id pattern appears 14 times under `crates/`. `@/inv/domain-agnostic` keeps package vocabulary out of engine code, so the derivation belongs to test support. `dev/TESTING.md` documents `with_item_kinds` as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support exposes the shipped item-kind declarations as read from the default profile package's item-kinds contribution, with no restated kind, alias, mode or id pattern.\n- [hard] REQ-02: `TestHarness::with_item_kinds` and `test_taxonomy` take shipped kinds from that derivation, and neither holds an item-kind literal.\n- [hard] REQ-03: A change to the package's item-kind contribution reaches harness tests with no test-support edit.\n- [hard] REQ-04: `dev/TESTING.md` describes the derivation where it describes `with_item_kinds`.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-07",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/single-source-prose",
-      "enforces:@/invariant/domain-agnostic",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [],
-    "planning": {
-      "outcome": "Shared test support derives shipped item-kind declarations from the default profile package.",
-      "contract_refs": [],
-      "produces_contracts": [
-        "shipped-item-kinds-fixture"
-      ],
-      "source_refs": [
-        "REQ-07",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "shared test support",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "One derivation function replacing two literal tables in shared support.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/test_harness.rs",
-            "crates/jit/src/test_taxonomy.rs",
-            "crates/jit/src/test_utils.rs",
-            "dev/TESTING.md"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "unit-test-shipped-item-kinds",
-    "title": "Command unit tests take shipped item kinds from the default package",
-    "description": "Remove the item-kind copies from command and domain unit tests.\n\n## Background\n\n`CANONICAL_ITEM_KINDS` is hand-copied in the test modules of `crates/jit/src/commands/item.rs` (`:570`, with its `D-[0-9]+` pattern at `:581`) and `crates/jit/src/commands/validate.rs` (`:2975`, pattern at `:2986`). `crates/jit/src/domain/item.rs` tests hard-code the decision kind's `D-[0-9]+` pattern (`:1633`, `:2087`). Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Unit tests in `commands/item.rs`, `commands/validate.rs` and `domain/item.rs` that need shipped kinds take them from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No unit test under `crates/jit/src` restates a shipped kind's declaration or its id pattern.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-07",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/single-source-prose",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "harness-shipped-item-kinds"
-    ],
-    "planning": {
-      "outcome": "Item, validate and domain item unit tests read shipped item kinds from the shared derivation.",
-      "contract_refs": [
-        "shipped-item-kinds-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-07"
-      ],
-      "terminal": {
-        "consumer_family": "item-kind unit tests",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Three test modules switch literal tables to one existing derivation.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/commands/item.rs",
-            "crates/jit/src/commands/validate.rs",
-            "crates/jit/src/domain/item.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "suite-shipped-item-kinds",
-    "title": "Integration suites take shipped item kinds from the default package",
-    "description": "Remove the decision-kind copies from the integration suites.\n\n## Background\n\n`cli_item_validate/decision_kind_tests.rs` (`:15`, `:55`, `:175`), `cli_item_validate/decision_risk_story_tests.rs` (`:16`, `:65`, `:131`) and `fast_rules/project_render_harness_tests.rs` (`:133`, `:189`, `:467`) restate the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No integration test restates a shipped kind's declaration or its id pattern.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-07",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/single-source-prose",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "harness-shipped-item-kinds",
-      "cli-item-validate-migration",
-      "in-process-memory-setup-consolidation"
-    ],
-    "planning": {
-      "outcome": "Decision-kind and projection-render suites read shipped item kinds from the shared derivation.",
-      "contract_refs": [
-        "shipped-item-kinds-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-07"
-      ],
-      "terminal": {
-        "consumer_family": "item-kind integration tests",
-        "test_boundary": "cli_item_validate integration target",
-        "worker_sized_reason": "Three test files switch literal declarations to one existing derivation.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_item_validate/decision_kind_tests.rs",
-            "crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs",
-            "crates/jit/tests/fast_rules/project_render_harness_tests.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "cli-gate-migration",
     "title": "cli_gate tests spawn jit through the shared process fixture",
     "description": "Move the gate CLI tests in `crates/jit/tests/cli_gate` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\n`cli_gate` has 15 test files. 14 of them spawn through `cargo_bin!`, 11 define a local setup, and 8 parse human-readable output with `split_whitespace`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper of its own; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: No test in scope reads an id or other value from human-readable output; ids come from `--json` output.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
@@ -443,7 +112,7 @@
   {
     "key": "cli-issue-command-migration",
     "title": "cli_issue command tests spawn jit through the shared process fixture",
-    "description": "Move the issue-command tests in `crates/jit/tests/cli_issue` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThe issue-command files of `cli_issue` (create, update, show, status, search, batch and bulk commands, aliases and container rollups) each define a binary locator and a local setup, and seven scrape ids with `split_whitespace`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper of its own; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: No test in scope reads an id or other value from human-readable output; ids come from `--json` output.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
+    "description": "Move the issue-command tests in `crates/jit/tests/cli_issue` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThe issue-command files of `cli_issue` (create, update, show, status, search, batch and bulk commands, aliases and container rollups) each define a binary locator and a local setup, and seven scrape ids with `split_whitespace`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper of its own; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: No test in scope reads an id or other value from human-readable output; ids come from `--json` output.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n- [hard] REQ-05: The suite root defines no taxonomy repository type or label helper, and its callers use the shared `TaxonomyRepo` with unchanged assertions.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -498,7 +167,8 @@
             "crates/jit/tests/cli_issue/issue_status_projection_tests.rs",
             "crates/jit/tests/cli_issue/issue_update_atomicity_tests.rs",
             "crates/jit/tests/cli_issue/issue_update_description_ops_tests.rs",
-            "crates/jit/tests/cli_issue/issue_update_lean_response_test.rs"
+            "crates/jit/tests/cli_issue/issue_update_lean_response_test.rs",
+            "crates/jit/tests/cli_issue/main.rs"
           ]
         }
       }
@@ -549,7 +219,6 @@
             "crates/jit/tests/cli_issue/failure_lever_registry.rs",
             "crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs",
             "crates/jit/tests/cli_issue/failure_probe_fixture.rs",
-            "crates/jit/tests/cli_issue/main.rs",
             "crates/jit/tests/cli_issue/payload_stream_purity_tests.rs",
             "crates/jit/tests/cli_issue/quiet_mode_tests.rs",
             "crates/jit/tests/cli_issue/recover_command_tests.rs",
@@ -627,7 +296,7 @@
   {
     "key": "cli-query-graph-migration",
     "title": "cli_query_graph tests spawn jit through the shared process fixture",
-    "description": "Move the query, graph, label and search CLI tests in `crates/jit/tests/cli_query_graph` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\n`cli_query_graph` has 16 test files. 12 define `fn jit_binary`, 11 define a local setup, and they hold 49 `split_whitespace` sites, 32 of them in `query_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper of its own; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: No test in scope reads an id or other value from human-readable output; ids come from `--json` output.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n\n## Notes\n\n`query_tests.rs` is out of scope: its cases are cut to wiring cases written directly on the fixture.\n",
+    "description": "Move the query, graph, label and search CLI tests in `crates/jit/tests/cli_query_graph` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\n`cli_query_graph` has 16 test files. 12 define `fn jit_binary`, 11 define a local setup, and they hold 49 `split_whitespace` sites, 32 of them in `query_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper of its own; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: No test in scope reads an id or other value from human-readable output; ids come from `--json` output.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n- [hard] REQ-05: The suite root defines no taxonomy repository type or label helper, and its callers use the shared `TaxonomyRepo` with unchanged assertions.\n\n## Notes\n\n`query_tests.rs` is out of scope: its cases are cut to wiring cases written directly on the fixture.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -647,7 +316,8 @@
     ],
     "depends_on": [
       "cli-process-fixture",
-      "shared-taxonomy-repo"
+      "shared-taxonomy-repo",
+      "cli-query-graph-fixture-issue-adoption"
     ],
     "planning": {
       "outcome": "The cli_query_graph suite spawns jit only through the shared CLI process fixture.",
@@ -969,7 +639,9 @@
     "depends_on": [
       "exit-code-envelope-case-moves",
       "exit-code-claim-delete-case-moves",
-      "exit-code-argument-case-moves"
+      "exit-code-issue-prefix-case-moves",
+      "exit-code-dependency-guard-case-moves",
+      "exit-code-gate-preset-case-move"
     ],
     "planning": {
       "outcome": "exit_code_tests.rs and the parity suite are gone; the projection suite alone binds exit codes.",
@@ -990,60 +662,6 @@
             "crates/jit/tests/cli_issue/exit_code_tests.rs",
             "crates/jit/tests/cli_issue/invocation_exit_status_parity_tests.rs",
             "crates/jit/tests/cli_issue/main.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "list-envelope-reassertion-removal",
-    "title": "Per-command count re-assertions leave the list-emitting suites",
-    "description": "Remove the per-command checks of `count` against collection length that re-prove the list-envelope property.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test. Per-command re-assertions remain at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs` (about `:640`), `cli_repo_workflow/profile_cli_tests.rs:1695` (`assert_count_envelope`), `cli_repo_workflow/worktree_cli_tests.rs:546,1036`, `cli_issue/container_rollup_tests.rs:211,348` and `cli_issue/issue_search_json_tests.rs:234`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test outside the single list-envelope coverage test asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:exit-code-envelope-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-04",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "list-envelope-coverage-test",
-      "cli-query-graph-migration",
-      "cli-repo-workflow-migration",
-      "cli-repo-profile-migration",
-      "cli-repo-checkout-migration",
-      "cli-issue-command-migration"
-    ],
-    "planning": {
-      "outcome": "No per-command test re-asserts count against collection length.",
-      "contract_refs": [
-        "list-envelope-coverage"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-04"
-      ],
-      "terminal": {
-        "consumer_family": "list-emitting command tests",
-        "test_boundary": "CLI integration targets",
-        "worker_sized_reason": "Six files each drop one or two assertions or a helper.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_query_graph/search_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
-            "crates/jit/tests/cli_issue/container_rollup_tests.rs",
-            "crates/jit/tests/cli_issue/issue_search_json_tests.rs"
           ]
         }
       }
@@ -1088,8 +706,7 @@
           "touches": [
             "crates/jit/src/domain/queries.rs",
             "crates/jit/src/commands/query.rs",
-            "crates/jit/src/commands/issue.rs",
-            "crates/jit/tests/fast_issue/domain_queries_tests.rs"
+            "crates/jit/src/commands/issue.rs"
           ]
         }
       }
@@ -1137,192 +754,6 @@
             "crates/jit/src/domain/types.rs",
             "crates/jit/src/commands/issue.rs",
             "crates/jit/src/commands/mod.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "query-cli-wiring-reduction",
-    "title": "Query CLI tests assert one wiring case per subcommand and flag",
-    "description": "Cut the subprocess query suite to wiring cases, now that the domain owns query semantics.\n\n## Background\n\n`crates/jit/tests/cli_query_graph/query_tests.rs` has 25 subprocess tests (1,422 lines) and 32 `split_whitespace` sites. It re-proves the filters and priority order that `crates/jit/src/domain/queries.rs` owns as pure functions. `dev/TESTING.md:619` cites the file as a worked example, and `crates/jit/tests/fast_rules/main.rs` mentions it.\n\n## Success Criteria\n\n- [hard] REQ-01: `query_tests.rs` holds at most one case per `query` subcommand and per flag. Each case asserts that the command reaches the domain query, for example that a filter is applied, and not the query's semantics.\n- [hard] REQ-02: A property of a removed case that the domain tests lack gains a domain test.\n- [hard] REQ-03: The remaining cases spawn `jit` through the shared CLI process fixture and read ids from `--json` output.\n- [hard] REQ-04: `dev/TESTING.md` and `fast_rules/main.rs` describe the reduced suite.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-02",
-      "satisfies:c780514e/REQ-05",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "query-available-domain-order",
-      "cli-query-graph-migration"
-    ],
-    "planning": {
-      "outcome": "query_tests.rs keeps one wiring case per query subcommand or flag on the shared CLI process fixture.",
-      "contract_refs": [
-        "domain-query-ownership",
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02",
-        "REQ-05"
-      ],
-      "terminal": {
-        "consumer_family": "query CLI tests",
-        "test_boundary": "cli_query_graph integration target",
-        "worker_sized_reason": "One file shrinks to a handful of wiring cases on an existing fixture.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_query_graph/query_tests.rs",
-            "crates/jit/src/domain/queries.rs",
-            "dev/TESTING.md",
-            "crates/jit/tests/fast_rules/main.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "auto-transition-wiring-reduction",
-    "title": "Workflow CLI tests keep one auto-transition wiring case",
-    "description": "Cut the CLI re-proofs of dependency auto-transitions to one wiring case.\n\n## Background\n\n`crates/jit/tests/cli_repo_workflow/workflow_tests.rs` re-proves dependency auto-transitions in four subprocess tests (`:529`, `:577`, `:646`, `:698`). A pure domain function owns the rules.\n\n## Success Criteria\n\n- [hard] REQ-01: `workflow_tests.rs` holds one auto-transition case, which shows that completing a dependency through the CLI readies its dependent; the other three cases no longer exist.\n- [hard] REQ-02: A rule a removed case covered that the domain tests lack gains a domain test.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-02",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "auto-transition-domain-decision",
-      "cli-repo-workflow-migration"
-    ],
-    "planning": {
-      "outcome": "One CLI case shows completing a dependency readies its dependent; the domain owns the rules.",
-      "contract_refs": [
-        "domain-query-ownership"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02"
-      ],
-      "terminal": {
-        "consumer_family": "auto-transition CLI tests",
-        "test_boundary": "cli_repo_workflow integration target",
-        "worker_sized_reason": "Four cases in one file collapse to one.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_repo_workflow/workflow_tests.rs",
-            "crates/jit/src/domain/types.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "auto-transition-harness-owner",
-    "title": "One harness test owns the auto-transition cascade wiring",
-    "description": "Keep one in-process test of the cascade wiring and stop the other harness tests re-proving its rules.\n\n## Background\n\nHarness-level tests at `crates/jit/src/commands/bulk_update.rs:2001` and `crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs:89` both drive the command cascade to dependents and assert its rules. A pure domain function owns those rules.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly one harness test asserts that a transition through the command layer readies its dependents. It asserts the wiring, and the domain function's tests own the rules.\n- [hard] REQ-02: Other harness tests no longer assert the cascade's rules; a test that also asserts a property of its own keeps that assertion.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "satisfies:c780514e/REQ-02",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "auto-transition-domain-decision"
-    ],
-    "planning": {
-      "outcome": "One in-process harness test owns the cascade wiring, and no other harness test re-proves its rules.",
-      "contract_refs": [
-        "domain-query-ownership"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02"
-      ],
-      "terminal": {
-        "consumer_family": "auto-transition harness tests",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Two test sites reduce to one wiring assertion.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/commands/bulk_update.rs",
-            "crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "cycle-reproof-removal",
-    "title": "Cycle detection is proven only in the graph module",
-    "description": "Remove the tests that re-prove dependency cycle detection above the graph module.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). `crates/jit/src/commands/batch_create.rs:640` adapts keyed detection, and four tests at `:686-707` repeat the keyed tests over that adapter. `crates/jit/tests/cli_repo_workflow/integration_test.rs:616` re-proves cycle rejection through the CLI; the cycle exit code is bound by the exit-code projection suite. Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`).\n\n## Success Criteria\n\n- [hard] REQ-01: The four adapter tests in `commands/batch_create.rs` no longer exist. At most one test there shows that batch creation rejects a cyclic manifest through the adapter.\n- [hard] REQ-02: `integration_test.rs` holds no dependency cycle re-proof.\n- [hard] REQ-03: Each cycle property the removed tests covered has an owning test in `crates/jit/src/graph/`.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "satisfies:c780514e/REQ-02",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests",
-      "enforces:@/invariant/dag-acyclic"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "cli-repo-workflow-migration"
-    ],
-    "planning": {
-      "outcome": "Batch-create adapter and CLI cycle re-proofs are gone, and graph tests own cycle detection.",
-      "contract_refs": [
-        "domain-query-ownership"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02"
-      ],
-      "terminal": {
-        "consumer_family": "cycle re-proof tests",
-        "test_boundary": "graph unit tests",
-        "worker_sized_reason": "Five test deletions across two files, with owners already present.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/commands/batch_create.rs",
-            "crates/jit/tests/cli_repo_workflow/integration_test.rs"
           ]
         }
       }
@@ -1677,8 +1108,8 @@
       ],
       "terminal": {
         "consumer_family": "profiled-repository fixture",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "One cache-key function, its collection step and a signature change at six callers.",
+        "test_boundary": "workspace test suite",
+        "worker_sized_reason": "One cache-key function and its collection step; the dropped argument is a compile-forced one-token edit at six call sites, which the workspace suite observes.",
         "footprint": {
           "touches": [
             "crates/jit/src/test_utils.rs",
@@ -1732,8 +1163,8 @@
       ],
       "terminal": {
         "consumer_family": "profiled-fixture runner hook",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Removes one hook end to end: subcommand, receipt path and two setup-script declarations.",
+        "test_boundary": "workspace test suite",
+        "worker_sized_reason": "Removes one hook end to end; the two tests that parse the runner configuration change in the same commit because they assert its removed entries.",
         "footprint": {
           "touches": [
             "crates/jit/src/main.rs",
@@ -2179,59 +1610,6 @@
     }
   },
   {
-    "key": "library-git-fixture-adoption",
-    "title": "In-process tests initialise git through the shared helper",
-    "description": "Make source-tree test modules and in-process suites initialise git repositories through the shared test-support helper instead of private copies.\n\n## Background\n\nEight source test modules and one server module hand-roll `git init` for their tests: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs`, `commands/archive.rs` and `crates/server/src/routes.rs`. The in-process suite file `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` (`:15-20`) does the same with a fixed author identity. Shared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: No source-tree test module and no in-process suite file defines a git initialisation helper or spawns `git init` itself; each uses the shared test-support function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-05",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "cli-process-fixture"
-    ],
-    "planning": {
-      "outcome": "In-process test modules initialise git repositories through one shared test-support helper.",
-      "contract_refs": [
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-05",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "in-process test modules",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Ten modules replace a few lines of git setup with one existing call.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/gate_execution.rs",
-            "crates/jit/src/storage/json.rs",
-            "crates/jit/src/storage/repository_state_store_tests.rs",
-            "crates/jit/src/commands/mod.rs",
-            "crates/jit/src/commands/hooks.rs",
-            "crates/jit/src/commands/worktree.rs",
-            "crates/jit/src/profile/repository_package.rs",
-            "crates/jit/src/commands/archive.rs",
-            "crates/server/src/routes.rs",
-            "crates/jit/tests/fast_docs_templates/git_revision_tests.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "exit-code-envelope-case-moves",
     "title": "Blocked-transition and startup envelope cases move beside their owners",
     "description": "Move the blocked-transition and startup-envelope cases that only the exit-code suite tests into the error-envelope suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:312` and `:405`: a transition blocked by gates, human and JSON. They assert the `BLOCKED` details (`requested_state`, `actual_state`, gate blockers) and remediation commands (`gate evaluate`, `gate status-all`, `gate status --all`).\n- `:493` and `:559`: a transition blocked by dependencies, JSON and human remediation text.\n- `:605`: a missing dependency, whose blocker state is `missing`.\n- `:1488`, `:1512` and `:1528`: startup envelopes. Repository-not-found emits `REPOSITORY_NOT_FOUND` under `--json` and empty stdout without it; a format that is too new emits `REPOSITORY_FORMAT_TOO_NEW`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test with the same non-exit assertions. The blocked transitions live in `cli_issue/error_json_tests.rs` and the startup envelopes in `cli_issue/top_level_failure_envelope_tests.rs`.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
@@ -2271,7 +1649,6 @@
         "worker_sized_reason": "Eight cases move with their assertions into two existing files.",
         "footprint": {
           "touches": [
-            "crates/jit/tests/cli_issue/exit_code_tests.rs",
             "crates/jit/tests/cli_issue/error_json_tests.rs",
             "crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs"
           ]
@@ -2321,62 +1698,8 @@
         "worker_sized_reason": "Ten cases move with their assertions into two existing files.",
         "footprint": {
           "touches": [
-            "crates/jit/tests/cli_issue/exit_code_tests.rs",
             "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
             "crates/jit/tests/cli_repo_workflow/integration_test.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "exit-code-argument-case-moves",
-    "title": "Id-prefix and argument-guard cases move beside their owners",
-    "description": "Move the id-prefix and argument-guard cases that only the exit-code suite tests beside the tests of the commands they guard.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1189` and `:1220`: an ambiguous and a too-short prefix on `issue show` (\"Ambiguous ID\", `AMBIGUOUS_ID`, \"at least 4 characters\").\n- `:1372` and `:1447`: a too-short and an ambiguous prefix in both `dep add` positions.\n- `:1315`: symmetric argument validation for `dep rm`.\n- `:1280`: the guard against a parent filter given before the `query` subcommand (\"were given before\", `INVALID_ARGUMENT`); the string appears only in `main.rs`.\n- `:1079`: `gate preset create` naming a gate that was removed from the registry (\"Gate not found in registry: mygate\").\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test with the same non-exit assertions. The `issue show` prefix cases live in `cli_issue/issue_status_projection_tests.rs`; the `dep add` and `dep rm` cases in `cli_query_graph/dep_add_redundancy_cli_tests.rs`; the parent-filter guard in `cli_query_graph/query_json_tests.rs`; and the preset case in `cli_repo_workflow/gate_preset_tests.rs`.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:exit-code-envelope-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-01",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "exit-code-binding-completeness",
-      "cli-issue-command-migration",
-      "cli-query-graph-migration",
-      "cli-repo-profile-migration"
-    ],
-    "planning": {
-      "outcome": "Id-prefix and argument-guard cases live beside the tests of the commands they guard.",
-      "contract_refs": [
-        "exit-code-projection-ownership",
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-01",
-        "D-04"
-      ],
-      "terminal": {
-        "consumer_family": "command argument tests",
-        "test_boundary": "CLI integration targets",
-        "worker_sized_reason": "Seven cases move with their assertions into four existing files.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_issue/exit_code_tests.rs",
-            "crates/jit/tests/cli_issue/issue_status_projection_tests.rs",
-            "crates/jit/tests/cli_query_graph/dep_add_redundancy_cli_tests.rs",
-            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/gate_preset_tests.rs"
           ]
         }
       }
@@ -2457,7 +1780,7 @@
     ],
     "depends_on": [
       "exit-code-envelope-case-moves",
-      "exit-code-argument-case-moves"
+      "exit-code-issue-prefix-case-moves"
     ],
     "planning": {
       "outcome": "The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion.",
@@ -2611,7 +1934,7 @@
     ],
     "depends_on": [
       "exit-code-claim-delete-case-moves",
-      "exit-code-argument-case-moves"
+      "exit-code-gate-preset-case-move"
     ],
     "planning": {
       "outcome": "The cli_repo_workflow suite asserts only properties it adds, with no projected exit-code re-assertion.",
@@ -2746,164 +2069,6 @@
     }
   },
   {
-    "key": "in-process-file-setup-consolidation",
-    "title": "Shared file-backed repository setup for in-process suites",
-    "description": "Replace the private file-backed repository and executor setups of the in-process suites with shared test-support constructors.\n\n## Background\n\nFile-backed setups create a temporary repository, write configuration, run `jit init` or open a `JsonFileStorage` executor. These are defined privately:\n\n- `executor` and `setup_initialized_repo` in `crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs` (`:18`, `:28`) and again in `fast_rules/type_hierarchy_schema_regen_tests.rs` (`:10`, `:16`).\n- `repo` and `executor` in `fast_rules/effective_rules_tests.rs` (`:16`, `:36`).\n- `scaffold_declaring` in `fast_rules/undeclared_taxonomy_tests.rs:20`, a third init-from-config copy.\n- `file_backed_executor` in `fast_docs_templates/planning_preset_tests.rs:21`.\n- `setup` in `fast_docs_templates/templates_loader_tests.rs:16`, which writes declaration files into a temporary directory.\n\nShared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`). The profiled setup in `fast_rules/cli_warnings_integration_tests.rs` is already gone.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: No file in `fast_rules` or `fast_docs_templates` defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-05",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "rule-warning-tests-down-a-layer"
-    ],
-    "planning": {
-      "outcome": "In-process suites build file-backed repositories and executors through shared test support.",
-      "contract_refs": [],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-05",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "file-backed suite setups",
-        "test_boundary": "fast_rules and fast_docs_templates integration targets",
-        "worker_sized_reason": "Three shared constructors replace about nine private helpers in six files.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/test_utils.rs",
-            "crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs",
-            "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
-            "crates/jit/tests/fast_rules/effective_rules_tests.rs",
-            "crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs",
-            "crates/jit/tests/fast_docs_templates/planning_preset_tests.rs",
-            "crates/jit/tests/fast_docs_templates/templates_loader_tests.rs"
-          ]
-        },
-        "warning_overrides": {
-          "multiple-test-boundaries": "One consumer family, private file-backed setups, spread over the two in-process integration targets that hold them; each target's suite observes its own files."
-        }
-      }
-    }
-  },
-  {
-    "key": "in-process-memory-setup-consolidation",
-    "title": "Memory-backed suite setups go through the shared memory executor",
-    "description": "Make the in-process suites build their memory stores and executors through the shared memory executor, passing scenario declarations as data.\n\n## Background\n\nThe shared memory executor in shared test support is initialised by product initialisation. Suite files build their own `InMemoryStorage` or memory executor and seed declarations around it:\n\n- `store_with_rules` in `crates/jit/tests/fast_issue/graph_rule_validation_tests.rs:15` and `fast_rules/validate_rule_runner_tests.rs:21`.\n- `executor_with_rules` in `fast_issue/transition_graph_enforcement_tests.rs:24` and `fast_rules/local_rule_enforcement_tests.rs:20`.\n- `executor` in `fast_issue/strictness_enforcement_tests.rs:42` and `fast_issue/strictness_transition_tests.rs:41`.\n- `executor_for` in `fast_issue/graph_rule_validation_tests.rs:34`, and `make_storage` in `fast_issue/short_hash_tests.rs:389`.\n- `executor_with_templates` in `fast_docs_templates/template_binding_tests.rs:106`, and `memory_storage` in `fast_docs_templates/template_apply_atomicity_tests.rs:380`.\n- `storage_with` and `render_executor` in `fast_rules/project_render_harness_tests.rs:77,90`, and `strategic_executor` in `fast_rules/label_strategic_tests.rs:13`.\n- `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.\n\nHelpers that act on a `TestHarness` or executor they are given are scenario steps, not setups.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied declarations (configuration, rules and templates) on top of the shared memory executor.\n- [hard] REQ-02: No file in `fast_issue`, `fast_rules` or `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-05",
-      "satisfies:c780514e/REQ-06",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "shared-memory-executor"
-    ],
-    "planning": {
-      "outcome": "In-process suites build memory stores and executors through the shared memory executor.",
-      "contract_refs": [],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-05",
-        "REQ-06",
-        "D-02"
-      ],
-      "terminal": {
-        "consumer_family": "memory-backed suite setups",
-        "test_boundary": "fast_issue, fast_rules and fast_docs_templates integration targets",
-        "worker_sized_reason": "One declaration-seeding entry point replaces about fourteen private helpers in twelve files.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/commands/test_helpers.rs",
-            "crates/jit/tests/fast_issue/graph_rule_validation_tests.rs",
-            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
-            "crates/jit/tests/fast_issue/transition_graph_enforcement_tests.rs",
-            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs",
-            "crates/jit/tests/fast_issue/strictness_enforcement_tests.rs",
-            "crates/jit/tests/fast_issue/strictness_transition_tests.rs",
-            "crates/jit/tests/fast_issue/short_hash_tests.rs",
-            "crates/jit/tests/fast_docs_templates/template_binding_tests.rs",
-            "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
-            "crates/jit/tests/fast_rules/project_render_harness_tests.rs",
-            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
-            "crates/jit/tests/fast_rules/example_rulesets_tests.rs"
-          ]
-        },
-        "warning_overrides": {
-          "multiple-test-boundaries": "One consumer family, private suite setups, spread over the three in-process integration targets that hold them; each target's suite observes its own files."
-        }
-      }
-    }
-  },
-  {
-    "key": "label-query-cli-wiring-reduction",
-    "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
-    "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic` (`:278`, `:318`, `:336`). Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: A semantic property of a removed case that the domain tests lack gains a domain test.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-02",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "exit-code-argument-case-moves"
-    ],
-    "planning": {
-      "outcome": "Label and filter CLI tests keep one wiring case per subcommand or flag, and the domain owns label semantics.",
-      "contract_refs": [
-        "domain-query-ownership"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02"
-      ],
-      "terminal": {
-        "consumer_family": "label query CLI tests",
-        "test_boundary": "cli_query_graph integration target",
-        "worker_sized_reason": "Four files shrink to wiring cases on an existing fixture.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_query_graph/label_filter_repeatable_query_tests.rs",
-            "crates/jit/tests/cli_query_graph/label_query_json_tests.rs",
-            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
-            "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
-            "crates/jit/src/domain/queries.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "list-envelope-coverage-test",
     "title": "One test proves the list-envelope count for each list-emitting command",
     "description": "Replace the per-command list-envelope tests with one schema-driven test that covers each list-emitting command.\n\n## Background\n\n`ListEnvelope` (`crates/jit/src/output.rs`) derives `count` from its collection on serialize and rejects a mismatch on deserialize. Each list-emitting command, found from its emission site, declares a typed output schema in the generated CLI schema (`CommandSchema::generate()`). `crates/jit/tests/cli_issue/list_envelope_tests.rs` asserts `count == len` in 19 per-command subprocess tests, covering `issue list`, the `query` family, `issue search`, `search`, `gate list`, `gate preset list`, `events tail` and `events query`, `doc list`, `doc assets list`, `claim list`, `label namespaces` and `label values`, `item list` and `item search`, `worktree list`, `worktree store-divergence`, `graph roots` and `graph rdeps`, `invariant check`, multi-id `issue show`, `graph deps` and `gate status-all`.\n\n## Success Criteria\n\n- [hard] REQ-01: One test enumerates the list-emitting commands from the generated schema, meaning commands whose output schema carries `count` beside a collection. It runs each on a seeded repository through the shared CLI process fixture and asserts that `count` equals the collection's length.\n- [hard] REQ-02: The test fails and names the command when a list-emitting command in the schema has no invocation in it.\n- [hard] REQ-03: Its invocations cover each command the 19 per-command cases covered, plus `claim status`, `project render` and the three `archive` commands.\n- [hard] REQ-04: Independently of the schema, the test fails and names the command when an invocation's JSON body carries `count` beside an array while that command's schema output is the untyped fallback.\n- [hard] REQ-05: The 19 per-command cases of `list_envelope_tests.rs` no longer exist.\n",
@@ -2947,51 +2112,6 @@
           "touches": [
             "crates/jit/tests/cli_issue/list_envelope_tests.rs",
             "crates/jit/tests/cli_issue/main.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "label-query-harness-reduction",
-    "title": "Label and strategic executor tests keep one wiring case each",
-    "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: A property of a removed case that the domain tests lack gains a test in `domain/queries.rs`.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:query-graph-ownership",
-      "component:testing",
-      "satisfies:c780514e/REQ-02",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "in-process-memory-setup-consolidation"
-    ],
-    "planning": {
-      "outcome": "Executor label and strategic tests keep one wiring case per entry point, and the domain owns the semantics.",
-      "contract_refs": [
-        "domain-query-ownership"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-02"
-      ],
-      "terminal": {
-        "consumer_family": "label query executor tests",
-        "test_boundary": "fast_rules integration target",
-        "worker_sized_reason": "Two files shrink to a few wiring cases each.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/fast_rules/label_query_tests.rs",
-            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
-            "crates/jit/src/domain/queries.rs"
           ]
         }
       }
@@ -3074,12 +2194,1806 @@
       ],
       "terminal": {
         "consumer_family": "server shutdown tests",
-        "test_boundary": "server_integration integration target",
+        "test_boundary": "jit-server test suite",
         "worker_sized_reason": "Uses an existing deadline parameter; one process test shortens and one unit test is added.",
         "footprint": {
           "touches": [
             "crates/server/tests/server_integration/graceful_shutdown_tests.rs",
             "crates/server/src/shutdown.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shared-taxonomy-repo",
+    "title": "Shared taxonomy repository type for CLI tests",
+    "description": "Define the taxonomy-initialised CLI test repository once in shared test support, so the suite copies can be retired.\n\n## Background\n\n`TaxonomyRepo` and its constructor `setup_test_repo_with_taxonomy` are defined twice, in `crates/jit/tests/cli_issue/main.rs` and `crates/jit/tests/cli_query_graph/main.rs`. Each is a thin wrapper over `jit::test_utils::setup_test_repo_with_taxonomy` that pairs a temporary repository with the `TestTaxonomy` declaration that authored its vocabulary, so a subprocess test reads type names from that declaration. `cli_query_graph/main.rs` adds `type_label`, `membership_label` and `membership_namespace` helpers.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support, beside `TestTaxonomy`, defines `TaxonomyRepo`, its constructor and the label helpers, with the behaviour of the suite copies.\n- [hard] REQ-02: A unit test proves the repository declares the taxonomy it carries.\n\n## Notes\n\nThe CLI process fixture can take ownership of this repository; the taxonomy stays with the test that reads it. The suite copies are retired by each suite's own adoption.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Shared test support defines the taxonomy-initialised CLI test repository and its label helpers.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared test support",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One small type and three helpers move into shared support, with no caller changed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_taxonomy.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shared-fixture-issue",
+    "title": "Shared issue-construction fixture",
+    "description": "Define the issue-construction fixture once in shared test support, so the five copies can be retired.\n\n## Background\n\n`fixture_issue(title, description)` drafts an issue and assigns it a random UUID. It is defined five times with the same body: in `crates/jit/src/domain/types.rs` as a `pub(crate)` function for library unit tests, and in the suite roots of `fast_issue`, `fast_docs_templates`, `cli_query_graph` and `fast_rules`. `crate::test_utils` is compiled for library unit tests and, under `test-support`, for every integration target.\n\n## Success Criteria\n\n- [hard] REQ-01: `crate::test_utils` defines `fixture_issue` with the body of the existing copies, reachable from library unit tests and integration suites.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "crate::test_utils defines the one issue-construction fixture.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared test support",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One function is added to shared support, with no caller changed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_utils.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "library-fixture-issue-adoption",
+    "title": "Library unit tests use the shared issue fixture",
+    "description": "Retire the library's own issue-construction fixture in favour of the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/domain/types.rs` defines no issue-construction fixture, and no production module does.\n- [hard] REQ-02: Each library unit test calls the shared fixture; call sites change only their path, and each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-fixture-issue"
+    ],
+    "planning": {
+      "outcome": "Library unit tests call the shared issue fixture, and domain/types.rs defines none.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "library unit-test modules",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "A path rewrite at call sites of one function, with no behaviour change.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/commands/claim.rs",
+            "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/src/commands/gate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/snapshot.rs",
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/commands/template_expand.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/declarations/rules.rs",
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "crates/jit/src/domain/artifact_conformance.rs",
+            "crates/jit/src/domain/artifact_directory.rs",
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/domain/projection.rs",
+            "crates/jit/src/domain/queries.rs",
+            "crates/jit/src/domain/store_divergence.rs",
+            "crates/jit/src/domain/type_taxonomy.rs",
+            "crates/jit/src/domain/types.rs",
+            "crates/jit/src/graph/hierarchy.rs",
+            "crates/jit/src/graph/mod.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/repository_state/archive.rs",
+            "crates/jit/src/repository_state/default_rules.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/reference.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/validation/desugar.rs",
+            "crates/jit/src/validation/graph.rs",
+            "crates/jit/src/validation/local.rs",
+            "crates/jit/src/visualization.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-issue-fixture-issue-adoption",
+    "title": "fast_issue uses the shared issue fixture",
+    "description": "Retire the `fast_issue` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/fast_issue/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `fast_issue/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-fixture-issue"
+    ],
+    "planning": {
+      "outcome": "The fast_issue suite calls the shared issue fixture and defines no copy.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_issue suite root",
+        "test_boundary": "fast_issue integration target",
+        "worker_sized_reason": "Removes one five-line copy and imports the shared function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_issue/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-docs-templates-fixture-issue-adoption",
+    "title": "fast_docs_templates uses the shared issue fixture",
+    "description": "Retire the `fast_docs_templates` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/fast_docs_templates/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `fast_docs_templates/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-fixture-issue"
+    ],
+    "planning": {
+      "outcome": "The fast_docs_templates suite calls the shared issue fixture and defines no copy.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_docs_templates suite root",
+        "test_boundary": "fast_docs_templates integration target",
+        "worker_sized_reason": "Removes one five-line copy and imports the shared function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_docs_templates/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-rules-fixture-issue-adoption",
+    "title": "fast_rules uses the shared issue fixture",
+    "description": "Retire the `fast_rules` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/fast_rules/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `fast_rules/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-fixture-issue"
+    ],
+    "planning": {
+      "outcome": "The fast_rules suite calls the shared issue fixture and defines no copy.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_rules suite root",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Removes one five-line copy and imports the shared function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-query-graph-fixture-issue-adoption",
+    "title": "cli_query_graph uses the shared issue fixture",
+    "description": "Retire the `cli_query_graph` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/cli_query_graph/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli_query_graph/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-fixture-issue"
+    ],
+    "planning": {
+      "outcome": "The cli_query_graph suite calls the shared issue fixture and defines no copy.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "cli_query_graph suite root",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Removes one five-line copy and imports the shared function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "store-generic-initialisation",
+    "title": "Product initialisation runs over any repository-state store",
+    "description": "Let the product's repository initialisation run over any repository-state store, so in-memory repositories can be initialised by the same code as file-backed ones.\n\n## Background\n\n`initialize_fresh_repository` and `run_initialization` exist only on `impl CommandExecutor<JsonFileStorage>` (`crates/jit/src/commands/init.rs:73-215`), although both go through the generic `with_mutation_session`. `repository_state::initialize::structural_minimum_config` is the pure minimal configuration. Test support therefore seeds memory stores by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: Product initialisation is available on `CommandExecutor<S>` for every store implementing the repository-state store trait, and the JSON backend's behaviour is unchanged.\n- [hard] REQ-02: A unit test initialises an in-memory store and observes the same configuration, index and data-root files the JSON backend writes.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:core",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/architecture-dependency-direction"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Product initialisation runs over any repository-state store with unchanged file-backed behaviour.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "repository initialisation",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Generalises one impl block's receiver type and adds one cross-backend test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/init.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shared-memory-executor",
+    "title": "Memory executor initialised through product initialisation",
+    "description": "Make the shared memory executor set up its repository through product initialisation instead of hand-written configuration.\n\n## Background\n\n`crate::commands::test_helpers::memory_executor` seeds `[worktree] enforce_leases = \"off\"` and the data-root ignore file by hand; `TestHarness` (`crate::test_harness`) builds on it, and library command tests (`commands/{batch_create,bulk_update,dependency,gate_check,gate,issue,mod,validate}.rs`) call it. Product initialisation runs over any repository-state store. A second copy in the `fast_rules` suite root writes a literal index body.\n\n## Success Criteria\n\n- [hard] REQ-01: The shared `memory_executor` seeds configuration and index by running product initialisation over the memory store, and writes no literal configuration, schema version or index body.\n- [hard] REQ-02: `TestHarness` builds on it, and a library test that relied on the former fixture configuration declares that value itself and keeps the property it asserted.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "store-generic-initialisation"
+    ],
+    "planning": {
+      "outcome": "The shared memory executor is set up by product initialisation, and TestHarness builds on it.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared memory executor",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One fixture function changes its seeding; library callers keep their signature.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/test_helpers.rs",
+            "crates/jit/src/test_harness.rs"
+          ],
+          "uncertainty": "Library tests that relied on enforce_leases = off are found by running the library suite."
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-rules-memory-executor-adoption",
+    "title": "fast_rules uses the shared memory executor",
+    "description": "Retire the `fast_rules` suite's own memory executor in favour of the shared one.\n\n## Background\n\n`memory_executor` in `crates/jit/tests/fast_rules/main.rs` seeds an empty configuration and a literal index body carrying `\"schema_version\": 2`, then delegates to the shared executor, which product initialisation now sets up. Its callers are `fast_rules/{example_rulesets,label_query,label_strategic,validate_rule_runner,validation}_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `fast_rules/main.rs` defines no executor fixture, and no file in the suite writes a literal schema version or index body.\n- [hard] REQ-02: Each former caller uses the shared executor and asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-memory-executor"
+    ],
+    "planning": {
+      "outcome": "The fast_rules suite uses the shared memory executor and defines no copy.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_rules executor callers",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Removes one wrapper and points five files at the shared function.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/main.rs",
+            "crates/jit/tests/fast_rules/example_rulesets_tests.rs",
+            "crates/jit/tests/fast_rules/label_query_tests.rs",
+            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
+            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
+            "crates/jit/tests/fast_rules/validation_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shipped-item-kinds-derivation",
+    "title": "Shared test support derives shipped item kinds from the default package",
+    "description": "Give test support one derivation of the shipped item-kind declarations from the default profile package.\n\n## Background\n\nThe shipped item kinds are the `[[contribution]] target = \"item-kinds\"` section of `profiles/jit-default/manifest.toml`. Tests restate them by hand in four places and the `D-[0-9]+` id pattern 14 times. `@/inv/domain-agnostic` keeps package vocabulary out of engine code, so the derivation belongs to test support.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support exposes the shipped item-kind declarations as read from the default package's item-kinds contribution, in the TOML and typed forms tests consume, with no restated kind, alias, mode or id pattern.\n- [hard] REQ-02: A unit test proves that a change to the package's contribution changes the derivation's output.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-07",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/domain-agnostic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Shared test support derives shipped item-kind declarations from the default profile package.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "shipped-item-kinds-fixture"
+      ],
+      "source_refs": [
+        "REQ-07",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared test support",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One derivation function with its test, and no consumer changed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_utils.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "harness-shipped-item-kinds",
+    "title": "Harness and test taxonomy take shipped item kinds from the derivation",
+    "description": "Retire the item-kind tables in the shared harness and test taxonomy in favour of the package derivation.\n\n## Background\n\n`TestHarness::with_item_kinds` (`crates/jit/src/test_harness.rs`) hand-copies the shipped kinds as `CANONICAL_ITEM_KINDS`, with the `D-[0-9]+` pattern, and `SUITE_TABLES` in `crates/jit/src/test_taxonomy.rs` restates them again. Shared test support derives the shipped kinds from `profiles/jit-default/manifest.toml`. `dev/TESTING.md` documents `with_item_kinds` as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `TestHarness::with_item_kinds` and `test_taxonomy` take shipped kinds from the derivation, and neither holds an item-kind literal.\n- [hard] REQ-02: Harness tests that use item kinds assert what they asserted before.\n- [hard] REQ-03: `dev/TESTING.md` describes the derivation where it describes `with_item_kinds`.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-07",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shipped-item-kinds-derivation"
+    ],
+    "planning": {
+      "outcome": "TestHarness and test_taxonomy take shipped item kinds from the package derivation.",
+      "contract_refs": [
+        "shipped-item-kinds-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-07",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared harness tables",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Two literal tables switch to one existing derivation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_harness.rs",
+            "crates/jit/src/test_taxonomy.rs",
+            "dev/TESTING.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "unit-test-shipped-item-kinds",
+    "title": "Command unit tests take shipped item kinds from the default package",
+    "description": "Remove the item-kind copies from command and domain unit tests.\n\n## Background\n\n`CANONICAL_ITEM_KINDS` is hand-copied in the test modules of `crates/jit/src/commands/item.rs` (`:570`, with its `D-[0-9]+` pattern at `:581`) and `crates/jit/src/commands/validate.rs` (`:2975`, pattern at `:2986`). `crates/jit/src/domain/item.rs` tests hard-code the decision kind's `D-[0-9]+` pattern (`:1633`, `:2087`). Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Unit tests in `commands/item.rs`, `commands/validate.rs` and `domain/item.rs` that need shipped kinds take them from the shared derivation.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No unit test under `crates/jit/src` restates a shipped kind's declaration or its id pattern.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-07",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shipped-item-kinds-derivation"
+    ],
+    "planning": {
+      "outcome": "Item, validate and domain item unit tests read shipped item kinds from the shared derivation.",
+      "contract_refs": [
+        "shipped-item-kinds-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-07"
+      ],
+      "terminal": {
+        "consumer_family": "item-kind unit tests",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Three test modules switch literal tables to one existing derivation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/domain/item.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-item-validate-shipped-item-kinds",
+    "title": "Decision-kind CLI tests take shipped item kinds from the default package",
+    "description": "Remove the decision-kind copies from the item and validate CLI suite.\n\n## Background\n\n`cli_item_validate/decision_kind_tests.rs` (`:15`, `:55`, `:175`) and `cli_item_validate/decision_risk_story_tests.rs` (`:16`, `:65`, `:131`) restate the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No test in these files restates a shipped kind's declaration or its id pattern.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-07",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shipped-item-kinds-derivation",
+      "cli-item-validate-migration"
+    ],
+    "planning": {
+      "outcome": "Decision-kind CLI tests read shipped item kinds from the shared derivation.",
+      "contract_refs": [
+        "shipped-item-kinds-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-07"
+      ],
+      "terminal": {
+        "consumer_family": "decision-kind CLI tests",
+        "test_boundary": "cli_item_validate integration target",
+        "worker_sized_reason": "Two test files switch literal declarations to one existing derivation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_item_validate/decision_kind_tests.rs",
+            "crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-rules-shipped-item-kinds",
+    "title": "Projection-render tests take shipped item kinds from the default package",
+    "description": "Remove the decision-kind copies from the projection-render harness tests.\n\n## Background\n\n`fast_rules/project_render_harness_tests.rs` (`:133`, `:189`, `:467`) restates the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No test in these files restates a shipped kind's declaration or its id pattern.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-07",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shipped-item-kinds-derivation",
+      "fast-rules-memory-setup-adoption"
+    ],
+    "planning": {
+      "outcome": "Projection-render harness tests read shipped item kinds from the shared derivation.",
+      "contract_refs": [
+        "shipped-item-kinds-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-07"
+      ],
+      "terminal": {
+        "consumer_family": "projection-render harness tests",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "One test file switches literal declarations to one existing derivation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/project_render_harness_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "library-git-fixture-adoption",
+    "title": "Library unit tests initialise git through the shared helper",
+    "description": "Retire the private git setup in library unit-test modules in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. Eight library test modules hand-roll `git init`: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs` and `commands/archive.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No library test module defines a git initialisation helper or spawns `git init` itself; each uses the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-process-fixture"
+    ],
+    "planning": {
+      "outcome": "Library unit-test modules initialise git repositories through the shared helper.",
+      "contract_refs": [
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "library unit-test modules",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Eight modules replace a few lines of git setup with one existing call.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/gate_execution.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/hooks.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/profile/repository_package.rs",
+            "crates/jit/src/commands/archive.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "server-git-fixture-adoption",
+    "title": "Server unit tests initialise git through the shared helper",
+    "description": "Retire the private git setup in the server's route tests in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. `crates/server/src/routes.rs` tests hand-roll `git init`; the server crate's tests enable `jit`'s `test-support` feature.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/server/src/routes.rs` tests initialise git only through the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "component:server",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-process-fixture"
+    ],
+    "planning": {
+      "outcome": "Server route tests initialise git repositories through the shared helper.",
+      "contract_refs": [
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05"
+      ],
+      "terminal": {
+        "consumer_family": "server route tests",
+        "test_boundary": "jit-server unit tests",
+        "worker_sized_reason": "One module replaces a few lines of git setup with one existing call.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-docs-templates-git-fixture-adoption",
+    "title": "Git revision tests initialise git through the shared helper",
+    "description": "Retire the private git setup in the git-revision suite file in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:15-20` hand-rolls `git init` with a fixed author identity in its `Repo` fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: `git_revision_tests.rs` initialises git only through the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-process-fixture"
+    ],
+    "planning": {
+      "outcome": "Git-revision suite tests initialise git repositories through the shared helper.",
+      "contract_refs": [
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "git revision tests",
+        "test_boundary": "fast_docs_templates integration target",
+        "worker_sized_reason": "One file replaces its git initialisation with one existing call.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_docs_templates/git_revision_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "file-backed-setup-constructors",
+    "title": "Shared constructors for file-backed in-process test repositories",
+    "description": "Give in-process suites shared constructors for file-backed repositories, executors and declaration directories.\n\n## Background\n\nIn-process suites define private helpers that create a temporary repository from a configuration, run `jit init`, open a `JsonFileStorage` executor with a discovered layout, or write declaration files into a temporary directory. Shared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`), which take no configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository root, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: Unit tests prove each constructor's result: the configuration is the caller's, the executor's layout is the repository's, and the directory holds exactly the supplied files.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Shared test support constructs file-backed repositories, executors and declaration directories.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "file-setup-constructors"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared test support",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Three small constructors with their tests, and no consumer changed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_utils.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-rules-file-setup-adoption",
+    "title": "fast_rules file-backed tests use the shared constructors",
+    "description": "Retire the private file-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. These `crates/jit/tests/fast_rules` helpers duplicate them: `executor` and `setup_initialized_repo` in `default_rules_registry_derivation_tests.rs` (`:18`, `:28`) and again in `type_hierarchy_schema_regen_tests.rs` (`:10`, `:16`); `repo` and `executor` in `effective_rules_tests.rs` (`:16`, `:36`); and `scaffold_declaring` in `undeclared_taxonomy_tests.rs:20`. The profiled setup in `cli_warnings_integration_tests.rs` is already gone.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that creates a file-backed repository or opens a file-backed executor.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "rule-warning-tests-down-a-layer"
+    ],
+    "planning": {
+      "outcome": "fast_rules file-backed tests build repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_rules file-backed setups",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Four files replace private helpers with existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs",
+            "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
+            "crates/jit/tests/fast_rules/effective_rules_tests.rs",
+            "crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-docs-templates-file-setup-adoption",
+    "title": "fast_docs_templates file-backed tests use the shared constructors",
+    "description": "Retire the private file-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. `file_backed_executor` in `crates/jit/tests/fast_docs_templates/planning_preset_tests.rs:21` and `setup` in `templates_loader_tests.rs:16`, which writes declaration files into a temporary directory, duplicate them.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors"
+    ],
+    "planning": {
+      "outcome": "fast_docs_templates file-backed tests use the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_docs_templates file-backed setups",
+        "test_boundary": "fast_docs_templates integration target",
+        "worker_sized_reason": "Two files replace private helpers with existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_docs_templates/planning_preset_tests.rs",
+            "crates/jit/tests/fast_docs_templates/templates_loader_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "memory-declaration-seeding",
+    "title": "Shared memory executor accepts declarations as data",
+    "description": "Give in-process suites one way to build a memory store and executor from declared configuration, rules and templates on top of the shared memory executor.\n\n## Background\n\nThe shared memory executor (`crate::commands::test_helpers::memory_executor`) is set up by product initialisation. In-process suites build their own `InMemoryStorage` and write `config.toml`, `rules.toml` or `templates.toml` around it before calling it.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor.\n- [hard] REQ-02: A unit test proves that the supplied declarations are what the executor loads and that unsupplied ones are product defaults.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-memory-executor"
+    ],
+    "planning": {
+      "outcome": "Shared test support builds memory stores and executors from declarations passed as data.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "memory-declaration-seeding"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "shared memory executor",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One seeding entry point with its test, and no consumer changed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/test_helpers.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-issue-memory-setup-adoption",
+    "title": "fast_issue memory-backed tests use the shared seeding",
+    "description": "Retire the private memory-backed setups of the `fast_issue` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_issue` helpers build their own store or executor: `store_with_rules` and `executor_for` in `graph_rule_validation_tests.rs` (`:15`, `:34`), `executor_with_rules` in `transition_graph_enforcement_tests.rs:24`, `executor` in `strictness_enforcement_tests.rs:42` and `strictness_transition_tests.rs:41`, and `make_storage` in `short_hash_tests.rs:389`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_issue` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding"
+    ],
+    "planning": {
+      "outcome": "fast_issue memory-backed tests build stores and executors through the shared seeding.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_issue memory-backed setups",
+        "test_boundary": "fast_issue integration target",
+        "worker_sized_reason": "Five files replace private helpers with one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_issue/graph_rule_validation_tests.rs",
+            "crates/jit/tests/fast_issue/transition_graph_enforcement_tests.rs",
+            "crates/jit/tests/fast_issue/strictness_enforcement_tests.rs",
+            "crates/jit/tests/fast_issue/strictness_transition_tests.rs",
+            "crates/jit/tests/fast_issue/short_hash_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-rules-memory-setup-adoption",
+    "title": "fast_rules memory-backed tests use the shared seeding",
+    "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_rules` helpers build their own store or executor: `store_with_rules` in `validate_rule_runner_tests.rs:21`, `executor_with_rules` in `local_rule_enforcement_tests.rs:20`, `storage_with` and `render_executor` in `project_render_harness_tests.rs` (`:77`, `:90`), `strategic_executor` in `label_strategic_tests.rs:13`, and `executor_with_sdd_example` and `research_coverage_executor` in `example_rulesets_tests.rs` (`:612`, `:1524`).\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding",
+      "fast-rules-memory-executor-adoption"
+    ],
+    "planning": {
+      "outcome": "fast_rules memory-backed tests build stores and executors through the shared seeding.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_rules memory-backed setups",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Five files replace private helpers with one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs",
+            "crates/jit/tests/fast_rules/project_render_harness_tests.rs",
+            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
+            "crates/jit/tests/fast_rules/example_rulesets_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fast-docs-templates-memory-setup-adoption",
+    "title": "fast_docs_templates memory-backed tests use the shared seeding",
+    "description": "Retire the private memory-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. `executor_with_templates` in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs:106` and `memory_storage` in `template_apply_atomicity_tests.rs:380` build their own store or executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding"
+    ],
+    "planning": {
+      "outcome": "fast_docs_templates memory-backed tests build stores and executors through the shared seeding.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "fast_docs_templates memory-backed setups",
+        "test_boundary": "fast_docs_templates integration target",
+        "worker_sized_reason": "Two files replace private helpers with one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_docs_templates/template_binding_tests.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-issue-prefix-case-moves",
+    "title": "Issue-show prefix cases move beside their owner",
+    "description": "Move the `issue show` id-prefix cases that only the exit-code suite tests beside the status projection tests, which already own the prefix error code.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1189` and `:1220`: an ambiguous and a too-short prefix on `issue show` (\"Ambiguous ID\", `AMBIGUOUS_ID`, \"at least 4 characters\"). `cli_issue/issue_status_projection_tests.rs` owns `INVALID_ID_PREFIX`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test in `cli_issue/issue_status_projection_tests.rs` with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test there already owns is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-issue-command-migration"
+    ],
+    "planning": {
+      "outcome": "The issue-show prefix cases live in the status projection tests with their non-exit assertions.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "issue-show prefix tests",
+        "test_boundary": "cli_issue integration target",
+        "worker_sized_reason": "Two cases move with their assertions into one existing file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/issue_status_projection_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-dependency-guard-case-moves",
+    "title": "Dependency and query argument-guard cases move beside their owners",
+    "description": "Move the `dep add`, `dep rm` and `query` argument-guard cases that only the exit-code suite tests beside the tests of those commands.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1372` and `:1447`: a too-short and an ambiguous prefix in both `dep add` positions.\n- `:1315`: symmetric argument validation for `dep rm`.\n- `:1280`: the guard against a parent filter given before the `query` subcommand (\"were given before\", `INVALID_ARGUMENT`); the string appears only in `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The `dep add` and `dep rm` cases have owning tests in `cli_query_graph/dep_add_redundancy_cli_tests.rs`, and the parent-filter guard has one in `cli_query_graph/query_json_tests.rs`, each with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test there already owns is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-query-graph-migration"
+    ],
+    "planning": {
+      "outcome": "Dependency and query argument-guard cases live beside the tests of those commands.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "dependency-query argument tests",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Four cases move with their assertions into two existing files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/dep_add_redundancy_cli_tests.rs",
+            "crates/jit/tests/cli_query_graph/query_json_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-gate-preset-case-move",
+    "title": "Gate preset registry case moves beside its owner",
+    "description": "Move the gate preset case that only the exit-code suite tests beside the gate preset tests.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1079`: `gate preset create` naming a gate that was removed from the registry (\"Gate not found in registry: mygate\").\n\n## Success Criteria\n\n- [hard] REQ-01: The case has an owning test in `cli_repo_workflow/gate_preset_tests.rs` with the same non-exit assertion.\n- [hard] REQ-02: The moved case names a numeric exit code only where the projection has no row for its command and code.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-repo-profile-migration"
+    ],
+    "planning": {
+      "outcome": "The gate preset registry case lives in the gate preset tests with its message assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "gate preset tests",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "One case moves with its assertion into one existing file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/gate_preset_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-issue-list-envelope-reassertion-removal",
+    "title": "cli_issue tests stop re-asserting the list-envelope count",
+    "description": "Remove the per-command checks of `count` against collection length from the `cli_issue` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_issue/container_rollup_tests.rs:211,348`, `cli_issue/issue_search_json_tests.rs:234`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "list-envelope-coverage-test",
+      "cli-issue-command-migration"
+    ],
+    "planning": {
+      "outcome": "No cli_issue test re-asserts count against collection length.",
+      "contract_refs": [
+        "list-envelope-coverage"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "cli_issue list-emitting tests",
+        "test_boundary": "cli_issue integration target",
+        "worker_sized_reason": "Drops one or two assertions or a helper per file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/container_rollup_tests.rs",
+            "crates/jit/tests/cli_issue/issue_search_json_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-query-graph-list-envelope-reassertion-removal",
+    "title": "cli_query_graph tests stop re-asserting the list-envelope count",
+    "description": "Remove the per-command checks of `count` against collection length from the `cli_query_graph` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_query_graph/search_tests.rs:236`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "list-envelope-coverage-test",
+      "cli-query-graph-migration"
+    ],
+    "planning": {
+      "outcome": "No cli_query_graph test re-asserts count against collection length.",
+      "contract_refs": [
+        "list-envelope-coverage"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "cli_query_graph list-emitting tests",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Drops one or two assertions or a helper per file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/search_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-repo-workflow-list-envelope-reassertion-removal",
+    "title": "cli_repo_workflow tests stop re-asserting the list-envelope count",
+    "description": "Remove the per-command checks of `count` against collection length from the `cli_repo_workflow` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_repo_workflow/artifact_conformance_cli_tests.rs (about :640)`, `cli_repo_workflow/profile_cli_tests.rs:1695 (assert_count_envelope)`, `cli_repo_workflow/worktree_cli_tests.rs:546,1036`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "list-envelope-coverage-test",
+      "cli-repo-workflow-migration",
+      "cli-repo-profile-migration",
+      "cli-repo-checkout-migration"
+    ],
+    "planning": {
+      "outcome": "No cli_repo_workflow test re-asserts count against collection length.",
+      "contract_refs": [
+        "list-envelope-coverage"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "cli_repo_workflow list-emitting tests",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "Drops one or two assertions or a helper per file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "query-domain-owner-gaps",
+    "title": "Domain query tests own each property the query re-proofs assert",
+    "description": "Give the domain query tests an owning case for every query property the CLI and executor re-proofs assert, before those re-proofs are cut to wiring.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns the query filters, label queries (`query_by_label`, `query_by_labels`, `query_strategic` at `:278`, `:318`, `:336`) and the available-work order, with unit and property tests. Subprocess and executor tests re-prove those semantics. In `cli_query_graph` they are `query_tests.rs` (25), `label_filter_repeatable_query_tests.rs` (17), `label_query_json_tests.rs` (7), `query_json_tests.rs` (5) and `label_hierarchy_e2e_test.rs` (4). In `fast_rules` they are `label_query_tests.rs` (12) and `label_strategic_tests.rs` (7).\n\n## Success Criteria\n\n- [hard] REQ-01: For each query property those files assert (filter membership, AND semantics, pattern matching, case sensitivity, strategic selection, empty repositories, ordering), `domain/queries.rs` has an owning test.\n- [hard] REQ-02: A property already owned there is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:core",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "query-available-domain-order"
+    ],
+    "planning": {
+      "outcome": "domain/queries.rs owns each query property the CLI and executor re-proofs assert.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "domain query tests",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Adds only missing cases, compared against a fixed list of files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/queries.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "query-cli-wiring-reduction",
+    "title": "Query CLI tests assert one wiring case per subcommand and flag",
+    "description": "Cut the subprocess query suite to wiring cases, now that the domain owns query semantics.\n\n## Background\n\n`crates/jit/tests/cli_query_graph/query_tests.rs` has 25 subprocess tests (1,422 lines) and 32 `split_whitespace` sites. It re-proves filters and priority order that `crates/jit/src/domain/queries.rs` owns as pure functions. `dev/TESTING.md:619` cites the file as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `query_tests.rs` holds at most one case per `query` subcommand and per flag, each asserting that the command reaches the domain query, for example that a filter is applied, and not the query's semantics.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n- [hard] REQ-03: The remaining cases spawn `jit` through the shared CLI process fixture and read ids from `--json` output.\n- [hard] REQ-04: `dev/TESTING.md` describes the reduced suite.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-02",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "query-domain-owner-gaps",
+      "cli-query-graph-migration"
+    ],
+    "planning": {
+      "outcome": "query_tests.rs keeps one wiring case per query subcommand or flag on the shared CLI process fixture.",
+      "contract_refs": [
+        "domain-query-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02",
+        "REQ-05"
+      ],
+      "terminal": {
+        "consumer_family": "query CLI tests",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "One file shrinks to a handful of wiring cases on an existing fixture.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/query_tests.rs",
+            "dev/TESTING.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "label-query-cli-wiring-reduction",
+    "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
+    "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic`. Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "query-domain-owner-gaps",
+      "exit-code-dependency-guard-case-moves"
+    ],
+    "planning": {
+      "outcome": "Label and filter CLI tests keep one wiring case per subcommand or flag, and the domain owns label semantics.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "label query CLI tests",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Four files shrink to wiring cases on an existing fixture.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/label_filter_repeatable_query_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_query_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "label-query-harness-reduction",
+    "title": "Label and strategic executor tests keep one wiring case each",
+    "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "query-domain-owner-gaps",
+      "fast-rules-memory-setup-adoption"
+    ],
+    "planning": {
+      "outcome": "Executor label and strategic tests keep one wiring case per entry point, and the domain owns the semantics.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "label query executor tests",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Two files shrink to a few wiring cases each.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/label_query_tests.rs",
+            "crates/jit/tests/fast_rules/label_strategic_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "auto-transition-wiring-reduction",
+    "title": "Workflow CLI tests keep one auto-transition wiring case",
+    "description": "Cut the CLI re-proofs of dependency auto-transitions to one wiring case.\n\n## Background\n\n`crates/jit/tests/cli_repo_workflow/workflow_tests.rs` re-proves dependency auto-transitions in four subprocess tests (`:529`, `:577`, `:646`, `:698`). A pure domain function owns the rules, with unit and property tests.\n\n## Success Criteria\n\n- [hard] REQ-01: `workflow_tests.rs` holds one auto-transition case, which shows that completing a dependency through the CLI readies its dependent; the other three cases no longer exist.\n- [hard] REQ-02: Each removed case's rule has an owning test of the domain function; a case whose rule has none stays.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "auto-transition-domain-decision",
+      "cli-repo-workflow-migration"
+    ],
+    "planning": {
+      "outcome": "One CLI case shows completing a dependency readies its dependent; the domain owns the rules.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "auto-transition CLI tests",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "Four cases in one file collapse to one.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/workflow_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "auto-transition-harness-owner",
+    "title": "Lifecycle harness tests stop re-proving the auto-transition cascade",
+    "description": "Leave one harness owner of the cascade wiring by removing the cascade re-proof from the lifecycle timestamp tests.\n\n## Background\n\nHarness-level tests at `crates/jit/src/commands/bulk_update.rs:2001` and `crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs:89` both drive the command cascade to dependents. A pure domain function owns the cascade's rules, and the `bulk_update.rs` test is the harness owner of its wiring.\n\n## Success Criteria\n\n- [hard] REQ-01: `lifecycle_timestamps_tests.rs` asserts no cascade rule; a test there keeps the timestamp properties it asserts.\n- [hard] REQ-02: The `bulk_update.rs` test remains the one harness test that asserts the cascade's wiring.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "auto-transition-domain-decision"
+    ],
+    "planning": {
+      "outcome": "Lifecycle harness tests assert timestamps only, and one harness test owns the cascade wiring.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "lifecycle harness tests",
+        "test_boundary": "fast_issue integration target",
+        "worker_sized_reason": "Removes cascade assertions from one test file.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "batch-cycle-adapter-reproof-removal",
+    "title": "Batch-create stops re-proving keyed cycle detection",
+    "description": "Remove the batch-create unit tests that repeat the keyed graph's cycle tests over an adapter.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`). `crates/jit/src/commands/batch_create.rs:640` adapts keyed detection, and four tests at `:686-707` repeat the keyed tests over that adapter.\n\n## Success Criteria\n\n- [hard] REQ-01: The four adapter tests in `commands/batch_create.rs` no longer exist; at most one test there shows that batch creation rejects a cyclic manifest through the adapter.\n- [hard] REQ-02: Each cycle property the removed tests covered has an owning test in `crates/jit/src/graph/`.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests",
+      "enforces:@/invariant/dag-acyclic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Batch-create keeps at most one adapter wiring test, and graph tests own keyed cycle detection.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "batch-create cycle tests",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Four test deletions in one module, with owners already present.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/batch_create.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-cycle-reproof-removal",
+    "title": "Workflow CLI tests stop re-proving dependency cycle rejection",
+    "description": "Remove the CLI test that re-proves dependency cycle rejection.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`). `crates/jit/tests/cli_repo_workflow/integration_test.rs:616` re-proves cycle rejection through the CLI; the cycle exit code is bound by the exit-code projection suite.\n\n## Success Criteria\n\n- [hard] REQ-01: `integration_test.rs` holds no dependency cycle re-proof.\n- [hard] REQ-02: The cycle property it covered has an owning test in `crates/jit/src/graph/`.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests",
+      "enforces:@/invariant/dag-acyclic"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-repo-workflow-migration"
+    ],
+    "planning": {
+      "outcome": "integration_test.rs holds no dependency cycle re-proof.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "CLI cycle re-proof",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "One test deletion with its owner already present.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/integration_test.rs"
           ]
         }
       }
@@ -3108,7 +4022,9 @@
     ],
     "depends_on": [
       "exit-code-reproof-deletion",
-      "list-envelope-reassertion-removal",
+      "cli-issue-list-envelope-reassertion-removal",
+      "cli-query-graph-list-envelope-reassertion-removal",
+      "cli-repo-workflow-list-envelope-reassertion-removal",
       "exit-code-reassertion-cli-gate",
       "exit-code-reassertion-cli-issue",
       "exit-code-reassertion-cli-query-graph",
@@ -3150,7 +4066,8 @@
       "query-cli-wiring-reduction",
       "auto-transition-wiring-reduction",
       "auto-transition-harness-owner",
-      "cycle-reproof-removal",
+      "batch-cycle-adapter-reproof-removal",
+      "cli-cycle-reproof-removal",
       "harness-demo-deletion",
       "label-query-cli-wiring-reduction",
       "label-query-harness-reduction"
@@ -3231,11 +4148,21 @@
       "cli-repo-profile-migration",
       "cli-repo-workflow-migration",
       "library-git-fixture-adoption",
-      "shared-fixture-issue",
+      "server-git-fixture-adoption",
+      "fast-docs-templates-git-fixture-adoption",
+      "library-fixture-issue-adoption",
+      "fast-issue-fixture-issue-adoption",
+      "fast-docs-templates-fixture-issue-adoption",
+      "fast-rules-fixture-issue-adoption",
+      "harness-shipped-item-kinds",
       "unit-test-shipped-item-kinds",
-      "suite-shipped-item-kinds",
-      "env-reading-tests-guarded",
-      "in-process-file-setup-consolidation"
+      "cli-item-validate-shipped-item-kinds",
+      "fast-rules-shipped-item-kinds",
+      "fast-rules-file-setup-adoption",
+      "fast-docs-templates-file-setup-adoption",
+      "fast-issue-memory-setup-adoption",
+      "fast-docs-templates-memory-setup-adoption",
+      "env-reading-tests-guarded"
     ],
     "planning": {
       "outcome": "CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards",

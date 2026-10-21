@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "blocked: waits on external 3754095f, 8673dc5e"
+          "status": "in_progress (opus worker dispatched 2026-10-21)"
         },
         {
           "key": "list-envelope-adoption",
@@ -712,14 +712,11 @@
   ],
   "rework_counts": {
     "719a5501": 0,
-    "650e6a56": 1
+    "650e6a56": 1,
+    "d8176fd3": 0
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
-    "d8176fd3": [
-      "3754095f (backlog, waits on f37d228e)",
-      "8673dc5e (in_progress)"
-    ],
     "083c9a91": [
       "d759d606"
     ],

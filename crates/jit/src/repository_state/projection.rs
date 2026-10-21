@@ -97,7 +97,7 @@ pub enum ProjectionError {
 /// Each invariant is listed in authored order. The two styles
 /// ([`ProjectionStyle`], REQ-08) differ only in framing:
 ///
-/// - [`ProjectionStyle::Full`] (the default) renders a `## Project invariants`
+/// - [`ProjectionStyle::Full`] renders a `## Project invariants`
 ///   header followed by one `- **{id}** [{kind}]{enforced_by}: {statement}` bullet
 ///   per invariant, where `enforced_by` is `` (enforced-by: `<rule>`)`` when bound.
 ///   This output is byte-identical to the original single-style render.

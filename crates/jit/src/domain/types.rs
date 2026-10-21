@@ -474,7 +474,8 @@ pub struct Issue {
     pub labels: Vec<String>,
     /// Content format of the `description` body, selecting the parser used to
     /// extract `sections` during validation. Absent (`None`) means inherit the
-    /// repo default (`[validation].content_format`), with a Markdown fallback.
+    /// repo default (`[validation].content_format`), falling back to
+    /// [`ContentFormat::DEFAULT`].
     /// Existing issue files without this field deserialize as `None` and are NOT
     /// rewritten (skipped on serialize when absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]

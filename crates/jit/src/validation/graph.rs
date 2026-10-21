@@ -1085,8 +1085,8 @@ fn describe_link(link: ChildLink) -> &'static str {
 ///
 /// The body is parsed with the [`ContentParser`](crate::document::ContentParser)
 /// selected by [`content_parser_for`]: the source's own `content_format` → else
-/// `repo_default_format` → else Markdown. A selected format whose parser feature
-/// is not compiled returns
+/// `repo_default_format` → else [`ContentFormat::DEFAULT`]. A selected format
+/// whose parser feature is not compiled returns
 /// [`ContentParserError`](crate::document::ContentParserError) rather than a
 /// silent Markdown fallback, so the caller can surface it as a finding.
 fn criterion_ids(
