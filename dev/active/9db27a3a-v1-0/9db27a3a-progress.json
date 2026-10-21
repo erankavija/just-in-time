@@ -473,6 +473,13 @@
       "status": "open",
       "date": "2026-10-21",
       "summary": "When b697a3f7 is planned: its REQ-01 readiness derivation must also cover 9876a23a REQ-14's `validate --fix` single mutation (converging on the one derivation)."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-18, @/inv/shared-test-contracts",
+      "summary": "D1: c780514e's fixture consolidation lands before 2195c98f's eight retype tasks, which get edges onto specific c780514e fixture terminals. Those terminals carry no 2195c98f or 842b0ac6 dependency and run in the first wave. Rejected: c780514e waiting behind 107 retype-chain tasks. D2: c780514e REQ-08 owns the IssueStore conformance suite and 89e7a273 consumes it. D3: REQ-13 added (suite clock measured before and after; no default-suite test over 5 s warm at load <=10; server shutdown test and doctests in scope). D4: REQ-01/04 consolidate after df129d9e's 650e6a56, not after the handler wave."
     }
   ],
   "notes": [
