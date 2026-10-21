@@ -14,7 +14,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-10-21T01:50:36.097912150Z",
+      "updated_at": "2026-10-21T05:38:29.178601357Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Batch update filter panics on non-ASCII query text",
-  "updated_at": "2026-10-21T01:50:36.097912150Z"
+  "updated_at": "2026-10-21T05:38:29.178601357Z"
 }
