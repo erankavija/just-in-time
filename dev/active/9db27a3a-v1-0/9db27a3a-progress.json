@@ -537,7 +537,8 @@
     "2026-10-21 ~20:30-23:30: fifth shared usage-limit stall; work was resumed at 23:31. Tally: 842b0ac6 26 done; 3d9a0ce3 13 done (8673dc5e conversion pending); df129d9e 11 done (blocked on 3d9a0ce3); c780514e and 9876a23a in planning.",
     "2026-10-21 ~23:50: 9876a23a planned (39 issues, 67 edges; behaviour changes are stated in its tasks). just-in-time-59 is assigned to plan b697a3f7, with the steward's open notes for that planner passed along.",
     "2026-10-21 23:45: gates_status run_id conversion committed (e2f2693d8): 2615 entries lacked run_id; 2407 pointed at existing runs; 210 runs published from entry fields; 19 pending untouched; 0 remaining. The steward reinstalled the dogfood binary at e2f2693d8. The one-off tool lives in the steward scratchpad (convert/target/release/gate-run-id-backfill), outside the repository.",
-    "2026-10-22 ~00:05: 8673dc5e and 3754095f are done, unblocking df129d9e's d8176fd3; a third df129d9e execution lead was dispatched from handoff-3. The steward reinstalled the dogfood binary at b12262ecc after 842b0ac6's 2492ab29 removed `migrate lifecycle-timestamps`. mcp-server tests pass at 69/0 and 14/0."
+    "2026-10-22 ~00:05: 8673dc5e and 3754095f are done, unblocking df129d9e's d8176fd3; a third df129d9e execution lead was dispatched from handoff-3. The steward reinstalled the dogfood binary at b12262ecc after 842b0ac6's 2492ab29 removed `migrate lifecycle-timestamps`. mcp-server tests pass at 69/0 and 14/0.",
+    "2026-10-22: standing permission. Any lead whose merge changes the CLI surface may reinstall the dogfood binary from a clean main via `CARGO_INCREMENTAL=0 flock turnstile flock -x lock ./scripts/install-jit.sh`, then notify all leads. This is the interim until the user decides mcp-ci option B."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
