@@ -221,7 +221,7 @@
           "title": "Define test gates through the production definition path",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5e846743-174b-4385-9c95-a700a8df6587",
@@ -308,7 +308,7 @@
           "title": "State each configuration default once",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "awaiting-merge"
+          "status": "rework-awaiting-merge"
         },
         {
           "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
@@ -433,7 +433,9 @@
     "9aa54649": 1,
     "af9a5509": 1,
     "81e7cdc3": 1,
-    "5e846743": 1
+    "5e846743": 1,
+    "459bb995": 1,
+    "d125490a": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
@@ -446,7 +448,10 @@
     "66bd4b5c code-review advisory (low): StatePredicate comment at declarations/rules.rs:365 refers to a removed predicate whitelist.",
     "66bd4b5c renamed the jit status JSON count field open -> backlog (breaking output change within REQ-05's class); MCP tests updated. Human output still prints Debug state names until 1622756a.",
     "af9a5509 worker: config validate's own JIT_WORKTREE_WRITE_POLICY check looks unreachable (a bad value exits 2 before dispatch). Candidate dead code outside 842b0ac6's criteria.",
-    "81e7cdc3: DocumentReference::new gained a production caller (artifact_directory.rs:124, from 66986f88) after planning; lead chose struct literal in production plus one test fixture to meet REQ-01 as written."
+    "81e7cdc3: DocumentReference::new gained a production caller (artifact_directory.rs:124, from 66986f88) after planning; lead chose struct literal in production plus one test fixture to meet REQ-01 as written.",
+    "459bb995 scope note: rules.toml defaults (severity 'default: warn', enforce 'defaults to false' in docs/how-to/validation-rules.md:63/72, declarations/rules.rs:18), profile-manifest field defaults (docs/reference/profiles.md:163/171/183) and CLI flag defaults are still restated in prose; outside REQ-01 (configuration defaults). Candidate follow-up.",
+    "459bb995 replaced project.rs mode_token/style_token (audit had assigned them to 2195c98f); 2195c98f lead informed.",
+    "d125490a: 31.6 s budget failure was host variance; worker measured +50 ms from the change (3 alternating runs, base 794bc6798 vs head)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

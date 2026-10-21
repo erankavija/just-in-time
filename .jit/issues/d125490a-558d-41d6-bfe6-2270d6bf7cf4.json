@@ -8,6 +8,7 @@
   ],
   "description": "Tests define gates through `add_gate_definition`, a command method production never calls. It also builds automated gates without a checker, which the production path refuses.\n\n## Background\n\n`CommandExecutor::add_gate_definition` (`crates/jit/src/commands/gate.rs:1155-1191`) is reached only from tests: the harness wrapper `add_gate` (`src/test_harness.rs:209-220`) and direct calls in `tests/fast_docs_templates/planning_preset_tests.rs:36`, `template_apply_atomicity_tests.rs:399` and `template_apply_tests.rs:955`.\n\nThe harness wrapper's callers are `tests/fast_issue/bulk_operations_tests.rs` (12 calls), `tests/fast_docs_templates/harness_demo.rs` (3), `tests/fast_docs_templates/batch_export_tests.rs` (2), `tests/fast_docs_templates/template_apply_tests.rs` (2) and `tests/fast_issue/test_no_coordinator.rs` (1).\n\nThe production definition path is `CommandExecutor::define_gate` (`gate.rs:1203-1250`), reached from `gate define`. It rejects an automated gate without a checker (`gate.rs:1222-1226`). Four test sites build that invalid gate through `add_gate_definition` with `auto = true` (`template_apply_tests.rs:119,704,955`, `template_apply_atomicity_tests.rs:399`). `GateChecker::RepositoryValidation` is the natural checker for them. The other callers pass `auto = false`, which maps to a manual gate with no checker.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::add_gate_definition` no longer exists.\n- [hard] REQ-02: The shared test harness's gate helper delegates to `define_gate` and takes a mode and an optional checker.\n- [hard] REQ-03: Tests that built an automated gate without a checker define it with the repository-validation checker.\n- [hard] REQ-04: Each affected test keeps the property it asserted.\n\n## Notes\n\nA shared gate-definition fixture is optional; if one is added, it lives in the shared test support.\n",
   "documents": [],
+  "done_at": "2026-10-21T20:41:16.822254324Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
@@ -15,8 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T17:06:15.827976266Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T20:37:28.502727948Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T20:41:06.481165291Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +37,7 @@
     "satisfies:842b0ac6/REQ-10"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Define test gates through the production definition path",
-  "updated_at": "2026-10-21T17:06:15.827976266Z"
+  "updated_at": "2026-10-21T20:41:16.822254324Z"
 }
