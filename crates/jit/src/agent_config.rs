@@ -14,7 +14,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Agent configuration from `~/.config/jit/agent.toml`.
 ///
@@ -43,21 +43,29 @@ impl AgentConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - Config file exists but cannot be read
-    /// - Config file exists but is malformed TOML
-    /// - Agent ID format is invalid
+    /// See [`AgentConfig::load_from`].
     pub fn load() -> Result<Option<Self>> {
-        let config_path = Self::config_path()?;
+        Self::load_from(&Self::config_path()?)
+    }
 
+    /// Load agent configuration from `config_path`; an absent file is `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is malformed TOML, holds an
+    /// unknown or missing key, or carries an invalid agent ID. The message
+    /// itself names the parse cause, since the CLI prints only the outermost
+    /// message.
+    pub fn load_from(config_path: &Path) -> Result<Option<Self>> {
         if !config_path.exists() {
             return Ok(None);
         }
 
         let content =
-            std::fs::read_to_string(&config_path).context("Failed to read agent config file")?;
+            std::fs::read_to_string(config_path).context("Failed to read agent config file")?;
 
-        let config: AgentConfig = toml::from_str(&content).context("Failed to parse agent.toml")?;
+        let config: AgentConfig =
+            toml::from_str(&content).map_err(|e| anyhow!("Failed to parse agent.toml: {e}"))?;
 
         // Validate agent ID format
         validate_agent_id(&config.agent.id)?;
@@ -225,20 +233,19 @@ description = "GitHub Copilot Workspace Session 1"
     }
 
     #[test]
-    fn test_parse_agent_config_rejects_unknown_keys() {
+    fn test_load_from_unknown_key_error_names_the_key() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("agent.toml");
         for (extra, key) in [
             ("\n[behavior]\nauto_heartbeat = true\n", "behavior"),
             ("\n[other]\nx = 1\n", "other"),
+            ("default_ttl_secs = 900\n", "default_ttl_secs"),
         ] {
-            let err = toml::from_str::<AgentConfig>(&format!("{VALID_TOML}{extra}"))
-                .unwrap_err()
-                .to_string();
+            std::fs::write(&path, format!("{VALID_TOML}{extra}")).unwrap();
+            // Rendered as the CLI prints a top-level error.
+            let err = AgentConfig::load_from(&path).unwrap_err().to_string();
             assert!(err.contains(key), "error must name {key}: {err}");
         }
-        let err = toml::from_str::<AgentConfig>(&format!("{VALID_TOML}default_ttl_secs = 900\n"))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("default_ttl_secs"), "{err}");
     }
 
     fn no_env(_: &str) -> Option<String> {

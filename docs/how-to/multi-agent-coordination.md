@@ -31,6 +31,7 @@ export JIT_AGENT_ID=agent:copilot-1
 mkdir -p ~/.config/jit
 echo '[agent]
 id = "agent:copilot-1"
+created_at = "2026-01-01T00:00:00Z"
 description = "Copilot session 1"' > ~/.config/jit/agent.toml
 ```
 
