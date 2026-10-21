@@ -15,8 +15,8 @@ Every criterion is a removal or a convergence onto a surviving path (`@/charter/
 | REQ-04 | `strict-declaration-loading`, applied separately to `config.toml`, rule declarations and `agent.toml`; the last is folded into the agent-config task. | Investigation B, REQ-04 |
 | REQ-05 | Keep the production agent type; resolver seams take the environment and loader as parameters. | Investigation A, REQ-05 |
 | REQ-06 | Convert both profiles and every fixture to version 2. Delete version-1 decoding and canonical-JSON identity. | Investigation B, REQ-06 |
-| REQ-07 | Delete the sweep and `read_issues`. The owning test compares the data root before and after a listing, excluding the index lock. | Investigation A, REQ-07 |
-| REQ-08 | Vertical deletion. Old logs parse through the existing retired-tag tolerance. | Investigation A, REQ-08 |
+| REQ-07 | Delete the sweep and `read_issues`. The owning test compares the data root before and after a listing, excluding the index lock. The same leaf owns removing this checkout's 19 ignored sidecars, with a recorded listing as its criterion. | Investigation A, REQ-07 |
+| REQ-08 | First, the in-memory backend parses events through `parse_known_events`, and the retired-tag property moves from a JSON-only test into one cross-backend storage test. Then the backfill goes as a vertical deletion, and old logs parse in both backends. | Investigation A, REQ-08 |
 | REQ-09 | `lifecycle-state-tokens`: one exact-token `State::from_str`; rule parsing delegates to it. | Investigation B, REQ-09 |
 | REQ-10 | First route test gates through `define_gate`. Then delete both fields and make `GateDefinition` strict. | Investigation B, REQ-10 |
 | REQ-11 | Decode-boundary invariant on `Issue`. The revive fallback collapses, and legacy-record tests go. schemars 0.8 ignores `serde(try_from)`, so the `Issue` schema keeps describing `archived_from`. | Investigation B, REQ-11; `schemars_derive-0.8.22/src/attr/schemars_to_serde.rs` |
@@ -69,7 +69,8 @@ An item defined in `domain/types.rs` is imported as `crate::domain::<Item>`, thr
 | unify-agent-configuration | Keep one agent configuration type | task | One strict agent configuration type exists, and tests call the production agent-id resolver. | removal-hygiene, strict-declaration-loading | REQ-05, REQ-04, DEC-agent-config | touches 3 | — | — |
 | adopt-manifest-version-two | Keep one profile manifest version | task | Profile manifests have one wire version, version 2, with one identity hashing scheme. | removal-hygiene | REQ-06, DEC-manifest-v2 | touches 17 | — | — |
 | remove-read-lock-sidecar-sweep | Remove the read-lock sidecar sweep | task | Listing issues writes nothing beyond the index lock, and the sidecar sweep with its trait method is gone. | removal-hygiene | REQ-07, DEC-lock-files | touches 6 | — | — |
-| remove-lifecycle-backfill | Remove the lifecycle-timestamp backfill | task | The lifecycle-timestamp backfill is gone, and logs holding its record still load. | removal-hygiene | REQ-08, DEC-backfill-parse | touches 17 | — | — |
+| converge-memory-event-parsing | Parse in-memory event logs through the shared event parser | task | Both storage backends skip retired event tags through one parser, proven by one cross-backend test. | removal-hygiene | REQ-08, DEC-backfill-parse | touches 3 | — | — |
+| remove-lifecycle-backfill | Remove the lifecycle-timestamp backfill | task | The lifecycle-timestamp backfill is gone, and logs holding its record still load. | removal-hygiene | REQ-08, DEC-backfill-parse | touches 17 | — | converge-memory-event-parsing |
 | canonical-state-tokens | Parse lifecycle states from canonical tokens only | task | Lifecycle states parse only from their exact serde tokens, through one parser. | removal-hygiene, lifecycle-state-tokens | REQ-09, DEC-state-tokens | touches 6 | — | — |
 | route-test-gates-through-definition | Define test gates through the production definition path | task | Tests define gates through define_gate, and the test-only definition method is gone. | removal-hygiene | REQ-10, DEC-gate-strict | touches 9 | — | — |
 | remove-gate-auto-fields | Remove the auto and example-integration gate fields | task | Gate declarations hold no auto or example-integration field, and automation reads mode alone. | removal-hygiene, strict-declaration-loading | REQ-10, DEC-gate-auto-flag, DEC-gate-strict | touches 28 | — | route-test-gates-through-definition, adopt-manifest-version-two |
@@ -92,7 +93,7 @@ An item defined in `domain/types.rs` is imported as `crate::domain::<Item>`, thr
 | collapse-container-destination-states | Collapse container-destination classification to its outcomes | task | Container-destination classification has one variant per outcome, and missing location evidence is an error. | removal-hygiene | REQ-21 | touches 3 | — | — |
 | gate-reference-renderers | Compile reference-page renderers only with test support | task | Reference-page renderers compile only into builds that include the generated-artifact checks. | removal-hygiene | REQ-22, DEC-renderer-gating | touches 10 | — | prune-output-surface, remove-skipped-gate-run-status, state-config-defaults-once, remove-test-only-gate-entry-points |
 | single-file-lock-poll-loop | Give the file lock one poll loop | task | The file lock has one poll loop, and its non-blocking variants and path accessor exist only in tests. | removal-hygiene | REQ-23, DEC-lock-path | touches 1 | — | — |
-| remove-storage-cfg-twins | Remove cfg twins in storage | task | Storage holds no cfg twin and no dead-code allow on a public item. | removal-hygiene | REQ-24, DEC-dead-code-scope | touches 2 | — | — |
+| remove-storage-cfg-twins | Remove cfg twins in storage | task | Storage holds no cfg twin and no dead-code allow on a public item. | removal-hygiene | REQ-24, DEC-dead-code-scope | touches 2 | — | converge-memory-event-parsing |
 | remove-repository-state-cfg-twins | Remove cfg twins in repository_state | task | repository_state holds no cfg re-export twin, uncalled scaffold, or test-only membership diff. | removal-hygiene | REQ-24, DEC-dead-code-scope | touches 3 | — | remove-linked-worktree-evidence |
 | remove-orphan-web-module | Remove the orphaned web hierarchy module | task | Each web UI source module is imported by the application or its tests. | removal-hygiene | REQ-25, DEC-web-orphan | touches 1 | — | — |
 
@@ -109,71 +110,74 @@ flowchart LR
     N8["unify-agent-configuration: Keep one agent configuration type"]
     N9["adopt-manifest-version-two: Keep one profile manifest version"]
     N10["remove-read-lock-sidecar-sweep: Remove the read-lock sidecar sweep"]
-    N11["remove-lifecycle-backfill: Remove the lifecycle-timestamp backfill"]
-    N12["canonical-state-tokens: Parse lifecycle states from canonical tokens only"]
-    N13["route-test-gates-through-definition: Define test gates through the production definition path"]
-    N14["remove-gate-auto-fields: Remove the auto and example-integration gate fields"]
-    N15["require-archived-from: Require archived_from on archived issue records"]
-    N16["derive-mermaid-state-classes: Derive mermaid state classes from the state enumeration"]
-    N17["remove-retired-name-scans: Remove source-scan tests for retired names"]
-    N18["single-domain-types-path: Import domain type items through the domain facade"]
-    N19["single-domain-module-paths: Remove the remaining domain re-export paths"]
-    N20["prune-output-surface: Prune the uncalled output surface"]
-    N21["remove-taxonomy-dead-errors: Remove dead taxonomy error and membership types"]
-    N22["remove-skipped-gate-run-status: Remove the skipped gate-run status"]
-    N23["move-state-symbol-to-output: Render state symbols in the output layer"]
-    N24["remove-small-domain-helpers: Remove uncalled domain predicates and parsers"]
-    N25["remove-reference-builders: Remove the DocumentReference builder methods"]
-    N26["remove-adapter-link-rewrite: Remove the unimplemented link-rewrite adapter method"]
-    N27["trim-git-revision-access: Trim git revision access to production queries"]
-    N28["drop-claim-type-parameter: Drop the unused storage type parameter from claim commands"]
-    N29["unify-gate-not-required-error: Report a non-required gate through one typed error"]
-    N30["remove-test-only-gate-entry-points: Remove test-only gate entry points"]
-    N31["collapse-container-destination-states: Collapse container-destination classification to its outcomes"]
-    N32["gate-reference-renderers: Compile reference-page renderers only with test support"]
-    N33["single-file-lock-poll-loop: Give the file lock one poll loop"]
-    N34["remove-storage-cfg-twins: Remove cfg twins in storage"]
-    N35["remove-repository-state-cfg-twins: Remove cfg twins in repository_state"]
-    N36["remove-orphan-web-module: Remove the orphaned web hierarchy module"]
+    N11["converge-memory-event-parsing: Parse in-memory event logs through the shared event parser"]
+    N12["remove-lifecycle-backfill: Remove the lifecycle-timestamp backfill"]
+    N13["canonical-state-tokens: Parse lifecycle states from canonical tokens only"]
+    N14["route-test-gates-through-definition: Define test gates through the production definition path"]
+    N15["remove-gate-auto-fields: Remove the auto and example-integration gate fields"]
+    N16["require-archived-from: Require archived_from on archived issue records"]
+    N17["derive-mermaid-state-classes: Derive mermaid state classes from the state enumeration"]
+    N18["remove-retired-name-scans: Remove source-scan tests for retired names"]
+    N19["single-domain-types-path: Import domain type items through the domain facade"]
+    N20["single-domain-module-paths: Remove the remaining domain re-export paths"]
+    N21["prune-output-surface: Prune the uncalled output surface"]
+    N22["remove-taxonomy-dead-errors: Remove dead taxonomy error and membership types"]
+    N23["remove-skipped-gate-run-status: Remove the skipped gate-run status"]
+    N24["move-state-symbol-to-output: Render state symbols in the output layer"]
+    N25["remove-small-domain-helpers: Remove uncalled domain predicates and parsers"]
+    N26["remove-reference-builders: Remove the DocumentReference builder methods"]
+    N27["remove-adapter-link-rewrite: Remove the unimplemented link-rewrite adapter method"]
+    N28["trim-git-revision-access: Trim git revision access to production queries"]
+    N29["drop-claim-type-parameter: Drop the unused storage type parameter from claim commands"]
+    N30["unify-gate-not-required-error: Report a non-required gate through one typed error"]
+    N31["remove-test-only-gate-entry-points: Remove test-only gate entry points"]
+    N32["collapse-container-destination-states: Collapse container-destination classification to its outcomes"]
+    N33["gate-reference-renderers: Compile reference-page renderers only with test support"]
+    N34["single-file-lock-poll-loop: Give the file lock one poll loop"]
+    N35["remove-storage-cfg-twins: Remove cfg twins in storage"]
+    N36["remove-repository-state-cfg-twins: Remove cfg twins in repository_state"]
+    N37["remove-orphan-web-module: Remove the orphaned web hierarchy module"]
     N4 --> N5
     N4 --> N6
-    N13 --> N14
-    N9 --> N14
-    N9 --> N17
-    N0 --> N18
-    N1 --> N18
-    N2 --> N18
-    N6 --> N18
-    N7 --> N18
-    N8 --> N18
-    N10 --> N18
-    N11 --> N18
-    N15 --> N18
-    N16 --> N18
-    N17 --> N18
-    N21 --> N18
-    N23 --> N18
-    N24 --> N18
-    N25 --> N18
-    N26 --> N18
-    N27 --> N18
-    N28 --> N18
-    N29 --> N18
-    N31 --> N18
-    N32 --> N18
-    N33 --> N18
-    N34 --> N18
-    N35 --> N18
-    N36 --> N18
+    N11 --> N12
+    N14 --> N15
+    N9 --> N15
+    N9 --> N18
+    N0 --> N19
+    N1 --> N19
+    N2 --> N19
+    N6 --> N19
+    N7 --> N19
+    N8 --> N19
+    N10 --> N19
+    N12 --> N19
+    N16 --> N19
+    N17 --> N19
     N18 --> N19
-    N12 --> N24
-    N14 --> N29
-    N14 --> N30
-    N20 --> N32
-    N22 --> N32
-    N5 --> N32
-    N30 --> N32
-    N3 --> N35
+    N22 --> N19
+    N24 --> N19
+    N25 --> N19
+    N26 --> N19
+    N27 --> N19
+    N28 --> N19
+    N29 --> N19
+    N30 --> N19
+    N32 --> N19
+    N33 --> N19
+    N34 --> N19
+    N35 --> N19
+    N36 --> N19
+    N37 --> N19
+    N19 --> N20
+    N13 --> N25
+    N15 --> N30
+    N15 --> N31
+    N21 --> N33
+    N23 --> N33
+    N5 --> N33
+    N31 --> N33
+    N11 --> N35
+    N3 --> N36
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -181,8 +185,8 @@ flowchart LR
 
 | Risk / decision | Resolution and rationale |
 |---|---|
-| DEC-lock-files | Chosen: the execution lead deletes the 19 untracked, ignored `.jit/issues/*.lock` files in the primary checkout at integration and records the listing as evidence. Rejected: carrying the deletion in a commit, because ignored files cannot be committed. |
-| DEC-backfill-parse | Chosen: rely on the existing unknown-tag skip in `parse_known_events`, owned by `storage/json.rs:1831`, with evidence from this repository's log loading under validation. Rejected: a parse-only variant (a compatibility shim), and rewriting this repository's log (it rewrites history for no gain). |
+| DEC-lock-files | Chosen: `remove-read-lock-sidecar-sweep` carries a hard criterion that, once the change merges, the primary checkout's `.jit/issues/` holds no `.lock` file, evidenced by a recorded listing. Rejected: carrying the deletion in a commit, because ignored files cannot be committed. |
+| DEC-backfill-parse | Chosen: rely on the unknown-tag skip in `parse_known_events`. `converge-memory-event-parsing` routes the in-memory backend through it (`storage/memory.rs:480-492` parses strictly today) and moves the JSON-only test (`storage/json.rs:1830`) into one cross-backend test. No `IssueStore` event-read conformance suite exists, so that test joins the cross-backend matrix in `storage/repository_state_store_tests.rs`. This repository's log loading under validation is further evidence. Rejected: a parse-only variant (a compatibility shim), and rewriting this repository's log (it rewrites history for no gain). |
 | DEC-domain-path | Chosen: the `domain::<Type>` facade with a private `mod types`, which the compiler enforces, with sibling and crate-root re-exports removed in a second task. The facade task depends on every other sink, so both land last. Rejected: `domain::types::` everywhere, because it means about 546 hand edits with no compiler enforcement. |
 | DEC-exit-code-table | Chosen: derive `generate_exit_codes` from `ExitCode::description`, which removes the hand copy at `schema.rs:835`. Rejected: deleting `description` and keeping the copy, because the copy is a single-source-prose defect. |
 | DEC-hierarchy-error | Chosen: `extract_type` returns `Option`, and `HierarchyError` is deleted. Rejected: keeping the enum minus `UnknownType`, because every caller discards it. |

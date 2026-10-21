@@ -489,7 +489,7 @@
   {
     "key": "remove-read-lock-sidecar-sweep",
     "title": "Remove the read-lock sidecar sweep",
-    "description": "Listing issues sweeps `.jit/issues/` once per process for retired read-lock sidecars. The sweep misses short-id sidecars, and a trait method exists only to keep it out of one caller.\n\n## Background\n\n- `list_issues` runs the sweep at `crates/jit/src/storage/json.rs:1304-1324`, guarded by `sidecars_swept` (`:395-397,442`), through the helper at `storage/lock.rs:440-492`. The helper requires `Uuid::parse_str(stem)` (`lock.rs:480-484`), so it skips short-id names. This repository holds 19 such files (`003f.lock`, `003f9f83.lock`, and others), untracked and ignored by `.gitignore:5`.\n- The `read_issues` trait default (`storage/mod.rs:193-224`) and its JSON override (`json.rs:1326-1333`) have one production caller, document conformance (`commands/document.rs:215`). The trait doc on `list_issues` mentions it.\n- Tests: `json.rs:2305,2411-2470`; `lock.rs:1015-1080`; `tests/cli_repo_workflow/artifact_conformance_cli_tests.rs:415-427,464-467`, which plants a sidecar to prove conformance leaves it in place.\n- Docs: `docs/reference/storage-format.md:77-82`.\n\nAfter the sweep is removed, `list_issues` still takes a shared lock on `.index.lock`, which it creates if absent (`lock.rs:255`). Lock files are gitignored runtime state.\n\n## Success Criteria\n\n- [hard] REQ-01: The sidecar sweep, its once-per-process guard, its helper and the `read_issues` trait method with its override no longer exist, and document conformance lists issues through `list_issues`.\n- [hard] REQ-02: Listing issues creates, rewrites or removes no file other than the storage's own index lock. One owning test compares the data root before and after a listing.\n- [hard] REQ-03: No test plants or sweeps a read-lock sidecar.\n- [hard] REQ-04: The storage-format reference does not describe the sweep.\n\n## Notes\n\nThe 19 `.jit/issues/*.lock` files in this repository are untracked and ignored, so no commit can remove them. They are deleted in the primary checkout at integration, and a listing of `.jit/issues/` with no `.lock` file is recorded as evidence.\n",
+    "description": "Listing issues sweeps `.jit/issues/` once per process for retired read-lock sidecars. The sweep misses short-id sidecars, and a trait method exists only to keep it out of one caller.\n\n## Background\n\n- `list_issues` runs the sweep at `crates/jit/src/storage/json.rs:1304-1324`, guarded by `sidecars_swept` (`:395-397,442`), through the helper at `storage/lock.rs:440-492`. The helper requires `Uuid::parse_str(stem)` (`lock.rs:480-484`), so it skips short-id names. This repository holds 19 such files (`003f.lock`, `003f9f83.lock`, and others), untracked and ignored by `.gitignore:5`.\n- The `read_issues` trait default (`storage/mod.rs:193-224`) and its JSON override (`json.rs:1326-1333`) have one production caller, document conformance (`commands/document.rs:215`). The trait doc on `list_issues` mentions it.\n- Tests: `json.rs:2305,2411-2470`; `lock.rs:1015-1080`; `tests/cli_repo_workflow/artifact_conformance_cli_tests.rs:415-427,464-467`, which plants a sidecar to prove conformance leaves it in place.\n- Docs: `docs/reference/storage-format.md:77-82`.\n\nAfter the sweep is removed, `list_issues` still takes a shared lock on `.index.lock`, which it creates if absent (`lock.rs:255`). Lock files are gitignored runtime state.\n\n## Success Criteria\n\n- [hard] REQ-01: The sidecar sweep, its once-per-process guard, its helper and the `read_issues` trait method with its override no longer exist, and document conformance lists issues through `list_issues`.\n- [hard] REQ-02: Listing issues creates, rewrites or removes no file other than the storage's own index lock. One owning test compares the data root before and after a listing.\n- [hard] REQ-03: No test plants or sweeps a read-lock sidecar.\n- [hard] REQ-04: The storage-format reference does not describe the sweep.\n- [hard] REQ-05: Once the change lands, the primary checkout's `.jit/issues/` holds no `.lock` file, evidenced by a listing of that directory recorded after the change merges.\n\n## Notes\n\nThe 19 `.jit/issues/*.lock` files are untracked and ignored, so no commit can remove them, and a linked worktree cannot reach them. They are deleted in the primary checkout after the change merges.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -534,9 +534,51 @@
     }
   },
   {
+    "key": "converge-memory-event-parsing",
+    "title": "Parse in-memory event logs through the shared event parser",
+    "description": "The in-memory storage backend parses each event line strictly and fails on a retired event tag, while the JSON backend skips such records. Both backends load a log through one parser, and one cross-backend test owns the property.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-76`) deserializes a record only when its type is in `EventTag::ALL` (`:66`) and skips other well-formed records. The JSON backend reads through it (`storage/json.rs:160,1352`), and so do `repository_state/mutation.rs:684` and `repository_state/archive.rs:465`.\n\n`InMemoryStorage::load_events` (`storage/memory.rs:480-492`) deserializes each line straight into `Event` with `serde_json::from_str`, so a log holding a retired tag fails to load in that backend. The two backends diverge on one interface (`@/inv/shared-test-contracts`).\n\nThe property is owned by a JSON-only test, `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1830`). No `IssueStore` conformance suite for event reads exists. The shared suites that run both backends are the cross-backend conformance matrix in `storage/repository_state_store_tests.rs:660`, which covers capture and publication semantics, and the redo interruption matrix in `storage/redo_conformance.rs`. Each backend seeds itself through its `test_fixtures` module (`storage/memory.rs:1330`, `storage/redo_apply.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: `InMemoryStorage` loads its event log through `parse_known_events`, and no strict per-line event deserialization remains in storage.\n- [hard] REQ-02: One cross-backend test, run against both the JSON and in-memory backends, proves that a log holding a structurally valid retired tag loads, skipping that record and keeping every known record in order, and that a malformed known record is an error.\n- [hard] REQ-03: The JSON-only retired-tag test no longer exists; its assertions live in the cross-backend test.\n\n## Notes\n\nThe cross-backend test joins the existing cross-backend conformance matrix in `storage/repository_state_store_tests.rs`, which already seeds both backends.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:greenfield-cutover",
+      "milestone:v1.0",
+      "per:@/charter/D-18",
+      "component:storage",
+      "component:testing",
+      "satisfies:842b0ac6/REQ-08"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Both storage backends skip retired event tags through one parser, proven by one cross-backend test.",
+      "contract_refs": [
+        "removal-hygiene"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "DEC-backfill-parse"
+      ],
+      "terminal": {
+        "consumer_family": "storage event-log readers",
+        "test_boundary": "cross-backend storage conformance tests",
+        "worker_sized_reason": "One parser swap and one test moved into an existing matrix.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/memory.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "remove-lifecycle-backfill",
     "title": "Remove the lifecycle-timestamp backfill",
-    "description": "A one-off lifecycle-timestamp backfill still ships as a CLI command, a module, an event variant, a mutation intent and a derivation function. The derivation costs O(issues × events).\n\n## Background\n\nThe backfill surface:\n\n- CLI: `crates/jit/src/cli.rs:435-440,2310-2330,3265,3325,3765-3769,3870`; dispatch at `main.rs:23,7873-7895`.\n- `commands/migrate.rs` (148 lines), declared at `commands/mod.rs:48,87`.\n- `Event::LifecycleTimestampsBackfilled` (`domain/types.rs:1553-1568,1642,1674,1943-1949,2010`) and its catalog entries (`domain/event_catalog.rs:118-119,151,178,206,257-259,416,478,790`).\n- `MutationIntent::RepairIssueLifecycle` (`repository_state/mutation.rs:372-380,941-953,2400-2430`).\n- `derive_lifecycle_timestamps` and `LifecycleTimestamps` (`domain/queries.rs:10-100`, tests `:514-572`), which fold the whole event slice per issue (`migrate.rs:98`).\n\nTests: backfill tests at `tests/fast_issue/lifecycle_timestamps_tests.rs:220-479`. The write-point tests at `:1-69` stay; the module doc at `:1-7` names the backfill. `tests/cli_repo_workflow/integration_test.rs:431` `test_migrate_lifecycle_timestamps_runs` runs the command, and `tests/cli_issue/failure_lever_registry.toml:924-925` declares a failure lever for it.\n\nOther consumers:\n\n- `mcp-server/curated-tools.json:73` excludes `jit_migrate_lifecycle-timestamps`. `mcp-server/test-unit.js:506-508` fails on a stale curated name.\n- `docs/reference/events.md:20,47`, generated from the event catalog.\n- `docs/reference/cli-commands.md:3904-3925`, `docs/reference/cli-command-grammar.md:27`, `docs/reference/storage-format.md:233-236,254-256,427` and `docs/concepts/guarantees.md:199-200`.\n\n`domain::parse_known_events` (`domain/event_log.rs:42-76`) deserializes only records whose type is in `EventTag::ALL` (`:66`) and skips other well-formed records. `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1831`) owns that property. This repository's `.jit/events.jsonl` holds one backfill record, at line 5417.\n\n## Success Criteria\n\n- [hard] REQ-01: The `migrate` command, `commands/migrate.rs`, `Event::LifecycleTimestampsBackfilled` with its tag, `MutationIntent::RepairIssueLifecycle`, `derive_lifecycle_timestamps` and `LifecycleTimestamps` no longer exist.\n- [hard] REQ-02: An event log holding a backfill record parses without error, through the existing retired-tag tolerance, and this repository's log loads under repository validation.\n- [hard] REQ-03: The generated events reference, the CLI references, the storage-format reference and the guarantees page do not describe the command or the event.\n- [hard] REQ-04: The MCP curated tool list names no migrate tool, and the MCP unit suite passes.\n- [hard] REQ-05: Backfill tests, the migrate integration test and the migrate failure lever are deleted. Lifecycle write-point tests remain, and their module doc does not mention the backfill.\n\n## Notes\n\nNo parse-only variant and no new tolerance test are added; the existing JSON-storage test owns tolerance. This repository's event log is not rewritten. `CHANGELOG.md:944-945` is history and stays.\n",
+    "description": "A one-off lifecycle-timestamp backfill still ships as a CLI command, a module, an event variant, a mutation intent and a derivation function. The derivation costs O(issues × events).\n\n## Background\n\nThe backfill surface:\n\n- CLI: `crates/jit/src/cli.rs:435-440,2310-2330,3265,3325,3765-3769,3870`; dispatch at `main.rs:23,7873-7895`.\n- `commands/migrate.rs` (148 lines), declared at `commands/mod.rs:48,87`.\n- `Event::LifecycleTimestampsBackfilled` (`domain/types.rs:1553-1568,1642,1674,1943-1949,2010`) and its catalog entries (`domain/event_catalog.rs:118-119,151,178,206,257-259,416,478,790`).\n- `MutationIntent::RepairIssueLifecycle` (`repository_state/mutation.rs:372-380,941-953,2400-2430`).\n- `derive_lifecycle_timestamps` and `LifecycleTimestamps` (`domain/queries.rs:10-100`, tests `:514-572`), which fold the whole event slice per issue (`migrate.rs:98`).\n\nTests: backfill tests at `tests/fast_issue/lifecycle_timestamps_tests.rs:220-479`. The write-point tests at `:1-69` stay; the module doc at `:1-7` names the backfill. `tests/cli_repo_workflow/integration_test.rs:431` `test_migrate_lifecycle_timestamps_runs` runs the command, and `tests/cli_issue/failure_lever_registry.toml:924-925` declares a failure lever for it.\n\nOther consumers:\n\n- `mcp-server/curated-tools.json:73` excludes `jit_migrate_lifecycle-timestamps`. `mcp-server/test-unit.js:506-508` fails on a stale curated name.\n- `docs/reference/events.md:20,47`, generated from the event catalog.\n- `docs/reference/cli-commands.md:3904-3925`, `docs/reference/cli-command-grammar.md:27`, `docs/reference/storage-format.md:233-236,254-256,427` and `docs/concepts/guarantees.md:199-200`.\n\nBoth storage backends read event logs through `domain::parse_known_events` (`domain/event_log.rs:42-76`), which skips well-formed records whose type is not in `EventTag::ALL` (`:66`). A cross-backend storage test owns that property. This repository's `.jit/events.jsonl` holds one backfill record, at line 5417.\n\n## Success Criteria\n\n- [hard] REQ-01: The `migrate` command, `commands/migrate.rs`, `Event::LifecycleTimestampsBackfilled` with its tag, `MutationIntent::RepairIssueLifecycle`, `derive_lifecycle_timestamps` and `LifecycleTimestamps` no longer exist.\n- [hard] REQ-02: An event log holding a backfill record parses without error, through the existing retired-tag tolerance, and this repository's log loads under repository validation.\n- [hard] REQ-03: The generated events reference, the CLI references, the storage-format reference and the guarantees page do not describe the command or the event.\n- [hard] REQ-04: The MCP curated tool list names no migrate tool, and the MCP unit suite passes.\n- [hard] REQ-05: Backfill tests, the migrate integration test and the migrate failure lever are deleted. Lifecycle write-point tests remain, and their module doc does not mention the backfill.\n\n## Notes\n\nNo parse-only variant and no new tolerance test are added; the cross-backend storage test owns tolerance. This repository's event log is not rewritten. `CHANGELOG.md:944-945` is history and stays.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -556,7 +598,9 @@
       "doc-review",
       "docs-mechanical"
     ],
-    "depends_on": [],
+    "depends_on": [
+      "converge-memory-event-parsing"
+    ],
     "planning": {
       "outcome": "The lifecycle-timestamp backfill is gone, and logs holding its record still load.",
       "contract_refs": [
@@ -1688,7 +1732,9 @@
       "cargo-ci",
       "code-review"
     ],
-    "depends_on": [],
+    "depends_on": [
+      "converge-memory-event-parsing"
+    ],
     "planning": {
       "outcome": "Storage holds no cfg twin and no dead-code allow on a public item.",
       "contract_refs": [
