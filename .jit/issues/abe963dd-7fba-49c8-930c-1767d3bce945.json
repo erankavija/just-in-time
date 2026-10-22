@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1f6e56d4-0023-47c8-a698-ad14eda1c47b",
-      "status": "passed",
-      "updated_at": "2026-10-22T19:52:00.195277418Z",
+      "run_id": "d3a0da67-f613-4997-816f-20cbb2e4ab3a",
+      "status": "failed",
+      "updated_at": "2026-10-22T21:22:04.863795743Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Build one profile selection per invocation",
-  "updated_at": "2026-10-22T19:52:00.195277418Z"
+  "updated_at": "2026-10-22T21:22:04.863795743Z"
 }
