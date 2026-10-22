@@ -318,6 +318,15 @@ mod archive_render_tests {
 // Output Context for Quiet Mode
 // ============================================================================
 
+/// The global output flags of one invocation, built once from the parsed
+/// command line; the only source of `--json` for dispatch and for rendering a
+/// failure that escapes it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OutputMode {
+    pub json: bool,
+    pub quiet: bool,
+}
+
 /// Context for controlling output verbosity
 pub struct OutputContext {
     quiet: bool,

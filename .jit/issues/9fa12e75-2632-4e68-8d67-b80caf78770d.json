@@ -8,6 +8,7 @@
   ],
   "description": "Human gate-run status lines — \"has not been run yet\" and \"Passed gate\" — go through one renderer in the output module instead of copies across gate arms.\n\n## Background\n\nIn `crates/jit/src/main.rs` (or the gate handler modules once moved), the message \"Gate '{k}' has not been run yet for issue {id}. Use 'jit gate evaluate' to run it.\" appears three times in `GateCommands::Status` (findings, flat and default views) and once in `GateCommands::StatusAll`. The pass line \"Passed gate '{k}' for issue {id}\" appears in `GateCommands::Evaluate`, `EvaluateAll` and `EvaluateMany`. 72d89161 removed the commit-based already-passed skip, so no arm prints an already-passed line or suffix. `print_gate_run_details` and `render_gate_pass_error` are already shared.\n\n## Success Criteria\n\n- [hard] REQ-01: One renderer in the output module prints a gate's run status line for the never-run and passed cases.\n- [hard] REQ-02: `gate status` (all views), `gate status-all`, `gate evaluate`, `gate evaluate-all` and `gate evaluate-many` print those lines only through that renderer.\n- [hard] REQ-03: `gate evaluate`, `gate evaluate-all` and `gate evaluate-many` report a passed gate with the same passed line, carrying no already-passed suffix, and a test states that output.\n- [hard] REQ-04: One unit test owns the renderer's lines; other gate human output is unchanged and the gate suites pass without weakened assertions.\n\n## Notes\n\nThe `--json` \"not run\" output is outside this renderer. 8673dc5e changes how a manually attested gate is reported in `gate status`; the renderer starts from its result. REQ-01 and REQ-03 were narrowed by steward ruling after 72d89161 (plan D-24). Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T01:49:46.140880021Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Render gate run status lines through one output renderer",
-  "updated_at": "2026-10-21T07:07:53.985694834Z"
+  "updated_at": "2026-10-22T01:49:46.140880021Z"
 }

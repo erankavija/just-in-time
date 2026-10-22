@@ -509,6 +509,12 @@
       "date": "2026-10-22",
       "decision": "@/inv/semantic-types",
       "summary": "Reconciliation after 459bb995: pure narrowings of 6add7ca6, 96bb0941, 42bcaa6e, 977d01d8 and 145b4d57 approved. 6add7ca6, 96bb0941 and 42bcaa6e also delete the hand-written as_token/Display that 459bb995 added (2195c98f REQ-10). Chosen (a): 42bcaa6e takes projection_render.rs and 977d01d8's REQ-02 so it lands green. Rejected (b): an interim compile bridge across epics."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "summary": "Chosen (a): all footprint-overlap edges from 2195c98f's retype tasks (0af95f14 onto about 8 c780514e terminals, plus the others) are wired. c780514e waves 1-2 are on 2195c98f's critical path, so the steward assigns c780514e execution immediately after its gates. Rejected (b), fixture edges only: rebase-conflict risk."
     }
   ],
   "notes": [
@@ -545,7 +551,9 @@
     "2026-10-21 ~23:50: 9876a23a planned (39 issues, 67 edges; behaviour changes are stated in its tasks). just-in-time-59 is assigned to plan b697a3f7, with the steward's open notes for that planner passed along.",
     "2026-10-21 23:45: gates_status run_id conversion committed (e2f2693d8): 2615 entries lacked run_id; 2407 pointed at existing runs; 210 runs published from entry fields; 19 pending untouched; 0 remaining. The steward reinstalled the dogfood binary at e2f2693d8. The one-off tool lives in the steward scratchpad (convert/target/release/gate-run-id-backfill), outside the repository.",
     "2026-10-22 ~00:05: 8673dc5e and 3754095f are done, unblocking df129d9e's d8176fd3; a third df129d9e execution lead was dispatched from handoff-3. The steward reinstalled the dogfood binary at b12262ecc after 842b0ac6's 2492ab29 removed `migrate lifecycle-timestamps`. mcp-server tests pass at 69/0 and 14/0.",
-    "2026-10-22: standing permission. Any lead whose merge changes the CLI surface may reinstall the dogfood binary from a clean main via `CARGO_INCREMENTAL=0 flock turnstile flock -x lock ./scripts/install-jit.sh`, then notify all leads. This is the interim until the user decides mcp-ci option B."
+    "2026-10-22: standing permission. Any lead whose merge changes the CLI surface may reinstall the dogfood binary from a clean main via `CARGO_INCREMENTAL=0 flock turnstile flock -x lock ./scripts/install-jit.sh`, then notify all leads. This is the interim until the user decides mcp-ci option B.",
+    "2026-10-22 ~00:30-04:30: sixth shared usage-limit stall, with all sessions idle; everyone was resumed at 04:31. Pattern: about 3-4 h of five-lead concurrency exhausts the quota, then a 3-4 h stall follows. Throughput is bounded by the quota, not by session count.",
+    "2026-10-22 ~05:30: main went red after 842b0ac6's fbb661f2 (config set exit-code contract) and was fixed forward at 12f6a06aa within the 45-min cap (user args give INVALID_ARGUMENT; a corrupt file gives PARSE_ERROR). df129d9e's d8176fd3 (global --json) is done with all gates passed; wave 3 has started (27f0a575 in flight; handoff-6)."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
@@ -597,6 +605,10 @@
     {
       "date": "2026-10-21",
       "item": "Skill prose drift: .agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:51 restates the linked-checkout write default '(refusing by default)'. Since 459bb995 that default is stated once (LinkedCheckoutWriteStance::DEFAULT, projected in docs/reference/runtime-defaults.md). Suggested fix: drop the parenthetical or cite the reference page. Left for you because skills are shared infrastructure and may be packaged profile assets (see OD-9)."
+    },
+    {
+      "date": "2026-10-22",
+      "item": "Capacity note: six shared usage-limit stalls in about 28 h, each roughly 3-4 h, with five concurrent leads (3 sessions plus 2 background agents). Consider whether to run fewer concurrent leads, schedule around quota windows, or accept the stall cadence."
     }
   ]
 }

@@ -1291,8 +1291,8 @@ fn test_exit_code_query_parent_filter_before_subcommand() {
         .contains("were given before the `available` subcommand"));
 
     // --json path: same exit code, machine-readable envelope on stdout. The
-    // parent-level `--json` (and `--state`) precede the subcommand — that is the
-    // misplacement the guard rejects, and it also selects JSON rendering.
+    // misplaced `--state` is what the guard rejects; the global `--json` beside
+    // it only selects JSON rendering.
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
         .args(["query", "--state", "ready", "--json", "available"])

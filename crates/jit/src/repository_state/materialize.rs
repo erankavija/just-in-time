@@ -820,7 +820,7 @@ kind = "advisory"
         // The complete issues listing is reconciled against the index ids.
         assert_eq!(closure.listings, vec![VirtualPath::data("issues").unwrap()]);
         // A referenced rule schema enters the closure when rules bytes are supplied.
-        let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
+        let rules = "[[rules]]\nname = \"shape\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
         let with_schema = validate_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
         assert!(with_schema
@@ -833,7 +833,7 @@ kind = "advisory"
         let config: JitConfig = toml::from_str(CONFIG).unwrap();
         // A rules.toml that references a json-schema pulls that schema into the
         // closure, so the effective-rule parse reads image-projected bytes.
-        let rules = "[[rules]]\nname = \"shape\"\ntype = \"format\"\n\
+        let rules = "[[rules]]\nname = \"shape\"\n\
              assert = { json-schema = \"schemas/custom.json\" }\n";
         let paths = render_capture_closure(&layout(), &config, &[], Some(rules)).unwrap();
         assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));

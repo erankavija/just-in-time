@@ -22,6 +22,7 @@ jit claim <COMMAND> [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-q, --quiet` | Suppress non-essential output (for scripting) |
+| `--json` | Emit machine-readable JSON |
 | `-h, --help` | Print help information |
 
 ---

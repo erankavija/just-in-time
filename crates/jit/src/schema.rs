@@ -391,18 +391,11 @@ impl CommandSchema {
             .map(|names| names.into_iter().map(|s| s.to_string()).collect())
             .unwrap_or_default();
 
-        // Get description, with fallback for common flags
         let description = arg
             .get_help()
             .map(|s| s.to_string())
             .or_else(|| arg.get_long_help().map(|s| s.to_string()))
-            .unwrap_or_else(|| {
-                // Provide default descriptions for common flags
-                match name.as_str() {
-                    "json" => "Output JSON format".to_string(),
-                    _ => String::new(),
-                }
-            });
+            .unwrap_or_default();
 
         Flag {
             name,

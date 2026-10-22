@@ -2,9 +2,8 @@
 //!
 //! `jit config set` (see [`CommandExecutor::set_config`]): target-file
 //! resolution (repo vs user-global), key parsing, per-type value dispatch, and
-//! typed validation of the incoming value (notably `project.name` through
-//! [`ProjectName`], REQ-03 of the multi-jit story: an invalid identity must
-//! never reach the file). User-global config IO is delegated to the explicit
+//! parsing the edited document as configuration, so an edit that would not
+//! load never reaches the file. User-global config IO is delegated to the explicit
 //! [`crate::storage::user_config_store`] control plane; repository config edits
 //! publish through a repository-state mutation session.
 //!
@@ -19,7 +18,7 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::{EffectiveConfig, ProjectName};
+use crate::config::EffectiveConfig;
 use crate::errors::InvalidArgumentError;
 use crate::storage::user_config_store::{
     read_user_config_document, save_user_config_document, UserConfigRoot,
@@ -164,14 +163,14 @@ pub fn resolve_dotted_key(
 }
 
 /// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
-/// value and rejecting an invalid post-edit `[project].name` / `[validation].strictness`.
+/// value and rejecting a post-edit document that does not parse as configuration
+/// as an invalid argument.
 ///
 /// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
-/// and ordering). `project.name` is validated through [`ProjectName`] and
-/// `validation.strictness` through [`crate::validation::Strictness`] on the
-/// POST-mutation document, so a valid replacement is the repair path while any
-/// edit over a document already holding an invalid value is rejected — nothing is
-/// mutated on disk until the caller persists the returned document.
+/// and ordering). Parsing the POST-mutation document makes a valid replacement
+/// the repair path, while any edit over a document already holding an invalid
+/// value or unknown key is rejected; nothing is mutated on disk until the caller
+/// persists the returned document.
 fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
     if parts.len() != 2 {
@@ -197,26 +196,8 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
 
     doc[section][field] = parsed_value;
 
-    // REQ-03: the canonical `[project].name` is validated on EVERY document write,
-    // not only when it is the key being set.
-    if let Some(name) = doc
-        .get("project")
-        .and_then(|project| project.get("name"))
-        .and_then(|name| name.as_str())
-    {
-        let _validated: ProjectName = name.parse()?;
-    }
-
-    // Reject an unrecognized `[validation].strictness` eagerly, mirroring the
-    // load-time `deserialize_strictness` guard.
-    if let Some(strictness) = doc
-        .get("validation")
-        .and_then(|validation| validation.get("strictness"))
-        .and_then(|value| value.as_str())
-    {
-        let _validated: crate::validation::Strictness = strictness.parse()?;
-    }
-
+    crate::declarations::parse_configuration(doc.to_string().as_bytes())
+        .map_err(|e| InvalidArgumentError::new(e.to_string()))?;
     Ok(())
 }
 
@@ -226,11 +207,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Resolves the target file and edits a formatting-preserving TOML document.
     /// User-global writes use the capability-confined user-config store;
-    /// repository writes publish through the mutation session. `value`
-    /// is parsed into the expected type BEFORE the write: `project.name` is validated through
-    /// [`ProjectName`] so an invalid identity is rejected and the file is left
-    /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed
-    /// into TOML integers; any other key is stored as a string.
+    /// repository writes publish through the mutation session. The edited
+    /// document is parsed as configuration BEFORE the write, so an edit that
+    /// would not load is rejected and the file is left untouched. Numeric
+    /// (`*_secs`/`*_pct`/`max_*`) keys are parsed into TOML integers; any other
+    /// key is stored as a string.
     pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome>
     where
         S: crate::storage::RepositoryStateStore,

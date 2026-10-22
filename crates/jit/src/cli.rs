@@ -28,6 +28,10 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub quiet: bool,
 
+    /// Emit machine-readable JSON; accepted after any command segment
+    #[arg(long, global = true)]
+    pub json: bool,
+
     /// Export command schema in JSON format for AI agent introspection
     #[arg(long)]
     pub schema: bool,
@@ -57,9 +61,6 @@ pub enum Commands {
         /// Set one declared profile variable; repeatable and last-wins.
         #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
         set: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Inspect and apply repository profiles
@@ -98,9 +99,6 @@ pub enum Commands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Apply a graph template to a container (plan-before-fan-out scaffold)
@@ -137,10 +135,6 @@ pub enum Commands {
         /// Bypass validation warnings and refresh an already-applied template
         #[arg(long)]
         force: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Dependency management commands
@@ -202,9 +196,6 @@ pub enum Commands {
         /// transitive dependents (unlimited, opt-in). Matches `jit graph rdeps`.
         #[arg(long, default_value = "1")]
         depth: u32,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query issues for orchestrators
@@ -242,10 +233,6 @@ pub enum Commands {
         /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
         #[arg(long)]
         full: bool,
-
-        /// Output in JSON format (used when no subcommand is given)
-        #[arg(long)]
-        json: bool,
     },
 
     /// Label namespace management commands
@@ -342,33 +329,19 @@ pub enum Commands {
         /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
         #[arg(short = 'g', long)]
         glob: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show CLI version and build metadata
-    Version {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    Version,
 
     /// Show overall status
-    Status {
-        #[arg(long)]
-        json: bool,
-    },
+    Status,
 
     /// Validate repository integrity and diagnose declared derived-state drift
     Validate {
         /// Issue id to validate (runs local + graph rules for this issue only).
         /// When omitted, validates the whole repository.
         id: Option<String>,
-
-        #[arg(long)]
-        json: bool,
 
         /// Explain rule outcomes for the issue: which rules matched and whether
         /// each passed or failed (requires an issue id)
@@ -427,10 +400,7 @@ pub enum Commands {
     ///
     /// Safe to run at any time: it removes only provably stale data and never
     /// the pending redo record.
-    Recover {
-        #[arg(long)]
-        json: bool,
-    },
+    Recover,
 
     /// Start the JIT API and web UI server as a background process
     ///
@@ -473,10 +443,6 @@ pub enum Commands {
         /// Directory containing built web UI static files (auto-detected if omitted)
         #[arg(long)]
         web_dir: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -496,10 +462,6 @@ pub enum ItemCommands {
         /// (e.g. "requirement", or "inv" for the invariant kind)
         #[arg(long)]
         kind: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show / resolve a single item by its qualified id
@@ -521,10 +483,6 @@ pub enum ItemCommands {
         /// Qualified id of the item (`@/<kind>/<self-id>`,
         /// `@/issue/<short-id>/<kind>/<self-id>`, or `<short-id>/<self-id>` sugar)
         qualified_id: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Resolve a qualified id to its item (alias of `show`)
@@ -535,10 +493,6 @@ pub enum ItemCommands {
         /// Qualified id of the item (`@/<kind>/<self-id>`,
         /// `@/issue/<short-id>/<kind>/<self-id>`, or `<short-id>/<self-id>` sugar)
         qualified_id: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Search items by self-id or text
@@ -557,10 +511,6 @@ pub enum ItemCommands {
         /// Filter to one item kind by name or config-declared alias
         #[arg(long)]
         kind: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -587,11 +537,7 @@ pub enum InvariantCommands {
     /// Successful JSON output uses the list envelope `{"count": N, "findings": [...]}`.
     /// Enforcement drift is a failing JSON error envelope with the report under
     /// `error.details`.
-    Check {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    Check,
 }
 
 /// Documentation-projection subcommands.
@@ -620,10 +566,6 @@ pub enum ProjectCommands {
         /// Render only the projection with this `[projection.<name>]` name
         #[arg(long)]
         name: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -715,9 +657,6 @@ pub enum IssueCommands {
         /// Explicitly allow orphaned leaf issues (tasks without parent labels)
         #[arg(long)]
         orphan: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Batch-create issues with dependency wiring from a JSON file.
@@ -757,9 +696,6 @@ pub enum IssueCommands {
         /// Validate the batch without allocating ids or writing repository state.
         #[arg(long)]
         dry_run: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Search issues by text query and/or filters.
@@ -800,9 +736,6 @@ pub enum IssueCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show issue details. Use `--summary` for a compact response without the
@@ -854,9 +787,6 @@ pub enum IssueCommands {
         /// object (`{"a":...,"b":...}`). Requires a single id.
         #[arg(long, value_name = "A,B,C", value_delimiter = ',')]
         fields: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Print a compact "where does this issue stand" status: state, per-gate
@@ -883,9 +813,6 @@ pub enum IssueCommands {
         /// Issue id(s). One object/line per id, in argument order.
         #[arg(required = true)]
         ids: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// List a container's direct children — its immediate dependencies (depth 1)
@@ -910,9 +837,6 @@ pub enum IssueCommands {
     Children {
         /// Container id whose direct children (dependencies) to list.
         id: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Summarize a container's direct children (depth 1) as counts by state plus
@@ -938,9 +862,6 @@ pub enum IssueCommands {
     Progress {
         /// Container id whose direct children to aggregate.
         id: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Update an issue or multiple issues. Returns a lightweight confirmation
@@ -1064,18 +985,10 @@ pub enum IssueCommands {
         /// Bypass blocking (`enforce`) validation rules; the bypass is logged
         #[arg(long)]
         force: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Delete an issue
-    Delete {
-        id: String,
-
-        #[arg(long)]
-        json: bool,
-    },
+    Delete { id: String },
 
     /// Assign issue to someone
     ///
@@ -1087,9 +1000,6 @@ pub enum IssueCommands {
 
         /// Assignee (format: type:identifier, e.g., agent:worker-1)
         assignee: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Claim an issue: assign it and promote it to in_progress
@@ -1111,9 +1021,6 @@ pub enum IssueCommands {
         /// Assign the issue without transitioning its state to in_progress
         #[arg(long)]
         assign_only: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Unassign an issue
@@ -1123,9 +1030,6 @@ pub enum IssueCommands {
     Unassign {
         /// Issue ID
         id: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Reject an issue (convenience for --state rejected)
@@ -1136,9 +1040,6 @@ pub enum IssueCommands {
         /// Reason for rejection (adds resolution:REASON label)
         #[arg(long)]
         reason: Option<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Release an issue from its assignee (for timeout recovery)
@@ -1151,9 +1052,6 @@ pub enum IssueCommands {
 
         /// Reason for release (e.g., timeout, error)
         reason: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Claim the next available ready issue
@@ -1167,10 +1065,6 @@ pub enum IssueCommands {
         /// `issue update --filter`)
         #[arg(short, long)]
         filter: Option<String>,
-
-        /// Output JSON format
-        #[arg(long)]
-        json: bool,
     },
 
     /// List issues (equivalent to `jit query all`)
@@ -1198,9 +1092,6 @@ pub enum IssueCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -1227,9 +1118,6 @@ pub enum DepCommands {
         /// operation, instead of rejecting. Leaves the graph transitively reduced.
         #[arg(long)]
         reduce: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Remove a dependency
@@ -1244,9 +1132,6 @@ pub enum DepCommands {
         /// Dependencies to remove (the blocking issues)
         #[arg(required = true)]
         to_ids: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -1351,9 +1236,6 @@ pub enum GateCommands {
         /// Execution priority (lower number runs first, default: 100)
         #[arg(long, default_value = "100")]
         priority: u32,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Update an existing gate definition in the registry
@@ -1439,18 +1321,12 @@ pub enum GateCommands {
         /// New execution priority (lower number runs first)
         #[arg(long)]
         priority: Option<u32>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Remove a gate definition from the registry
     Remove {
         /// Gate key
         key: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Add a gate requirement to an issue
@@ -1471,9 +1347,6 @@ pub enum GateCommands {
         /// Can specify multiple: jit gate add <issue> gate1 gate2 gate3
         #[arg(required = true)]
         gate_keys: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Gate preset management
@@ -1538,9 +1411,6 @@ pub enum GateCommands {
         /// gate's declared inputs
         #[arg(long)]
         force: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Evaluate all of an issue's required gates in one command, fail-fast
@@ -1576,9 +1446,6 @@ pub enum GateCommands {
         /// gate's declared inputs
         #[arg(long)]
         force: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Evaluate one named gate for several issues, continuing after failures
@@ -1609,9 +1476,6 @@ pub enum GateCommands {
         /// Execute the checker even where a prior run's verdict covers the gate's declared inputs
         #[arg(long)]
         force: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Mark a gate as failed
@@ -1625,27 +1489,18 @@ pub enum GateCommands {
         /// Who failed the gate (optional)
         #[arg(short, long)]
         by: Option<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     // ===== Inspection: report definitions or run results, no side effects =====
     /// List all gate definitions
     ///
     /// JSON output uses the list envelope `{"count": N, "gates": [...]}`.
-    List {
-        #[arg(long)]
-        json: bool,
-    },
+    List,
 
     /// Show gate definition details
     Show {
         /// Gate key
         key: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Inspect gate run results (inspection only, non-mutating)
@@ -1729,9 +1584,6 @@ pub enum GateCommands {
         /// verdict, one finding per line. Requires a gate key.
         #[arg(long)]
         findings: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Report readiness of every required gate on an issue (strict exit)
@@ -1760,9 +1612,6 @@ pub enum GateCommands {
         /// (default behaviour omits them for passing runs).
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -1771,18 +1620,12 @@ pub enum PresetCommands {
     /// List available gate presets
     ///
     /// JSON output uses the list envelope `{"count": N, "presets": [...]}`.
-    List {
-        #[arg(long)]
-        json: bool,
-    },
+    List,
 
     /// Show preset details
     Show {
         /// Preset name
         name: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Apply preset gates to issues
@@ -1818,9 +1661,6 @@ pub enum PresetCommands {
         /// Exclude specific gates (repeatable)
         #[arg(long, value_delimiter = ',')]
         except: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Create custom preset from issue gates
@@ -1838,9 +1678,6 @@ pub enum PresetCommands {
 
         /// Preset name
         name: String,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -1881,9 +1718,6 @@ pub enum DocCommands {
         /// Skip scanning document for assets (default: false)
         #[arg(long, default_value_t = false)]
         skip_scan: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// List document references for an issue
@@ -1892,9 +1726,6 @@ pub enum DocCommands {
     List {
         /// Issue ID
         id: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Remove a document reference from an issue
@@ -1907,9 +1738,6 @@ pub enum DocCommands {
 
         /// Path to document to remove
         path: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show document content
@@ -1923,9 +1751,6 @@ pub enum DocCommands {
         /// View document at specific commit (defaults to HEAD)
         #[arg(long)]
         at: Option<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Print the canonical artifact directory an issue owns in an area
@@ -1949,9 +1774,6 @@ pub enum DocCommands {
 
         /// Declared issue-scoped area to resolve the directory in
         area: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Report artifacts sitting outside their owning issue's canonical directory
@@ -1971,10 +1793,7 @@ pub enum DocCommands {
     ///
     /// JSON output is the standard list envelope over `artifacts`, alongside
     /// the `areas` it walked; `jit --schema` declares its exact shape.
-    Conformance {
-        #[arg(long)]
-        json: bool,
-    },
+    Conformance,
 
     /// List commit history for a document
     History {
@@ -1983,9 +1802,6 @@ pub enum DocCommands {
 
         /// Path to document
         path: String,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show diff between document versions
@@ -2003,9 +1819,6 @@ pub enum DocCommands {
         /// Target commit (defaults to HEAD)
         #[arg(long)]
         to: Option<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Asset management commands
@@ -2019,10 +1832,6 @@ pub enum DocCommands {
         /// Scope of validation (all or issue:ID)
         #[arg(long, default_value = "all")]
         scope: String,
-
-        /// Output results in JSON format
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2030,14 +1839,13 @@ pub enum DocCommands {
 #[derive(Subcommand)]
 pub enum ArchiveCommands {
     /// Fully evaluate every effectively terminal configured non-leaf container
-    /// (Done, Rejected, or Archived from one of those) without mutation
-    Candidates {
-        /// Output schema version 1 with count and complete candidate plans
-        #[arg(long)]
-        json: bool,
-    },
+    /// (Done, Rejected, or Archived from one of those) without mutation;
+    /// `--json` emits schema version 1 with count and complete candidate plans
+    Candidates,
 
     /// Preview archival of one repository-relative document and its supported bundle
+    ///
+    /// `--json` emits the binding schema-version-1 plan.
     Document {
         /// Repository-relative document or opaque artifact path
         path: String,
@@ -2045,13 +1853,11 @@ pub enum ArchiveCommands {
         /// Recompute under the repository write guard and execute the eligible plan
         #[arg(long)]
         execute: bool,
-
-        /// Output the binding schema-version-1 plan as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Preview archival of all issue-linked artifacts in a container subtree
+    ///
+    /// `--json` emits the binding schema-version-1 plan.
     Container {
         /// Container issue ID or unique prefix
         id: String,
@@ -2059,10 +1865,6 @@ pub enum ArchiveCommands {
         /// Recompute under the repository write guard and execute the eligible plan
         #[arg(long)]
         execute: bool,
-
-        /// Output the binding schema-version-1 plan as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2081,9 +1883,6 @@ pub enum AssetCommands {
         /// Rescan document to refresh asset metadata
         #[arg(long, default_value_t = false)]
         rescan: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2115,9 +1914,6 @@ pub enum GraphCommands {
         /// Depth of dependency traversal (1 = immediate, 0 = unlimited)
         #[arg(long, default_value = "1")]
         depth: u32,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show reverse dependencies (issues that depend on this one)
@@ -2144,18 +1940,12 @@ pub enum GraphCommands {
         /// Depth of traversal (1 = immediate, 0 = unlimited)
         #[arg(long, default_value = "1")]
         depth: u32,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show root issues (no dependencies)
     ///
     /// JSON output uses the list envelope `{"count": N, "roots": [...]}`.
-    Roots {
-        #[arg(long)]
-        json: bool,
-    },
+    Roots,
 
     /// Show the DAG-resolved containment hierarchy (parent/children per node)
     ///
@@ -2172,9 +1962,6 @@ pub enum GraphCommands {
     Tree {
         /// Optional root id to scope the tree to (its containment subtree).
         root: Option<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Export dependency graph in various formats
@@ -2186,16 +1973,12 @@ pub enum GraphCommands {
         /// creation. It strips lifecycle fields and identity-bound labels and
         /// excludes template bracket nodes; see `--scope` for capturing one
         /// container's subtree.
+        ///
+        /// The global `--json` is sugar for `--format json`; combining it with
+        /// an explicit `--format dot`/`--format mermaid`/`--format batch` is a
+        /// usage error.
         #[arg(short, long, value_enum)]
         format: Option<crate::commands::GraphExportFormat>,
-
-        /// Emit JSON to stdout — sugar for `--format json`.
-        ///
-        /// Equivalent to `--format json`; combining it with an explicit
-        /// `--format dot`/`--format mermaid`/`--format batch` is a usage error.
-        /// Composes with `--full`.
-        #[arg(long)]
-        json: bool,
 
         /// Emit complete issue records for each node (JSON only).
         ///
@@ -2229,9 +2012,6 @@ pub enum EventCommands {
     Tail {
         #[arg(short, long, default_value = "10")]
         n: usize,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query events by type or issue
@@ -2246,9 +2026,6 @@ pub enum EventCommands {
 
         #[arg(short, long, default_value = "50")]
         limit: usize,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2279,9 +2056,6 @@ pub enum QueryCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query available issues (unassigned, state=ready, unblocked)
@@ -2302,9 +2076,6 @@ pub enum QueryCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query blocked issues with reasons
@@ -2324,9 +2095,6 @@ pub enum QueryCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query strategic issues (those with labels from strategic namespaces)
@@ -2346,9 +2114,6 @@ pub enum QueryCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Query closed issues: those effectively terminal (Done, Rejected, or
@@ -2369,9 +2134,6 @@ pub enum QueryCommands {
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Aggregate issues into counts by a dimension over a label bucket (or the
@@ -2403,9 +2165,6 @@ pub enum QueryCommands {
         /// must match every pattern given. None given aggregates the whole repo.
         #[arg(short = 'l', long)]
         label: Vec<String>,
-
-        #[arg(long)]
-        json: bool,
     },
 
     /// Report membership labels that disagree with DAG-resolved containment
@@ -2417,10 +2176,7 @@ pub enum QueryCommands {
     /// truth; membership labels are advisory grouping.
     ///
     /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
-    Divergence {
-        #[arg(long)]
-        json: bool,
-    },
+    Divergence,
 }
 
 /// Dimension to aggregate by in `jit query count --by <DIMENSION>`.
@@ -2440,10 +2196,7 @@ pub enum LabelCommands {
     /// List all label namespaces
     ///
     /// JSON output uses the list envelope `{"count": N, "namespaces": [...]}`.
-    Namespaces {
-        #[arg(long)]
-        json: bool,
-    },
+    Namespaces,
 
     /// List all values used in a namespace
     ///
@@ -2451,9 +2204,6 @@ pub enum LabelCommands {
     Values {
         /// Namespace to query (e.g., 'milestone', 'epic')
         namespace: String,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2469,10 +2219,7 @@ pub enum ConfigCommands {
     ///
     /// worktree.enforce_leases is repository policy: it is read from the
     /// repository config only, exactly as write commands enforce it.
-    Show {
-        #[arg(long)]
-        json: bool,
-    },
+    Show,
 
     /// Get a specific configuration value
     ///
@@ -2482,8 +2229,6 @@ pub enum ConfigCommands {
     Get {
         /// Configuration key (e.g., coordination.max_indefinite_leases_per_agent)
         key: String,
-        #[arg(long)]
-        json: bool,
     },
 
     /// Set a configuration value
@@ -2501,8 +2246,6 @@ pub enum ConfigCommands {
         /// Set in user config instead of repository config
         #[arg(long)]
         global: bool,
-        #[arg(long)]
-        json: bool,
     },
 
     /// Validate configuration files for errors
@@ -2516,16 +2259,10 @@ pub enum ConfigCommands {
     /// Exit codes (see docs/reference/exit-codes.md, the generated reference):
     ///   0 - Valid configuration
     ///   4 - Errors found (invalid configuration)
-    Validate {
-        #[arg(long)]
-        json: bool,
-    },
+    Validate,
 
     /// Show current type hierarchy
-    ShowHierarchy {
-        #[arg(long)]
-        json: bool,
-    },
+    ShowHierarchy,
 }
 
 #[derive(Subcommand)]
@@ -2588,10 +2325,6 @@ pub enum SnapshotCommands {
         /// Skip repository validation before export
         #[arg(long)]
         force: bool,
-
-        /// Output metadata as JSON instead of human-readable format
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2625,10 +2358,6 @@ pub enum ClaimCommands {
         /// Reason for claim (required for TTL=0)
         #[arg(long)]
         reason: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Release the active lease on an issue
@@ -2647,10 +2376,6 @@ pub enum ClaimCommands {
     Release {
         /// Issue ID whose active lease should be released (short ids accepted)
         issue_id: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Renew a lease
@@ -2669,10 +2394,6 @@ pub enum ClaimCommands {
         /// How many seconds to extend the lease by
         #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         extension: u64,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Send heartbeat for an indefinite lease
@@ -2687,10 +2408,6 @@ pub enum ClaimCommands {
     Heartbeat {
         /// Lease ID to heartbeat
         lease_id: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Show active lease status
@@ -2713,10 +2430,6 @@ pub enum ClaimCommands {
         /// Filter by agent ID (format: type:identifier)
         #[arg(long)]
         agent: Option<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// List all active leases
@@ -2729,11 +2442,7 @@ pub enum ClaimCommands {
     ///   jit claim list --json      # JSON output
     ///
     /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
-    List {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    List,
 
     /// Force-evict a lease (admin operation)
     ///
@@ -2751,10 +2460,6 @@ pub enum ClaimCommands {
         /// Reason for eviction (required for audit trail)
         #[arg(long)]
         reason: String,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -2769,11 +2474,7 @@ pub enum WorktreeCommands {
     /// Examples:
     ///   jit worktree info          # Show current worktree info
     ///   jit worktree info --json   # JSON output
-    Info {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    Info,
 
     /// List all git worktrees with JIT status
     ///
@@ -2785,11 +2486,7 @@ pub enum WorktreeCommands {
     ///   jit worktree list --json   # JSON output
     ///
     /// JSON output uses the list envelope `{"count": N, "worktrees": [...]}`.
-    List {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    List,
 
     /// Report records this checkout's store and the primary's disagree about
     ///
@@ -2804,11 +2501,7 @@ pub enum WorktreeCommands {
     ///   jit worktree store-divergence --json   # JSON output
     ///
     /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
-    StoreDivergence {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    StoreDivergence,
 }
 
 /// Git hooks commands
@@ -2825,11 +2518,7 @@ pub enum HooksCommands {
     /// Examples:
     ///   jit hooks install          # Install hooks
     ///   jit hooks install --json   # JSON output
-    Install {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
+    Install,
 }
 
 /// Repository profile commands.
@@ -2841,10 +2530,6 @@ pub enum ProfileCommands {
         /// Repeatable; occurrence order is preserved.
         #[arg(long, value_name = "SELECTOR", action = ArgAction::Append, required = true)]
         profile: Vec<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Report what applying a selection would change in this repository
@@ -2889,10 +2574,6 @@ pub enum ProfileCommands {
         /// Set one declared profile variable; repeatable and last-wins.
         #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
         set: Vec<String>,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Apply a profile package read from a repository location through one multi-target redo record
@@ -2918,10 +2599,6 @@ pub enum ProfileCommands {
         /// Build and validate the exact application plans without writing
         #[arg(long)]
         dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Pack a package directory into one portable archive file
@@ -2952,10 +2629,6 @@ pub enum ProfileCommands {
         /// Build and validate the exact archive publication without writing
         #[arg(long)]
         dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 
     /// Place the package an archive carries into the worktree
@@ -2984,10 +2657,6 @@ pub enum ProfileCommands {
         /// Build and validate the exact package-tree publication without writing
         #[arg(long)]
         dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
     },
 }
 
@@ -3637,12 +3306,10 @@ mod recovery_dispatch_tests {
             profile: Vec::new(),
             values_file: None,
             set: Vec::new(),
-            json: false,
         }
         .requires_recovery_dispatch());
         assert!(Commands::Validate {
             id: None,
-            json: false,
             explain: false,
             scope: None,
             rule: None,
@@ -3653,11 +3320,10 @@ mod recovery_dispatch_tests {
             leases: false,
         }
         .requires_recovery_dispatch());
-        assert!(!Commands::Status { json: false }.requires_recovery_dispatch());
+        assert!(!Commands::Status.requires_recovery_dispatch());
         assert!(!Commands::Issue(IssueCommands::BatchCreate {
             from_json: "batch.json".into(),
             dry_run: true,
-            json: false,
         })
         .requires_recovery_dispatch());
         assert!(!Commands::Serve {
@@ -3667,7 +3333,6 @@ mod recovery_dispatch_tests {
             fg: false,
             log: None,
             web_dir: None,
-            json: false,
         }
         .requires_recovery_dispatch());
     }
@@ -3802,7 +3467,6 @@ mod recovery_dispatch_tests {
             working_tree: false,
             committed_only: false,
             force: false,
-            json: false,
         })
         .requires_recovery_dispatch());
     }

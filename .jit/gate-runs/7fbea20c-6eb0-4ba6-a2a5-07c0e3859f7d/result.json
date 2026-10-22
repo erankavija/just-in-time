@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6d43f84cda88a8d962de5b787d11cb6e1a52460",
+  "completed_at": "2026-10-22T01:49:39.506826541Z",
+  "duration_ms": 83081,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met and the newer passing cargo-ci evidence resolves the prior blocking finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7fbea20c-6eb0-4ba6-a2a5-07c0e3859f7d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:48:16.425339152Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 188be65ee, 0ac985e93, 6e6b4e2e7, f767033dc, 2119a9bfe, 78975ecf1, 2bc7b2bee (all `jit:d8176fd3`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/issue/d8176fd3/requirement/REQ-01..REQ-05 and @/issue/df129d9e/requirement/REQ-09,REQ-15 (issue descriptions); @/gate/cargo-ci, @/gate/mcp-ci (.jit/gates.toml); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code none, 2026-10-22T01:48:07Z); mcp-ci passed (exit 0, 2026-10-22T01:35:39Z)\nTruncation recovery: narrowed per-file patches, source/test sections, line reads, and targeted searches after truncated broad diff/search reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met and the newer passing cargo-ci evidence resolves the prior blocking finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

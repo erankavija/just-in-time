@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "in_progress (opus worker dispatched 2026-10-21)"
+          "status": "done (merged f767033dc+78975ecf1; cargo-ci, mcp-ci, code-review passed)"
         },
         {
           "key": "list-envelope-adoption",
@@ -102,7 +102,7 @@
           "short_id": "27f0a575",
           "title": "Issue lifecycle methods behind an issues facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (sonnet worker w-27f0a575, worktree base b81e5227f)"
         },
         {
           "key": "issue-list-renderer",

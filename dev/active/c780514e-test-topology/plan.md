@@ -13,12 +13,12 @@ Fixtures land first, then the per-target migrations onto them; owners gain missi
 | REQ-02 | `domain-query-ownership`: extract the `query available` composition and order, and the auto-transition decision, into pure domain functions. Then cut `query_tests`, the label and filter CLI files, and the executor label tests to wiring cases, cut cycle re-proofs, move six `harness_demo` cases and delete the suite. | §1 #4–#8, §5, §D.3 |
 | REQ-03 | Add missing finalization cases to `repository_state`, then delete the storage determinism section. | §1 #9 |
 | REQ-04 | `list-envelope-coverage`: sixteen list-emitting commands found from their emission sites, not the schema, gain typed `ListEnvelope` outputs (six inline bodies plus a schema key, then nine command-layer results). One schema-driven test then replaces the 19 per-command cases with a runtime guard against untyped list output, and the per-command re-assertions go. | §1 #10, §4, §D.4 |
-| REQ-05 | `cli-process-fixture` (wave 1), then one migration per target or coherent file family (eight). Git setup adoptions are split per test boundary (library, server, `fast_docs_templates`). File-backed and memory-backed setups each get a shared-constructor foundation, then one adoption per integration target. Files whose properties move elsewhere are excluded from migration and handled by their owner entries. | §1 #11–#17, §C, §D.6 |
-| REQ-06 | Wave-1 foundations: shared `fixture_issue`, shared `TaxonomyRepo`, and product initialisation over any store (followed by the shared memory executor built on it). One adoption per test boundary then retires each copy: library and four suites for `fixture_issue`, two CLI suites for `TaxonomyRepo`, and `fast_rules` for the executor. | §1 #18, §4 |
+| REQ-05 | `cli-process-fixture` (wave 1), then one migration per target or coherent file family (eight). Git setup adoptions are split per test boundary (library, server, `fast_docs_templates`). File-backed and memory-backed setups each get a shared-constructor foundation, then adoptions per boundary across the whole workspace: the three in-process suites, the in-process helpers of three CLI suites, two library module families plus the library file-backed modules, and the server crate. The mechanical sweep in §D.6 classifies every candidate helper and names its owner. Files whose properties move elsewhere are excluded from migration and handled by their owner entries. | §1 #11–#17, §C, §D.6 |
+| REQ-06 | Wave-1 foundations: shared `fixture_issue`, shared `TaxonomyRepo`, and product initialisation over any store (followed by the shared memory executor built on it). One adoption per test boundary then retires each copy: library and four suites for `fixture_issue`, two CLI suites for `TaxonomyRepo`, `fast_rules` for the executor. The memory-backed adoptions in the suites, the library and the server remove every private memory executor and literal index body. | §1 #18, §4, §D.6 |
 | REQ-07 | `shipped-item-kinds-fixture` derivation (wave 1), then one adoption each for the harness tables, command unit tests, `cli_item_validate` and `fast_rules`. | §1 #20–#21 |
 | REQ-08 | `issue-store-conformance` (absorbs the three ad-hoc tests), then the in-memory path-read fix, then backend-test pruning. | §1 #22–#24 |
 | REQ-09 | The receipt env lock goes with the runner hook; an audit puts unguarded environment readers under `EnvGuard`. | §1 #25, §4 |
-| REQ-10 | `script-self-test-gates`: three self-tests become declared gates; the corpus setup's nested cargo test is replaced by an in-suite fixture; the cargo and node skips fail. | §1 #26–#28, #32, §D.5 |
+| REQ-10 | `script-self-test-gates`: every repository shell-script self-test becomes a declared gate (investigation §D.7). The three that the default suite wraps leave it, and seven that ran nowhere or only in CI gain gates, including three skill-script suites under `.agents/`. The corpus setup's nested cargo test is replaced by an in-suite fixture, and every skip-and-pass path fails instead: the cargo and node skips, the root-only lock tests, and the read-bit and actionlint skips inside the docs-check and workflow-contract self-tests. | §1 #26–#28, #32, §D.5, §D.7 |
 | REQ-11 | `input-keyed-fixture-cache`, then removal of the hidden subcommand, receipts and setup scripts. | §1 #29–#32, §A |
 | REQ-12 | Final footprint report under `suite-measurement-protocol`. | §1 #34, §C |
 | REQ-13 | Early relief: input key, in-memory rule-warning tests, short-deadline server drain, doctest pruning. Final suite-clock report. | §A; D-01 |
@@ -35,11 +35,11 @@ Test support reads the item-kinds contribution of `profiles/jit-default/manifest
 
 ### `file-setup-constructors` [implementation-produced] — File-backed in-process setups
 
-Shared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root with its discovered layout, and a temporary declaration directory from caller-supplied files. Suite adoptions replace private helpers with these.
+Shared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root with its discovered layout, and a temporary declaration directory from caller-supplied files. Adoptions in the in-process suites, the in-process helpers of the CLI suites, the library test modules and the server crate replace the private helpers that investigation §D.6 classifies as setup.
 
 ### `memory-declaration-seeding` [implementation-produced] — Memory stores from declarations
 
-Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor, which product initialisation sets up. Scenario declarations stay in tests as data.
+Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor, which product initialisation sets up. Scenario declarations stay in tests as data. A test writes no index body and restates no value that product initialisation already writes. Scenario values, for example `enforce_leases = "off"`, reach the shared constructor as declarations. Adoptions cover the in-process suites, the in-process helpers of the CLI suites, the library test modules and the server crate. Investigation §D.6 lists each helper with its owner.
 
 ### `input-keyed-fixture-cache` [implementation-produced] — Input-keyed fixture cache
 
@@ -63,7 +63,14 @@ Filter composition, priority order and the auto-transition decision are pure fun
 
 ### `script-self-test-gates` [plan-fixed] — Script self-tests as gates
 
-This covers the three script self-tests the default suite runs today: `scripts/cargo-ci-selftest.sh`, `scripts/profile-test-suite.sh --self-test` and the `scripts/rust-build-budget.sh` cases. The fourth, `scripts/setup-recorded-failure-corpus.sh --self-test`, is deleted together with its script. Self-tests the default suite never ran, such as `scripts/docs-check-selftest.sh`, are outside this contract. Each covered self-test is a `.jit/gates.toml` gate with `[gates.inputs]` covering the script and what it exercises. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test, and no test passes by printing a skip notice. New gates carry `mode` and no deprecated `auto` key.
+This covers every shell-script self-test in the repository (investigation §D.7):
+
+- three that the default suite wraps today: `scripts/cargo-ci-selftest.sh`, `scripts/profile-test-suite.sh --self-test` and the `scripts/rust-build-budget.sh` cases, which move into the script;
+- seven that ran nowhere or only in CI: `scripts/docs-check-selftest.sh`, `scripts/generate-shipped-policy-regions-selftest.sh`, `scripts/workflow-contract-selftest.sh`, `scripts/benchmark-session-cost-selftest.sh`, and the skill suites `test-standards-scan.sh`, `test-standards-fix.sh` (`.agents/skills/jit-project-lead/scripts/`) and `test-manifest-tool.sh` (`.agents/skills/jit-planning-lead/evals/`).
+
+Shell files that test no script (CI replays, product walkthroughs, image smoke, the MCP test runner) are recorded as such in §D.7.
+
+`scripts/setup-recorded-failure-corpus.sh --self-test` is deleted together with its script. Each self-test is a `.jit/gates.toml` gate with `[gates.inputs]` covering the script and what it exercises. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test. No test or self-test passes by printing a skip notice, whether a tool is missing or a host precondition such as an enforced read bit is absent: it establishes the precondition or fails. Investigation §D.5 lists each skip-and-pass path and its owner, and the matches that are not test skips. New gates carry `mode` and no deprecated `auto` key.
 
 ### `suite-measurement-protocol` [plan-fixed] — How suite cost is measured
 
@@ -88,7 +95,7 @@ This covers the three script self-tests the default suite runs today: `scripts/c
 | exit-code-reproof-deletion | Exit-code re-proof suites are deleted | task | exit_code_tests.rs and the parity suite are gone; the projection suite alone binds exit codes. | exit-code-projection-ownership | REQ-01, D-04 | touches 3 | — | exit-code-envelope-case-moves, exit-code-claim-delete-case-moves, exit-code-issue-prefix-case-moves, exit-code-dependency-guard-case-moves, exit-code-gate-preset-case-move |
 | query-available-domain-order | Available-work filtering and priority order become a pure domain query | task | query available's filter composition and priority order are one pure domain function with unit and property tests. | domain-query-ownership | REQ-02 | touches 3 | — | — |
 | auto-transition-domain-decision | Auto-transition readiness is decided by a pure domain function | task | A pure domain function decides which dependents a terminal transition makes ready. | domain-query-ownership | REQ-02 | touches 3 | — | query-available-domain-order |
-| harness-demo-case-moves | Unique harness demonstration cases move beside their owners | task | The six harness-demonstration cases with no other owner live beside the code they exercise. | shipped-item-kinds-fixture | REQ-02 | touches 1, uncertain | — | harness-shipped-item-kinds, shared-memory-executor |
+| harness-demo-case-moves | Unique harness demonstration cases move beside their owners | task | The six harness-demonstration cases with no other owner have owning tests in the library modules they exercise. | shipped-item-kinds-fixture | REQ-02 | touches 4 | — | harness-shipped-item-kinds, shared-memory-executor, unit-test-shipped-item-kinds |
 | harness-demo-deletion | The harness demonstration suite is deleted | task | harness_demo.rs is gone, and contributor guidance cites owning tests instead. | — | REQ-02 | touches 3 | — | harness-demo-case-moves |
 | finalization-owner-gaps | Repository-state tests own each finalization case | task | Each finalization case the storage determinism section covers has an owning repository_state test. | — | REQ-03 | touches 1 | — | — |
 | finalization-reproof-deletion | Storage tests stop re-proving mutation finalization | task | The storage determinism section is gone, and storage tests cover only backend-added behaviour. | — | REQ-03 | touches 1 | — | finalization-owner-gaps |
@@ -104,7 +111,7 @@ This covers the three script self-tests the default suite runs today: `scripts/c
 | profile-suite-selftest-gate | Suite-profiler self-test runs as a declared gate | task | The suite profiler self-test runs as its own gate over the script, outside the default suite. | script-self-test-gates | REQ-10 | touches 2 | — | — |
 | build-budget-selftest-gate | Build-budget checker self-test runs as a declared gate | task | The build-budget checker's cases run as the script's own self-test under a declared gate. | script-self-test-gates | REQ-10 | touches 4 | — | — |
 | dependency-policy-tool-failure | Dependency-feature policy tests fail when cargo is missing | task | The dependency-feature policy tests use the running toolchain's cargo and fail rather than skip. | script-self-test-gates | REQ-10 | touches 1 | — | — |
-| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, server-shutdown-test-bound, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure |
+| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure, docs-check-selftest-gate, shipped-policy-regions-selftest-gate, workflow-contract-selftest-gate, session-cost-benchmark-selftest-gate, standards-scan-test-gate, standards-fix-test-gate, manifest-tool-test-gate, lock-tests-deterministic-precondition |
 | suite-clock-report | Suite clock before and after the epic is reported | task | The benchmark note records the suite clock before and after, and a per-test profile with no test over 5 s. | suite-measurement-protocol | REQ-13, D-01 | touches 1 | — | build-footprint-report |
 | exit-code-envelope-case-moves | Blocked-transition and startup envelope cases move beside their owners | task | Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness |
 | exit-code-claim-delete-case-moves | Claim and confirmed-delete cases move beside their owners | task | Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness, cli-repo-checkout-migration, cli-repo-workflow-migration |
@@ -138,7 +145,7 @@ This covers the three script self-tests the default suite runs today: `scripts/c
 | fast-docs-templates-git-fixture-adoption | Git revision tests initialise git through the shared helper | task | Git-revision suite tests initialise git repositories through the shared helper. | cli-process-fixture | REQ-05, D-02 | touches 1 | — | cli-process-fixture |
 | file-backed-setup-constructors | Shared constructors for file-backed in-process test repositories | task | Shared test support constructs file-backed repositories, executors and declaration directories. | — | REQ-05, D-02 | touches 1 | — | — |
 | fast-rules-file-setup-adoption | fast_rules file-backed tests use the shared constructors | task | fast_rules file-backed tests build repositories and executors through the shared constructors. | file-setup-constructors | REQ-05, D-02 | touches 4 | — | file-backed-setup-constructors, rule-warning-tests-down-a-layer |
-| fast-docs-templates-file-setup-adoption | fast_docs_templates file-backed tests use the shared constructors | task | fast_docs_templates file-backed tests use the shared constructors. | file-setup-constructors | REQ-05, D-02 | touches 2 | — | file-backed-setup-constructors |
+| fast-docs-templates-file-setup-adoption | fast_docs_templates file-backed tests use the shared constructors | task | fast_docs_templates file-backed tests use the shared constructors. | file-setup-constructors | REQ-05, D-02 | touches 3 | — | file-backed-setup-constructors |
 | memory-declaration-seeding | Shared memory executor accepts declarations as data | task | Shared test support builds memory stores and executors from declarations passed as data. | — | REQ-05, REQ-06, D-02 | touches 1 | — | shared-memory-executor |
 | fast-issue-memory-setup-adoption | fast_issue memory-backed tests use the shared seeding | task | fast_issue memory-backed tests build stores and executors through the shared seeding. | memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 5 | — | memory-declaration-seeding |
 | fast-rules-memory-setup-adoption | fast_rules memory-backed tests use the shared seeding | task | fast_rules memory-backed tests build stores and executors through the shared seeding. | memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 5 | — | memory-declaration-seeding, fast-rules-memory-executor-adoption |
@@ -157,10 +164,26 @@ This covers the three script self-tests the default suite runs today: `scripts/c
 | auto-transition-harness-owner | Lifecycle harness tests stop re-proving the auto-transition cascade | task | Lifecycle harness tests assert timestamps only, and one harness test owns the cascade wiring. | domain-query-ownership | REQ-02 | touches 1 | — | auto-transition-domain-decision |
 | batch-cycle-adapter-reproof-removal | Batch-create stops re-proving keyed cycle detection | task | Batch-create keeps at most one adapter wiring test, and graph tests own keyed cycle detection. | domain-query-ownership | REQ-02 | touches 1 | — | — |
 | cli-cycle-reproof-removal | Workflow CLI tests stop re-proving dependency cycle rejection | task | integration_test.rs holds no dependency cycle re-proof. | domain-query-ownership | REQ-02 | touches 1 | — | cli-repo-workflow-migration |
+| docs-check-selftest-gate | Documentation checker self-test runs as a declared gate | task | The documentation checker self-test runs as its own gate over the checkers. | script-self-test-gates | REQ-10 | touches 2, uncertain | — | — |
+| shipped-policy-regions-selftest-gate | Shipped-policy region generator self-test runs as a declared gate | task | The shipped-policy region generator self-test runs as its own gate over the generator. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| workflow-contract-selftest-gate | Workflow-contract harness self-test runs as a declared gate | task | The workflow-contract self-test runs as its own gate over the harness and its vectors. | script-self-test-gates | REQ-10 | touches 2, uncertain | — | — |
+| session-cost-benchmark-selftest-gate | Session-cost benchmark self-test runs as a declared gate | task | The session-cost benchmark self-test runs as its own gate over the benchmark script. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| standards-scan-test-gate | Standards-scan test suite runs as a declared gate | task | The standards-scan test suite runs as its own gate over the scanner. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| standards-fix-test-gate | Standards-fix test suite runs as a declared gate | task | The standards-fix test suite runs as its own gate over the fixer. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| manifest-tool-test-gate | Breakdown-manifest tool test suite runs as a declared gate | task | The breakdown-manifest tool test suite runs as its own gate over the tool and its fixtures. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| lock-tests-deterministic-precondition | Read-only lock tests establish their precondition on any host | task | The four read-only lock tests run their assertions on any host and never pass by skipping. | — | REQ-10 | touches 1 | — | — |
+| library-item-validate-memory-setup-adoption | Item and validate unit tests use the shared memory seeding | task | Item and validate unit tests build memory executors through the shared seeding, with no literal index. | memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 2 | — | memory-declaration-seeding, harness-demo-case-moves |
+| library-command-memory-setup-adoption | Command unit tests use the shared memory seeding | task | Command unit tests build memory stores and executors through the shared seeding. | memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 9 | — | memory-declaration-seeding, harness-demo-case-moves, batch-cycle-adapter-reproof-removal, library-git-fixture-adoption |
+| library-file-setup-adoption | Library unit tests use the shared file-backed constructors | task | Library unit tests build file-backed repositories and executors through the shared constructors. | file-setup-constructors | REQ-05, D-02 | touches 9 | — | file-backed-setup-constructors, library-command-memory-setup-adoption |
+| server-memory-setup-adoption | Server tests use the shared memory seeding | task | Server tests build memory stores through the shared seeding, with no literal index. | memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 2 | — | memory-declaration-seeding, server-git-fixture-adoption |
+| server-file-setup-adoption | Server tests use the shared file-backed constructors | task | Server tests build file-backed repositories and executors through the shared constructors. | file-setup-constructors | REQ-05, D-02 | touches 3 | — | file-backed-setup-constructors, server-memory-setup-adoption, server-shutdown-test-bound |
+| cli-item-validate-in-process-setup-adoption | cli_item_validate in-process tests use the shared constructors | task | The cli_item_validate in-process tests build repositories and executors through the shared constructors. | file-setup-constructors | REQ-05, REQ-06, D-02 | touches 3 | — | file-backed-setup-constructors, cli-item-validate-shipped-item-kinds |
+| cli-query-graph-in-process-setup-adoption | cli_query_graph in-process tests use the shared constructors | task | The cli_query_graph in-process tests build repositories and executors through the shared constructors. | file-setup-constructors, memory-declaration-seeding | REQ-05, REQ-06, D-02 | touches 2 | — | file-backed-setup-constructors, memory-declaration-seeding, cli-query-graph-migration |
+| cli-repo-workflow-in-process-setup-adoption | cli_repo_workflow in-process tests use the shared constructors | task | The cli_repo_workflow in-process tests build repositories and executors through the shared constructors. | file-setup-constructors | REQ-05, REQ-06, D-02 | touches 1 | — | file-backed-setup-constructors, cli-repo-profile-migration |
 | exit-code-envelope-ownership | Exit codes and list envelopes each have one owning test | story | command exit codes and the list-envelope count each have one owning test | — | REQ-01, REQ-04 | — | — | exit-code-reproof-deletion, cli-issue-list-envelope-reassertion-removal, cli-query-graph-list-envelope-reassertion-removal, cli-repo-workflow-list-envelope-reassertion-removal, exit-code-reassertion-cli-gate, exit-code-reassertion-cli-issue, exit-code-reassertion-cli-query-graph, exit-code-reassertion-cli-item-validate, exit-code-reassertion-cli-repo-workflow |
 | query-graph-ownership | Query, transition and cycle semantics are proven at the domain and graph layers | story | query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring | — | REQ-02 | — | — | query-cli-wiring-reduction, auto-transition-wiring-reduction, auto-transition-harness-owner, batch-cycle-adapter-reproof-removal, cli-cycle-reproof-removal, harness-demo-deletion, label-query-cli-wiring-reduction, label-query-harness-reduction |
 | storage-contracts | Storage behaviour is proven once per contract | story | finalization is proven in repository state and every IssueStore backend runs one conformance suite | — | REQ-03, REQ-08 | — | — | backend-specific-test-pruning |
-| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-gate-migration, cli-issue-command-migration, cli-issue-envelope-migration, cli-query-graph-migration, cli-repo-checkout-migration, cli-repo-profile-migration, cli-repo-workflow-migration, library-git-fixture-adoption, server-git-fixture-adoption, fast-docs-templates-git-fixture-adoption, library-fixture-issue-adoption, fast-issue-fixture-issue-adoption, fast-docs-templates-fixture-issue-adoption, fast-rules-fixture-issue-adoption, harness-shipped-item-kinds, unit-test-shipped-item-kinds, cli-item-validate-shipped-item-kinds, fast-rules-shipped-item-kinds, fast-rules-file-setup-adoption, fast-docs-templates-file-setup-adoption, fast-issue-memory-setup-adoption, fast-docs-templates-memory-setup-adoption, env-reading-tests-guarded |
+| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-gate-migration, cli-issue-command-migration, cli-issue-envelope-migration, cli-repo-checkout-migration, cli-repo-workflow-migration, fast-docs-templates-git-fixture-adoption, library-fixture-issue-adoption, fast-issue-fixture-issue-adoption, fast-docs-templates-fixture-issue-adoption, fast-rules-fixture-issue-adoption, fast-rules-shipped-item-kinds, fast-rules-file-setup-adoption, fast-docs-templates-file-setup-adoption, fast-issue-memory-setup-adoption, fast-docs-templates-memory-setup-adoption, env-reading-tests-guarded, library-item-validate-memory-setup-adoption, library-file-setup-adoption, server-file-setup-adoption, cli-item-validate-in-process-setup-adoption, cli-query-graph-in-process-setup-adoption, cli-repo-workflow-in-process-setup-adoption |
 | suite-cost | The default suite runs within its time and footprint budgets | story | the default suite runs no nested cargo build or tool-skipping test, fixtures are keyed on inputs, and footprint and clock are reported | — | REQ-10, REQ-11, REQ-12, REQ-13, D-01 | — | — | suite-clock-report |
 
 ```mermaid
@@ -248,11 +271,27 @@ flowchart LR
     N80["auto-transition-harness-owner: Lifecycle harness tests stop re-proving the auto-transition cascade"]
     N81["batch-cycle-adapter-reproof-removal: Batch-create stops re-proving keyed cycle detection"]
     N82["cli-cycle-reproof-removal: Workflow CLI tests stop re-proving dependency cycle rejection"]
-    N83["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
-    N84["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
-    N85["storage-contracts: Storage behaviour is proven once per contract"]
-    N86["shared-test-fixtures: Tests run on shared fixtures and guards"]
-    N87["suite-cost: The default suite runs within its time and footprint budgets"]
+    N83["docs-check-selftest-gate: Documentation checker self-test runs as a declared gate"]
+    N84["shipped-policy-regions-selftest-gate: Shipped-policy region generator self-test runs as a declared gate"]
+    N85["workflow-contract-selftest-gate: Workflow-contract harness self-test runs as a declared gate"]
+    N86["session-cost-benchmark-selftest-gate: Session-cost benchmark self-test runs as a declared gate"]
+    N87["standards-scan-test-gate: Standards-scan test suite runs as a declared gate"]
+    N88["standards-fix-test-gate: Standards-fix test suite runs as a declared gate"]
+    N89["manifest-tool-test-gate: Breakdown-manifest tool test suite runs as a declared gate"]
+    N90["lock-tests-deterministic-precondition: Read-only lock tests establish their precondition on any host"]
+    N91["library-item-validate-memory-setup-adoption: Item and validate unit tests use the shared memory seeding"]
+    N92["library-command-memory-setup-adoption: Command unit tests use the shared memory seeding"]
+    N93["library-file-setup-adoption: Library unit tests use the shared file-backed constructors"]
+    N94["server-memory-setup-adoption: Server tests use the shared memory seeding"]
+    N95["server-file-setup-adoption: Server tests use the shared file-backed constructors"]
+    N96["cli-item-validate-in-process-setup-adoption: cli_item_validate in-process tests use the shared constructors"]
+    N97["cli-query-graph-in-process-setup-adoption: cli_query_graph in-process tests use the shared constructors"]
+    N98["cli-repo-workflow-in-process-setup-adoption: cli_repo_workflow in-process tests use the shared constructors"]
+    N99["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
+    N100["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
+    N101["storage-contracts: Storage behaviour is proven once per contract"]
+    N102["shared-test-fixtures: Tests run on shared fixtures and guards"]
+    N103["suite-cost: The default suite runs within its time and footprint budgets"]
     N0 --> N1
     N0 --> N2
     N44 --> N2
@@ -274,6 +313,7 @@ flowchart LR
     N12 --> N13
     N55 --> N14
     N52 --> N14
+    N56 --> N14
     N14 --> N15
     N16 --> N17
     N17 --> N18
@@ -282,18 +322,25 @@ flowchart LR
     N21 --> N22
     N22 --> N23
     N3 --> N23
-    N83 --> N30
-    N84 --> N30
-    N85 --> N30
-    N86 --> N30
+    N99 --> N30
+    N100 --> N30
+    N101 --> N30
+    N102 --> N30
     N23 --> N30
-    N43 --> N30
     N25 --> N30
     N26 --> N30
     N27 --> N30
     N28 --> N30
     N29 --> N30
     N42 --> N30
+    N83 --> N30
+    N84 --> N30
+    N85 --> N30
+    N86 --> N30
+    N87 --> N30
+    N88 --> N30
+    N89 --> N30
+    N90 --> N30
     N30 --> N31
     N10 --> N32
     N10 --> N33
@@ -361,48 +408,67 @@ flowchart LR
     N8 --> N79
     N13 --> N80
     N8 --> N82
-    N11 --> N83
-    N72 --> N83
-    N73 --> N83
-    N74 --> N83
-    N34 --> N83
-    N35 --> N83
-    N36 --> N83
-    N37 --> N83
-    N38 --> N83
-    N76 --> N84
-    N79 --> N84
-    N80 --> N84
-    N81 --> N84
-    N82 --> N84
-    N15 --> N84
-    N77 --> N84
-    N78 --> N84
-    N20 --> N85
-    N1 --> N86
-    N2 --> N86
-    N3 --> N86
-    N5 --> N86
-    N6 --> N86
-    N7 --> N86
-    N8 --> N86
-    N59 --> N86
-    N60 --> N86
-    N61 --> N86
-    N46 --> N86
-    N47 --> N86
-    N48 --> N86
-    N49 --> N86
-    N55 --> N86
-    N56 --> N86
-    N57 --> N86
-    N58 --> N86
-    N63 --> N86
-    N64 --> N86
-    N66 --> N86
-    N68 --> N86
-    N9 --> N86
-    N31 --> N87
+    N65 --> N91
+    N14 --> N91
+    N65 --> N92
+    N14 --> N92
+    N81 --> N92
+    N59 --> N92
+    N62 --> N93
+    N92 --> N93
+    N65 --> N94
+    N60 --> N94
+    N62 --> N95
+    N94 --> N95
+    N43 --> N95
+    N62 --> N96
+    N57 --> N96
+    N62 --> N97
+    N65 --> N97
+    N5 --> N97
+    N62 --> N98
+    N7 --> N98
+    N11 --> N99
+    N72 --> N99
+    N73 --> N99
+    N74 --> N99
+    N34 --> N99
+    N35 --> N99
+    N36 --> N99
+    N37 --> N99
+    N38 --> N99
+    N76 --> N100
+    N79 --> N100
+    N80 --> N100
+    N81 --> N100
+    N82 --> N100
+    N15 --> N100
+    N77 --> N100
+    N78 --> N100
+    N20 --> N101
+    N1 --> N102
+    N2 --> N102
+    N3 --> N102
+    N6 --> N102
+    N8 --> N102
+    N61 --> N102
+    N46 --> N102
+    N47 --> N102
+    N48 --> N102
+    N49 --> N102
+    N58 --> N102
+    N63 --> N102
+    N64 --> N102
+    N66 --> N102
+    N68 --> N102
+    N9 --> N102
+    N91 --> N102
+    N93 --> N102
+    N95 --> N102
+    N96 --> N102
+    N97 --> N102
+    N98 --> N102
+    N31 --> N103
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -411,10 +477,10 @@ flowchart LR
 | Risk / decision | Resolution and rationale |
 |---|---|
 | D-01 REQ-13 scope (steward) | Chosen: the server shutdown test and the doctest substep are in scope. Early-relief terminals with no upstream edge are `profiled-fixture-input-key`, `rule-warning-tests-down-a-layer`, `server-shutdown-test-bound` and `doctest-substep-bound`. The before figures are the investigation's §A. |
-| D-02 Fixtures first (steward D1) | Chosen: each fixture is a foundation, and the foundations are wave-1 roots with no edge: `cli-process-fixture`, `shared-taxonomy-repo`, `shared-fixture-issue`, `store-generic-initialisation`, `shipped-item-kinds-derivation` and `file-backed-setup-constructors`. `shared-memory-executor` and `memory-declaration-seeding` follow `store-generic-initialisation`. Adoptions follow their foundation, one per test boundary. Every terminal a 2195c98f task depends on reaches no 2195c98f, 842b0ac6 or df129d9e task; a script checks this. Incoming edges are derived from footprint overlap: each 2195c98f retype task depends on every D1-clean entry here that edits a file it retypes, reduced transitively, including through the 2195c98f chain. Edges to add at breakdown: 0af95f14 → `library-fixture-issue-adoption`, `library-git-fixture-adoption`, `unit-test-shipped-item-kinds`, `file-backed-setup-constructors`, `env-reading-tests-guarded`, `issue-store-conformance-suite`, `command-list-output-types`, `doctest-substep-bound`; 13190465 → `fast-issue-fixture-issue-adoption`, `fast-issue-memory-setup-adoption`; b45a2865 → `fast-rules-fixture-issue-adoption`, `fast-rules-file-setup-adoption`, `fast-rules-shipped-item-kinds`; b73b3e5a → `fast-docs-templates-fixture-issue-adoption`, `fast-docs-templates-file-setup-adoption`, `fast-docs-templates-memory-setup-adoption`; 19d9bd7d → `cli-item-validate-migration`, `cli-query-graph-migration`, `exit-code-reassertion-cli-gate`, `exit-code-reassertion-cli-repo-workflow`; c797b59b → `harness-shipped-item-kinds`; 5fac48b8 → `fast-issue-fixture-issue-adoption`, `fast-docs-templates-fixture-issue-adoption`, `fast-rules-fixture-issue-adoption`, `cli-query-graph-migration`, `fast-rules-memory-executor-adoption`, `rule-warning-tests-down-a-layer`, `batch-cycle-adapter-reproof-removal`, `server-git-fixture-adoption`. cd8adfc1 and 89e7a273 need no direct edge: their overlaps are reached through c797b59b, 5fac48b8 and 0af95f14. That includes 89e7a273 → `issue-store-conformance-suite` (D-03) through 0af95f14. Overlaps with entries that carry an external edge stay conflict-avoid, because D1 forbids them as 2195c98f dependencies: 0af95f14 and 5fac48b8 with `query-available-domain-order` and `query-domain-owner-gaps` (`domain/queries.rs`); 0af95f14 and 89e7a273 with `backend-specific-test-pruning` and `memory-backend-path-reads`; 13190465 with `auto-transition-harness-owner`; b45a2865 with `label-query-harness-reduction`; b73b3e5a and 5fac48b8 with the harness-demo entries; 19d9bd7d with `label-query-cli-wiring-reduction` and `exit-code-reassertion-cli-query-graph`; cd8adfc1 and 5fac48b8 with `auto-transition-domain-decision`. |
+| D-02 Fixtures first (steward D1) | Chosen: each fixture is a foundation, and the foundations are wave-1 roots with no edge: `cli-process-fixture`, `shared-taxonomy-repo`, `shared-fixture-issue`, `store-generic-initialisation`, `shipped-item-kinds-derivation` and `file-backed-setup-constructors`. `shared-memory-executor` and `memory-declaration-seeding` follow `store-generic-initialisation`. Adoptions follow their foundation, one per test boundary. Every terminal a 2195c98f task depends on reaches no 2195c98f, 842b0ac6 or df129d9e task; a script checks this. Incoming edges are derived from footprint overlap: each 2195c98f retype task depends on every D1-clean entry here that edits a file it retypes, reduced transitively, including through the 2195c98f chain. Edges to add at breakdown: 0af95f14 → `library-fixture-issue-adoption`, `library-item-validate-memory-setup-adoption`, `library-file-setup-adoption`, `env-reading-tests-guarded`, `issue-store-conformance-suite`, `command-list-output-types`, `doctest-substep-bound`; 13190465 → `fast-issue-fixture-issue-adoption`, `fast-issue-memory-setup-adoption`; b45a2865 → `fast-rules-fixture-issue-adoption`, `fast-rules-file-setup-adoption`, `fast-rules-shipped-item-kinds`; b73b3e5a → `fast-docs-templates-fixture-issue-adoption`, `fast-docs-templates-file-setup-adoption`, `fast-docs-templates-memory-setup-adoption`; 19d9bd7d → `cli-item-validate-migration`, `cli-query-graph-in-process-setup-adoption`, `exit-code-reassertion-cli-gate`, `exit-code-reassertion-cli-repo-workflow`; 5fac48b8 → `fast-issue-fixture-issue-adoption`, `fast-docs-templates-fixture-issue-adoption`, `fast-rules-fixture-issue-adoption`, `cli-query-graph-migration`, `fast-rules-memory-executor-adoption`, `rule-warning-tests-down-a-layer`, `server-file-setup-adoption`. Edges implied by these are not listed. For example, 0af95f14 → `library-file-setup-adoption` reaches `library-command-memory-setup-adoption`, `library-git-fixture-adoption`, `file-backed-setup-constructors`, `harness-demo-case-moves`, `harness-shipped-item-kinds`, `unit-test-shipped-item-kinds` and `batch-cycle-adapter-reproof-removal`. 5fac48b8 → `server-file-setup-adoption` reaches `server-memory-setup-adoption` and `server-git-fixture-adoption`. c797b59b, cd8adfc1 and 89e7a273 need no direct edge: their overlaps are reached through 0af95f14, c797b59b and 5fac48b8. That includes 89e7a273 → `issue-store-conformance-suite` (D-03) through 0af95f14. Overlaps with entries that carry an external edge stay conflict-avoid, because D1 forbids them as 2195c98f dependencies: 0af95f14 and 5fac48b8 with `query-available-domain-order` and `query-domain-owner-gaps` (`domain/queries.rs`); 0af95f14 and 89e7a273 with `backend-specific-test-pruning` and `memory-backend-path-reads`; 13190465 with `auto-transition-harness-owner`; b45a2865 with `label-query-harness-reduction`; b73b3e5a and 5fac48b8 with `harness-demo-deletion`; 19d9bd7d with `label-query-cli-wiring-reduction` and `exit-code-reassertion-cli-query-graph`; cd8adfc1 and 5fac48b8 with `auto-transition-domain-decision`. |
 | D-03 Conformance suite owner (steward D2) | Chosen: `issue-store-conformance-suite` owns the suite. 89e7a273 reaches it through 0af95f14 → `issue-store-conformance-suite`, so no direct edge is added. Rejected: waiting for the in-memory fix, because the suite already passes both backends on the cases it carries. |
 | D-04 df129d9e ordering (steward D4) | 650e6a56 (count structs as `ListEnvelope`) is done, so REQ-01 and REQ-04 both already follow it, and no edge is needed. Neither waits for the handler moves. `inline-list-output-types` and `command-list-output-types` type the sixteen fallback lists now, so the handler-move tasks find those lists already wrapped. |
-| Outgoing edges (onto ready tasks) | `harness-demo-case-moves` → d125490a (edits `harness_demo.rs` and the harness gate helper; this key is outside every 2195c98f edge, so there is no cycle or D1 conflict). `query-available-domain-order` → 2492ab29 (deletes backfill tests in the same `domain/queries.rs` test module). `memory-backend-path-reads` → ec190bd5 (`memory.rs`). |
+| Outgoing edges (onto ready tasks) | `harness-demo-deletion` → d125490a (d125490a edits `harness_demo.rs` and the harness gate helper, and the deletion is the only entry that edits `harness_demo.rs`. No 2195c98f task depends on the deletion, so there is no cycle or D1 conflict). `query-available-domain-order` → 2492ab29 (deletes backfill tests in the same `domain/queries.rs` test module). `memory-backend-path-reads` → ec190bd5 (`memory.rs`). |
 | Conflict-avoid, no edge | 5687e281 (`main.rs`/`schema.rs`, also edited by `inline-list-output-types`, `command-list-output-types`, `fixture-setup-hook-removal` and `exit-code-binding-completeness`; 25 handler moves, and waiting would stall REQ-01, REQ-04 and REQ-11). b73b3e5a (`harness_demo.rs`). b45a2865 (`cli_warnings_integration_tests.rs` and the executor label tests). 13190465 (`domain_queries_tests.rs`, `lifecycle_timestamps_tests.rs`). d125490a against `harness-shipped-item-kinds`, `shared-memory-executor` (`test_harness.rs:209-220`) and `fixture-setup-hook-removal` (`template_apply_tests.rs`); those are D1 foundations and D1 forbids the edge. 0e3b69fc (`Cargo.toml` test-support comment; backlog). bc1955a8 and b4fe7887 (`D-[0-9]+` literals; rule-compilation chain). b4929342 and 63c11d08 (`domain::types::fixture_issue` paths, which `shared-fixture-issue` removes). 0af95f14 (`domain/queries.rs` ids and rustdoc examples, also touched by the query extraction and doctest pruning). fe761000 (`auto` keys in `.jit/gates.toml`; new gates carry none). f9977efd and fb2dc5c3 (budget script and re-measurement; backlog). e3d06f82 and 3625b18b (event matchers in moved cases). afc2b698 (a different `scratch_build` file). |
 | Stale external citations | c400730c and 2ac50581 cite `exit_code_tests.rs`, `query_tests` and `harness_demo`, and cc6ef886 cites `tests/common/`. Their owners must re-point them once the deletions land. |
 | Migration scope | Chosen: migrations skip files whose properties move to one owner (`exit_code_tests.rs`, the parity suite, `list_envelope_tests.rs`, `query_tests.rs`). Owner entries delete or rewrite those files on the fixture. Rejected: migrating then deleting them (about 3,600 lines of churn). |
@@ -422,7 +488,7 @@ flowchart LR
 | Doctest bound | Chosen: prune rustdoc examples that restate unit-tested properties (`@/inv/essential-code-prose`) until the substep meets the bound. Rejected: an edition-2024 bump for merged doctests, a workspace-wide migration outside this epic. |
 | Server drain test | Chosen: a unit test of `run_shutdown_sequence` passes a short deadline (its existing parameter) to own the entitlement, and the process test uses the existing short-deadline seam. Rejected: a paused tokio clock, which needs the `test-util` dependency feature (`@/inv/bounded-rust-build-footprint`); shortening `GRACEFUL_DRAIN_TIMEOUT`, which changes product behaviour. |
 | A test over 5 s at report time | `suite-clock-report`'s criterion fails if any test exceeds 5 s, so the report cannot pass over a regression. The execution lead adds a remediation terminal under `suite-cost` for each named test (owning the move down a layer, like the rule-warning and server cases), makes the report depend on it, and re-runs the report. The likeliest candidates are the two `profile_cli_tests` cases (3.66 s quiet). |
-| Root-only lock-test skip | `storage/lock.rs:652` skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool, so it is outside REQ-10. It stays and is recorded in investigation §D.5. |
+| Steward ruling: execution order | Waves 1–2 are on 2195c98f's critical path: the IssueId retype chain (0af95f14 onward) depends on the overlap-derived c780514e terminals in the external-edge table; the steward assigns c780514e execution with waves 1–2 first. |
 | Measurement ordering | Chosen: `build-footprint-report` depends on the four other stories and the remaining suite-cost terminals, so "after" covers all changes. Risk: the stories' holistic reviews then sit on the critical path to the report. |
 | Same-file ordering | `exit-code-dependency-guard-case-moves` → `label-query-cli-wiring-reduction` → `exit-code-reassertion-cli-query-graph` serialises `query_json_tests.rs` and `label_query_json_tests.rs`; the wiring cut keeps the moved parent-filter guard. `fast-rules-memory-executor-adoption` → `fast-rules-memory-setup-adoption` → `label-query-harness-reduction` and `fast-rules-shipped-item-kinds` serialise the `fast_rules` executor files. The rule-warning move precedes `fast-rules-file-setup-adoption`, and `cli-query-graph-fixture-issue-adoption` precedes `cli-query-graph-migration` (`main.rs`). Query reductions depend on `query-domain-owner-gaps`, so each cut lands with its domain owner already present. |
 | Shared-file contention | `test_utils.rs`, `dev/TESTING.md`, `.jit/gates.toml`, `.config/nextest.toml`, `repository_state_store_tests.rs` and `commands/issue.rs` are edited by several entries. Edges serialise same-region rewrites: query extraction before the auto-transition decision, finalization deletion before the conformance suite, hook removal before the corpus fixture, and migrations before the re-assertion and wiring cuts in their files. Workers rebase over the remaining advisories. |

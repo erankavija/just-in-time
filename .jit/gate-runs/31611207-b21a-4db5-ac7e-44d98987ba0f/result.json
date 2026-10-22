@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "171ec45d293fd3b13b6e05208963d70331d6ecfc",
+  "completed_at": "2026-10-21T21:29:40.925829006Z",
+  "duration_ms": 94549,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue’s configuration-validation changes are accurately documented in the affected validation-rule guidance.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "31611207-b21a-4db5-ac7e-44d98987ba0f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:28:06.376018414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `cd7b6c4a` is a leaf task. Its two reachable tagged commits were inspected individually; the implementation patch updates the rule loader and validation-rules how-to, while the merge adds no separate patch.\n\nThe strict load-time validation and canonical `has_doc_type` spelling are accurately and concisely documented at [docs/how-to/validation-rules.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/validation-rules.md:76). The selector reference and affected rustdoc agree with current behavior.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s configuration-validation changes are accurately documented in the affected validation-rule guidance.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
