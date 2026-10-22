@@ -18,7 +18,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "07330ce8-6ce8-4824-923a-2b6fb24010dc",
+      "status": "failed",
+      "updated_at": "2026-10-22T01:37:25.039499186Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "739bf7b3-801b-43a0-83d6-61b1b5c3b56c",
+      "status": "passed",
+      "updated_at": "2026-10-22T01:35:41.514657211Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One global --json flag carried as OutputMode",
-  "updated_at": "2026-10-21T20:57:04.842301295Z"
+  "updated_at": "2026-10-22T01:37:25.039499186Z"
 }

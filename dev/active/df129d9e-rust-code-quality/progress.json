@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "in_progress (opus worker dispatched 2026-10-21)"
+          "status": "merged f767033dc+78975ecf1; mcp-ci pass; cargo-ci held (main red from fbb661f2); code-review rerun after cargo-ci"
         },
         {
           "key": "list-envelope-adoption",
