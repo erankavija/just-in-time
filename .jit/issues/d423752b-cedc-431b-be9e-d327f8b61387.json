@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-22T15:43:03.606979497Z",
   "context": {},
   "created_at": "2026-10-22T15:40:49.042225799Z",
   "dependencies": [],
@@ -22,7 +23,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "No test waits on a cold profiled-repository fixture build",
-  "updated_at": "2026-10-22T15:40:49.042225799Z"
+  "updated_at": "2026-10-22T15:43:03.606979497Z"
 }
