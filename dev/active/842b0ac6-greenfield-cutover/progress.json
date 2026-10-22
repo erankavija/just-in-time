@@ -272,7 +272,7 @@
           "title": "Remove cfg twins in repository_state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "merged-gate-pending"
         },
         {
           "id": "afc2b698-34bb-43d1-b7e2-c859de8d8104",
@@ -290,7 +290,7 @@
           "title": "Remove uncalled domain predicates and parsers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged-gate-pending"
+          "status": "rework-dispatched"
         },
         {
           "id": "ec190bd5-af89-4776-969f-81f48412592a",
@@ -299,7 +299,7 @@
           "title": "Remove cfg twins in storage",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "merged-gate-pending"
         },
         {
           "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
@@ -359,7 +359,7 @@
           "title": "Resolve the coordination lease limits through one resolver",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged-gate-pending"
+          "status": "rework-2-dispatched"
         },
         {
           "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
@@ -459,8 +459,9 @@
     "459bb995": 2,
     "d125490a": 1,
     "fbb661f2": 1,
-    "34361448": 1,
-    "fe761000": 1
+    "34361448": 2,
+    "fe761000": 1,
+    "58282882": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
