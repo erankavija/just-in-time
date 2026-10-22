@@ -4514,8 +4514,6 @@ template = true
             ProfileSelector::path("vendor/workflow"),
             absolute,
             ProfileSelector::path("vendor/./workflow/"),
-            ProfileSelector::path("vendor/../vendor/workflow"),
-            ProfileSelector::path("vendor/workflow/../workflow"),
         ];
         #[cfg(unix)]
         let selectors = {
@@ -4529,6 +4527,31 @@ template = true
         });
         assert_eq!(planned.unwrap().count(), closure + selectors.len() - 1);
         assert_eq!(stages, selection_probe::once_per_invocation(closure));
+    }
+
+    #[test]
+    fn test_select_profiles_rejects_parent_traversal_before_model_validation() {
+        let (temp, _storage, executor, _package) = fixture();
+        dependent_selection(&temp, &executor);
+
+        for spelling in ["vendor/../vendor/workflow", "vendor/workflow/../workflow"] {
+            for location in [PathBuf::from(spelling), temp.path().join(spelling)] {
+                let (result, stages) = selection_probe::observe(|| {
+                    executor.select_profiles(
+                        &[ProfileSelector::path(location)],
+                        &ProfileVariableOptions::default(),
+                    )
+                });
+
+                let error = result.err().expect("parent traversal must remain rejected");
+                assert!(matches!(
+                    error.downcast_ref::<ProfileApplyError>(),
+                    Some(ProfileApplyError::PackageOutsideWorktree { .. })
+                ));
+                assert!(!stages
+                    .contains_key(&selection_probe::SelectionStage::ModelReferenceValidation));
+            }
+        }
     }
 
     #[cfg(unix)]
