@@ -140,7 +140,7 @@
           "key": "finalization-owner-gaps",
           "title": "Repository-state tests own each finalization case",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; Luna xhigh selected for bounded single-file unit ownership completion, stronger lead audit and unchanged independent gates; reused memory checkout"
         },
         {
           "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
