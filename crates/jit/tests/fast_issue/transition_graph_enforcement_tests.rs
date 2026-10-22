@@ -48,6 +48,7 @@ fn seed_issue(
     state: State,
 ) -> String {
     let (id, _) = executor
+        .issues()
         .create_issue(
             title.to_string(),
             String::new(),
@@ -85,7 +86,7 @@ fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
     // blocked by the enforcing graph rule.
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -124,7 +125,7 @@ fn test_blocked_transition_records_event_in_log() {
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let _ = executor.update_issue(
+    let _ = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -172,7 +173,7 @@ fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -235,6 +236,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let warnings = executor
+        .issues()
         .update_issue(
             &epic,
             None,
@@ -289,6 +291,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let _unrelated = seed_issue(&executor, "Unrelated", &["type:epic"], State::InProgress);
 
     let warnings = executor
+        .issues()
         .update_issue(
             &epic,
             None,
@@ -337,7 +340,7 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     // Register the gate so it is a valid reference, leaving it unpassed.
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -390,7 +393,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -440,7 +443,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -489,7 +492,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
     executor.add_gate(&epic, "tests".to_string()).unwrap();
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -524,7 +527,7 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
     let executor = executor_with_rules(DONE_NEEDS_DESIGN);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.update_issue_state(&epic, State::Done);
+    let result = executor.issues().update_issue_state(&epic, State::Done);
     let err = result.expect_err("update_issue_state done must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -555,7 +558,7 @@ fn test_enforce_rule_config_error_blocks_transition() {
     let executor = executor_with_rules(DONE_RULE_MISCONFIGURED);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,
@@ -607,6 +610,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     let warnings = executor
+        .issues()
         .update_issue(
             &epic,
             None,
@@ -665,7 +669,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
 
     // Drive the Gated arm: it runs postchecks, which try to auto-transition to
     // done. The enforce-at-done graph rule must block that auto-done.
-    let result = executor.update_issue_state(&epic, State::Gated);
+    let result = executor.issues().update_issue_state(&epic, State::Gated);
     let err = result.expect_err("enforce-at-done rule must block the gated auto-done path");
     let blocked = err
         .downcast_ref::<TransitionBlockedError>()
@@ -706,7 +710,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let executor = executor_with_rules(rules);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Ready);
 
-    let result = executor.update_issue_state(&epic, State::InProgress);
+    let result = executor
+        .issues()
+        .update_issue_state(&epic, State::InProgress);
     let err = result.expect_err("the `_` arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -730,7 +736,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let executor = executor_with_rules(rules);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.update_issue_state(&epic, State::Gated);
+    let result = executor.issues().update_issue_state(&epic, State::Gated);
     let err = result.expect_err("the gated arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -883,7 +889,7 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     // The state-only path (`jit issue reject`) routes through the chokepoint.
-    let result = executor.update_issue_state(&epic, State::Rejected);
+    let result = executor.issues().update_issue_state(&epic, State::Rejected);
     assert!(
         result.is_ok(),
         "rejection must bypass enforcement even with a violated enforce rule"
@@ -907,7 +913,7 @@ fn test_done_rule_does_not_fire_on_non_done_transition() {
     // Backlog epic with no dependencies -> can go ready.
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Backlog);
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &epic,
         None,
         None,

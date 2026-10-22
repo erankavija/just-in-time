@@ -152,6 +152,7 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
     let issue = issue_with_label("enforces:gate-semantics");
     let exec = executor(&jit_dir);
     let id = exec
+        .issues()
         .create_issue(
             issue.title,
             issue.description,
@@ -206,6 +207,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
 
     let exec = executor(&jit_dir);
     let (id, _warnings) = exec
+        .issues()
         .create_issue(
             "enforcer".to_string(),
             String::new(),

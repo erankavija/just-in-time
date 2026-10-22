@@ -12,7 +12,10 @@ use jit::test_harness::TestHarness;
 
 /// Reject an issue outright, the way `jit issue update --state rejected` does.
 fn reject(h: &TestHarness, id: &str) {
-    h.executor.update_issue_state(id, State::Rejected).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(id, State::Rejected)
+        .unwrap();
 }
 
 #[test]
@@ -24,6 +27,7 @@ fn test_transition_to_ready_allows_rejected_dependency() {
     reject(&h, &dependency);
 
     h.executor
+        .issues()
         .update_issue_state(&dependent, State::Ready)
         .unwrap();
 
@@ -39,9 +43,11 @@ fn test_transition_to_done_allows_rejected_dependency() {
     reject(&h, &dependency);
 
     h.executor
+        .issues()
         .update_issue_state(&dependent, State::InProgress)
         .unwrap();
     h.executor
+        .issues()
         .update_issue_state(&dependent, State::Done)
         .unwrap();
 
@@ -85,8 +91,8 @@ fn test_issue_show_omits_rejected_dependency_from_unmet() {
     h.executor.add_dependency(&dependent, &pending).unwrap();
     reject(&h, &rejected);
 
-    let issue = h.executor.show_issue(&dependent).unwrap();
-    let enriched_deps = h.executor.get_dependencies_enriched(&issue);
+    let issue = h.executor.issues().show_issue(&dependent).unwrap();
+    let enriched_deps = h.executor.issues().get_dependencies_enriched(&issue);
     let response = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
 
     let unmet: Vec<&str> = response
@@ -107,6 +113,7 @@ fn test_claim_next_selects_issue_whose_dependency_is_rejected() {
 
     let (claimed, _) = h
         .executor
+        .issues()
         .claim_next("agent:worker-1".to_string(), None)
         .unwrap();
 
@@ -121,10 +128,14 @@ fn test_claim_next_skips_issue_with_unmet_dependency() {
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     // The upstream leaves the ready set itself, so only `dependent` could match.
     h.executor
+        .issues()
         .update_issue_state(&dependency, State::InProgress)
         .unwrap();
 
-    let result = h.executor.claim_next("agent:worker-1".to_string(), None);
+    let result = h
+        .executor
+        .issues()
+        .claim_next("agent:worker-1".to_string(), None);
 
     assert!(
         result.is_err(),

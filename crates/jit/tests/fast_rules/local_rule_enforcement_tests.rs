@@ -55,7 +55,7 @@ fn test_create_enforce_rule_blocks_without_force() {
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
 
     // An epic without a req: label violates the enforce rule -> blocked.
-    let result = executor.create_issue(
+    let result = executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,
@@ -81,7 +81,7 @@ fn test_create_enforce_rule_blocks_without_force() {
 fn test_create_satisfying_issue_passes() {
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
 
-    let result = executor.create_issue(
+    let result = executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,
@@ -101,6 +101,7 @@ fn test_create_force_bypasses_and_logs_event() {
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
 
     let (id, _warnings) = executor
+        .issues()
         .create_issue(
             "An epic".to_string(),
             String::new(),
@@ -141,6 +142,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     );
 
     let (_, warnings) = executor
+        .issues()
         .create_issue(
             "An epic".to_string(),
             String::new(),
@@ -183,7 +185,7 @@ assert = { json-schema = "schemas/needs-sections.json" }
     // An epic with a body section: the description parses into a `sections`
     // projection, so `required: ["sections"]` is satisfied. Without the body
     // parse being triggered, `sections` is absent and this would wrongly fail.
-    let result = executor.create_issue(
+    let result = executor.issues().create_issue(
         "An epic".to_string(),
         "## Goals\n\n- ship it\n".to_string(),
         Priority::Normal,
@@ -212,7 +214,7 @@ enforce = true
 assert = { label-coverage = { child-state = "done" } }
 "#,
     );
-    let result = executor.create_issue(
+    let result = executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,
@@ -237,7 +239,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Removing the only req: label would violate the enforce rule -> blocked.
-    let blocked = executor.update_issue(
+    let blocked = executor.issues().update_issue(
         &id,
         None,
         None,
@@ -260,6 +262,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
 
     // With --force the removal goes through and is logged.
     executor
+        .issues()
         .update_issue(
             &id,
             None,
@@ -326,6 +329,7 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     // no label edits. force = true makes the still-violated enforce rules a
     // bypass rather than a rejection.
     executor
+        .issues()
         .update_issue(
             &id,
             None,
@@ -459,7 +463,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     let id = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
-    let result = executor.update_issue(
+    let result = executor.issues().update_issue(
         &id,
         None,
         None,
@@ -564,7 +568,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
     // validated.
     let executor = executor_with_rules(READY_NEEDS_REQ_ENFORCE);
 
-    let blocked = executor.create_issue(
+    let blocked = executor.issues().create_issue(
         "A task".to_string(),
         String::new(),
         Priority::Normal,
@@ -583,6 +587,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
 
     // A satisfying issue (carrying req:) is created and promoted to Ready.
     let (id, _) = executor
+        .issues()
         .create_issue(
             "A task".to_string(),
             String::new(),
@@ -613,7 +618,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
     let id = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
-    let blocked = executor.update_issue(
+    let blocked = executor.issues().update_issue(
         &id,
         None,
         None,
@@ -639,6 +644,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
 
     // Adding the req: label in the same update unblocks the transition.
     executor
+        .issues()
         .update_issue(
             &id,
             None,
@@ -667,6 +673,7 @@ fn test_force_bypass_event_emitted_after_successful_create_publication() {
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
 
     executor
+        .issues()
         .create_issue(
             "An epic".to_string(),
             String::new(),
@@ -724,7 +731,7 @@ fn test_no_bypass_event_when_publication_fails() {
     .unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
 
-    let result = executor.create_issue(
+    let result = executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,
@@ -755,7 +762,7 @@ fn test_ordinary_rejection_is_not_logged() {
     // A blocked (non-forced) write must NOT append any event at all.
     let executor = executor_with_rules(EPIC_NEEDS_REQ_ENFORCE);
     let before = executor.storage().read_events().unwrap().len();
-    let _ = executor.create_issue(
+    let _ = executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,

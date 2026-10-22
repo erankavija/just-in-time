@@ -44,6 +44,7 @@ fn test_query_strategic_returns_top_level_issues() {
 
     // Create issues with strategic types
     let (top_id, _) = executor
+        .issues()
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
@@ -57,6 +58,7 @@ fn test_query_strategic_returns_top_level_issues() {
         .unwrap();
 
     let (_tactical_id, _) = executor
+        .issues()
         .create_issue(
             "Fix bug".to_string(),
             "".to_string(),
@@ -82,6 +84,7 @@ fn test_query_strategic_returns_second_level_issues() {
     let container = taxonomy.type_at_level(2);
 
     let (container_id, _) = executor
+        .issues()
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -112,6 +115,7 @@ fn test_query_strategic_returns_every_declared_strategic_type() {
         .iter()
         .map(|type_name| {
             let (id, _) = executor
+                .issues()
                 .create_issue(
                     format!("A {type_name}"),
                     "".to_string(),
@@ -131,6 +135,7 @@ fn test_query_strategic_returns_every_declared_strategic_type() {
         .collect();
 
     let (_tactical_id, _) = executor
+        .issues()
         .create_issue(
             "Fix typo".to_string(),
             "".to_string(),
@@ -156,6 +161,7 @@ fn test_query_strategic_excludes_tactical_only() {
 
     // Create only tactical issues
     executor
+        .issues()
         .create_issue(
             "Task 1".to_string(),
             "".to_string(),
@@ -169,6 +175,7 @@ fn test_query_strategic_excludes_tactical_only() {
         .unwrap();
 
     executor
+        .issues()
         .create_issue(
             "Task 2".to_string(),
             "".to_string(),
@@ -193,6 +200,7 @@ fn test_query_strategic_includes_mixed_labels() {
 
     // Issue with both strategic type and tactical labels
     let (mixed_id, _) = executor
+        .issues()
         .create_issue(
             "Auth release".to_string(),
             "".to_string(),
@@ -224,6 +232,7 @@ fn test_query_strategic_ignores_membership_label_without_strategic_type() {
     // Strategic classification is type-based, not namespace-based: a container's
     // membership label on a leaf-typed issue does not make it strategic.
     let (_member_id, _) = executor
+        .issues()
         .create_issue(
             "Digital transformation".to_string(),
             "".to_string(),
@@ -241,6 +250,7 @@ fn test_query_strategic_ignores_membership_label_without_strategic_type() {
 
     // Create issue with strategic type
     let (top_id, _) = executor
+        .issues()
         .create_issue(
             "Launch".to_string(),
             "".to_string(),

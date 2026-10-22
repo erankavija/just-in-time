@@ -126,6 +126,7 @@ fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStor
 /// Create a breakable container, returning its id.
 fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) -> String {
     executor
+        .issues()
         .create_issue(
             title.to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),

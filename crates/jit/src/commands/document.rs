@@ -2131,7 +2131,7 @@ mod tests {
         let (temp, storage) = crate::test_utils::setup_test_repo()?;
         let executor =
             CommandExecutor::new(storage.clone()).with_layout(storage.configured_layout()?);
-        let (issue_id, _) = executor.create_issue(
+        let (issue_id, _) = executor.issues().create_issue(
             "Long History Issue".to_string(),
             String::new(),
             crate::domain::Priority::Normal,

@@ -1695,7 +1695,7 @@ pub struct IssueShowResponse {
     /// Dependency ids from the issue's stored `dependencies` array that did
     /// NOT resolve to an existing issue (e.g. a stale reference left by raw
     /// storage mutation or legacy data predating the delete-cascade fix in
-    /// `CommandExecutor::delete_issue`, jit:f847df3f). Deleting an issue
+    /// `IssueOps::delete_issue`, jit:f847df3f). Deleting an issue
     /// through the CLI strips its own id from every dependent's
     /// `dependencies`, so this is empty in a repository touched only through
     /// the CLI; when non-empty, it means a dangling id exists and — unlike
@@ -1740,7 +1740,7 @@ impl IssueShowResponse {
     /// `enriched_deps` normally holds one [`MinimalIssue`] per entry in
     /// `issue.dependencies`, but an id that no longer resolves to a stored
     /// issue is left out of it by
-    /// [`get_dependencies_enriched`](crate::commands::CommandExecutor::get_dependencies_enriched).
+    /// [`get_dependencies_enriched`](crate::commands::IssueOps::get_dependencies_enriched).
     /// This constructor recovers any such id by diffing `enriched_deps`
     /// against `issue.dependencies` and reports it via
     /// `dangling_dependency_ids` instead of dropping it silently

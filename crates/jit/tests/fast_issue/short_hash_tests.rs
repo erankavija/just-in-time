@@ -27,7 +27,7 @@ fn test_cli_show_with_short_hash() {
 
     // Use short hash in show command
     let prefix = &id[..8];
-    let issue = h.executor.show_issue(prefix).unwrap();
+    let issue = h.executor.issues().show_issue(prefix).unwrap();
     assert_eq!(issue.id, id);
     assert_eq!(issue.title, "Test issue");
 }
@@ -41,6 +41,7 @@ fn test_cli_update_with_short_hash() {
     let prefix = &id[..8];
     let _ = h
         .executor
+        .issues()
         .update_issue(
             prefix,
             None,
@@ -84,7 +85,7 @@ fn test_cli_delete_with_short_hash() {
 
     // Delete using short hash
     let prefix = &id[..8];
-    h.executor.delete_issue(prefix).unwrap();
+    h.executor.issues().delete_issue(prefix).unwrap();
 
     // Verify it's gone
     let result = h.storage.load_issue(&id);
@@ -103,16 +104,17 @@ fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records
     type EntryPoint = fn(&TestHarness, &str, &str) -> anyhow::Result<()>;
     let entry_points: &[(&str, EntryPoint)] = &[
         ("issue show", |h, short, _| {
-            h.executor.show_issue(short).map(drop)
+            h.executor.issues().show_issue(short).map(drop)
         }),
         ("issue children", |h, short, _| {
-            h.executor.issue_children(short).map(drop)
+            h.executor.issues().issue_children(short).map(drop)
         }),
         ("issue progress", |h, short, _| {
-            h.executor.issue_progress(short).map(drop)
+            h.executor.issues().issue_progress(short).map(drop)
         }),
         ("issue update", |h, short, _| {
             h.executor
+                .issues()
                 .update_issue(
                     short,
                     Some("t".into()),
@@ -129,29 +131,39 @@ fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records
         }),
         ("issue state", |h, short, _| {
             h.executor
+                .issues()
                 .update_issue_state(short, jit::domain::State::Done)
                 .map(drop)
         }),
         ("issue reject", |h, short, _| {
-            h.executor.reject_issue(short, None).map(drop)
+            h.executor.issues().reject_issue(short, None).map(drop)
         }),
         ("issue reject with reason", |h, short, _| {
-            h.executor.reject_issue(short, Some("dup")).map(drop)
+            h.executor
+                .issues()
+                .reject_issue(short, Some("dup"))
+                .map(drop)
         }),
         ("issue assign", |h, short, _| {
-            h.executor.assign_issue(short, "agent:a".into()).map(drop)
+            h.executor
+                .issues()
+                .assign_issue(short, "agent:a".into())
+                .map(drop)
         }),
         ("issue claim", |h, short, _| {
-            h.executor.claim_issue(short, "agent:a".into()).map(drop)
+            h.executor
+                .issues()
+                .claim_issue(short, "agent:a".into())
+                .map(drop)
         }),
         ("issue unassign", |h, short, _| {
-            h.executor.unassign_issue(short).map(drop)
+            h.executor.issues().unassign_issue(short).map(drop)
         }),
         ("issue release", |h, short, _| {
-            h.executor.release_issue(short, "r")
+            h.executor.issues().release_issue(short, "r")
         }),
         ("issue delete", |h, short, _| {
-            h.executor.delete_issue(short).map(drop)
+            h.executor.issues().delete_issue(short).map(drop)
         }),
         ("dep add source", |h, short, full| {
             h.executor.add_dependency(short, full).map(drop)
@@ -373,7 +385,7 @@ fn test_issue_id_filters_and_document_reads_resolve_any_spelling_of_a_full_id() 
 fn test_query_events_issue_filter_matches_a_deleted_issue_in_any_spelling() {
     let h = TestHarness::new();
     let id = h.create_issue("Deleted");
-    h.executor.delete_issue(&id).unwrap();
+    h.executor.issues().delete_issue(&id).unwrap();
 
     let events = h
         .executor

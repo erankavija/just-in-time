@@ -14,15 +14,22 @@ use jit::test_harness::TestHarness;
 /// Drive a dependency-free issue to `Done` (no gates required).
 fn drive_to_done(h: &TestHarness, id: &str) {
     h.executor
+        .issues()
         .update_issue_state(id, State::InProgress)
         .unwrap();
-    h.executor.update_issue_state(id, State::Done).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(id, State::Done)
+        .unwrap();
     assert_eq!(h.get_issue(id).state, State::Done);
 }
 
 /// Park an issue into `Archived` the way `jit issue update --state archived` does.
 fn archive(h: &TestHarness, id: &str) {
-    h.executor.update_issue_state(id, State::Archived).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(id, State::Archived)
+        .unwrap();
 }
 
 fn count_state_changes(h: &TestHarness, id: &str) -> usize {
@@ -47,6 +54,7 @@ fn test_archived_from_done_still_satisfies_dependents() {
 
     // The archived-from-Done dependency remains met: the dependent reaches Ready.
     h.executor
+        .issues()
         .update_issue_state(&dependent, State::Ready)
         .unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
@@ -60,6 +68,7 @@ fn test_archived_from_non_terminal_does_not_satisfy_dependents() {
     let dependency = h.create_issue("Parked mid-flight");
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     h.executor
+        .issues()
         .update_issue_state(&dependency, State::InProgress)
         .unwrap();
     archive(&h, &dependency);
@@ -69,7 +78,10 @@ fn test_archived_from_non_terminal_does_not_satisfy_dependents() {
     );
 
     // Archived from a non-terminal state does not start satisfying dependents.
-    let result = h.executor.update_issue_state(&dependent, State::Ready);
+    let result = h
+        .executor
+        .issues()
+        .update_issue_state(&dependent, State::Ready);
     assert!(
         result.is_err(),
         "a dependency archived from a non-terminal state must still block"
@@ -85,7 +97,10 @@ fn test_revive_restores_done_exactly_and_clears_origin() {
     assert_eq!(h.get_issue(&id).archived_from, Some(State::Done));
 
     // Reviving to the recorded origin succeeds and clears archived_from.
-    h.executor.update_issue_state(&id, State::Done).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Done)
+        .unwrap();
     let revived = h.get_issue(&id);
     assert_eq!(revived.state, State::Done);
     assert_eq!(revived.archived_from, None);
@@ -102,6 +117,7 @@ fn test_revive_to_non_origin_is_refused_closing_resurrection_loophole() {
     // resurrect a completed issue into the active lifecycle.
     let error = h
         .executor
+        .issues()
         .update_issue_state(&id, State::Ready)
         .expect_err("archived-from-done issue must not revive to ready");
     let rendered = format!("{error:#}");
@@ -121,6 +137,7 @@ fn test_archived_from_rejected_revives_only_to_rejected_and_stays_terminal() {
     let dependency = h.create_issue("Abandoned then archived");
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     h.executor
+        .issues()
         .update_issue_state(&dependency, State::Rejected)
         .unwrap();
     archive(&h, &dependency);
@@ -131,6 +148,7 @@ fn test_archived_from_rejected_revives_only_to_rejected_and_stays_terminal() {
 
     // Effectively terminal: the dependent is unblocked.
     h.executor
+        .issues()
         .update_issue_state(&dependent, State::Ready)
         .unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
@@ -138,9 +156,11 @@ fn test_archived_from_rejected_revives_only_to_rejected_and_stays_terminal() {
     // Reviving to a non-origin (done) is refused; reviving to rejected succeeds.
     assert!(h
         .executor
+        .issues()
         .update_issue_state(&dependency, State::Done)
         .is_err());
     h.executor
+        .issues()
         .update_issue_state(&dependency, State::Rejected)
         .unwrap();
     assert_eq!(h.get_issue(&dependency).state, State::Rejected);
@@ -154,8 +174,15 @@ fn test_archive_from_ready_records_origin_and_revives_to_ready() {
     assert_eq!(h.get_issue(&id).archived_from, Some(State::Ready));
 
     // Reviving to done (not the origin) is refused; reviving to ready succeeds.
-    assert!(h.executor.update_issue_state(&id, State::Done).is_err());
-    h.executor.update_issue_state(&id, State::Ready).unwrap();
+    assert!(h
+        .executor
+        .issues()
+        .update_issue_state(&id, State::Done)
+        .is_err());
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Ready)
+        .unwrap();
     assert_eq!(h.get_issue(&id).state, State::Ready);
     assert_eq!(h.get_issue(&id).archived_from, None);
 }
@@ -186,11 +213,13 @@ fn test_rollup_folds_archived_by_terminal_origin() {
     archive(&h, &delivered);
     let abandoned = h.create_issue("Rejected then archived");
     h.executor
+        .issues()
         .update_issue_state(&abandoned, State::Rejected)
         .unwrap();
     archive(&h, &abandoned);
     let parked = h.create_issue("Parked mid-flight");
     h.executor
+        .issues()
         .update_issue_state(&parked, State::InProgress)
         .unwrap();
     archive(&h, &parked);
@@ -216,6 +245,7 @@ fn test_query_closed_uses_effective_terminality() {
     archive(&h, &delivered);
     let parked = h.create_issue("Parked mid-flight");
     h.executor
+        .issues()
         .update_issue_state(&parked, State::InProgress)
         .unwrap();
     archive(&h, &parked);
@@ -238,7 +268,10 @@ fn test_entering_and_leaving_archived_each_log_state_change() {
     drive_to_done(&h, &id); // backlog->? plus in_progress + done state changes
     let before = count_state_changes(&h, &id);
     archive(&h, &id); // one state change into Archived
-    h.executor.update_issue_state(&id, State::Done).unwrap(); // one revive change
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Done)
+        .unwrap(); // one revive change
     let after = count_state_changes(&h, &id);
     assert_eq!(
         after - before,
@@ -255,7 +288,10 @@ fn test_archived_to_archived_is_noop() {
     archive(&h, &id);
     let before = count_state_changes(&h, &id);
     // Re-archiving is a no-op: no event, origin unchanged.
-    h.executor.update_issue_state(&id, State::Archived).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Archived)
+        .unwrap();
     assert_eq!(count_state_changes(&h, &id), before);
     assert_eq!(h.get_issue(&id).archived_from, Some(State::Done));
 }

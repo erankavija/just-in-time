@@ -162,7 +162,19 @@ fn derive_issue_deletion(
     })
 }
 
+/// Issue lifecycle operations of a [`CommandExecutor`].
+pub struct IssueOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The issue-lifecycle family.
+    pub fn issues(&self) -> IssueOps<'_, S> {
+        IssueOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> IssueOps<'_, S> {
     #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,
@@ -220,7 +232,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
-        let (issue_id, validation) = self.publish_issue_creation(issue, explicit_type, force)?;
+        let (issue_id, validation) =
+            self.exec
+                .publish_issue_creation(issue, explicit_type, force)?;
 
         Ok((issue_id, validation.warnings))
     }
@@ -231,7 +245,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         assignee_filter: Option<String>,
         priority_filter: Option<Priority>,
     ) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
 
         let filtered = issues
             .into_iter()
@@ -263,8 +277,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_issue(&self, id: &str) -> Result<Issue> {
-        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
-        self.storage.load_issue(&full_id)
+        let full_id = self
+            .exec
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        self.exec.storage.load_issue(&full_id)
     }
 
     /// Get enriched dependency information for an issue.
@@ -283,7 +300,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .dependencies
             .iter()
             .filter_map(|dep_id| {
-                self.storage
+                self.exec
+                    .storage
                     .load_issue(dep_id)
                     .ok()
                     .map(|dep| crate::domain::MinimalIssue::from(&dep))
@@ -305,7 +323,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: Issue,
     ) -> Result<crate::output::IssueStatusResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
-        let gate_runs = self.list_gate_runs(&issue.id, None)?;
+        let gate_runs = self.exec.list_gate_runs(&issue.id, None)?;
         let show = crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
         Ok(crate::output::IssueStatusResponse::from_show(&show))
     }
@@ -323,7 +341,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut children = Vec::new();
         let mut dangling = Vec::new();
         for dep_id in &container.dependencies {
-            match self.storage.load_issue_or_not_found(dep_id) {
+            match self.exec.storage.load_issue_or_not_found(dep_id) {
                 Ok(child) => children.push(child),
                 Err(crate::storage::PathReadError::NotFound(_)) => dangling.push(dep_id.clone()),
                 // A real lookup failure is not a dangling edge — surface it.
@@ -515,29 +533,31 @@ impl<S: IssueStore> CommandExecutor<S> {
             .assignee
             .map(|assignee| assignee.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
-            issue_id: IssueIdPrefix::parse(id)?,
-            title,
-            description,
-            priority,
-            state,
-            add_labels,
-            remove_labels,
-            label_edit: None,
-            content_format,
-            issue_type,
-            add_gates: local.add_gates,
-            remove_gates: local.remove_gates,
-            assignee,
-            unassign: local.unassign,
-            bulk: false,
-            force,
-            enforce_lease: true,
-        })?;
+        let outcome = self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate {
+                issue_id: IssueIdPrefix::parse(id)?,
+                title,
+                description,
+                priority,
+                state,
+                add_labels,
+                remove_labels,
+                label_edit: None,
+                content_format,
+                issue_type,
+                add_gates: local.add_gates,
+                remove_gates: local.remove_gates,
+                assignee,
+                unassign: local.unassign,
+                bulk: false,
+                force,
+                enforce_lease: true,
+            })?;
 
         // A publication that entered a terminal state may unblock dependents.
         if outcome.entered_terminal {
-            self.check_auto_transitions()?;
+            self.exec.check_auto_transitions()?;
         }
 
         Ok((outcome.target_id, outcome.warnings))
@@ -596,13 +616,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::finalize;
 
         let id = &IssueIdPrefix::parse(id)?;
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
             let (expected_target, expected_mode) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
+                let mut preflight = self.exec.storage.open_mutation_session(layout.clone())?;
                 let Some(preflight) =
-                    self.capture_mutation_preflight(preflight.as_mut(), id, |_| false)?
+                    self.exec
+                        .capture_mutation_preflight(preflight.as_mut(), id, |_| false)?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
@@ -612,12 +633,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Claims coordination is acquired before repository serialization;
             // the target and policy are then re-resolved from the held image.
             let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
-                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
+                .then(|| claims_mutation_guard(self.exec.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], None)?
+            let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
+            let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                .exec
+                .capture_mutation_base(session.as_mut(), &[], None)?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
@@ -665,7 +687,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let outcome = self.publish_captured_state_transition(
+        let outcome = self.exec.publish_captured_state_transition(
             IssueIdPrefix::parse(id)?,
             new_state,
             false,
@@ -673,7 +695,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             true,
         )?;
         if new_state == State::Gated {
-            self.run_postchecks(&outcome.target_id)?;
+            self.exec.run_postchecks(&outcome.target_id)?;
         }
 
         Ok(outcome.warnings)
@@ -695,7 +717,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
         request.state = Some(State::Rejected);
         request.enforce_lease = true;
-        Ok(self.publish_captured_field_update(request)?.warnings)
+        Ok(self.exec.publish_captured_field_update(request)?.warnings)
     }
 
     /// Assign an issue to someone.
@@ -705,21 +727,25 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        let full_id = self
+            .exec
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
+        if let Some(warning) = self.exec.require_active_lease(&full_id)? {
             warnings.push(warning);
         }
 
         // Validate through the one `Assignee` path so `assign` cannot persist a
         // raw, malformed assignee (this command previously skipped validation).
         let assignee: crate::domain::Assignee = assignee.parse()?;
-        self.publish_captured_issue_mutation(CapturedIssueMutation::Assign {
-            issue_id: full_id,
-            assignee,
-        })?;
+        self.exec
+            .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
+                issue_id: full_id,
+                assignee,
+            })?;
         Ok(warnings)
     }
 
@@ -736,7 +762,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
-        self.publish_captured_claim(IssueIdPrefix::parse(id)?, claimant)
+        self.exec
+            .publish_captured_claim(IssueIdPrefix::parse(id)?, claimant)
     }
 
     /// Unassign an issue.
@@ -746,17 +773,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        let full_id = self
+            .exec
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
+        if let Some(warning) = self.exec.require_active_lease(&full_id)? {
             warnings.push(warning);
         }
 
-        self.publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
-            issue_id: full_id,
-        })?;
+        self.exec
+            .publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
+                issue_id: full_id,
+            })?;
         Ok(warnings)
     }
 
@@ -764,8 +795,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
-        self.publish_captured_release(IssueIdPrefix::of_stored(&full_id), reason.to_string())
+        let full_id = self
+            .exec
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        self.exec
+            .publish_captured_release(IssueIdPrefix::of_stored(&full_id), reason.to_string())
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -787,7 +822,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map_err(|e| crate::errors::InvalidArgumentError::new(e.to_string()))
             })
             .transpose()?;
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let context = crate::query_engine::QueryContext::from_issues(&issues);
 
         // Highest-priority issue of the domain ready set (Ready, unassigned, every
@@ -813,7 +848,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             Err(crate::errors::NotFoundError::new("No ready issues available").into())
         }
     }
+}
 
+impl<S: IssueStore> CommandExecutor<S> {
     pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
@@ -956,6 +993,7 @@ mod tests {
     #[test]
     fn test_claim_next_without_ready_issue_returns_typed_not_found_error() {
         let error = setup()
+            .issues()
             .claim_next("agent:test".to_string(), None)
             .expect_err("an empty ready set must reject claim-next");
 
@@ -990,6 +1028,7 @@ mod tests {
         let gamma = seed_ready(&executor, "Gamma", Priority::High, "type:epic");
 
         let (claimed, _) = executor
+            .issues()
             .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
             .unwrap();
 
@@ -1004,6 +1043,7 @@ mod tests {
         let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
 
         let error = executor
+            .issues()
             .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
             .expect_err("a filter matching no ready issue must not claim");
 
@@ -1024,6 +1064,7 @@ mod tests {
         let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
 
         let error = executor
+            .issues()
             .claim_next("agent:w1".to_string(), Some("garbage %%%".to_string()))
             .expect_err("a malformed filter must be rejected");
 
@@ -1130,7 +1171,9 @@ mod tests {
             .unwrap();
 
         // Try to claim the issue - should fail because precheck hasn't passed
-        let result = executor.claim_issue(&issue_id, "agent:test".to_string());
+        let result = executor
+            .issues()
+            .claim_issue(&issue_id, "agent:test".to_string());
 
         // Currently this test FAILS because claim_issue bypasses prechecks
         // After fix, claiming should fail with "Manual precheck 'tdd-reminder' has not been passed"
@@ -1199,7 +1242,9 @@ mod tests {
             .unwrap();
 
         // Now claiming should succeed
-        let result = executor.claim_issue(&issue_id, "agent:test".to_string());
+        let result = executor
+            .issues()
+            .claim_issue(&issue_id, "agent:test".to_string());
         assert!(
             result.is_ok(),
             "Claiming should succeed when precheck passes"
@@ -1234,6 +1279,7 @@ mod tests {
         // Assign while the dependency is still open. The issue remains Backlog
         // (a full claim here would exit 4 on the blocked in_progress transition).
         executor
+            .issues()
             .assign_issue(&dependent_id, "agent:test".to_string())
             .unwrap();
         let assigned = executor.storage.load_issue(&dependent_id).unwrap();
@@ -1242,6 +1288,7 @@ mod tests {
 
         // Complete the dependency: this auto-promotes the dependent to Ready.
         executor
+            .issues()
             .update_issue(
                 &dependency_id,
                 None,
@@ -1263,7 +1310,9 @@ mod tests {
         );
 
         // Claim as the SAME assignee: must proceed rather than erroring.
-        let result = executor.claim_issue(&dependent_id, "agent:test".to_string());
+        let result = executor
+            .issues()
+            .claim_issue(&dependent_id, "agent:test".to_string());
         assert!(
             result.is_ok(),
             "same-assignee claim should promote the assignment, got: {:?}",
@@ -1293,10 +1342,13 @@ mod tests {
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
+            .issues()
             .claim_issue(&issue_id, "agent:first".to_string())
             .unwrap();
 
-        let result = executor.claim_issue(&issue_id, "agent:second".to_string());
+        let result = executor
+            .issues()
+            .claim_issue(&issue_id, "agent:second".to_string());
         assert!(
             result.is_err(),
             "claim by a different assignee must still be rejected"
@@ -1496,7 +1548,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         // Transition to Rejected should succeed without passing gates
-        let result = executor.update_issue_state(&issue_id, State::Rejected);
+        let result = executor
+            .issues()
+            .update_issue_state(&issue_id, State::Rejected);
         assert!(
             result.is_ok(),
             "Rejected state should bypass gate validation"
@@ -1526,7 +1580,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Transition to Rejected should succeed even with unmet dependencies
-        let result = executor.update_issue_state(&issue_id, State::Rejected);
+        let result = executor
+            .issues()
+            .update_issue_state(&issue_id, State::Rejected);
         assert!(
             result.is_ok(),
             "Rejected state should bypass dependency checks"
@@ -1549,7 +1605,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
         // Transition to Done should fail (gates not passed)
-        let result = executor.update_issue_state(&issue_id, State::Done);
+        let result = executor.issues().update_issue_state(&issue_id, State::Done);
         assert!(
             result.is_err(),
             "Done state should still enforce gate validation"
@@ -1573,7 +1629,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // First `--state done`: a genuine in_progress -> gated transition, which
         // should persist and emit exactly one state-change event.
-        let first = executor.update_issue_state(&issue_id, State::Done);
+        let first = executor.issues().update_issue_state(&issue_id, State::Done);
         assert!(first.is_err(), "unpassed gates should block done");
         let gated = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(gated.state, State::Gated);
@@ -1584,7 +1640,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // Retry `--state done` on the already-gated issue. It must still report
         // the blocking gates, but must NOT append another state-change event or
         // bump updated_at (the no-op gated -> gated audit-log corruption).
-        let retry = executor.update_issue_state(&issue_id, State::Done);
+        let retry = executor.issues().update_issue_state(&issue_id, State::Done);
         assert!(retry.is_err(), "retry should still report blocking gates");
 
         let after = executor.storage.load_issue(&issue_id).unwrap();
@@ -1615,6 +1671,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // First done attempt: genuine transition to Gated.
         assert!(executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1635,6 +1692,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // Pure retry via update_issue (all fields None) must not save or log.
         assert!(executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1677,6 +1735,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // Set the override to Html.
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1701,6 +1760,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // `None` leaves it unchanged (e.g. a title-only edit).
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 Some("Renamed".to_string()),
@@ -1726,6 +1786,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // `Some(None)` clears back to inherit.
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1766,6 +1827,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // Move to Gated via a first blocked done attempt.
         assert!(executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1782,7 +1844,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let events_after_first = executor.storage.read_events().unwrap().len();
 
         // Retry done together with a title edit on the already-gated issue.
-        let result = executor.update_issue(
+        let result = executor.issues().update_issue(
             &issue_id,
             Some("New Title".to_string()),
             None,
@@ -1839,6 +1901,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // First blocked done attempt: transition to Gated.
         assert!(executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1858,6 +1921,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // Retry with the SAME title value: no real change, so it must be a no-op.
         assert!(executor
+            .issues()
             .update_issue(
                 &issue_id,
                 Some("Same Title".to_string()),
@@ -1892,12 +1956,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
+            .issues()
             .assign_issue(&issue_id, "agent:a".to_string())
             .unwrap();
         let updated_after_assign = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Re-assigning the same assignee is a no-op.
         executor
+            .issues()
             .assign_issue(&issue_id, "agent:a".to_string())
             .unwrap();
         assert_eq!(
@@ -1917,7 +1983,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Unassigning an issue that has no assignee is a no-op.
-        executor.unassign_issue(&issue_id).unwrap();
+        executor.issues().unassign_issue(&issue_id).unwrap();
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
             updated_before,
@@ -1938,6 +2004,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // No fields and no state change: pure no-op.
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -1975,6 +2042,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // A real description edit must be captured in the event log, not only
         // state transitions (mirrors the bulk-update event-logging contract).
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -2012,7 +2080,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_confirm_deletion_allowed_refuses_when_not_allowed() {
         let executor = setup();
 
-        let result = executor.confirm_deletion_allowed("abc12345", false);
+        let result = executor
+            .issues()
+            .confirm_deletion_allowed("abc12345", false);
 
         let err = result.expect_err("must refuse without confirmation");
         assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
@@ -2023,7 +2093,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_confirm_deletion_allowed_ok_when_allowed() {
         let executor = setup();
 
-        assert!(executor.confirm_deletion_allowed("abc12345", true).is_ok());
+        assert!(executor
+            .issues()
+            .confirm_deletion_allowed("abc12345", true)
+            .is_ok());
     }
 
     #[test]
@@ -2036,7 +2109,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let events_before = executor.storage.read_events().unwrap().len();
 
         // Deletion is a state change and must be captured in the event log.
-        executor.delete_issue(&issue_id).unwrap();
+        executor.issues().delete_issue(&issue_id).unwrap();
 
         let events = executor.storage.read_events().unwrap();
         assert_eq!(
@@ -2066,7 +2139,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let dependent_id = dependent.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
-        executor.delete_issue(&dependency_id).unwrap();
+        executor.issues().delete_issue(&dependency_id).unwrap();
 
         let updated = executor.storage.load_issue(&dependent_id).unwrap();
         assert!(updated.dependencies.is_empty());
@@ -2120,7 +2193,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file(&issue_relative, &issue_bytes);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
 
-        assert!(executor.delete_issue(&issue.id).is_err());
+        assert!(executor.issues().delete_issue(&issue.id).is_err());
         assert_eq!(
             storage.read_repo_file(&issue_path).unwrap(),
             Some(issue_bytes)
@@ -2141,7 +2214,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_path = format!(".jit/issues/{issue_id}.json");
         let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
 
-        assert!(executor.delete_issue(&issue_id).is_err());
+        assert!(executor.issues().delete_issue(&issue_id).is_err());
         assert_eq!(
             executor.storage.read_repo_file(".jit/index.json").unwrap(),
             Some("not valid JSON".to_string())
@@ -2170,7 +2243,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let warnings = executor.delete_issue(&issue_id).unwrap();
+        let warnings = executor.issues().delete_issue(&issue_id).unwrap();
 
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("No active lease"));
@@ -2204,6 +2277,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
+            .issues()
             .delete_issue("2222")
             .expect_err("recaptured prefix must become ambiguous");
 
@@ -2238,7 +2312,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&storage, dependent);
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
-        assert!(executor.delete_issue(&dependency_id).is_err());
+        assert!(executor.issues().delete_issue(&dependency_id).is_err());
         drop(recovered.open_mutation_session(layout.clone()).unwrap());
 
         let unchanged = recovered.load_issue(&dependent_id).unwrap();
@@ -2249,6 +2323,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         CommandExecutor::new(recovered.clone())
             .with_layout(layout)
+            .issues()
             .delete_issue(&dependency_id)
             .unwrap();
         let updated = recovered.load_issue(&dependent_id).unwrap();
@@ -2263,6 +2338,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let create = |title: &str| {
             executor
+                .issues()
                 .create_issue(
                     title.to_string(),
                     "Test".to_string(),
@@ -2306,6 +2382,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let create = |title: &str| {
             executor
+                .issues()
                 .create_issue(
                     title.to_string(),
                     "Test".to_string(),
@@ -2434,7 +2511,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
 
         let events_before = executor.storage.read_events().unwrap().len();
-        executor.delete_issue(&b_id).unwrap();
+        executor.issues().delete_issue(&b_id).unwrap();
 
         let a_after = executor.storage.load_issue(&a_id).unwrap();
         assert!(
@@ -2477,6 +2554,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
 
         let (a_id, _) = executor
+            .issues()
             .create_issue(
                 "A".to_string(),
                 String::new(),
@@ -2489,6 +2567,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             )
             .unwrap();
         let (b_id, _) = executor
+            .issues()
             .create_issue(
                 "B".to_string(),
                 String::new(),
@@ -2506,7 +2585,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             "validation should pass before deletion"
         );
 
-        executor.delete_issue(&b_id).unwrap();
+        executor.issues().delete_issue(&b_id).unwrap();
 
         let result = executor.validate_silent();
         assert!(
@@ -2627,7 +2706,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Parent".to_string(), "Test".to_string());
         issue.dependencies = vec![dep_id.clone(), "missing-id".to_string()];
 
-        let resolved = executor.get_dependencies_enriched(&issue);
+        let resolved = executor.issues().get_dependencies_enriched(&issue);
         assert_eq!(resolved.len(), 1, "only the resolvable dep must appear");
         assert_eq!(resolved[0].id, dep_id);
     }
@@ -2646,6 +2725,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .type_at_level(4)
             .to_string();
         let (id, _warnings) = executor
+            .issues()
             .create_issue(
                 "Declared type".to_string(),
                 String::new(),
@@ -2677,6 +2757,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
         let before = executor.storage.list_issues().unwrap().len();
         let err = executor
+            .issues()
             .create_issue(
                 "Undeclared type".to_string(),
                 String::new(),
@@ -2713,6 +2794,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -2750,6 +2832,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let err = executor
+            .issues()
             .update_issue(
                 &issue_id,
                 None,
@@ -2789,7 +2872,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Manually transition to Ready should succeed (dependency is done)
-        let result = executor.update_issue(
+        let result = executor.issues().update_issue(
             &issue_id,
             None,               // title
             None,               // description
@@ -2841,7 +2924,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         id: &str,
         local: IssueLocalUpdate,
     ) -> Result<(String, Vec<String>)> {
-        executor.update_issue_resolved(
+        executor.issues().update_issue_resolved(
             id,
             None,
             None,
@@ -2915,11 +2998,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 .remove_gates(&separate, &local.remove_gates)
                 .unwrap();
             match &local.assignee {
-                Some(assignee) => executor.assign_issue(&separate, assignee.clone()).map(drop),
-                None => executor.unassign_issue(&separate).map(drop),
+                Some(assignee) => executor
+                    .issues()
+                    .assign_issue(&separate, assignee.clone())
+                    .map(drop),
+                None => executor.issues().unassign_issue(&separate).map(drop),
             }
             .unwrap();
             executor
+                .issues()
                 .update_issue(
                     &separate,
                     None,
@@ -2970,7 +3057,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let opened = counter.0.load(Ordering::SeqCst);
 
-        executor.reject_issue(&id, Some("duplicate")).unwrap();
+        executor
+            .issues()
+            .reject_issue(&id, Some("duplicate"))
+            .unwrap();
 
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
     }
@@ -2985,9 +3075,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let state_only = seed_fixture_issue(&executor, twin);
 
         executor
+            .issues()
             .reject_issue(&with_reason, Some("duplicate"))
             .unwrap();
         executor
+            .issues()
             .update_issue_state(&state_only, State::Rejected)
             .unwrap();
 
@@ -3014,7 +3106,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let id = seed_fixture_issue(&executor, issue);
         let events_before = recovered.read_events().unwrap().len();
 
-        assert!(executor.reject_issue(&id, Some("duplicate")).is_err());
+        assert!(executor
+            .issues()
+            .reject_issue(&id, Some("duplicate"))
+            .is_err());
 
         let issue = recovered.load_issue(&id).unwrap();
         assert_eq!(issue.state, prior);
@@ -3041,7 +3136,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(raced.clone());
 
-        executor.reject_issue(&id, Some("done")).unwrap();
+        executor.issues().reject_issue(&id, Some("done")).unwrap();
 
         let issue = raced.load_issue(&id).unwrap();
         assert_eq!(issue.state, State::Rejected);
@@ -3057,8 +3152,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::domain::types::fixture_issue("Reject twice".into(), String::new()),
         );
 
-        executor.reject_issue(&id, Some("done")).unwrap();
-        executor.reject_issue(&id, Some("done")).unwrap();
+        executor.issues().reject_issue(&id, Some("done")).unwrap();
+        executor.issues().reject_issue(&id, Some("done")).unwrap();
 
         let labels = executor.storage.load_issue(&id).unwrap().labels;
         assert_eq!(

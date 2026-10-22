@@ -52,6 +52,7 @@ unique = true
 
 fn create_typed(jit_dir: &std::path::Path, type_label: &str) -> Vec<String> {
     executor(jit_dir)
+        .issues()
         .create_issue(
             "issue".to_string(),
             String::new(),

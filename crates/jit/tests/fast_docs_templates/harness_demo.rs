@@ -17,6 +17,7 @@ fn test_harness_query_ready() {
     let ready_id = h.create_ready_issue("Ready task");
     let assigned_id = h.create_ready_issue("Assigned task");
     h.executor
+        .issues()
         .claim_issue(&assigned_id, "agent:worker-1".to_string())
         .unwrap();
 
@@ -54,6 +55,7 @@ fn test_harness_issue_lifecycle() {
     // Update state
     let _ = h
         .executor
+        .issues()
         .update_issue(
             &id,
             None,
@@ -72,18 +74,19 @@ fn test_harness_issue_lifecycle() {
 
     // Claim
     h.executor
+        .issues()
         .claim_issue(&id, "agent:worker-1".to_string())
         .unwrap();
     let issue = h.get_issue(&id);
     assert_eq!(issue.assignee, Some("agent:worker-1".parse().unwrap()));
 
     // Release
-    h.executor.release_issue(&id, "timeout").unwrap();
+    h.executor.issues().release_issue(&id, "timeout").unwrap();
     let issue = h.get_issue(&id);
     assert!(issue.assignee.is_none());
 
     // Delete
-    h.executor.delete_issue(&id).unwrap();
+    h.executor.issues().delete_issue(&id).unwrap();
     assert_eq!(h.all_issues().len(), 0);
 }
 
@@ -109,6 +112,7 @@ fn test_harness_dependencies_block() {
     // Complete parent
     let _ = h
         .executor
+        .issues()
         .update_issue(
             &parent,
             None,
@@ -227,6 +231,7 @@ fn test_harness_complex_workflow() {
     // Complete dependencies
     let _ = h
         .executor
+        .issues()
         .update_issue(
             &dep1,
             None,
@@ -242,6 +247,7 @@ fn test_harness_complex_workflow() {
         .unwrap();
     let _ = h
         .executor
+        .issues()
         .update_issue(
             &dep2,
             None,
@@ -376,7 +382,7 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
 // ========== Container Rollup Tests (jit:7fe5c743) ==========
 
 /// Build a container whose direct children span several states, wired as
-/// dependencies, then drive `CommandExecutor::issue_progress` and
+/// dependencies, then drive `IssueOps::issue_progress` and
 /// `issue_children` (the orchestration behind the two commands). Verifies the
 /// terminal-state semantics (done/rejected distinct, open = non-terminal) and
 /// that children are the direct dependencies in ascending short-id order.
@@ -394,6 +400,7 @@ fn test_harness_container_progress_and_children() {
     }
     let set_state = |id: &str, state: State| {
         h.executor
+            .issues()
             .update_issue(
                 id,
                 None,
@@ -413,7 +420,7 @@ fn test_harness_container_progress_and_children() {
     set_state(&rejected, State::Rejected);
 
     // progress: the rollup over direct children, no dangling edges.
-    let progress = h.executor.issue_progress(&epic).unwrap();
+    let progress = h.executor.issues().issue_progress(&epic).unwrap();
     assert_eq!(progress.container.title, "Epic");
     assert!(progress.dangling.is_empty());
     let rollup = &progress.rollup;
@@ -430,7 +437,7 @@ fn test_harness_container_progress_and_children() {
 
     // children: one compact status per direct child, ascending short id, no
     // dangling edges.
-    let children = h.executor.issue_children(&epic).unwrap();
+    let children = h.executor.issues().issue_children(&epic).unwrap();
     assert_eq!(children.count(), 4);
     assert!(children.extras.dangling.is_empty());
     let short_ids: Vec<&str> = children.items.iter().map(|c| c.short_id.as_str()).collect();
@@ -449,7 +456,7 @@ fn test_harness_issue_status_response_projection() {
     h.executor.add_dependency(&child, &dep).unwrap();
 
     let issue = h.get_issue(&child);
-    let status = h.executor.issue_status_response(issue).unwrap();
+    let status = h.executor.issues().issue_status_response(issue).unwrap();
 
     assert_eq!(status.title, "Gated child");
     assert_eq!(status.gates.len(), 1);

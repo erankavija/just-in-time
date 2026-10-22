@@ -408,6 +408,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         )
         .unwrap();
     let (upstream, _) = executor
+        .issues()
         .create_issue(
             "Upstream U".to_string(),
             "Upstream work".to_string(),
@@ -420,6 +421,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         )
         .unwrap();
     let (container, _) = executor
+        .issues()
         .create_issue(
             "Auth epic".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
@@ -583,6 +585,7 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
             let executor = CommandExecutor::new(storage).with_layout(layout);
             let started = Instant::now();
             let id = executor
+                .issues()
                 .create_issue(
                     "Concurrent bystander".to_string(),
                     "Independent write".to_string(),

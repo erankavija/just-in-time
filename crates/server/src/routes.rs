@@ -84,6 +84,7 @@ async fn list_issues<S: IssueStore>(
 ) -> Result<Json<Vec<Issue>>, StatusCode> {
     state
         .executor
+        .issues()
         .list_issues(None, None, None)
         .map(Json)
         .map_err(|e| {
@@ -97,10 +98,15 @@ async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<Issue>, StatusCode> {
-    state.executor.show_issue(&id).map(Json).map_err(|e| {
-        tracing::error!("Failed to get issue {}: {:?}", id, e);
-        StatusCode::NOT_FOUND
-    })
+    state
+        .executor
+        .issues()
+        .show_issue(&id)
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!("Failed to get issue {}: {:?}", id, e);
+            StatusCode::NOT_FOUND
+        })
 }
 
 /// Graph data for visualization: one node per issue, one edge per dependency.
@@ -163,10 +169,14 @@ pub struct GraphEdge {
 async fn get_graph<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
-    let issues = state.executor.list_issues(None, None, None).map_err(|e| {
-        tracing::error!("Failed to list issues for graph: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let issues = state
+        .executor
+        .issues()
+        .list_issues(None, None, None)
+        .map_err(|e| {
+            tracing::error!("Failed to list issues for graph: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Build node lookup for blocked state calculation
     let issue_map: std::collections::HashMap<String, &Issue> =
@@ -1162,6 +1172,7 @@ mod tests {
 
         // Create test issues
         let (_id1, _) = executor
+            .issues()
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),
@@ -1174,6 +1185,7 @@ mod tests {
             )
             .unwrap();
         let (_id2, _) = executor
+            .issues()
             .create_issue(
                 "Issue 2".to_string(),
                 "Description".to_string(),
@@ -1210,6 +1222,7 @@ mod tests {
 
         // Create issues with dependencies
         let (id1, _) = executor
+            .issues()
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),
@@ -1222,6 +1235,7 @@ mod tests {
             )
             .unwrap();
         let (id2, _) = executor
+            .issues()
             .create_issue(
                 "Issue 2".to_string(),
                 "Description".to_string(),
@@ -1264,6 +1278,7 @@ mod tests {
         let executor = test_executor(storage);
         let new = |title: &str| {
             executor
+                .issues()
                 .create_issue(
                     title.to_string(),
                     String::new(),
@@ -1308,6 +1323,7 @@ mod tests {
         let executor = test_executor(storage);
         let new = |title: &str, labels: Vec<String>| {
             executor
+                .issues()
                 .create_issue(
                     title.to_string(),
                     String::new(),
@@ -1404,6 +1420,7 @@ mod tests {
         let executor = test_executor(storage);
 
         let (_id, _) = executor
+            .issues()
             .create_issue(
                 "Issue 1".to_string(),
                 "Description".to_string(),
@@ -1722,6 +1739,7 @@ unique = false
 
         // Create an issue.
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "Test issue".to_string(),
                 "desc".to_string(),
@@ -1869,6 +1887,7 @@ unique = false
         let executor = test_executor(storage);
 
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "Binary test".to_string(),
                 "desc".to_string(),
@@ -2179,6 +2198,7 @@ unique = false
         let executor = test_executor(storage);
 
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "IO error test".to_string(),
                 "desc".to_string(),
@@ -2245,6 +2265,7 @@ unique = false
         .unwrap();
         let executor = test_executor(JsonFileStorage::new(&jit_dir));
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "Derived document reads".to_string(),
                 "desc".to_string(),
@@ -2326,6 +2347,7 @@ unique = false
         fs::write(&doc_path, doc_content).unwrap();
 
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "CSV content test".to_string(),
                 "desc".to_string(),
@@ -2387,6 +2409,7 @@ unique = false
         let executor = test_executor(storage);
 
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "IO error raw test".to_string(),
                 "desc".to_string(),
@@ -2786,6 +2809,7 @@ unique = false
         let executor = test_executor(storage);
 
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "base tag test".to_string(),
                 "desc".to_string(),
@@ -2952,6 +2976,7 @@ unique = false
         let storage = JsonFileStorage::new(&jit_dir);
         let executor = test_executor(storage);
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "Symlink escape repro".to_string(),
                 "desc".to_string(),

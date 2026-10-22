@@ -120,6 +120,7 @@ mod recovery_startup_tests {
             .initialize_fresh_repository(&root.join("repo"), None)
             .expect("a repository the server can serve");
         let (id, _) = executor
+            .issues()
             .create_issue(
                 "Hello".into(),
                 String::new(),

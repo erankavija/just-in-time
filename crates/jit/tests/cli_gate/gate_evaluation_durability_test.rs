@@ -56,6 +56,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         )
         .expect("define durability gate");
     let (issue_id, _) = executor
+        .issues()
         .create_issue(
             "Durability carrier".to_string(),
             "Issue for gate persistence durability regression coverage".to_string(),
