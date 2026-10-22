@@ -696,7 +696,7 @@ pub enum MaterializationRequest<'a> {
     ApplyProfileSelection {
         /// Parsed package metadata and neutral canonical claims for the whole
         /// selected closure.
-        profiles: Vec<ProfileApplicationInput>,
+        profiles: &'a [ProfileApplicationInput],
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
         /// Requested lifecycle operation recorded when this selection changes
@@ -741,7 +741,7 @@ pub fn derive_materialization(
         } => (
             initialize::derive_profile_applications(
                 image,
-                &profiles,
+                profiles,
                 context,
                 operation,
                 std::collections::BTreeSet::new(),

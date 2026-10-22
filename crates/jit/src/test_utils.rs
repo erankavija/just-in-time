@@ -617,9 +617,12 @@ fn initialize_profiled_repository_fixture(
     let jit_root = repository.join(".jit");
     let storage = JsonFileStorage::new(&jit_root);
     let layout = discover_repository_layout(repository, &jit_root)?;
-    CommandExecutor::new(storage)
-        .with_layout(layout)
-        .initialize_fresh_repository(repository, Some(&[ProfileSelector::path(&selected)]))?;
+    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let selection = executor.select_profiles(
+        &[ProfileSelector::path(&selected)],
+        &crate::commands::ProfileVariableOptions::default(),
+    )?;
+    executor.initialize_fresh_repository(repository, Some(&selection))?;
     Ok(())
 }
 

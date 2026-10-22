@@ -429,7 +429,7 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
 }
 
 // A re-init runs the same session-backed init publication as a fresh init
-// (jit:49adf23b increment 7 unified plain re-init onto `run_initialization`), so
+// (jit:49adf23b increment 7 unified plain re-init onto `initialize_fresh_repository`), so
 // it too claims the worktree `.gitattributes` merge driver. When the block is
 // already configured the claim is `Unchanged`, so a re-init reports
 // `.gitattributes` in neither created nor modified.
@@ -476,7 +476,7 @@ fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
 
 // jit:49adf23b increment 7: pin that a PLAIN re-init asserts the worktree
 // `.gitattributes` merge-driver claim, not only a fresh init. Before the plain
-// re-init was unified onto the session-backed `run_initialization`, a re-init
+// re-init was unified onto the session-backed `initialize_fresh_repository`, a re-init
 // reported `.gitattributes` as `NotApplicable` and never restored it. Here the
 // first init creates it, the file is then deleted, and the re-init must re-create
 // it — proving the claim runs on the ordinary (non-fresh, non-profiled) re-init

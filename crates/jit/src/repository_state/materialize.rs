@@ -1012,7 +1012,7 @@ kind = "advisory"
         let apply_profile = derive_materialization(
             &profile_image,
             MaterializationRequest::ApplyProfileSelection {
-                profiles: vec![profile],
+                profiles: std::slice::from_ref(&profile),
                 context: &context,
                 operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
