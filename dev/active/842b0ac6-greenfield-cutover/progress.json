@@ -341,7 +341,7 @@
           "title": "Reject unknown keys in config.toml",
           "classification": "implementation",
           "model": "opus",
-          "status": "awaiting-merge"
+          "status": "rework-dispatched"
         },
         {
           "id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
@@ -435,7 +435,8 @@
     "81e7cdc3": 1,
     "5e846743": 1,
     "459bb995": 2,
-    "d125490a": 1
+    "d125490a": 1,
+    "fbb661f2": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
@@ -455,7 +456,8 @@
     "Slow test: cli_repo_workflow profile_cli_tests::test_profile_pack_packs_every_shipped_package_from_the_checkout takes ~8.8 s alone and hit the 20 s nextest timeout in 459bb995's full run (load rising 1.7->6.8). Candidate for c780514e alongside the profiled-fixture timeouts.",
     "459bb995 R2 code-review: restatements phrased as 'falls back to Markdown' escaped the R1 'default' sweep (same class). Rework 2 is the last before escalation.",
     "Suite clock near budget on a quiet host: 29.0 s at load 2.1 after 459bb995 (7f3449a19). Cutover deletions alone have not lowered it; watch further merges.",
-    "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci."
+    "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci.",
+    "Workers' focused checks skip nextest setup scripts (recorded failure corpus): fbb661f2 changed config set's failure and broke the corpus setup, which aborts the whole cargo-ci run. Prompt workers who change a command's failure behaviour to run `cargo nextest run -p jit --test cli_issue`."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
