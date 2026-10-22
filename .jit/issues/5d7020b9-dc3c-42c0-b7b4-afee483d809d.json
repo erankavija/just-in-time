@@ -27,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Repository-state tests own each finalization case",
-  "updated_at": "2026-10-22T14:28:16.513479417Z"
+  "updated_at": "2026-10-22T14:42:59.727410454Z"
 }

@@ -27,7 +27,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared test support derives shipped item kinds from the default package",
-  "updated_at": "2026-10-22T14:28:22.213125739Z"
+  "updated_at": "2026-10-22T14:42:59.038564744Z"
 }

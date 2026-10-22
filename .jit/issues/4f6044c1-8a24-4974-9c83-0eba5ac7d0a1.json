@@ -29,7 +29,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Documentation checker self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:28:23.046049967Z"
+  "updated_at": "2026-10-22T14:42:59.465530947Z"
 }

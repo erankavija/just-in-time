@@ -29,7 +29,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Workflow-contract harness self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:28:24.026086164Z"
+  "updated_at": "2026-10-22T14:43:00.631840912Z"
 }

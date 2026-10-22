@@ -28,7 +28,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared fixture for spawning jit in CLI tests",
-  "updated_at": "2026-10-22T14:28:15.631587790Z"
+  "updated_at": "2026-10-22T14:42:59.122759372Z"
 }

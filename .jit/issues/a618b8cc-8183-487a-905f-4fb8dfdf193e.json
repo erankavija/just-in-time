@@ -27,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Server shutdown force-close test stays under the per-test bound",
-  "updated_at": "2026-10-22T14:28:20.444928259Z"
+  "updated_at": "2026-10-22T14:43:00.410025237Z"
 }

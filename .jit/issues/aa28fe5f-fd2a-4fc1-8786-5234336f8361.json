@@ -30,7 +30,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "cargo-ci self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:28:18.264351898Z"
+  "updated_at": "2026-10-22T14:43:00.557924964Z"
 }

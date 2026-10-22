@@ -28,7 +28,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Inline list bodies in main.rs become typed list envelopes",
-  "updated_at": "2026-10-22T14:28:20.003330792Z"
+  "updated_at": "2026-10-22T14:43:00.775639865Z"
 }

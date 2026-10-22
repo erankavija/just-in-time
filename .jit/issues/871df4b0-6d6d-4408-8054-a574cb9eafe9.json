@@ -28,7 +28,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Doctest substep fits within the per-test bound",
-  "updated_at": "2026-10-22T14:28:17.823156933Z"
+  "updated_at": "2026-10-22T14:42:59.992360698Z"
 }

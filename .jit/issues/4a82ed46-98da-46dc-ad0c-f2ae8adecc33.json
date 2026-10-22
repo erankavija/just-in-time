@@ -26,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared constructors for file-backed in-process test repositories",
-  "updated_at": "2026-10-22T14:28:22.634032059Z"
+  "updated_at": "2026-10-22T14:42:59.381907372Z"
 }

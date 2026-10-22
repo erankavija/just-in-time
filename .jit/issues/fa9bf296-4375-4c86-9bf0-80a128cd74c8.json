@@ -29,7 +29,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Session-cost benchmark self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:28:24.443545654Z"
+  "updated_at": "2026-10-22T14:43:00.839952967Z"
 }

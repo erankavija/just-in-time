@@ -26,7 +26,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Product initialisation runs over any repository-state store",
-  "updated_at": "2026-10-22T14:28:21.781675710Z"
+  "updated_at": "2026-10-22T14:43:00.485996637Z"
 }

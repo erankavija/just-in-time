@@ -30,7 +30,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Build-budget checker self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:28:19.128670015Z"
+  "updated_at": "2026-10-22T14:42:59.643201986Z"
 }

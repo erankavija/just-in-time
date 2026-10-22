@@ -26,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared taxonomy repository type for CLI tests",
-  "updated_at": "2026-10-22T14:28:20.889756275Z"
+  "updated_at": "2026-10-22T14:42:58.949668129Z"
 }
