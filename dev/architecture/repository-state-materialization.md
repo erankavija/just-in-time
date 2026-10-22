@@ -208,8 +208,7 @@ declarations, never from hardcoded domain assumptions (`@/inv/domain-agnostic`).
 `derive_repair` is complete *and* ownership-safe per target: `rules.toml` splices
 only generated default spans, region projections splice only their managed region,
 and full-file projections replace only a target the declaration proves. When
-ownership cannot be proven — two installed profiles claiming one target, or a
-duplicate rule name — repair refuses before publication with a typed
+ownership cannot be proven — a duplicate rule name — repair refuses before publication with a typed
 `AmbiguousOwnershipError` rather than rewriting an authored boundary it cannot
 prove it owns.
 

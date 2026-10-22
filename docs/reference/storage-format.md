@@ -24,8 +24,6 @@ where each comes up.
 ├── rules.toml        # Validation rules
 ├── invariants.toml   # Invariants registry
 ├── events.jsonl      # Append-only event log
-├── profiles/         # Minimal applied-profile provenance records
-│   └── <id>.json
 ├── issues/           # One JSON file per issue
 │   └── <uuid>.json   # Issue data
 ├── gate-runs/        # Recorded gate runs, one directory per run
@@ -78,10 +76,6 @@ Issue reads do not create per-issue lock files. A pending redo record lives in
 the scratch directory `.jit/tmp/` as `redo.record` (see
 [Publication and Recovery](#publication-and-recovery)). All of these are
 runtime state, not part of the versioned data format.
-
-When a repository profile is applied, its canonical provenance record lives
-under `.jit/profiles/`. The [Repository Profiles reference](profiles.md)
-defines that record.
 
 Lease records live under `.git/jit/`, not `.jit/`. See
 [The `.git/jit/` control plane](#the-gitjit-control-plane) below.
