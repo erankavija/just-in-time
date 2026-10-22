@@ -2394,8 +2394,9 @@ fn lifecycle_event() -> Event {
             id: "example"
                 .try_into()
                 .expect("the conformance profile id is canonical"),
+            version: "1.0.0".to_string(),
             status: crate::domain::ProfileLifecycleStatus::Installed,
-            variables: Vec::new(),
+            variables: Default::default(),
         }],
         isolated_torn_tail: false,
     }

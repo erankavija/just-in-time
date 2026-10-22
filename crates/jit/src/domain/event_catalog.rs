@@ -251,8 +251,8 @@ impl EventTag {
             EventTag::GateDefinitionRemoved => "`jit gate remove` unregistered a gate.",
             EventTag::ProfileLifecycle => {
                 "A profile lifecycle operation reached its commit point, the redo record \
-                 carrying its writes; the event summarizes per-profile actions and variable \
-                 source kinds without resolved values or rendered content."
+                 carrying its writes; the event summarizes per-profile actions, recording \
+                 each package's id, version and applied variable values."
             }
             EventTag::LinkedCheckoutWriteOverridden => {
                 "An explicit per-invocation override permitted a state-mutating command inside a \
@@ -412,13 +412,15 @@ impl EventTag {
                     id: "example"
                         .try_into()
                         .expect("sample profile id is canonical"),
+                    version: "1.0.0".to_string(),
                     status: crate::domain::ProfileLifecycleStatus::Installed,
-                    variables: vec![crate::domain::ProfileLifecycleVariable {
-                        name: "NAME"
+                    variables: [(
+                        "NAME"
                             .try_into()
                             .expect("sample variable name is canonical"),
-                        source: crate::profile::VariableSource::Set,
-                    }],
+                        "value".to_string(),
+                    )]
+                    .into(),
                 }],
                 isolated_torn_tail: false,
             },

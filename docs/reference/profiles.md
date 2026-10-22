@@ -421,10 +421,9 @@ One repository-scoped `profile_lifecycle` audit event records the operation
 and its per-profile outcomes for the complete selection, published by the same
 redo record as the targets. A package's outcome is decided by what its
 application publishes, so applying identical content again publishes nothing
-and reports the package unchanged. The event names each profile's variables
-with their source kinds, never their resolved values. The repository keeps no
-other account of which packages were applied: once applied, every value is
-repository content.
+and reports the package unchanged. The event records each profile's id, version
+and the variable values applied. The repository keeps no other account of which
+packages were applied: once applied, every value is repository content.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work
