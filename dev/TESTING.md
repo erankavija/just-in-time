@@ -176,7 +176,7 @@ model and subsystem:
 | --- | --- | --- |
 | `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
 | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | policy checks and synthetic fixtures | build-footprint budget-checker fixtures and manifest/source policy checks |
+| `scratch_build` | policy checks | manifest/source policy checks |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
 its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
@@ -186,8 +186,10 @@ target count and unique active test-executable bytes from `cargo metadata` and
 profile and dependency-feature policies, failing the gate when
 a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
 (`--metadata-json`, `--artifacts-json`, `--root`), so
-`scratch_build/rust_build_budget_checker_tests.rs` exercises each failure mode
-with synthetic JSON and sparse executables — no compilation. See "4. Build
+the script's `--self-test` exercises the checker with synthetic JSON, policy
+manifests and sparse executables, without compilation. This repository runs it
+through the `build-budget-selftest` gate, separately from the default Rust suite;
+missing tools fail the self-test. See "4. Build
 Footprint Budget" below for the exact budgets, the build-profile and
 dependency-feature policy they check, and how to diagnose a failure.
 
