@@ -38,8 +38,16 @@
       "doc_type": "progress",
       "label": "Execution progress",
       "path": "dev/active/842b0ac6-greenfield-cutover/progress.json"
+    },
+    {
+      "commit": null,
+      "doc_type": "completion",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/active/842b0ac6-greenfield-cutover/completion-report.md"
     }
   ],
+  "done_at": "2026-10-22T19:43:10.954167844Z",
   "first_ready_at": "2026-10-20T20:12:36.415815215Z",
   "gates_required": [
     "repo-validate",
@@ -74,7 +82,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-22T19:41:38.098991116Z"
+  "updated_at": "2026-10-22T19:43:10.954167844Z"
 }

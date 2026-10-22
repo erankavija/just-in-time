@@ -24,7 +24,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "This checkout's claims log names issues by full id",
-  "updated_at": "2026-10-21T05:32:18.401369852Z"
+  "updated_at": "2026-10-22T19:43:14.504129552Z"
 }
