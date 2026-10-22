@@ -1387,6 +1387,14 @@ mod tests {
         MutationContext::deterministic([7u8; 32], fixed_instant())
     }
 
+    struct PanicMutationClock;
+
+    impl MutationClock for PanicMutationClock {
+        fn now(&self) -> DateTime<Utc> {
+            panic!("a no-op must not sample the mutation clock");
+        }
+    }
+
     fn budget() -> CaptureBudget {
         CaptureBudget {
             max_listings: 2,
@@ -1727,15 +1735,9 @@ mod tests {
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
-        struct PanicClock;
-        impl MutationClock for PanicClock {
-            fn now(&self) -> DateTime<Utc> {
-                panic!("a no-op must not sample the mutation clock");
-            }
-        }
         let context = MutationContext::with_annotation(
             IdAuthority::random(),
-            Box::new(PanicClock),
+            Box::new(PanicMutationClock),
             Some(override_annotation()),
         );
         let plan = finalize(
@@ -1922,6 +1924,22 @@ mod tests {
         assert!(issue_bytes.starts_with(b"{\n"));
         assert!(!issue_bytes.ends_with(b"\n"));
 
+        let gate_run = GateRunResult::attestation(
+            "issue-1",
+            "cargo-ci",
+            crate::declarations::GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        let gate_run_bytes = serialize_gate_run(&gate_run).unwrap();
+        assert!(gate_run_bytes.starts_with(b"{\n"));
+        assert!(!gate_run_bytes.ends_with(b"\n"));
+        assert_eq!(
+            serde_json::from_slice::<GateRunResult>(&gate_run_bytes).unwrap(),
+            gate_run,
+            "gate-run bytes preserve the repository record"
+        );
+
         let event = Event::GateDefinitionCreated {
             id: "event-1".into(),
             timestamp: fixed_instant(),
@@ -2096,14 +2114,11 @@ mod tests {
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
-        // A clock that panics on use proves the no-op samples no time.
-        struct PanicClock;
-        impl MutationClock for PanicClock {
-            fn now(&self) -> DateTime<Utc> {
-                panic!("no-op must not sample the mutation clock");
-            }
-        }
-        let context = MutationContext::new(IdAuthority::from_seed([9u8; 32]), Box::new(PanicClock));
+        // The shared clock proves the no-op samples no time.
+        let context = MutationContext::new(
+            IdAuthority::from_seed([9u8; 32]),
+            Box::new(PanicMutationClock),
+        );
         let delta = finalize(
             &layout(),
             &image,
@@ -2139,13 +2154,7 @@ mod tests {
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
-        struct PanicClock;
-        impl MutationClock for PanicClock {
-            fn now(&self) -> DateTime<Utc> {
-                panic!("no-op must not sample the mutation clock");
-            }
-        }
-        let context = MutationContext::new(IdAuthority::random(), Box::new(PanicClock));
+        let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
         let plan = finalize(
             &layout(),
             &image,
@@ -2201,20 +2210,22 @@ mod tests {
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
-        let delta = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent: agent.clone(),
-            }],
-        )
-        .unwrap();
+        let intent = MutationIntent::ClaimIssue {
+            issue_id: issue.id.clone(),
+            agent: agent.clone(),
+        };
+        let context = ctx();
+        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
+        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+        assert_eq!(
+            serde_json::to_vec(first.delta()).unwrap(),
+            serde_json::to_vec(retry.delta()).unwrap(),
+            "a captured-image retry preserves the complete claim delta bytes"
+        );
         // Two actions: the assigned issue and the appended claim event.
-        assert_eq!(delta.delta().actions().len(), 2);
+        assert_eq!(first.delta().actions().len(), 2);
         // The issue write carries the assignee and a stamped claimed_at.
-        let issue_action = delta
+        let issue_action = first
             .delta()
             .actions()
             .iter()
@@ -2223,10 +2234,191 @@ mod tests {
         let RepositoryAction::WriteFile { bytes, .. } = issue_action else {
             panic!("expected issue write");
         };
-        let written: Issue = serde_json::from_slice(bytes).unwrap();
-        assert_eq!(written.assignee, Some(agent));
-        assert_eq!(written.claimed_at, Some(fixed_instant()));
-        assert_eq!(written.updated_at, fixed_instant());
+        let mut expected_issue = issue;
+        expected_issue.assignee = Some(agent.clone());
+        expected_issue.claimed_at = Some(fixed_instant());
+        expected_issue.updated_at = fixed_instant();
+        assert_eq!(bytes, &serialize_issue(&expected_issue).unwrap());
+
+        let expected_event = Event::IssueClaimed {
+            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            issue_id: expected_issue.id,
+            timestamp: fixed_instant(),
+            assignee: agent,
+        };
+        let mut expected_event_line = serialize_event(&expected_event).unwrap();
+        expected_event_line.push(b'\n');
+        assert_eq!(
+            first.delta().appended_event_bytes(),
+            Some(expected_event_line.as_slice())
+        );
+    }
+
+    #[test]
+    fn test_finalize_empty_intents_samples_neither_time_nor_identity() {
+        let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
+        let plan = finalize(&layout(), &image_with(Vec::new()), &context, &[]).unwrap();
+
+        assert!(plan.delta().actions().is_empty());
+        assert!(
+            context.ids.sampled_seed().is_none(),
+            "empty intents must not draw the production identifier seed"
+        );
+    }
+
+    #[test]
+    fn test_finalize_record_event_reuses_identity_time_and_bytes_on_retry() {
+        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let intent = MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(Event::GateDefinitionCreated {
+                id: String::new(),
+                timestamp: sentinel_time(),
+                gate_key: "cargo-ci".into(),
+            }),
+        };
+        let context = ctx();
+        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
+        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+
+        assert_eq!(
+            serde_json::to_vec(first.delta()).unwrap(),
+            serde_json::to_vec(retry.delta()).unwrap(),
+            "the same image and context produce byte-identical provenance plans"
+        );
+        let expected_event = Event::GateDefinitionCreated {
+            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            timestamp: fixed_instant(),
+            gate_key: "cargo-ci".into(),
+        };
+        let mut expected_line = serialize_event(&expected_event).unwrap();
+        expected_line.push(b'\n');
+        assert_eq!(
+            first.delta().appended_event_bytes(),
+            Some(expected_line.as_slice())
+        );
+    }
+
+    #[test]
+    fn test_finalize_gate_run_assigns_identity_and_serializes_attestation() {
+        let run_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let image = image_with(vec![
+            (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
+        ]);
+        let draft = GateRunResult::attestation(
+            "issue-1",
+            "cargo-ci",
+            crate::declarations::GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        let intent = MutationIntent::RecordGateRun {
+            draft: Box::new(draft.clone()),
+        };
+        let provenance = MutationIntent::RecordEvent {
+            phase: 5,
+            event: Box::new(Event::GateDefinitionCreated {
+                id: String::new(),
+                timestamp: sentinel_time(),
+                gate_key: "cargo-ci".into(),
+            }),
+        };
+        let intents = [intent, provenance];
+        let context = ctx();
+        let first = finalize(&layout(), &image, &context, &intents).unwrap();
+        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+
+        assert_eq!(
+            serde_json::to_vec(first.delta()).unwrap(),
+            serde_json::to_vec(retry.delta()).unwrap(),
+            "a retry keeps the assigned run record bytes"
+        );
+        let result_path = gate_run_result_relative_path(&run_id).unwrap();
+        let result_path = VirtualPath::data(result_path.as_path()).unwrap();
+        let bytes = first
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. } if path == &result_path => {
+                    Some(bytes)
+                }
+                _ => None,
+            })
+            .expect("the allocated gate-run record is written");
+        let mut expected = draft;
+        expected.run_id = run_id;
+        expected.started_at = fixed_instant();
+        expected.completed_at = Some(fixed_instant());
+        assert_eq!(bytes, &serialize_gate_run(&expected).unwrap());
+
+        let expected_event = Event::GateDefinitionCreated {
+            id: IdAuthority::from_seed([7u8; 32]).uuid_at(1),
+            timestamp: fixed_instant(),
+            gate_key: "cargo-ci".into(),
+        };
+        let mut expected_line = serialize_event(&expected_event).unwrap();
+        expected_line.push(b'\n');
+        assert_eq!(
+            first.delta().appended_event_bytes(),
+            Some(expected_line.as_slice()),
+            "provenance follows the gate-run allocation and carries its next identity"
+        );
+    }
+
+    #[test]
+    fn test_finalize_creation_orders_events_and_assigns_frozen_identity_sequence() {
+        let ids = IdAuthority::from_seed([7u8; 32]);
+        let mut draft = crate::domain::fixture_issue("New".into(), "Body".into());
+        draft.state = State::Ready;
+        let intents = [
+            MutationIntent::CreateIssue {
+                draft: Box::new(draft),
+            },
+            MutationIntent::RecordEvent {
+                phase: 5,
+                event: Box::new(Event::GateDefinitionCreated {
+                    id: String::new(),
+                    timestamp: sentinel_time(),
+                    gate_key: "bbb".into(),
+                }),
+            },
+            MutationIntent::RecordEvent {
+                phase: 5,
+                event: Box::new(Event::GateDefinitionCreated {
+                    id: String::new(),
+                    timestamp: sentinel_time(),
+                    gate_key: "aaa".into(),
+                }),
+            },
+        ];
+        let image = creation_image();
+        let context = ctx();
+        let first = finalize(&layout(), &image, &context, &intents).unwrap();
+        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+        assert_eq!(
+            serde_json::to_vec(first.delta()).unwrap(),
+            serde_json::to_vec(retry.delta()).unwrap(),
+            "retry keeps issue, membership, and event bytes identical"
+        );
+        let events = appended_events(first.delta());
+
+        assert!(matches!(
+            &events[..],
+            [
+                Event::IssueCreated { id, timestamp, .. },
+                Event::GateDefinitionCreated { id: first_id, timestamp: first_time, gate_key: first_key },
+                Event::GateDefinitionCreated { id: second_id, timestamp: second_time, gate_key: second_key },
+            ] if id == &ids.uuid_at(1)
+                && *timestamp == fixed_instant()
+                && first_id == &ids.uuid_at(2)
+                && *first_time == fixed_instant()
+                && first_key == "aaa"
+                && second_id == &ids.uuid_at(3)
+                && *second_time == fixed_instant()
+                && second_key == "bbb"
+        ), "events are canonically ordered before the finalizer allocates their identities: {events:?}");
     }
 
     #[test]
