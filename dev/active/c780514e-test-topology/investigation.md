@@ -331,56 +331,256 @@ Matches that are not a test passing on a skip:
 - `test-vectors/container-image/test_image_contract.py:219` (`skipUnless(RUNTIME_ENABLED)`): an opt-in runtime tier selected by `JIT_IMAGE_RUNTIME=1`, which `scripts/test-podman.sh` and `.github/workflows/docker.yml` set. It does not depend on a missing tool.
 - The `skip` wording in `cargo-ci-selftest.sh`, `test-standards-fix.sh` and `reclaim-worker-worktree.sh`: reported counts and records, not skipped assertions.
 
-### D.6 In-process private setups outside the CLI targets
+### D.6 Private setups across the workspace
 
-File-backed setups. These are functions that create a temporary repository, write configuration, run `jit init` or open a `JsonFileStorage` executor:
+Mechanical sweep. It covers every non-`#[test]` function in a `#[cfg(test)]` module under `crates/*/src` and in every file under `crates/*/tests`, excluding the shared test-support modules (`test_utils.rs`, `test_harness.rs`, `commands/test_helpers.rs`, `test_taxonomy.rs`, `storage/test_support.rs`). A function is listed when its body does one of these:
 
-- `fast_rules/default_rules_registry_derivation_tests.rs`: `executor` (`:18`) and `setup_initialized_repo` (`:28`).
-- `fast_rules/type_hierarchy_schema_regen_tests.rs`: `executor` (`:10`) and `setup_initialized_repo` (`:16`), the same as the previous file.
-- `fast_rules/effective_rules_tests.rs`: `repo` (`:16`) and `executor` (`:36`).
-- `fast_rules/undeclared_taxonomy_tests.rs:20`: `scaffold_declaring`, a third init-from-config copy.
-- `fast_docs_templates/planning_preset_tests.rs:21`: `file_backed_executor`.
-- `fast_docs_templates/templates_loader_tests.rs:16`: `setup`, which writes declaration files into a temporary directory.
-- `fast_docs_templates/git_revision_tests.rs:15-20`: hand-rolls `git init` with a fixed author identity.
-- `fast_rules/cli_warnings_integration_tests.rs:24`: a profiled setup, which the rule-warning move removes.
+- constructs a `CommandExecutor` (`CommandExecutor::new` or `.with_layout(`);
+- constructs a storage backend (`InMemoryStorage::new` or `rooted_at`, `JsonFileStorage::new`);
+- constructs a repository layout (`discover_repository_layout`, `RepositoryLayout::…`);
+- writes `.jit/` files (`add_data_file`, a `.jit` path, `initialize_fresh_repository`, `run_initialization`);
+- or writes a `config.toml`, `templates.toml`, `rules.toml` or `gates.toml` into a fresh `TempDir`.
 
-Memory-backed setups. These are functions that build an `InMemoryStorage` or a memory executor and seed declarations, instead of taking them from the shared executor:
+Each listed function is classified as one of:
 
-- `store_with_rules` in `fast_issue/graph_rule_validation_tests.rs:15` and `fast_rules/validate_rule_runner_tests.rs:21`.
-- `executor_with_rules` in `fast_issue/transition_graph_enforcement_tests.rs:24` and `fast_rules/local_rule_enforcement_tests.rs:20`.
-- `executor` in `fast_issue/strictness_enforcement_tests.rs:42` and `fast_issue/strictness_transition_tests.rs:41`.
-- `executor_for` in `fast_issue/graph_rule_validation_tests.rs:34`.
-- `make_storage` in `fast_issue/short_hash_tests.rs:389`.
-- `executor_with_templates` in `fast_docs_templates/template_binding_tests.rs:106`.
-- `memory_storage` in `fast_docs_templates/template_apply_atomicity_tests.rs:380`.
-- `storage_with` and `render_executor` in `fast_rules/project_render_harness_tests.rs:77,90`.
-- `strategic_executor` in `fast_rules/label_strategic_tests.rs:13`.
-- `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.
+- **setup**: builds a repository, store, executor or declaration directory from scratch, or opens an executor over a store it is given. The owner entry retires it.
+- **scenario**: arranges paths, writes scenario declarations or records into a repository it is given, or reads results.
+- **subject**: the backend, layout, image or wrapper under test.
 
-Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.
+183 functions: 103 setup, 52 scenario, 28 subject.
 
-Library test modules (`crates/jit/src`). The sweep covered helper functions in `#[cfg(test)]` modules that build an `InMemoryStorage` or a memory executor, create a file-backed repository or executor, or write a literal index body:
+**library (`crates/jit/src`)**
 
-- Memory-backed:
-  - `commands/item.rs`: `executor_with` (`:613`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`) and `config_exec` (`:1536`).
-  - `commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3042`, a literal `"schema_version": 2` index at `:3053`) and `dangling_exec_with_rules_and_gates` (`:3103`).
-  - `commands/batch_create.rs`: `executor` (`:671`) and `coverage_executor` (`:926`).
-  - One each in `commands/bulk_update.rs` (`blocked_dependent_fixture`, `:1973`), `commands/events.rs` (`seeded_override_executor`, `:51`), `commands/gate.rs` (`setup`, `:1452`, literal `enforce_leases = "off"`), `commands/gate_check.rs` (`setup`, `:1666`), `commands/gate_cli_tests.rs` (`setup`, `:10`), `commands/invariant.rs` (`exec`, `:76`), `commands/issue.rs` (`setup`, `:916`) and `commands/mod.rs` (`precheck_evidence_fixture`, `:3571`).
-- File-backed:
-  - `commands/archive.rs`: `executor` (`:892`) and five repository builders (`:994`, `:1764`, `:1995`, `:2399`, `:2494`).
-  - One each in `commands/gate_check.rs` (`setup_file_repository`, `:2082`), `commands/hooks.rs` (`diverged_strict_repo`, `:254`), `commands/profile.rs` (`fixture`, `:2265`), `storage/gate_runs.rs` (`setup_storage`, `:16`, a copy of `setup_test_repo`), `validation/repository.rs` (`executor`, `:892`) and `main.rs` tests (`repository_declaring`, `:7669`).
-- Not setups:
-  - `storage/memory.rs` and `storage/json.rs` backend tests construct the backend they test.
-  - `commands/worktree.rs` `linked_checkout_paths` (`:760`) only arranges paths.
-  - The `schema_version` fields in `gate_check.rs:1740` and `commands/mod.rs:3672` belong to gate-run records, not to an index.
+| Function | Class | Owner |
+| --- | --- | --- |
+| `commands/archive.rs:892` `executor` | setup | `library-file-setup-adoption` |
+| `commands/archive.rs:994` `executable_document_repo` | setup | `library-file-setup-adoption` |
+| `commands/archive.rs:1764` `configured_repo` | setup | `library-file-setup-adoption` |
+| `commands/archive.rs:1995` `development_root_repo` | setup | `library-file-setup-adoption` |
+| `commands/archive.rs:2399` `directory_link_repo` | setup | `library-file-setup-adoption` |
+| `commands/archive.rs:2494` `executable_container_repo` | setup | `library-file-setup-adoption` |
+| `commands/batch_create.rs:671` `executor` | setup | `library-command-memory-setup-adoption` |
+| `commands/batch_create.rs:926` `coverage_executor` | setup | `library-command-memory-setup-adoption` |
+| `commands/bulk_update.rs:1973` `blocked_dependent_fixture` | setup | `library-command-memory-setup-adoption` |
+| `commands/claim.rs:1045` `create_test_issue` | setup | `library-file-setup-adoption` |
+| `commands/dependency.rs:1213` `mark_index_deleted` | scenario | — |
+| `commands/events.rs:51` `seeded_override_executor` | setup | `library-command-memory-setup-adoption` |
+| `commands/gate.rs:1452` `setup` | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs:1666` `setup` | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs:1705` `seed_rule_validation_rules` | scenario | — |
+| `commands/gate_check.rs:2082` `setup_file_repository` | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs:2157` `new` | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs:2279` `rewrite_checker_command` | scenario | — |
+| `commands/gate_check.rs:2583` `write_corrupt_gate_run` | scenario | — |
+| `commands/gate_cli_tests.rs:10` `setup` | setup | `library-command-memory-setup-adoption` |
+| `commands/hooks.rs:254` `diverged_strict_repo` | setup | `library-file-setup-adoption` |
+| `commands/init.rs:665` `executor_with_layout` | setup | `library-file-setup-adoption` |
+| `commands/init.rs:675` `assert_repo_valid` | setup | `library-file-setup-adoption` |
+| `commands/init.rs:748` `declare_before_init` | subject | — |
+| `commands/invariant.rs:76` `exec` | setup | `library-command-memory-setup-adoption` |
+| `commands/issue.rs:916` `setup` | setup | `library-command-memory-setup-adoption` |
+| `commands/issue.rs:920` `setup_over` | setup | `library-command-memory-setup-adoption` |
+| `commands/item.rs:613` `executor_with` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:629` `project_exec_with_name` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:728` `project_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:826` `two_project_kinds_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1122` `policy_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1207` `registry_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1225` `registry_exec_with_rules` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1344` `registry_exec_with_gates` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1428` `registry_exec_with_rules_and_gates` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs:1536` `config_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/mod.rs:3571` `precheck_evidence_fixture` | setup | `library-command-memory-setup-adoption` |
+| `commands/profile.rs:2265` `fixture` | setup | `library-file-setup-adoption` |
+| `commands/profile.rs:2411` `record_for` | scenario | — |
+| `commands/profile.rs:2701` `edit_contributed_description` | scenario | — |
+| `commands/profile.rs:3143` `bare_repository_beside_shipped_packages` | setup | `library-file-setup-adoption` |
+| `commands/profile.rs:3171` `published_configuration` | scenario | — |
+| `commands/validate.rs:3004` `dangling_exec` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs:3023` `dangling_exec_with_namespaces` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs:3042` `finish_dangling_executor` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs:3103` `dangling_exec_with_rules_and_gates` | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/worktree.rs:760` `linked_checkout_paths` | scenario | — |
+| `document/reference.rs:263` `layout` | subject | — |
+| `domain/item.rs:1655` `invariant_cfg` | scenario | — |
+| `gate_execution.rs:977` `worktree_with_data_root` | subject | — |
+| `main.rs:7669` `repository_declaring` | setup | `library-file-setup-adoption` |
+| `main.rs:7680` `checkout_paths` | scenario | — |
+| `profile/drift_report.rs:181` `subject` | subject | — |
+| `profile/package_capture.rs:557` `new` | subject | — |
+| `repository_state/archive.rs:607` `layout` | subject | — |
+| `repository_state/export.rs:310` `layout` | subject | — |
+| `repository_state/image.rs:1449` `layout` | subject | — |
+| `repository_state/initialize.rs:1304` `image_with_records` | subject | — |
+| `repository_state/materialize.rs:696` `layout` | subject | — |
+| `repository_state/materialize.rs:1449` `assert_duplicate_name_is_non_repairable` | subject | — |
+| `repository_state/materialize.rs:1581` `ns_and_projection_config` | subject | — |
+| `repository_state/materialize.rs:1837` `image_with_ignore` | scenario | — |
+| `repository_state/mod.rs:1236` `layout` | subject | — |
+| `repository_state/mutation.rs:1369` `layout` | subject | — |
+| `repository_state/overlay.rs:154` `layout` | subject | — |
+| `repository_state/profile_apply.rs:3385` `image_owning` | subject | — |
+| `repository_state/profile_apply.rs:3520` `merge_authored_contribution` | subject | — |
+| `storage/claim_coordinator.rs:1535` `coordinator_with_lock_wait` | subject | — |
+| `storage/discovery.rs:112` `index_in` | subject | — |
+| `storage/external_publish.rs:329` `external_target` | subject | — |
+| `storage/gate_runs.rs:16` `setup_storage` | setup | `library-file-setup-adoption` |
+| `storage/gate_runs.rs:24` `record_gate_run` | scenario | — |
+| `storage/json.rs:1564` `configure_test_layout` | subject | — |
+| `storage/json.rs:1613` `retained_storage` | subject | — |
+| `storage/json.rs:3020` `storage_with_index_version` | subject | — |
+| `storage/memory.rs:1299` `seeded` | subject | — |
+| `storage/redo_apply.rs:379` `repository` | subject | — |
+| `validation/repository.rs:865` `fixture` | scenario | — |
+| `validation/repository.rs:892` `executor` | setup | `library-file-setup-adoption` |
 
-Server crate (`crates/server/src`, `crates/server/tests`):
+**`crates/jit/tests/cli_gate`**
 
-- Memory-backed: two copies of `test_memory_storage`, each writing `enforce_leases = "off"` and a literal `{"schema_version":2,…}` index. They are at `src/routes.rs:1081-1100` and `tests/server_integration/document_api_tests.rs:11-19`.
-- File-backed:
-  - `src/routes.rs`: `initialize_file_backed_test_repository` (`:1103`), under `create_test_app`, `create_test_app_with_html_doc` and `create_app_with_raw_fixture`.
-  - `src/lib.rs`: `repository_missing_its_index` (`:93`).
-  - `tests/server_integration/graceful_shutdown_tests.rs`: `initialize_repository` (`:75`) and `executor_for` (`:80`).
+| Function | Class | Owner |
+| --- | --- | --- |
+| `bracket_coverage_gate_run_test.rs:139` `setup_bracket_repo` | setup | `cli-gate-migration` |
+| `bracket_coverage_gate_run_test.rs:192` `assert_gate_run` | scenario | — |
+| `gate_cli_integration_test.rs:74` `enable_warn_leases` | scenario | — |
+| `gate_evaluate_all_test.rs:90` `define_review_placeholder_gate` | scenario | — |
+| `gate_evaluate_rerun_test.rs:106` `gate_updated_by` | scenario | — |
+| `gate_update_test.rs:56` `define_review_placeholder_gate` | scenario | — |
+| `gate_update_test.rs:93` `read_only_issue_file` | scenario | — |
+
+**`crates/jit/tests/cli_issue`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `command_exit_code_projection_tests.rs:110` `setup_prospective_cycle` | scenario | — |
+| `container_rollup_tests.rs:94` `delete_issue_file` | scenario | — |
+| `exit_code_tests.rs:1147` `make_ambiguous_prefix` | scenario | — |
+| `failure_probe_fixture.rs:604` `apply` | scenario | — |
+| `issue_update_description_ops_tests.rs:86` `assert_last_event_is_description_update` | scenario | — |
+| `serve_failure_envelope_tests.rs:12` `setup` | setup | `cli-issue-envelope-migration` |
+
+**`crates/jit/tests/cli_item_validate`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `decision_kind_tests.rs:48` `setup_test_repo` | setup | `cli-item-validate-migration` |
+| `decision_kind_tests.rs:163` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
+| `decision_risk_story_tests.rs:58` `setup_test_repo` | setup | `cli-item-validate-migration` |
+| `decision_risk_story_tests.rs:119` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
+| `derived_state_repair_tests.rs:42` `file_snapshot` | scenario | — |
+| `invariant_check_cli_tests.rs:33` `write_rules` | scenario | — |
+| `invariant_check_cli_tests.rs:36` `write_invariants` | scenario | — |
+| `invariant_registry_story_tests.rs:33` `setup_jit_root_with_invariants_toml` | setup | `cli-item-validate-migration` |
+| `invariant_registry_story_tests.rs:68` `setup_cli_repo` | setup | `cli-item-validate-migration` |
+| `item_cli_tests.rs:315` `configure_project_scope_kind` | scenario | — |
+| `item_cli_tests.rs:687` `register_link_namespaces` | scenario | — |
+| `markdown_kind_source_path_tests.rs:53` `configure_policy_kind` | scenario | — |
+| `project_render_cli_tests.rs:35` `append_projection` | scenario | — |
+| `risk_kind_tests.rs:50` `setup_test_repo` | setup | `cli-item-validate-migration` |
+| `risk_kind_tests.rs:129` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
+| `validate_cli_rule_tests.rs:27` `setup_repo_with_rules` | setup | `cli-item-validate-migration` |
+| `validate_cli_rule_tests.rs:608` `configure_review_placeholder` | scenario | — |
+
+**`crates/jit/tests/cli_query_graph`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `label_constraints_tests.rs:19` `setup_repo` | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs:161` `executor_with_rules_and_templates` | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs:1118` `executor` | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs:1298` `setup_spine` | scenario | — |
+| `search_tests.rs:7` `create_test_repo` | setup | `cli-query-graph-migration` |
+
+**`crates/jit/tests/cli_repo_workflow`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `apply_cli_tests.rs:88` `setup_repo` | setup | `cli-repo-profile-migration` |
+| `archive_preview_cli_tests.rs:121` `set_documentation_policy` | scenario | — |
+| `archive_preview_cli_tests.rs:135` `initialize_with_policy` | setup | `cli-repo-checkout-migration` |
+| `archive_preview_cli_tests.rs:1558` `document_contents` | scenario | — |
+| `artifact_conformance_cli_tests.rs:157` `declare_issue_scoped_areas` | scenario | — |
+| `claim_integration_tests.rs:113` `acquire_selected_linked_lease` | scenario | — |
+| `cross_substrate_generality_tests.rs:82` `write_jit_file` | scenario | — |
+| `divergence_recovery_journey_tests.rs:70` `store_of` | scenario | — |
+| `divergence_recovery_journey_tests.rs:254` `stage_documented_store_paths` | scenario | — |
+| `doc_show_tests.rs:176` `initialized_repo` | setup | `cli-repo-checkout-migration` |
+| `format_compat_cli_tests.rs:19` `setup_too_new_repo` | setup | `cli-repo-workflow-migration` |
+| `init_tests.rs:687` `packaged_documentation_policy` | scenario | — |
+| `linked_checkout_write_policy_tests.rs:147` `linked_checkout_fixture` | setup | `cli-repo-checkout-migration` |
+| `linked_checkout_write_policy_tests.rs:212` `declare_stance` | scenario | — |
+| `linked_checkout_write_policy_tests.rs:222` `durable_events` | scenario | — |
+| `linked_checkout_write_policy_tests.rs:425` `store_bytes` | scenario | — |
+| `linked_checkout_write_policy_tests.rs:700` `redeclare_stance` | scenario | — |
+| `profile_acceptance_tests.rs:116` `normalized_events` | scenario | — |
+| `profile_acceptance_tests.rs:143` `is_machine_local_path` | scenario | — |
+| `profile_cli_tests.rs:108` `stored_record` | scenario | — |
+| `profile_publication_tests.rs:107` `executor_with_interruptions` | subject | — |
+| `profile_publication_tests.rs:117` `ordinary_executor` | setup | `cli-repo-workflow-in-process-setup-adoption` |
+| `serve_cli_tests.rs:175` `write_stale_pid` | scenario | — |
+| `steering_scenarios.rs:150` `setup_scenario_repo` | setup | `cli-repo-workflow-migration` |
+| `template_binding_cli_tests.rs:136` `setup_repo` | setup | `cli-repo-profile-migration` |
+| `worktree_identity_tests.rs:13` `identity_paths` | scenario | — |
+
+**`crates/jit/tests/fast_docs_templates`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `artifact_discovery_tests.rs:62` `new` | setup | `fast-docs-templates-file-setup-adoption` |
+| `main.rs:24` `seed_memory_data_file` | scenario | — |
+| `planning_preset_tests.rs:21` `file_backed_executor` | setup | `fast-docs-templates-file-setup-adoption` |
+| `template_apply_atomicity_tests.rs:379` `memory_storage` | setup | `fast-docs-templates-memory-setup-adoption` |
+| `template_apply_atomicity_tests.rs:387` `fixture` | subject | — |
+| `template_apply_atomicity_tests.rs:446` `repository_image` | subject | — |
+| `template_apply_tests.rs:96` `declare_document_area` | scenario | — |
+| `template_binding_tests.rs:106` `executor_with_templates` | setup | `fast-docs-templates-memory-setup-adoption` |
+| `templates_loader_tests.rs:16` `setup` | setup | `fast-docs-templates-file-setup-adoption` |
+
+**`crates/jit/tests/fast_issue`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `graph_rule_validation_tests.rs:15` `store_with_rules` | setup | `fast-issue-memory-setup-adoption` |
+| `graph_rule_validation_tests.rs:33` `executor_for` | setup | `fast-issue-memory-setup-adoption` |
+| `short_hash_tests.rs:389` `make_storage` | setup | `fast-issue-memory-setup-adoption` |
+| `strictness_enforcement_tests.rs:42` `executor` | setup | `fast-issue-memory-setup-adoption` |
+| `strictness_transition_tests.rs:41` `executor` | setup | `fast-issue-memory-setup-adoption` |
+| `transition_graph_enforcement_tests.rs:24` `executor_with_rules` | setup | `fast-issue-memory-setup-adoption` |
+
+**`crates/jit/tests/fast_rules`**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `cli_warnings_integration_tests.rs:24` `setup_test_repo` | setup | `rule-warning-tests-down-a-layer` |
+| `default_rules_registry_derivation_tests.rs:17` `executor` | setup | `fast-rules-file-setup-adoption` |
+| `default_rules_registry_derivation_tests.rs:28` `setup_initialized_repo` | setup | `fast-rules-file-setup-adoption` |
+| `effective_rules_tests.rs:16` `repo` | setup | `fast-rules-file-setup-adoption` |
+| `effective_rules_tests.rs:35` `executor` | setup | `fast-rules-file-setup-adoption` |
+| `example_rulesets_tests.rs:612` `executor_with_sdd_example` | setup | `fast-rules-memory-setup-adoption` |
+| `example_rulesets_tests.rs:1524` `research_coverage_executor` | setup | `fast-rules-memory-setup-adoption` |
+| `label_strategic_tests.rs:13` `strategic_executor` | setup | `fast-rules-memory-setup-adoption` |
+| `local_rule_enforcement_tests.rs:20` `executor_with_rules` | setup | `fast-rules-memory-setup-adoption` |
+| `main.rs:20` `memory_executor` | setup | `fast-rules-memory-executor-adoption` |
+| `project_render_harness_tests.rs:77` `storage_with` | setup | `fast-rules-memory-setup-adoption` |
+| `project_render_harness_tests.rs:90` `render_executor` | setup | `fast-rules-memory-setup-adoption` |
+| `type_hierarchy_schema_regen_tests.rs:9` `executor` | setup | `fast-rules-file-setup-adoption` |
+| `type_hierarchy_schema_regen_tests.rs:15` `setup_initialized_repo` | setup | `fast-rules-file-setup-adoption` |
+| `undeclared_taxonomy_tests.rs:20` `scaffold_declaring` | setup | `fast-rules-file-setup-adoption` |
+| `validate_rule_runner_tests.rs:21` `store_with_rules` | setup | `fast-rules-memory-setup-adoption` |
+
+**server crate**
+
+| Function | Class | Owner |
+| --- | --- | --- |
+| `src/lib.rs:93` `repository_missing_its_index` | setup | `server-file-setup-adoption` |
+| `src/routes.rs:1053` `test_executor` | setup | `server-file-setup-adoption` |
+| `src/routes.rs:1081` `test_memory_storage` | setup | `server-memory-setup-adoption` |
+| `src/routes.rs:1103` `initialize_file_backed_test_repository` | setup | `server-file-setup-adoption` |
+| `src/routes.rs:1699` `create_test_app_with_html_doc` | setup | `server-file-setup-adoption` |
+| `src/routes.rs:2621` `create_app_with_raw_fixture` | setup | `server-file-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs:11` `test_memory_storage` | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs:23` `create_test_server` | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs:39` `create_test_server_with_issue` | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/graceful_shutdown_tests.rs:75` `initialize_repository` | setup | `server-file-setup-adoption` |
+| `tests/server_integration/graceful_shutdown_tests.rs:80` `executor_for` | setup | `server-file-setup-adoption` |
 
 ### D.7 Shell-script self-tests
 

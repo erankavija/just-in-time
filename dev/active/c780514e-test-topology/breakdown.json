@@ -2,7 +2,7 @@
   {
     "key": "cli-process-fixture",
     "title": "Shared fixture for spawning jit in CLI tests",
-    "description": "Give CLI integration tests one shared fixture that spawns `jit`, so no test file needs its own binary locator, repository setup, environment handling or id scraping.\n\n## Background\n\nNo shared subprocess fixture exists. `fn jit_binary` is defined in 56 files under `crates/jit/tests/`; 43 files spawn through `assert_cmd`'s `cargo_bin!` and 69 through `env!(\"CARGO_BIN_EXE_jit\")`. 56 files define a local `setup_test_repo` or `setup_repo`, and 33 more define differently named setups. 114 `split_whitespace` sites in 39 files parse human-readable output, most of them to scrape created ids. 20 test files and 8 source test modules hand-roll `git init`.\n\nA few files remove chosen `JIT_*` variables (`steering_scenarios.rs`, `repo_discovery_tests.rs`, `profile_acceptance_tests.rs`, `project_config_tests.rs`, `failure_probe_fixture.rs`), but nothing removes them all. The product reads `JIT_AGENT_ID` at 10 sites, plus `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT`, so a developer's agent identity and data-directory overrides reach most spawned processes.\n\nShared test support (`crate::test_utils`, `crate::test_harness`, `crate::test_taxonomy`) is compiled once under `cfg(any(test, feature = \"test-support\"))`, and every integration target enables that feature through the crate's self dev-dependency. `assert_cmd` is a dev-dependency, so library test support cannot name it. `CARGO_BIN_EXE_jit` is set only while an integration target compiles.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides one CLI process fixture. It owns a temporary repository, which is uninitialised, initialised by `jit init`, or a repository from shared test support handed to it, and it removes the repository on drop.\n- [hard] REQ-02: The fixture locates the `jit` binary built for the calling integration target through one shared construction path, so a test names no binary path, `CARGO_BIN_EXE_jit` or `cargo_bin!`.\n- [hard] REQ-03: Every process the fixture spawns starts with no inherited `JIT_*` variable. A test sets one only through the fixture, and the setting reaches that process alone.\n- [hard] REQ-04: On request the fixture initialises git in its repository, with a fixed author identity and no dependency on the developer's global git configuration. It does so through a shared test-support function that in-process tests can also call.\n- [hard] REQ-05: The fixture reads the ids of issues it creates from `--json` output.\n- [hard] REQ-06: The environment scrub, git initialisation and id reading each have one owning test, and each of those tests passes alone and in parallel with the rest.\n\n## Notes\n\nThe fixture hands tests a `std::process::Command` or a thin wrapper around one, so tests keep `assert_cmd`'s assertion traits from their own dev-dependency. It adds no integration target (`@/inv/bounded-rust-build-footprint`). `dev/TESTING.md` names it as the way to spawn `jit`.\n",
+    "description": "Give CLI integration tests one shared fixture that spawns `jit`, so no test file needs its own binary locator, repository setup, environment handling or id scraping.\n\n## Background\n\nNo shared subprocess fixture exists. `fn jit_binary` is defined in 56 files under `crates/jit/tests/`; 43 files spawn through `assert_cmd`'s `cargo_bin!` and 69 through `env!(\"CARGO_BIN_EXE_jit\")`. 56 files define a local `setup_test_repo` or `setup_repo`, and 33 more define differently named setups. 114 `split_whitespace` sites in 39 files parse human-readable output, most of them to scrape created ids. 20 test files and 8 source test modules hand-roll `git init`.\n\nA few files remove chosen `JIT_*` variables (`steering_scenarios.rs`, `repo_discovery_tests.rs`, `profile_acceptance_tests.rs`, `project_config_tests.rs`, `failure_probe_fixture.rs`), but nothing removes them all. The product reads `JIT_AGENT_ID` at 10 sites, plus `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT`, so a developer's agent identity and data-directory overrides reach most spawned processes.\n\nShared test support (`crate::test_utils`, `crate::test_harness`, `crate::test_taxonomy`) is compiled once under `cfg(any(test, feature = \"test-support\"))`, and every integration target enables that feature through the crate's self dev-dependency. `assert_cmd` is a dev-dependency, so library test support cannot name it. `CARGO_BIN_EXE_jit` is set only while an integration target compiles.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides one CLI process fixture. It owns a temporary repository, which is uninitialised, initialised by `jit init`, or a repository from shared test support handed to it, and it removes the repository on drop.\n- [hard] REQ-02: The fixture locates the `jit` binary built for the calling integration target through one shared construction path, so a test names no binary path, `CARGO_BIN_EXE_jit` or `cargo_bin!`.\n- [hard] REQ-03: Every process the fixture spawns starts with no inherited `JIT_*` variable. A test sets one only through the fixture, and the setting reaches that process alone.\n- [hard] REQ-04: On request the fixture initialises git in its repository, with a fixed author identity and no dependency on the developer's global git configuration. It does so through a shared test-support function that in-process tests can also call.\n- [hard] REQ-05: The fixture reads the ids of issues it creates from `--json` output.\n- [hard] REQ-06: The environment scrub, git initialisation and id reading each have one owning test, and each of those tests passes alone and in parallel with the rest.\n- [hard] REQ-07: The fixture adds no integration target; it lives in the shared test-support surface.\n\n## Notes\n\nThe fixture hands tests a `std::process::Command` or a thin wrapper around one, so tests keep `assert_cmd`'s assertion traits from their own dev-dependency. It adds no integration target (`@/inv/bounded-rust-build-footprint`). `dev/TESTING.md` names it as the way to spawn `jit`.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -3131,7 +3131,7 @@
   {
     "key": "fast-docs-templates-file-setup-adoption",
     "title": "fast_docs_templates file-backed tests use the shared constructors",
-    "description": "Retire the private file-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. `file_backed_executor` in `crates/jit/tests/fast_docs_templates/planning_preset_tests.rs:21` and `setup` in `templates_loader_tests.rs:16`, which writes declaration files into a temporary directory, duplicate them.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private file-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. These `crates/jit/tests/fast_docs_templates` helpers duplicate them: `file_backed_executor` in `planning_preset_tests.rs:21`, `Repo::new` in `artifact_discovery_tests.rs:62`, which creates a file-backed repository with its layout, and `setup` in `templates_loader_tests.rs:16`, which writes declaration files into a temporary directory.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3163,10 +3163,11 @@
       "terminal": {
         "consumer_family": "fast_docs_templates file-backed setups",
         "test_boundary": "fast_docs_templates integration target",
-        "worker_sized_reason": "Two files replace private helpers with existing constructors.",
+        "worker_sized_reason": "Three files replace private helpers with existing constructors.",
         "footprint": {
           "touches": [
             "crates/jit/tests/fast_docs_templates/planning_preset_tests.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_discovery_tests.rs",
             "crates/jit/tests/fast_docs_templates/templates_loader_tests.rs"
           ]
         }
@@ -3222,7 +3223,7 @@
   {
     "key": "fast-issue-memory-setup-adoption",
     "title": "fast_issue memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_issue` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_issue` helpers build their own store or executor: `store_with_rules` and `executor_for` in `graph_rule_validation_tests.rs` (`:15`, `:34`), `executor_with_rules` in `transition_graph_enforcement_tests.rs:24`, `executor` in `strictness_enforcement_tests.rs:42` and `strictness_transition_tests.rs:41`, and `make_storage` in `short_hash_tests.rs:389`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_issue` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_issue` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_issue` helpers build their own store or executor: `store_with_rules` and `executor_for` in `graph_rule_validation_tests.rs` (`:15`, `:34`), `executor_with_rules` in `transition_graph_enforcement_tests.rs:24`, `executor` in `strictness_enforcement_tests.rs:42` and `strictness_transition_tests.rs:41`, and `make_storage` in `short_hash_tests.rs:389`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_issue` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3272,7 +3273,7 @@
   {
     "key": "fast-rules-memory-setup-adoption",
     "title": "fast_rules memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_rules` helpers build their own store or executor: `store_with_rules` in `validate_rule_runner_tests.rs:21`, `executor_with_rules` in `local_rule_enforcement_tests.rs:20`, `storage_with` and `render_executor` in `project_render_harness_tests.rs` (`:77`, `:90`), `strategic_executor` in `label_strategic_tests.rs:13`, and `executor_with_sdd_example` and `research_coverage_executor` in `example_rulesets_tests.rs` (`:612`, `:1524`).\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_rules` helpers build their own store or executor: `store_with_rules` in `validate_rule_runner_tests.rs:21`, `executor_with_rules` in `local_rule_enforcement_tests.rs:20`, `storage_with` and `render_executor` in `project_render_harness_tests.rs` (`:77`, `:90`), `strategic_executor` in `label_strategic_tests.rs:13`, and `executor_with_sdd_example` and `research_coverage_executor` in `example_rulesets_tests.rs` (`:612`, `:1524`).\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3323,7 +3324,7 @@
   {
     "key": "fast-docs-templates-memory-setup-adoption",
     "title": "fast_docs_templates memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. `executor_with_templates` in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs:106` and `memory_storage` in `template_apply_atomicity_tests.rs:380` build their own store or executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. `executor_with_templates` in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs:106` and `memory_storage` in `template_apply_atomicity_tests.rs:380` build their own store or executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4362,7 +4363,7 @@
   {
     "key": "library-item-validate-memory-setup-adoption",
     "title": "Item and validate unit tests use the shared memory seeding",
-    "description": "Retire the private memory executors of the item and validate command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/item.rs`: `executor_with` (`:613`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`) and `config_exec` (`:1536`).\n- `crates/jit/src/commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3042`, which writes a literal `\"schema_version\": 2` index at `:3053`) and `dangling_exec_with_rules_and_gates` (`:3103`).\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in `commands/item.rs` or `commands/validate.rs` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory executors of the item and validate command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/item.rs`: `executor_with` (`:613`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`) and `config_exec` (`:1536`).\n- `crates/jit/src/commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3042`, which writes a literal `\"schema_version\": 2` index at `:3053`) and `dangling_exec_with_rules_and_gates` (`:3103`).\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in `commands/item.rs` or `commands/validate.rs` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4410,7 +4411,7 @@
   {
     "key": "library-command-memory-setup-adoption",
     "title": "Command unit tests use the shared memory seeding",
-    "description": "Retire the private memory executors of the remaining command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/batch_create.rs`: `executor` (`:671`) and `coverage_executor` (`:926`).\n- `commands/bulk_update.rs`: `blocked_dependent_fixture` (`:1973`).\n- `commands/events.rs`: `seeded_override_executor` (`:51`).\n- `commands/gate.rs`: `setup` (`:1452`, literal `enforce_leases = \"off\"`).\n- `commands/gate_check.rs`: `setup` (`:1666`).\n- `commands/gate_cli_tests.rs`: `setup` (`:10`).\n- `commands/invariant.rs`: `exec` (`:76`).\n- `commands/issue.rs`: `setup` (`:916`).\n- `commands/mod.rs`: `precheck_evidence_fixture` (`:3571`).\n\nThe literal `schema_version` fields in `prior_run` (`gate_check.rs:1740`) and `prior_precheck_run` (`mod.rs:3672`) belong to gate-run records, not to a repository index, and stay.\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in the files in this entry's footprint defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory executors of the remaining command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/batch_create.rs`: `executor` (`:671`) and `coverage_executor` (`:926`).\n- `commands/bulk_update.rs`: `blocked_dependent_fixture` (`:1973`).\n- `commands/events.rs`: `seeded_override_executor` (`:51`).\n- `commands/gate.rs`: `setup` (`:1452`, which writes the scenario value `enforce_leases = \"off\"` directly).\n- `commands/gate_check.rs`: `setup` (`:1666`).\n- `commands/gate_cli_tests.rs`: `setup` (`:10`).\n- `commands/invariant.rs`: `exec` (`:76`).\n- `commands/issue.rs`: `setup` (`:916`) and `setup_over` (`:920`).\n- `commands/mod.rs`: `precheck_evidence_fixture` (`:3571`).\n\nThe literal `schema_version` fields in `prior_run` (`gate_check.rs:1740`) and `prior_precheck_run` (`mod.rs:3672`) belong to gate-run records, not to a repository index, and stay.\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in the files in this entry's footprint defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4467,7 +4468,7 @@
   {
     "key": "library-file-setup-adoption",
     "title": "Library unit tests use the shared file-backed constructors",
-    "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. These library test helpers duplicate the shared constructors:\n\n- `crates/jit/src/commands/archive.rs`: `executor` (`:892`) and the repository builders `executable_document_repo` (`:994`), `configured_repo` (`:1764`), `development_root_repo` (`:1995`), `directory_link_repo` (`:2399`) and `executable_container_repo` (`:2494`).\n- `commands/gate_check.rs`: `setup_file_repository` (`:2082`).\n- `commands/hooks.rs`: `diverged_strict_repo` (`:254`).\n- `commands/profile.rs`: `fixture` (`:2265`).\n- `storage/gate_runs.rs`: `setup_storage` (`:16`), a copy of the shared `setup_test_repo`.\n- `validation/repository.rs`: `executor` (`:892`).\n- `main.rs` tests: `repository_declaring` (`:7669`), which writes a configuration into a temporary directory.\n\n## Success Criteria\n\n- [hard] REQ-01: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. These library test helpers duplicate the shared constructors:\n\n- `crates/jit/src/commands/archive.rs`: `executor` (`:892`) and the repository builders `executable_document_repo` (`:994`), `configured_repo` (`:1764`), `development_root_repo` (`:1995`), `directory_link_repo` (`:2399`) and `executable_container_repo` (`:2494`).\n- `commands/claim.rs`: `create_test_issue` (`:1045`), which opens an executor over a given store.\n- `commands/gate_check.rs`: `setup_file_repository` (`:2082`) and `ReuseFixture::new` (`:2157`).\n- `commands/hooks.rs`: `diverged_strict_repo` (`:254`).\n- `commands/init.rs`: `executor_with_layout` (`:665`) and `assert_repo_valid` (`:675`), which opens an executor over the worktree it asserts on.\n- `commands/profile.rs`: `fixture` (`:2265`) and `bare_repository_beside_shipped_packages` (`:3143`).\n- `storage/gate_runs.rs`: `setup_storage` (`:16`), a copy of the shared `setup_test_repo`.\n- `validation/repository.rs`: `executor` (`:892`).\n- `main.rs` tests: `repository_declaring` (`:7669`), which writes a configuration into a temporary directory.\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper the Background lists no longer exists, and its tests obtain the repository, executor or declaration directory from the shared constructors.\n- [hard] REQ-02: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4500,10 +4501,12 @@
       "terminal": {
         "consumer_family": "library file-backed setups",
         "test_boundary": "library unit tests",
-        "worker_sized_reason": "About twelve helpers in seven modules switch to existing constructors.",
+        "worker_sized_reason": "Seventeen small helpers in nine modules switch to existing constructors.",
         "footprint": {
           "touches": [
             "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/commands/claim.rs",
+            "crates/jit/src/commands/init.rs",
             "crates/jit/src/commands/gate_check.rs",
             "crates/jit/src/commands/hooks.rs",
             "crates/jit/src/commands/profile.rs",
@@ -4518,7 +4521,7 @@
   {
     "key": "server-memory-setup-adoption",
     "title": "Server tests use the shared memory seeding",
-    "description": "Retire the server's private memory stores, which write a literal index body.\n\n## Background\n\nShared test support builds a memory store from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. The server crate's tests reach `jit` test support through its `test-support` dev-dependency. Two copies of `test_memory_storage` write `enforce_leases = \"off\"` and a literal `{\"schema_version\":2,…}` index: `crates/server/src/routes.rs:1081-1100` and `crates/server/tests/server_integration/document_api_tests.rs:11-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that constructs an `InMemoryStorage`, and none writes a literal configuration default or index body.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the server's private memory stores, which write a literal index body.\n\n## Background\n\nShared test support builds a memory store from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. The server crate's tests reach `jit` test support through its `test-support` dev-dependency. Two copies of `test_memory_storage` write the scenario value `enforce_leases = \"off\"` directly into the store and a literal `{\"schema_version\":2,…}` index: `crates/server/src/routes.rs:1081-1100` and `crates/server/tests/server_integration/document_api_tests.rs:11-19`. `create_test_server` and `create_test_server_with_issue` (`document_api_tests.rs:23`, `:39`) build an executor over that store.\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4567,7 +4570,7 @@
   {
     "key": "server-file-setup-adoption",
     "title": "Server tests use the shared file-backed constructors",
-    "description": "Retire the server's private file-backed repository and executor setups.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root. The server crate's tests duplicate them: `initialize_file_backed_test_repository` (`crates/server/src/routes.rs:1103`), on which `create_test_app`, `create_test_app_with_html_doc` and `create_app_with_raw_fixture` build; `repository_missing_its_index` (`crates/server/src/lib.rs:93`), which builds a repository and then removes its index; and `initialize_repository` and `executor_for` (`crates/server/tests/server_integration/graceful_shutdown_tests.rs:75`, `:80`).\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that creates a file-backed repository or opens a file-backed executor of its own; a scenario that damages a repository does so to one built by the shared constructor.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the server's private file-backed repository and executor setups.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root. The server crate's tests duplicate them: `test_executor` (`crates/server/src/routes.rs:1053`), which opens an executor over a given store; `initialize_file_backed_test_repository` (`crates/server/src/routes.rs:1103`), on which `create_test_app`, `create_test_app_with_html_doc` and `create_app_with_raw_fixture` build; `repository_missing_its_index` (`crates/server/src/lib.rs:93`), which builds a repository and then removes its index; and `initialize_repository` and `executor_for` (`crates/server/tests/server_integration/graceful_shutdown_tests.rs:75`, `:80`).\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that creates a file-backed repository or opens a file-backed executor of its own; a scenario that damages a repository does so to one built by the shared constructor.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4602,12 +4605,158 @@
       "terminal": {
         "consumer_family": "server file-backed setups",
         "test_boundary": "jit-server test suite",
-        "worker_sized_reason": "Four helpers in three files switch to existing constructors.",
+        "worker_sized_reason": "Seven helpers in three files switch to existing constructors.",
         "footprint": {
           "touches": [
             "crates/server/src/routes.rs",
             "crates/server/src/lib.rs",
             "crates/server/tests/server_integration/graceful_shutdown_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-item-validate-in-process-setup-adoption",
+    "title": "cli_item_validate in-process tests use the shared constructors",
+    "description": "Retire the private in-process repository and executor setups of the `cli_item_validate` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own: `default_executor_with` in `decision_kind_tests.rs:163`, `decision_risk_story_tests.rs:119` and `risk_kind_tests.rs:129`, three copies of one file-backed executor setup.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `cli_item_validate` defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "cli-item-validate-shipped-item-kinds"
+    ],
+    "planning": {
+      "outcome": "The cli_item_validate in-process tests build repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "cli_item_validate in-process setups",
+        "test_boundary": "cli_item_validate integration target",
+        "worker_sized_reason": "A few helpers in a few files switch to existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_item_validate/decision_kind_tests.rs",
+            "crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs",
+            "crates/jit/tests/cli_item_validate/risk_kind_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-query-graph-in-process-setup-adoption",
+    "title": "cli_query_graph in-process tests use the shared constructors",
+    "description": "Retire the private in-process repository and executor setups of the `cli_query_graph` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own: `setup_repo` in `label_constraints_tests.rs:19` (a file-backed executor), and `executor_with_rules_and_templates` (`:161`, a memory executor) and `executor` (`:1118`, a file-backed executor) in `scope_validation_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `cli_query_graph` defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "memory-declaration-seeding",
+      "cli-query-graph-migration"
+    ],
+    "planning": {
+      "outcome": "The cli_query_graph in-process tests build repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors",
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "cli_query_graph in-process setups",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "A few helpers in a few files switch to existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/label_constraints_tests.rs",
+            "crates/jit/tests/cli_query_graph/scope_validation_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "cli-repo-workflow-in-process-setup-adoption",
+    "title": "cli_repo_workflow in-process tests use the shared constructors",
+    "description": "Retire the private in-process repository and executor setups of the `cli_repo_workflow` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own: `ordinary_executor` in `profile_publication_tests.rs:117`, a file-backed executor setup. Its sibling `executor_with_interruptions` (`:107`) builds failure-injected storage that is the test's own subject, and stays.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `cli_repo_workflow` defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "cli-repo-profile-migration"
+    ],
+    "planning": {
+      "outcome": "The cli_repo_workflow in-process tests build repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "cli_repo_workflow in-process setups",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "A few helpers in a few files switch to existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs"
           ]
         }
       }
@@ -4757,16 +4906,13 @@
       "cli-gate-migration",
       "cli-issue-command-migration",
       "cli-issue-envelope-migration",
-      "cli-query-graph-migration",
       "cli-repo-checkout-migration",
-      "cli-repo-profile-migration",
       "cli-repo-workflow-migration",
       "fast-docs-templates-git-fixture-adoption",
       "library-fixture-issue-adoption",
       "fast-issue-fixture-issue-adoption",
       "fast-docs-templates-fixture-issue-adoption",
       "fast-rules-fixture-issue-adoption",
-      "cli-item-validate-shipped-item-kinds",
       "fast-rules-shipped-item-kinds",
       "fast-rules-file-setup-adoption",
       "fast-docs-templates-file-setup-adoption",
@@ -4775,7 +4921,10 @@
       "env-reading-tests-guarded",
       "library-item-validate-memory-setup-adoption",
       "library-file-setup-adoption",
-      "server-file-setup-adoption"
+      "server-file-setup-adoption",
+      "cli-item-validate-in-process-setup-adoption",
+      "cli-query-graph-in-process-setup-adoption",
+      "cli-repo-workflow-in-process-setup-adoption"
     ],
     "planning": {
       "outcome": "CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards",
