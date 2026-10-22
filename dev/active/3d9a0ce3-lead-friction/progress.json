@@ -532,6 +532,10 @@
     {
       "topic": "fixture contention TIMEOUT/lock-wait signature in cargo-ci",
       "resolution": "steward: force allowed for that exact signature until c780514e's cold-key fix lands"
+    },
+    {
+      "topic": "abe963dd rework limit: code-review assumed parent-traversal aliases were admitted",
+      "resolution": "2026-10-22 parent approved one additional focused attempt: preserve existing parent-traversal rejection, prove rejected inputs never reach model validation, deduplicate admitted aliases, rerun full gates and review. Failed code-review a9d77cf0 and cargo-ci 00bccea4 preserved. Existing repository_state/path.rs lexical_absolute rejects ParentDir via non-Normal component; no path-acceptance expansion authorized."
     }
   ],
   "surfaced_pitfalls": [
@@ -556,7 +560,7 @@
     "8673dc5e": 2,
     "f866d9d8": 1,
     "39710b3b": 1,
-    "abe963dd": 1
+    "abe963dd": 3
   },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock",
