@@ -8,6 +8,7 @@
   ],
   "description": "Preserve the checker’s infrastructure exit status when the CI wrapper runs it under the host build lock.\n\n## Background\n\n`scripts/cargo-ci.sh` invokes `flock -E 75` and treats every returned 75 as lock-acquisition timeout. The child checker also returns 75 for a loaded-host execution failure. During test-topology recovery, run `448d0665-ddfb-4a46-aaf8-4d30cb15ca4f` passed all tests but exceeded the suite-duration budget at load 9.74; the wrapper replaced its infrastructure result with a false lock-timeout diagnostic and exit 2.\n\n## Success Criteria\n\n- [hard] REQ-01: A child checker returning infrastructure status 75 after lock acquisition retains status 75 and emits no lock-timeout diagnostic.\n- [hard] REQ-02: Genuine lock-acquisition timeout remains bounded, reports the lock path and timeout, and preserves the documented environment-error outcome.\n- [hard] REQ-03: The owning shell self-test proves both outcomes through the real wrapper without running the workspace suite or depending on host load.\n- [hard] REQ-04: Existing checker pass/fail status propagation, locking, and suite budgets remain intact.\n\n## Notes\n\nThe coordinator approved this targeted addition to the test-topology scope after the recovery run exposed the shared-tooling defect. The implementation footprint is the wrapper and its existing shell self-test.\n",
   "documents": [],
+  "done_at": "2026-10-22T20:15:29.858323115Z",
   "first_ready_at": "2026-10-22T19:41:38.454911265Z",
   "gates_required": [
     "cargo-ci",
@@ -43,7 +44,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Preserve infrastructure status through the CI build lock",
-  "updated_at": "2026-10-22T20:14:47.789335218Z"
+  "updated_at": "2026-10-22T20:15:29.858323115Z"
 }
