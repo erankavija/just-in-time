@@ -1,0 +1,40 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f767033dcb24048a75e66d01ffe595216d05cd8e",
+  "completed_at": "2026-10-22T01:37:24.812653171Z",
+  "duration_ms": 97995,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/d8176fd3/requirement/REQ-05",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "Required cargo-ci is pending, leaving the Rust formatting, clippy, and test requirements of REQ-05 unverified."
+      }
+    ],
+    "summary": "The implementation appears aligned with the global --json requirements, but required Rust CI remains unrun, leaving hard REQ-05 unverified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "07330ce8-6ce8-4824-923a-2b6fb24010dc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:35:46.816854706Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16486 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16140-0102-73f2-857c-7b806eefbb16\n--------\nuser\n--- 16473 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 188be65ee, 0ac985e93, 6e6b4e2e7, f767033dc (all `jit:d8176fd3`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/d8176fd3/requirement/REQ-01..REQ-05 and @/issue/df129d9e/requirement/REQ-09,REQ-15 (issue descriptions); @/gate/cargo-ci, @/gate/mcp-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci pending (no run or exit code); mcp-ci passed (exit 0, 2026-10-22T01:35:39Z)\nTruncation recovery: per-commit, per-file, and hunk-level patch reads after initial truncated output\n\n1. [blocking][issue-impact] Rust CI has no passing evidence: required `cargo-ci` is pending, so formatting, zero-warning clippy, and the Rust test suite remain materially unverified for hard REQ-05. `mcp-ci` passing does not cover the Rust workspace. References: @/issue/d8176fd3/requirement/REQ-05, @/gate/cargo-ci.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The implementation appears aligned with the global --json requirements, but required Rust CI remains unrun, leaving hard REQ-05 unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Required cargo-ci is pending, leaving the Rust formatting, clippy, and test requirements of REQ-05 unverified.\",\"references\":[\"@/issue/d8176fd3/requirement/REQ-05\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

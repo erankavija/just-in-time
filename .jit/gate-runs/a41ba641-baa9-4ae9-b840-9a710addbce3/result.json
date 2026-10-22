@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "282827ce9557d002ec18069e3da6c8aa3a941e4e",
+  "completed_at": "2026-10-22T01:33:04.239728287Z",
+  "duration_ms": 80283,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "ab9d413a06ad4e47be18b56a84e243b2fa86a91d64e1b9521df48871a490d252",
+  "issue_id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a41ba641-baa9-4ae9-b840-9a710addbce3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:31:43.956166111Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\n     Summary [   3.575s] 0/4600 tests run: 0 passed, 0 skipped\ninfo: experimental features enabled: setup-scripts\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n────────────\n Nextest run ID 91859413-fa0a-45d0-a388-edccf6397498 with nextest profile: default\n    Starting 4600 tests across 14 binaries\n       SETUP [      1/3] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default\n  SETUP PASS [   0.225s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default\n       SETUP [      2/3] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood\n  SETUP PASS [   0.671s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood\n       SETUP [      3/3] recorded-failure-corpus: /home/vkaskivuo/Projects/just-in-time/scripts/setup-recorded-failure-corpus.sh\n  SETUP FAIL [   2.657s] recorded-failure-corpus: /home/vkaskivuo/Projects/just-in-time/scripts/setup-recorded-failure-corpus.sh\n  stdout ───\n\n    running 1 test\n    test failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step ... FAILED\n\n    failures:\n\n    failures:\n        failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step\n\n    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 337 filtered out; finished in 2.53s\n\n  stderr ───\n        Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n         Running tests/cli_issue/main.rs (target/debug/deps/cli_issue-7c152a3be3a4e705)\n\n    thread 'failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step' (2699933) panicked at crates/jit/tests/cli_issue/failure_probe_fixture.rs:886:34:\n    prepare the run-bound recorded failure corpus: recorded failure corpus row for `config set` does not match the live registry\n    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n    error: test failed, to rerun pass `-p jit --test cli_issue`\n\n  Cancelling due to setup script failure: \n────────────\n     Summary [   3.575s] 0/4600 tests run: 0 passed, 0 skipped\nerror: setup script failed\n--- excluded-tests output ---\ncargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement\n  ✓ fmt: ok (1896 ms)\n  ✓ clippy: ok (32446 ms)\n  ✓ suite-build: built in 37361 ms, warmed 17 executables (2035004928 bytes) in 72 ms (37436 ms)\n  ✗ test: FAILED (exit 105) (3903 ms)\n  ✓ doctest: 60 passed, 0 failed, 0 ignored (4295 ms)\n  ✓ suite-clock: 8211 ms\n  ✗ excluded-tests: FAILED (exit 1) (4 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1710785072/2147483648 profile=line-tables-only dep-features=pruned suite-duration=8211ms (79 ms)\n\ncargo-ci: verdict (exit 1): step 'test' failed on repository content\n"
+}

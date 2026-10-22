@@ -1420,3 +1420,35 @@ fn test_query_subcommand_rejects_parent_filter() {
         String::from_utf8_lossy(&bare.stderr)
     );
 }
+
+/// `--json` is global, so placing it before a query subcommand selects JSON
+/// rendering rather than tripping the misplaced-parent-filter guard.
+#[test]
+fn test_query_accepts_global_json_before_subcommand() {
+    let temp = setup_test_repo();
+    let run = |args: &[&str]| {
+        Command::new(jit_binary())
+            .args(args)
+            .current_dir(temp.path())
+            .output()
+            .unwrap()
+    };
+
+    let leading = run(&["query", "--json", "available"]);
+    assert!(
+        leading.status.success(),
+        "`jit query --json available` must succeed: {}",
+        String::from_utf8_lossy(&leading.stderr)
+    );
+    let envelope: serde_json::Value = serde_json::from_slice(&leading.stdout).unwrap();
+    assert_eq!(
+        envelope["count"].as_u64(),
+        envelope["issues"]
+            .as_array()
+            .map(|issues| issues.len() as u64),
+        "list envelope must carry a count matching its issues: {envelope}"
+    );
+
+    let trailing = run(&["query", "available", "--json"]);
+    assert_eq!(leading.stdout, trailing.stdout);
+}

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T21:07:38.936817026Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a41ba641-baa9-4ae9-b840-9a710addbce3",
+      "status": "failed",
+      "updated_at": "2026-10-22T01:33:04.248008104Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Reject unknown keys in config.toml",
-  "updated_at": "2026-10-21T21:07:44.075377494Z"
+  "updated_at": "2026-10-22T01:33:04.248008104Z"
 }

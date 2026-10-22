@@ -26,7 +26,9 @@ use jit::domain::{GateRunResult, IssueIdPrefix, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
-use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
+use jit::output::{
+    ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext, OutputMode,
+};
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
@@ -1193,23 +1195,14 @@ fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bo
 fn run_item<S: IssueStore>(
     executor: &CommandExecutor<S>,
     command: ItemCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
-    // The `--json` flag is per-subcommand; extract it up front so a FAILURE can
-    // also honor the machine-readable contract (finding 4): when --json is set,
-    // an error is rendered as a JSON object and the process exits with the
-    // error's code, rather than the top-level plain `Error: ...`.
-    let json = match &command {
-        ItemCommands::List { json, .. }
-        | ItemCommands::Search { json, .. }
-        | ItemCommands::Show { json, .. }
-        | ItemCommands::Resolve { json, .. } => *json,
-    };
-
-    let result = run_item_inner(executor, command, quiet);
+    // When --json is set, a failure is rendered as a JSON object and the process
+    // exits with the error's code, rather than the top-level plain `Error: ...`.
+    let result = run_item_inner(executor, command, mode);
     if let Err(e) = result {
         handle_json_error!(
-            json,
+            mode.json,
             e,
             command_json_error(&e, jit::output::ErrorCode::ItemCommandFailed)
         );
@@ -1222,8 +1215,9 @@ fn run_item<S: IssueStore>(
 fn run_item_inner<S: IssueStore>(
     executor: &CommandExecutor<S>,
     command: ItemCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
+    let OutputMode { json, quiet } = mode;
     use jit::commands::ItemListResult;
 
     // Render an item list either as a JSON envelope or one line per item.
@@ -1247,16 +1241,15 @@ fn run_item_inner<S: IssueStore>(
     }
 
     match command {
-        ItemCommands::List { kind, json } => {
+        ItemCommands::List { kind } => {
             let result = executor.list_items(kind.as_deref())?;
             print_list(&result, json, quiet)?;
         }
-        ItemCommands::Search { query, kind, json } => {
+        ItemCommands::Search { query, kind } => {
             let result = executor.search_items(&query, kind.as_deref())?;
             print_list(&result, json, quiet)?;
         }
-        ItemCommands::Show { qualified_id, json }
-        | ItemCommands::Resolve { qualified_id, json } => {
+        ItemCommands::Show { qualified_id } | ItemCommands::Resolve { qualified_id } => {
             let result = executor.show_item(&qualified_id)?;
             print_item_show(&result, json, quiet)?;
         }
@@ -1276,14 +1269,12 @@ fn run_item_inner<S: IssueStore>(
 fn run_invariant<S: IssueStore>(
     executor: &CommandExecutor<S>,
     command: InvariantCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
-    let InvariantCommands::Check { json } = command;
-
-    let result = run_invariant_inner(executor, InvariantCommands::Check { json }, quiet);
+    let result = run_invariant_inner(executor, command, mode);
     if let Err(e) = result {
         handle_json_error!(
-            json,
+            mode.json,
             e,
             command_json_error(&e, jit::output::ErrorCode::InvariantCommandFailed)
         );
@@ -1296,10 +1287,11 @@ fn run_invariant<S: IssueStore>(
 fn run_invariant_inner<S: IssueStore>(
     executor: &CommandExecutor<S>,
     command: InvariantCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
+    let OutputMode { json, quiet } = mode;
     match command {
-        InvariantCommands::Check { json } => {
+        InvariantCommands::Check => {
             let result = executor.check_invariants()?;
             let exit_nonzero = result.has_drift();
             let output_ctx = OutputContext::new(quiet, json);
@@ -1348,13 +1340,9 @@ fn run_invariant_inner<S: IssueStore>(
 fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
     command: ProjectCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
-    let json = match &command {
-        ProjectCommands::Render { json, .. } => *json,
-    };
-
-    let result = run_project_inner(executor, command, quiet);
+    let result = run_project_inner(executor, command, mode);
     if let Err(e) = result {
         // A typed projection or managed-region composition failure is a validation
         // error (exit 4) in JSON mode too, matching the non-JSON path's top-level
@@ -1369,7 +1357,7 @@ fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
         } else {
             command_json_error(&e, jit::output::ErrorCode::ProjectCommandFailed)
         };
-        handle_json_error!(json, e, json_error);
+        handle_json_error!(mode.json, e, json_error);
     }
     Ok(())
 }
@@ -1379,10 +1367,11 @@ fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
 fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
     command: ProjectCommands,
-    quiet: bool,
+    mode: OutputMode,
 ) -> Result<()> {
+    let OutputMode { json, quiet } = mode;
     match command {
-        ProjectCommands::Render { name, json } => {
+        ProjectCommands::Render { name } => {
             let result = executor.project_render(name.as_deref())?;
             let output_ctx = OutputContext::new(quiet, json);
             if json {
@@ -1534,7 +1523,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
 /// Reject parent-level `jit query` filters when a subcommand is present.
 ///
 /// The bare `jit query` form carries its own filter flags (`--state`,
-/// `--assignee`, `--priority`, `--label`, `--full`, `--json`). When a
+/// `--assignee`, `--priority`, `--label`, `--full`). When a
 /// subcommand such as `available` is also given, those parent-level flags
 /// would be silently dropped — a silent-wrong-result footgun for orchestrators
 /// consuming `--json`. Detect any that were supplied and return an actionable
@@ -1556,7 +1545,6 @@ fn reject_parent_query_filters(
         priority.map(|_| "--priority"),
         (!label.is_empty()).then_some("--label"),
         full.then_some("--full"),
-        json.then_some("--json"),
     ]
     .into_iter()
     .flatten()
@@ -1573,7 +1561,7 @@ fn reject_parent_query_filters(
         QueryCommands::Strategic { .. } => "strategic",
         QueryCommands::Closed { .. } => "closed",
         QueryCommands::Count { .. } => "count",
-        QueryCommands::Divergence { .. } => "divergence",
+        QueryCommands::Divergence => "divergence",
     };
 
     // A misplaced pre-subcommand filter is a usage error (exit 2), the same class
@@ -1630,10 +1618,10 @@ fn main() {
     }));
 
     let outcome = std::panic::catch_unwind(|| match run() {
-        Ok(()) => ExitCode::Success,
-        Err(e) => {
+        (_, Ok(())) => ExitCode::Success,
+        (mode, Err(e)) => {
             eprintln!("Error: {}", e);
-            emit_top_level_json_error(&e).unwrap_or_else(|| classify(&e).exit_code())
+            emit_top_level_json_error(&e, mode).unwrap_or_else(|| classify(&e).exit_code())
         }
     });
 
@@ -1661,10 +1649,9 @@ fn main() {
 /// Handler-owned JSON failures print and terminate before reaching this
 /// function, preserving their tailored code, details, and suggestions without a
 /// second document. Propagated failures arrive here with stdout untouched. The
-/// flag is read from argv because startup failures can precede parsed command
-/// dispatch. The returned status is derived from the exact rendered code.
-fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
-    if !std::env::args().any(|arg| arg == "--json") {
+/// returned status is derived from the exact rendered code.
+fn emit_top_level_json_error(error: &anyhow::Error, mode: OutputMode) -> Option<ExitCode> {
+    if !mode.json {
         return None;
     }
 
@@ -1755,13 +1742,16 @@ fn linked_checkout_write_decision(
     }
 }
 
-fn run() -> Result<()> {
+/// Parse the command line and dispatch it, handing back the parsed output mode
+/// with the result so failure rendering reads the same mode the arms did.
+fn run() -> (OutputMode, Result<()>) {
     #[cfg(feature = "test-support")]
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("__test-fixture-setup")) {
-        let id = std::env::args()
+        let result = std::env::args()
             .nth(2)
-            .context("test fixture setup requires a profile id")?;
-        return jit::test_utils::prepare_nextest_profiled_repository_fixture(&id);
+            .context("test fixture setup requires a profile id")
+            .and_then(|id| jit::test_utils::prepare_nextest_profiled_repository_fixture(&id));
+        return (OutputMode::default(), result);
     }
 
     let args: Vec<String> = env::args().collect();
@@ -1774,7 +1764,15 @@ fn run() -> Result<()> {
             error.exit();
         }
     };
-    let quiet = cli.quiet;
+    let mode = OutputMode {
+        json: cli.json,
+        quiet: cli.quiet,
+    };
+    (mode, dispatch(cli, mode))
+}
+
+fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
+    let OutputMode { json, quiet } = mode;
 
     // Handle --schema flag first
     if cli.schema {
@@ -1790,9 +1788,9 @@ fn run() -> Result<()> {
         .command
         .ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
 
-    if let Commands::Version { json } = &command {
+    if let Commands::Version = &command {
         let info = jit::build_info::version_info();
-        if *json {
+        if json {
             let output = JsonOutput::success(&info);
             println!("{}", output.to_json_string()?);
         } else {
@@ -1917,8 +1915,8 @@ fn run() -> Result<()> {
                 .map_err(|error| match &command {
                     // Applying the leftover record is `jit recover`'s own work,
                     // so its failure is a recovery failure, not a startup one.
-                    Commands::Recover { json } if is_leftover_record_failure(&error) => {
-                        exit_recovery_failed(&error, *json)
+                    Commands::Recover if is_leftover_record_failure(&error) => {
+                        exit_recovery_failed(&error, json)
                     }
                     _ => error,
                 })?;
@@ -1947,12 +1945,11 @@ fn run() -> Result<()> {
             profile,
             values_file,
             set,
-            json,
         } => {
-            let output_ctx = OutputContext::new(quiet, *json);
-            let selectors = parse_profile_selectors(profile, *json)?;
-            let assignments = parse_profile_variable_assignments(set, *json)?;
-            profile_result(executor.validate_profile_selection(&selectors), *json)?;
+            let output_ctx = OutputContext::new(quiet, json);
+            let selectors = parse_profile_selectors(profile, json)?;
+            let assignments = parse_profile_variable_assignments(set, json)?;
+            profile_result(executor.validate_profile_selection(&selectors), json)?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
             // publishes through one mutation session: `run_initialization` fills
@@ -1971,7 +1968,7 @@ fn run() -> Result<()> {
                         assignments,
                     },
                 ),
-                *json,
+                json,
             )?;
             // Machine-local worktree identity (gitignored, not repository state)
             // is created after the scaffold is published.
@@ -2009,7 +2006,7 @@ fn run() -> Result<()> {
             };
             let _ = output_ctx.print_success(&message);
 
-            if *json {
+            if json {
                 let payload = InitResponse {
                     repository_root: current_dir.display().to_string(),
                     data_dir: jit_dir.display().to_string(),
@@ -2034,23 +2031,19 @@ fn run() -> Result<()> {
     // so `jit rdeps <id>` and `jit list` resolve to `jit graph rdeps` /
     // `jit issue list` and reuse those handlers verbatim.
     let command = match command {
-        Commands::Rdeps { id, depth, json } => {
-            Commands::Graph(GraphCommands::Rdeps { id, depth, json })
-        }
+        Commands::Rdeps { id, depth } => Commands::Graph(GraphCommands::Rdeps { id, depth }),
         Commands::List {
             state,
             assignee,
             priority,
             label,
             full,
-            json,
         } => Commands::Issue(IssueCommands::List {
             state,
             assignee,
             priority,
             label,
             full,
-            json,
         }),
         other => other,
     };
@@ -2060,7 +2053,7 @@ fn run() -> Result<()> {
             // Already handled above
         }
         Commands::Profile(profile_cmd) => match profile_cmd {
-            ProfileCommands::Show { profile, json } => {
+            ProfileCommands::Show { profile } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
                 match executor.show_profiles(&selectors) {
                     Ok(result) => {
@@ -2098,7 +2091,6 @@ fn run() -> Result<()> {
                 profile,
                 values_file,
                 set,
-                json,
             } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
                 let assignments = parse_profile_variable_assignments(&set, json)?;
@@ -2123,7 +2115,6 @@ fn run() -> Result<()> {
                 values_file,
                 set,
                 dry_run,
-                json,
             } => run_profile_lifecycle(
                 &executor,
                 ProfileLifecycleInvocation {
@@ -2142,7 +2133,6 @@ fn run() -> Result<()> {
                 source,
                 output,
                 dry_run,
-                json,
             } => {
                 let invocation_dir = std::env::current_dir()?;
                 let result = if dry_run {
@@ -2197,7 +2187,6 @@ fn run() -> Result<()> {
                 archive,
                 destination,
                 dry_run,
-                json,
             } => {
                 let invocation_dir = std::env::current_dir()?;
                 let result = if dry_run {
@@ -2250,7 +2239,7 @@ fn run() -> Result<()> {
         Commands::Rdeps { .. } | Commands::List { .. } => {
             unreachable!("top-level rdeps/list are normalized to canonical commands above")
         }
-        Commands::Version { .. } => unreachable!("version is handled before repository validation"),
+        Commands::Version => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
             match issue_cmd {
                 IssueCommands::Create {
@@ -2265,7 +2254,6 @@ fn run() -> Result<()> {
                     content_format,
                     force,
                     orphan,
-                    json,
                 } => {
                     // Clap guarantees exactly one of the two title forms is set.
                     let title = positional_title
@@ -2348,11 +2336,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::BatchCreate {
-                    from_json,
-                    dry_run,
-                    json,
-                } => {
+                IssueCommands::BatchCreate { from_json, dry_run } => {
                     use jit::commands::BatchIssueDef;
 
                     // Read + parse the file (both fallible I/O paths carry context).
@@ -2408,7 +2392,6 @@ fn run() -> Result<()> {
                     priority,
                     labels,
                     full,
-                    json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
 
@@ -2489,7 +2472,6 @@ fn run() -> Result<()> {
                     summary,
                     field,
                     fields,
-                    json,
                 } => {
                     let projecting = field.is_some() || !fields.is_empty();
 
@@ -2638,7 +2620,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Status { ids, json } => {
+                IssueCommands::Status { ids } => {
                     // One compact status per id, in argument order. Each status is
                     // projected from the same enriched show response so the unmet
                     // dependency set stays byte-for-byte consistent with
@@ -2685,7 +2667,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Children { id, json } => {
+                IssueCommands::Children { id } => {
                     // Orchestration (child resolution, dangling classification)
                     // lives in `CommandExecutor::issue_children`; this arm only
                     // dispatches, renders, and routes an id failure through the
@@ -2713,7 +2695,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Progress { id, json } => {
+                IssueCommands::Progress { id } => {
                     // Orchestration lives in `CommandExecutor::issue_progress`;
                     // this arm dispatches, renders, and routes an id failure
                     // through the JSON error path.
@@ -2765,7 +2747,6 @@ fn run() -> Result<()> {
                     unassign,
                     content_format,
                     force,
-                    json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
 
@@ -2982,7 +2963,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Delete { id, json } => {
+                IssueCommands::Delete { id } => {
                     // Deletion inside a linked checkout is governed by the
                     // linked-checkout write policy decided at dispatch, like
                     // every other state-mutating invocation (jit:1b6925a9).
@@ -3030,7 +3011,7 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
                     }
                 }
-                IssueCommands::Assign { id, assignee, json } => {
+                IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     let warnings = executor.assign_issue(&full_id, assignee)?;
@@ -3058,7 +3039,6 @@ fn run() -> Result<()> {
                     id,
                     assignee,
                     assign_only,
-                    json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
@@ -3127,7 +3107,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::Unassign { id, json } => {
+                IssueCommands::Unassign { id } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     let warnings = executor.unassign_issue(&full_id)?;
@@ -3144,7 +3124,7 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Unassigned issue: {}", full_id));
                     }
                 }
-                IssueCommands::Reject { id, reason, json } => {
+                IssueCommands::Reject { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
 
@@ -3166,7 +3146,7 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Rejected issue: {}", full_id));
                     }
                 }
-                IssueCommands::Release { id, reason, json } => {
+                IssueCommands::Release { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     executor.release_issue(&full_id, &reason)?;
@@ -3183,11 +3163,7 @@ fn run() -> Result<()> {
                         ));
                     }
                 }
-                IssueCommands::ClaimNext {
-                    assignee,
-                    filter,
-                    json,
-                } => {
+                IssueCommands::ClaimNext { assignee, filter } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let (id, claim_warnings) = match executor.claim_next(assignee, filter) {
                         Ok(result) => result,
@@ -3229,7 +3205,6 @@ fn run() -> Result<()> {
                     priority,
                     label,
                     full,
-                    json,
                 } => {
                     run_query_all(
                         &executor, quiet, state, assignee, priority, label, full, json,
@@ -3242,7 +3217,6 @@ fn run() -> Result<()> {
             container,
             anchor,
             force,
-            json,
         } => {
             // Parse the repeatable `--anchor role=id` pairs. Named apply resolves
             // the positional container's default anchor from its captured
@@ -3274,7 +3248,6 @@ fn run() -> Result<()> {
                 from_id,
                 to_ids,
                 reduce,
-                json,
             } => {
                 use jit::commands::RedundancyPolicy;
                 let policy = if reduce {
@@ -3347,11 +3320,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DepCommands::Rm {
-                from_id,
-                to_ids,
-                json,
-            } => {
+            DepCommands::Rm { from_id, to_ids } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.remove_dependencies(&from_id, &to_ids) {
                     Ok(result) => {
@@ -3418,7 +3387,6 @@ fn run() -> Result<()> {
                 prompt_file,
                 env,
                 priority,
-                json,
             } => {
                 use jit::declarations::GateChecker;
 
@@ -3533,7 +3501,6 @@ fn run() -> Result<()> {
                 env,
                 clear_env,
                 priority,
-                json,
             } => {
                 use jit::commands::{FieldEdit, GateUpdate};
 
@@ -3656,7 +3623,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::List { json } => {
+            GateCommands::List => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.list_gates() {
                     Ok(gates) => {
@@ -3692,7 +3659,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::Show { key, json } => match executor.show_gate_definition(&key) {
+            GateCommands::Show { key } => match executor.show_gate_definition(&key) {
                 Ok(gate) => {
                     if json {
                         use jit::output::JsonOutput;
@@ -3758,7 +3725,7 @@ fn run() -> Result<()> {
                     }
                 }
             },
-            GateCommands::Remove { key, json } => {
+            GateCommands::Remove { key } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.remove_gate_definition(&key) {
                     Ok(_) => {
@@ -3797,7 +3764,6 @@ fn run() -> Result<()> {
                 stderr,
                 tail,
                 findings,
-                json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
@@ -4083,7 +4049,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::StatusAll { id, full, json } => {
+            GateCommands::StatusAll { id, full } => {
                 use jit::domain::GateStatus;
                 let output_ctx = OutputContext::new(quiet, json);
                 // Latest recorded run of each required gate.
@@ -4185,11 +4151,7 @@ fn run() -> Result<()> {
                     std::process::exit(ExitCode::ValidationFailed.code());
                 }
             }
-            GateCommands::Add {
-                id,
-                gate_keys,
-                json,
-            } => {
+            GateCommands::Add { id, gate_keys } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_gates(&id, &gate_keys) {
                     Ok((result, warnings)) => {
@@ -4261,7 +4223,6 @@ fn run() -> Result<()> {
                 gate_flag,
                 by,
                 force,
-                json,
             } => {
                 let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
@@ -4296,12 +4257,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::EvaluateAll {
-                id,
-                by,
-                force,
-                json,
-            } => {
+            GateCommands::EvaluateAll { id, by, force } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.pass_all_gates(&id, by, force) {
                     Ok(outcome) => {
@@ -4361,7 +4317,6 @@ fn run() -> Result<()> {
                 ids,
                 by,
                 force,
-                json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let batch = executor.pass_gate_many(&ids, &gate_key, by, force);
@@ -4451,12 +4406,7 @@ fn run() -> Result<()> {
                     std::process::exit(code);
                 }
             }
-            GateCommands::Fail {
-                id,
-                gate_key,
-                by,
-                json,
-            } => {
+            GateCommands::Fail { id, gate_key, by } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.fail_gate(&id, gate_key.clone(), by) {
                     Ok(warnings) => {
@@ -4494,7 +4444,7 @@ fn run() -> Result<()> {
                 }
             }
             GateCommands::Preset(preset_cmd) => match preset_cmd {
-                jit::cli::PresetCommands::List { json } => {
+                jit::cli::PresetCommands::List => {
                     use jit::output::JsonOutput;
                     match executor.list_gate_presets() {
                         Ok(presets) => {
@@ -4536,7 +4486,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                jit::cli::PresetCommands::Show { name, json } => {
+                jit::cli::PresetCommands::Show { name } => {
                     use jit::output::JsonOutput;
                     match executor.show_gate_preset(&name) {
                         Ok(preset) => {
@@ -4612,7 +4562,6 @@ fn run() -> Result<()> {
                     no_precheck,
                     no_postcheck,
                     except,
-                    json,
                 } => {
                     use jit::output::{ErrorCode, JsonError, JsonOutput};
 
@@ -4700,11 +4649,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                jit::cli::PresetCommands::Create {
-                    from_issue,
-                    name,
-                    json,
-                } => {
+                jit::cli::PresetCommands::Create { from_issue, name } => {
                     use jit::output::JsonOutput;
                     match executor.create_gate_preset(&name, &from_issue) {
                         Ok(path) => {
@@ -4732,7 +4677,7 @@ fn run() -> Result<()> {
             },
         },
         Commands::Graph(graph_cmd) => match graph_cmd {
-            GraphCommands::Deps { id, depth, json } => {
+            GraphCommands::Deps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
                 if json {
@@ -4781,7 +4726,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GraphCommands::Rdeps { id, depth, json } => {
+            GraphCommands::Rdeps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_rdeps_with_depth(&id, depth)?;
                 if json {
@@ -4806,7 +4751,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GraphCommands::Roots { json } => {
+            GraphCommands::Roots => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let issues = executor.show_roots()?;
                 if json {
@@ -4826,7 +4771,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GraphCommands::Tree { root, json } => {
+            GraphCommands::Tree { root } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let response = executor.resolve_hierarchy_tree(root.as_deref())?;
 
@@ -4865,7 +4810,6 @@ fn run() -> Result<()> {
             }
             GraphCommands::Export {
                 format,
-                json,
                 full,
                 scope,
                 output,
@@ -4933,7 +4877,7 @@ fn run() -> Result<()> {
             }
         },
         Commands::Events(event_cmd) => match event_cmd {
-            EventCommands::Tail { n, json } => {
+            EventCommands::Tail { n } => {
                 let events = executor.tail_events(n)?;
                 if json {
                     use jit::output::JsonOutput;
@@ -4953,7 +4897,6 @@ fn run() -> Result<()> {
                 event_type,
                 issue_id,
                 limit,
-                json,
             } => {
                 let events = executor.query_events(event_type, issue_id, limit)?;
                 if json {
@@ -4979,7 +4922,6 @@ fn run() -> Result<()> {
                 label,
                 doc_type,
                 skip_scan,
-                json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let (result, warnings) = executor.add_document_reference(
@@ -5020,7 +4962,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DocCommands::List { id, json } => {
+            DocCommands::List { id } => {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
@@ -5058,7 +5000,7 @@ fn run() -> Result<()> {
                     output_ctx.print_data(format!("\nTotal: {}", result.count))?;
                 }
             }
-            DocCommands::Remove { id, path, json } => {
+            DocCommands::Remove { id, path } => {
                 let result = executor.remove_document_reference(&id, &path)?;
 
                 if json {
@@ -5076,7 +5018,7 @@ fn run() -> Result<()> {
                     );
                 }
             }
-            DocCommands::Show { id, path, at, json } => {
+            DocCommands::Show { id, path, at } => {
                 let result = executor.show_document_content(&id, &path, at.as_deref())?;
 
                 if json {
@@ -5097,7 +5039,7 @@ fn run() -> Result<()> {
                     println!("{}", result.content);
                 }
             }
-            DocCommands::Dir { id, area, json } => {
+            DocCommands::Dir { id, area } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
                 match executor.resolve_issue_artifact_directory(&id, &area) {
@@ -5146,7 +5088,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DocCommands::Conformance { json } => {
+            DocCommands::Conformance => {
                 let output_ctx = OutputContext::new(quiet, json);
                 // This command takes no argument it could reject and states no
                 // verdict in its exit status, so it has no typed rejection to
@@ -5203,7 +5145,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DocCommands::History { id, path, json } => {
+            DocCommands::History { id, path } => {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
@@ -5225,13 +5167,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DocCommands::Diff {
-                id,
-                path,
-                from,
-                to,
-                json,
-            } => {
+            DocCommands::Diff { id, path, from, to } => {
                 let result = executor.document_diff(&id, &path, &from, to.as_deref())?;
 
                 if json {
@@ -5244,12 +5180,7 @@ fn run() -> Result<()> {
                 }
             }
             DocCommands::Assets { command } => match command {
-                jit::cli::AssetCommands::List {
-                    id,
-                    path,
-                    rescan,
-                    json,
-                } => {
+                jit::cli::AssetCommands::List { id, path, rescan } => {
                     use jit::document::AssetType;
                     use jit::output::JsonOutput;
 
@@ -5382,7 +5313,7 @@ fn run() -> Result<()> {
                     }
                 }
             },
-            DocCommands::CheckLinks { scope, json } => {
+            DocCommands::CheckLinks { scope } => {
                 use jit::document::DocumentScope;
                 use jit::output::JsonOutput;
                 use std::str::FromStr;
@@ -5451,7 +5382,7 @@ fn run() -> Result<()> {
             }
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
-            ArchiveCommands::Candidates { json } => {
+            ArchiveCommands::Candidates => {
                 let report = executor.archive_candidates()?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -5459,11 +5390,7 @@ fn run() -> Result<()> {
                     print!("{}", jit::output::render_archive_candidates(&report));
                 }
             }
-            ArchiveCommands::Document {
-                path,
-                execute,
-                json,
-            } => {
+            ArchiveCommands::Document { path, execute } => {
                 if execute {
                     let result = executor.execute_archive_document(&path)?;
                     if json {
@@ -5495,7 +5422,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ArchiveCommands::Container { id, execute, json } => {
+            ArchiveCommands::Container { id, execute } => {
                 if execute {
                     let result = executor.execute_archive_container(&id)?;
                     if json {
@@ -5535,7 +5462,6 @@ fn run() -> Result<()> {
             priority: bare_priority,
             label: bare_label,
             full: bare_full,
-            json: bare_json,
         } => match subcommand {
             None => run_query_all(
                 &executor,
@@ -5545,7 +5471,7 @@ fn run() -> Result<()> {
                 bare_priority,
                 bare_label,
                 bare_full,
-                bare_json,
+                json,
             )?,
             Some(query_cmd) => {
                 // Parent-level filters only apply to the bare `jit query` form.
@@ -5559,7 +5485,7 @@ fn run() -> Result<()> {
                     bare_priority.as_deref(),
                     &bare_label,
                     bare_full,
-                    bare_json,
+                    json,
                 )?;
                 match query_cmd {
                     jit::cli::QueryCommands::All {
@@ -5568,7 +5494,6 @@ fn run() -> Result<()> {
                         priority,
                         label,
                         full,
-                        json,
                     } => {
                         run_query_all(
                             &executor, quiet, state, assignee, priority, label, full, json,
@@ -5578,7 +5503,6 @@ fn run() -> Result<()> {
                         priority,
                         label,
                         full,
-                        json,
                     } => {
                         let output_ctx = OutputContext::new(quiet, json);
                         let priority_filter = priority
@@ -5618,7 +5542,6 @@ fn run() -> Result<()> {
                         priority,
                         label,
                         full,
-                        json,
                     } => {
                         let output_ctx = OutputContext::new(quiet, json);
                         let priority_filter = priority
@@ -5700,7 +5623,6 @@ fn run() -> Result<()> {
                         priority,
                         label,
                         full,
-                        json,
                     } => {
                         let output_ctx = OutputContext::new(quiet, json);
                         let priority_filter = priority
@@ -5739,7 +5661,6 @@ fn run() -> Result<()> {
                         priority,
                         label,
                         full,
-                        json,
                     } => {
                         let output_ctx = OutputContext::new(quiet, json);
                         let priority_filter = priority
@@ -5774,7 +5695,7 @@ fn run() -> Result<()> {
                             let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
                         }
                     }
-                    jit::cli::QueryCommands::Count { by, label, json } => {
+                    jit::cli::QueryCommands::Count { by, label } => {
                         // Aggregation lives in the executor; this arm dispatches
                         // by dimension and renders. The bucket is every issue
                         // matching all --label patterns (ANDed; none = whole repo).
@@ -5798,7 +5719,7 @@ fn run() -> Result<()> {
                             }
                         }
                     }
-                    jit::cli::QueryCommands::Divergence { json } => {
+                    jit::cli::QueryCommands::Divergence => {
                         let output_ctx = OutputContext::new(quiet, json);
                         let report = executor.detect_divergences()?;
 
@@ -5822,7 +5743,7 @@ fn run() -> Result<()> {
             } // end Some(query_cmd)
         }, // end match subcommand
         Commands::Label(label_cmd) => match label_cmd {
-            jit::cli::LabelCommands::Namespaces { json } => {
+            jit::cli::LabelCommands::Namespaces => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
                 let config_mgr = ConfigManager::new(&jit_dir);
@@ -5845,7 +5766,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            jit::cli::LabelCommands::Values { namespace, json } => {
+            jit::cli::LabelCommands::Values { namespace } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let values = executor.list_label_values(&namespace)?;
                 if json {
@@ -5869,7 +5790,7 @@ fn run() -> Result<()> {
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
-            jit::cli::ConfigCommands::Show { json } => {
+            jit::cli::ConfigCommands::Show => {
                 use jit::output::JsonOutput;
 
                 let snapshot = executor.effective_config_snapshot()?;
@@ -5886,7 +5807,7 @@ fn run() -> Result<()> {
                     print!("{}", jit::output::render_config_snapshot(&snapshot));
                 }
             }
-            jit::cli::ConfigCommands::Get { key, json } => {
+            jit::cli::ConfigCommands::Get { key } => {
                 use jit::output::{render_config_get_value, ErrorCode, JsonOutput};
                 use serde_json::json;
 
@@ -5928,12 +5849,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            jit::cli::ConfigCommands::Set {
-                key,
-                value,
-                global,
-                json,
-            } => {
+            jit::cli::ConfigCommands::Set { key, value, global } => {
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
@@ -5959,7 +5875,7 @@ fn run() -> Result<()> {
                     );
                 }
             }
-            jit::cli::ConfigCommands::Validate { json } => {
+            jit::cli::ConfigCommands::Validate => {
                 use jit::config::JitConfig;
                 use serde_json::json;
 
@@ -6026,7 +5942,7 @@ fn run() -> Result<()> {
                     std::process::exit(ErrorCode::ValidationFailed.exit_code().code());
                 }
             }
-            jit::cli::ConfigCommands::ShowHierarchy { json } => {
+            jit::cli::ConfigCommands::ShowHierarchy => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
                 let config_mgr = ConfigManager::new(&jit_dir);
@@ -6052,7 +5968,7 @@ fn run() -> Result<()> {
             }
         },
         Commands::Hooks(hooks_cmd) => match hooks_cmd {
-            jit::cli::HooksCommands::Install { json } => {
+            jit::cli::HooksCommands::Install => {
                 use jit::commands::hooks::install_hooks;
 
                 match install_hooks(None) {
@@ -6102,13 +6018,13 @@ fn run() -> Result<()> {
             }
         },
         Commands::Item(item_cmd) => {
-            run_item(&executor, item_cmd, quiet)?;
+            run_item(&executor, item_cmd, mode)?;
         }
         Commands::Invariant(invariant_cmd) => {
-            run_invariant(&executor, invariant_cmd, quiet)?;
+            run_invariant(&executor, invariant_cmd, mode)?;
         }
         Commands::Project(project_cmd) => {
-            run_project(&executor, project_cmd, quiet)?;
+            run_project(&executor, project_cmd, mode)?;
         }
         Commands::Search {
             query,
@@ -6117,7 +6033,6 @@ fn run() -> Result<()> {
             context,
             limit,
             glob,
-            json,
         } => {
             let output_ctx = OutputContext::new(quiet, json);
             use jit::search::{search, SearchOptions};
@@ -6213,7 +6128,7 @@ fn run() -> Result<()> {
                 }
             }
         }
-        Commands::Status { json } => {
+        Commands::Status => {
             let output_ctx = OutputContext::new(quiet, json);
             let summary = executor.get_status()?;
 
@@ -6236,7 +6151,6 @@ fn run() -> Result<()> {
         }
         Commands::Validate {
             id,
-            json,
             explain,
             fix,
             dry_run,
@@ -6810,7 +6724,7 @@ fn run() -> Result<()> {
                 }
             }
         }
-        Commands::Recover { json } => {
+        Commands::Recover => {
             use jit::commands::claim::execute_recover;
             use jit::output::{JsonOutput, OutputContext};
             use serde_json::json;
@@ -6865,7 +6779,6 @@ fn run() -> Result<()> {
             fg,
             log,
             web_dir,
-            json,
         } => {
             use jit::commands::serve::{
                 find_web_dir, server_status, start_server, stop_server, ServeOptions, ServeOutcome,
@@ -7142,7 +7055,6 @@ fn run() -> Result<()> {
                 ttl,
                 agent_id,
                 reason,
-                json,
             } => {
                 use jit::commands::claim::execute_claim_acquire;
                 use jit::output::{JsonOutput, OutputContext};
@@ -7187,7 +7099,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::Release { issue_id, json } => {
+            ClaimCommands::Release { issue_id } => {
                 use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7235,7 +7147,6 @@ fn run() -> Result<()> {
             ClaimCommands::Renew {
                 lease_id,
                 extension,
-                json,
             } => {
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonOutput, OutputContext};
@@ -7274,7 +7185,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::Heartbeat { lease_id, json } => {
+            ClaimCommands::Heartbeat { lease_id } => {
                 use jit::commands::claim::execute_claim_heartbeat;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7307,7 +7218,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::Status { issue, agent, json } => {
+            ClaimCommands::Status { issue, agent } => {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7397,7 +7308,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::List { json } => {
+            ClaimCommands::List => {
                 use jit::commands::claim::execute_claim_list;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7470,11 +7381,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            ClaimCommands::ForceEvict {
-                lease_id,
-                reason,
-                json,
-            } => {
+            ClaimCommands::ForceEvict { lease_id, reason } => {
                 use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7511,7 +7418,7 @@ fn run() -> Result<()> {
             }
         },
         Commands::Worktree(worktree_cmd) => match worktree_cmd {
-            jit::cli::WorktreeCommands::Info { json } => {
+            jit::cli::WorktreeCommands::Info => {
                 use jit::commands::worktree::execute_worktree_info;
                 use jit::output::{JsonOutput, OutputContext};
 
@@ -7562,7 +7469,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            jit::cli::WorktreeCommands::List { json } => {
+            jit::cli::WorktreeCommands::List => {
                 use jit::commands::worktree::execute_worktree_list;
                 use jit::output::{JsonOutput, OutputContext, WorktreeListResponse};
 
@@ -7615,7 +7522,7 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            jit::cli::WorktreeCommands::StoreDivergence { json } => {
+            jit::cli::WorktreeCommands::StoreDivergence => {
                 use jit::commands::worktree::execute_worktree_store_divergence;
                 use jit::output::{JsonOutput, WorktreeStoreDivergenceResponse};
 
@@ -7682,7 +7589,6 @@ fn run() -> Result<()> {
                 working_tree,
                 committed_only,
                 force,
-                json,
             } => {
                 use jit::snapshot::{SnapshotFormat, SnapshotScope};
 
