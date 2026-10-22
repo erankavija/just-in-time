@@ -2,7 +2,7 @@
 //!
 //! Provides CLI interface to the lease-based claim coordination system.
 
-use crate::config::ConfigLoader;
+use crate::config::JitConfig;
 use crate::domain::IssueIdPrefix;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
@@ -106,11 +106,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
     // Load config for policy limits
-    let config = ConfigLoader::new()
-        .with_repo_config(&paths.local_jit)
-        .unwrap_or_else(|_| ConfigLoader::new())
-        .build();
-    let coord_config = config.coordination();
+    let coord_config = JitConfig::load(&paths.local_jit)?.coordination();
 
     // Create file locker with the default lock-acquisition timeout
     let locker = FileLocker::with_configured_timeout();

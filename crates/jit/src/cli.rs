@@ -2205,16 +2205,14 @@ pub enum LabelCommands {
 
 #[derive(Subcommand)]
 pub enum ConfigCommands {
-    /// Show effective configuration from all sources
+    /// Show effective configuration
     ///
-    /// Displays merged configuration with values from:
-    /// 1. Repository config (.jit/config.toml) - highest priority
-    /// 2. User config (~/.config/jit/config.toml)
-    /// 3. System config (/etc/jit/config.toml)
-    /// 4. Defaults - lowest priority
+    /// Displays the repository config (.jit/config.toml) with built-in defaults
+    /// filled in.
     ///
-    /// worktree.enforce_leases is repository policy: it is read from the
-    /// repository config only, exactly as write commands enforce it.
+    /// worktree.enforce_leases and the coordination lease limits are repository
+    /// policy: they are read from the repository config only, exactly as write
+    /// commands enforce them.
     Show,
 
     /// Get a specific configuration value
