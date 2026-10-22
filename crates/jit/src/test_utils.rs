@@ -1194,7 +1194,10 @@ mod file_setup_tests {
         let outside = TempDir::new().unwrap();
         let absolute = outside.path().join("escaped.toml");
         let absolute = absolute.to_str().unwrap();
-        let traversing = "../escaped-by-traversal.toml";
+        let traversing = Path::new("..")
+            .join(outside.path().file_name().unwrap())
+            .join("escaped-by-traversal.toml");
+        let traversing = traversing.to_str().unwrap();
 
         [absolute, traversing].iter().for_each(|escaping| {
             let error = declaration_dir(&[("inside.toml", "a"), (escaping, "b")]).unwrap_err();
@@ -1203,9 +1206,6 @@ mod file_setup_tests {
         });
 
         assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
-        assert!(!std::env::temp_dir()
-            .join("escaped-by-traversal.toml")
-            .exists());
     }
 
     #[test]

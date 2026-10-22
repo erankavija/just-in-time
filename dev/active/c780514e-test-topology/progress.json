@@ -108,7 +108,7 @@
           "key": "cargo-ci-selftest-gate",
           "title": "cargo-ci self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; reuse adoption checkout; remove default-suite wrapper and update declared gate/docs"
         },
         {
           "id": "559335cf-35ca-4046-ae3d-aab3f2f54498",
@@ -132,7 +132,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "rework 2 implemented32bb5c27d; final full CI after lockfix integration underway"
+          "status": "done"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -1298,7 +1298,7 @@
     "pending_external_landing": null,
     "worktrees": {
       "agent-22355a56": "worktree-agent-871df4b0",
-      "agent-de880d9c": "worktree-agent-4a82ed46"
+      "agent-de880d9c": "worktree-agent-aa28fe5f"
     }
   },
   "lead_reviews": {
@@ -1376,6 +1376,42 @@
       "stale_narrative": "zero stale matches; progress status reconciled",
       "deferred_items": "no linked design documents",
       "holistic": "separate acquisition/child statuses preserve shared checker protocol and daemon descriptor isolation; exactly two script files"
+    },
+    "4a82ed46": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "3c189a59-60c6-46d2-826d-1718ee102edc",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "ebce65da-1813-40c5-b834-940b23357b46",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "test_utils.rs:1079,1091,1109 provides discovered-layout executor, initialized caller-config repository, confined declaration directory",
+        "REQ-02": "file_setup_tests:1146-1223 owns caller config/init, discovered layout/root, exact supplied contents, containment and empty case; focused six tests and full4591+58 pass"
+      },
+      "prior_findings": [
+        {
+          "round": "R1",
+          "finding": "declaration_dir permits absolute and parent-traversal paths to write outside its TempDir.",
+          "status": "closed",
+          "cite": "crates/jit/src/test_utils.rs:1109 pre-write component validation"
+        },
+        {
+          "round": "R2",
+          "finding": "The traversal-rejection test reads a fixed path under the process temp directory without owning or isolating it, so parallel activity can make it fail spuriously.",
+          "status": "closed",
+          "cite": "crates/jit/src/test_utils.rs:1205 owned traversal target;1216 owned-directory assertion"
+        }
+      ],
+      "stale_narrative": "zero stale matches; progress status reconciled",
+      "deferred_items": "no linked design documents",
+      "holistic": "foundation APIs retain one shared implementation; consumer adoptions remain owned by dependent tasks; no process-global temp-path read"
     }
   }
 }

@@ -8,6 +8,7 @@
   ],
   "description": "Give in-process suites shared constructors for file-backed repositories, executors and declaration directories.\n\n## Background\n\nIn-process suites define private helpers that create a temporary repository from a configuration, run `jit init`, open a `JsonFileStorage` executor with a discovered layout, or write declaration files into a temporary directory. Shared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`), which take no configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository root, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: Unit tests prove each constructor's result: the configuration is the caller's, the executor's layout is the repository's, and the directory holds exactly the supplied files.\n\n\nScope (steward ruling): this task adds the shared definition only; existing copies are retired by the adoption tasks that depend on it.",
   "documents": [],
+  "done_at": "2026-10-22T20:22:57.866908030Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f3c5bfd0-3c62-4a2a-803b-139e6e64013e",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:55:08.991970371Z",
+      "run_id": "3c189a59-60c6-46d2-826d-1718ee102edc",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:18:03.232634289Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "bc802dec-5640-4015-958f-760428deeb25",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:59:33.836582950Z",
+      "run_id": "ebce65da-1813-40c5-b834-940b23357b46",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:22:31.968577256Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Shared constructors for file-backed in-process test repositories",
-  "updated_at": "2026-10-22T15:59:33.836582950Z"
+  "updated_at": "2026-10-22T20:22:57.866908030Z"
 }
