@@ -794,7 +794,7 @@ pub enum KindScopeConfigError {
 /// This is the fifth field of the item-kind six-tuple `(section, id-pattern,
 /// markers, link-namespaces, scope, source-of-truth)`. It mirrors
 /// [`KindScope`](crate::domain::item::KindScope) from the domain layer but
-/// lives in the config layer so unrecognised tokens fail at TOML parse time
+/// lives in this config module so unrecognised tokens fail at TOML parse time
 /// rather than at projection time.
 ///
 /// Parsed (case-insensitively) from the tokens `"issue"` / `"project"` by both

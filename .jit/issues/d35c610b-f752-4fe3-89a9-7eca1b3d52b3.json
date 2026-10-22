@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:21.000167214Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,12 +8,26 @@
   ],
   "description": "Define the issue-construction fixture once in shared test support, so the five copies can be retired.\n\n## Background\n\n`fixture_issue(title, description)` drafts an issue and assigns it a random UUID. It is defined five times with the same body: in `crates/jit/src/domain/types.rs` as a `pub(crate)` function for library unit tests, and in the suite roots of `fast_issue`, `fast_docs_templates`, `cli_query_graph` and `fast_rules`. `crate::test_utils` is compiled for library unit tests and, under `test-support`, for every integration target.\n\n## Success Criteria\n\n- [hard] REQ-01: `crate::test_utils` defines `fixture_issue` with the body of the existing copies, reachable from library unit tests and integration suites.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:28:18.117368699Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e1ecac9e-4a31-4c7a-b782-74fef03dd956",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:26:38.914239162Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "344859bd-6981-40de-b0d1-a20ae9e0b943",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:28:00.770640102Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d35c610b-f752-4fe3-89a9-7eca1b3d52b3",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Shared issue-construction fixture",
-  "updated_at": "2026-10-22T14:44:30.757281868Z"
+  "updated_at": "2026-10-22T15:28:18.117368699Z"
 }

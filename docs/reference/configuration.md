@@ -22,7 +22,6 @@ or customize individual settings.
 |------|---------|
 | `.jit/config.toml` | Repository config (schema + runtime) |
 | `.jit/templates.toml` | Graph templates and their [role/anchor bindings](#template-bindings-jittemplatestoml) |
-| `~/.config/jit/agent.toml` | Agent identity |
 
 `.jit/config.toml` accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
 
@@ -520,11 +519,9 @@ motivates it: a command that writes only the shared control plane or
 machine-local runtime state still counts as state-mutating and is still
 refused. Over-refusing that class is the chosen behaviour.
 
-The stance is read from the repository's own `.jit/config.toml` only, never
-from user- or system-level config, and `jit config get` and `jit config show`
-do not report it: it is a repository-scoped policy, not something a user- or system-level
-config should be able to relax on the repository's behalf. The one surface that
-outranks it is the per-invocation
+The stance is a repository-scoped policy read from `.jit/config.toml`, and
+`jit config get` and `jit config show` do not report it. The one override is
+the per-invocation
 [`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) below.
 
 This repository declares the allowing stance (see `.jit/config.toml`),
@@ -593,9 +590,10 @@ unit and operational scope, are listed in
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
 
-## Agent Config (`~/.config/jit/agent.toml`)
+## Agent Identity (`~/.config/jit/agent.toml`)
 
-Agent-specific configuration for persistent identity.
+`~/.config/jit/agent.toml` holds an agent's persistent identity. It is read by
+agent-id resolution only and sets no configuration key.
 
 ```toml
 [agent]
@@ -617,7 +615,7 @@ Agent identity in `type:identifier` format. Examples:
 
 #### `created_at`
 
-ISO 8601 timestamp when this agent config was created.
+ISO 8601 timestamp when this identity file was created.
 
 #### `description`
 

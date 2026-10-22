@@ -345,7 +345,7 @@ then act on the reason:
    Your branch has diverged from origin/main
 ```
 
-**Cause:** You're modifying global config while diverged from main.
+**Cause:** You're modifying shared repository configuration (`.jit/`) while diverged from main.
 
 **Solution:**
 ```bash
@@ -461,7 +461,7 @@ Error: No agent identity configured
    export JIT_AGENT_ID='agent:your-name'
    ```
 
-2. **User config** (`~/.config/jit/agent.toml`):
+2. **Agent identity file** (`~/.config/jit/agent.toml`):
    ```toml
    id = "agent:your-name"
    ```

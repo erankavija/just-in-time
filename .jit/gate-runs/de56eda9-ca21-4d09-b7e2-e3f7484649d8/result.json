@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "522219079834cc75342fbc1c31af115228404370",
+  "completed_at": "2026-10-22T15:05:30.333171819Z",
+  "duration_ms": 107413,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 3824,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9fa12e75/requirement/REQ-01",
+          "@/issue/9fa12e75/requirement/REQ-02",
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "The three gate status JSON never-run branches call the human run-status renderer, contrary to the issue's explicit JSON carve-out."
+      }
+    ],
+    "summary": "One issue-impact blocking finding: JSON never-run responses incorrectly use the human renderer.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9fa12e75-2632-4e68-8d67-b80caf78770d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "de56eda9-ca21-4d09-b7e2-e3f7484649d8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:03:42.919678366Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3967 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16423-b0ef-7b62-97e4-ef38a899e479\n--------\nuser\n--- 3954 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 6796fc3e7, 27e26f3cc, 12d718456 (all reachable from HEAD)\nPolicy sources: AGENTS.md; .jit/issues/9fa12e75-2632-4e68-8d67-b80caf78770d.json; .jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/9fa12e75/requirement/REQ-01–REQ-04; @/issue/df129d9e/requirement/REQ-09, @/issue/df129d9e/requirement/REQ-21; @/invariant/essential-code-prose, @/invariant/orthogonal-tests; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T15:03:20Z); code-review pending\nTruncation recovery: re-read individual patches, current affected line ranges, resolved items, and the latest cargo-ci result in narrower calls.\n\n1. **F1 — blocking, issue-impact:** [`crates/jit/src/main.rs:3824`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:3824) (also lines 3933 and 4017) constructs the `gate status --json` never-run message through the human `render_gate_run_status` renderer. The issue explicitly excludes `--json` never-run output from that renderer; keep JSON message construction outside it and add regression coverage. References: `@/issue/9fa12e75/requirement/REQ-01`, `@/issue/9fa12e75/requirement/REQ-02`, `@/issue/df129d9e/requirement/REQ-09`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking finding: JSON never-run responses incorrectly use the human renderer.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The three gate status JSON never-run branches call the human run-status renderer, contrary to the issue's explicit JSON carve-out.\",\"file\":\"crates/jit/src/main.rs\",\"line\":3824,\"references\":[\"@/issue/9fa12e75/requirement/REQ-01\",\"@/issue/9fa12e75/requirement/REQ-02\",\"@/issue/df129d9e/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

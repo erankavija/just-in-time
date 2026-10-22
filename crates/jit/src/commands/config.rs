@@ -291,9 +291,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The effective-configuration snapshot behind both `jit config get` and
     /// `jit config show`.
     ///
-    /// All filesystem interaction (system/user/repo existence probing,
-    /// home-directory resolution, each source's `JitConfig::load`) lives behind
-    /// `EffectiveConfig::load` in the config layer.
+    /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
+    /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
         EffectiveConfig::load(self.storage.root())?.full_snapshot()
     }
@@ -303,9 +302,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// CLI needs to print.
     ///
     /// Loads the same repository [`EffectiveConfig`] `jit
-    /// config show` uses via [`EffectiveConfig::load`] (which owns all the
-    /// filesystem probing — this command touches no `std::fs` / `dirs`
-    /// itself), snapshots it once via [`EffectiveConfig::full_snapshot`], then
+    /// config show` uses via [`EffectiveConfig::load`] (which owns the
+    /// filesystem read; this command touches no `std::fs` itself), snapshots it once via [`EffectiveConfig::full_snapshot`], then
     /// walks `key` with [`resolve_dotted_key`]. An unknown key (top-level or
     /// nested) surfaces as the shared [`InvalidArgumentError`] (exit 2) —
     /// naming the valid top-level sections for an unknown top-level key —

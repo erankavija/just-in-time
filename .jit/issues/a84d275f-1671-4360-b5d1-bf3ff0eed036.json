@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:21.445125121Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,12 +8,26 @@
   ],
   "description": "Let the product's repository initialisation run over any repository-state store, so in-memory repositories can be initialised by the same code as file-backed ones.\n\n## Background\n\n`initialize_fresh_repository` and `run_initialization` exist only on `impl CommandExecutor<JsonFileStorage>` (`crates/jit/src/commands/init.rs:73-215`), although both go through the generic `with_mutation_session`. `repository_state::initialize::structural_minimum_config` is the pure minimal configuration. Test support therefore seeds memory stores by hand.\n\n## Success Criteria\n\n- [hard] REQ-01: Product initialisation is available on `CommandExecutor<S>` for every store implementing the repository-state store trait, and the JSON backend's behaviour is unchanged.\n- [hard] REQ-02: A unit test initialises an in-memory store and observes the same configuration, index and data-root files the JSON backend writes.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:18:11.063027386Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "09402fc1-574d-426b-a983-e09be7f9e1dc",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:16:39.701300580Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3875d5b4-45cb-41d9-ac99-f1d84f708a27",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:17:53.892300728Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Product initialisation runs over any repository-state store",
-  "updated_at": "2026-10-22T14:53:27.078315727Z"
+  "updated_at": "2026-10-22T15:18:11.063027386Z"
 }

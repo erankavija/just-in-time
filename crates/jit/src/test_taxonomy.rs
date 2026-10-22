@@ -12,9 +12,9 @@
 //!   from that fragment, which initialization preserves and derives the
 //!   repository's coupled rules and schemas from.
 //!
-//! This module reaches for nothing but the pure hierarchy types it renders into,
-//! so a domain or graph unit test reads the declaration without linking the
-//! command and storage layers that repository construction needs.
+//! The declaration itself reaches for nothing but the pure hierarchy types it
+//! renders into; only [`TaxonomyRepo`] reaches the repository construction in
+//! [`crate::test_utils`].
 //!
 //! The vocabulary names no type any shipped package declares, so a suite
 //! asserting that a strategic type resolves is exercising the mechanism over a
@@ -26,6 +26,8 @@
 
 use crate::domain::type_taxonomy::HierarchyConfig;
 use std::collections::HashMap;
+use std::ops::Deref;
+use tempfile::TempDir;
 
 /// One namespace declaration in the shared test vocabulary.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,6 +218,56 @@ pub fn test_taxonomy() -> TestTaxonomy {
     }
 }
 
+/// A repository initialized from [`test_taxonomy`], paired with the declaration
+/// that authored its vocabulary so a test reads type names from it.
+pub struct TaxonomyRepo {
+    pub temp: TempDir,
+    pub taxonomy: TestTaxonomy,
+}
+
+impl Deref for TaxonomyRepo {
+    type Target = TempDir;
+
+    fn deref(&self) -> &Self::Target {
+        &self.temp
+    }
+}
+
+/// Build a [`TaxonomyRepo`] on disk.
+///
+/// # Panics
+///
+/// Panics if repository setup fails, which is a defect in this fixture.
+pub fn setup_test_repo_with_taxonomy() -> TaxonomyRepo {
+    let (temp, _storage, taxonomy) = crate::test_utils::setup_test_repo_with_taxonomy()
+        .expect("shared taxonomy repository setup succeeds");
+    TaxonomyRepo { temp, taxonomy }
+}
+
+/// The `type:` label of the type `taxonomy` declares at `level`.
+pub fn type_label(taxonomy: &TestTaxonomy, level: u8) -> String {
+    format!("type:{}", taxonomy.type_at_level(level))
+}
+
+/// A membership label of the container type at `level`, with `value`.
+pub fn membership_label(taxonomy: &TestTaxonomy, level: u8, value: &str) -> String {
+    format!("{}:{value}", membership_namespace(taxonomy, level))
+}
+
+/// The membership namespace of the container type at `level`.
+///
+/// # Panics
+///
+/// Panics if that type owns no membership namespace.
+pub fn membership_namespace(taxonomy: &TestTaxonomy, level: u8) -> &str {
+    let type_name = taxonomy.type_at_level(level);
+    taxonomy
+        .label_associations
+        .get(type_name)
+        .map(String::as_str)
+        .expect("every taxonomy container type has a membership namespace")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,5 +344,40 @@ mod tests {
             taxonomy.strategic_types,
             "a repository built from the fragment resolves the declared strategic types"
         );
+    }
+
+    #[test]
+    fn test_setup_test_repo_with_taxonomy_declares_the_taxonomy_it_carries() {
+        let repo = setup_test_repo_with_taxonomy();
+
+        let text = std::fs::read_to_string(repo.path().join(".jit/config.toml"))
+            .expect("the repository writes its configuration");
+        let configured = toml::from_str::<JitConfig>(&text)
+            .expect("the repository configuration parses")
+            .type_hierarchy
+            .expect("the repository declares the vocabulary");
+
+        assert_eq!(configured.types, repo.taxonomy.hierarchy);
+        assert_eq!(
+            configured.label_associations.unwrap_or_default(),
+            repo.taxonomy.label_associations
+        );
+    }
+
+    #[test]
+    fn test_label_helpers_name_namespaces_the_vocabulary_declares() {
+        let taxonomy = test_taxonomy();
+
+        let (namespace, value) = type_label(&taxonomy, 2)
+            .split_once(':')
+            .map(|(namespace, value)| (namespace.to_string(), value.to_string()))
+            .expect("a label is namespace:value");
+        assert_eq!(namespace, "type");
+        assert!(taxonomy.hierarchy.contains_key(&value));
+
+        let membership = membership_label(&taxonomy, 2, "x");
+        let (namespace, value) = membership.split_once(':').expect("namespace:value");
+        assert!(taxonomy.namespaces.contains_key(namespace));
+        assert_eq!(value, "x");
     }
 }

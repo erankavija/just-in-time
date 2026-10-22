@@ -3821,18 +3821,24 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = jit::output::render_gate_run_status(
-                                jit::output::GateRunLine::NeverRun,
-                                &gate_key,
-                                &id,
-                            );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output =
-                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
+                                let output = JsonOutput::<Option<()>>::success(None).with_message(
+                                    format!(
+                                        "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
+                                        gate_key, id
+                                    ),
+                                );
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                println!("{}", msg);
+                                println!(
+                                    "{}",
+                                    jit::output::render_gate_run_status(
+                                        jit::output::GateRunLine::NeverRun,
+                                        &gate_key,
+                                        &id,
+                                    )
+                                );
                             }
                         }
                         Err(e) => {
@@ -3930,18 +3936,24 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = jit::output::render_gate_run_status(
-                                jit::output::GateRunLine::NeverRun,
-                                &gate_key,
-                                &id,
-                            );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output =
-                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
+                                let output = JsonOutput::<Option<()>>::success(None).with_message(
+                                    format!(
+                                        "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
+                                        gate_key, id
+                                    ),
+                                );
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                println!("{}", msg);
+                                println!(
+                                    "{}",
+                                    jit::output::render_gate_run_status(
+                                        jit::output::GateRunLine::NeverRun,
+                                        &gate_key,
+                                        &id,
+                                    )
+                                );
                             }
                         }
                         Err(e) => {
@@ -4014,18 +4026,24 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = jit::output::render_gate_run_status(
-                                jit::output::GateRunLine::NeverRun,
-                                &gate_key,
-                                &id,
-                            );
                             if json {
                                 use jit::output::JsonOutput;
-                                let output =
-                                    JsonOutput::<Option<()>>::success(None).with_message(msg);
+                                let output = JsonOutput::<Option<()>>::success(None).with_message(
+                                    format!(
+                                        "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
+                                        gate_key, id
+                                    ),
+                                );
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                println!("{}", msg);
+                                println!(
+                                    "{}",
+                                    jit::output::render_gate_run_status(
+                                        jit::output::GateRunLine::NeverRun,
+                                        &gate_key,
+                                        &id,
+                                    )
+                                );
                             }
                         }
                         Err(e) => {

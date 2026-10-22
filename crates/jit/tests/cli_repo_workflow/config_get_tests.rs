@@ -2,8 +2,8 @@
 //!
 //! `jit config get <dotted.key>` walks the WHOLE configuration surface (type
 //! hierarchy, label associations, documentation paths, validation settings,
-//! item kinds, namespaces, project identity, version, the system/user/repo
-//! layered worktree and coordination settings) via a generic dotted-path walk
+//! item kinds, namespaces, project identity, version, the worktree and
+//! coordination settings) via a generic dotted-path walk
 //! over an assembled JSON snapshot, rather than a hand-maintained per-key
 //! match. See `crates/jit/src/commands/config.rs` (`resolve_dotted_key`,
 //! `CommandExecutor::get_config`) and `EffectiveConfig::full_snapshot` in
