@@ -61,7 +61,9 @@ pub use json::{
     read_exact_store, ExactStoreSnapshot, JsonFileStorage, RetainedMutationSessionGuard,
     RetainedSessionSuspendedError,
 };
-pub use lock::{configured_lock_timeout, is_lock_timeout, FileLocker, LockMode, LockTimeout};
+pub use lock::{
+    configured_lock_timeout, is_lock_timeout, FileLocker, LockMetadata, LockMode, LockTimeout,
+};
 pub(in crate::storage) use mutation_interruption::SessionRedoInterruptions;
 pub use mutation_interruption::{
     MutationInterruptionInjector, MutationPoint, NoMutationInterruptions,
