@@ -3631,7 +3631,6 @@
       "story:suite-cost",
       "component:testing",
       "component:storage",
-      "satisfies:c780514e/REQ-10",
       "per:@/charter/D-18",
       "enforces:@/invariant/no-ignored-tests"
     ],
@@ -3644,9 +3643,7 @@
       "outcome": "The four read-only lock tests run their assertions on any host and never pass by skipping.",
       "contract_refs": [],
       "produces_contracts": [],
-      "source_refs": [
-        "REQ-10"
-      ],
+      "source_refs": [],
       "terminal": {
         "consumer_family": "read-only lock tests",
         "test_boundary": "library unit tests",
