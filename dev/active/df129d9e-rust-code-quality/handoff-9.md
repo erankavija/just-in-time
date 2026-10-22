@@ -18,6 +18,7 @@
 
 - **Renderer tasks must leave `--json` payloads outside the human renderer.** The 9fa12e75 review failed on exactly that. The prompts now say so.
 - The profiled-fixture and cli_warnings timeouts are fixed on main (a3dd995a, 9a07026e). The `--force` rerun exemption for that signature no longer applies.
+- **Route rework to a worker, never to the lead.** Steward ruling after ce437049d: send review findings back to the original worker, or to a fresh one at the next model tier. The lead fixing its own merge skips the worker/review separation. This also applies to the doctest fix be0d9ab53.
 - Traps in handoff-2 through handoff-8 remain in force.
 
 ## Open questions needing invoker input
