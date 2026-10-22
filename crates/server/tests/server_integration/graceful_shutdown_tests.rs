@@ -58,10 +58,17 @@ const READ_POLL: Duration = Duration::from_millis(50);
 /// The drain deadline the seeded early-closing server enforces: none, so it
 /// retires the connection that cannot finish the moment it stops accepting.
 ///
-/// The gap to [`GRACEFUL_DRAIN_TIMEOUT`] is the entitlement in full, and that
+/// The gap to [`CONFIGURED_DRAIN_DEADLINE`] is the entitlement in full, and that
 /// gap is the margin the seeded demonstration holds against a host that stops
 /// scheduling the server mid-drain.
 const SEEDED_EARLY_CLOSE_DEADLINE: Duration = Duration::ZERO;
+
+/// The drain deadline the force-close case configures: whole seconds, so the
+/// server's `drain_deadline_secs` field states it exactly, and short enough that
+/// the case does not wait out [`GRACEFUL_DRAIN_TIMEOUT`]. That the serving
+/// process enforces the full timeout when nothing is configured is owned by
+/// `test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_configured`.
+const CONFIGURED_DRAIN_DEADLINE: Duration = Duration::from_secs(1);
 
 /// How long the registration observation is watched for a premature result
 /// while the server is stopped. Any result inside the window is a defect, so the
@@ -168,7 +175,8 @@ impl Drop for RunningServer {
 
 /// Spawns the compiled `jit-server` binary against `worktree_root`, with no
 /// intermediate shell or supervisor, and waits until it reports its port. The
-/// server enforces the drain deadline it ships with.
+/// server enforces the drain deadline it ships with, whatever the host
+/// environment holds.
 fn start_server(worktree_root: &Path, bind: &str, log_name: &str) -> RunningServer {
     spawn_server(worktree_root, bind, log_name, None)
 }
@@ -204,9 +212,10 @@ fn spawn_server(
         .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone().expect("clone the log handle")))
         .stderr(Stdio::from(log));
-    if let Some(deadline) = drain_deadline {
-        command.env(DRAIN_DEADLINE_MS_ENV, deadline.as_millis().to_string());
-    }
+    match drain_deadline {
+        Some(deadline) => command.env(DRAIN_DEADLINE_MS_ENV, deadline.as_millis().to_string()),
+        None => command.env_remove(DRAIN_DEADLINE_MS_ENV),
+    };
     let child = command.spawn().expect("spawn jit-server");
 
     let mut server = RunningServer {
@@ -513,10 +522,10 @@ fn assert_no_child_processes(pid: u32) {
 // ── The drain property ──────────────────────────────────────────────────────
 
 /// Asserts the connection that could not finish received the whole drain
-/// deadline before the server retired it.
+/// `deadline` before the server retired it.
 ///
 /// Both terms are the server's: `drained_for_ms` is measured across its own
-/// drain, and [`GRACEFUL_DRAIN_TIMEOUT`] is the entitlement its own code grants.
+/// drain, and `deadline` is the entitlement the server was configured to grant.
 /// The fixture contributes no clock, and load can delay a deadline without
 /// bringing one early, so the comparison carries no scheduling margin and reads
 /// the same on a busy machine as on an idle one.
@@ -524,12 +533,12 @@ fn assert_no_child_processes(pid: u32) {
 /// `test_the_drain_assertion_rejects_a_server_that_force_closes_early` runs this
 /// same function against a server seeded to close early, which is what keeps the
 /// comparison above from passing whatever it is shown.
-fn assert_survivor_drained_to_the_deadline(log: &str) {
+fn assert_survivor_drained_to_the_deadline(log: &str, deadline: Duration) {
     let drained_for = reported_drain(log, FORCE_CLOSING);
     assert!(
-        drained_for >= GRACEFUL_DRAIN_TIMEOUT,
+        drained_for >= deadline,
         "the server force-closed the survivor after draining for {drained_for:?}, \
-         short of the {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
+         short of the {deadline:?} the connection was entitled to"
     );
 }
 
@@ -539,7 +548,12 @@ fn assert_survivor_drained_to_the_deadline(log: &str) {
 fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     let repository = TempDir::new().expect("create the fixture repository directory");
     initialize_repository(repository.path());
-    let mut server = start_server(repository.path(), "127.0.0.1:0", "server.log");
+    let mut server = start_server_draining_for(
+        repository.path(),
+        "127.0.0.1:0",
+        "server.log",
+        CONFIGURED_DRAIN_DEADLINE,
+    );
 
     // The four connections the shutdown logs must account for: one that cannot
     // finish, two live event streams, and one that completes. The one that
@@ -582,7 +596,7 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     assert_eq!(log_field(&log, SIGNAL_RECEIVED, "signal"), "SIGTERM");
     assert_eq!(
         log_field(&log, SIGNAL_RECEIVED, "drain_deadline_secs"),
-        GRACEFUL_DRAIN_TIMEOUT.as_secs().to_string()
+        CONFIGURED_DRAIN_DEADLINE.as_secs().to_string()
     );
     assert_eq!(
         log_field(&log, SIGNAL_RECEIVED, "open_connections"),
@@ -600,7 +614,7 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
         "1",
         "the log must report the connection the deadline force-closed"
     );
-    assert_survivor_drained_to_the_deadline(&log);
+    assert_survivor_drained_to_the_deadline(&log, CONFIGURED_DRAIN_DEADLINE);
     assert!(
         log.contains("Shutdown complete"),
         "the shutdown log does not record clean completion:\n{log}"
@@ -612,11 +626,12 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
 ///
 /// `jit-server` built for these tests takes its drain deadline from
 /// [`DRAIN_DEADLINE_MS_ENV`], and this case gives one server
-/// [`SEEDED_EARLY_CLOSE_DEADLINE`]. Everything else is the shipped path: the
+/// [`SEEDED_EARLY_CLOSE_DEADLINE`] against the [`CONFIGURED_DRAIN_DEADLINE`]
+/// the healthy case grants. Everything else is the shipped path: the
 /// same binary, the same signal, the same drain, the same forced close, and the
 /// same log the healthy case reads. What that server produces is the regression
 /// in question — a connection stuck mid message retired far short of the
-/// [`GRACEFUL_DRAIN_TIMEOUT`] the crate grants it — and
+/// deadline it is entitled to — and
 /// [`assert_survivor_drained_to_the_deadline`] must reject it.
 ///
 /// Reaching the forced close is established before the rejection is: a log with
@@ -645,12 +660,35 @@ fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
     let seeded_drain = reported_drain(&log, FORCE_CLOSING);
     // The panic this catches carries its own message to stderr; the run is
     // healthy despite it.
-    let verdict = std::panic::catch_unwind(|| assert_survivor_drained_to_the_deadline(&log));
+    let verdict = std::panic::catch_unwind(|| {
+        assert_survivor_drained_to_the_deadline(&log, CONFIGURED_DRAIN_DEADLINE)
+    });
     assert!(
         verdict.is_err(),
         "the drain assertion accepted a server that force-closed the survivor \
          after draining for {seeded_drain:?}, short of the \
-         {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
+         {CONFIGURED_DRAIN_DEADLINE:?} the connection was entitled to"
+    );
+}
+
+/// With no deadline configured the serving process enforces
+/// [`GRACEFUL_DRAIN_TIMEOUT`]. A server with nothing to drain stops at once yet
+/// still logs the deadline it enforces, so the wiring is read without waiting
+/// the timeout out.
+#[test]
+fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_configured() {
+    let repository = TempDir::new().expect("create the fixture repository directory");
+    initialize_repository(repository.path());
+    let mut server = start_server(repository.path(), "127.0.0.1:0", "default.log");
+
+    let signalled_at = Instant::now();
+    send_signal(server.pid(), Signal::SIGTERM);
+    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+
+    assert_eq!(
+        log_field(&server.log(), SIGNAL_RECEIVED, "drain_deadline_secs"),
+        GRACEFUL_DRAIN_TIMEOUT.as_secs().to_string()
     );
 }
 
