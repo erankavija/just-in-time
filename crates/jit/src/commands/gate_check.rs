@@ -1649,8 +1649,6 @@ mod tests {
                 checker: Some(checker),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1730,8 +1728,6 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
                 checker: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1893,8 +1889,6 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -2108,7 +2102,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 GateMode::Auto,
                 Some(GateChecker::RepositoryValidation),
                 100,
-                None,
             )
             .unwrap();
         executor
@@ -2120,7 +2113,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 GateMode::Auto,
                 Some(GateChecker::ReviewPlaceholder),
                 100,
-                None,
             )
             .unwrap();
         let (issue_id, _) = executor
@@ -2212,8 +2204,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     }),
                     priority: 100,
                     reserved: HashMap::new(),
-                    auto: true,
-                    example_integration: None,
                 },
             );
             let bytes = crate::declarations::serialize_gate_registry(&registry)
@@ -2575,7 +2565,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     prompt_file,
                 }),
                 100,
-                None,
             )
             .unwrap();
         executor.add_gate(issue_id, gate_key.to_string()).unwrap();
@@ -3139,8 +3128,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3184,8 +3171,6 @@ source-of-truth = "markdown-first"
                 checker: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3232,8 +3217,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 10,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3249,8 +3232,6 @@ source-of-truth = "markdown-first"
                 checker: None,
                 priority: 20,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3310,7 +3291,6 @@ source-of-truth = "markdown-first"
         crate::declarations::GateDefinition {
             mode: GateMode::Manual,
             checker: None,
-            auto: false,
             ..make_auto_gate(key, "")
         }
     }
@@ -3565,8 +3545,6 @@ source-of-truth = "markdown-first"
                     }),
                     priority: 100,
                     reserved: HashMap::new(),
-                    auto: true,
-                    example_integration: None,
                     inputs: None,
                 },
             );
@@ -3643,8 +3621,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3668,8 +3644,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3826,8 +3800,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3872,8 +3844,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4019,8 +3989,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4074,8 +4042,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4135,8 +4101,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4204,8 +4168,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4266,8 +4228,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4343,8 +4303,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4923,8 +4881,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -4997,8 +4953,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5045,8 +4999,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5102,8 +5054,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5150,8 +5100,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5198,8 +5146,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5263,8 +5209,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5334,8 +5278,6 @@ source-of-truth = "markdown-first"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -5384,8 +5326,6 @@ source-of-truth = "markdown-first"
                     }),
                     priority,
                     reserved: HashMap::new(),
-                    auto: true,
-                    example_integration: None,
                     inputs: None,
                 },
             );
@@ -5446,8 +5386,6 @@ source-of-truth = "markdown-first"
                     }),
                     priority: 100,
                     reserved: HashMap::new(),
-                    auto: true,
-                    example_integration: None,
                     inputs: None,
                 },
             );
@@ -5484,9 +5422,7 @@ source-of-truth = "markdown-first"
             "title": "Old Gate",
             "description": "Pre-priority gate",
             "stage": "postcheck",
-            "mode": "manual",
-            "auto": false,
-            "example_integration": null
+            "mode": "manual"
         }"#;
 
         let gate: crate::declarations::GateDefinition = serde_json::from_str(json).unwrap();
@@ -5512,8 +5448,6 @@ source-of-truth = "markdown-first"
             }),
             priority: 100,
             reserved: HashMap::new(),
-            auto: true,
-            example_integration: None,
             inputs: None,
         }
     }

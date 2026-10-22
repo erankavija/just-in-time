@@ -1420,8 +1420,6 @@ mod tests {
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),
-            auto: false,
-            example_integration: None,
             inputs: None,
         }
     }

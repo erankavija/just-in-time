@@ -142,7 +142,6 @@ description = "External-review placeholder for the linked plan before implementa
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
@@ -161,7 +160,6 @@ description = "External-review placeholder for decomposition quality, issue cont
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
@@ -180,7 +178,6 @@ description = "Review issue-attributable implementation changes against reposito
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
@@ -199,7 +196,6 @@ description = "Evaluate the coverage-preview rule with the gated breakdown as it
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
@@ -219,7 +215,6 @@ description = "Run declarative validation for the gated issue."
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
@@ -238,7 +233,6 @@ description = "Run structural and declarative validation for the whole repositor
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 reserved = {}
 
 [contribution.value.checker]
