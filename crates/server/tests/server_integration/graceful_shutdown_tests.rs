@@ -89,6 +89,7 @@ fn executor_for(worktree_root: &Path) -> CommandExecutor<JsonFileStorage> {
 /// server's file watcher turns into an SSE `change` event.
 fn record_repository_change(worktree_root: &Path) {
     executor_for(worktree_root)
+        .issues()
         .create_issue(
             "Live change".to_string(),
             "Observed over the event stream".to_string(),

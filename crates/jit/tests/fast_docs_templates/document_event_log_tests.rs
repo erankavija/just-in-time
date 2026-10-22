@@ -12,6 +12,7 @@ where
     S: IssueStore + jit::storage::RepositoryStateStore,
 {
     executor
+        .issues()
         .create_issue(
             title.into(),
             String::new(),

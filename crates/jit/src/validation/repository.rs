@@ -873,6 +873,7 @@ mod tests {
         .unwrap();
         executor(&repo).validate_with_fix(true, false).unwrap();
         executor(&repo)
+            .issues()
             .create_issue(
                 "Root".to_string(),
                 "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),

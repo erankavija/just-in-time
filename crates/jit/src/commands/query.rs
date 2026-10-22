@@ -203,7 +203,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The bucket is every issue matching all `label_filters` (AND-combined; an
     /// empty slice aggregates the whole repository), the advisory-grouping
     /// counterpart to the DAG-authoritative
-    /// [`issue_progress`](Self::issue_progress). Patterns are validated with the
+    /// [`issue_progress`](crate::commands::IssueOps::issue_progress). Patterns are validated with the
     /// same rules as [`Self::query_by_labels`].
     ///
     /// # Examples

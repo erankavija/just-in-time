@@ -703,7 +703,7 @@ mod sdd_lifecycle {
         jit::test_harness::seed_memory_issue(executor.storage(), &epic);
 
         // Attempt to transition to done: must be blocked.
-        let result = executor.update_issue(
+        let result = executor.issues().update_issue(
             &epic_id,
             None,
             None,
@@ -815,7 +815,7 @@ mod sdd_lifecycle {
         executor.add_dependency(&epic_id, &child_id).unwrap();
 
         // Transition to done: must succeed.
-        let result = executor.update_issue(
+        let result = executor.issues().update_issue(
             &epic_id,
             None,
             None,
@@ -1574,7 +1574,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
             State::InProgress,
         );
 
-        let result = executor.update_issue(
+        let result = executor.issues().update_issue(
             &goal_id,
             None,
             None,

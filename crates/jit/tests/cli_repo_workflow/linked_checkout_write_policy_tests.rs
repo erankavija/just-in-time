@@ -39,7 +39,7 @@ fn test_create_issue_under_dispatch_override_persists_the_audit_record_with_the_
     let annotation = override_annotation(temp.path());
 
     let (issue_id, _) = jit::commands::with_dispatch_mutation_annotation(annotation, || {
-        executor.create_issue(
+        executor.issues().create_issue(
             "Permitted mutation".to_string(),
             "Issue created while an override permitted the invocation".to_string(),
             Priority::Normal,

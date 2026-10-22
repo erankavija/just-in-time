@@ -123,7 +123,7 @@ pub enum BatchValidationProblem {
     /// An entry requires a gate key absent from the gate registry.
     UnknownGate { key: String, gate: String },
     /// An entry's FINAL issue shape would be rejected by the same write-time
-    /// validation [`create_issue`](crate::commands::CommandExecutor::create_issue)
+    /// validation [`create_issue`](crate::commands::IssueOps::create_issue)
     /// runs (label format, namespace-uniqueness such as a single `type:*`, and
     /// every other enforcing local rule). Catching this before finalization gives
     /// callers a complete, entry-attributed validation report.
@@ -530,7 +530,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Build the candidate [`Issue`] for an entry EXACTLY as
-    /// [`create_issue`](Self::create_issue) assembles it before validating, so
+    /// [`create_issue`](crate::commands::IssueOps::create_issue) assembles it before validating, so
     /// pre-validation sees the shape that would actually be persisted: the config
     /// default `type:<t>` label applied when the entry carries no `type:` label,
     /// the requested priority / gates / labels / content format, and the state

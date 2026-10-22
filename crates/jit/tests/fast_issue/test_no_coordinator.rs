@@ -24,6 +24,7 @@ fn test_query_interface_works_without_coordinator() {
 
     // Claim one issue
     h.executor
+        .issues()
         .claim_issue(&id1, "agent:test".to_string())
         .unwrap();
 
@@ -45,6 +46,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
     // Create issue
     let (id, _) = h
         .executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "description".to_string(),
@@ -60,6 +62,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
     // Update issue
     let _ = h
         .executor
+        .issues()
         .update_issue(
             &id,
             Some("Updated".to_string()),
@@ -78,11 +81,15 @@ fn test_issue_lifecycle_works_without_coordinator() {
 
     // Claim issue
     h.executor
+        .issues()
         .claim_issue(&id, "agent:test".to_string())
         .unwrap();
 
     // Release issue
-    h.executor.release_issue(&id, "Test release").unwrap();
+    h.executor
+        .issues()
+        .release_issue(&id, "Test release")
+        .unwrap();
 
     // After release, assignee is cleared (state stays in-progress though)
     let issue = h.storage.load_issue(&id).unwrap();
@@ -139,7 +146,7 @@ fn test_gates_work_without_coordinator() {
 
     // But gates prevent completion - attempting to mark Done will transition to Gated
     // and return an error (gate validation failed)
-    let result = h.executor.update_issue(
+    let result = h.executor.issues().update_issue(
         &id,
         None,
         None,
@@ -188,6 +195,7 @@ fn test_state_queries_work_without_coordinator() {
 
     // Claim one
     h.executor
+        .issues()
         .claim_issue(&id1, "agent:test".to_string())
         .unwrap();
 

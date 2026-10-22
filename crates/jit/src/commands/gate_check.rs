@@ -1548,7 +1548,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Run all postchecks for an issue.
     ///
     /// Production reachability has one direct edge: the `State::Gated` branch of
-    /// [`CommandExecutor::update_issue_state`]. The shipped CLI's only call to that
+    /// [`IssueOps::update_issue_state`]. The shipped CLI's only call to that
     /// state-only method is `issue reject`, with `State::Rejected`, so current CLI
     /// dispatch does not enter this loop; library callers explicitly requesting
     /// `State::Gated` do.
@@ -2116,6 +2116,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
         let (issue_id, _) = executor
+            .issues()
             .create_issue(
                 "Test".to_string(),
                 "Test".to_string(),
@@ -2222,6 +2223,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             let taxonomy = crate::test_taxonomy::test_taxonomy();
             let (issue_id, _) = self
                 .executor
+                .issues()
                 .create_issue(
                     "Test".to_string(),
                     "Test".to_string(),
@@ -3663,6 +3665,7 @@ source-of-truth = "markdown-first"
 
         // Try to start work - should run prechecks
         executor
+            .issues()
             .update_issue_state(&issue_id, State::InProgress)
             .unwrap();
 
@@ -3696,6 +3699,7 @@ source-of-truth = "markdown-first"
             )
             .unwrap();
         executor
+            .issues()
             .update_issue_state(&issue_id, State::Ready)
             .unwrap();
 
@@ -3721,6 +3725,7 @@ source-of-truth = "markdown-first"
             .success());
 
         executor
+            .issues()
             .update_issue_state(&issue_id, State::InProgress)
             .unwrap();
 
@@ -3754,11 +3759,13 @@ source-of-truth = "markdown-first"
             )
             .unwrap();
         executor
+            .issues()
             .update_issue_state(&issue_id, State::Ready)
             .unwrap();
         write_corrupt_gate_run(repo.path());
 
         executor
+            .issues()
             .update_issue_state(&issue_id, State::InProgress)
             .unwrap();
 
@@ -3811,6 +3818,7 @@ source-of-truth = "markdown-first"
         seed_issue(executor.storage(), issue);
 
         let error = executor
+            .issues()
             .update_issue_state(&id, State::InProgress)
             .expect_err("strict lease enforcement must reject before checker execution");
 
@@ -3859,7 +3867,9 @@ source-of-truth = "markdown-first"
             .unwrap();
 
         // Try to start work - should fail
-        let result = executor.update_issue_state(&issue_id, State::InProgress);
+        let result = executor
+            .issues()
+            .update_issue_state(&issue_id, State::InProgress);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("precheck"));
 
@@ -3892,10 +3902,12 @@ source-of-truth = "markdown-first"
             )
             .unwrap();
         executor
+            .issues()
             .update_issue_state(&issue_id, State::Ready)
             .unwrap();
 
         executor
+            .issues()
             .update_issue_state(&issue_id, State::InProgress)
             .unwrap();
 
@@ -3942,10 +3954,12 @@ source-of-truth = "markdown-first"
             .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
             .unwrap();
         executor
+            .issues()
             .update_issue_state(&issue_id, State::Ready)
             .unwrap();
 
         executor
+            .issues()
             .update_issue_state(&issue_id, State::InProgress)
             .unwrap();
 
@@ -4005,6 +4019,7 @@ source-of-truth = "markdown-first"
 
         // Complete work
         executor
+            .issues()
             .update_issue_state(&issue_id, State::Gated)
             .unwrap();
 
@@ -4057,7 +4072,9 @@ source-of-truth = "markdown-first"
             .unwrap();
 
         // Complete work
-        let result = executor.update_issue_state(&issue_id, State::Gated);
+        let result = executor
+            .issues()
+            .update_issue_state(&issue_id, State::Gated);
         assert!(
             result.is_ok(),
             "an ordinary checker failure remains a successful invocation: {result:?}"
@@ -4121,6 +4138,7 @@ source-of-truth = "markdown-first"
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
+            .issues()
             .update_issue_state(&issue_id, State::Gated)
             .expect_err("postcheck persistence failure must reach the state-transition caller");
 
@@ -4182,6 +4200,7 @@ source-of-truth = "markdown-first"
             .unwrap();
 
         let error = executor
+            .issues()
             .update_issue_state(&issue_id, State::Gated)
             .expect_err("postcheck evaluation failure must reach the state-transition caller");
 
@@ -4409,6 +4428,7 @@ source-of-truth = "markdown-first"
     fn test_check_gate_records_pre_run_verdict_when_direct_dependency_changes() {
         let (repo, executor, issue_id) = setup_file_repository();
         let (dependency_id, _) = executor
+            .issues()
             .create_issue(
                 "Dependency".into(),
                 "Test".into(),

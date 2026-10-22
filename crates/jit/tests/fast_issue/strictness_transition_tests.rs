@@ -72,7 +72,7 @@ fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> State {
 fn test_warn_graph_rule_blocks_transition_under_strict() {
     let executor = executor("strict", DONE_WANTS_DESIGN_WARN);
     let epic = seed_epic(&executor);
-    let result = executor.update_issue_state(&epic, State::Done);
+    let result = executor.issues().update_issue_state(&epic, State::Done);
     assert!(
         result.is_err(),
         "strict must block the done transition on a warning-only graph violation"
@@ -88,7 +88,7 @@ fn test_warn_graph_rule_blocks_transition_under_strict() {
 fn test_warn_graph_rule_does_not_block_transition_under_loose() {
     let executor = executor("loose", DONE_WANTS_DESIGN_WARN);
     let epic = seed_epic(&executor);
-    let result = executor.update_issue_state(&epic, State::Done);
+    let result = executor.issues().update_issue_state(&epic, State::Done);
     assert!(
         result.is_ok(),
         "loose must allow the transition; a warning does not block: {result:?}"
@@ -102,7 +102,7 @@ fn test_warn_graph_rule_does_not_block_transition_under_loose() {
 fn test_enforced_graph_rule_blocks_transition_under_loose() {
     let executor = executor("loose", DONE_NEEDS_DESIGN_ENFORCE);
     let epic = seed_epic(&executor);
-    let result = executor.update_issue_state(&epic, State::Done);
+    let result = executor.issues().update_issue_state(&epic, State::Done);
     assert!(
         result.is_err(),
         "loose must block the done transition on an enforced-error graph violation"
@@ -114,7 +114,7 @@ fn test_enforced_graph_rule_blocks_transition_under_loose() {
 fn test_enforced_graph_rule_allowed_under_permissive() {
     let executor = executor("permissive", DONE_NEEDS_DESIGN_ENFORCE);
     let epic = seed_epic(&executor);
-    let result = executor.update_issue_state(&epic, State::Done);
+    let result = executor.issues().update_issue_state(&epic, State::Done);
     assert!(
         result.is_ok(),
         "permissive must downgrade even an enforced-error graph violation: {result:?}"

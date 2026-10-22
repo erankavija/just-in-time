@@ -1128,9 +1128,10 @@ fn build_issue_show_response<S: IssueStore>(
     id: &str,
 ) -> Result<jit::output::IssueShowResponse> {
     let issue = executor
+        .issues()
         .show_issue(id)
         .with_context(|| format!("Failed to load issue {}", id))?;
-    let enriched_deps = executor.get_dependencies_enriched(&issue);
+    let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
     let gate_runs = executor
         .list_gate_runs(&issue.id, None)
         .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
@@ -2257,7 +2258,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let (id, warnings) = executor.create_issue(
+                    let (id, warnings) = executor.issues().create_issue(
                         title,
                         description,
                         prio,
@@ -2278,7 +2279,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&id)?;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
-                        let enriched_deps = executor.get_dependencies_enriched(&issue);
+                        let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
                         let gate_runs =
                             executor.list_gate_runs(&issue.id, None).with_context(|| {
                                 format!("Failed to load gate runs for issue {}", issue.id)
@@ -2516,11 +2517,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
                     }
 
-                    match executor.show_issue(&id) {
+                    match executor.issues().show_issue(&id) {
                         Ok(issue) => {
                             // Field projection: print the named field(s) and return.
                             if projecting {
-                                let enriched_deps = executor.get_dependencies_enriched(&issue);
+                                let enriched_deps =
+                                    executor.issues().get_dependencies_enriched(&issue);
                                 let gate_runs = executor
                                     .list_gate_runs(&issue.id, None)
                                     .with_context(|| {
@@ -2571,7 +2573,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 println!("{}", output.to_json_string()?);
                                 return Ok(());
                             }
-                            let enriched_deps = executor.get_dependencies_enriched(&issue);
+                            let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
                             let gate_runs =
                                 executor.list_gate_runs(&issue.id, None).with_context(|| {
                                     format!("Failed to load gate runs for issue {}", issue.id)
@@ -2617,9 +2619,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // multi-id run fails fast on the first bad id.
                     let mut statuses = Vec::with_capacity(ids.len());
                     for id in &ids {
-                        match executor.show_issue(id) {
+                        match executor.issues().show_issue(id) {
                             Ok(issue) => {
-                                statuses.push(executor.issue_status_response(issue)?);
+                                statuses.push(executor.issues().issue_status_response(issue)?);
                             }
                             Err(e) => {
                                 handle_json_error!(
@@ -2650,10 +2652,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Children { id } => {
                     // Orchestration (child resolution, dangling classification)
-                    // lives in `CommandExecutor::issue_children`; this arm only
+                    // lives in `IssueOps::issue_children`; this arm only
                     // dispatches, renders, and routes an id failure through the
                     // JSON error path.
-                    match executor.issue_children(&id) {
+                    match executor.issues().issue_children(&id) {
                         Ok(response) => {
                             if json {
                                 let output = jit::output::JsonOutput::success(&response);
@@ -2677,10 +2679,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
                 IssueCommands::Progress { id } => {
-                    // Orchestration lives in `CommandExecutor::issue_progress`;
+                    // Orchestration lives in `IssueOps::issue_progress`;
                     // this arm dispatches, renders, and routes an id failure
                     // through the JSON error path.
-                    match executor.issue_progress(&id) {
+                    match executor.issues().issue_progress(&id) {
                         Ok(response) => {
                             if json {
                                 let output = jit::output::JsonOutput::success(&response);
@@ -2811,7 +2813,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 Some(s) => Some(Some(jit::domain::ContentFormat::from_str(s)?)),
                             };
 
-                        match executor.update_issue_resolved(
+                        match executor.issues().update_issue_resolved(
                             &id_str,
                             title,
                             description_update,
@@ -2952,11 +2954,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // Phase 3 safety check: require JIT_ALLOW_DELETION=1 to discourage
                     // deletion (jit:0daba57d). The env var is read here (dispatch-level
                     // input gathering); the refusal decision itself is
-                    // `CommandExecutor::confirm_deletion_allowed`, so it stays testable
+                    // `IssueOps::confirm_deletion_allowed`, so it stays testable
                     // without mutating global process state.
                     let allow_deletion =
                         std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
-                    if let Err(e) = executor.confirm_deletion_allowed(&id, allow_deletion) {
+                    if let Err(e) = executor
+                        .issues()
+                        .confirm_deletion_allowed(&id, allow_deletion)
+                    {
                         if json {
                             let json_error = jit::output::JsonError::new(
                                 jit::output::ErrorCode::DeletionNotConfirmed,
@@ -2974,7 +2979,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);
-                    let warnings = executor.delete_issue(&id)?;
+                    let warnings = executor.issues().delete_issue(&id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
                     }
@@ -2995,7 +3000,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
-                    let warnings = executor.assign_issue(&full_id, assignee)?;
+                    let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
                     }
@@ -3027,7 +3032,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if assign_only {
                         // Assign without transitioning state: reuse the same
                         // path as `jit issue assign`.
-                        let warnings = executor.assign_issue(&full_id, assignee)?;
+                        let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                         for warning in warnings {
                             output_ctx.print_warning(&warning)?;
                         }
@@ -3051,7 +3056,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Ok(());
                     }
 
-                    let claim_warnings = match executor.claim_issue(&full_id, assignee) {
+                    let claim_warnings = match executor.issues().claim_issue(&full_id, assignee) {
                         Ok(warnings) => warnings,
                         Err(e) => {
                             if json {
@@ -3091,7 +3096,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 IssueCommands::Unassign { id } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
-                    let warnings = executor.unassign_issue(&full_id)?;
+                    let warnings = executor.issues().unassign_issue(&full_id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
                     }
@@ -3109,7 +3114,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
 
-                    for warning in executor.reject_issue(&full_id, reason.as_deref())? {
+                    for warning in executor
+                        .issues()
+                        .reject_issue(&full_id, reason.as_deref())?
+                    {
                         output_ctx.print_warning(&warning)?;
                     }
 
@@ -3130,7 +3138,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 IssueCommands::Release { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
-                    executor.release_issue(&full_id, &reason)?;
+                    executor.issues().release_issue(&full_id, &reason)?;
 
                     if json {
                         let issue = storage.load_issue(&full_id)?;
@@ -3146,7 +3154,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::ClaimNext { assignee, filter } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let (id, claim_warnings) = match executor.claim_next(assignee, filter) {
+                    let (id, claim_warnings) = match executor.issues().claim_next(assignee, filter)
+                    {
                         Ok(result) => result,
                         Err(e) => {
                             if json {

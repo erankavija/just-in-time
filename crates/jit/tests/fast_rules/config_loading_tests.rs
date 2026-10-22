@@ -91,6 +91,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
 
     // Create a task without parent labels (orphaned at a leaf level).
     let (issue_id, _) = executor
+        .issues()
         .create_issue(
             "Orphaned task".to_string(),
             "No parent labels".to_string(),

@@ -35,6 +35,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
         let documents = issue.documents.clone();
         let target_state = issue.state;
         let id = executor
+            .issues()
             .create_issue(
                 issue.title,
                 issue.description,
@@ -52,6 +53,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
         }
         if executor.storage().load_issue(&id).unwrap().state != target_state {
             executor
+                .issues()
                 .update_issue(
                     &id,
                     None,

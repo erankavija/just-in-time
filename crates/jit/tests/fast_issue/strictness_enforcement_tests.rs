@@ -68,7 +68,7 @@ fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMem
 fn create_violating_epic(
     executor: &CommandExecutor<InMemoryStorage>,
 ) -> anyhow::Result<(String, Vec<String>)> {
-    executor.create_issue(
+    executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),
         Priority::Normal,

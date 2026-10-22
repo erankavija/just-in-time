@@ -13,6 +13,7 @@ fn test_validation_detects_broken_dependency() {
 
     // Create two issues
     let (issue1_id, _) = executor
+        .issues()
         .create_issue(
             "Task A".to_string(),
             "".to_string(),
@@ -26,6 +27,7 @@ fn test_validation_detects_broken_dependency() {
         .unwrap();
 
     let (issue2_id, _) = executor
+        .issues()
         .create_issue(
             "Task B".to_string(),
             "".to_string(),
@@ -65,6 +67,7 @@ fn test_validation_detects_cycle() {
 
     // Create two issues
     let (issue1_id, _) = executor
+        .issues()
         .create_issue(
             "A".to_string(),
             "".to_string(),
@@ -77,6 +80,7 @@ fn test_validation_detects_cycle() {
         )
         .unwrap();
     let (issue2_id, _) = executor
+        .issues()
         .create_issue(
             "B".to_string(),
             "".to_string(),
@@ -112,6 +116,7 @@ fn test_validation_passes_with_valid_graph() {
 
     // Create a valid dependency graph: A -> B -> C
     let (issue_c_id, _) = executor
+        .issues()
         .create_issue(
             "C".to_string(),
             "".to_string(),
@@ -124,6 +129,7 @@ fn test_validation_passes_with_valid_graph() {
         )
         .unwrap();
     let (issue_b_id, _) = executor
+        .issues()
         .create_issue(
             "B".to_string(),
             "".to_string(),
@@ -136,6 +142,7 @@ fn test_validation_passes_with_valid_graph() {
         )
         .unwrap();
     let (issue_a_id, _) = executor
+        .issues()
         .create_issue(
             "A".to_string(),
             "".to_string(),
@@ -161,6 +168,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let executor = crate::memory_executor(storage.clone());
 
     let (issue1_id, _) = executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -202,6 +210,7 @@ fn test_validation_detects_invalid_gate_reference() {
 
     // Create issue with gate requirement
     let (_issue, _) = executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -231,6 +240,7 @@ fn test_validation_detects_isolated_issues() {
 
     // Create connected issues: A -> B
     let (issue_a_id, _) = executor
+        .issues()
         .create_issue(
             "Connected A".to_string(),
             "".to_string(),
@@ -244,6 +254,7 @@ fn test_validation_detects_isolated_issues() {
         .unwrap();
 
     let (issue_b_id, _) = executor
+        .issues()
         .create_issue(
             "Connected B".to_string(),
             "".to_string(),
@@ -260,6 +271,7 @@ fn test_validation_detects_isolated_issues() {
 
     // Create an isolated issue (no deps, not a dep of anything)
     let (_isolated_id, _) = executor
+        .issues()
         .create_issue(
             "Isolated Issue".to_string(),
             "".to_string(),
@@ -287,6 +299,7 @@ fn test_validation_passes_with_all_connected_issues() {
 
     // Create a connected graph: A -> B -> C
     let (issue_a_id, _) = executor
+        .issues()
         .create_issue(
             "Issue A".to_string(),
             "".to_string(),
@@ -300,6 +313,7 @@ fn test_validation_passes_with_all_connected_issues() {
         .unwrap();
 
     let (issue_b_id, _) = executor
+        .issues()
         .create_issue(
             "Issue B".to_string(),
             "".to_string(),
@@ -313,6 +327,7 @@ fn test_validation_passes_with_all_connected_issues() {
         .unwrap();
 
     let (issue_c_id, _) = executor
+        .issues()
         .create_issue(
             "Issue C".to_string(),
             "".to_string(),
@@ -340,6 +355,7 @@ fn test_validation_passes_with_single_issue() {
 
     // Create a single issue (edge case - should not be considered isolated)
     let (_issue_id, _) = executor
+        .issues()
         .create_issue(
             "Single Issue".to_string(),
             "".to_string(),

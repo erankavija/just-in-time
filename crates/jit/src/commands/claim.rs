@@ -1042,6 +1042,7 @@ mod tests {
         let layout = storage.configured_layout()?;
         CommandExecutor::new(storage.clone())
             .with_layout(layout)
+            .issues()
             .create_issue(
                 title.to_string(),
                 "Test description".to_string(),

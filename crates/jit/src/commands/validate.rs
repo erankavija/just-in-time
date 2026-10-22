@@ -2842,6 +2842,7 @@ depends_on = ["planning"]
         std::fs::write(storage.root().join("config.toml"), config).unwrap();
         let mut executor = memory_executor(storage.clone());
         let id = executor
+            .issues()
             .create_issue(
                 "Type fix no-op".to_string(),
                 String::new(),
@@ -2873,6 +2874,7 @@ depends_on = ["planning"]
         let storage = InMemoryStorage::new();
         let executor = memory_executor(storage.clone());
         let id = executor
+            .issues()
             .create_issue(
                 "Type fix race".to_string(),
                 String::new(),

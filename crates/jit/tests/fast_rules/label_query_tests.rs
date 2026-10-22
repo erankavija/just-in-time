@@ -10,6 +10,7 @@ fn test_query_by_label_exact_match() {
 
     // Create issues with various labels
     let (milestone_id, _) = executor
+        .issues()
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
@@ -23,6 +24,7 @@ fn test_query_by_label_exact_match() {
         .unwrap();
 
     let (epic_id, _) = executor
+        .issues()
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
@@ -36,6 +38,7 @@ fn test_query_by_label_exact_match() {
         .unwrap();
 
     let (_other_id, _) = executor
+        .issues()
         .create_issue(
             "Other Task".to_string(),
             "".to_string(),
@@ -64,6 +67,7 @@ fn test_query_by_label_wildcard_namespace() {
 
     // Create issues with various milestones
     let (v1_id, _) = executor
+        .issues()
         .create_issue(
             "Task v1".to_string(),
             "".to_string(),
@@ -77,6 +81,7 @@ fn test_query_by_label_wildcard_namespace() {
         .unwrap();
 
     let (v2_id, _) = executor
+        .issues()
         .create_issue(
             "Task v2".to_string(),
             "".to_string(),
@@ -90,6 +95,7 @@ fn test_query_by_label_wildcard_namespace() {
         .unwrap();
 
     let (_no_milestone_id, _) = executor
+        .issues()
         .create_issue(
             "No milestone".to_string(),
             "".to_string(),
@@ -118,6 +124,7 @@ fn test_query_by_label_no_matches() {
 
     // Create issue without the queried label
     let (_id, _) = executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -154,6 +161,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
 
     // Create issues with multiple types
     let (task_id, _) = executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -167,6 +175,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
         .unwrap();
 
     let (bug_id, _) = executor
+        .issues()
         .create_issue(
             "Bug".to_string(),
             "".to_string(),
@@ -180,6 +189,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
         .unwrap();
 
     let (epic_id, _) = executor
+        .issues()
         .create_issue(
             "Epic".to_string(),
             "".to_string(),
@@ -209,6 +219,7 @@ fn test_query_by_label_case_sensitive() {
 
     // Create issue with specific case
     let (_id, _) = executor
+        .issues()
         .create_issue(
             "Task".to_string(),
             "".to_string(),
@@ -242,6 +253,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
     let executor = crate::memory_executor(storage);
 
     let (matching_id, _) = executor
+        .issues()
         .create_issue(
             "Rule-linked".to_string(),
             "".to_string(),
@@ -254,6 +266,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
         )
         .unwrap();
     executor
+        .issues()
         .create_issue(
             "Other rule-linked".to_string(),
             "".to_string(),
@@ -294,6 +307,7 @@ fn test_query_by_label_multiple_labels_per_issue() {
 
     // Create issue with multiple labels
     let (multi_id, _) = executor
+        .issues()
         .create_issue(
             "Multi-labeled".to_string(),
             "".to_string(),
@@ -330,6 +344,7 @@ fn create_labeled(
     labels: &[&str],
 ) -> String {
     executor
+        .issues()
         .create_issue(
             title.to_string(),
             "".to_string(),

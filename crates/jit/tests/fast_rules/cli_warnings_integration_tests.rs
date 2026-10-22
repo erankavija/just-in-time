@@ -91,6 +91,7 @@ fn test_create_epic_without_label_shows_warning() {
 
     // Create epic without epic:* label
     let (id, _) = executor
+        .issues()
         .create_issue(
             "Auth System".to_string(),
             "Epic description".to_string(),
@@ -118,6 +119,7 @@ fn test_create_task_without_parent_shows_warning() {
 
     // Create task without parent labels
     let (id, _) = executor
+        .issues()
         .create_issue(
             "Fix bug".to_string(),
             "Task description".to_string(),
@@ -143,6 +145,7 @@ fn test_create_epic_with_label_no_warning() {
 
     // Create epic with epic:* label
     let (id, _) = executor
+        .issues()
         .create_issue(
             "Auth System".to_string(),
             "Epic description".to_string(),
@@ -168,6 +171,7 @@ fn test_create_task_with_parent_no_warning() {
 
     // Create task with epic label
     let (id, _) = executor
+        .issues()
         .create_issue(
             "Fix bug".to_string(),
             "Task description".to_string(),

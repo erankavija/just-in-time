@@ -32,6 +32,7 @@ fn setup_repo(config_toml: &str) -> (TempDir, CommandExecutor<JsonFileStorage>) 
 
 fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: &[&str]) -> String {
     let (id, _) = exec
+        .issues()
         .create_issue(
             title.to_string(),
             String::new(),
@@ -97,7 +98,7 @@ unique = true
 "#;
     let (_tmp, exec) = setup_repo(cfg);
 
-    let result = exec.create_issue(
+    let result = exec.issues().create_issue(
         "dup".to_string(),
         String::new(),
         Priority::Normal,

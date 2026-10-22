@@ -44,6 +44,7 @@ fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
     // Complete the dependency through `update_issue` (which cascades ready
     // auto-transitions to dependents); the dependent returns to Ready.
     h.executor
+        .issues()
         .update_issue(
             &dep,
             None,
@@ -78,7 +79,10 @@ fn test_backlog_to_ready_transition_stamps_first_ready() {
     issue.first_ready_at = None;
     jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
-    h.executor.update_issue_state(&id, State::Ready).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Ready)
+        .unwrap();
 
     let after = h.get_issue(&id);
     assert_eq!(after.state, State::Ready);
@@ -93,6 +97,7 @@ fn test_claim_stamps_claimed_at() {
     assert!(h.get_issue(&id).claimed_at.is_none());
 
     h.executor
+        .issues()
         .claim_issue(&id, "agent:worker-1".to_string())
         .unwrap();
 
@@ -109,6 +114,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
     let id = h.create_ready_issue("Assignable");
 
     h.executor
+        .issues()
         .assign_issue(&id, "human:alice".to_string())
         .unwrap();
 
@@ -131,7 +137,10 @@ fn test_done_transition_stamps_done_at() {
     let id = h.create_ready_issue("Finishable");
     assert!(h.get_issue(&id).done_at.is_none());
 
-    h.executor.update_issue_state(&id, State::Done).unwrap();
+    h.executor
+        .issues()
+        .update_issue_state(&id, State::Done)
+        .unwrap();
 
     let issue = h.get_issue(&id);
     assert_eq!(issue.state, State::Done);
@@ -145,6 +154,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     let h = TestHarness::new();
     let id = h.create_ready_issue("Claimable");
     h.executor
+        .issues()
         .claim_issue(&id, "agent:worker-1".to_string())
         .unwrap();
     let first = h.get_issue(&id).claimed_at;
@@ -152,6 +162,7 @@ fn test_reclaim_keeps_first_claimed_at() {
 
     // Re-claiming as the same assignee promotes/no-ops but must not re-stamp.
     h.executor
+        .issues()
         .claim_issue(&id, "agent:worker-1".to_string())
         .unwrap();
     assert_eq!(h.get_issue(&id).claimed_at, first);

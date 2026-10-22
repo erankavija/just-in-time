@@ -71,6 +71,7 @@ fn new_issue(
     labels: &[&str],
 ) -> String {
     h.executor
+        .issues()
         .create_issue(
             title.to_string(),
             String::new(),
@@ -269,6 +270,7 @@ fn test_batch_export_omits_lifecycle_and_includes_all_states() {
     let s = build_scenario(&h);
 
     h.executor
+        .issues()
         .update_issue(
             &s.c2,
             None,

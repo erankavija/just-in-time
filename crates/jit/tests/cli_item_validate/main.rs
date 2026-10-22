@@ -26,6 +26,7 @@ fn create_issue(
     use jit::storage::IssueStore;
 
     let id = executor
+        .issues()
         .create_issue(
             title.to_string(),
             body.to_string(),

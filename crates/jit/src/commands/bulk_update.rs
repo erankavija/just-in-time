@@ -1211,6 +1211,7 @@ mod tests {
         let single = crate::commands::test_helpers::memory_executor(single_storage);
         for id in ["aaaa1111", "bbbb2222"] {
             single
+                .issues()
                 .update_issue(
                     id,
                     None,
@@ -1270,6 +1271,7 @@ mod tests {
         seed(&single_storage);
         let single = crate::commands::test_helpers::memory_executor(single_storage);
         let single_error = single
+            .issues()
             .update_issue(
                 "bbbb2222",
                 None,
@@ -1321,6 +1323,7 @@ mod tests {
         seed(&single_storage);
         let single = crate::commands::test_helpers::memory_executor(single_storage);
         let single_error = single
+            .issues()
             .update_issue(
                 "aaaa1111",
                 None,
@@ -2007,6 +2010,7 @@ mod tests {
 
             let (single, single_reader) = blocked_dependent_fixture();
             single
+                .issues()
                 .update_issue(
                     "bbbb2222",
                     None,

@@ -53,6 +53,7 @@ fn preset_captured_from_gates(
     gates: &[&str],
 ) -> std::path::PathBuf {
     let (reference, _) = executor
+        .issues()
         .create_issue(
             format!("Reference issue for {preset}"),
             String::new(),
@@ -181,6 +182,7 @@ fn test_apply_gate_preset_appends_definition_events() {
 
     let issue_with = |title: &str| {
         executor
+            .issues()
             .create_issue(
                 title.to_string(),
                 String::new(),
@@ -307,6 +309,7 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
 
     // APPLY: attaching the preset to a fresh issue adds both bundled gates.
     let (target, _) = executor
+        .issues()
         .create_issue(
             "Feature issue".to_string(),
             String::new(),

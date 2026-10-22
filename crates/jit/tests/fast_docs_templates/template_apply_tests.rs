@@ -127,6 +127,7 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
     }
     let (id, _) = h
         .executor
+        .issues()
         .create_issue(
             title.to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: it works\n- [soft] nice\n".to_string(),
@@ -398,6 +399,7 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     let template = plan_template();
     let (task, _) = h
         .executor
+        .issues()
         .create_issue(
             "A task".to_string(),
             String::new(),
@@ -489,6 +491,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
     // must reject rather than create a duplicate planning node.
     let (planning, _) = h
         .executor
+        .issues()
         .create_issue(
             "Plan: Legacy".to_string(),
             String::new(),
@@ -533,6 +536,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
 
     // Rename the container, then force-refresh.
     h.executor
+        .issues()
         .update_issue(
             &epic,
             Some("Renamed title".to_string()),
@@ -897,6 +901,7 @@ applies_to  = ["epic"]
             .clone();
         let epic = h
             .executor
+            .issues()
             .create_issue(
                 format!("Container gated by {key}"),
                 "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
@@ -1025,6 +1030,7 @@ applies_to  = ["epic"]
         .clone();
 
     let (epic, _) = executor
+        .issues()
         .create_issue(
             "Broken-preset epic".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),

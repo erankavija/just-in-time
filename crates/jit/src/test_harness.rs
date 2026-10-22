@@ -108,6 +108,7 @@ source-of-truth = \"registry-first\"
     pub fn create_issue(&self, title: &str) -> String {
         let (id, _) = self
             .executor
+            .issues()
             .create_issue(
                 title.to_string(),
                 String::new(),
@@ -126,6 +127,7 @@ source-of-truth = \"registry-first\"
     pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String {
         let (id, _) = self
             .executor
+            .issues()
             .create_issue(
                 title.to_string(),
                 desc.to_string(),
@@ -144,6 +146,7 @@ source-of-truth = \"registry-first\"
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
         let (id, _) = self
             .executor
+            .issues()
             .create_issue(
                 title.to_string(),
                 String::new(),
@@ -163,6 +166,7 @@ source-of-truth = \"registry-first\"
         let id = self.create_issue(title);
         let _ = self
             .executor
+            .issues()
             .update_issue(
                 &id,
                 None,
@@ -183,6 +187,7 @@ source-of-truth = \"registry-first\"
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
         let (id, _) = self
             .executor
+            .issues()
             .create_issue(
                 title.to_string(),
                 String::new(),

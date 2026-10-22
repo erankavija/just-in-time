@@ -43,6 +43,7 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
 
     // Create a test issue
     let (issue_id, _) = executor
+        .issues()
         .create_issue(
             "Test Issue".to_string(),
             "Test description".to_string(),
@@ -98,6 +99,7 @@ async fn test_get_document_content_not_yet_implemented() {
 
     // Create issue with document reference
     let (issue_id, _) = executor
+        .issues()
         .create_issue(
             "Test Issue".to_string(),
             "Test".to_string(),
