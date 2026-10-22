@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5293d171-d7fd-45ef-9e39-a7155f6266a8",
+      "status": "passed",
+      "updated_at": "2026-10-22T16:25:25.545159342Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7de39437-cb70-45ce-9832-4390eb0cbb70",
+      "status": "passed",
+      "updated_at": "2026-10-22T16:26:55.831320134Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9cc3056a-7147-4a9a-89bf-f0e6fd53806b",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One output renderer for validation findings",
-  "updated_at": "2026-10-22T15:20:47.921025369Z"
+  "updated_at": "2026-10-22T16:26:55.831320134Z"
 }

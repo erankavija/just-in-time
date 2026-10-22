@@ -857,7 +857,10 @@ impl IssueStore for FailingMutationStorage {
         self.inner.load_issue(id)
     }
 
-    fn resolve_issue_id(&self, prefix: &jit::domain::IssueIdPrefix) -> anyhow::Result<String> {
+    fn resolve_issue_id(
+        &self,
+        prefix: &jit::domain::issue_id::IssueIdPrefix,
+    ) -> anyhow::Result<String> {
         self.inner.resolve_issue_id(prefix)
     }
 
@@ -887,7 +890,7 @@ impl IssueStore for FailingMutationStorage {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &jit::domain::InputsDigest,
+        digest: &jit::domain::repository_inputs::InputsDigest,
     ) -> anyhow::Result<Option<jit::domain::GateRunResult>> {
         self.inner.find_reusable_gate_run(gate_key, digest)
     }

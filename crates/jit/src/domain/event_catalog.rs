@@ -534,7 +534,7 @@ pub fn render_event_reference() -> String {
         .join("\n");
 
     format!(
-        "<!-- Generated from `jit::domain::event_catalog` — do not edit by hand. -->\n\
+        "<!-- Generated from `jit::domain::event_catalog::event_catalog` — do not edit by hand. -->\n\
          \n\
          # Event Log Tags\n\
          \n\
@@ -852,7 +852,7 @@ mod tests {
         assert_eq!(
             committed,
             render_event_reference(),
-            "{} is stale — regenerate it from `jit::domain::event_catalog` (run: {})",
+            "{} is stale — regenerate it from `jit::domain::event_catalog::event_catalog` (run: {})",
             test_support::REFERENCE_PATH,
             test_support::REFERENCE_GENERATOR,
         );

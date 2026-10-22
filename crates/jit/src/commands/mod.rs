@@ -102,8 +102,9 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
+use crate::domain::issue_id::IssueIdPrefix;
 use crate::domain::{
-    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue, IssueIdPrefix,
+    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
@@ -2092,7 +2093,7 @@ fn discover_gate_run_results(
 ///
 /// # Errors
 ///
-/// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
+/// [`InvalidIdPrefixError`](crate::domain::issue_id::InvalidIdPrefixError) before any
 /// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
 pub(crate) fn resolve_issue_filter<S: IssueStore>(
     storage: &S,

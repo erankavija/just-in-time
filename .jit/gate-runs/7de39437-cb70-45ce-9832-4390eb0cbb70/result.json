@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1450912327d5e472572db95b1271ac52b9a24761",
+  "completed_at": "2026-10-22T16:26:55.614213568Z",
+  "duration_ms": 86159,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared validation renderer, command wiring, and focused tests satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9cc3056a-7147-4a9a-89bf-f0e6fd53806b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7de39437-cb70-45ce-9832-4390eb0cbb70",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T16:25:29.454442340Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c983c7d3c, 548dabe62, 145091232 (jit:9cc3056a)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/df129d9e/requirement/REQ-09 and REQ-21 (parent issue description); @/charter/D-18; @/invariant/architecture-dependency-direction, essential-code-prose, orthogonal-tests, semantic-test-assertions, shared-test-contracts; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T16:24:00.355310285+00:00)\nTruncation recovery: re-read 548dabe62 patches per affected file, merge parent file lists, current source/test ranges, and targeted policy records\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared validation renderer, command wiring, and focused tests satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

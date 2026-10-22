@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6bd8ca1366d716f5f764673db38ce9bbd0c2e9ae",
+  "completed_at": "2026-10-22T15:59:33.428282619Z",
+  "duration_ms": 264095,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 1214,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The traversal-rejection test reads a fixed path under the process temp directory without owning or isolating it, so parallel activity can make it fail spuriously."
+      }
+    ],
+    "summary": "The new traversal test reads unguarded process-wide filesystem state.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bc802dec-5640-4015-958f-760428deeb25",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:55:09.332497845Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9723 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16452-c93f-7473-a60b-9f7a8fb8174e\n--------\nuser\n--- 9710 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 024e9ce5f, bfd2077fc, 84971a76c, 0bba22f71\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/4a82ed46/requirement/REQ-01–REQ-02 and @/issue/c780514e/requirement/REQ-05 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-22T15:53:37.694024630+00:00)\nTruncation recovery: narrowed truncated output to the affected path, registry sources, resolved items, and first-parent merge patches; archived and unrelated gate-run material was outside the impact cone.\n\n1. [blocking][issue-impact] `test_declaration_dir_rejects_paths_leaving_the_directory_before_writing` reads the fixed global path `<TMPDIR>/escaped-by-traversal.toml` without owning or isolating it. Another test or process can create that path, making this test order- and environment-dependent. Use test-owned state or a scoped, serialized temporary-directory environment instead. `crates/jit/src/test_utils.rs:1214`. References: `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new traversal test reads unguarded process-wide filesystem state.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The traversal-rejection test reads a fixed path under the process temp directory without owning or isolating it, so parallel activity can make it fail spuriously.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":1214,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

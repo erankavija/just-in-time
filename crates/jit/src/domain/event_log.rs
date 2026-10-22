@@ -1,6 +1,7 @@
 //! Pure parsing for the append-only event log.
 
-use super::{Event, EventTag};
+use super::event_catalog::EventTag;
+use super::Event;
 
 /// Structural failure while reading a known event-log record.
 #[derive(Debug, thiserror::Error)]

@@ -13,12 +13,13 @@ use thiserror::Error;
 
 pub mod failure;
 
-pub use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
-
 use crate::declarations::{GateMode, GateStage};
+use crate::domain::gate_findings::GateFindings;
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::{
-    GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
-    MinimalIssue, Priority, State, StoreDivergence,
+    GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
+    Priority, State,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -271,6 +272,64 @@ pub fn render_gate_run_status(
         ),
         GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {issue_id}"),
     }
+}
+
+/// Closing lines of a findings block: `pass` when there are no findings,
+/// `"{failure} with N error(s)"` on stderr when any finding is an error.
+#[derive(Debug, Clone, Copy)]
+pub struct FindingsSummary<'a> {
+    pub pass: &'a str,
+    pub failure: &'a str,
+}
+
+/// The human findings block, split by destination stream.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RenderedFindings {
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl RenderedFindings {
+    pub fn print(&self) {
+        print!("{}", self.stdout);
+        eprint!("{}", self.stderr);
+    }
+}
+
+/// One `{severity} [{rule}] {message}` line per finding, then the summary.
+/// Warnings-only findings get no pass line; `summary: None` renders the lines alone
+/// for commands that frame the block themselves.
+pub fn render_validation_findings(
+    findings: &[crate::validation::report::ReportedFinding],
+    summary: Option<FindingsSummary<'_>>,
+) -> RenderedFindings {
+    use std::fmt::Write;
+    let mut rendered = RenderedFindings::default();
+    for finding in findings {
+        let severity = if finding.is_error() {
+            "error"
+        } else {
+            "warning"
+        };
+        let _ = writeln!(
+            rendered.stdout,
+            "{severity} [{}] {}",
+            finding.rule, finding.message
+        );
+    }
+    let errors = findings.iter().filter(|f| f.is_error()).count();
+    if let Some(summary) = summary {
+        if errors > 0 {
+            let _ = writeln!(
+                rendered.stderr,
+                "{} with {errors} error(s)",
+                summary.failure
+            );
+        } else if findings.is_empty() {
+            let _ = writeln!(rendered.stdout, "{}", summary.pass);
+        }
+    }
+    rendered
 }
 
 fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagnostics: &[T]) {
@@ -1269,7 +1328,9 @@ impl From<ErrorCode> for String {
 /// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
-    if let Some(prefix_error) = error.downcast_ref::<crate::domain::InvalidIdPrefixError>() {
+    if let Some(prefix_error) =
+        error.downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+    {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
     }
@@ -2512,7 +2573,7 @@ pub struct GateRunSummary {
     /// Omitted when the gate declares none. Two summaries carrying the same
     /// value describe evaluations over identical content.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inputs_digest: Option<crate::domain::InputsDigest>,
+    pub inputs_digest: Option<crate::domain::repository_inputs::InputsDigest>,
     /// Whether this run executed the checker (`{"derivation": "executed"}`),
     /// carried an earlier run's verdict
     /// (`{"derivation": "reused", "source_run": "<run-id>"}`), or records a
@@ -2671,7 +2732,7 @@ pub struct GateFlatReportResponse {
 ///
 /// The structured-findings view of a single gate's latest run. `verdict`,
 /// `summary`, and `findings` come straight from the checker's machine-readable
-/// block ([`GateFindings`](crate::domain::GateFindings)); they are present only
+/// block ([`GateFindings`](crate::domain::gate_findings::GateFindings)); they are present only
 /// when that run carried a block. `has_findings` is `false` for a plain-text
 /// checker (no block emitted) so a consumer can distinguish "ran, no structured
 /// findings" from "no findings recorded", without inspecting the optional
@@ -2689,7 +2750,7 @@ pub struct GateFindingsResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     /// Individual findings; empty when no block was emitted.
-    pub findings: Vec<crate::domain::GateFinding>,
+    pub findings: Vec<crate::domain::gate_findings::GateFinding>,
 }
 
 // ============================================================================
@@ -2720,7 +2781,7 @@ pub struct GateDefinition {
     /// declares none, which is what keeps its checker executing on every
     /// evaluation.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inputs: Option<crate::domain::RepositoryInputs>,
+    pub inputs: Option<crate::domain::repository_inputs::RepositoryInputs>,
 }
 
 impl From<crate::declarations::GateDefinition> for GateDefinition {
@@ -2886,6 +2947,43 @@ mod tests {
         }
         assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
         assert_eq!(passed, "Passed gate 'tests' for issue abc123");
+    }
+
+    #[test]
+    fn test_render_validation_findings_formats_lines_and_summary_by_stream() {
+        use crate::declarations::rules::Severity;
+        use crate::validation::report::ReportedFinding;
+        let finding = |rule: &str, severity| ReportedFinding {
+            issue_id: None,
+            rule: rule.into(),
+            severity,
+            message: format!("{rule} message"),
+        };
+        let summary = Some(FindingsSummary {
+            pass: "All passed",
+            failure: "Checks failed",
+        });
+
+        let clean = render_validation_findings(&[], summary);
+        assert_eq!(clean.stdout, "All passed\n");
+        assert!(clean.stderr.is_empty());
+
+        let warned = render_validation_findings(&[finding("w", Severity::Warn)], summary);
+        assert_eq!(warned.stdout, "warning [w] w message\n");
+        assert!(warned.stderr.is_empty());
+
+        let failed = render_validation_findings(
+            &[finding("w", Severity::Warn), finding("e", Severity::Error)],
+            summary,
+        );
+        assert_eq!(
+            failed.stdout,
+            "warning [w] w message\nerror [e] e message\n"
+        );
+        assert_eq!(failed.stderr, "Checks failed with 1 error(s)\n");
+
+        let bare = render_validation_findings(&[], None);
+        assert_eq!(bare, RenderedFindings::default());
     }
 
     fn schema_property_names<T: JsonSchema>() -> BTreeSet<String> {
@@ -3314,7 +3412,7 @@ mod tests {
 
     #[test]
     fn test_gate_findings_response_preserves_populated_references_and_omits_empty() {
-        use crate::domain::GateFinding;
+        use crate::domain::gate_findings::GateFinding;
 
         let finding = |id: &str, references: Vec<String>| GateFinding {
             id: id.to_string(),
