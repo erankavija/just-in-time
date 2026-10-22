@@ -14,7 +14,26 @@
     "code-review",
     "build-budget-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "build-budget-selftest": {
+      "run_id": "0a3fae4b-2758-43f6-92d4-738c38e62dd3",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:03:05.742162076Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci": {
+      "run_id": "16bbf6d1-3d5e-4f33-ae08-c09264d88b3b",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:03:05.070142490Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d1f0916-8731-4d36-8fbf-315cfec8914a",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:06:41.466835536Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
   "labels": [
     "type:task",
@@ -32,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Build-budget checker self-test runs as a declared gate",
-  "updated_at": "2026-10-22T20:52:45.585544918Z"
+  "updated_at": "2026-10-22T21:06:41.466835536Z"
 }
