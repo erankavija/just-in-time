@@ -29,7 +29,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-22T02:10:35.356826327Z"
+  "updated_at": "2026-10-22T19:21:30.562190405Z"
 }

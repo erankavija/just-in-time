@@ -7,7 +7,16 @@
     "b4929342-6c7c-4f35-8e18-c8cbb0ec526c"
   ],
   "description": "Besides the type facade, `domain/mod.rs` and the crate root re-export items of other modules, so many types have two or three import paths.\n\n## Background\n\n`crates/jit/src/domain/mod.rs` re-exports selected items of `gate_findings`, `store_divergence`, `repository_inputs`, `event_catalog`, `event_log` and `projection`. Callers split between the facade and the module path; for example, `repository_inputs` has 14 facade sites and 5 module-path sites. It also re-exports `crate::graph::{DependencyGraph, GraphError, GraphNode}` and `crate::labels` items \"for backward compatibility\" (`domain/mod.rs:74-80`). `item`, `graph` and `labels` are imported almost only by module path (39, 50 and 32 sites).\n\nThe crate root adds a third path: `crates/jit/src/lib.rs:45` (`Issue`, `Priority`, `State`), `:51-54` (`query_*`) and `:57` (`DependencyGraph`, `GraphError`, `GraphNode`). Consumers include `main.rs` (for example `jit::GraphError` at `:245-248,445,9105`), `visualization.rs`, and the tests `template_apply_tests.rs:1501-1502`, `transition_graph_enforcement_tests.rs`, `config_loading_tests.rs` and `local_rule_enforcement_tests.rs`. `tests/fast_issue/domain_queries_tests.rs:6` uses `jit::domain::*`.\n\nThe module doc (`domain/mod.rs:1-22`) lists `graph`, `validation` and `labels` as domain submodules; they are crate-root modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain/mod.rs` re-exports no item of a domain submodule other than `types`, nor any item of `graph` or `labels`, and those items are imported by module path.\n- [hard] REQ-02: The crate root re-exports no domain, graph or query item.\n- [hard] REQ-03: Each domain type is reachable by exactly one path.\n- [hard] REQ-04: The `domain/mod.rs` module doc lists only modules declared under `domain/`.\n\n## Notes\n\nBrace-group imports mixing items from several modules are split by hand. The footprint lists the 33 files that import a re-exported item through `domain` or the crate root, measured by search at planning time.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "review",
+      "format": "markdown",
+      "label": "Final lead review",
+      "path": "dev/active/63c11d08/review.md"
+    }
+  ],
+  "done_at": "2026-10-22T19:21:30.195064404Z",
   "first_ready_at": "2026-10-22T16:05:16.802397232Z",
   "gates_required": [
     "cargo-ci",
@@ -15,9 +24,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2f837120-4e6d-4523-ab82-eee31d2ea44a",
-      "status": "failed",
-      "updated_at": "2026-10-22T19:08:05.835319627Z",
+      "run_id": "788882e7-e067-4b26-96bc-76afca3628d9",
+      "status": "passed",
+      "updated_at": "2026-10-22T19:15:54.423194886Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a3462790-a2bf-46bd-afc4-360f4d392c5e",
+      "status": "passed",
+      "updated_at": "2026-10-22T19:20:27.263783763Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +46,7 @@
     "satisfies:842b0ac6/REQ-14"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the remaining domain re-export paths",
-  "updated_at": "2026-10-22T19:08:05.835319627Z"
+  "updated_at": "2026-10-22T19:21:30.195064404Z"
 }
