@@ -4,7 +4,7 @@
   "context": {},
   "created_at": "2026-10-21T15:40:49.485551803Z",
   "dependencies": [],
-  "description": "Plan Give each test property one owning test on shared fixtures and contracts (c780514e) against every hard success criterion, write the concise design at dev/active/c780514e-test-topology/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.\n\n## Escalation (2026-10-22)\n\nplan-review failed three times; the third finding is that the ten new self-test gates are declared but required by no issue. Further gate attempts await the milestone steward's ruling on how the gates are registered and attached (bootstrap the declarations before instantiation, attach at execution, or fold the self-tests into the existing gate).",
+  "description": "Plan Give each test property one owning test on shared fixtures and contracts (c780514e) against every hard success criterion, write the concise design at dev/active/c780514e-test-topology/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.\n\n## Escalation (2026-10-22)\n\nplan-review failed three times; the third finding is that the ten new self-test gates are declared but required by no issue. Further gate attempts await the milestone steward's ruling on how the gates are registered and attached (bootstrap the declarations before instantiation, attach at execution, or fold the self-tests into the existing gate).\n\nFourth plan-review run (authorised by the steward) failed on terminal sizing: the target-wide CLI fixture migrations and three library adoption tasks exceed one focused cycle. Awaiting the steward's ruling before any further run.",
   "documents": [
     {
       "commit": null,
@@ -72,5 +72,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T02:28:26.136366197Z"
+  "updated_at": "2026-10-22T06:33:34.283026335Z"
 }
