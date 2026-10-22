@@ -4422,7 +4422,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = command_json_error(&e, ErrorCode::GateError);
+                            let json_error = gate_pass_json_error(&e, &id);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {

@@ -976,10 +976,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(&gate_key) {
-            return Err(anyhow!(
-                "Gate '{}' is not required for this issue",
-                gate_key
-            ));
+            return Err(GateNotRequiredError {
+                issue_id: full_id,
+                gate_key,
+            }
+            .into());
         }
 
         // Check if gate is automated - reject manual pass/fail
