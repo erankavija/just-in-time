@@ -1925,4 +1925,99 @@ mod tests {
             );
         }
     }
+
+    /// Create-time warnings the package's own `orphan-leaf` and
+    /// `strategic-consistency` rules raise over one issue carrying `labels`,
+    /// evaluated in memory over the declared test vocabulary.
+    fn create_time_warnings(labels: Vec<String>) -> Vec<crate::validation::graph::GraphFinding> {
+        let (_workspace, package) = assembled_package();
+        let rules = package
+            .model()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::KeyedArray {
+                    target: KeyedArrayTarget::Rules,
+                    value,
+                    ..
+                } if matches!(
+                    value.get("name").and_then(serde_json::Value::as_str),
+                    Some("orphan-leaf" | "strategic-consistency")
+                ) =>
+                {
+                    Some(value.clone())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rules.len(), 2, "the package declares both warnings");
+        let declared = toml::to_string(&serde_json::json!({ "rules": rules }))
+            .expect("the package's rules serialize as a rules file");
+        let ruleset = crate::declarations::rules::RuleSet::parse(&declared, None, [])
+            .expect("the package's rules parse");
+        let graph_rules = ruleset.rules.iter().collect::<Vec<_>>();
+
+        let mut issue = crate::domain::types::fixture_issue("Subject".to_string(), String::new());
+        issue.labels = labels;
+        crate::validation::graph::evaluate_graph(
+            &graph_rules,
+            std::slice::from_ref(&issue),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+            crate::domain::ContentFormat::Markdown,
+            chrono::Utc::now(),
+            &std::collections::HashMap::new(),
+        )
+    }
+
+    #[test]
+    fn test_workflow_package_rules_warn_for_strategic_issue_without_membership_label() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let strategic = taxonomy.type_at_level(2);
+
+        let warnings = create_time_warnings(vec![format!("type:{strategic}")]);
+
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].finding.rule, "strategic-consistency");
+        assert!(warnings[0]
+            .finding
+            .message
+            .contains(&format!("{}:*", taxonomy.label_associations[strategic])));
+    }
+
+    #[test]
+    fn test_workflow_package_rules_warn_for_leaf_issue_without_parent_label() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+
+        let warnings = create_time_warnings(vec![format!("type:{}", taxonomy.type_at_level(4))]);
+
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].finding.rule, "orphan-leaf");
+        assert!(warnings[0].finding.message.contains("orphaned leaf"));
+    }
+
+    #[test]
+    fn test_workflow_package_rules_accept_strategic_issue_with_membership_label() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let strategic = taxonomy.type_at_level(2);
+
+        let warnings = create_time_warnings(vec![
+            format!("type:{strategic}"),
+            format!("{}:auth", taxonomy.label_associations[strategic]),
+        ]);
+
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    #[test]
+    fn test_workflow_package_rules_accept_leaf_issue_with_parent_label() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let parent = taxonomy.type_at_level(2);
+
+        let warnings = create_time_warnings(vec![
+            format!("type:{}", taxonomy.type_at_level(4)),
+            format!("{}:auth", taxonomy.label_associations[parent]),
+        ]);
+
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
 }
