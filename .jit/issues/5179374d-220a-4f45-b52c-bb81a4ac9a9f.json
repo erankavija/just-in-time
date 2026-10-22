@@ -8,6 +8,7 @@
   ],
   "description": "Profile application and selection neither write nor read applied-profile records: the record type, its writes under the data root, its layout constant, record conflicts and record-driven dependency resolution are removed.\n\n## Background\n\nCharter decision D-8 deletes applied-profile records. No released record format exists, so a repository holding records drops them with no migration (`@/inv/canonical-cutover`). Record code remains in several modules (line numbers at the investigation baseline):\n\n- `crates/jit/src/repository_state/profile_apply.rs`: `AppliedProfileRecord` (1395) and record handling (1057-1510).\n- `crates/jit/src/repository_state/initialize.rs`: profiles directory creation (1057-1063), `InstalledRecordConflict` (152), `profile_record_changed` (637) and `serialize_profile_record` (1141).\n- The data-root layout constant `VirtualPath::PROFILES` (`crates/jit/src/repository_state/path.rs:305`).\n- `crates/jit/src/commands/profile.rs`: the record readers (`applied_record_path` 2466, `read_applied_profile_record` 2191, `read_applied_record` 2986, 2377-2600, 2631-2812), and the applied-package graph candidates (`resolve_applied_profile_packages` 1679, `resolve_profile_graph_with_applied` 1640, the record fallback in `resolve_dependency_package_from` 1757-1790).\n- `crates/jit/src/profile/variables.rs`: record-based resolution (`resolve_package_from_record` 324 and its helpers).\n- `crates/jit/src/profile/agreement.rs`: the agreement report over records.\n\nThe lifecycle event's status is classified today by whether a record existed (`profile_lifecycle_profile`, `initialize.rs:1081`). Here that classification stops reading a record and is computed from what the apply publishes; redefining the status vocabulary is separate work.\n\nFailure-injection fixtures name a malformed record (`crates/jit/tests/cli_issue/failure_lever_registry.toml:674-762`, `crates/jit/tests/cli_issue/failure_probe_fixture.rs`). A cutover test holds a record-authority guard (`crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`) that another stream also edits.\n\n## Success Criteria\n\n- [hard] REQ-01: No code path reads or writes applied-profile records, and the data-root layout declares no profiles directory.\n- [hard] REQ-02: A dependency resolves only from the selection's own package closure; previously applied packages are no longer candidates.\n- [hard] REQ-03: The lifecycle event's status is computed without reading a record, and re-applying identical content reports no change.\n- [hard] REQ-04: Failure-injection fixtures and tests name no record, and the failure-probe coverage test passes.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:01:36.006358557Z",
   "first_ready_at": "2026-10-22T14:27:05.025243208Z",
   "gates_required": [
     "cargo-ci",
@@ -18,6 +19,12 @@
       "run_id": "005a2315-2fc5-494a-8fce-5d8fb75bd730",
       "status": "passed",
       "updated_at": "2026-10-22T14:55:21.334736212Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c7e27370-2427-443f-b836-3012878e1ec9",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:01:27.011794902Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove applied-profile records",
-  "updated_at": "2026-10-22T14:55:21.334736212Z"
+  "updated_at": "2026-10-22T15:01:36.006358557Z"
 }
