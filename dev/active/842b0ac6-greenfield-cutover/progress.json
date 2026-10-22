@@ -254,7 +254,7 @@
           "title": "Remove the auto and example-integration gate fields",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged-gate-pending"
+          "status": "done"
         },
         {
           "id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
@@ -459,7 +459,8 @@
     "459bb995": 2,
     "d125490a": 1,
     "fbb661f2": 1,
-    "34361448": 1
+    "34361448": 1,
+    "fe761000": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",

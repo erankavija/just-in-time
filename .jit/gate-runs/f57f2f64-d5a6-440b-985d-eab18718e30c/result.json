@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "468f572b7223b295d0e6d994f18c2e0d449b6d12",
+  "completed_at": "2026-10-22T02:14:56.078393365Z",
+  "duration_ms": 113045,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s gate-field removals are accurately and concisely reflected across its affected adopter documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "fe761000-c89f-447f-a20b-e292c5b4e2e8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f57f2f64-d5a6-440b-985d-eab18718e30c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T02:13:03.033304898Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf type and its resolved graph node has no children. I inspected all four reachable `jit:fe761000` commits individually; commit-based attribution was available. The adopter-facing impact cone is the gate CLI reference, gate-presets reference, and planning-bracket how-to.\n\nThe shipped schema accepts automation through `mode` alone; the retained `--auto` CLI flag is accurately documented as shorthand for `--mode auto`. The removed fields and `--example` no longer appear in adopter documentation, and affected TOML/JSON examples match the current implementation.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s gate-field removals are accurately and concisely reflected across its affected adopter documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
