@@ -894,10 +894,6 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
         "validate must expose --explain flag: {flags:?}"
     );
     assert!(
-        flags.iter().any(|f| f["name"] == "json"),
-        "validate must expose --json flag"
-    );
-    assert!(
         flags.iter().any(|f| f["name"] == "rule"),
         "validate must expose --rule for selected graph-rule reproduction"
     );

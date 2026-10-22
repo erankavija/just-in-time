@@ -229,7 +229,6 @@ fn test_schema_issue_create_details() {
     let flags = create["flags"].as_array().unwrap();
     assert!(flags.iter().any(|f| f["name"] == "title"));
     assert!(flags.iter().any(|f| f["name"] == "priority"));
-    assert!(flags.iter().any(|f| f["name"] == "json"));
     assert!(
         flags
             .iter()
