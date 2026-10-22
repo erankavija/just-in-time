@@ -46,7 +46,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{EventTag, LinkedCheckoutWriteStance};
+    use crate::domain::event_catalog::EventTag;
+    use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
 
     fn seeded_override_executor() -> (CommandExecutor<InMemoryStorage>, Event) {

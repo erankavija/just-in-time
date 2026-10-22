@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-63c11d08",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "abbb84126babb102f656555950a9793d6719358b",
+  "completed_at": "2026-10-22T19:20:27.052127221Z",
+  "duration_ms": 237081,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "63c11d08-054e-471a-9b0c-491c30b8d8a1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a3462790-a2bf-46bd-afc4-360f4d392c5e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T19:16:29.971017706Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6a7fcd727, 473170220, 2426bacea, 355c316da, 5f63abc04, fdecce3d5, 0deaabf89, abbb84126 (`jit:63c11d08`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-14 (issue description); @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T19:15:07Z)\nTruncation recovery: partitioned `6a7fcd727` patches by path group; narrowed policy discovery to tracked AGENTS.md; excluded fixture AGENTS and historical-record artifacts outside the impact cone.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

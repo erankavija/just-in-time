@@ -22,7 +22,8 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::{GateRunResult, IssueIdPrefix, Priority, State};
+use jit::domain::issue_id::IssueIdPrefix;
+use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
@@ -61,8 +62,8 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
 fn dep_add_batch_json_error(
     batch: &jit::errors::DependencyBatchRejectedError,
 ) -> jit::output::JsonError {
+    use jit::graph::GraphError;
     use jit::output::{ErrorCode, JsonError};
-    use jit::GraphError;
 
     let from_id = batch.from_id();
 
@@ -90,7 +91,7 @@ fn dep_add_batch_json_error(
         {
             ErrorCode::IssueNotFound.as_str()
         } else if err
-            .downcast_ref::<jit::domain::InvalidIdPrefixError>()
+            .downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
             .is_some()
         {
             ErrorCode::InvalidIdPrefix.as_str()
@@ -615,7 +616,7 @@ fn print_profile_decision(
 fn print_profile_heading(
     id: &str,
     version: &str,
-    origin: &jit::profile::ProfileOrigin,
+    origin: &jit::domain::ProfileOrigin,
     status: &str,
 ) {
     println!(
@@ -710,8 +711,8 @@ fn print_profile_applications(
 
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
-fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
-    let jit::profile::ProfileOrigin::Directory(location) = origin;
+fn profile_origin_label(origin: &jit::domain::ProfileOrigin) -> String {
+    let jit::domain::ProfileOrigin::Directory(location) = origin;
     format!("directory {}", location.as_path().display())
 }
 
@@ -940,9 +941,8 @@ mod gate_findings_text_tests {
     use super::render_gate_findings_text;
     use chrono::Utc;
     use jit::declarations::GateStage;
-    use jit::domain::{
-        GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
-    };
+    use jit::domain::gate_findings::{GateFinding, GateFindings};
+    use jit::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION};
 
     fn run_with(references: Vec<String>) -> GateRunResult {
         GateRunResult {
@@ -5098,7 +5098,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
                             || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::domain::InvalidIdPrefixError>()
+                            || e.downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
                                 .is_some()
                         {
                             JsonError::issue_not_found(&id)

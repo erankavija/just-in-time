@@ -364,7 +364,7 @@ pub struct StatePredicate {
     /// load-time validation.
     authored: Vec<String>,
     /// The recognized lifecycle states, parsed once from `authored` via the
-    /// predicate whitelist. Unrecognized tokens are omitted here and reported by
+    /// canonical state parser. Unrecognized tokens are omitted here and reported by
     /// [`StatePredicate::validate`].
     states: BTreeSet<State>,
 }

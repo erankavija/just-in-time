@@ -2,9 +2,9 @@
 
 use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
+use crate::domain::gate_findings::{GateFinding, GateFindings};
 use crate::domain::{
-    GateContext, GateEvaluationStability, GateFinding, GateFindings, GateRunResult, GateRunStatus,
-    GateStatus,
+    GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
@@ -762,7 +762,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::IssueIdPrefix,
+        prefix: &crate::domain::issue_id::IssueIdPrefix,
         gate_key: &str,
         run_paths: &[crate::repository_state::VirtualPath],
     ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
@@ -1058,7 +1058,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn declared_inputs_digest(
         &self,
         gate: &crate::declarations::GateDefinition,
-    ) -> Result<Option<crate::domain::InputsDigest>> {
+    ) -> Result<Option<crate::domain::repository_inputs::InputsDigest>> {
         let (Some(inputs), Some(layout)) = (gate.inputs.as_ref(), self.real_repo_layout()) else {
             return Ok(None);
         };
@@ -1596,9 +1596,8 @@ mod tests {
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
-    use crate::domain::{
-        GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
-    };
+    use crate::domain::gate_findings::GateFindings;
+    use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
@@ -2208,7 +2207,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                         prompt_file: None,
                     }),
                     inputs: declaration.map(|(roots, exclude)| {
-                        crate::domain::RepositoryInputs::parse(roots, exclude)
+                        crate::domain::repository_inputs::RepositoryInputs::parse(roots, exclude)
                             .expect("a declarable input set")
                     }),
                     priority: 100,
@@ -2604,7 +2603,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let image = executor
             .capture_gate_evaluation_image(
                 session.as_mut(),
-                &crate::domain::IssueIdPrefix::parse(issue_id).unwrap(),
+                &crate::domain::issue_id::IssueIdPrefix::parse(issue_id).unwrap(),
                 gate_key,
                 &run_paths,
             )
@@ -4700,13 +4699,13 @@ source-of-truth = "markdown-first"
 
         let error = executor
             .check_gate(
-                &issue_id[..crate::domain::MIN_ID_PREFIX_LENGTH - 1],
+                &issue_id[..crate::domain::issue_id::MIN_ID_PREFIX_LENGTH - 1],
                 "short-id",
             )
             .unwrap_err();
         assert!(
             error
-                .downcast_ref::<crate::domain::InvalidIdPrefixError>()
+                .downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
                 .is_some(),
             "{error:?}"
         );

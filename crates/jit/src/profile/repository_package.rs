@@ -7,10 +7,11 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
+    use crate::domain::repository_inputs::ExclusionPattern;
     use crate::profile::contribution_drift::{DeclaredOverride, OverrideScope};
     use crate::profile::drift_report::{DriftCarrier, DriftReport, DriftSubject};
     use crate::profile::{
-        ExclusionPattern, LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
+        LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
     };
     use crate::repository_state::{
         render_managed_document, render_rules_and_gates_markdown, Contribution, KeyedArrayTarget,

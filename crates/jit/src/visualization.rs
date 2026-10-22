@@ -105,7 +105,7 @@ fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&
 /// # Example
 /// ```
 /// use jit::visualization;
-/// use jit::{graph::DependencyGraph, Issue};
+/// use jit::{domain::Issue, graph::DependencyGraph};
 ///
 /// let issue1 = Issue::draft("Setup".to_string(), "Initial setup".to_string());
 /// let mut issue2 = Issue::draft("Deploy".to_string(), "Deploy app".to_string());
@@ -167,7 +167,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 /// # Example
 /// ```
 /// use jit::visualization;
-/// use jit::{graph::DependencyGraph, Issue};
+/// use jit::{domain::Issue, graph::DependencyGraph};
 ///
 /// let issue1 = Issue::draft("Design".to_string(), "Design API".to_string());
 /// let mut issue2 = Issue::draft("Implement".to_string(), "Build API".to_string());
@@ -296,7 +296,7 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// use jit::visualization;
 /// use jit::graph::hierarchy::resolve_hierarchy;
 /// use jit::domain::type_taxonomy::HierarchyConfig;
-/// use jit::{graph::DependencyGraph, Issue};
+/// use jit::{domain::Issue, graph::DependencyGraph};
 ///
 /// let mut epic = Issue::draft("Epic".to_string(), String::new());
 /// epic.labels = vec!["type:epic".to_string()];

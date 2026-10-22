@@ -676,9 +676,11 @@ fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError>
         path: path.clone(),
         reason: error.to_string(),
     })?;
-    crate::domain::parse_known_events(text).map_err(|error| MutationError::MalformedRecord {
-        path: path.clone(),
-        reason: error.to_string(),
+    crate::domain::event_log::parse_known_events(text).map_err(|error| {
+        MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: error.to_string(),
+        }
     })
 }
 
@@ -1581,7 +1583,8 @@ mod tests {
     fn appended_events(delta: &RepositoryDelta) -> Vec<Event> {
         appended_event_bytes(delta)
             .map(|bytes| {
-                crate::domain::parse_known_events(std::str::from_utf8(&bytes).unwrap()).unwrap()
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&bytes).unwrap())
+                    .unwrap()
             })
             .unwrap_or_default()
     }
@@ -1690,8 +1693,10 @@ mod tests {
 
         assert!(
             override_records(
-                &crate::domain::parse_known_events(std::str::from_utf8(&unannotated).unwrap())
-                    .unwrap()
+                &crate::domain::event_log::parse_known_events(
+                    std::str::from_utf8(&unannotated).unwrap()
+                )
+                .unwrap()
             )
             .is_empty(),
             "an invocation with no override in effect emits no override record"
@@ -1824,7 +1829,8 @@ mod tests {
             unreachable!("an audit append appends to the event log");
         };
         let events =
-            crate::domain::parse_known_events(std::str::from_utf8(bytes).unwrap()).unwrap();
+            crate::domain::event_log::parse_known_events(std::str::from_utf8(bytes).unwrap())
+                .unwrap();
         assert_eq!(
             override_records(&events).len(),
             1,
@@ -2498,11 +2504,15 @@ mod tests {
             );
             let whole = [log.as_slice(), &appended].concat();
             let read =
-                crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).unwrap();
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
+                    .unwrap();
             let prior_events =
-                crate::domain::parse_known_events(std::str::from_utf8(&log).unwrap()).unwrap();
-            let new_events =
-                crate::domain::parse_known_events(std::str::from_utf8(&appended).unwrap()).unwrap();
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&log).unwrap())
+                    .unwrap();
+            let new_events = crate::domain::event_log::parse_known_events(
+                std::str::from_utf8(&appended).unwrap(),
+            )
+            .unwrap();
             assert_eq!(
                 read,
                 [prior_events, new_events].concat(),
@@ -2587,7 +2597,8 @@ mod tests {
         ));
         let whole = [TORN_LOG, &appended].concat();
         assert!(
-            crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).is_ok(),
+            crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
+                .is_ok(),
             "the reader accepts the certified log"
         );
     }
