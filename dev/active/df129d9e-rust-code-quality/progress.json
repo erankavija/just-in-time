@@ -110,7 +110,7 @@
           "short_id": "2f15d48d",
           "title": "Render issue lists through one output renderer",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (sonnet worker w-2f15d48d, base 24385f797)"
         },
         {
           "key": "gate-run-status-renderer",
