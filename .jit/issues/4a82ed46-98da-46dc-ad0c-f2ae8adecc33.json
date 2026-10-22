@@ -1,12 +1,12 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:22.319820727Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
   ],
-  "description": "Give in-process suites shared constructors for file-backed repositories, executors and declaration directories.\n\n## Background\n\nIn-process suites define private helpers that create a temporary repository from a configuration, run `jit init`, open a `JsonFileStorage` executor with a discovered layout, or write declaration files into a temporary directory. Shared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`), which take no configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository root, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: Unit tests prove each constructor's result: the configuration is the caller's, the executor's layout is the repository's, and the directory holds exactly the supplied files.\n",
+  "description": "Give in-process suites shared constructors for file-backed repositories, executors and declaration directories.\n\n## Background\n\nIn-process suites define private helpers that create a temporary repository from a configuration, run `jit init`, open a `JsonFileStorage` executor with a discovered layout, or write declaration files into a temporary directory. Shared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`), which take no configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository root, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: Unit tests prove each constructor's result: the configuration is the caller's, the executor's layout is the repository's, and the directory holds exactly the supplied files.\n\n\nScope (steward ruling): this task adds the shared definition only; existing copies are retired by the adoption tasks that depend on it.",
   "documents": [],
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
@@ -28,5 +28,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Shared constructors for file-backed in-process test repositories",
-  "updated_at": "2026-10-22T15:33:15.902906661Z"
+  "updated_at": "2026-10-22T15:37:07.909477672Z"
 }

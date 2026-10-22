@@ -6,7 +6,7 @@
   "dependencies": [
     "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
   ],
-  "description": "Give test support one derivation of the shipped item-kind declarations from the default profile package.\n\n## Background\n\nThe shipped item kinds are the `[[contribution]] target = \"item-kinds\"` section of `profiles/jit-default/manifest.toml`. Tests restate them by hand in four places and the `D-[0-9]+` id pattern 14 times. `@/inv/domain-agnostic` keeps package vocabulary out of engine code, so the derivation belongs to test support.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support exposes the shipped item-kind declarations as read from the default package's item-kinds contribution, in the TOML and typed forms tests consume, with no restated kind, alias, mode or id pattern.\n- [hard] REQ-02: A unit test proves that a change to the package's contribution changes the derivation's output.\n",
+  "description": "Give test support one derivation of the shipped item-kind declarations from the default profile package.\n\n## Background\n\nThe shipped item kinds are the `[[contribution]] target = \"item-kinds\"` section of `profiles/jit-default/manifest.toml`. Tests restate them by hand in four places and the `D-[0-9]+` id pattern 14 times. `@/inv/domain-agnostic` keeps package vocabulary out of engine code, so the derivation belongs to test support.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support exposes the shipped item-kind declarations as read from the default package's item-kinds contribution, in the TOML and typed forms tests consume, with no restated kind, alias, mode or id pattern.\n- [hard] REQ-02: A unit test proves that a change to the package's contribution changes the derivation's output.\n\n\nScope (steward ruling): this task adds the shared definition only; existing copies are retired by the adoption tasks that depend on it. REQ-01's \"no restated kind, alias, mode or id pattern\" applies to the derivation itself.",
   "documents": [],
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared test support derives shipped item kinds from the default package",
-  "updated_at": "2026-10-22T15:36:10.277422851Z"
+  "updated_at": "2026-10-22T15:37:07.469138371Z"
 }
