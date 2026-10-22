@@ -705,7 +705,7 @@ roots = [
 version = 1
 key = "session-cost-benchmark-selftest"
 title = "Session-cost benchmark self-test"
-description = "Runs scripts/benchmark-session-cost-selftest.sh, which drives scripts/benchmark-session-cost.sh against a fake jit and checks its output contract. Any non-zero exit fails the gate, including exit 2 for a missing cmp, find, git, grep, jq or sha256sum. Registered at planning for c780514e."
+description = "Runs scripts/benchmark-session-cost-selftest.sh, which drives scripts/benchmark-session-cost.sh against a fake jit and checks its output contract. Any non-zero exit fails the gate, including exit 2 for a missing cmp, find, git, grep, jq or sha256sum."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -720,6 +720,8 @@ pass_context = false
 
 [gates.inputs]
 roots = [
+  "crates/jit/src/storage/json.rs",
+  "dev/archive/1cc809de-repository-state-quality/studies/perf/session-cost-27ffbd2d.json",
   "scripts/benchmark-session-cost-selftest.sh",
   "scripts/benchmark-session-cost.sh",
 ]
