@@ -469,7 +469,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str, labels: Vec<String>| {
     ///     executor
-    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], labels, None, None, false)
     ///         .unwrap()
     ///         .0
@@ -564,11 +564,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .expect("the test taxonomy declares container membership");
     /// let membership = format!("{membership_namespace}:auth");
     /// executor
-    ///     .create_issue("Auth".into(), String::new(), Priority::Normal, vec![],
+    ///     .issues().create_issue("Auth".into(), String::new(), Priority::Normal, vec![],
     ///         vec![format!("type:{container_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     /// executor
-    ///     .create_issue("Stray".into(), String::new(), Priority::Normal, vec![],
+    ///     .issues().create_issue("Stray".into(), String::new(), Priority::Normal, vec![],
     ///         vec![format!("type:{leaf_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     ///

@@ -218,15 +218,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let layout = storage.repository_layout();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let (done, _) = executor
-    ///     .create_issue("Shipped".into(), String::new(), Priority::Normal,
+    ///     .issues().create_issue("Shipped".into(), String::new(), Priority::Normal,
     ///         vec![], vec![], None, None, false)
     ///     .unwrap();
     /// executor
-    ///     .create_issue("Todo".into(), String::new(), Priority::Normal,
+    ///     .issues().create_issue("Todo".into(), String::new(), Priority::Normal,
     ///         vec![], vec![], None, None, false)
     ///     .unwrap();
     /// executor
-    ///     .update_issue(&done, None, None, None, Some(State::Done),
+    ///     .issues().update_issue(&done, None, None, None, Some(State::Done),
     ///         vec![], vec![], None, None, false)
     ///     .unwrap();
     ///
