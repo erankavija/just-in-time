@@ -34,9 +34,7 @@ fn checker_script() -> PathBuf {
     workspace_root().join("scripts/rust-build-budget.sh")
 }
 
-/// The checker shells out to `jq`; a machine without it (matching the skip
-/// convention `dependency_feature_policy_tests.rs` uses for a missing `cargo`)
-/// cannot exercise these fixtures.
+/// The checker shells out to `jq`; a machine without it cannot exercise these fixtures.
 fn jq_available() -> bool {
     Command::new("jq")
         .arg("--version")
