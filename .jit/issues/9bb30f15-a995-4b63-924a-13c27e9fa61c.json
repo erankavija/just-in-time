@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f5c2b6ec-0deb-4850-8ae1-229271758c3e",
+      "status": "passed",
+      "updated_at": "2026-10-22T22:03:11.897434756Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2caebc75-6ffd-4511-875b-b77e1905778a",
+      "status": "passed",
+      "updated_at": "2026-10-22T22:06:08.669360206Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9bb30f15-a995-4b63-924a-13c27e9fa61c",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Read-only lock tests establish their precondition on any host",
-  "updated_at": "2026-10-22T21:42:34.298156029Z"
+  "updated_at": "2026-10-22T22:06:08.669360206Z"
 }
