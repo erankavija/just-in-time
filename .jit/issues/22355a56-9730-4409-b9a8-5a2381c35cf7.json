@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "39bfaefa-fb75-4601-84a9-2e157980bbd1",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:50:34.806347751Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d4bb5ab5-b8ed-4e5c-adef-5616bf5dbe59",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:55:28.599686471Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "22355a56-9730-4409-b9a8-5a2381c35cf7",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Memory executor initialised through product initialisation",
-  "updated_at": "2026-10-22T15:37:07.687222398Z"
+  "updated_at": "2026-10-22T15:55:28.599686471Z"
 }

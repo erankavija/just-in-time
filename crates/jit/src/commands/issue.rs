@@ -2172,10 +2172,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_bytes = serde_json::to_string_pretty(&issue).unwrap();
         storage.add_data_file(&issue_relative, &issue_bytes);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        storage
-            .repository_state()
-            .entries
-            .remove(&crate::repository_state::VirtualPath::INDEX);
 
         assert!(executor.issues().delete_issue(&issue.id).is_err());
         assert_eq!(

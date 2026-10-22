@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "258f08c9323372f3723de728aa6e5cda98d3d4d0",
+  "completed_at": "2026-10-22T15:57:03.473857561Z",
+  "duration_ms": 311741,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged Nextest selector change prebuilds both fixture keys for every identified default-suite consumer, while existing fixture tests retain cold-cache concurrency and lock-timeout coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d423752b-cedc-431b-be9e-d327f8b61387",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "152b9f78-ede5-49ab-84b0-b05870e9c42f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:51:51.732059236Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 16a67f974, 258f08c93 (both tagged `jit:d423752b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-11 and REQ-13 (issue source); @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-22T15:51:33Z); code-review pending\nTruncation recovery: narrowed the fixture-reference search into bounded fixture implementation, consumer-callsite, and test reads\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged Nextest selector change prebuilds both fixture keys for every identified default-suite consumer, while existing fixture tests retain cold-cache concurrency and lock-timeout coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

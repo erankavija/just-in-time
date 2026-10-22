@@ -593,7 +593,9 @@
     "2026-10-22 ~17:45: c780514e plan-review passed on attempt 5; breakdown of 151 issues instantiated; B gates running. just-in-time-05 will execute it (same-session deviation, contained as for 842b0ac6), fixture-timeout fix and waves 1-2 first, preferring sonnet and haiku workers for weekly-quota pacing.",
     "2026-10-22 ~18:00: c780514e planning complete (B 3d7d8ab2 done; both gates passed). Execution started under just-in-time-05; wave 1a is the fixture-lock timeout fix (a3dd995a) and rule-warning tests down a layer (9a07026e).",
     "2026-10-22 ~18:15: c780514e's a3dd995a and 9a07026e fixed the recurring fixture timeouts (bounded 12 s lock wait with a named error; cli_warnings now in-process at ~0.03 s). The force-rerun exemption for that signature is withdrawn. Suite clock is 23.6-23.7 s at load 10-17.",
-    "2026-10-22 ~18:40: a3dd995a's fix is incomplete. The first full run after a crate change builds the cold fixture key under contention for longer than the 12 s wait (lock timeout plus a 20 s TIMEOUT; suite 31.6 s). The force exemption is restored for exactly that signature; the fix is routed to c780514e as top priority."
+    "2026-10-22 ~18:40: a3dd995a's fix is incomplete. The first full run after a crate change builds the cold fixture key under contention for longer than the 12 s wait (lock timeout plus a 20 s TIMEOUT; suite 31.6 s). The force exemption is restored for exactly that signature; the fix is routed to c780514e as top priority.",
+    "2026-10-22 ~19:00: pre-merge rule. Every merge into main first passes `cargo nextest run --workspace` and `cargo test --doc --workspace` on the branch with main merged in (under the shared CI lock; unbudgeted). Main went red 5 times today from subset testing; the latest was c780514e's 22355a56, reverted at cf274f369.",
+    "2026-10-22 ~19:30: c780514e's d423752b fixed the cold-fixture timeouts at the root (nextest setup-script filters now cover every fixture consumer; slowest cold consumer 1.2 s at load ~11; gate suite clock 22.3 s). The force exemption is retired for good."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
