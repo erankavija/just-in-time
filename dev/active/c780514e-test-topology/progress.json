@@ -44,7 +44,7 @@
           "key": "doctest-substep-bound",
           "title": "Doctest substep fits within the per-test bound",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; audit maps20 removals and11 retained examples; reused memory checkout"
         },
         {
           "id": "9a07026e-0666-4c3e-9868-5f083b293988",
@@ -1295,7 +1295,11 @@
     "backup": "/tmp/jit-c780514e-recovery-20261022T220855",
     "coordinator_thread": "01a164c8-d7ba-7812-a630-db8dddcee05b",
     "active_worktree_limit": 2,
-    "pending_external_landing": null
+    "pending_external_landing": null,
+    "worktrees": {
+      "agent-22355a56": "worktree-agent-871df4b0",
+      "agent-de880d9c": "worktree-agent-4a82ed46"
+    }
   },
   "lead_reviews": {
     "de880d9c": {
