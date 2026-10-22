@@ -35,8 +35,6 @@ pub mod drift_report;
 #[cfg(any(test, feature = "test-support"))]
 pub mod template_region;
 
-pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
-pub use crate::domain::ProfileOrigin;
 pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,

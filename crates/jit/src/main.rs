@@ -616,7 +616,7 @@ fn print_profile_decision(
 fn print_profile_heading(
     id: &str,
     version: &str,
-    origin: &jit::profile::ProfileOrigin,
+    origin: &jit::domain::ProfileOrigin,
     status: &str,
 ) {
     println!(
@@ -711,8 +711,8 @@ fn print_profile_applications(
 
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
-fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
-    let jit::profile::ProfileOrigin::Directory(location) = origin;
+fn profile_origin_label(origin: &jit::domain::ProfileOrigin) -> String {
+    let jit::domain::ProfileOrigin::Directory(location) = origin;
     format!("directory {}", location.as_path().display())
 }
 

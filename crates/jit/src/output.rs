@@ -13,10 +13,9 @@ use thiserror::Error;
 
 pub mod failure;
 
-pub use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
-
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
