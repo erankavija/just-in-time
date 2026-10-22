@@ -1063,16 +1063,6 @@ pub fn already_claimed(issue_id: &str, agent_id: &str, expires_info: &str) -> Ac
     .with_remedy("If the agent crashed, force evict with: jit claim force-evict <lease-id> --reason \"<reason>\"")
 }
 
-/// Helper to create git repository detection errors with standard remediation.
-pub fn not_in_git_repo() -> ActionableError {
-    ActionableError::new("Not in a git repository")
-        .with_cause("Current directory is not part of a git repository")
-        .with_cause("Git is not installed or not in PATH")
-        .with_remedy("Initialize a git repository: git init")
-        .with_remedy("Change to a directory inside a git repository")
-        .with_remedy("Verify git is installed: git --version")
-}
-
 /// Helper to create git command failure errors with standard remediation.
 pub fn git_command_failed(command: &str, stderr: &str) -> ActionableError {
     ActionableError::new(format!("Git command failed: {}", command))
@@ -1276,16 +1266,6 @@ mod tests {
         assert!(msg.contains("agent:worker-1"));
         assert!(msg.contains("jit claim status --issue"));
         assert!(msg.contains("force-evict"));
-    }
-
-    #[test]
-    fn test_not_in_git_repo_helper() {
-        let error = not_in_git_repo();
-        let msg = error.to_error_message();
-
-        assert!(msg.contains("Not in a git repository"));
-        assert!(msg.contains("git init"));
-        assert!(msg.contains("git --version"));
     }
 
     // The generic message-carrier errors exist so the top-level exit-code
