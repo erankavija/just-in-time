@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f2655d13-1f96-468e-8150-5935ac67d331",
+      "status": "failed",
+      "updated_at": "2026-10-22T06:32:17.735875383Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "39710b3b-2b92-4fc1-bbc2-4c230577e350",
   "labels": [
     "type:task",
@@ -25,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record built-in checker faults as error runs",
-  "updated_at": "2026-10-22T01:56:50.248294393Z"
+  "updated_at": "2026-10-22T06:32:17.735875383Z"
 }
