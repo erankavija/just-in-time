@@ -40,7 +40,6 @@ pub mod ruleset_store;
 pub mod temp_cleanup;
 #[cfg(feature = "test-support")]
 mod test_support;
-pub mod user_config_store;
 pub mod warnings;
 pub mod worktree_identity;
 pub mod worktree_paths;
@@ -62,7 +61,9 @@ pub use json::{
     read_exact_store, ExactStoreSnapshot, JsonFileStorage, RetainedMutationSessionGuard,
     RetainedSessionSuspendedError,
 };
-pub use lock::{configured_lock_timeout, is_lock_timeout, FileLocker, LockMode, LockTimeout};
+pub use lock::{
+    configured_lock_timeout, is_lock_timeout, FileLocker, LockMetadata, LockMode, LockTimeout,
+};
 pub(in crate::storage) use mutation_interruption::SessionRedoInterruptions;
 pub use mutation_interruption::{
     MutationInterruptionInjector, MutationPoint, NoMutationInterruptions,

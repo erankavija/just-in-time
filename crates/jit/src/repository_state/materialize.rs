@@ -648,14 +648,12 @@ mod tests {
     use crate::config::ProjectName;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
-    use crate::domain::ProfileOrigin;
     use crate::repository_state::{
         compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
-        CaptureSpec, CapturedBytes, Contribution, InitializationScaffold, MapEntryTarget,
-        MaterializationDriftKind, MaterializationPlan, MaterializationRequest, MutationContext,
-        ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
-        ProfilePackageId, ProfileRegionClaim, RepositoryAction, RepositoryImage, RepositoryLayout,
-        RepositoryRootEvidence, TargetClaim,
+        CaptureSpec, CapturedBytes, InitializationScaffold, MaterializationDriftKind,
+        MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
+        ProfileClaims, ProfilePackageId, RepositoryAction, RepositoryImage, RepositoryLayout,
+        RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -920,10 +918,9 @@ kind = "advisory"
                         selected,
                     }
                 }
-                TestIntent::RepairDerivedState => MaterializationRequest::RepairDerivedState {
-                    declarations,
-                    profiles: Vec::new(),
-                },
+                TestIntent::RepairDerivedState => {
+                    MaterializationRequest::RepairDerivedState { declarations }
+                }
             },
         )
     }
@@ -967,7 +964,6 @@ kind = "advisory"
             &declared_image,
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&config, &gate_registry, &rule_set),
-                profiles: Vec::new(),
             },
         )
         .unwrap();
@@ -994,14 +990,8 @@ kind = "advisory"
                 .try_into()
                 .expect("test profile id is canonical"),
             version: "1.0.0".into(),
-            compatible_jit: "*".into(),
-            package_hash: "package-hash".into(),
             variables: crate::profile::ResolvedVariables::default(),
             target_hashes: BTreeMap::new(),
-            origin: ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("packages/identity-test")
-                    .expect("a canonical package location"),
-            ),
             claims: ProfileClaims {
                 package_id: ProfilePackageId::new("identity-test"),
                 contributions: Vec::new(),
@@ -1009,7 +999,6 @@ kind = "advisory"
                 regions: Vec::new(),
             },
             contribution_context: Vec::new(),
-            record_path: VirtualPath::data("profiles/identity-test.json").unwrap(),
         };
         let profile_image = image(&[
             (
@@ -1018,8 +1007,6 @@ kind = "advisory"
             ),
             (".jit/gates.toml", None),
             (".jit/rules.toml", None),
-            (".jit/profiles", None),
-            (".jit/profiles/identity-test.json", None),
             (".jit/events.jsonl", None),
         ]);
         let apply_profile = derive_materialization(
@@ -1601,7 +1588,7 @@ kind = "advisory"
     /// configured-projection family (stale AGENTS.md region) in one image exercises
     /// both families in a single `derive_repair` call; every non-delete action
     /// target it emits must be a member of `repair_target_paths` computed over the
-    /// same image, declarations, and profiles.
+    /// same image and declarations.
     #[test]
     fn test_repair_target_paths_covers_every_derive_repair_action_target() {
         let config_partial = ns_and_projection_config(&["component"]);
@@ -1646,7 +1633,7 @@ kind = "advisory"
             plan.delta().actions()
         );
 
-        let allowed = repair_target_paths(&img, declarations(&cfg, &g, &r), Vec::new()).unwrap();
+        let allowed = repair_target_paths(&img, declarations(&cfg, &g, &r)).unwrap();
         for action in non_delete {
             assert!(
                 allowed.contains(action.path()),
@@ -1657,8 +1644,7 @@ kind = "advisory"
     }
 
     /// Full-drift coverage: every family `repair_target_paths` enumerates (default
-    /// ruleset, configured projection, and profile-owned contribution/asset/region)
-    /// is seeded stale in one image, so `derive_repair` emits a write for every
+    /// ruleset and configured projection) is seeded stale in one image, so `derive_repair` emits a write for every
     /// member. The delta's write/set-mode target set must then equal
     /// `repair_target_paths(...)` exactly — not merely a subset (REQ-02's
     /// authority direction), but the complete space with nothing left over.
@@ -1700,24 +1686,12 @@ kind = "advisory"
         // Configured-projection family: a stale region interior.
         let stale_agents = agents_with_region("invariants", "STALE");
 
-        // Profile family: one synthetic contribution (config.toml), one asset, and
-        // one region, each seeded with bytes that differ from what the claims
-        // declare.
-        let asset_target = "profile-asset.md";
-        let region_target = "profile-region.md";
-        let region_id = "profile-region";
-        let stale_region_doc = format!(
-            "# Doc\n\n<!-- jit:{region_id}:begin -->\nSTALE\n<!-- jit:{region_id}:end -->\n"
-        );
-
         let mut files: Vec<(&str, Option<&str>)> = vec![
             (".jit/config.toml", Some(&config)),
             (".jit/gates.toml", None),
             (".jit/rules.toml", Some(&stale_rules)),
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(&stale_agents)),
-            (asset_target, Some("STALE ASSET\n")),
-            (region_target, Some(&stale_region_doc)),
         ];
         for (p, c) in &stale_schema_paths {
             files.push((p.as_str(), Some(c.as_str())));
@@ -1726,47 +1700,10 @@ kind = "advisory"
         let cfg = config_decls(&config);
         let (g, r) = (gates(), rules());
 
-        let test_layout = layout();
-        let profile_claims = ProfileClaims {
-            package_id: ProfilePackageId::new("profile-test"),
-            contributions: vec![ProfileContributionClaim {
-                package_id: ProfilePackageId::new("profile-test"),
-                contribution: Contribution::MapEntry {
-                    target: MapEntryTarget::Namespaces,
-                    identity: "profile-owned".to_string(),
-                    value: serde_json::json!({
-                        "description": "profile-owned namespace",
-                        "unique": false,
-                    }),
-                },
-            }],
-            assets: vec![ProfileAssetClaim {
-                claim: TargetClaim::new(
-                    &test_layout,
-                    VirtualPath::worktree(asset_target).unwrap(),
-                    "profile-asset:test",
-                )
-                .unwrap(),
-                bytes: b"CORRECT ASSET\n".to_vec(),
-                mode: FileMode::Regular,
-            }],
-            regions: vec![ProfileRegionClaim {
-                claim: TargetClaim::new(
-                    &test_layout,
-                    VirtualPath::worktree(region_target).unwrap(),
-                    "profile-region:test",
-                )
-                .unwrap(),
-                region_id: region_id.try_into().expect("test region id is canonical"),
-                content: b"CORRECT REGION CONTENT".to_vec(),
-            }],
-        };
-
         let plan = derive_materialization(
             &img,
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&cfg, &g, &r),
-                profiles: vec![profile_claims.clone()],
             },
         )
         .unwrap();
@@ -1783,23 +1720,18 @@ kind = "advisory"
                 | RepositoryAction::AppendEvents { .. } => None,
             })
             .collect();
-        let expected =
-            repair_target_paths(&img, declarations(&cfg, &g, &r), vec![profile_claims]).unwrap();
+        let expected = repair_target_paths(&img, declarations(&cfg, &g, &r)).unwrap();
 
         assert_eq!(
             actual, expected,
             "the full-drift write/set-mode target set must equal repair_target_paths exactly"
         );
         // Not a degenerate empty comparison: every family the fixture drifted is
-        // represented (default-ruleset rules.toml and its baked schemas, the
-        // configured-projection region, and the profile-owned
-        // contribution/asset/region).
+        // represented (default-ruleset rules.toml and its baked schemas, and the
+        // configured-projection region).
         for path in [
-            VirtualPath::data("config.toml").unwrap(),
             VirtualPath::data("rules.toml").unwrap(),
             VirtualPath::worktree("AGENTS.md").unwrap(),
-            VirtualPath::worktree(asset_target).unwrap(),
-            VirtualPath::worktree(region_target).unwrap(),
         ] {
             assert!(actual.contains(&path), "expected {path:?} in {actual:?}");
         }

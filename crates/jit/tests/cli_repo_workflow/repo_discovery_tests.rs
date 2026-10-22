@@ -106,7 +106,6 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
         String::from_utf8_lossy(&child_init.stderr)
     );
     assert!(child.join(".jit/index.json").is_file());
-    assert!(child.join(".jit/profiles/jit-dogfood.json").is_file());
     assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
     assert_eq!(
         fs::read(parent.path().join(".jit/index.json")).unwrap(),
@@ -116,10 +115,6 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
         fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
         parent_events
     );
-    assert!(!parent
-        .path()
-        .join(".jit/profiles/jit-dogfood.json")
-        .exists());
     assert!(!parent.path().join(".agents").exists());
 }
 
@@ -147,7 +142,6 @@ fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(data_root.join("index.json").is_file());
-    assert!(data_root.join("profiles/jit-dogfood.json").is_file());
     assert!(child.join(".agents/skills/jit-manage/SKILL.md").is_file());
     assert_eq!(
         fs::read(parent.path().join(".jit/events.jsonl")).unwrap(),
@@ -186,7 +180,12 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
         "relative-root profile apply failed: stderr={}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(repo.path().join(".jit/profiles/jit-dogfood.json").is_file());
+    assert!(
+        fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+            .unwrap()
+            .contains("profile_lifecycle"),
+        "the application is audited under the overridden data root"
+    );
     assert!(repo
         .path()
         .join(".agents/skills/jit-manage/SKILL.md")

@@ -1214,7 +1214,7 @@ pub enum ProfileLifecycleOperation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileLifecycleStatus {
-    /// No prior record existed and the operation installed the profile.
+    /// The operation published the profile's content.
     Installed,
     /// The profile and all of its materializations were already current.
     Unchanged,

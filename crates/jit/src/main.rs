@@ -4433,7 +4433,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = command_json_error(&e, ErrorCode::GateError);
+                            let json_error = gate_pass_json_error(&e, &id);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5854,11 +5854,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             }
-            jit::cli::ConfigCommands::Set { key, value, global } => {
+            jit::cli::ConfigCommands::Set { key, value } => {
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
-                let outcome = executor.set_config(&key, &value, global)?;
+                let outcome = executor.set_config(&key, &value)?;
 
                 if json {
                     println!(
@@ -5866,8 +5866,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         JsonOutput::success(json!({
                             "key": outcome.key,
                             "value": outcome.value,
-                            "file": outcome.file.display().to_string(),
-                            "scope": outcome.scope
+                            "file": outcome.file.display().to_string()
                         }))
                         .to_json_string()?
                     );
@@ -5897,17 +5896,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if repo_config_path.exists() {
                     if let Err(e) = JitConfig::load(&jit_dir) {
                         result.errors.push(format!("repo config: {}", e));
-                    }
-                }
-
-                // Check user config.
-                if let Some(home) = dirs::home_dir() {
-                    let user_config_path = home.join(".config/jit/config.toml");
-                    if user_config_path.exists() {
-                        let user_dir = home.join(".config/jit");
-                        if let Err(e) = JitConfig::load(&user_dir) {
-                            result.errors.push(format!("user config: {}", e));
-                        }
                     }
                 }
 

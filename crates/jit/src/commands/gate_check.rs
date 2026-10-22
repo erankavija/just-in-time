@@ -199,11 +199,11 @@ fn required_automated_gate<'a>(
     gate_key: &str,
 ) -> Result<&'a crate::declarations::GateDefinition> {
     if !issue.gates_required.iter().any(|key| key == gate_key) {
-        anyhow::bail!(
-            "Gate '{}' is not required for issue '{}'",
-            gate_key,
-            issue.id
-        );
+        return Err(super::gate::GateNotRequiredError {
+            issue_id: issue.id.to_string(),
+            gate_key: gate_key.to_string(),
+        }
+        .into());
     }
     let gate = registry
         .gates
@@ -961,7 +961,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let digest = self.declared_inputs_digest(gate)?;
         let reused = match (source, digest.as_ref()) {
             (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
-                self.reusable_verdict(gate_key, digest)?
+                self.storage.find_reusable_gate_run(gate_key, digest)?
             }
             _ => None,
         };
@@ -1072,22 +1072,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             &declaration,
         )
         .map(Some)
-    }
-
-    /// The recorded run whose verdict an evaluation of `gate_key` over inputs
-    /// digesting to `digest` may carry, or `None` when no such run exists.
-    ///
-    /// Only a run that executed its checker is a source, so a reused record
-    /// always names the execution behind its verdict rather than another
-    /// reference to it. Only a pass or a failure is carried: a run that errored
-    /// reports the checker never reaching a verdict — a timeout, a missing
-    /// command — which says nothing about the inputs and may not repeat.
-    fn reusable_verdict(
-        &self,
-        gate_key: &str,
-        digest: &crate::domain::InputsDigest,
-    ) -> Result<Option<GateRunResult>> {
-        self.storage.find_reusable_gate_run(gate_key, digest)
     }
 
     /// Execute a built-in checker against one exact repository image.

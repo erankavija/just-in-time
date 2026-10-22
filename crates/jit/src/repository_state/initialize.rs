@@ -2,8 +2,7 @@
 //!
 //! `repository_state` owns fresh-config rendering and the complete init/profile
 //! delta. A command submits semantic choices — the template config skeleton, the
-//! project name, and (for a profile) its neutral claims and provenance
-//! metadata — and this module renders every neutral byte and composes one exact
+//! project name, and (for a profile) its neutral claims — and this module renders every neutral byte and composes one exact
 //! [`RepositoryDelta`] over the captured base image, including the audit append.
 //! The command opens the mutation session, captures the base under its guard,
 //! and applies the returned plan; it never hand-builds a redo record or a
@@ -39,13 +38,13 @@ use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
 use super::RepositoryStateError;
 use super::{
-    AppliedProfileRecord, ProfileApplicationInput, ProfileContributionMaterialization,
-    ProfileTargetDisposition, ProfileTargetMaterialization,
+    ProfileApplicationInput, ProfileContributionMaterialization, ProfileTargetDisposition,
+    ProfileTargetMaterialization,
 };
 
 /// Stable ownership identity for the neutral scaffold materialization.
 const SCAFFOLD_OWNER: &str = "repository-init";
-/// Stable ownership identity for profile-applied assets and provenance.
+/// Stable ownership identity for profile-applied targets.
 const PROFILE_OWNER: &str = "profile-application";
 /// Stable ownership identity for the worktree `.gitattributes` line-set claim.
 const GITATTRIBUTES_OWNER: &str = "gitattributes-merge-driver";
@@ -148,14 +147,6 @@ pub enum InitializationError {
         /// The offending path.
         path: VirtualPath,
     },
-    #[error("installed profile record '{path:?}' conflicts with package {id}@{version}")]
-    InstalledRecordConflict {
-        path: VirtualPath,
-        id: String,
-        version: String,
-    },
-    #[error("profile metadata path '{0:?}' has unsupported filesystem state")]
-    UnsupportedMetadataPath(VirtualPath),
 }
 
 /// When a desired file is written.
@@ -382,13 +373,13 @@ impl InitializationScaffold {
     }
 
     /// Directories the scaffold must create that hold no delta file. Only the
-    /// issues directory qualifies; schema and profile directories are ancestors of
+    /// issues directory qualifies; schema directories are ancestors of
     /// written files and enter the directory closure automatically.
     fn explicit_dirs(&self) -> Result<Vec<VirtualPath>, InitializationError> {
         Ok(vec![VirtualPath::ISSUES])
     }
 
-    /// Every path the composed delta may touch — files, the provenance record, the
+    /// Every path the composed delta may touch — files, the
     /// explicit directories, and every ancestor directory of those — so the command
     /// discovers them into its capture spec and `apply` finds each action's
     /// captured preimage. Over-inclusion is safe; a missing delta path is not.
@@ -402,8 +393,6 @@ impl InitializationScaffold {
         // path must be captured for that length and the action preimage.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
-            paths.push(profile.record_path.clone());
-            paths.push(VirtualPath::PROFILES);
             paths.extend(profile.claims.target_paths()?);
             if profile.owns_default_rule_authority() {
                 paths.push(VirtualPath::SCHEMAS);
@@ -550,8 +539,7 @@ fn coupled_default_repair_profile<'a>(
 /// Every action's expected preimage is derived from the captured base, so
 /// `session.apply` revalidates against exactly what was captured. Neutral scaffold
 /// files fill missing state (authored content preserved), generated schemas are
-/// rewritten, profile provenance writes when it changes, and profile assets write
-/// unconditionally (the derivation proved them changed). The audit log is composed
+/// rewritten, and profile assets write unconditionally (the derivation proved them changed). The audit log is composed
 /// by the finalizer (`context`): a plain init creates it empty, a profiled init
 /// appends one aggregate lifecycle record. The data root's ignore file is composed
 /// by the producer derived-state repair reaches, so it lands before the first
@@ -611,31 +599,6 @@ fn desired_overrides(
             }
             Ok(overlay)
         })
-}
-
-fn profile_record_changed(
-    base: &RepositoryImage,
-    profile: &ProfileApplicationInput,
-    record: &AppliedProfileRecord,
-) -> Result<bool, InitializationError> {
-    match base.entry(&profile.record_path)? {
-        RepositoryEntry::Absent => Ok(true),
-        RepositoryEntry::File { content, .. } => {
-            let existing = serde_json::from_slice::<AppliedProfileRecord>(content.bytes());
-            match existing {
-                Ok(existing) if existing == *record => Ok(false),
-                Ok(existing) if existing.id == profile.id => Ok(true),
-                _ => Err(InitializationError::InstalledRecordConflict {
-                    path: profile.record_path.clone(),
-                    id: profile.id.to_string(),
-                    version: profile.version.clone(),
-                }),
-            }
-        }
-        _ => Err(InitializationError::UnsupportedMetadataPath(
-            profile.record_path.clone(),
-        )),
-    }
 }
 
 /// Select the final authored config/rules bytes before derived materialization.
@@ -870,7 +833,6 @@ fn derive_profile_application_candidate(
         contested_assets,
     )
     .map_err(rule_materialization_error)?;
-    let record = profile.record();
     // The composition already decided every target this profile participates in.
     // Publication reads those decisions rather than re-deriving them, so what a
     // difference report states and what this candidate writes are one answer.
@@ -928,42 +890,7 @@ fn derive_profile_application_candidate(
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;
     }
-    match base.entry(&profile.record_path)? {
-        RepositoryEntry::Absent => actions.push(RepositoryAction::WriteFile {
-            path: profile.record_path.clone(),
-            owner: PROFILE_OWNER.to_string(),
-            expected: ExpectedPreimage::Absent,
-            bytes: serialize_profile_record(&record)?,
-            mode: FileMode::Regular,
-        }),
-        RepositoryEntry::File { .. } => {
-            if profile_record_changed(base, profile, &record)? {
-                push_file_actions(
-                    base,
-                    &[DesiredFile {
-                        path: profile.record_path.clone(),
-                        bytes: serialize_profile_record(&record)?,
-                        mode: FileMode::Regular,
-                        policy: WritePolicy::Always,
-                        owner: PROFILE_OWNER,
-                    }],
-                    &mut actions,
-                )?;
-            }
-        }
-        _ => {
-            return Err(InitializationError::UnsupportedMetadataPath(
-                profile.record_path.clone(),
-            ))
-        }
-    }
-    let profiles = VirtualPath::PROFILES;
-    let explicit = match base.entry(&profiles)? {
-        RepositoryEntry::Absent => vec![profiles],
-        RepositoryEntry::Directory { .. } => Vec::new(),
-        _ => return Err(InitializationError::UnsupportedMetadataPath(profiles)),
-    };
-    let mut all = directory_actions(base, &actions, &explicit)?;
+    let mut all = directory_actions(base, &actions, &[])?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
     Ok(MaterializationDerivation::new(delta)
@@ -974,8 +901,8 @@ fn derive_profile_application_candidate(
 /// Compose one profile selection and record its aggregate lifecycle outcome.
 ///
 /// `operation` names the lifecycle command that requested the selection; each
-/// member's own status is still derived from its prior record rather than from
-/// that name. `forced_changed` carries coupled initialization materializations
+/// member's own status is derived from what its candidate publishes rather than
+/// from that name. `forced_changed` carries coupled initialization materializations
 /// that are derived before the profile candidates themselves. Keeping both
 /// facts in this planner means initialization and every lifecycle command share
 /// one composition and one event shape.
@@ -998,7 +925,6 @@ pub(super) fn derive_profile_applications(
     );
 
     for profile in profiles {
-        let status_base = proposed.clone();
         let candidate =
             derive_profile_application_candidate(&proposed, profile, &contested_assets)?;
         let candidate_actions = candidate
@@ -1019,7 +945,7 @@ pub(super) fn derive_profile_applications(
         if changed {
             applied_profiles.insert(profile.id.clone());
         }
-        lifecycle_profiles.push(profile_lifecycle_profile(&status_base, profile, changed)?);
+        lifecycle_profiles.push(profile_lifecycle_profile(profile, changed));
     }
 
     if aggregate_changed {
@@ -1028,17 +954,7 @@ pub(super) fn derive_profile_applications(
             fold_rebased_action(base, &mut actions, &action)?;
         }
     }
-    let profiles_path = VirtualPath::PROFILES;
-    let explicit = match base.entry(&profiles_path)? {
-        RepositoryEntry::Absent => vec![profiles_path],
-        RepositoryEntry::Directory { .. } => Vec::new(),
-        _ => return Err(InitializationError::UnsupportedMetadataPath(profiles_path)),
-    };
-    for action in directory_actions(
-        base,
-        &actions.values().cloned().collect::<Vec<_>>(),
-        &explicit,
-    )? {
+    for action in directory_actions(base, &actions.values().cloned().collect::<Vec<_>>(), &[])? {
         fold_rebased_action(base, &mut actions, &action)?;
     }
     let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
@@ -1048,55 +964,29 @@ pub(super) fn derive_profile_applications(
         .with_applied_profiles(applied_profiles))
 }
 
-/// Classify one profile's aggregate outcome from its prior provenance and the
-/// candidate's materialization effect. The package operation itself determines
-/// no status; the recorded package identity and resolved inputs do.
+/// Classify one profile's aggregate outcome from whether its candidate
+/// publishes anything: a publishing candidate installs the package's content,
+/// and one that publishes nothing leaves the repository unchanged.
 fn profile_lifecycle_profile(
-    base: &RepositoryImage,
     profile: &ProfileApplicationInput,
     changed: bool,
-) -> Result<ProfileLifecycleProfile, InitializationError> {
-    let status =
-        match base.entry(&profile.record_path)? {
-            RepositoryEntry::Absent => {
-                if changed {
-                    ProfileLifecycleStatus::Installed
-                } else {
-                    ProfileLifecycleStatus::Unchanged
-                }
-            }
-            RepositoryEntry::File { content, .. } => {
-                let prior = serde_json::from_slice::<AppliedProfileRecord>(content.bytes())
-                    .map_err(|_| InitializationError::InstalledRecordConflict {
-                        path: profile.record_path.clone(),
-                        id: profile.id.to_string(),
-                        version: profile.version.clone(),
-                    })?;
-                if prior.version != profile.version || prior.package_hash != profile.package_hash {
-                    ProfileLifecycleStatus::Upgraded
-                } else if prior.variables != profile.variables {
-                    ProfileLifecycleStatus::Reconfigured
-                } else {
-                    ProfileLifecycleStatus::Unchanged
-                }
-            }
-            _ => {
-                return Err(InitializationError::UnsupportedMetadataPath(
-                    profile.record_path.clone(),
-                ))
-            }
-        };
+) -> ProfileLifecycleProfile {
+    let status = if changed {
+        ProfileLifecycleStatus::Installed
+    } else {
+        ProfileLifecycleStatus::Unchanged
+    };
     let variables = profile
         .variables
         .sources()
         .into_iter()
         .map(|(name, source)| ProfileLifecycleVariable { name, source })
         .collect();
-    Ok(ProfileLifecycleProfile {
+    ProfileLifecycleProfile {
         id: profile.id.clone(),
         status,
         variables,
-    })
+    }
 }
 
 /// Deduplicate desired files by canonical path, keeping the LAST occurrence so a
@@ -1109,12 +999,6 @@ fn dedup_last_wins(files: Vec<DesiredFile>) -> Vec<DesiredFile> {
         ordered.insert(file.path.clone(), file);
     }
     ordered.into_values().collect()
-}
-
-fn serialize_profile_record(record: &AppliedProfileRecord) -> Result<Vec<u8>, InitializationError> {
-    record
-        .to_bytes()
-        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
 
 /// Carry a producer failure raised while composing a profile's targets as an
@@ -1224,11 +1108,7 @@ fn push_file_actions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::ProfileOrigin;
-    use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryLayout,
-        RepositoryRootEvidence,
-    };
+    use crate::repository_state::{CapturedBytes, EntryIdentity};
     use std::collections::BTreeMap;
 
     const LINE: &str = ".jit/events.jsonl merge=union";
@@ -1240,23 +1120,15 @@ mod tests {
         }
     }
 
-    fn profile_input(
-        id: &str,
-        version: &str,
-        package_hash: &str,
-        variables: crate::profile::ResolvedVariables,
-    ) -> ProfileApplicationInput {
-        let profile_id = crate::profile::ProfileId::try_from(id).unwrap();
+    fn profile_input(id: &str) -> ProfileApplicationInput {
         ProfileApplicationInput {
-            id: profile_id.clone(),
-            version: version.to_string(),
-            compatible_jit: "*".to_string(),
-            package_hash: package_hash.to_string(),
-            variables,
+            id: crate::profile::ProfileId::try_from(id).unwrap(),
+            version: "1.0.0".to_string(),
+            variables: serde_json::from_value(serde_json::json!({
+                "NAME": {"value": "value", "source": "set"}
+            }))
+            .unwrap(),
             target_hashes: BTreeMap::new(),
-            origin: ProfileOrigin::Directory(
-                RootRelativePath::parse(format!("packages/{id}")).unwrap(),
-            ),
             claims: crate::repository_state::ProfileClaims {
                 package_id: crate::repository_state::ProfilePackageId::new(id),
                 contributions: Vec::new(),
@@ -1264,103 +1136,20 @@ mod tests {
                 regions: Vec::new(),
             },
             contribution_context: Vec::new(),
-            record_path: VirtualPath::data(format!("profiles/{id}.json")).unwrap(),
         }
     }
 
-    fn variables(value: &str) -> crate::profile::ResolvedVariables {
-        serde_json::from_value(serde_json::json!({
-            "NAME": {"value": value, "source": "set"}
-        }))
-        .unwrap()
-    }
-
-    fn image_with_records(records: Vec<(VirtualPath, AppliedProfileRecord)>) -> RepositoryImage {
-        let paths = records
-            .iter()
-            .map(|(path, _)| path.clone())
-            .collect::<Vec<_>>();
-        let spec = CaptureSpec::new(
-            paths,
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 4096,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        let entries = records
-            .into_iter()
-            .map(|(path, record)| (path, file(&record.to_bytes().unwrap())))
-            .collect::<BTreeMap<_, _>>();
-        let layout = RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap();
-        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
-    }
-
     #[test]
-    fn test_profile_lifecycle_profile_classifies_changed_existing_profiles() {
-        let unchanged = profile_input("unchanged", "1.0.0", "same", variables("value"));
-        let reconfigured = profile_input("reconfigured", "1.0.0", "same", variables("new"));
-        let upgraded = profile_input("upgraded", "2.0.0", "new", variables("value"));
-        let records = vec![
-            (
-                unchanged.record_path.clone(),
-                AppliedProfileRecord::new(
-                    unchanged.id.clone(),
-                    "1.0.0",
-                    "*",
-                    unchanged.origin.clone(),
-                    "same",
-                    variables("value"),
-                ),
-            ),
-            (
-                reconfigured.record_path.clone(),
-                AppliedProfileRecord::new(
-                    reconfigured.id.clone(),
-                    "1.0.0",
-                    "*",
-                    reconfigured.origin.clone(),
-                    "same",
-                    variables("old"),
-                ),
-            ),
-            (
-                upgraded.record_path.clone(),
-                AppliedProfileRecord::new(
-                    upgraded.id.clone(),
-                    "1.0.0",
-                    "*",
-                    upgraded.origin.clone(),
-                    "old",
-                    variables("value"),
-                ),
-            ),
-        ];
-        let base = image_with_records(records);
+    fn test_profile_lifecycle_profile_classifies_status_from_whether_the_candidate_publishes() {
+        let profile = profile_input("workflow");
 
-        assert_eq!(
-            profile_lifecycle_profile(&base, &unchanged, true)
-                .unwrap()
-                .status,
-            ProfileLifecycleStatus::Unchanged
-        );
-        assert_eq!(
-            profile_lifecycle_profile(&base, &reconfigured, true)
-                .unwrap()
-                .status,
-            ProfileLifecycleStatus::Reconfigured
-        );
-        assert_eq!(
-            profile_lifecycle_profile(&base, &upgraded, true)
-                .unwrap()
-                .status,
-            ProfileLifecycleStatus::Upgraded
-        );
+        let published = profile_lifecycle_profile(&profile, true);
+        let unpublished = profile_lifecycle_profile(&profile, false);
+
+        assert_eq!(published.status, ProfileLifecycleStatus::Installed);
+        assert_eq!(unpublished.status, ProfileLifecycleStatus::Unchanged);
+        assert_eq!(published.variables, unpublished.variables);
+        assert_eq!(published.id, profile.id);
     }
 
     #[test]

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:26:09.214126337Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,26 @@
   ],
   "description": "A gate that is not required for an issue is reported three ways: a typed `GateNotRequiredError`, an `anyhow!` and a `bail!`. Only the typed error maps to the invalid-argument exit code.\n\n## Background\n\n- `GateNotRequiredError` (`crates/jit/src/commands/gate.rs:37-43`) is raised by `pass_gate` (`gate.rs:823`) and by manual evaluation (`commands/mod.rs:1613`).\n- `fail_gate` raises `anyhow!` (`gate.rs:1039-1043`).\n- `required_automated_gate` raises `bail!` (`commands/gate_check.rs:204-209`; callers `:776,896,959`).\n- Typed matching lives in `main.rs:79` (`error_to_error_code` maps it to `InvalidArgument`), `main.rs:719-730` (JSON details `issue_id`, `key`) and `main.rs:9063`.\n- No consumer matches the message text, and tests check exit codes (`tests/cli_gate/gate_evaluate_exit_code_test.rs:205,237`).\n\n`gate fail` (`main.rs:5312`) is the user-visible change: a non-required gate there exits through the invalid-argument code instead of the generic gate-error fallback.\n\n## Success Criteria\n\n- [hard] REQ-01: Every command path that finds a gate not required for an issue returns `GateNotRequiredError`.\n- [hard] REQ-02: No `anyhow!` or `bail!` reports that condition in `commands/gate.rs` or `commands/gate_check.rs`.\n- [hard] REQ-03: Failing a gate that is not required exits with the invalid-argument code, proven by one CLI test.\n\n## Notes\n\nThe `main.rs` classifier already maps the typed error and needs no change.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:43:37.193755947Z",
   "first_ready_at": "2026-10-22T02:15:09.965239043Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dd8d182c-dc87-4957-853e-b412c68323ed",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:38:04.107129643Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bba89543-127d-4c86-9a2c-2850d13387ee",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:43:27.427347907Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:842b0ac6/REQ-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Report a non-required gate through one typed error",
-  "updated_at": "2026-10-22T14:26:09.270739849Z"
+  "updated_at": "2026-10-22T14:43:37.193755947Z"
 }

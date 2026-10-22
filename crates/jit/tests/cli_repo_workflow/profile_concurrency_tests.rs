@@ -20,7 +20,7 @@ struct PauseState {
 /// Pause one real publication at the moment its record application begins.
 ///
 /// The repository mutation session already holds the repository-wide lock at
-/// this point, while none of the planned target, ownership, or audit bytes have
+/// this point, while none of the planned target or audit bytes have
 /// been published. The condition variable makes both edges of the overlap
 /// explicit; elapsed time is not used to decide when the contender has arrived.
 #[derive(Debug, Default)]
@@ -147,19 +147,19 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     assert_eq!(
         LifecycleState::capture(repository.path()),
         after_winner,
-        "the replanned no-op must not republish stale ownership, targets, or audit bytes"
+        "the replanned no-op must not republish stale targets or audit bytes"
     );
 
-    let record: Value = serde_json::from_slice(
-        &std::fs::read(
+    assert_eq!(
+        std::fs::read_to_string(
             repository
                 .path()
-                .join(".jit/profiles/lifecycle-interruption.json"),
+                .join("docs/lifecycle-interruption/retained.txt")
         )
         .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(record["version"], "2.0.0");
+        "retained content from 2.0.0\n",
+        "the winner published the changed package"
+    );
     assert_eq!(
         std::fs::read_to_string(repository.path().join(".jit/events.jsonl"))
             .unwrap()

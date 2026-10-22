@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c1784e935b09832c7e5416cf1eb695b56d437c2b",
+  "completed_at": "2026-10-22T14:38:22.147619368Z",
+  "duration_ms": 295773,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/plan.md",
+        "id": "F1",
+        "line": 698,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/decision/D-02"
+        ],
+        "severity": "high",
+        "summary": "The plan requires memory-backend-path-reads to depend on ec190bd5, but mapped issue 94bbdbd6 lacks that external dependency."
+      }
+    ],
+    "summary": "One approved external re-home edge is missing from the created graph.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c487f70-e92f-4437-b761-87c2cfc0cb64",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:33:26.374131957Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 27747 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16407-f8e8-7111-a144-836a53536a7f\n--------\nuser\n--- 27734 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Required checks passed: manifest validation, renderer check, native batch dry-run, and `jit validate`. All 151 issues and 298 intra-manifest edges match; no `planning` metadata was persisted or exported.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| All 146 finest-tier issues | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n\n1. **F1 — high; disposition: blocking; origin: issue-impact.** The approved plan requires `memory-backend-path-reads → ec190bd5` ([plan.md:698](/home/vkaskivuo/Projects/just-in-time/dev/active/c780514e-test-topology/plan.md:698)), but mapped issue `94bbdbd6` depends only on `issue-store-conformance-suite`; the external re-home edge is absent. This makes the created graph diverge from the approved external geometry. Manifest correction: none—external edges are not represented in `breakdown.json`. Graph reconciliation: add `ec190bd5` as a direct dependency of `94bbdbd6` (`jit dep add 94bbdbd6 ec190bd5`) and rerun `jit validate`. If the completed external issue is intentionally omitted, replace the outgoing-edge decision and rerun plan-review before reconciliation.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One approved external re-home edge is missing from the created graph.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan requires memory-backend-path-reads to depend on ec190bd5, but mapped issue 94bbdbd6 lacks that external dependency.\",\"file\":\"dev/active/c780514e-test-topology/plan.md\",\"line\":698,\"references\":[\"@/issue/c780514e/decision/D-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

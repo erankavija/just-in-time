@@ -169,14 +169,11 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
 
     let config_path = temp.path().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"1abc\"\n").unwrap();
-    let home = temp.path().join("isolated-home");
-    fs::create_dir_all(home.join(".config/jit")).unwrap();
-    fs::write(home.join(".config/jit/config.toml"), "not = valid = toml").unwrap();
 
     let out = Command::new(jit_binary())
         .args(["config", "validate", "--json"])
         .current_dir(temp.path())
-        .env("HOME", &home)
+        .env("HOME", temp.path().join("isolated-home"))
         .env_remove("JIT_WORKTREE_WRITE_POLICY")
         .output()
         .expect("failed to run jit config validate --json");
@@ -193,15 +190,12 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
     let errors = parsed["error"]["details"]["errors"]
         .as_array()
         .expect("validation details carry an errors array");
-    assert_eq!(errors.len(), 2, "every actionable finding is retained");
-    for source in ["repo config", "user config"] {
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.as_str().is_some_and(|error| error.contains(source))),
-            "details must retain the {source} finding, got: {errors:?}"
-        );
-    }
+    assert!(
+        errors.iter().any(|error| error
+            .as_str()
+            .is_some_and(|error| error.contains("repo config"))),
+        "details must retain the repo config finding, got: {errors:?}"
+    );
 }
 
 #[test]
@@ -269,45 +263,110 @@ fn test_config_set_rejects_invalid_project_name_without_writing() {
     assert_eq!(before, after, "a rejected set must not modify the file");
 }
 
-/// `config set` parses the edited document as configuration at both scopes and
-/// refuses an edit that would not load as an invalid argument, leaving each file
-/// untouched.
+/// `config set` parses the edited document as configuration and refuses an edit
+/// that would not load as an invalid argument, leaving the file untouched.
 #[test]
-fn test_config_set_rejects_unknown_key_at_repo_and_global_scope_without_writing() {
+fn test_config_set_rejects_unknown_key_without_writing() {
     let temp = TempDir::new().unwrap();
     let repo_dir = temp.path().join("unknown-key-repo");
     fs::create_dir(&repo_dir).unwrap();
     assert!(jit_init(&repo_dir).status.success());
-    let home = temp.path().join("isolated-home");
     let repo_config = repo_dir.join(".jit/config.toml");
-    let user_config = home.join(".config/jit/config.toml");
     let before = fs::read_to_string(&repo_config).unwrap();
 
-    for scope in [&[][..], &["--global"][..]] {
-        let out = Command::new(jit_binary())
-            .args(["config", "set", "coordination.undeclared_key", "x"])
-            .args(scope)
+    let out = Command::new(jit_binary())
+        .args(["config", "set", "coordination.undeclared_key", "x"])
+        .current_dir(&repo_dir)
+        .env("HOME", temp.path().join("isolated-home"))
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+        .output()
+        .expect("failed to run jit config set");
+    assert_eq!(
+        out.status.code(),
+        Some(ErrorCode::InvalidArgument.exit_code().code()),
+        "an unknown key is an invalid argument"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("undeclared_key"),
+        "error names the key: {stderr}"
+    );
+
+    assert_eq!(fs::read_to_string(&repo_config).unwrap(), before);
+}
+
+/// The user's home carries no configuration layer: a `~/.config/jit/config.toml`
+/// (here both malformed and holding overriding values) changes no command's
+/// output, and `config set` has no global scope.
+#[test]
+fn test_user_home_config_toml_has_no_effect_on_any_command() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("home-layer-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    assert!(jit_init(&repo_dir).status.success());
+    let home = temp.path().join("home");
+    fs::create_dir_all(home.join(".config/jit")).unwrap();
+    let user_config = home.join(".config/jit/config.toml");
+
+    let run = |args: &[&str]| {
+        Command::new(jit_binary())
+            .args(args)
             .current_dir(&repo_dir)
             .env("HOME", &home)
+            .env_remove("XDG_CONFIG_HOME")
             .env_remove("JIT_WORKTREE_WRITE_POLICY")
+            .env_remove("JIT_ENFORCE_LEASES")
             .output()
-            .expect("failed to run jit config set");
+            .expect("failed to run jit")
+    };
+    let observe = || {
+        [
+            "config show --json",
+            "config validate --json",
+            "config get worktree.enforce_leases --json",
+        ]
+        .map(|line| {
+            let args: Vec<&str> = line.split(' ').collect();
+            let out = run(&args);
+            (out.status.code(), out.stdout)
+        })
+    };
+
+    let baseline = observe();
+    assert_eq!(baseline[1].0, Some(0), "baseline repository is valid");
+
+    let overriding = "[worktree]\nenforce_leases = \"off\"\n\n[coordination]\n\
+                      max_indefinite_leases_per_agent = 99\nmax_indefinite_leases_per_repo = 99\n";
+    for content in [overriding, "not = valid = toml"] {
+        fs::write(&user_config, content).unwrap();
         assert_eq!(
-            out.status.code(),
-            Some(ErrorCode::InvalidArgument.exit_code().code()),
-            "{scope:?}: an unknown key is an invalid argument"
-        );
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(
-            stderr.contains("undeclared_key"),
-            "{scope:?}: error names the key: {stderr}"
+            observe(),
+            baseline,
+            "user config {content:?} changed output"
         );
     }
 
-    assert_eq!(fs::read_to_string(&repo_config).unwrap(), before);
-    assert!(
-        !user_config.exists(),
-        "a rejected global set must not write"
+    let before = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let out = run(&[
+        "config",
+        "set",
+        "coordination.max_indefinite_leases_per_agent",
+        "3",
+        "--global",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(ErrorCode::InvalidArgument.exit_code().code()),
+        "`--global` is no longer an option: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap(),
+        before
+    );
+    assert_eq!(
+        fs::read_to_string(&user_config).unwrap(),
+        "not = valid = toml"
     );
 }
 

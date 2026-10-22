@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:26:08.837384929Z",
   "context": {},
   "created_at": "2026-10-22T02:10:49.370855023Z",
@@ -16,7 +16,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d27da6d1-aa6d-4194-b0d7-a9ab6b139925",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:47:39.934754156Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "303ba85e-f7e7-4acd-8e73-73a2a08f4a9f",
+      "status": "failed",
+      "updated_at": "2026-10-22T14:53:18.002112980Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove the user and system configuration layers",
-  "updated_at": "2026-10-22T14:26:08.893608069Z"
+  "updated_at": "2026-10-22T14:53:18.002112980Z"
 }

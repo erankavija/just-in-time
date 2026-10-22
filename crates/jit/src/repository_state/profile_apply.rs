@@ -5,10 +5,9 @@
 //!
 //! `repository_state` owns this composition; the profile package produces the
 //! neutral [`ProfileClaims`] and the command captures the base image and applies the
-//! resulting delta. The applied record carries the profile layer's canonical
-//! resolved-variable provenance, but package parsing, storage, and command code
-//! remain outside this module; the typed aggregate profile-selection
-//! materialization request sits between them.
+//! resulting delta. Package parsing, storage, and command code remain outside
+//! this module; the typed aggregate profile-selection materialization request
+//! sits between them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,7 +21,6 @@ use super::{
     TargetClaim, VirtualPath,
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
-use crate::domain::ProfileOrigin;
 use crate::profile::{ProfileId, RegionId, ResolvedVariables};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -676,7 +674,7 @@ impl ProfileTargetConflictsError {
 
 /// A profile package's contribution to a repository, in canonical repository-state
 /// vocabulary. Produced by `profile::package` from the immutable manifest and
-/// consumed only by [`compose_profile_targets`].
+/// consumed only by [`compose_profile_targets_with_context`].
 #[derive(Clone)]
 pub struct ProfileClaims {
     /// Package that authored these claims.
@@ -722,10 +720,6 @@ impl Contribution {
     }
 }
 
-/// The sole installed-profile provenance wire version accepted by ordinary
-/// readers.
-pub const APPLIED_PROFILE_RECORD_VERSION: u8 = 2;
-
 /// The byte prefix every managed-region delimiter this engine writes begins
 /// with. Text carrying it holds a region some owner manages.
 const REGION_MARKER_PREFIX: &[u8] = b"<!-- jit:";
@@ -745,87 +739,15 @@ fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
     (delimiter("begin"), delimiter("end"))
 }
 
-/// Canonical repository-local provenance for one installed profile.
-///
-/// This record deliberately carries no registry definitions, ownership claims,
-/// or effective configuration. Registry loaders remain the sole source of
-/// behavior.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedProfileRecord {
-    /// Explicit current wire discriminator. Only `2` is accepted here.
-    #[serde(deserialize_with = "deserialize_current_record_version")]
-    pub record_version: u8,
-    /// Stable package identity.
-    pub id: ProfileId,
-    /// Installed package version.
-    pub version: String,
-    /// Compatible JIT range authored by the package manifest.
-    pub compatible_jit: String,
-    /// Package discovery source.
-    pub origin: ProfileOrigin,
-    /// Digest of the complete package manifest and content.
-    pub package_hash: String,
-    /// Canonical public values and source kinds used to resolve this package.
-    pub variables: ResolvedVariables,
-}
-
-fn deserialize_current_record_version<'de, D>(deserializer: D) -> Result<u8, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let record_version = u8::deserialize(deserializer)?;
-    (record_version == APPLIED_PROFILE_RECORD_VERSION)
-        .then_some(record_version)
-        .ok_or_else(|| {
-            serde::de::Error::custom(format!(
-                "unsupported applied profile record_version {record_version}; expected {APPLIED_PROFILE_RECORD_VERSION}"
-            ))
-        })
-}
-
-impl AppliedProfileRecord {
-    /// Construct the only current installed-profile provenance representation.
-    pub fn new(
-        id: ProfileId,
-        version: impl Into<String>,
-        compatible_jit: impl Into<String>,
-        origin: ProfileOrigin,
-        package_hash: impl Into<String>,
-        variables: ResolvedVariables,
-    ) -> Self {
-        Self {
-            record_version: APPLIED_PROFILE_RECORD_VERSION,
-            id,
-            version: version.into(),
-            compatible_jit: compatible_jit.into(),
-            origin,
-            package_hash: package_hash.into(),
-            variables,
-        }
-    }
-
-    /// Encode the stable current record image.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
-        let mut bytes = serde_json::to_vec_pretty(self)?;
-        bytes.push(b'\n');
-        Ok(bytes)
-    }
-}
-
 /// Neutral profile package input consumed by the one materialization dispatcher.
 #[derive(Clone)]
 pub struct ProfileApplicationInput {
     /// Stable package identity carried from the resolved manifest.
     pub id: ProfileId,
     pub version: String,
-    /// Compatible JIT range authored by this package's manifest.
-    pub compatible_jit: String,
-    pub package_hash: String,
     /// Exact public values and source kinds that produced `claims`.
     pub variables: ResolvedVariables,
     pub target_hashes: BTreeMap<String, String>,
-    pub origin: ProfileOrigin,
     pub claims: ProfileClaims,
     /// Resolved candidates sharing one of this package's semantic identities.
     ///
@@ -834,7 +756,6 @@ pub struct ProfileApplicationInput {
     /// this package's definitions with the selection's without making unrelated
     /// package declarations part of this package's materialization.
     pub(crate) contribution_context: Vec<ProfileContributionClaim>,
-    pub record_path: VirtualPath,
 }
 
 impl ProfileApplicationInput {
@@ -866,17 +787,6 @@ impl ProfileApplicationInput {
     pub(crate) fn owns_default_rule_authority(&self) -> bool {
         self.target_hashes.contains_key(".jit/config.toml")
             || self.target_hashes.contains_key(".jit/rules.toml")
-    }
-
-    pub(super) fn record(&self) -> AppliedProfileRecord {
-        AppliedProfileRecord::new(
-            self.id.clone(),
-            self.version.clone(),
-            self.compatible_jit.clone(),
-            self.origin.clone(),
-            self.package_hash.clone(),
-            self.variables.clone(),
-        )
     }
 }
 
@@ -997,15 +907,6 @@ pub(super) fn contested_asset_targets<'a>(
 /// regardless of whether it changed from the captured occupant; the caller
 /// (the typed aggregate profile-selection materialization request) decides
 /// which targets to write.
-pub(super) fn compose_profile_targets(
-    base: &RepositoryImage,
-    claims: ProfileClaims,
-) -> Result<ProfileTargetComposition, RepositoryStateError> {
-    let contribution_context = claims.contributions.clone();
-    compose_profile_targets_with_context(base, claims, contribution_context, &BTreeMap::new())
-}
-
-/// Derive profile-owned targets within the selection being applied.
 ///
 /// `contribution_context` holds the selected packages' definitions of this
 /// package's semantic identities, and `contested_assets` the asset targets
@@ -2095,39 +1996,6 @@ mod tests {
     }
 
     #[test]
-    fn test_applied_profile_record_wire_is_strict_about_version_and_fields() {
-        let record = AppliedProfileRecord::new(
-            "example".try_into().expect("test profile id is canonical"),
-            "1.2.3",
-            ">=1.0.0",
-            ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("profiles/example")
-                    .expect("canonical package source"),
-            ),
-            "a".repeat(64),
-            ResolvedVariables::default(),
-        );
-
-        let wire = serde_json::to_value(&record).expect("record serializes");
-        assert_eq!(
-            serde_json::from_value::<AppliedProfileRecord>(wire.clone())
-                .expect("exact current record reads"),
-            record
-        );
-
-        let mut obsolete_version = wire.clone();
-        obsolete_version["record_version"] = serde_json::json!(1);
-        assert!(serde_json::from_value::<AppliedProfileRecord>(obsolete_version).is_err());
-
-        let mut unknown = wire;
-        unknown
-            .as_object_mut()
-            .expect("record is an object")
-            .insert("claims".to_string(), serde_json::json!([]));
-        assert!(serde_json::from_value::<AppliedProfileRecord>(unknown).is_err());
-    }
-
-    #[test]
     fn test_contribution_identity_uses_stable_typed_registry_target_and_name_dimensions() {
         let namespace = namespace_contribution("shared", "Shared vocabulary.");
         let other_namespace = namespace_contribution("other", "Shared vocabulary.");
@@ -2236,7 +2104,10 @@ mod tests {
             ..asset_claims(&layout, "workflow", &[], b"")
         };
 
-        let composition = compose_profile_targets(&image, claims).unwrap();
+        let context = claims.contributions.clone();
+        let composition =
+            compose_profile_targets_with_context(&image, claims, context, &BTreeMap::new())
+                .unwrap();
 
         assert_eq!(
             composition
@@ -2259,7 +2130,10 @@ mod tests {
             b"package bytes",
         );
 
-        let composition = compose_profile_targets(&image, claims).unwrap();
+        let context = claims.contributions.clone();
+        let composition =
+            compose_profile_targets_with_context(&image, claims, context, &BTreeMap::new())
+                .unwrap();
 
         assert_eq!(
             disposition_of(&composition, &target),

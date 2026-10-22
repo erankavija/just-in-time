@@ -168,6 +168,8 @@ impl Drop for EnvGuard {
 pub const PROFILE_PACKAGE_SOURCES: &str = "profiles";
 
 const PROFILED_REPOSITORY_FIXTURE_SCHEMA: u32 = 1;
+/// Longest wait on a fixture build lock; below the 20 s per-test timeout in `.config/nextest.toml`.
+const PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND: Duration = Duration::from_secs(12);
 const PROFILED_REPOSITORY_FIXTURE_DIRECTORY: &str = "jit-profiled-repository-fixtures";
 const PROFILED_REPOSITORY_FIXTURE_SETUP: &str = "command-executor.initialize-fresh-repository.v1";
 
@@ -279,6 +281,7 @@ pub fn profiled_repository_fixture(
         return Ok(clone);
     }
 
+    // No receipt: the direct path builds each key once under its lock; later consumers read it.
     let entry = direct_profiled_repository_fixture(id, package_directory, scenario_executable)?;
     let clone = TempDir::new()?;
     copy_tree_exact(&entry.join("repository"), clone.path())?;
@@ -287,8 +290,8 @@ pub fn profiled_repository_fixture(
 
 /// A verified applied-profile repository imported into isolated memory state.
 ///
-/// The returned temporary repository owns both the package locations used by
-/// applied-profile provenance and the file-backed baseline clone. Keep it
+/// The returned temporary repository owns both the package locations the
+/// profile was applied from and the file-backed baseline clone. Keep it
 /// alive for as long as commands use the accompanying memory store.
 pub fn profiled_in_memory_repository_fixture(
     id: &str,
@@ -726,11 +729,44 @@ fn ensure_profiled_repository_fixture(
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<PathBuf> {
+    ensure_profiled_repository_fixture_within(
+        cache_root,
+        key,
+        PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND,
+        build,
+    )
+}
+
+/// Builds the entry under its lock, or reads the one a concurrent consumer
+/// published. A wait past `bound` fails naming the lock, key and holder.
+fn ensure_profiled_repository_fixture_within(
+    cache_root: &Path,
+    key: &str,
+    bound: Duration,
+    build: impl FnOnce(&Path) -> Result<()>,
+) -> Result<PathBuf> {
     fs::create_dir_all(cache_root)?;
     let lock_root = cache_root.join("locks");
     fs::create_dir_all(&lock_root)?;
-    let _lock = FileLocker::new(Duration::from_secs(120))
-        .lock_exclusive(&lock_root.join(format!("{key}.lock")))?;
+    let lock_path = lock_root.join(format!("{key}.lock"));
+    let _lock = FileLocker::new(bound)
+        .lock_exclusive_with_metadata(&lock_path, &format!("fixture-build:{key}"))
+        .map_err(|error| {
+            if !crate::storage::is_lock_timeout(&error) {
+                return error;
+            }
+            let holder = fs::read(lock_path.with_extension("lock.meta"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<crate::storage::LockMetadata>(&bytes).ok())
+                .map_or_else(
+                    || "unknown".to_string(),
+                    |meta| format!("pid {} ({})", meta.pid, meta.agent_id),
+                );
+            error.context(format!(
+                "profiled-repository fixture key {key} is still being built; lock {} held by {holder}",
+                lock_path.display()
+            ))
+        })?;
     let entry = cache_root.join(key);
     match fs::symlink_metadata(&entry) {
         Ok(_) => {
@@ -1579,6 +1615,78 @@ mod tests {
     }
 
     #[test]
+    fn test_profiled_repository_fixture_cold_concurrent_consumers_build_once_within_budget() {
+        const CONSUMERS: usize = 6;
+        let cache = TempDir::new().unwrap();
+        let builds = AtomicUsize::new(0);
+        let start = Barrier::new(CONSUMERS);
+        let began = std::time::Instant::now();
+        let entries = std::thread::scope(|scope| {
+            (0..CONSUMERS)
+                .map(|_| {
+                    scope.spawn(|| {
+                        start.wait();
+                        ensure_profiled_repository_fixture(cache.path(), "cold-key", |repository| {
+                            builds.fetch_add(1, Ordering::SeqCst);
+                            std::thread::sleep(Duration::from_millis(200));
+                            fs::write(repository.join("state"), b"built")?;
+                            Ok(())
+                        })
+                        .unwrap()
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|consumer| consumer.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
+        assert!(entries.windows(2).all(|pair| pair[0] == pair[1]));
+        assert!(began.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_lock_wait_past_the_bound_names_lock_key_and_holder() {
+        let cache = TempDir::new().unwrap();
+        let lock_root = cache.path().join("locks");
+        fs::create_dir_all(&lock_root).unwrap();
+        let lock_path = lock_root.join("held-key.lock");
+        let _holder = FileLocker::new(Duration::from_secs(1))
+            .lock_exclusive_with_metadata(&lock_path, "fixture-build:held-key")
+            .unwrap();
+        let built = AtomicUsize::new(0);
+
+        let error = ensure_profiled_repository_fixture_within(
+            cache.path(),
+            "held-key",
+            Duration::from_millis(100),
+            |_| {
+                built.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(
+            message.contains(&lock_path.display().to_string()),
+            "{message}"
+        );
+        assert!(message.contains("held-key"), "{message}");
+        assert!(
+            message.contains(&format!("pid {}", std::process::id())),
+            "{message}"
+        );
+        assert_eq!(built.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_lock_bound_is_below_the_per_test_timeout() {
+        assert!(PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND < Duration::from_secs(20));
+    }
+
+    #[test]
     fn test_profiled_repository_fixture_refuses_an_occupied_publication_path() {
         let cache = TempDir::new().unwrap();
         fs::write(cache.path().join("occupied"), b"not a fixture").unwrap();
@@ -1637,12 +1745,12 @@ mod tests {
             profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
         let second =
             profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
-        let profile_record = Path::new(".jit/profiles/jit-dogfood.json");
+        let profile_asset = Path::new(".agents/skills/jit-manage/SKILL.md");
 
-        assert!(first.path().join(profile_record).is_file());
+        assert!(first.path().join(profile_asset).is_file());
         assert_eq!(
-            fs::read(first.path().join(profile_record)).unwrap(),
-            fs::read(second.path().join(profile_record)).unwrap()
+            fs::read(first.path().join(profile_asset)).unwrap(),
+            fs::read(second.path().join(profile_asset)).unwrap()
         );
         fs::write(first.path().join("AGENTS.md"), b"mutated clone").unwrap();
         assert_ne!(
@@ -1666,7 +1774,7 @@ mod tests {
 
         const EXECUTABLE: &str =
             ".agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh";
-        const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
+        const REGULAR: &str = ".agents/skills/jit-manage/SKILL.md";
         let (first_source, first) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
         let (second_source, second) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
 
@@ -1684,13 +1792,13 @@ mod tests {
             FileMode::Executable
         );
         assert_eq!(
-            first.repository_file_mode_fixture(PROFILE_RECORD).unwrap(),
+            first.repository_file_mode_fixture(REGULAR).unwrap(),
             FileMode::Regular
         );
         assert_eq!(
-            first.read_repo_file(PROFILE_RECORD).unwrap(),
-            Some(fs::read_to_string(first_source.path().join(PROFILE_RECORD)).unwrap()),
-            "the memory adapter must retain the baseline's exact applied-profile record"
+            first.read_repo_file(REGULAR).unwrap(),
+            Some(fs::read_to_string(first_source.path().join(REGULAR)).unwrap()),
+            "the memory adapter must retain the baseline's exact regular profile asset"
         );
 
         first.add_worktree_file("AGENTS.md", "mutated memory clone");

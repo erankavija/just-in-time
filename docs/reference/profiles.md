@@ -20,9 +20,7 @@ verifying it, and where its contents land.
 A package is applied from a location inside the repository worktree, so an
 obtained directory is placed in the repository before it is applied. A package
 read from outside the worktree — including from under `.jit/` — is refused by
-name. Leave the directory where it was applied from: the applied-profile record
-names that location, and later `jit profile` commands read the package there
-again.
+name.
 
 Place a package and the packages it depends on as siblings under one parent,
 each directory named by its own profile ID — that is where [Profile
@@ -269,8 +267,8 @@ for declaration, reference, and precedence semantics.
 The selector syntax and package-resolution contract are defined in [Profile
 Commands](cli-commands.md#profile-commands). This page
 describes the package and its lifecycle; the command reference covers how a
-package obtained from a directory is selected and found again on later runs,
-including where a declared dependency is looked for. A directory of obtained
+package obtained from a directory is selected, including where a declared
+dependency is looked for. A directory of obtained
 packages applies as a set: naming one of them reaches its siblings without
 naming them.
 
@@ -292,8 +290,8 @@ defining it. Only the packages being applied are parties: the repository's
 current content never conflicts with a package. Identical restatements merge, so
 a package and its dependency may declare the same thing.
 
-Profile enumeration and its handling of applied-profile records are defined in
-[Profile Commands](cli-commands.md#profile-commands).
+Profile enumeration is defined in [Profile
+Commands](cli-commands.md#profile-commands).
 
 ## Inspect, recover, and evolve
 
@@ -301,7 +299,7 @@ Use `jit profile diff` before a change to see every target and semantic
 declaration a selection would create, update, leave unchanged, or conflict on.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
-validation as its corresponding `apply`, `pack`, or `add` command, but writes no target, provenance record, or lifecycle
+validation as its corresponding `apply`, `pack`, or `add` command, but writes no target or lifecycle
 event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
 operator can identify each conflicting target or declaration and the packages
 defining it.
@@ -381,8 +379,7 @@ through one redo record, as every other mutation publishes.
 It preserves authored rule comments, order, policy, and all unmanaged document
 bytes; it never treats a conventional filename as proof of ownership.
 
-Repository validation reads no applied-profile record. A value a package
-contributed is repository content: editing it is an ordinary repository change
+A value a package contributed is repository content: editing it is an ordinary repository change
 that git shows and restores, and `jit validate` neither reports nor repairs it.
 
 Managed regions replace only the package- or projection-owned marked region.
@@ -408,7 +405,7 @@ defines what the record carries, its commit point, and how a session open
 applies a record an interruption left. A profile adds no publication path of its
 own. In a repository whose data root exists, an application's worktree targets
 — assets and managed regions — and its data-root targets — the registries its
-contributions reach, its provenance records, and its `profile_lifecycle` event
+contributions reach and its `profile_lifecycle` event
 — are operations of that one record, so an application never commits its
 worktree half apart from its data-root half.
 
@@ -420,25 +417,14 @@ worktree targets publishes the new root alone. An occupied destination is never
 overwritten; the losing operation fails, and a retry proceeds through the
 ordinary existing-root path.
 
-Successful application writes a canonical provenance record named by the
-profile ID, in the applied-profile record directory the [Storage
-Format](storage-format.md) reference lays out. Every changed or applied package
-has its own provenance record. One repository-scoped `profile_lifecycle` audit
-event records the operation and its per-profile outcomes for the complete
-selection, published by the same redo record as the targets. Each
-provenance record stores the profile ID, version, origin, package hash,
-and resolved public variable values with their source kinds. A record carries
-no ownership claim: composition never reads it, so a later application decides
-every target from the packages being applied alone. The
-audit event carries the resolved target hashes but never the resolved values.
-A provenance record does not state why a package was applied, so it reads the
-same whether the adopter named that package or received it as another's
-dependency.
-
-The origin says where the applied bytes were read from: the repository
-directory holding the package, carried as a worktree-relative location, so
-re-reading a repository's package never depends on machine state. The command
-reference defines how later commands use that recorded location.
+One repository-scoped `profile_lifecycle` audit event records the operation
+and its per-profile outcomes for the complete selection, published by the same
+redo record as the targets. A package's outcome is decided by what its
+application publishes, so applying identical content again publishes nothing
+and reports the package unchanged. The event names each profile's variables
+with their source kinds, never their resolved values. The repository keeps no
+other account of which packages were applied: once applied, every value is
+repository content.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work

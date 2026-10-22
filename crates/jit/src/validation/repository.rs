@@ -161,7 +161,6 @@ pub fn validate_repository(
                 image,
                 crate::repository_state::MaterializationRequest::RepairDerivedState {
                     declarations: declarations.borrowed(),
-                    profiles: Vec::new(),
                 },
             )
         })
@@ -950,7 +949,6 @@ mod tests {
             &proposed,
             crate::repository_state::MaterializationRequest::RepairDerivedState {
                 declarations: declarations.borrowed(),
-                profiles: Vec::new(),
             },
         )
         .unwrap();

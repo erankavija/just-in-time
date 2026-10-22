@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-22T14:44:52.236371156Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -25,5 +26,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove test-only gate entry points",
-  "updated_at": "2026-10-22T02:15:10.056109765Z"
+  "updated_at": "2026-10-22T14:44:52.296371633Z"
 }

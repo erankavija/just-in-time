@@ -483,7 +483,8 @@
     "Suite clock near budget on a quiet host: 29.0 s at load 2.1 after 459bb995 (7f3449a19). Cutover deletions alone have not lowered it; watch further merges.",
     "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci.",
     "Workers' focused checks skip nextest setup scripts (recorded failure corpus): fbb661f2 changed config set's failure and broke the corpus setup, which aborts the whole cargo-ci run. Prompt workers who change a command's failure behaviour to run `cargo nextest run -p jit --test cli_issue`.",
-    "34361448 first attempt removed user/system config layering wholesale (contradicting 459bb995 REQ-02); lead review required repo-only resolution for lease policy only."
+    "34361448 first attempt removed user/system config layering wholesale (contradicting 459bb995 REQ-02); lead review required repo-only resolution for lease policy only.",
+    "287eef78 changed gate fail --json for a missing issue from GATE_ERROR (exit 6) to ISSUE_NOT_FOUND (exit 3) by routing through gate_pass_json_error; failure-lever registry row updated. Lead accepted as the type-derived contract (df129d9e REQ-13 direction)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

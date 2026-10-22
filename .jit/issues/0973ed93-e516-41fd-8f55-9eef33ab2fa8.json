@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-22T14:28:20.558691828Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -26,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Shared taxonomy repository type for CLI tests",
-  "updated_at": "2026-10-22T14:28:20.889756275Z"
+  "updated_at": "2026-10-22T14:55:50.183381472Z"
 }
