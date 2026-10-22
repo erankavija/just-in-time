@@ -121,6 +121,15 @@ enforce = false
 assert = { require-label = { label = "req:*", min = 1 } }
 "#;
 
+const EPIC_WARNS_WITHOUT_REQ: &str = r#"
+[[rules]]
+name = "epic-warns-without-req"
+when = { type = "epic" }
+severity = "warn"
+enforce = false
+assert = { require-label = { label = "req:*", min = 1 } }
+"#;
+
 #[test]
 fn test_validate_id_passes_for_compliant_issue() {
     let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
@@ -651,6 +660,29 @@ fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
     assert_eq!(json["warning_count"], 1);
     assert_eq!(json["warnings"][0]["rule"], "review-placeholder");
     assert_eq!(json["rule_findings"][0]["rule"], "review-placeholder");
+}
+
+#[test]
+fn test_validate_scope_with_only_warnings_prints_findings_without_pass_line_and_succeeds() {
+    let temp = setup_repo_with_rules(EPIC_WARNS_WITHOUT_REQ);
+    let container = create_epic(&temp, false);
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args(["validate", "--scope", &container])
+        .assert()
+        .success();
+    let output = assert.get_output();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("warning [epic-warns-without-req]"),
+        "warnings-only scope run must list its findings, got: {stdout}"
+    );
+    assert!(
+        !stdout.contains("Scope validation passed"),
+        "warnings-only findings must not be followed by a pass line, got: {stdout}"
+    );
+    assert!(output.stderr.is_empty());
 }
 
 #[test]
