@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6febef2557af829eaa96045b898dd4365cd6802",
+  "completed_at": "2026-10-22T15:28:32.599120977Z",
+  "duration_ms": 279747,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/TESTING.md",
+        "id": "F1",
+        "line": 215,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "medium",
+        "summary": "The guide states all CLI suites use JitCli, but 109 test files still use local binary locators and only one integration test consumes the fixture."
+      }
+    ],
+    "summary": "The testing guide falsely claims universal adoption of the new CLI fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8af43b7d-3982-4fcc-90ba-cf7f2f5b7333",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:23:52.851617946Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3322 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16436-2716-7a73-b50a-7c40376355e1\n--------\nuser\n--- 3309 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8ee5984dd and merge 8c2837ad5 (same five-path patch, individually inspected)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2b49f95b/requirement/REQ-01–REQ-07 (issue description); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-09 (parent issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T15:22:20Z); code-review pending\nTruncation recovery: Replaced the truncated broad locator listing with per-pattern counts and a narrowed cli_repo_workflow read.\n\n1. **F1 — blocking, issue-impact (medium):** [dev/TESTING.md:215](/home/vkaskivuo/Projects/just-in-time/dev/TESTING.md:215) states that CLI suites already spawn through `JitCli` and that tests name no binary locator. The current tree has only one integration-test consumer of `JitCli`, while 109 test files still use `fn jit_binary`, `CARGO_BIN_EXE_jit`, or `cargo_bin!` (including `cli_repo_workflow`). Scope the guide to new/migrated tests, or migrate the stated suites before making this universal claim. References: @/issue/c780514e/requirement/REQ-05, @/invariant/shared-test-contracts.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The testing guide falsely claims universal adoption of the new CLI fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The guide states all CLI suites use JitCli, but 109 test files still use local binary locators and only one integration test consumes the fixture.\",\"file\":\"dev/TESTING.md\",\"line\":215,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

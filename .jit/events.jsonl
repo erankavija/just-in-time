@@ -19286,3 +19286,4 @@
 {"from":"backlog","id":"28e069ec-90bf-49ae-ab88-54b672147afe","issue_id":"b90b1660-6ea6-48b3-9866-df8709838ebb","timestamp":"2026-10-22T15:28:24.132470869Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"0efca118-1980-4f7c-b492-1096fed0ec23","issue_id":"d9598a97-61bc-4cf1-8b58-0792afc0c1f8","timestamp":"2026-10-22T15:28:24.231079435Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"6aa8c098-1399-44c5-bac5-4c375269ef5b","issue_id":"de880d9c-c9bf-475c-8d89-de0b2e55f620","timestamp":"2026-10-22T15:28:24.328600794Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"code-review","id":"4c859c78-f647-4444-adc5-85d381cf618e","issue_id":"2b49f95b-c99f-4182-bb55-252efa30eea9","timestamp":"2026-10-22T15:28:32.821182633Z","type":"gate_failed","updated_by":"auto:executor"}
