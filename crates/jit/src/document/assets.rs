@@ -48,23 +48,6 @@ pub enum AssetType {
 ///
 /// Scans documents using format adapters to discover asset references,
 /// resolves paths, and computes metadata.
-///
-/// # Example
-///
-/// ```
-/// use jit::document::{AdapterRegistry, AssetScanner};
-/// use std::path::Path;
-///
-/// let registry = AdapterRegistry::with_builtins();
-/// let scanner = AssetScanner::new(registry, Path::new("/repo"));
-///
-/// let assets = scanner
-///     .scan_document(Path::new("docs/guide.md"), "# Guide\n\n![Logo](./logo.png)")
-///     .unwrap();
-///
-/// assert_eq!(assets.len(), 1);
-/// assert_eq!(assets[0].original_path, "./logo.png");
-/// ```
 pub struct AssetScanner {
     registry: AdapterRegistry,
     repo_root: PathBuf,

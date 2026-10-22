@@ -1005,14 +1005,6 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
 ///
 /// Creates a temporary directory with initialized jit storage.
 /// Returns both the TempDir (which cleans up on drop) and the storage instance.
-///
-/// # Example
-/// ```no_run
-/// use jit::test_utils::setup_test_repo;
-///
-/// let (temp, storage) = setup_test_repo().unwrap();
-/// // Use temp.path() and storage for tests
-/// ```
 pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let temp = TempDir::new()?;
 
@@ -1658,15 +1650,6 @@ pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
 ///
 /// Generates a WorktreePaths structure suitable for testing,
 /// with standard paths relative to the temp directory.
-///
-/// # Example
-/// ```no_run
-/// use jit::test_utils::{setup_test_repo, create_test_paths};
-///
-/// let (temp, _storage) = setup_test_repo().unwrap();
-/// let paths = create_test_paths(&temp);
-/// assert_eq!(paths.worktree_root, temp.path());
-/// ```
 pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
     WorktreePaths {
         git_repository: true,
@@ -1701,6 +1684,13 @@ mod tests {
                     > 1
             })
             .expect("a shipped package carries more than a manifest")
+    }
+
+    #[test]
+    fn test_create_test_paths_uses_owned_temporary_directory_as_worktree_root() {
+        let temp = TempDir::new().unwrap();
+
+        assert_eq!(create_test_paths(&temp).worktree_root, temp.path());
     }
 
     #[test]
