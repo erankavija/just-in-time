@@ -8,6 +8,7 @@
   ],
   "description": "Make the four lock tests that skip when a read-only file is writable establish that precondition on every host, or fail, instead of passing.\n\n## Background\n\n`crates/jit/src/storage/lock.rs` defines `skip_unless_write_is_denied` (`:652`). Four tests call it (`:676`, `:729`, `:773`, `:805`), among them `test_lock_shared_is_granted_when_the_lock_file_cannot_be_opened_for_writing`. When the process can still write a file whose mode denies writing, as root can, the helper prints \"skipping …\" and the test returns early and passes. `@/inv/no-ignored-tests` treats a test held out of the run as a property nobody checks.\n\n## Success Criteria\n\n- [hard] REQ-01: `skip_unless_write_is_denied` no longer exists, and none of the four tests returns early because of the host.\n- [hard] REQ-02: Each test establishes a lock path that the process cannot open for writing on every host, for example a path whose parent is not a directory or a read-only bind it creates itself, or fails naming the precondition it could not establish.\n- [hard] REQ-03: Each test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-22T22:06:42.446167280Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Read-only lock tests establish their precondition on any host",
-  "updated_at": "2026-10-22T22:06:08.669360206Z"
+  "updated_at": "2026-10-22T22:06:42.446167280Z"
 }
