@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "fe708443-21d9-4b79-81e1-6b8b15ebc175",
+      "run_id": "63c1d94d-2de5-4c44-a7d2-f5363f6647ea",
       "status": "failed",
-      "updated_at": "2026-10-22T21:28:01.250070221Z",
+      "updated_at": "2026-10-22T21:30:31.937980682Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Available-work filtering and priority order become a pure domain query",
-  "updated_at": "2026-10-22T21:28:01.250070221Z"
+  "updated_at": "2026-10-22T21:30:31.937980682Z"
 }
