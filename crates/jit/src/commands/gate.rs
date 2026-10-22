@@ -1488,7 +1488,7 @@ enforce_leases = "off"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -1542,7 +1542,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "g1");
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
@@ -1567,7 +1567,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "g1");
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
@@ -1617,7 +1617,7 @@ enforce_leases = "off"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -1669,7 +1669,7 @@ enforce_leases = "off"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with the gate
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -1702,7 +1702,7 @@ enforce_leases = "off"
         let executor = setup();
         define_manual_gate(&executor, "manual-gate");
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -1797,7 +1797,7 @@ enforce_leases = "off"
             ".jit/config.toml",
             "[worktree]\nenforce_leases = \"off\"\n",
         );
-        let issue = crate::domain::fixture_issue("Preset target".into(), String::new());
+        let issue = crate::test_utils::fixture_issue("Preset target".into(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(&storage, issue);
         let recovered = storage.without_mutation_interruptions();
@@ -1831,7 +1831,7 @@ enforce_leases = "off"
 
         let executor = setup();
         define_manual_gate(&executor, "manual-gate");
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -1892,7 +1892,7 @@ enforce_leases = "off"
 
         let executor = setup();
         define_manual_gate(&executor, "review");
-        let mut issue = crate::domain::fixture_issue("Preset source".into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -1951,7 +1951,7 @@ enforce_leases = "off"
     fn test_memory_gate_preset_create_is_visible_to_list_and_show() {
         let executor = setup();
         define_manual_gate(&executor, "review");
-        let mut issue = crate::domain::fixture_issue("Preset source".into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -2007,7 +2007,7 @@ enforce_leases = "off"
     fn test_gate_preset_create_reports_occupied_malformed_target_as_already_exists() {
         let executor = setup();
         define_manual_gate(&executor, "review");
-        let mut issue = crate::domain::fixture_issue("Preset source".into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Preset source".into(), String::new());
         issue.gates_required.push("review".into());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);

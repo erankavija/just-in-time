@@ -9,7 +9,7 @@ Every criterion is a removal or a convergence onto a surviving path (`@/charter/
 
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
-| REQ-01 | Three independent deletions: the breakdown module, the silent validator, and the strict drift twin. The tolerant drift function takes the plain name. | Investigation A, REQ-01 |
+| REQ-01 | Delete the breakdown module, the silent validator, and the original unused strict drift implementation with its obsolete tests. The retained tolerant production implementation is the sole `enforcement_drift`, used by production and tests (DEC-drift-name; criterion wording reconciled by the steward on 2026-10-22). | Investigation A, REQ-01 |
 | REQ-02 | Remove the linked-evidence chain from capture spec, image, store and gate evidence. Capture stops resolving worktree paths. | Investigation A, REQ-02 |
 | REQ-03 | First delete the inert keys and their three readers. Then state each default present at landing once, `enforce_leases` and any remaining coordination timing key included: one layered lookup, named constants projected into the runtime-defaults reference, and `config show` rendered from `full_snapshot`. The `enforce_leases` resolution behaviour stays with bedf0962. | Investigation B, REQ-03 |
 | REQ-04 | `strict-declaration-loading`, applied separately to `config.toml`, rule declarations and `agent.toml`; the last is folded into the agent-config task. | Investigation B, REQ-04 |

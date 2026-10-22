@@ -455,6 +455,16 @@
       "to": "steward",
       "detail": "df129d9e plan and f7f01654 criterion required an output re-export, conflicting with single domain path.",
       "resolution": "Steward authorized canonical domain::list_envelope ownership, preserving wire/schema behavior; amend plan, manifest, f7f01654 criterion and 650e6a56 description without reopening completed tasks."
+    },
+    {
+      "issue": "842b0ac6",
+      "category": "criterion and approved plan conflict",
+      "raised": "2026-10-22",
+      "to": "steward",
+      "detail": "Holistic-review F1 (04a46d76) fails literal REQ-01 deletion of enforcement_drift. Approved DEC-drift-name and completed e1af39db require deleting the unused strict implementation and renaming the surviving tolerant production implementation to enforcement_drift.",
+      "resolution": "Steward explicitly approved option 1 on 2026-10-22: reconcile contradictory naming prose with approved DEC-drift-name and completed e1af39db. Delete the original unused strict implementation, retain the sole production implementation under enforcement_drift, preserve all behavior and other REQ-01 clauses. Re-run holistic-review; no manual gate pass.",
+      "prior_wording": "- [hard] REQ-01: The bracket breakdown module, `validate_integrity_silent` with its private helpers, and `drift::enforcement_drift` are deleted, and no test references them.",
+      "approved_wording": "- [hard] REQ-01: The bracket breakdown module and `validate_integrity_silent` with its private helpers are deleted, and no test references them. The original unused strict `drift::enforcement_drift` implementation and its obsolete tests are removed; the retained tolerant production implementation is the sole `enforcement_drift` function used by production and tests."
     }
   ],
   "rework_counts": {
@@ -471,7 +481,8 @@
     "fe761000": 1,
     "58282882": 1,
     "ea5f4536": 2,
-    "63c11d08": 2
+    "63c11d08": 2,
+    "842b0ac6": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
@@ -509,7 +520,8 @@
     "Main red from 27f0a575 (df129d9e) doctests; gates for 34361448 and 58282882 held until fixed.",
     "2026-10-22 Codex handoff: resumed 63c11d08 at 8165124c9, merged main 145091232. Lead audit found remaining output/profile domain reexports violating REQ-14; focused rework dispatched before full gates. Main unrelated 9cc3056a gate records and other worktrees preserved.",
     "63c11d08 cargo-ci at 9ccf7d411: fmt/clippy/58 doctests/budget passed; event reference freshness test failed because original import cutover changed generated header. Rework 2 regenerates projection and audits related generated references.",
-    "63c11d08 final cargo-ci passed: 4588 tests, 58 doctests, suite clock 18.434s; code-review passed with zero findings. All 40 implementation tasks are complete; epic validation and holistic review follow."
+    "63c11d08 final cargo-ci passed: 4588 tests, 58 doctests, suite clock 18.434s; code-review passed with zero findings. All 40 implementation tasks are complete; epic validation and holistic review follow.",
+    "Epic repo-validate passed (2557f21c). Holistic review 04a46d76 failed one finding: REQ-01 naming conflict with approved DEC-drift-name; escalated without overriding gate or modifying criterion."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }
