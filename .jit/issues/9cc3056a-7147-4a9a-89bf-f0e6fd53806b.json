@@ -7,6 +7,7 @@
   ],
   "description": "The human validation findings block, copied four times in `Commands::Validate` and once more in `config validate`, goes through one renderer in the output module.\n\n## Background\n\nThe `Commands::Validate` arm in `crates/jit/src/main.rs` (or its handler module once moved) prints a findings line `{marker} [{rule}] {message}` in four places: `--scope`, `--rule`, per-issue `validate <id>`, and the full repository run. They differ: `--scope` prints a pass line after warnings-only findings while `--rule` and per-issue print nothing; three of four write the failure summary to stderr; the repository variant prints its header before the findings, then `Warnings: N` and a divergence advisory. `ConfigCommands::Validate` has its own `Errors:` block with different markers. The machine-readable side is already shared through `render_validation_json`.\n\n## Success Criteria\n\n- [hard] REQ-01: One renderer in the output module prints a findings block (one line per finding with severity, rule and message, then a summary) in the majority form: no pass line after warnings-only findings, failure summary on stderr.\n- [hard] REQ-02: The four `validate` variants and `config validate` print findings only through that renderer; command-specific framing such as the repository header and divergence advisory stays with the command.\n- [hard] REQ-03: `validate --scope` with warnings only and `config validate` have tests stating their new human output.\n- [hard] REQ-04: One unit test owns the renderer's format; exit codes are unchanged, and the existing validation suites pass without weakened assertions.\n\n## Notes\n\nWhich exit code each validate variant returns is decided by its findings outcome, not by this renderer. 3754095f changes the severity markers from emoji to words first; the renderer uses those words. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T01:49:46.060712489Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "One output renderer for validation findings",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-22T01:49:46.060712489Z"
 }
