@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fbdd8d61-3871-4b60-940e-7d6a5100e4d0",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:36:41.184328456Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Server shutdown force-close test stays under the per-test bound",
-  "updated_at": "2026-10-22T15:33:21.850305782Z"
+  "updated_at": "2026-10-22T15:36:41.184328456Z"
 }

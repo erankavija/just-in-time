@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-22T15:32:25.055048554Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "46917d83-ebaa-4813-8cda-231f4e545b5d",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:36:10.277422851Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0bf97911-8302-47bb-95c0-585d897ad63f",
@@ -36,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared test support derives shipped item kinds from the default package",
-  "updated_at": "2026-10-22T15:32:25.055048554Z"
+  "updated_at": "2026-10-22T15:36:10.277422851Z"
 }
