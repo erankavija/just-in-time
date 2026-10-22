@@ -44,7 +44,7 @@
           "key": "doctest-substep-bound",
           "title": "Doctest substep fits within the per-test bound",
           "classification": "implementation",
-          "status": "implemented c7bb5037d;33 examples removed with owning tests; integrated aa main final CI queued"
+          "status": "done"
         },
         {
           "id": "9a07026e-0666-4c3e-9868-5f083b293988",
@@ -116,7 +116,7 @@
           "key": "dependency-policy-tool-failure",
           "title": "Dependency-feature policy tests fail when cargo is missing",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; require suite Cargo and remove two false-pass skip paths; reused memory checkout"
         },
         {
           "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
@@ -172,7 +172,7 @@
           "key": "profile-suite-selftest-gate",
           "title": "Suite-profiler self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress; reuse adoption checkout; remove default-suite profiler wrapper"
+          "status": "source6e9369142 integrated2b54bf3ee; fullCI4590+25 pass; awaiting main gates"
         },
         {
           "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
@@ -1265,7 +1265,8 @@
     "2b49f95b": 1,
     "0bf97911": 1,
     "4a82ed46": 2,
-    "22355a56": 1
+    "22355a56": 1,
+    "871df4b0": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1285,7 +1286,8 @@
     }
   ],
   "traps": [
-    "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back."
+    "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back.",
+    "871df4b0 actual full/warm doctest timings met criterion, but evidence stayed in /tmp and was not linked before review; reviewer could not verify warm/load bounds and failed. Commit and link reproducible measurement evidence before measurement-dependent reviews."
   ],
   "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
@@ -1297,7 +1299,7 @@
     "active_worktree_limit": 2,
     "pending_external_landing": null,
     "worktrees": {
-      "agent-22355a56": "worktree-agent-871df4b0",
+      "agent-22355a56": "worktree-agent-559335cf",
       "agent-de880d9c": "worktree-agent-7a412cb0"
     }
   },
@@ -1442,6 +1444,46 @@
       "stale_narrative": "no active stale references; historical investigation/archive/baseline evidence retained",
       "deferred_items": "no linked design documents",
       "holistic": "selftest remains required through declared gate; generic runner failure contract reused; no script semantics/budget change"
+    },
+    "871df4b0": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "e191bd72-1723-42af-9995-02500660e11c",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "adc05199-b337-429d-a14f-685621b81f9d",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "warm CARGO_INCREMENTAL=0 cargo test --doc --workspace under turnstile/exclusive passed25 in2.627s wall at load1.74; f66a7d35da40e3209be50eff49889281f575dde5; fullCI doctest2.644s load2.31",
+        "REQ-02": "c7bb5037d commit body records all33 removed-example mappings to unit owners; three existing test extensions and one TempDir-root test passed before pruning",
+        "REQ-03": "25 retained non-parser examples each audited for non-obvious API composition/serialization/semantics; all pass with zero ignored; parser source untouched"
+      },
+      "prior_findings": [
+        {
+          "round": "R1",
+          "finding": "REQ-01 lacks evidence of a warm, low-load doctest substep below five seconds; cargo-ci only enforces a30-second combined suite clock.",
+          "status": "closed",
+          "cite": "dev/benchmarks/test-topology-c780514e/README.md:20, linked to task and epic; commit/load/warm timing and reproduction recorded"
+        }
+      ],
+      "stale_narrative": "no newly stale active task references; historical baselines preserved",
+      "deferred_items": "linked measurement report scanned: no deferred or unimplemented promised work; explicitly distinguishes observations from unchanged combined budget",
+      "holistic": "semantic diff after stripping rustdoc identical in15files; remaining3files contain only four intended unit additions; no production behavior changes",
+      "measurement": {
+        "source_commit": "c7bb5037d",
+        "integrated_commit": "f66a7d35da40e3209be50eff49889281f575dde5",
+        "warm_doctest_seconds": 2.627,
+        "warm_load": 1.74,
+        "command": "CARGO_INCREMENTAL=0 cargo test --doc --workspace",
+        "serialization": "flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock",
+        "timing": "Bash builtin; /usr/bin/time absent failed before cargo and was replaced"
+      }
     }
   }
 }
