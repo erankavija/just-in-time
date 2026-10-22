@@ -8,12 +8,26 @@
   ],
   "description": "Make the dependency-feature policy tests fail rather than pass when they cannot run cargo.\n\n## Background\n\n`crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs:168,185` print `SKIP: no cargo on PATH to resolve the dependency graph` and pass when `cargo tree` cannot run. Cargo passes its own path to test processes in the `CARGO` environment variable.\n\n## Success Criteria\n\n- [hard] REQ-01: Both tests run `cargo tree` through the cargo that runs the suite and fail, naming the missing tool, when it cannot run.\n- [hard] REQ-02: Neither test has a skip path.\n",
   "documents": [],
+  "done_at": "2026-10-22T21:00:44.687273247Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "74a892e6-484e-40d3-9c48-6eec02ad3837",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:58:02.310239492Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d5d68042-06c9-4ef6-9152-2685c9f1cd87",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:00:19.591884840Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "559335cf-35ca-4046-ae3d-aab3f2f54498",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Dependency-feature policy tests fail when cargo is missing",
-  "updated_at": "2026-10-22T20:47:41.298817559Z"
+  "updated_at": "2026-10-22T21:00:44.687273247Z"
 }

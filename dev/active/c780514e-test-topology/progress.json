@@ -100,7 +100,7 @@
           "key": "build-budget-selftest-gate",
           "title": "Build-budget checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress; port14 Rust-driven checker cases into script self-test; reused adoption checkout"
+          "status": "implemented shell311ceb4f2 and wrapper deletion50a6755e3; aggregate-size case preserved; final CI queued"
         },
         {
           "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -116,7 +116,7 @@
           "key": "dependency-policy-tool-failure",
           "title": "Dependency-feature policy tests fail when cargo is missing",
           "classification": "implementation",
-          "status": "in_progress; require suite Cargo and remove two false-pass skip paths; reused memory checkout"
+          "status": "done"
         },
         {
           "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
@@ -180,7 +180,7 @@
           "key": "query-available-domain-order",
           "title": "Available-work filtering and priority order become a pure domain query",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; pure available filter/order owner shared by query and claim; reused memory checkout"
         },
         {
           "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
@@ -1299,7 +1299,7 @@
     "active_worktree_limit": 2,
     "pending_external_landing": null,
     "worktrees": {
-      "agent-22355a56": "worktree-agent-559335cf",
+      "agent-22355a56": "worktree-agent-368df0c1",
       "agent-de880d9c": "worktree-agent-5b42e3ff"
     }
   },
@@ -1513,6 +1513,29 @@
       "stale_narrative": "removed obsolete module prose and two script caller comments; rendered gate description from source",
       "deferred_items": "no linked design documents",
       "holistic": "script execution unchanged; only test invocation ownership moved to configured gate; no budget or lock change"
+    },
+    "559335cf": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "74a892e6-484e-40d3-9c48-6eec02ad3837",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "d5d68042-06c9-4ef6-9152-2685c9f1cd87",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "dependency_feature_policy_tests.rs requires runtime CARGO and names selected executable/package on spawn error; normal nextest two tests passed",
+        "REQ-02": "helper returns String and both tests call directly, no None/SKIP branch; child-only nonexistent CARGO probes changed from false-pass exit0 to named failure101"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "all active missing-Cargo skip references removed including adjacent budget-fixture comment; historical evidence preserved",
+      "deferred_items": "no linked design documents",
+      "holistic": "no global env mutation, no fallback Cargo, policy assertions unchanged; red/green evidence recorded in ddd25c64e commit body"
     }
   }
 }
