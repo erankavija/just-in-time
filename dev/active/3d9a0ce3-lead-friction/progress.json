@@ -248,7 +248,7 @@
           "title": "Build one profile selection per invocation",
           "classification": "implementation",
           "model": "opus",
-          "status": "merge approved; validating latest main"
+          "status": "paused; merge approved; latest full gate pending"
         }
       ]
     },
@@ -569,6 +569,8 @@
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock",
   "notes": [
-    "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence."
-  ]
+    "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence.",
+    "2026-10-23 paused for user handoff. See handoff-4.md. Owning branch checkpoint 01f148ba4 includes main through ba02afa0d. Timeout d3a0da67 preserved in e00b10914; subsequent compile-only check passed in 34.19s, final cargo-ci not launched. No active workers/builds/locks; main/build window released. Explicit merge approval retained, no merge performed. Future bounded workers Luna xhigh; no new worktrees/caches; all builds incremental=0."
+  ],
+  "latest_handoff": "handoff-4.md"
 }
