@@ -44,7 +44,7 @@
           "key": "doctest-substep-bound",
           "title": "Doctest substep fits within the per-test bound",
           "classification": "implementation",
-          "status": "implemented c7bb5037d;33 examples removed with owning tests; integrated aa main final CI queued"
+          "status": "rework1: publish/link existing warm low-load timing evidence; source and all tests pass"
         },
         {
           "id": "9a07026e-0666-4c3e-9868-5f083b293988",
@@ -1265,7 +1265,8 @@
     "2b49f95b": 1,
     "0bf97911": 1,
     "4a82ed46": 2,
-    "22355a56": 1
+    "22355a56": 1,
+    "871df4b0": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1285,7 +1286,8 @@
     }
   ],
   "traps": [
-    "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back."
+    "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back.",
+    "871df4b0 actual full/warm doctest timings met criterion, but evidence stayed in /tmp and was not linked before review; reviewer could not verify warm/load bounds and failed. Commit and link reproducible measurement evidence before measurement-dependent reviews."
   ],
   "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
@@ -1442,6 +1444,33 @@
       "stale_narrative": "no active stale references; historical investigation/archive/baseline evidence retained",
       "deferred_items": "no linked design documents",
       "holistic": "selftest remains required through declared gate; generic runner failure contract reused; no script semantics/budget change"
+    },
+    "871df4b0": {
+      "verdict": "FAIL",
+      "gate_run": "94f44886-b688-4304-a35e-10ef7f3d67d0",
+      "prior_findings": [
+        {
+          "disposition": "blocking",
+          "file": "scripts/cargo-ci.sh",
+          "id": "F1",
+          "line": 523,
+          "origin": "issue-impact",
+          "references": [
+            "@/issue/871df4b0/requirement/REQ-01",
+            "@/issue/c780514e/requirement/REQ-13"
+          ],
+          "severity": "high",
+          "summary": "REQ-01 lacks evidence of a warm, low-load doctest substep below five seconds; cargo-ci only enforces a 30-second combined suite clock."
+        }
+      ],
+      "criteria": {
+        "REQ-01": "measurement exists in scratch logs but unavailable in tracked linked review artifacts; publish exact evidence",
+        "REQ-02": "all33 owner mappings in c7bb5037d; four owner extensions verified before removals",
+        "REQ-03": "25 retained audited examples,0ignored; parser untouched"
+      },
+      "deferred_items": "no linked docs before rework",
+      "stale_narrative": "no newly stale active refs",
+      "required_change": "Publish measurement artifact at plan-prescribed dev/benchmarks/test-topology-c780514e/README.md and link to issue; rerun review without weakening bounds"
     }
   }
 }
