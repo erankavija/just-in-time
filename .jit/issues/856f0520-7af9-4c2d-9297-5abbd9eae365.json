@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "37b1004f-061f-4bbc-939c-feecf5f44d16",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:06:29.182571687Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "856f0520-7af9-4c2d-9297-5abbd9eae365",
   "labels": [
     "epic:lead-friction",
@@ -23,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Classify cargo-ci load from a pre-run baseline",
-  "updated_at": "2026-10-22T02:28:56.174905356Z"
+  "updated_at": "2026-10-22T14:06:29.182571687Z"
 }
