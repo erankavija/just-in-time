@@ -124,28 +124,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority_filter: Option<Priority>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
-        let mut issues = self.query_ready()?;
-
-        // Apply additional filters
-        if let Some(priority) = priority_filter {
-            issues.retain(|i| i.priority == priority);
-        }
-        if !label_filters.is_empty() {
-            let label_matches = self.query_by_labels(label_filters)?;
-            let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| i.id.as_str()).collect();
-            issues.retain(|i| label_ids.contains(i.id.as_str()));
-        }
-
-        // Sort by priority (Critical > High > Normal > Low)
-        issues.sort_by_key(|i| match i.priority {
-            Priority::Critical => 0,
-            Priority::High => 1,
-            Priority::Normal => 2,
-            Priority::Low => 3,
-        });
-
-        Ok(issues)
+        label_filters
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        let issues = self.storage.list_issues()?;
+        Ok(crate::domain::queries::query_available(
+            &issues,
+            crate::domain::queries::AvailableFilter {
+                priority: priority_filter,
+                labels: label_filters,
+            },
+        ))
     }
 
     /// Query blocked issues with optional filters
@@ -268,5 +257,37 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(issues)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_available_delegates_filters_to_domain() {
+        let executor =
+            crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
+        let mut issue = crate::domain::fixture_issue("Available".to_string(), String::new());
+        issue.state = State::Ready;
+        issue.priority = Priority::High;
+        issue.labels = vec!["component:api".to_string()];
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        let result = executor
+            .query_available(Some(Priority::High), &["component:api".to_string()])
+            .unwrap();
+        assert_eq!(result.iter().map(|i| &i.id).collect::<Vec<_>>(), [&id]);
+        assert!(executor
+            .query_available(Some(Priority::Low), &["component:api".to_string()])
+            .unwrap()
+            .is_empty());
+        assert!(executor
+            .query_available(None, &["component:web".to_string()])
+            .unwrap()
+            .is_empty());
+        assert!(executor
+            .query_available(None, &["invalid".to_string()])
+            .is_err());
     }
 }

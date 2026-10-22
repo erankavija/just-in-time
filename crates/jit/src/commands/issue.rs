@@ -825,22 +825,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let issues = self.exec.storage.list_issues()?;
         let context = crate::query_engine::QueryContext::from_issues(&issues);
 
-        // Highest-priority issue of the domain ready set (Ready, unassigned, every
-        // dependency met) matching the filter; `sort_by_key` is stable, so ties
-        // keep storage order.
-        let mut candidates: Vec<_> = crate::domain::queries::query_ready(&issues)
-            .into_iter()
-            .filter(|i| filter.as_ref().is_none_or(|f| f.matches(i, &context)))
-            .collect();
-
-        candidates.sort_by_key(|i| match i.priority {
-            Priority::Critical => 0,
-            Priority::High => 1,
-            Priority::Normal => 2,
-            Priority::Low => 3,
-        });
-
-        if let Some(issue) = candidates.first() {
+        let candidates = crate::domain::queries::query_available(
+            &issues,
+            crate::domain::queries::AvailableFilter::default(),
+        );
+        if let Some(issue) = candidates
+            .iter()
+            .find(|i| filter.as_ref().is_none_or(|f| f.matches(i, &context)))
+        {
             let id = issue.id.clone();
             let warnings = self.claim_issue(&id, assignee)?;
             Ok((id, warnings))

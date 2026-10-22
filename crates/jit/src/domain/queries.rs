@@ -7,6 +7,29 @@
 use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
 use std::collections::HashMap;
 
+/// Optional restrictions on available work; label patterns are AND-combined.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AvailableFilter<'a> {
+    pub priority: Option<Priority>,
+    pub labels: &'a [String],
+}
+
+/// Return matching ready issues in priority order, preserving input order for ties.
+pub fn query_available(issues: &[Issue], filter: AvailableFilter<'_>) -> Vec<Issue> {
+    let ready = query_ready(issues);
+    let mut matches = query_by_labels(&ready, filter.labels);
+    if let Some(priority) = filter.priority {
+        matches = query_by_priority(&matches, priority);
+    }
+    matches.sort_by_key(|issue| match issue.priority {
+        Priority::Critical => 0,
+        Priority::High => 1,
+        Priority::Normal => 2,
+        Priority::Low => 3,
+    });
+    matches
+}
+
 /// Build a HashMap of issue ID to issue reference for dependency resolution.
 ///
 /// This is a common pattern used throughout query and validation code to enable
@@ -361,6 +384,106 @@ pub fn bracket_scope_ids(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use proptest::prelude::*;
+
+    fn available_issue(index: usize, priority: Priority, labels: &[&str]) -> Issue {
+        let mut issue = labeled_issue(&format!("Issue {index}"), labels);
+        issue.id = index.to_string();
+        issue.state = State::Ready;
+        issue.priority = priority;
+        issue
+    }
+
+    #[test]
+    fn test_query_available_composes_each_priority_and_label_filter() {
+        let priorities = [
+            Priority::Critical,
+            Priority::High,
+            Priority::Normal,
+            Priority::Low,
+        ];
+        let issues: Vec<_> = priorities
+            .iter()
+            .enumerate()
+            .flat_map(|(index, &priority)| {
+                [
+                    available_issue(index * 2, priority, &["component:api", "epic:auth"]),
+                    available_issue(index * 2 + 1, priority, &["component:web"]),
+                ]
+            })
+            .collect();
+        for priority in std::iter::once(None).chain(priorities.into_iter().map(Some)) {
+            for patterns in [
+                vec![],
+                vec!["component:api"],
+                vec!["component:*"],
+                vec!["component:*", "epic:auth"],
+                vec!["component:api", "component:api"],
+                vec!["component:absent"],
+            ] {
+                let labels: Vec<_> = patterns.into_iter().map(String::from).collect();
+                let ready = query_ready(&issues);
+                let labeled = query_by_labels(&ready, &labels);
+                let expected =
+                    priority.map_or_else(|| labeled.clone(), |p| query_by_priority(&labeled, p));
+                let actual = query_available(
+                    &issues,
+                    AvailableFilter {
+                        priority,
+                        labels: &labels,
+                    },
+                );
+                assert_eq!(
+                    actual.iter().map(|i| &i.id).collect::<Vec<_>>(),
+                    expected.iter().map(|i| &i.id).collect::<Vec<_>>(),
+                    "priority={priority:?}, labels={labels:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_query_available_preserves_input_order_within_priority_ties() {
+        let issues = vec![
+            available_issue(9, Priority::High, &[]),
+            available_issue(7, Priority::Low, &[]),
+            available_issue(4, Priority::Critical, &[]),
+            available_issue(2, Priority::High, &[]),
+        ];
+        let actual = query_available(&issues, AvailableFilter::default());
+        assert_eq!(
+            actual.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
+            ["4", "9", "2", "7"]
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn test_query_available_stably_orders_the_filtered_ready_set(
+            entries in proptest::collection::vec((0usize..4, any::<bool>(), any::<bool>()), 0..40),
+            priority_index in proptest::option::of(0usize..4),
+            require_label in any::<bool>(),
+        ) {
+            let priorities = [Priority::Critical, Priority::High, Priority::Normal, Priority::Low];
+            let issues: Vec<_> = entries.iter().enumerate().map(|(index, &(rank, ready, labeled))| {
+                let mut issue = available_issue(index, priorities[rank], if labeled { &["component:api"] } else { &[] });
+                if !ready { issue.state = State::Backlog; }
+                issue
+            }).collect();
+            let labels = if require_label { vec!["component:api".to_string()] } else { vec![] };
+            let priority = priority_index.map(|index| priorities[index]);
+            let ready = query_ready(&issues);
+            let labeled = query_by_labels(&ready, &labels);
+            // Concatenating priority bands preserves input ties without repeating the sort.
+            let expected: Vec<_> = priorities.into_iter()
+                .filter(|p| priority.is_none_or(|selected| selected == *p))
+                .flat_map(|p| query_by_priority(&labeled, p).into_iter().map(|i| i.id))
+                .collect();
+            let actual = query_available(&issues, AvailableFilter { priority, labels: &labels });
+            prop_assert_eq!(actual.into_iter().map(|i| i.id).collect::<Vec<_>>(), expected);
+        }
+    }
 
     #[test]
     fn test_build_issue_map() {

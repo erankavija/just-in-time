@@ -124,7 +124,7 @@
           "key": "docs-check-selftest-gate",
           "title": "Documentation checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress; permission preconditions fail closed; gate input closure audited; reused adoption checkout"
+          "status": "implemented22db1218c;67 self-test assertions pass; finalCI pending"
         },
         {
           "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
@@ -180,7 +180,7 @@
           "key": "query-available-domain-order",
           "title": "Available-work filtering and priority order become a pure domain query",
           "classification": "implementation",
-          "status": "in_progress; pure available filter/order owner shared by query and claim; reused memory checkout"
+          "status": "implementedc789459ce;4 focused domain/wiring tests pass; finalCI pending"
         },
         {
           "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
@@ -1567,5 +1567,6 @@
       "deferred_items": "no linked design documents",
       "holistic": "same budget values and normal checker preserved; fixtures now owned by checker; inherited BUSY_HOST_OVERRIDE cleared for child fixtures; no Cargo in self-test"
     }
-  }
+  },
+  "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates."
 }
