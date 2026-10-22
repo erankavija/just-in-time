@@ -1354,6 +1354,24 @@ fn resolve_enforcement_mode(worktree: Option<&WorktreeConfig>) -> EnforcementMod
     })
 }
 
+/// Resolve the lease limits from a repository's `[coordination]` section: each
+/// key's value, else its built-in default.
+fn resolve_coordination(coordination: Option<&CoordinationConfig>) -> EffectiveCoordination {
+    let limit = |read: fn(&CoordinationConfig) -> Option<u32>, default| {
+        coordination.and_then(read).unwrap_or(default)
+    };
+    EffectiveCoordination {
+        max_indefinite_leases_per_agent: limit(
+            |c| c.max_indefinite_leases_per_agent,
+            MAX_INDEFINITE_LEASES_PER_AGENT,
+        ),
+        max_indefinite_leases_per_repo: limit(
+            |c| c.max_indefinite_leases_per_repo,
+            MAX_INDEFINITE_LEASES_PER_REPO,
+        ),
+    }
+}
+
 impl JitConfig {
     /// The lease enforcement mode write commands apply and `jit config` reports.
     ///
@@ -1361,6 +1379,14 @@ impl JitConfig {
     /// decides it; user/system layers and the environment do not.
     pub fn enforcement_mode(&self) -> EnforcementMode {
         resolve_enforcement_mode(self.worktree.as_ref())
+    }
+
+    /// The lease limits `claim acquire` enforces and `jit config` reports.
+    ///
+    /// Repository policy like [`Self::enforcement_mode`]: only this repository
+    /// config decides them; user/system layers do not.
+    pub fn coordination(&self) -> EffectiveCoordination {
+        resolve_coordination(self.coordination.as_ref())
     }
 
     /// The repo-level content format for issue bodies: `[validation]`'s
@@ -1549,95 +1575,22 @@ impl JitConfig {
     }
 }
 
-// ============================================================
-// Config Loader with Priority and Merging
-// ============================================================
-
-/// Builder for loading configuration from multiple sources with priority.
+/// The repository configuration as `jit config` reports it.
 ///
-/// Priority order (highest to lowest):
-/// 1. Repository config (`.jit/config.toml`)
-/// 2. User config (`~/.config/jit/config.toml`)
-/// 3. System config (`/etc/jit/config.toml`)
-/// 4. Defaults (hardcoded)
-#[derive(Debug, Default)]
-pub struct ConfigLoader {
-    system_config: Option<JitConfig>,
-    user_config: Option<JitConfig>,
-    repo_config: Option<JitConfig>,
-}
-
-impl ConfigLoader {
-    /// Create a new config loader with only defaults.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Load and add system-level config (`/etc/jit/config.toml`).
-    pub fn with_system_config(mut self, config_dir: &Path) -> Result<Self> {
-        self.system_config = Some(JitConfig::load(config_dir)?);
-        Ok(self)
-    }
-
-    /// Load and add user-level config (`~/.config/jit/config.toml`).
-    pub fn with_user_config(mut self, config_dir: &Path) -> Result<Self> {
-        self.user_config = Some(JitConfig::load(config_dir)?);
-        Ok(self)
-    }
-
-    /// Load and add repository-level config (`.jit/config.toml`).
-    pub fn with_repo_config(mut self, jit_root: &Path) -> Result<Self> {
-        self.repo_config = Some(JitConfig::load(jit_root)?);
-        Ok(self)
-    }
-
-    /// Build the effective configuration by merging all sources.
-    pub fn build(self) -> EffectiveConfig {
-        EffectiveConfig {
-            system_config: self.system_config,
-            user_config: self.user_config,
-            repo_config: self.repo_config,
-        }
-    }
-}
-
-/// Merged configuration from all sources with priority resolution.
-///
-/// When accessing a config value, checks sources in order:
-/// repo > user > system > default
+/// Lease policy (enforcement mode and limits) is repository-scoped, so every
+/// value here comes from `.jit/config.toml` alone, else its built-in default.
 #[derive(Debug, Default)]
 pub struct EffectiveConfig {
-    system_config: Option<JitConfig>,
-    user_config: Option<JitConfig>,
     repo_config: Option<JitConfig>,
 }
 
 impl EffectiveConfig {
-    /// Load the system/user/repo-layered effective configuration for
-    /// `jit_root`, probing each source's existence and loading whichever are
-    /// present.
-    ///
-    /// Owns ALL filesystem interaction for this assembly — the `/etc/jit` and
-    /// `~/.config/jit` existence checks, home-directory resolution, and each
-    /// present source's [`JitConfig::load`] — so callers outside this module
-    /// (notably the `commands` layer) never touch `std::fs` / `dirs` directly
-    /// (AGENTS.md "Separation of Concerns": config IO stays in the config
-    /// layer). Mirrors the system (`/etc/jit`) > user (`~/.config/jit`) > repo
-    /// priority `jit config show` has always used.
+    /// Load the effective configuration for `jit_root`. Owns the filesystem
+    /// interaction so callers in the `commands` layer never touch `std::fs`.
     pub fn load(jit_root: &Path) -> Result<Self> {
-        let mut loader = ConfigLoader::new();
-        let system_path = Path::new("/etc/jit");
-        if system_path.exists() {
-            loader = loader.with_system_config(system_path)?;
-        }
-        if let Some(home) = dirs::home_dir() {
-            let user_path = home.join(".config/jit");
-            if user_path.exists() {
-                loader = loader.with_user_config(&user_path)?;
-            }
-        }
-        loader = loader.with_repo_config(jit_root)?;
-        Ok(loader.build())
+        Ok(Self {
+            repo_config: Some(JitConfig::load(jit_root)?),
+        })
     }
 
     /// Get the effective enforcement mode: the repository config's
@@ -1652,31 +1605,14 @@ impl EffectiveConfig {
         std::env::var("JIT_AGENT_ID").ok()
     }
 
-    /// The first value `read` finds in the repository, user, then system layer.
-    fn layered<T>(&self, read: impl Fn(&JitConfig) -> Option<T>) -> Option<T> {
-        [&self.repo_config, &self.user_config, &self.system_config]
-            .into_iter()
-            .flatten()
-            .find_map(read)
-    }
-
-    /// The coordination limits: each key's first layered value, else its
-    /// built-in default.
+    /// Get the effective lease limits: the repository config's
+    /// [`JitConfig::coordination`].
     pub fn coordination(&self) -> EffectiveCoordination {
-        let limit = |read: fn(&CoordinationConfig) -> Option<u32>, default| {
-            self.layered(|c| c.coordination.as_ref().and_then(read))
-                .unwrap_or(default)
-        };
-        EffectiveCoordination {
-            max_indefinite_leases_per_agent: limit(
-                |c| c.max_indefinite_leases_per_agent,
-                MAX_INDEFINITE_LEASES_PER_AGENT,
-            ),
-            max_indefinite_leases_per_repo: limit(
-                |c| c.max_indefinite_leases_per_repo,
-                MAX_INDEFINITE_LEASES_PER_REPO,
-            ),
-        }
+        resolve_coordination(
+            self.repo_config
+                .as_ref()
+                .and_then(|c| c.coordination.as_ref()),
+        )
     }
 
     /// Assemble a single JSON snapshot of the effective configuration across
@@ -1686,9 +1622,8 @@ impl EffectiveConfig {
     /// `jit config show` renders this same snapshot. Two resolution
     /// strategies, matching how the rest of the codebase already reads these
     /// sections — this method does not invent a THIRD merge policy:
-    /// - `worktree`, `coordination`: [`Self::enforcement_mode`] (repo-only) and
-    ///   [`Self::coordination`] (the layered repo, user, system, default
-    ///   chain).
+    /// - `worktree`, `coordination`: [`Self::enforcement_mode`] and
+    ///   [`Self::coordination`] (both repo-only, default-filled).
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
@@ -2957,192 +2892,74 @@ max_indefinite_leases_per_agent = 3
         assert_eq!(coord.max_indefinite_leases_per_agent, Some(3));
     }
 
-    // ============================================================
-    // Config loading with priority and merging tests (TDD)
-    // ============================================================
-
-    #[test]
-    fn test_config_loader_defaults_only() {
-        let loader = ConfigLoader::new();
-        let config = loader.build();
-
-        assert_eq!(
-            config.coordination(),
-            EffectiveCoordination {
-                max_indefinite_leases_per_agent: MAX_INDEFINITE_LEASES_PER_AGENT,
-                max_indefinite_leases_per_repo: MAX_INDEFINITE_LEASES_PER_REPO,
-            }
-        );
-    }
-
-    #[test]
-    fn test_config_loader_repo_overrides_defaults() {
-        let temp_dir = TempDir::new().unwrap();
-        let config_toml = r#"
-[coordination]
-max_indefinite_leases_per_agent = 5
-"#;
-        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
-
-        let loader = ConfigLoader::new()
-            .with_repo_config(temp_dir.path())
-            .unwrap();
-        let config = loader.build();
-
-        // Repo value overrides default
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 5);
-        // Other defaults preserved
-        assert_eq!(
-            config.coordination().max_indefinite_leases_per_repo,
-            MAX_INDEFINITE_LEASES_PER_REPO
-        );
-    }
-
-    #[test]
-    fn test_config_loader_repo_overrides_user() {
-        let user_dir = TempDir::new().unwrap();
-        let repo_dir = TempDir::new().unwrap();
-
-        // User config sets both caps
-        let user_config = r#"
-[coordination]
-max_indefinite_leases_per_agent = 4
-max_indefinite_leases_per_repo = 20
-"#;
-        std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
-
-        // Repo config sets the per-agent cap (overrides user)
-        let repo_config = r#"
-[coordination]
-max_indefinite_leases_per_agent = 6
-"#;
-        std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
-
-        let loader = ConfigLoader::new()
-            .with_user_config(user_dir.path())
-            .unwrap()
-            .with_repo_config(repo_dir.path())
-            .unwrap();
-        let config = loader.build();
-
-        // Repo overrides user for the per-agent cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 6);
-        // User value used for the per-repo cap (not in repo config)
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 20);
-    }
-
-    #[test]
-    fn test_config_loader_full_priority_chain() {
-        let system_dir = TempDir::new().unwrap();
-        let user_dir = TempDir::new().unwrap();
-        let repo_dir = TempDir::new().unwrap();
-
-        // System config (lowest priority after defaults)
-        let system_config = r#"
-[coordination]
-max_indefinite_leases_per_agent = 1
-max_indefinite_leases_per_repo = 30
-"#;
-        std::fs::write(system_dir.path().join("config.toml"), system_config).unwrap();
-
-        // User config overrides system
-        let user_config = r#"
-[coordination]
-max_indefinite_leases_per_agent = 7
-"#;
-        std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
-
-        // Repo config overrides user
-        let repo_config = r#"
-[coordination]
-max_indefinite_leases_per_repo = 40
-"#;
-        std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
-
-        let loader = ConfigLoader::new()
-            .with_system_config(system_dir.path())
-            .unwrap()
-            .with_user_config(user_dir.path())
-            .unwrap()
-            .with_repo_config(repo_dir.path())
-            .unwrap();
-        let config = loader.build();
-
-        // User wins over system for the per-agent cap (not in repo)
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 7);
-        // Repo wins over system for the per-repo cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 40);
-    }
-
-    #[test]
-    fn test_config_loader_missing_files_ok() {
-        let temp_dir = TempDir::new().unwrap();
-
-        // Loading from non-existent paths should succeed (use defaults)
-        let loader = ConfigLoader::new()
-            .with_system_config(temp_dir.path())
-            .unwrap()
-            .with_user_config(temp_dir.path())
-            .unwrap()
-            .with_repo_config(temp_dir.path())
-            .unwrap();
-        let config = loader.build();
-
-        assert_eq!(
-            config.coordination().max_indefinite_leases_per_agent,
-            MAX_INDEFINITE_LEASES_PER_AGENT
-        );
-    }
-
     #[test]
     fn test_enforcement_mode_reported_matches_enforced_in_every_configuration_state() {
         const NO_SECTION: &str = "";
         const SECTION_WITHOUT_KEY: &str = "[worktree]\n";
         let explicit = |mode: &str| format!("[worktree]\nenforce_leases = \"{mode}\"\n");
-        // (repo, user, system) config.toml contents; `None` leaves the layer absent.
-        let states: Vec<(String, Option<String>, Option<String>)> = vec![
-            (NO_SECTION.into(), None, None),
-            (SECTION_WITHOUT_KEY.into(), None, None),
-            (explicit("strict"), None, None),
-            (explicit("warn"), None, None),
-            (explicit("off"), None, None),
-            (NO_SECTION.into(), Some(explicit("strict")), None),
-            (SECTION_WITHOUT_KEY.into(), Some(explicit("off")), None),
-            (NO_SECTION.into(), None, Some(explicit("warn"))),
-            (SECTION_WITHOUT_KEY.into(), None, Some(explicit("off"))),
+        let states = [
+            NO_SECTION.to_string(),
+            SECTION_WITHOUT_KEY.to_string(),
+            explicit("strict"),
+            explicit("warn"),
+            explicit("off"),
         ];
         let mut env = EnvGuard::acquire();
-        for (repo, user, system) in &states {
-            let layer = |content: &Option<String>| {
-                content.as_ref().map(|toml| {
-                    let dir = TempDir::new().unwrap();
-                    std::fs::write(dir.path().join("config.toml"), toml).unwrap();
-                    dir
-                })
-            };
-            let repo_dir = layer(&Some(repo.clone())).unwrap();
-            let (user_dir, system_dir) = (layer(user), layer(system));
+        for repo in &states {
+            let repo_dir = TempDir::new().unwrap();
+            std::fs::write(repo_dir.path().join("config.toml"), repo).unwrap();
             for env_value in [None, Some("strict"), Some("warn"), Some("off")] {
                 match env_value {
                     Some(value) => env.set("JIT_ENFORCE_LEASES", value),
                     None => env.remove("JIT_ENFORCE_LEASES"),
                 };
-                let mut loader = ConfigLoader::new();
-                if let Some(dir) = &system_dir {
-                    loader = loader.with_system_config(dir.path()).unwrap();
-                }
-                if let Some(dir) = &user_dir {
-                    loader = loader.with_user_config(dir.path()).unwrap();
-                }
-                let effective = loader.with_repo_config(repo_dir.path()).unwrap().build();
                 let enforced = JitConfig::load(repo_dir.path()).unwrap().enforcement_mode();
-                let reported = effective.enforcement_mode();
+                let reported = EffectiveConfig::load(repo_dir.path())
+                    .unwrap()
+                    .enforcement_mode();
                 assert_eq!(
                     reported, enforced,
-                    "repo {repo:?}, user {user:?}, system {system:?}, \
-                     JIT_ENFORCE_LEASES {env_value:?}"
+                    "repo {repo:?}, JIT_ENFORCE_LEASES {env_value:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_coordination_reported_matches_enforced_in_every_configuration_state() {
+        let both = |agent: Option<u32>, repo: Option<u32>| {
+            let line = |key: &str, value: Option<u32>| {
+                value.map_or(String::new(), |v| format!("{key} = {v}\n"))
+            };
+            format!(
+                "[coordination]\n{}{}",
+                line("max_indefinite_leases_per_agent", agent),
+                line("max_indefinite_leases_per_repo", repo)
+            )
+        };
+        let states = [
+            (String::new(), None, None),
+            ("[coordination]\n".to_string(), None, None),
+            (both(Some(5), None), Some(5), None),
+            (both(None, Some(40)), None, Some(40)),
+            (both(Some(3), Some(12)), Some(3), Some(12)),
+        ];
+        for (repo, agent, repo_limit) in states {
+            let dir = TempDir::new().unwrap();
+            std::fs::write(dir.path().join("config.toml"), &repo).unwrap();
+            let enforced = JitConfig::load(dir.path()).unwrap().coordination();
+            let reported = EffectiveConfig::load(dir.path()).unwrap().coordination();
+            assert_eq!(reported, enforced, "repo {repo:?}");
+            assert_eq!(
+                enforced,
+                EffectiveCoordination {
+                    max_indefinite_leases_per_agent: agent
+                        .unwrap_or(MAX_INDEFINITE_LEASES_PER_AGENT),
+                    max_indefinite_leases_per_repo: repo_limit
+                        .unwrap_or(MAX_INDEFINITE_LEASES_PER_REPO),
+                },
+                "repo {repo:?}"
+            );
         }
     }
 
@@ -3150,7 +2967,7 @@ max_indefinite_leases_per_repo = 40
     fn test_env_override_agent_id() {
         let mut env = EnvGuard::acquire();
         env.set("JIT_AGENT_ID", "agent:env-test");
-        let config = ConfigLoader::new().build();
+        let config = EffectiveConfig::default();
         assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
     }
 

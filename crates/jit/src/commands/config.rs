@@ -331,7 +331,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// configuration surface (REQ-01 of jit:043ae624), returning the value the
     /// CLI needs to print.
     ///
-    /// Loads the same system/user/repo-layered [`EffectiveConfig`] `jit
+    /// Loads the same repository [`EffectiveConfig`] `jit
     /// config show` uses via [`EffectiveConfig::load`] (which owns all the
     /// filesystem probing — this command touches no `std::fs` / `dirs`
     /// itself), snapshots it once via [`EffectiveConfig::full_snapshot`], then
