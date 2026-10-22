@@ -1,0 +1,36 @@
+{
+  "assignee": "agent:planning-lead-c780514e",
+  "claimed_at": "2026-10-22T14:28:18.813398468Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: The registered gate `build-budget-selftest` runs `scripts/rust-build-budget.sh --self-test`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-03: `build-budget-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-04: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "build-budget-selftest"
+  ],
+  "gates_status": {},
+  "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:gates",
+    "satisfies:c780514e/REQ-10",
+    "per:@/charter/D-18",
+    "per:@/charter/D-2",
+    "enforces:@/invariant/no-ignored-tests",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Build-budget checker self-test runs as a declared gate",
+  "updated_at": "2026-10-22T14:28:19.128670015Z"
+}

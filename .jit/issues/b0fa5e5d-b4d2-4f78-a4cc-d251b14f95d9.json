@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "5353463c-6517-43ba-b104-b42cf951b4ce"
+  ],
+  "description": "Stop the gate status and key tests in `crates/jit/tests/cli_gate` reading ids or values from human-readable output.\n\n## Background\n\nShared test support provides one CLI process fixture, which reads the ids of issues it creates from `--json` output. These files still parse human-readable output with `split_whitespace`, mostly to scrape created ids. This entry covers `gate_status_all_lean_response_test.rs`, `gate_status_all_strict_test.rs`, `gate_status_history_flat_test.rs`, `gate_findings_test.rs`, `gate_key_flag_test.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files reads an id or other value from human-readable output; ids and values come from `--json` output.\n- [hard] REQ-02: Each edited test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b0fa5e5d-b4d2-4f78-a4cc-d251b14f95d9",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts",
+    "enforces:@/invariant/semantic-test-assertions"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "gate status and key tests read created ids from JSON output",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

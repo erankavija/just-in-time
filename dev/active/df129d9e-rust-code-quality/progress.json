@@ -118,7 +118,7 @@
           "short_id": "9fa12e75",
           "title": "Render gate run status lines through one output renderer",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (sonnet worker w-9fa12e75, base 6796fc3e7)"
         },
         {
           "key": "validation-report-renderer",

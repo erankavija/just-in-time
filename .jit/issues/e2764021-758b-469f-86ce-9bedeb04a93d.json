@@ -1,0 +1,49 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
+    "28e6703c-2fa3-41c9-8fc0-ebdf79440a0b",
+    "2c453337-7604-4320-8c24-2d1b0b3d49f6",
+    "2f63adec-7602-4d65-961a-3dd3b5daa54d",
+    "340a846d-19c1-4afb-a5bd-7be6d1334e8a",
+    "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
+    "559335cf-35ca-4046-ae3d-aab3f2f54498",
+    "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
+    "7495521e-8338-4ef8-82b9-cb4ddf182739",
+    "7a412cb0-1969-4c46-b106-703bcdb502fe",
+    "871df4b0-6d6d-4408-8054-a574cb9eafe9",
+    "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+    "8d64ffae-719b-4631-9660-1317ba7b59cf",
+    "9bb30f15-a995-4b63-924a-13c27e9fa61c",
+    "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
+    "c11bcdaa-03d2-4b89-8143-26abd58d4632",
+    "c5aafdc0-998c-46a0-a286-7f853f0b814a",
+    "eae17510-00c4-40fe-832c-b783b518112c",
+    "fa9bf296-4375-4c86-9bf0-80a128cd74c8"
+  ],
+  "description": "Measure and report the build footprint after the test-topology changes against the figures before them.\n\n## Background\n\n`scripts/rust-build-budget.sh` enforces at most 12 integration targets, 2 GiB of active test executables and a 30 s suite duration (`dev/benchmarks/rust-build-budgets/README.md`). Before this work, the last passing gate run (`8e22dd96`, at commit `0896fc29b`) reported 10 of 12 integration targets and 14 active executables totalling 1,723,670,208 of 2,147,483,648 bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: The build-footprint budget checker passes on the tree with these changes.\n- [hard] REQ-02: `dev/benchmarks/test-topology-c780514e/README.md` reports the integration-target count and the active test-executable count and bytes, before and after, with the commit and command of each measurement.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e2764021-758b-469f-86ce-9bedeb04a93d",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:docs",
+    "satisfies:c780514e/REQ-12",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Build-footprint figures before and after the epic are reported",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
+    "64f04da6-c24f-49b8-891d-e8c4245cfe03",
+    "b612cde1-ee3f-48b3-a47d-90dffcb601d9"
+  ],
+  "description": "Delete the storage section that re-proves mutation finalization through both backends.\n\n## Background\n\nThe typed-mutation-determinism section of `crates/jit/src/storage/repository_state_store_tests.rs` (`:1754-2585`) re-proves finalization, which the repository-state layer owns as a pure function of the image.\n\n## Success Criteria\n\n- [hard] REQ-01: The typed-mutation-determinism section of `repository_state_store_tests.rs` no longer exists.\n- [hard] REQ-02: Remaining storage tests assert only what a backend adds to finalization, such as publication, durability or read-back.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e2eb8862-1622-4a58-9bbc-c77a57a87013",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:storage-contracts",
+    "component:testing",
+    "component:storage",
+    "satisfies:c780514e/REQ-03",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Storage tests stop re-proving mutation finalization",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

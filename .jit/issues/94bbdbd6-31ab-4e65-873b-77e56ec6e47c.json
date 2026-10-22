@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "2c9badcd-07b8-4489-9ca0-4ef70e5e6980"
+  ],
+  "description": "Make the in-memory backend's path reads come from its own state, so it passes the shared conformance suite for path reads, decoding and commit-pinned reads.\n\n## Background\n\n`InMemoryStorage::read_path_bytes` (`crates/jit/src/storage/memory.rs:943-990`) ignores its `_at_commit` argument and reads `std::fs::read(root_path.join(path))` from the real disk, so in-memory tests observe whatever the host directory holds. `storage/test_support.rs` (`seed_repository_tree_fixture`) imports a file tree into memory state.\n\n## Success Criteria\n\n- [hard] REQ-01: In-memory path reads return bytes from the store's own state, never from the host filesystem.\n- [hard] REQ-02: A commit-pinned read returns the state recorded for that commit, and a read at an unknown commit fails with the same error class as the JSON backend.\n- [hard] REQ-03: The conformance suite includes path-read, decoding and commit-pinned read cases, and both backends pass them.\n- [hard] REQ-04: A test that relied on the disk fallback seeds the store instead.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "94bbdbd6-31ab-4e65-873b-77e56ec6e47c",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:storage-contracts",
+    "component:storage",
+    "satisfies:c780514e/REQ-08",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "In-memory path reads serve the store's own commit-pinned state",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

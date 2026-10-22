@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "22355a56-9730-4409-b9a8-5a2381c35cf7"
+  ],
+  "description": "Give in-process suites one way to build a memory store and executor from declared configuration, rules and templates on top of the shared memory executor.\n\n## Background\n\nThe shared memory executor (`crate::commands::test_helpers::memory_executor`) is set up by product initialisation. In-process suites build their own `InMemoryStorage` and write `config.toml`, `rules.toml` or `templates.toml` around it before calling it.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor.\n- [hard] REQ-02: A unit test proves that the supplied declarations are what the executor loads and that unsupplied ones are product defaults.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ad1e6d0e-ec8a-4178-91a2-434ab80845c8",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "satisfies:c780514e/REQ-06",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Shared memory executor accepts declarations as data",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

@@ -1,0 +1,35 @@
+{
+  "assignee": "agent:planning-lead-c780514e",
+  "claimed_at": "2026-10-22T14:28:25.390073480Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Make the `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` self-test pass as the registered gate `manifest-tool-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` is a re-runnable self-test of `.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py` over the fixtures in `.agents/skills/jit-planning-lead/evals/fixtures/` and the shared batch structural-conformance fixture. It needs `python3` and runs under `set -e`, so a missing interpreter exits non-zero. Until planning, no gate ran it. The gate `manifest-tool-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `manifest-tool-test` runs `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `manifest-tool-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "manifest-tool-test"
+  ],
+  "gates_status": {},
+  "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:gates",
+    "satisfies:c780514e/REQ-10",
+    "per:@/charter/D-18",
+    "per:@/charter/D-2",
+    "enforces:@/invariant/no-ignored-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Breakdown-manifest tool test suite runs as a declared gate",
+  "updated_at": "2026-10-22T14:28:25.706100302Z"
+}

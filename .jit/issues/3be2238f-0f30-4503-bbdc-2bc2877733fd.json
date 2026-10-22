@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "2b49f95b-c99f-4182-bb55-252efa30eea9",
+    "ad1e6d0e-ec8a-4178-91a2-434ab80845c8"
+  ],
+  "description": "Retire the private memory executors of the remaining command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. `setup` in `commands/gate.rs` writes the scenario value `enforce_leases = \"off\"` directly into the store. The literal `schema_version` fields in `prior_run` (`commands/gate_check.rs`) and `prior_precheck_run` (`commands/mod.rs`) belong to gate-run records, not to a repository index, and stay.\n\nThis entry covers `gate.rs`, `gate_check.rs`, `gate_cli_tests.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/commands/gate.rs`: `setup` (`:1445`).\n- `crates/jit/src/commands/gate_check.rs`: `setup` (`:1665`).\n- `crates/jit/src/commands/gate_cli_tests.rs`: `setup` (`:11`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No test module in the files in this entry's footprint defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3be2238f-0f30-4503-bbdc-2bc2877733fd",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "satisfies:c780514e/REQ-06",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Gate command tests use the shared memory seeding",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

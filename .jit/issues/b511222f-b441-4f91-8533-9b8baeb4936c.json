@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "2b49f95b-c99f-4182-bb55-252efa30eea9"
+  ],
+  "description": "Retire the private git setup in library unit-test modules in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. Eight library test modules hand-roll `git init`: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs` and `commands/archive.rs`.\n\nThis entry covers `mod.rs`, `hooks.rs`, `worktree.rs`, `archive.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No library test module defines a git initialisation helper or spawns `git init` itself; each uses the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b511222f-b441-4f91-8533-9b8baeb4936c",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Command unit tests initialise git through the shared helper",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}
