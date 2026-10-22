@@ -252,6 +252,27 @@ pub fn print_issue_list<'a>(
     writeln_safe(&rendered)
 }
 
+/// Which run-status line [`render_gate_run_status`] renders.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateRunLine {
+    NeverRun,
+    Passed,
+}
+
+/// The human status line for a gate's run, shared by every gate command.
+pub fn render_gate_run_status(
+    line: GateRunLine,
+    gate_key: impl Display,
+    issue_id: impl Display,
+) -> String {
+    match line {
+        GateRunLine::NeverRun => format!(
+            "Gate '{gate_key}' has not been run yet for issue {issue_id}. Use 'jit gate evaluate' to run it."
+        ),
+        GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {issue_id}"),
+    }
+}
+
 fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagnostics: &[T]) {
     use std::fmt::Write;
     if diagnostics.is_empty() {
@@ -2854,6 +2875,17 @@ mod tests {
     use schemars::schema_for;
     use serde_json::json;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn test_render_gate_run_status_never_run_and_passed_name_gate_and_issue() {
+        let never = render_gate_run_status(GateRunLine::NeverRun, "tests", "abc123");
+        let passed = render_gate_run_status(GateRunLine::Passed, "tests", "abc123");
+        for line in [&never, &passed] {
+            assert!(line.contains("'tests'") && line.contains("abc123"));
+        }
+        assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
+        assert_eq!(passed, "Passed gate 'tests' for issue abc123");
+    }
 
     fn schema_property_names<T: JsonSchema>() -> BTreeSet<String> {
         schema_for!(T)

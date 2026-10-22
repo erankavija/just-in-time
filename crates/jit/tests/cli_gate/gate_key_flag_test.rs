@@ -418,3 +418,43 @@ fn test_gate_status_neither_with_json_emits_machine_readable_error() {
         .expect("`gate status --json` argument error must be valid JSON on stdout");
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
+
+// ---------------------------------------------------------------------------
+// Passed line is identical across evaluate, evaluate-all and evaluate-many
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_gate_evaluate_commands_report_passed_gate_with_one_suffixless_line() {
+    let passed_stdout = |subcommand_args: &[&str]| {
+        let (temp, issue_id) = setup_manual_gate_issue("code-review");
+        let mut args = vec!["gate"];
+        args.extend_from_slice(subcommand_args);
+        let args: Vec<String> = args
+            .into_iter()
+            .map(|a| a.replace("{id}", &issue_id))
+            .collect();
+        let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .args(&args)
+            .args(["--by", "human:reviewer"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let line = String::from_utf8_lossy(&out)
+            .lines()
+            .find(|l| l.contains("Passed gate"))
+            .expect("a passed line is printed")
+            .replace(&issue_id, "{id}");
+        line
+    };
+
+    let evaluate = passed_stdout(&["evaluate", "{id}", "code-review"]);
+    let evaluate_all = passed_stdout(&["evaluate-all", "{id}"]);
+    let evaluate_many = passed_stdout(&["evaluate-many", "code-review", "{id}"]);
+
+    assert_eq!(evaluate, "Passed gate 'code-review' for issue {id}");
+    assert_eq!(evaluate_all, evaluate);
+    assert_eq!(evaluate_many, evaluate);
+}

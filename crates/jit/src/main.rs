@@ -3821,9 +3821,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = format!(
-                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
-                                gate_key, id
+                            let msg = jit::output::render_gate_run_status(
+                                jit::output::GateRunLine::NeverRun,
+                                &gate_key,
+                                &id,
                             );
                             if json {
                                 use jit::output::JsonOutput;
@@ -3929,9 +3930,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = format!(
-                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
-                                gate_key, id
+                            let msg = jit::output::render_gate_run_status(
+                                jit::output::GateRunLine::NeverRun,
+                                &gate_key,
+                                &id,
                             );
                             if json {
                                 use jit::output::JsonOutput;
@@ -4012,9 +4014,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             }
                         }
                         Ok(None) => {
-                            let msg = format!(
-                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
-                                gate_key, id
+                            let msg = jit::output::render_gate_run_status(
+                                jit::output::GateRunLine::NeverRun,
+                                &gate_key,
+                                &id,
                             );
                             if json {
                                 use jit::output::JsonOutput;
@@ -4122,8 +4125,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
                         match status {
                             GateStatus::Pending => println!(
-                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
-                                gate_key, id
+                                "{}",
+                                jit::output::render_gate_run_status(
+                                    jit::output::GateRunLine::NeverRun,
+                                    gate_key,
+                                    &id
+                                )
                             ),
                             GateStatus::Passed => {
                                 println!("Gate '{}' status: passed", gate_key)
@@ -4229,14 +4236,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 "status": "passed",
                                 "verdict": "pass",
                                 "warnings": outcome.warnings,
-                                "message": format!("Passed gate '{}' for issue {}", gate_key, id),
+                                "message": jit::output::render_gate_run_status(jit::output::GateRunLine::Passed, &gate_key, &id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_success(format!(
-                                "Passed gate '{}' for issue {}",
-                                gate_key, id
+                            let _ = output_ctx.print_success(jit::output::render_gate_run_status(
+                                jit::output::GateRunLine::Passed,
+                                &gate_key,
+                                &id,
                             ));
                         }
                     }
@@ -4288,10 +4296,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 .print_success(format!("No required gates for issue {}", id));
                         } else {
                             for entry in &outcome.results {
-                                let _ = output_ctx.print_success(format!(
-                                    "Passed gate '{}' for issue {}",
-                                    entry.gate_key, id
-                                ));
+                                let _ =
+                                    output_ctx.print_success(jit::output::render_gate_run_status(
+                                        jit::output::GateRunLine::Passed,
+                                        &entry.gate_key,
+                                        &id,
+                                    ));
                             }
                         }
                     }
@@ -4318,9 +4328,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 for warning in &outcome.warnings {
                                     output_ctx.print_warning(warning)?;
                                 }
-                                output_ctx.print_success(format!(
-                                    "Passed gate '{}' for issue {}",
-                                    gate_key, entry.issue_id
+                                output_ctx.print_success(jit::output::render_gate_run_status(
+                                    jit::output::GateRunLine::Passed,
+                                    &gate_key,
+                                    &entry.issue_id,
                                 ))?;
                             }
                             results.push(jit::output::GateEvaluateManyResult {
