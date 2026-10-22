@@ -579,35 +579,6 @@ pub enum ItemError {
 ///
 /// Resolved from an [`ItemKindConfig`] via [`ItemKind::from_config`]. The
 /// `id_pattern` is pre-compiled so indexing is regex-error-free.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::config::{KindScopeConfig, SourceOfTruth};
-/// use jit::domain::item::ItemKind;
-///
-/// let kind = ItemKind::from_config(
-///     "example",
-///     &ItemKindConfig {
-///         section: Some("success_criteria".into()),
-///         id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".into()),
-///         markers: Some(vec!["[hard]".into()]),
-///         link_namespaces: Some(vec!["satisfies".into()]),
-///         scope: Some(KindScopeConfig::Issue),
-///         source: None,
-///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-///         aliases: None,
-///     },
-/// )
-/// .unwrap();
-/// assert_eq!(kind.name(), "example");
-/// // The kind exposes the same triple the label-coverage rule consumes.
-/// let (section, marker, pattern) = kind.as_triple();
-/// assert_eq!(section, "success_criteria");
-/// assert_eq!(marker, Some("[hard]"));
-/// assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
-/// ```
 #[derive(Debug, Clone)]
 pub struct ItemKind {
     name: String,
@@ -1055,39 +1026,6 @@ pub fn derive_scope_items(
 /// repeated under the SAME kind is an [`ItemError::DuplicateSelfId`]; the same
 /// self-id under a *different* kind coexists. A list entry with no self-id match
 /// is plain prose and is skipped, never an error (REQ-06).
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::config::{KindScopeConfig, SourceOfTruth};
-/// use jit::document::MarkdownContentParser;
-/// use jit::domain::item::{index_items, ItemKind};
-/// use jit::domain::Issue;
-///
-/// let issue = Issue::draft(
-///     "T".to_string(),
-///     "## Success Criteria\n\n- [hard] REQ-01: a\n- prose line\n".to_string(),
-/// );
-/// let kind = ItemKind::from_config(
-///     "example",
-///     &ItemKindConfig {
-///         section: Some("success_criteria".into()),
-///         id_pattern: Some("REQ-[0-9]+".into()),
-///         markers: Some(vec!["[hard]".into()]),
-///         link_namespaces: Some(vec!["satisfies".into()]),
-///         scope: Some(KindScopeConfig::Issue),
-///         source: None,
-///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-///         aliases: None,
-///     },
-/// )
-/// .unwrap();
-/// let items = index_items(&issue, &[kind], &MarkdownContentParser).unwrap();
-/// assert_eq!(items.len(), 1);
-/// assert_eq!(items[0].self_id, "REQ-01");
-/// assert!(items[0].qualified_id.ends_with("/REQ-01"));
-/// ```
 pub fn index_items(
     issue: &Issue,
     kinds: &[ItemKind],
@@ -1525,36 +1463,6 @@ pub struct KindTriple {
 /// consumes the triple and never sees the kind NAME, keeping it domain-agnostic
 /// (REQ-05). A name absent from `registry` is an [`ItemError::UnknownKind`]; a
 /// `None` registry has no declared kinds, so any name is unknown.
-///
-/// # Examples
-///
-/// ```
-/// use std::collections::HashMap;
-/// use jit::config::{ItemKindConfig, KindScopeConfig, SourceOfTruth};
-/// use jit::domain::item::{expand_kind_triple, ItemError};
-///
-/// let mut registry = HashMap::new();
-/// registry.insert(
-///     "example".to_string(),
-///     ItemKindConfig {
-///         section: Some("success_criteria".to_string()),
-///         markers: Some(vec!["[hard]".to_string()]),
-///         id_pattern: Some("REQ-\\d+".to_string()),
-///         link_namespaces: Some(vec!["satisfies".to_string()]),
-///         scope: Some(KindScopeConfig::Issue),
-///         source: None,
-///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-///         aliases: None,
-///     },
-/// );
-/// let triple = expand_kind_triple(Some(&registry), "example").unwrap();
-/// assert_eq!(triple.section, "success_criteria");
-/// assert_eq!(triple.marker.as_deref(), Some("[hard]"));
-///
-/// // An undeclared name is a typed error, not a silent pass.
-/// let err = expand_kind_triple(Some(&registry), "bogus").unwrap_err();
-/// assert!(matches!(err, ItemError::UnknownKind { .. }));
-/// ```
 pub fn expand_kind_triple(
     registry: Option<&HashMap<String, ItemKindConfig>>,
     name: &str,

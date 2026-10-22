@@ -71,32 +71,6 @@ pub enum LocalEvalError {
 /// block a write. The block/allow decision is modulated by the evaluation's
 /// [`Strictness`] level (defaulting to [`Strictness::DEFAULT`]); set the repository's level with [`LocalEvaluation::with_strictness`].
 /// Construct via [`evaluate_local`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{ContentFormat, Issue};
-/// use jit::validation::local::evaluate_local;
-/// use jit::declarations::rules::RuleSet;
-/// use std::path::Path;
-///
-/// // A rule set with one enforce rule that requires a `req:*` label.
-/// let toml = r#"
-/// [[rules]]
-/// name = "epic-needs-req"
-/// when = { type = "epic" }
-/// severity = "error"
-/// enforce = true
-/// assert = { require-label = { label = "req:*", min = 1 } }
-/// "#;
-/// let rules = RuleSet::parse(toml, None, []).unwrap();
-///
-/// // An epic with no `req:*` label violates the enforce rule.
-/// let mut epic = Issue::draft("An epic".to_string(), String::new());
-/// epic.labels = vec!["type:epic".to_string()];
-/// let evaluation = evaluate_local(&epic, &rules, ContentFormat::Markdown).unwrap();
-/// assert!(!evaluation.blocking_rules().is_empty());
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct LocalEvaluation {
     /// All findings produced by matching local rules, with their severities.

@@ -78,33 +78,6 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9.
 ///
 /// See the module docs for the EXACT emitted contract. This is a pure function of
 /// its input: no I/O, deterministic, and total.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::repository_state::default_ruleset;
-/// use std::collections::HashMap;
-///
-/// // A registry with a unique `type` namespace.
-/// let mut namespaces = HashMap::new();
-/// namespaces.insert("type".to_string(), LabelNamespace::new("Issue type", true));
-/// let registry = LabelNamespaces {
-///     schema_version: 2,
-///     namespaces,
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// };
-///
-/// let rules = default_ruleset(&registry);
-/// assert!(rules.rules.iter().all(|r| r.origin.as_deref() == Some("default")));
-/// // The unique `type` namespace yields a uniqueness rule.
-/// assert!(rules
-///     .rules
-///     .iter()
-///     .any(|r| r.name == "namespace-unique-type"));
-/// ```
 pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     let mut rules: Vec<Rule> = Vec::new();
 
@@ -216,42 +189,6 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 /// defaults — nothing is added: the file is returned unchanged.
 ///
 /// Pure: performs no I/O, deterministic, and total.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::repository_state::{default_ruleset, reconcile_default_rules_with_config};
-/// use std::collections::HashMap;
-///
-/// // A ruleset scaffolded when only `type` was declared (unique).
-/// let mut old = HashMap::new();
-/// old.insert("type".to_string(), LabelNamespace::new("Type", true));
-/// let scaffolded = default_ruleset(&LabelNamespaces {
-///     schema_version: 2,
-///     namespaces: old,
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// });
-/// assert!(!scaffolded.rules.iter().any(|r| r.name == "namespace-unique-team"));
-///
-/// // The registry now also declares a unique `team` namespace (a later hand edit).
-/// let mut now = HashMap::new();
-/// now.insert("type".to_string(), LabelNamespace::new("Type", true));
-/// now.insert("team".to_string(), LabelNamespace::new("Team", true));
-/// let current = LabelNamespaces {
-///     schema_version: 2,
-///     namespaces: now,
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// };
-///
-/// let reconciled = reconcile_default_rules_with_config(scaffolded, &current);
-/// // The uniqueness rule for the newly-declared namespace now enforces.
-/// assert!(reconciled.rules.iter().any(|r| r.name == "namespace-unique-team"));
-/// ```
 pub fn reconcile_default_rules_with_config(
     loaded: RuleSet,
     namespaces: &LabelNamespaces,

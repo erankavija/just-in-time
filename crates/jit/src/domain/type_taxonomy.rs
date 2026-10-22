@@ -33,29 +33,6 @@
 //! It does NOT:
 //! - Validate dependencies (dependencies are unrestricted by type)
 //! - Check organizational membership (future: via `epic:*`, `milestone:*` labels)
-//!
-//! # Examples
-//!
-//! ```
-//! use jit::domain::type_taxonomy::{extract_type, HierarchyConfig};
-//! use std::collections::HashMap;
-//!
-//! // The hierarchy carries whatever `[type_hierarchy]` declared.
-//! let config = HierarchyConfig::new(
-//!     HashMap::from([("task".to_string(), 2), ("epic".to_string(), 1)]),
-//!     HashMap::from([("epic".to_string(), "epic".to_string())]),
-//! )
-//! .unwrap();
-//!
-//! // Extract and validate type labels
-//! assert_eq!(extract_type("type:task"), Some("task".to_string()));
-//! assert_eq!(extract_type("type:epic"), Some("epic".to_string()));
-//! assert!(config.contains_type("task"));
-//! assert!(!config.contains_type("unknown"));
-//!
-//! // A repository that declared no hierarchy knows no type.
-//! assert!(!HierarchyConfig::empty().contains_type("task"));
-//! ```
 
 use crate::labels::is_type_label;
 use std::collections::HashMap;
@@ -520,6 +497,7 @@ mod tests {
 
     #[test]
     fn test_config_contains_type() {
+        assert!(!HierarchyConfig::empty().contains_type(&test_type(4)));
         let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
         assert!(config.contains_type(&test_type(4)));

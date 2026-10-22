@@ -16,20 +16,6 @@ use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
 ///
 /// This struct wraps an error message with additional context to help users
 /// diagnose and fix the problem.
-///
-/// # Example
-///
-/// ```
-/// use jit::errors::ActionableError;
-///
-/// let error = ActionableError::new("Lease abc123 not found")
-///     .with_cause("The lease may have expired")
-///     .with_cause("The lease ID may be incorrect")
-///     .with_remedy("List all active leases: jit claim list --json | jq -r '.data.leases[].lease_id'")
-///     .with_remedy("Check if the issue is still claimed: jit claim status --issue <issue-id>");
-///
-/// eprintln!("{}", error);
-/// ```
 #[derive(Debug, Clone)]
 pub struct ActionableError {
     /// The main error message

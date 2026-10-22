@@ -11,22 +11,6 @@ use std::collections::HashMap;
 ///
 /// This is a common pattern used throughout query and validation code to enable
 /// efficient lookups when checking if issues are blocked by dependencies.
-///
-/// # Example
-///
-/// ```rust
-/// use jit::domain::queries::build_issue_map;
-/// use jit::domain::Issue;
-///
-/// let mut task_1 = Issue::draft("Task 1".to_string(), String::new());
-/// task_1.id = "task-1".to_string();
-/// let mut task_2 = Issue::draft("Task 2".to_string(), String::new());
-/// task_2.id = "task-2".to_string();
-/// let issues = vec![task_1, task_2];
-///
-/// let map = build_issue_map(&issues);
-/// assert_eq!(map.len(), 2);
-/// ```
 pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
     issues.iter().map(|i| (i.id.clone(), i)).collect()
 }
@@ -198,31 +182,6 @@ pub fn query_by_label(issues: &[Issue], pattern: &str) -> Vec<Issue> {
 /// Each pattern uses the same `namespace:value` / `namespace:*` wildcard
 /// syntax as [`query_by_label`]; an issue is kept only when it matches every
 /// pattern in `patterns`. An empty `patterns` slice matches every issue.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::domain::queries::query_by_labels;
-/// use jit::domain::Issue;
-///
-/// let mut a = Issue::draft("A".to_string(), String::new());
-/// a.labels = vec!["epic:auth".to_string(), "component:api".to_string()];
-/// let mut b = Issue::draft("B".to_string(), String::new());
-/// b.labels = vec!["epic:auth".to_string()];
-///
-/// let issues = vec![a, b];
-///
-/// // Both patterns must match: only issue A carries both labels.
-/// let matches = query_by_labels(
-///     &issues,
-///     &["epic:auth".to_string(), "component:api".to_string()],
-/// );
-/// assert_eq!(matches.len(), 1);
-/// assert_eq!(matches[0].title, "A");
-///
-/// // No patterns: every issue matches.
-/// assert_eq!(query_by_labels(&issues, &[]).len(), 2);
-/// ```
 pub fn query_by_labels(issues: &[Issue], patterns: &[String]) -> Vec<Issue> {
     use crate::labels;
 

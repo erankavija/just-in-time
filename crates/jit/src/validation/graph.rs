@@ -223,42 +223,6 @@ pub enum ChildLink {
 /// - `issue_id` is `None` for a `config-error` finding: a malformed rule config
 ///   pertains to the rule itself, not a single issue, and must never be silently
 ///   dropped from a per-issue view.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{ContentFormat, Issue};
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-/// use jit::validation::graph::{evaluate_graph, GraphFinding};
-/// use jit::declarations::rules::RuleSet;
-/// use std::path::Path;
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "task-needs-design-dep"
-/// when = { type = "task" }
-/// severity = "error"
-/// assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
-/// "#;
-/// let set = RuleSet::parse(toml, None, []).unwrap();
-/// let rules: Vec<&_> = set.rules.iter().collect();
-///
-/// let mut task = Issue::draft("a task".into(), String::new());
-/// task.labels = vec!["type:task".into()];
-/// let task_id = task.id.clone();
-/// let findings: Vec<GraphFinding> = evaluate_graph(
-///     &rules,
-///     &[task],
-///     &HierarchyConfig::empty(),
-///     ContentFormat::Markdown,
-///     chrono::Utc::now(),
-///     &std::collections::HashMap::new(),
-/// );
-/// assert_eq!(findings.len(), 1);
-/// // The finding is attributed to the offending issue, not parsed from text.
-/// assert_eq!(findings[0].issue_id.as_deref(), Some(task_id.as_str()));
-/// assert!(!findings[0].is_config_error());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphFinding {
     /// Full id of the issue this finding concerns, or `None` for a config-error

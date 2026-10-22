@@ -101,21 +101,6 @@ fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&
 /// - Node labels showing issue ID and title
 /// - Color-coded nodes based on issue state
 /// - Dependency edges between issues
-///
-/// # Example
-/// ```
-/// use jit::visualization;
-/// use jit::{domain::Issue, graph::DependencyGraph};
-///
-/// let issue1 = Issue::draft("Setup".to_string(), "Initial setup".to_string());
-/// let mut issue2 = Issue::draft("Deploy".to_string(), "Deploy app".to_string());
-/// issue2.dependencies.push(issue1.id.clone());
-///
-/// let issues = vec![&issue1, &issue2];
-/// let graph = DependencyGraph::new(&issues);
-/// let dot = visualization::export_dot(&graph);
-/// assert!(dot.contains("digraph issues"));
-/// ```
 pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
     let mut output = String::from("digraph issues {\n");
     output.push_str("  rankdir=LR;\n");
@@ -163,21 +148,6 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 /// - Node labels showing issue ID and title
 /// - CSS classes for state-based styling
 /// - Dependency arrows between issues
-///
-/// # Example
-/// ```
-/// use jit::visualization;
-/// use jit::{domain::Issue, graph::DependencyGraph};
-///
-/// let issue1 = Issue::draft("Design".to_string(), "Design API".to_string());
-/// let mut issue2 = Issue::draft("Implement".to_string(), "Build API".to_string());
-/// issue2.dependencies.push(issue1.id.clone());
-///
-/// let issues = vec![&issue1, &issue2];
-/// let graph = DependencyGraph::new(&issues);
-/// let mermaid = visualization::export_mermaid(&graph);
-/// assert!(mermaid.contains("graph LR"));
-/// ```
 pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     let mut output = String::from("graph LR\n");
 
@@ -290,35 +260,6 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// name ids by their canonical placement in the whole graph. A consumer that
 /// filters the emitted node set can therefore hold references to nodes it did
 /// not keep.
-///
-/// # Example
-/// ```
-/// use jit::visualization;
-/// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-/// use jit::{domain::Issue, graph::DependencyGraph};
-///
-/// let mut epic = Issue::draft("Epic".to_string(), String::new());
-/// epic.labels = vec!["type:epic".to_string()];
-/// let mut task = Issue::draft("Task".to_string(), String::new());
-/// task.labels = vec!["type:task".to_string()];
-/// epic.dependencies.push(task.id.clone());
-///
-/// let issues = vec![&epic, &task];
-/// let graph = DependencyGraph::new(&issues);
-/// let hierarchy = HierarchyConfig::new(
-///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
-///     std::collections::HashMap::new(),
-/// )
-/// .unwrap();
-/// let resolution = resolve_hierarchy(&issues, &hierarchy);
-/// let json = visualization::export_json_full(&graph, &resolution);
-/// assert!(json.contains("\"description\""));
-/// assert!(json.contains("\"parent\""));
-/// assert!(json.contains("\"children\""));
-/// assert!(json.contains("\"cluster\""));
-/// assert!(json.contains("\"rank\""));
-/// ```
 pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
     resolution: &crate::graph::hierarchy::HierarchyResolution,

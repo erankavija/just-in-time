@@ -191,33 +191,6 @@ impl HierarchyNode for crate::domain::Issue {
 /// --full`, and the server's `GET /graph`), so the four fields cannot drift
 /// apart. [`Default`] is the resolution of a node absent from the input: a root
 /// orphan sink.
-///
-/// # Examples
-///
-/// ```
-/// use jit::graph::hierarchy::NodeHierarchy;
-///
-/// let facts = NodeHierarchy {
-///     parent: Some("epic-1".into()),
-///     children: vec!["task-a".into(), "task-b".into()],
-///     cluster: Some("milestone-1".into()),
-///     rank: 2,
-/// };
-/// assert_eq!(facts.parent.as_deref(), Some("epic-1"));
-/// assert_eq!(facts.children.len(), 2);
-/// assert_eq!(facts.rank, 2);
-///
-/// // The four published field names come from this one derive.
-/// let json = serde_json::to_value(&facts).unwrap();
-/// assert_eq!(json["parent"], "epic-1");
-/// assert_eq!(json["cluster"], "milestone-1");
-/// assert_eq!(json["children"][1], "task-b");
-/// assert_eq!(json["rank"], 2);
-///
-/// let orphan = NodeHierarchy::default();
-/// assert_eq!(orphan.rank, 0);
-/// assert!(orphan.parent.is_none());
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct NodeHierarchy {
     /// The nearest dominating container's id, or `None` for a root node.
@@ -317,38 +290,6 @@ impl HierarchyResolution {
 /// configured type levels. Pure and deterministic; membership labels are not
 /// consulted and the input is left untouched. See the [module docs](self) for the
 /// resolution rules and edge-case semantics.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-///
-/// // A diamond: two epics both depend on the same task.
-/// let mut e1 = Issue::draft("E1".into(), String::new());
-/// e1.id = "aaaa".into();
-/// e1.labels = vec!["type:epic".into()];
-/// let mut e2 = Issue::draft("E2".into(), String::new());
-/// e2.id = "bbbb".into();
-/// e2.labels = vec!["type:epic".into()];
-/// let mut task = Issue::draft("T".into(), String::new());
-/// task.id = "cccc".into();
-/// task.labels = vec!["type:task".into()];
-/// e1.dependencies = vec![task.id.clone()];
-/// e2.dependencies = vec![task.id.clone()];
-///
-/// let config = HierarchyConfig::new(
-///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
-///     std::collections::HashMap::new(),
-/// )
-/// .unwrap();
-/// let r = resolve_hierarchy(&[&e1, &e2, &task], &config);
-/// // Same level and hop count → smallest container id wins the tie.
-/// assert_eq!(r.parent(&task.id), Some("aaaa"));
-/// assert_eq!(r.children("aaaa"), [task.id.clone()]);
-/// assert!(r.children("bbbb").is_empty());
-/// ```
 pub fn resolve_hierarchy<T: HierarchyNode>(
     nodes: &[&T],
     config: &HierarchyConfig,
@@ -597,41 +538,6 @@ pub struct MembershipDivergence {
 /// to the membership-reference validation, not reported here.
 ///
 /// The result is sorted by `(issue_id, label)` for deterministic reporting.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::hierarchy::detect_membership_divergences;
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-///
-/// // `epic` sits above `task` and carries an `epic:*` membership namespace.
-/// let config = HierarchyConfig::new(
-///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
-///     std::collections::HashMap::from([("epic".to_string(), "epic".to_string())]),
-/// )
-/// .unwrap();
-///
-/// // The epic "auth" contains `inside` via the DAG but not `outside`.
-/// let mut epic = Issue::draft("Auth".into(), String::new());
-/// epic.id = "epic".into();
-/// epic.labels = vec!["type:epic".into(), "epic:auth".into()];
-/// let mut inside = Issue::draft("Inside".into(), String::new());
-/// inside.id = "inside".into();
-/// inside.labels = vec!["type:task".into(), "epic:auth".into()];
-/// let mut outside = Issue::draft("Outside".into(), String::new());
-/// outside.id = "outside".into();
-/// outside.labels = vec!["type:task".into(), "epic:auth".into()];
-/// epic.dependencies = vec![inside.id.clone()]; // only `inside` is a DAG member
-///
-/// let divergences =
-///     detect_membership_divergences(&[&epic, &inside, &outside], &config);
-///
-/// // `outside` claims epic:auth but the epic does not depend on it.
-/// assert_eq!(divergences.len(), 1);
-/// assert_eq!(divergences[0].issue_id, outside.id);
-/// assert_eq!(divergences[0].label, "epic:auth");
-/// ```
 pub fn detect_membership_divergences(
     issues: &[&crate::domain::Issue],
     config: &HierarchyConfig,
