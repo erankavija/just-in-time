@@ -447,6 +447,14 @@
       "to": "steward",
       "detail": "REQ-26 leaves user/system config layers with no reader",
       "resolution": "Option 1: accept 93a6be35d; add task ea5f4536 (REQ-27)."
+    },
+    {
+      "issue": "63c11d08",
+      "category": "cross-epic ownership contract",
+      "raised": "2026-10-22",
+      "to": "steward",
+      "detail": "df129d9e plan and f7f01654 criterion required an output re-export, conflicting with single domain path.",
+      "resolution": "Steward authorized canonical domain::list_envelope ownership, preserving wire/schema behavior; amend plan, manifest, f7f01654 criterion and 650e6a56 description without reopening completed tasks."
     }
   ],
   "rework_counts": {
