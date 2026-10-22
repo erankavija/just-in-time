@@ -1,7 +1,7 @@
 {
   "epic_id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
   "epic_short_id": "842b0ac6",
-  "current_wave": 9,
+  "current_wave": 10,
   "waves": [
     {
       "wave_number": 1,
@@ -413,7 +413,7 @@
           "title": "Remove the remaining domain re-export paths",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework"
+          "status": "done"
         }
       ]
     }
@@ -508,7 +508,8 @@
     "fbb661f2 dispatch note: JitConfig::load hides the serde cause (config.rs ~1335, printed with {} at main.rs ~1663). 5e846743 folded the cause into AgentConfig::load_from's message; fbb661f2 must converge on one convention for both loaders (DEC-config-errors).",
     "Main red from 27f0a575 (df129d9e) doctests; gates for 34361448 and 58282882 held until fixed.",
     "2026-10-22 Codex handoff: resumed 63c11d08 at 8165124c9, merged main 145091232. Lead audit found remaining output/profile domain reexports violating REQ-14; focused rework dispatched before full gates. Main unrelated 9cc3056a gate records and other worktrees preserved.",
-    "63c11d08 cargo-ci at 9ccf7d411: fmt/clippy/58 doctests/budget passed; event reference freshness test failed because original import cutover changed generated header. Rework 2 regenerates projection and audits related generated references."
+    "63c11d08 cargo-ci at 9ccf7d411: fmt/clippy/58 doctests/budget passed; event reference freshness test failed because original import cutover changed generated header. Rework 2 regenerates projection and audits related generated references.",
+    "63c11d08 final cargo-ci passed: 4588 tests, 58 doctests, suite clock 18.434s; code-review passed with zero findings. All 40 implementation tasks are complete; epic validation and holistic review follow."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }
