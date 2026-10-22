@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": null,
   "claimed_at": "2026-10-22T14:28:25.819583619Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -29,5 +29,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Read-only lock tests establish their precondition on any host",
-  "updated_at": "2026-10-22T14:43:00.243755374Z"
+  "updated_at": "2026-10-22T14:44:28.530997437Z"
 }

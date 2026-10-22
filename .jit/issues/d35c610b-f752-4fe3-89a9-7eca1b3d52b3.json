@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": null,
   "claimed_at": "2026-10-22T14:28:21.000167214Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -28,5 +28,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Shared issue-construction fixture",
-  "updated_at": "2026-10-22T14:43:00.711271112Z"
+  "updated_at": "2026-10-22T14:44:30.757281868Z"
 }

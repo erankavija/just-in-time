@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:26:08.837384929Z",
   "context": {},
   "created_at": "2026-10-22T02:10:49.370855023Z",
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove the user and system configuration layers",
-  "updated_at": "2026-10-22T14:26:08.893608069Z"
+  "updated_at": "2026-10-22T14:44:44.302741059Z"
 }

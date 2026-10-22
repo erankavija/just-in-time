@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": null,
   "claimed_at": "2026-10-22T14:28:23.206571472Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -31,5 +31,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Shipped-policy region generator self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:43:00.075511579Z"
+  "updated_at": "2026-10-22T14:44:31.773897595Z"
 }

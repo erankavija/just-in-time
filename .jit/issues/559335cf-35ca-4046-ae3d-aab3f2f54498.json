@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": null,
   "claimed_at": "2026-10-22T14:28:19.240197981Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -28,5 +28,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Dependency-feature policy tests fail when cargo is missing",
-  "updated_at": "2026-10-22T14:42:59.550017786Z"
+  "updated_at": "2026-10-22T14:44:27.066638208Z"
 }
