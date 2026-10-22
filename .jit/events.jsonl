@@ -19427,3 +19427,9 @@
 {"fields":["description"],"id":"06142593-9ce8-45f1-82db-41c8d429f710","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-22T19:36:30.219063303Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"repo-validate","id":"831b9646-977c-4e24-ba66-8328485207d2","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-22T19:36:32.716484575Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"9a82c0c3-8382-4869-86f2-924a5ec2f890","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-22T19:41:38.098991116Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"d5e34e7a-33dc-4519-8f47-1afb81272dc9","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","priority":"high","timestamp":"2026-10-22T19:41:38.454911265Z","title":"Preserve infrastructure status through the CI build lock","type":"issue_created"}
+{"fields":["dependencies"],"id":"d81ad468-d7ff-4952-9c20-a319e8be8a6d","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T19:41:38.909521374Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"d9c6bf10-9771-4556-bb8d-6cdd50974bb1","issue_id":"aa28fe5f-fd2a-4fc1-8786-5234336f8361","timestamp":"2026-10-22T19:41:39.180010484Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"6c08823b-470d-4ded-8d06-39def2e0f4a0","issue_id":"aa28fe5f-fd2a-4fc1-8786-5234336f8361","timestamp":"2026-10-22T19:41:39.180010484Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"77b22b68-253f-4eba-bfad-43800bf83eb2","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T19:41:39.372189175Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"68fa59b5-6594-46ec-94ff-bc0ba5c60cc0","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T19:41:39.372189175Z","type":"issue_claimed"}
