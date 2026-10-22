@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "97084a6d-900e-403d-8a91-bf348cd34fc4",
+      "run_id": "69b4b46c-61d2-4e79-a378-0095ecede1f7",
       "status": "passed",
-      "updated_at": "2026-10-22T15:32:25.055048554Z",
+      "updated_at": "2026-10-22T16:02:28.595085512Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared test support derives shipped item kinds from the default package",
-  "updated_at": "2026-10-22T15:37:07.469138371Z"
+  "updated_at": "2026-10-22T16:02:28.595085512Z"
 }
