@@ -534,7 +534,7 @@ exclude = [
 version = 1
 key = "cargo-ci-selftest"
 title = "cargo-ci self-test"
-description = "Runs scripts/cargo-ci-selftest.sh, which seeds clean merges of six fixture crates that break the cargo-ci pipeline and asserts scripts/cargo-ci.sh rejects each. Any non-zero exit fails the gate, including exit 2 for missing git, cargo or jq. Registered at planning for c780514e; until its owning task removes the default-suite wrapper (merged_tree_gate_verification_tests.rs), the same self-test also still runs inside cargo-ci."
+description = "Runs scripts/cargo-ci-selftest.sh against the shipped CI pipeline. Any non-zero exit fails the gate, including missing-tool errors."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -554,7 +554,6 @@ roots = [
   "scripts/cargo-ci-selftest.sh",
   "scripts/cargo-ci.sh",
   "scripts/rust-build-budget.sh",
-  "scripts/setup-recorded-failure-corpus.sh",
 ]
 
 [gates.reserved]
@@ -563,7 +562,7 @@ roots = [
 version = 1
 key = "profile-suite-selftest"
 title = "Suite profiler self-test"
-description = "Runs scripts/profile-test-suite.sh --self-test over the suite profiler. Any non-zero exit fails the gate, including exit 2 for a missing tool. Registered at planning for c780514e; until its owning task removes the default-suite wrapper in build_profile_policy_tests.rs, the same self-test also still runs inside cargo-ci."
+description = "Runs scripts/profile-test-suite.sh --self-test over the suite profiler. Any non-zero exit fails the gate, including missing-tool errors."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -587,7 +586,7 @@ roots = [
 version = 1
 key = "build-budget-selftest"
 title = "Build-budget checker self-test"
-description = "Runs scripts/rust-build-budget.sh --self-test, the checker's own fixture cases (target and executable budget boundaries, profile drift, remote resolver, duplicate TLS backend, suite-duration flag handling and thresholds). Any non-zero exit fails the gate, including exit 2 for a missing jq. Registered at planning for c780514e; the script has no --self-test mode until its owning task ports the Rust-driven cases into it, so the gate starts out failing."
+description = "Runs scripts/rust-build-budget.sh --self-test over synthetic policy, Cargo-output and sparse-executable fixtures. Any non-zero exit fails the gate, including missing-tool errors."
 stage = "postcheck"
 mode = "auto"
 priority = 100

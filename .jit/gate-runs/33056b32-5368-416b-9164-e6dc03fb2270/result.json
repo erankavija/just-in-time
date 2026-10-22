@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "13c688ce79e471c18d992a8f8bb0fddd82d4e896",
+  "completed_at": "2026-10-22T20:51:37.764783177Z",
+  "duration_ms": 168355,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The declared gate directly runs the profiler self-test, tracks its complete in-file fixture implementation, propagates non-zero exits, and the default Rust suite no longer invokes it.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7a412cb0-1969-4c46-b106-703bcdb502fe",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "33056b32-5368-416b-9164-e6dc03fb2270",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T20:48:49.409358113Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 198b43f6, 4c94c5de, 77223d72, 6e936914, 13c688ce (`jit:7a412cb0`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 and D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (issue description); @/gate/profile-suite-selftest (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T20:47:41Z); profile-suite-selftest passed (exit 0, 2026-10-22T20:48:48Z)\nTruncation recovery: Re-read the affected gate declaration, current script self-test, focused Rust call sites, and each tagged patch separately.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The declared gate directly runs the profiler self-test, tracks its complete in-file fixture implementation, propagates non-zero exits, and the default Rust suite no longer invokes it.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

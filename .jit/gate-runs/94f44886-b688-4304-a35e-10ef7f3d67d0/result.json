@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9260a19ab69490ff96a9e3ae01802330500a875c",
+  "completed_at": "2026-10-22T20:39:22.838263513Z",
+  "duration_ms": 317712,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 523,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/871df4b0/requirement/REQ-01",
+          "@/issue/c780514e/requirement/REQ-13"
+        ],
+        "severity": "high",
+        "summary": "REQ-01 lacks evidence of a warm, low-load doctest substep below five seconds; cargo-ci only enforces a 30-second combined suite clock."
+      }
+    ],
+    "summary": "The doctest-specific under-five-second hard criterion is not verified by the available gate evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "94f44886-b688-4304-a35e-10ef7f3d67d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T20:34:05.125343891Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18676 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16552-2763-7551-a0a3-096c143dc9b2\n--------\nuser\n--- 18663 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8691efc71, c7bb5037d, 9260a19ab (`jit:871df4b0`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/871df4b0/requirement/REQ-01 and @/issue/c780514e/requirement/REQ-13 (issue descriptions, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/no-ignored-tests, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T20:32:40Z); code-review pending\nTruncation recovery: re-read every source patch by commit/path; narrowed gate and timing-policy reads after event-log/artifact output truncated\n\n1. **F1 — blocking, issue-impact (high):** REQ-01 is materially unverified. `scripts/cargo-ci.sh:523-562` measures and budgets the combined nextest-plus-doctest suite clock, while `scripts/rust-build-budget.sh:43` sets that threshold to 30 seconds. No configured assertion or available gate projection records the doctest substep’s required `<5 s` warm, low-load measurement. Thus `cargo-ci` can pass while the specific hard criterion remains unmet. References: `@/issue/871df4b0/requirement/REQ-01`, `@/issue/c780514e/requirement/REQ-13`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The doctest-specific under-five-second hard criterion is not verified by the available gate evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 lacks evidence of a warm, low-load doctest substep below five seconds; cargo-ci only enforces a 30-second combined suite clock.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":523,\"references\":[\"@/issue/871df4b0/requirement/REQ-01\",\"@/issue/c780514e/requirement/REQ-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

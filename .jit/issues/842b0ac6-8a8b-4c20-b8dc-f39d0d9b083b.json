@@ -28,6 +28,13 @@
       "format": "markdown",
       "label": "Completion report",
       "path": "dev/archive/842b0ac6-greenfield-cutover/active/completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "review",
+      "format": "markdown",
+      "label": "Historical state-token sweep",
+      "path": "dev/archive/842b0ac6-greenfield-cutover/active/sweep-66bd4b5c.md"
     }
   ],
   "done_at": "2026-10-22T19:43:10.954167844Z",
@@ -67,5 +74,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-22T19:48:17.801700205Z"
+  "updated_at": "2026-10-22T19:52:44.599653419Z"
 }

@@ -176,7 +176,7 @@ model and subsystem:
 | --- | --- | --- |
 | `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
 | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (the merged-tree gate self-test), plus the build-footprint budget-checker fixtures and the manifest/source policy checks |
+| `scratch_build` | policy checks | manifest/source policy checks |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
 its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
@@ -186,14 +186,17 @@ target count and unique active test-executable bytes from `cargo metadata` and
 profile and dependency-feature policies, failing the gate when
 a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
 (`--metadata-json`, `--artifacts-json`, `--root`), so
-`scratch_build/rust_build_budget_checker_tests.rs` exercises each failure mode
-with synthetic JSON and sparse executables — no compilation. See "4. Build
+the script's `--self-test` exercises the checker with synthetic JSON, policy
+manifests and sparse executables, without compilation. This repository runs it
+through the `build-budget-selftest` gate, separately from the default Rust suite;
+missing tools fail the self-test. See "4. Build
 Footprint Budget" below for the exact budgets, the build-profile and
 dependency-feature policy they check, and how to diagnose a failure.
 
-`scratch_build/merged_tree_gate_verification_tests.rs` runs
-`scripts/cargo-ci-selftest.sh`, which is what keeps the `cargo-ci` gate honest as
-the post-merge check (jit:3019eacd). A textually clean merge can leave `main`
+This repository's `cargo-ci-selftest` gate runs `scripts/cargo-ci-selftest.sh`
+separately from the default Rust suite. Any non-zero self-test exit fails the
+gate, including exit 2 for missing tools. The gate checks that `cargo-ci`
+rejects broken merged trees (jit:3019eacd). A textually clean merge can leave `main`
 broken in ways no per-issue gate saw, so the worktree dispatch protocol runs the
 gate on the merged tree. The self-test seeds merges in throwaway git repos, runs
 the shipped `scripts/cargo-ci.sh` against each, and asserts the verdict it
@@ -530,14 +533,10 @@ and is measured — twice.
 `crates/jit/tests/fixtures/steering/` from one test function by design — its own doc
 comment records the choice, made so adding a scenario needs a fixture, not a Rust change —
 and each scenario runs multiple real `jit` subprocess invocations.
-`test_cargo_ci_selftest_fails_seeded_broken_merges` is already explained in full under
-"3. Integration Tests" above: it runs the real `scripts/cargo-ci.sh` against four seeded
-merge fixtures, two of which also run a real `cargo build --workspace`.
 
 | Test | Warm (ms) |
 | --- | ---: |
 | `steering_scenarios::test_all_steering_scenarios` | 2,519 |
-| `merged_tree_gate_verification_tests::test_cargo_ci_selftest_fails_seeded_broken_merges` | 2,491 |
 
 ### Deliberate at-scale tests
 

@@ -7,6 +7,7 @@
   ],
   "description": "Retire the private file-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. `setup` in `templates_loader_tests.rs` writes declaration files into a temporary directory.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_docs_templates/artifact_discovery_tests.rs`: `Repo::new` (`:62`).\n- `crates/jit/tests/fast_docs_templates/planning_preset_tests.rs`: `file_backed_executor` (`:21`).\n- `crates/jit/tests/fast_docs_templates/templates_loader_tests.rs`: `setup` (`:16`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in `fast_docs_templates` defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T20:22:58.075944249Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "fast_docs_templates file-backed tests use the shared constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T20:22:58.075944249Z"
 }

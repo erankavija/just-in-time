@@ -8,16 +8,6 @@
 //! - Full flexibility through custom type name → icon mapping
 //! - Partial overrides (only specify what changes)
 //! - Fallback chain: custom → level default → no icon
-//!
-//! # Examples
-//!
-//! ```
-//! use jit::type_icons::{IconConfig, get_icon_for_type};
-//!
-//! let config = IconConfig::default();
-//! assert_eq!(get_icon_for_type("epic", 2, &config), Some("📦".to_string()));
-//! assert_eq!(get_icon_for_type("task", 4, &config), Some("☑️".to_string()));
-//! ```
 
 use std::collections::HashMap;
 

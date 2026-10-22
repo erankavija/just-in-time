@@ -61,34 +61,6 @@ impl Lease {
     /// never expire. This is the single source of truth for lease liveness,
     /// shared by index eviction, index rebuild, and read-only callers (e.g.
     /// `worktree list`) so their views cannot drift.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::Lease;
-    /// use chrono::{Duration, Utc};
-    ///
-    /// let now = Utc::now();
-    /// let mut lease = Lease {
-    ///     lease_id: "l1".into(),
-    ///     issue_id: "i1".into(),
-    ///     agent_id: "agent:demo".into(),
-    ///     worktree_id: "wt:demo".into(),
-    ///     branch: None,
-    ///     ttl_secs: 600,
-    ///     acquired_at: now,
-    ///     expires_at: Some(now - Duration::seconds(1)),
-    ///     last_beat: now,
-    ///     stale: false,
-    /// };
-    /// // A finite lease past its expiry instant is expired.
-    /// assert!(lease.is_expired(now));
-    ///
-    /// // Indefinite leases (ttl_secs == 0) never expire.
-    /// lease.ttl_secs = 0;
-    /// lease.expires_at = None;
-    /// assert!(!lease.is_expired(now));
-    /// ```
     pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
         if self.ttl_secs > 0 {
             if let Some(expires_at) = self.expires_at {

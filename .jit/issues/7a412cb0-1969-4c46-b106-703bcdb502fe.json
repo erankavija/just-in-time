@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:18.373636301Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,13 +8,33 @@
   ],
   "description": "Move the suite profiler's self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345` (`test_profile_test_suite_script_passes_its_own_self_test`) runs `scripts/profile-test-suite.sh --self-test` inside the default suite. The gate that runs it was registered in `.jit/gates.toml` at planning.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `profile-suite-selftest` runs `scripts/profile-test-suite.sh --self-test`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `profile-suite-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: No test in the default suite runs the profiler's self-test.\n",
   "documents": [],
+  "done_at": "2026-10-22T20:52:27.964614410Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "profile-suite-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "22b7f944-82f4-4a37-ad9f-6089b56a9ca9",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:48:48.135484392Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "33056b32-5368-416b-9164-e6dc03fb2270",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:51:37.982184358Z",
+      "updated_by": "auto:executor"
+    },
+    "profile-suite-selftest": {
+      "run_id": "acf56f70-8e68-47f1-a6d1-7f5697f7fde7",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:48:48.931748947Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7a412cb0-1969-4c46-b106-703bcdb502fe",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Suite-profiler self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:29.137197068Z"
+  "updated_at": "2026-10-22T20:52:27.964614410Z"
 }

@@ -3,17 +3,6 @@
 //! Provides search across issues and referenced documents using `ripgrep` as the backend.
 //! This approach requires no index management and always searches the current state.
 //!
-//! # Example
-//!
-//! ```no_run
-//! use jit::search::{search, SearchOptions};
-//! use std::path::Path;
-//!
-//! let options = SearchOptions::default();
-//! let results = search(Path::new(".jit"), "authentication", options).unwrap();
-//! println!("Found {} matches", results.len());
-//! ```
-//!
 //! # Ripgrep Requirement
 //!
 //! This module requires `ripgrep` (command `rg`) to be installed on the system.

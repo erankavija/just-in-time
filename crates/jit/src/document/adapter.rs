@@ -11,16 +11,6 @@ use std::path::Path;
 ///
 /// Adapters handle format-specific operations like asset scanning.
 /// Each format (Markdown, AsciiDoc, reStructuredText, MDX) implements this trait.
-///
-/// # Example
-///
-/// ```
-/// use jit::document::{DocFormatAdapter, MarkdownAdapter};
-///
-/// let adapter = MarkdownAdapter;
-/// assert_eq!(adapter.id(), "markdown");
-/// assert!(adapter.supports_path("readme.md"));
-/// ```
 pub trait DocFormatAdapter {
     /// Returns the adapter identifier (e.g., "markdown", "asciidoc")
     fn id(&self) -> &str;
@@ -115,18 +105,6 @@ impl DocFormatAdapter for HtmlAdapter {
 ///
 /// Maintains a collection of format adapters and resolves the appropriate
 /// adapter for a given file path and content.
-///
-/// # Example
-///
-/// ```
-/// use jit::document::{AdapterRegistry, MarkdownAdapter};
-///
-/// let mut registry = AdapterRegistry::new();
-/// registry.register(Box::new(MarkdownAdapter));
-///
-/// let adapter = registry.resolve("readme.md", "# Hello").unwrap();
-/// assert_eq!(adapter.id(), "markdown");
-/// ```
 pub struct AdapterRegistry {
     adapters: Vec<Box<dyn DocFormatAdapter>>,
 }

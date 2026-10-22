@@ -1008,14 +1008,6 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
 ///
 /// Creates a temporary directory with initialized jit storage.
 /// Returns both the TempDir (which cleans up on drop) and the storage instance.
-///
-/// # Example
-/// ```no_run
-/// use jit::test_utils::setup_test_repo;
-///
-/// let (temp, storage) = setup_test_repo().unwrap();
-/// // Use temp.path() and storage for tests
-/// ```
 pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let temp = TempDir::new()?;
 
@@ -1205,7 +1197,10 @@ mod file_setup_tests {
         let outside = TempDir::new().unwrap();
         let absolute = outside.path().join("escaped.toml");
         let absolute = absolute.to_str().unwrap();
-        let traversing = "../escaped-by-traversal.toml";
+        let traversing = Path::new("..")
+            .join(outside.path().file_name().unwrap())
+            .join("escaped-by-traversal.toml");
+        let traversing = traversing.to_str().unwrap();
 
         [absolute, traversing].iter().for_each(|escaping| {
             let error = declaration_dir(&[("inside.toml", "a"), (escaping, "b")]).unwrap_err();
@@ -1214,9 +1209,6 @@ mod file_setup_tests {
         });
 
         assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
-        assert!(!std::env::temp_dir()
-            .join("escaped-by-traversal.toml")
-            .exists());
     }
 
     #[test]
@@ -1661,15 +1653,6 @@ pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
 ///
 /// Generates a WorktreePaths structure suitable for testing,
 /// with standard paths relative to the temp directory.
-///
-/// # Example
-/// ```no_run
-/// use jit::test_utils::{setup_test_repo, create_test_paths};
-///
-/// let (temp, _storage) = setup_test_repo().unwrap();
-/// let paths = create_test_paths(&temp);
-/// assert_eq!(paths.worktree_root, temp.path());
-/// ```
 pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
     WorktreePaths {
         git_repository: true,
@@ -1704,6 +1687,13 @@ mod tests {
                     > 1
             })
             .expect("a shipped package carries more than a manifest")
+    }
+
+    #[test]
+    fn test_create_test_paths_uses_owned_temporary_directory_as_worktree_root() {
+        let temp = TempDir::new().unwrap();
+
+        assert_eq!(create_test_paths(&temp).worktree_root, temp.path());
     }
 
     #[test]

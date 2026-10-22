@@ -61,33 +61,6 @@ use crate::declarations::rules::{Rule, Severity};
 ///
 /// Used to register `x-jit-*` custom keywords on a [`SchemaEngine`] via
 /// [`SchemaEngine::with_keyword`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::KeywordFactory;
-/// use jsonschema::{Keyword, ValidationError};
-/// use std::sync::Arc;
-///
-/// struct AlwaysOk;
-/// impl Keyword for AlwaysOk {
-///     fn validate<'i>(&self, _i: &'i serde_json::Value) -> Result<(), ValidationError<'i>> {
-///         Ok(())
-///     }
-///     fn is_valid(&self, _i: &serde_json::Value) -> bool {
-///         true
-///     }
-/// }
-///
-/// // A factory matching the `KeywordFactory` alias.
-/// let factory: Arc<KeywordFactory> =
-///     Arc::new(|_parent, _schema, _location| Ok(Box::new(AlwaysOk) as Box<dyn Keyword>));
-/// // It can be invoked like the closure it wraps.
-/// let parent = serde_json::Map::new();
-/// let schema = serde_json::json!(true);
-/// let result = factory(&parent, &schema, jsonschema::paths::Location::new());
-/// assert!(result.is_ok());
-/// ```
 pub type KeywordFactory = dyn for<'a> Fn(
         &'a serde_json::Map<String, serde_json::Value>,
         &'a serde_json::Value,
@@ -136,43 +109,6 @@ pub struct SchemaCompileError {
 /// can never share a validator even if their rules have identical names, so no
 /// validator aliasing is possible. Reuse the same engine instance across all
 /// evaluations within a command for the cache to be effective.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::SchemaEngine;
-///
-/// // A schema requiring a `state` property; a projection missing it fails.
-/// let dir = tempfile::tempdir().unwrap();
-/// let schemas = dir.path().join("schemas");
-/// std::fs::create_dir_all(&schemas).unwrap();
-/// std::fs::write(
-///     schemas.join("needs-state.json"),
-///     r#"{ "type": "object", "required": ["state"] }"#,
-/// )
-/// .unwrap();
-/// let toml = r#"
-/// [[rules]]
-/// name = "needs-state"
-/// severity = "error"
-/// assert = { json-schema = "schemas/needs-state.json" }
-/// "#;
-/// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-/// let set = jit::storage::ruleset_store::load_ruleset(
-///     dir.path(),
-///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
-/// )
-/// .unwrap();
-///
-/// let engine = SchemaEngine::new();
-/// let bad = serde_json::json!({ "priority": "high" });
-/// let findings = engine.validate(&set.rules[0], &bad).unwrap();
-/// assert_eq!(findings.len(), 1);
-/// assert_eq!(findings[0].rule, "needs-state");
-///
-/// let ok = serde_json::json!({ "state": "ready" });
-/// assert!(engine.validate(&set.rules[0], &ok).unwrap().is_empty());
-/// ```
 #[derive(Default)]
 pub struct SchemaEngine {
     /// Compiled validators keyed by schema identity — the schema's canonical
@@ -330,38 +266,6 @@ impl SchemaEngine {
     /// of kind [`Assertion::JsonSchema`](crate::declarations::rules::Assertion::JsonSchema)
     /// is evaluated. Shorthand and graph assertion kinds carry no schema here and
     /// yield no findings; they are evaluated by their own downstream tasks.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::SchemaEngine;
-    ///
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let schemas = dir.path().join("schemas");
-    /// std::fs::create_dir_all(&schemas).unwrap();
-    /// std::fs::write(
-    ///     schemas.join("string-state.json"),
-    ///     r#"{ "type": "object", "properties": { "state": { "type": "string" } } }"#,
-    /// )
-    /// .unwrap();
-    /// let toml = r#"
-    /// [[rules]]
-    /// name = "state-is-string"
-    /// assert = { json-schema = "schemas/string-state.json" }
-    /// "#;
-    /// std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-    /// let set = jit::storage::ruleset_store::load_ruleset(
-    ///     dir.path(),
-    ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
-    /// )
-    /// .unwrap();
-    /// let engine = SchemaEngine::new();
-    ///
-    /// // `state` as a number violates the schema.
-    /// let bad = serde_json::json!({ "state": 7 });
-    /// let findings = engine.validate(&set.rules[0], &bad).unwrap();
-    /// assert_eq!(findings.len(), 1);
-    /// ```
     pub fn validate(
         &self,
         rule: &Rule,
@@ -500,46 +404,6 @@ fn rule_schema(rule: &Rule) -> Option<&serde_json::Value> {
 /// 5. **Instance-path prefix.** Every other finding is prefixed with the
 ///    readable instance path, e.g. `at sections.success_criteria.items: <msg>`;
 ///    an empty path renders as the projection root (no prefix change).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::render_finding_message;
-/// use jsonschema::Draft;
-/// use serde_json::json;
-///
-/// let schema = json!({
-///     "type": "object",
-///     "required": ["sections"],
-///     "properties": {
-///         "sections": {
-///             "type": "object",
-///             "properties": {
-///                 "success_criteria": {
-///                     "type": "object",
-///                     "x-jit-section-heading": "Success Criteria",
-///                     "properties": { "items": { "type": "array", "minItems": 1 } }
-///                 }
-///             }
-///         }
-///     }
-/// });
-/// let validator = jsonschema::options()
-///     .with_draft(Draft::Draft202012)
-///     .build(&schema)
-///     .unwrap();
-///
-/// // Prose-without-bullets: the section parsed to an empty `items` array.
-/// let projection = json!({
-///     "sections": { "success_criteria": { "heading": "Success Criteria", "items": [] } }
-/// });
-/// let error = validator.iter_errors(&projection).next().unwrap();
-/// assert_eq!(
-///     render_finding_message(&error, &schema, &projection),
-///     "at sections.success_criteria.items: section 'Success Criteria' has no list \
-///      items; items must be Markdown bullets (lines starting with '- ')"
-/// );
-/// ```
 pub fn render_finding_message(
     error: &ValidationError,
     schema: &serde_json::Value,

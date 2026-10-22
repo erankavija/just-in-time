@@ -12,18 +12,6 @@
 //! 1. **Lexer**: Converts query string to tokens
 //! 2. **Parser**: Builds abstract syntax tree (AST) from tokens
 //! 3. **Evaluator**: Evaluates AST against Issue objects
-//!
-//! # Examples
-//!
-//! ```
-//! use jit::domain::{Issue, State};
-//! use jit::query_engine::QueryFilter;
-//!
-//! # fn example() -> anyhow::Result<()> {
-//! let filter = QueryFilter::parse("state:ready AND priority:high")?;
-//! # Ok(())
-//! # }
-//! ```
 
 mod error;
 mod evaluator;

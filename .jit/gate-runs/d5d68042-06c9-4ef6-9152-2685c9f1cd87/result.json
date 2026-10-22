@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "493c49327c644a6bcbfdbb704589c69f29eb58f5",
+  "completed_at": "2026-10-22T21:00:19.375477910Z",
+  "duration_ms": 136122,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both resolved-subtree tests require and invoke the suite-provided CARGO executable, fail with its path and command context on spawn failure, and contain no skip path.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "559335cf-35ca-4046-ae3d-aab3f2f54498",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d5d68042-06c9-4ef6-9152-2685c9f1cd87",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T20:58:03.253474906Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fc6236097, ddd25c64e, 493c49327 (`jit:559335cf`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18, @/invariant/no-ignored-tests, @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint, @/issue/c780514e/requirement/REQ-10, @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T20:56:56Z); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both resolved-subtree tests require and invoke the suite-provided CARGO executable, fail with its path and command context on spawn failure, and contain no skip path.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

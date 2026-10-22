@@ -35,15 +35,9 @@ impl TestHarness {
         // Disable worktree divergence checks in tests
         crate::test_mode::enable();
 
-        // Session-backed declaration mutations capture config from the same
-        // aggregate image as gates/events; an empty file is the minimal valid
-        // repository declaration set for generic harness tests.
-        storage.add_data_file("config.toml", "");
-        // The store's own canonical layout, so session-backed mutations (e.g.
-        // the validate-fix path) can open the in-memory mutation session. The
-        // in-memory backend models its state in one aggregate map keyed by
-        // virtual path and never touches these paths on the real filesystem
-        // unless a case roots the store somewhere it wants read.
+        // Product initialization seeds the repository and the store's own
+        // canonical layout, so session-backed mutations (e.g. the validate-fix
+        // path) can open the in-memory mutation session.
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         Self { executor, storage }
     }
