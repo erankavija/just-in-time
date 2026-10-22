@@ -218,7 +218,7 @@ fn issue_creation_spec(issue_id: &str) -> CaptureSpec {
 /// would have gone unnoticed; this pins that parity.
 #[test]
 fn test_session_published_issue_reads_back_typed_on_both_backends() {
-    let issue = crate::domain::types::fixture_issue("Crossing".to_string(), "body".to_string());
+    let issue = crate::domain::fixture_issue("Crossing".to_string(), "body".to_string());
     let issue_bytes = serialize_issue(&issue).unwrap();
 
     // Memory backend.
@@ -237,7 +237,9 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(memory.list_issues().unwrap(), vec![issue.clone()]);
     assert_eq!(
         memory
-            .resolve_issue_id(&crate::domain::IssueIdPrefix::parse(&issue.short_id()).unwrap())
+            .resolve_issue_id(
+                &crate::domain::issue_id::IssueIdPrefix::parse(&issue.short_id()).unwrap()
+            )
             .unwrap(),
         issue.id
     );
@@ -278,7 +280,7 @@ fn publish_issue<S: RepositoryStateStore>(storage: &S, worktree: &Path, issue: &
 fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
     fn assert_resolution(backend: &str, storage: &impl IssueStore, id: &str) {
         for requested in [id.to_string(), id.to_uppercase(), id.replace('-', "")] {
-            let prefix = crate::domain::IssueIdPrefix::parse(&requested).unwrap();
+            let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&requested).unwrap();
             assert_eq!(
                 storage.resolve_issue_id(&prefix).ok().as_deref(),
                 Some(id),
@@ -287,7 +289,7 @@ fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
         }
     }
 
-    let issue = crate::domain::types::fixture_issue("Resolve".to_string(), String::new());
+    let issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
     let memory = InMemoryStorage::new();
     let memory_tree = TempDir::new().unwrap();
     publish_issue(&memory, memory_tree.path(), &issue);
@@ -1771,7 +1773,7 @@ fn req01_instant() -> chrono::DateTime<chrono::Utc> {
 }
 
 fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-    let mut issue = crate::domain::types::fixture_issue("Determinism".into(), "Body".into());
+    let mut issue = crate::domain::fixture_issue("Determinism".into(), "Body".into());
     issue.id = id.to_string();
     issue.assignee = assignee;
     issue.created_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
@@ -1782,8 +1784,7 @@ fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
 }
 
 fn req01_map_issue(reverse: bool) -> Issue {
-    let mut issue =
-        crate::domain::types::fixture_issue("Canonical backend retry".into(), "Body".into());
+    let mut issue = crate::domain::fixture_issue("Canonical backend retry".into(), "Body".into());
     issue.id = "11111111-1111-4111-8111-111111111111".into();
     let order = if reverse { [1, 0] } else { [0, 1] };
     let context = [("alpha", "one"), ("zeta", "two")];
@@ -1942,7 +1943,8 @@ fn test_conformance_claim_finalizer_bytes_match_across_backends() {
     assert_eq!(written.updated_at, req01_instant());
     // Exactly one event line, stamped with the mutation timestamp.
     let events =
-        crate::domain::parse_known_events(std::str::from_utf8(&json_events).unwrap()).unwrap();
+        crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
+            .unwrap();
     assert_eq!(events.len(), 1);
     let Event::IssueClaimed { timestamp, .. } = &events[0] else {
         panic!("expected an issue_claimed event");
@@ -2155,7 +2157,8 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_plan() {
 
     let event_bytes = first.delta().appended_event_bytes().unwrap();
     let events =
-        crate::domain::parse_known_events(std::str::from_utf8(event_bytes).unwrap()).unwrap();
+        crate::domain::event_log::parse_known_events(std::str::from_utf8(event_bytes).unwrap())
+            .unwrap();
     let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
         panic!("expected allocated claim event");
     };
@@ -2507,7 +2510,7 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
     let events = VirtualPath::data("events.jsonl").unwrap();
     let index_bytes = crate::repository_state::fresh_index_bytes().unwrap();
 
-    let mut draft = crate::domain::types::fixture_issue("New".into(), "Body".into());
+    let mut draft = crate::domain::fixture_issue("New".into(), "Body".into());
     draft.state = crate::domain::State::Ready;
     let intents = || {
         [
@@ -2566,7 +2569,8 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
     // Canonical event order and the frozen identifier sequence (issue id is
     // uuid_at(0), so the three events take uuid_at(1..=3)).
     let parsed =
-        crate::domain::parse_known_events(std::str::from_utf8(&json_events).unwrap()).unwrap();
+        crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
+            .unwrap();
     assert_eq!(parsed.len(), 3);
     let event_id = |event: &Event| match event {
         Event::IssueCreated { id, .. } | Event::GateDefinitionCreated { id, .. } => id.clone(),

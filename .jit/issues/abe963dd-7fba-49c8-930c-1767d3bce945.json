@@ -32,7 +32,7 @@
     "satisfies:3d9a0ce3/REQ-10"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Build one profile selection per invocation",
   "updated_at": "2026-10-22T19:15:07.129931462Z"
 }

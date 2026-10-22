@@ -7,7 +7,9 @@
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::declarations::GateRegistry;
-use crate::domain::{parse_known_events, Event, Issue, IssueIdPrefix};
+use crate::domain::event_log::parse_known_events;
+use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::{Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
@@ -1401,7 +1403,7 @@ impl IssueStore for JsonFileStorage {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &crate::domain::InputsDigest,
+        digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<crate::domain::GateRunResult>> {
         Ok(crate::domain::latest_gate_run(self.read_gate_runs(
             |result| result.is_reusable_for(gate_key, digest),
@@ -2139,12 +2141,12 @@ mod tests {
             let secondary_storage = JsonFileStorage::new(&secondary_data);
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_data);
 
-            let primary_only = crate::domain::types::fixture_issue(
+            let primary_only = crate::domain::fixture_issue(
                 "Only in primary".to_string(),
                 "The exact linked read must not aggregate this record".to_string(),
             );
             seed_issue_preimage(&main_storage, &primary_only);
-            let linked_only = crate::domain::types::fixture_issue(
+            let linked_only = crate::domain::fixture_issue(
                 "Only in linked".to_string(),
                 "The exact linked read must return this physical record".to_string(),
             );
@@ -2206,10 +2208,8 @@ mod tests {
             let (_temp, storage) = setup_storage();
 
             // Create and save an issue locally
-            let issue = crate::domain::types::fixture_issue(
-                "Local Issue".to_string(),
-                "Description".to_string(),
-            );
+            let issue =
+                crate::domain::fixture_issue("Local Issue".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2242,10 +2242,8 @@ mod tests {
         fn test_load_issue_creates_no_per_issue_sidecar_lock() {
             // REQ-01: reading an issue must not create a `<id>.lock` sidecar.
             let (_temp, storage) = setup_storage();
-            let issue = crate::domain::types::fixture_issue(
-                "Sidecar-free".to_string(),
-                "Description".to_string(),
-            );
+            let issue =
+                crate::domain::fixture_issue("Sidecar-free".to_string(), "Description".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2269,7 +2267,7 @@ mod tests {
             fn lock_count_after_reading_all(issue_count: usize) -> usize {
                 let (temp, storage) = setup_storage();
                 for i in 0..issue_count {
-                    let issue = crate::domain::types::fixture_issue(
+                    let issue = crate::domain::fixture_issue(
                         format!("Issue {i}"),
                         "Description".to_string(),
                     );
@@ -2296,7 +2294,7 @@ mod tests {
         #[test]
         fn test_list_issues_changes_no_file_other_than_the_index_lock() {
             let (_temp, storage) = setup_storage();
-            let issue = crate::domain::types::fixture_issue(
+            let issue = crate::domain::fixture_issue(
                 "Listed without writes".to_string(),
                 "Description".to_string(),
             );
@@ -2319,10 +2317,8 @@ mod tests {
             let jit_dir = repo_path.join(".jit");
 
             // Create an issue and commit it
-            let issue = crate::domain::types::fixture_issue(
-                "Committed Issue".to_string(),
-                "From git".to_string(),
-            );
+            let issue =
+                crate::domain::fixture_issue("Committed Issue".to_string(), "From git".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2363,7 +2359,7 @@ mod tests {
             let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create an issue in main worktree (not committed)
-            let issue = crate::domain::types::fixture_issue(
+            let issue = crate::domain::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2407,10 +2403,8 @@ mod tests {
             let jit_dir = repo_path.join(".jit");
 
             // Create and commit issue
-            let issue = crate::domain::types::fixture_issue(
-                "Committed Issue".to_string(),
-                "In git".to_string(),
-            );
+            let issue =
+                crate::domain::fixture_issue("Committed Issue".to_string(), "In git".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2559,7 +2553,7 @@ mod tests {
             let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create issue in main worktree (not committed)
-            let issue = crate::domain::types::fixture_issue(
+            let issue = crate::domain::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2640,10 +2634,8 @@ mod tests {
             let (_temp_dir, repo_path, storage) = setup_git_repo();
 
             // Create and commit issue
-            let issue = crate::domain::types::fixture_issue(
-                "Duplicate Issue".to_string(),
-                "Test".to_string(),
-            );
+            let issue =
+                crate::domain::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2676,10 +2668,8 @@ mod tests {
             let (_temp_dir, repo_path, storage) = setup_git_repo();
 
             // Create and commit an issue
-            let mut issue = crate::domain::types::fixture_issue(
-                "Original".to_string(),
-                "Old version".to_string(),
-            );
+            let mut issue =
+                crate::domain::fixture_issue("Original".to_string(), "Old version".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 

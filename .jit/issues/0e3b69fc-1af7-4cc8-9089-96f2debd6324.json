@@ -19,6 +19,7 @@
       "path": "dev/active/0e3b69fc/feature-off-check.md"
     }
   ],
+  "done_at": "2026-10-22T15:48:55.845305375Z",
   "first_ready_at": "2026-10-22T15:04:11.049823418Z",
   "gates_required": [
     "cargo-ci",
@@ -32,9 +33,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "95610477-7127-4a19-95ac-a6357be7790d",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:42:45.249731178Z",
+      "run_id": "e5ff41ae-fc9e-417c-973f-3acc30a91e73",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:48:43.341975004Z",
       "updated_by": "auto:executor"
     }
   },
@@ -48,7 +49,7 @@
     "satisfies:842b0ac6/REQ-22"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Compile reference-page renderers only with test support",
-  "updated_at": "2026-10-22T15:45:20.579200884Z"
+  "updated_at": "2026-10-22T15:48:55.845305375Z"
 }

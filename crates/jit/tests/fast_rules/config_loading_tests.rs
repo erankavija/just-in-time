@@ -95,7 +95,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
         .create_issue(
             "Orphaned task".to_string(),
             "No parent labels".to_string(),
-            jit::Priority::Normal,
+            jit::domain::Priority::Normal,
             Vec::new(),
             vec![format!("type:{}", taxonomy.default_type)],
             None,

@@ -676,9 +676,11 @@ fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError>
         path: path.clone(),
         reason: error.to_string(),
     })?;
-    crate::domain::parse_known_events(text).map_err(|error| MutationError::MalformedRecord {
-        path: path.clone(),
-        reason: error.to_string(),
+    crate::domain::event_log::parse_known_events(text).map_err(|error| {
+        MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: error.to_string(),
+        }
     })
 }
 
@@ -1429,7 +1431,7 @@ mod tests {
     }
 
     fn seeded_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue("Title".into(), "Body".into());
+        let mut issue = crate::domain::fixture_issue("Title".into(), "Body".into());
         issue.id = id.to_string();
         issue.assignee = assignee;
         issue.created_at = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
@@ -1440,7 +1442,7 @@ mod tests {
     }
 
     fn map_order_draft(reverse: bool) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue("Canonical".into(), "Body".into());
+        let mut issue = crate::domain::fixture_issue("Canonical".into(), "Body".into());
         issue.id = "11111111-1111-4111-8111-111111111111".into();
         let context_entries = [("alpha", "one"), ("zeta", "two")];
         let gate_entries = [
@@ -1581,7 +1583,8 @@ mod tests {
     fn appended_events(delta: &RepositoryDelta) -> Vec<Event> {
         appended_event_bytes(delta)
             .map(|bytes| {
-                crate::domain::parse_known_events(std::str::from_utf8(&bytes).unwrap()).unwrap()
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&bytes).unwrap())
+                    .unwrap()
             })
             .unwrap_or_default()
     }
@@ -1690,8 +1693,10 @@ mod tests {
 
         assert!(
             override_records(
-                &crate::domain::parse_known_events(std::str::from_utf8(&unannotated).unwrap())
-                    .unwrap()
+                &crate::domain::event_log::parse_known_events(
+                    std::str::from_utf8(&unannotated).unwrap()
+                )
+                .unwrap()
             )
             .is_empty(),
             "an invocation with no override in effect emits no override record"
@@ -1824,7 +1829,8 @@ mod tests {
             unreachable!("an audit append appends to the event log");
         };
         let events =
-            crate::domain::parse_known_events(std::str::from_utf8(bytes).unwrap()).unwrap();
+            crate::domain::event_log::parse_known_events(std::str::from_utf8(bytes).unwrap())
+                .unwrap();
         assert_eq!(
             override_records(&events).len(),
             1,
@@ -2232,7 +2238,7 @@ mod tests {
         })
         .unwrap();
         let draft = {
-            let mut issue = crate::domain::types::fixture_issue("New".into(), "Body".into());
+            let mut issue = crate::domain::fixture_issue("New".into(), "Body".into());
             issue.state = State::Ready;
             issue
         };
@@ -2334,7 +2340,7 @@ mod tests {
 
     #[test]
     fn test_create_issue_rejects_future_index_without_a_plan() {
-        let draft = crate::domain::types::fixture_issue("New".into(), "Body".into());
+        let draft = crate::domain::fixture_issue("New".into(), "Body".into());
         let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
         let index_bytes = serde_json::to_vec(&serde_json::json!({
             "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION + 1,
@@ -2498,11 +2504,15 @@ mod tests {
             );
             let whole = [log.as_slice(), &appended].concat();
             let read =
-                crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).unwrap();
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
+                    .unwrap();
             let prior_events =
-                crate::domain::parse_known_events(std::str::from_utf8(&log).unwrap()).unwrap();
-            let new_events =
-                crate::domain::parse_known_events(std::str::from_utf8(&appended).unwrap()).unwrap();
+                crate::domain::event_log::parse_known_events(std::str::from_utf8(&log).unwrap())
+                    .unwrap();
+            let new_events = crate::domain::event_log::parse_known_events(
+                std::str::from_utf8(&appended).unwrap(),
+            )
+            .unwrap();
             assert_eq!(
                 read,
                 [prior_events, new_events].concat(),
@@ -2587,7 +2597,8 @@ mod tests {
         ));
         let whole = [TORN_LOG, &appended].concat();
         assert!(
-            crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).is_ok(),
+            crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
+                .is_ok(),
             "the reader accepts the certified log"
         );
     }

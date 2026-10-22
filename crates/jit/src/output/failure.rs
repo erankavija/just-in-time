@@ -209,10 +209,10 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
 
     // Graph errors are typed: a cycle is a validation failure, a missing node is
     // a not-found condition. Classified by downcast, not by message text.
-    if let Some(graph_error) = error.downcast_ref::<crate::GraphError>() {
+    if let Some(graph_error) = error.downcast_ref::<crate::graph::GraphError>() {
         return match graph_error {
-            crate::GraphError::CycleDetected => ErrorCode::CycleDetected,
-            crate::GraphError::NodeNotFound { .. } => ErrorCode::IssueNotFound,
+            crate::graph::GraphError::CycleDetected => ErrorCode::CycleDetected,
+            crate::graph::GraphError::NodeNotFound { .. } => ErrorCode::IssueNotFound,
         };
     }
 
@@ -290,7 +290,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::storage::AmbiguousIdError>()
         .is_some()
         || error
-            .downcast_ref::<crate::domain::InvalidIdPrefixError>()
+            .downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
             .is_some()
     {
         return if error
@@ -592,7 +592,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
-                crate::domain::InvalidIdPrefixError::new("ab").into(),
+                crate::domain::issue_id::InvalidIdPrefixError::new("ab").into(),
                 2,
                 "*",
             ),
@@ -639,7 +639,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             // Command-family rows, each pinned by the error that command raises.
-            (crate::GraphError::CycleDetected.into(), 4, "dep add"),
+            (crate::graph::GraphError::CycleDetected.into(), 4, "dep add"),
             (
                 crate::errors::RedundantDependencyError::new(
                     ("aaaa1111".to_string(), "bbbb2222".to_string()),

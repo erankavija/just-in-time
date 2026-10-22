@@ -124,7 +124,7 @@ mod recovery_startup_tests {
             .create_issue(
                 "Hello".into(),
                 String::new(),
-                jit::Priority::Normal,
+                jit::domain::Priority::Normal,
                 vec![],
                 vec![],
                 None,

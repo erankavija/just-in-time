@@ -3,7 +3,7 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::JitConfig;
-use crate::domain::IssueIdPrefix;
+use crate::domain::issue_id::IssueIdPrefix;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -508,10 +508,6 @@ pub fn execute_claim_status<S: IssueStore>(
 }
 
 /// Lists all active leases across all agents and worktrees.
-///
-/// # Arguments
-///
-/// * `_storage` - Issue storage (unused but kept for consistency)
 ///
 /// # Returns
 ///
@@ -1063,7 +1059,7 @@ mod tests {
         title: &str,
     ) -> Result<String> {
         let mut issue =
-            crate::domain::types::fixture_issue(title.to_string(), "Test description".to_string());
+            crate::domain::fixture_issue(title.to_string(), "Test description".to_string());
         issue.id = id.to_string();
         let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
         std::fs::write(

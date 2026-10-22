@@ -102,8 +102,9 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
+use crate::domain::issue_id::IssueIdPrefix;
 use crate::domain::{
-    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue, IssueIdPrefix,
+    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
@@ -2092,7 +2093,7 @@ fn discover_gate_run_results(
 ///
 /// # Errors
 ///
-/// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
+/// [`InvalidIdPrefixError`](crate::domain::issue_id::InvalidIdPrefixError) before any
 /// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
 pub(crate) fn resolve_issue_filter<S: IssueStore>(
     storage: &S,
@@ -3620,7 +3621,7 @@ mod tests {
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        let mut issue = crate::domain::types::fixture_issue("checked".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("checked".to_string(), String::new());
         issue.state = State::Ready;
         issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
         issue.gates_status.insert(
@@ -3774,7 +3775,7 @@ mod tests {
         use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
 
         let storage = InMemoryStorage::new();
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "captured-retry-issue".to_string(),
             "Captured retry".to_string(),
         );
@@ -3834,7 +3835,7 @@ mod tests {
 
     #[test]
     fn test_captured_issue_idempotent_retry_derives_true_noop() {
-        let mut issue = crate::domain::types::fixture_issue(
+        let mut issue = crate::domain::fixture_issue(
             "captured-noop-issue".to_string(),
             "Captured no-op".to_string(),
         );
@@ -3870,7 +3871,7 @@ mod tests {
                 &storage,
                 &manual_gate_registry("review"),
             );
-            let mut issue = crate::domain::types::fixture_issue(
+            let mut issue = crate::domain::fixture_issue(
                 format!("repeat-{status:?}"),
                 "Repeated evidence".to_string(),
             );
@@ -3986,7 +3987,7 @@ mod tests {
 
     #[test]
     fn test_manual_gate_pending_status_is_rejected_before_other_validation() {
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "pending-precedence".to_string(),
             "Pending precedence".to_string(),
         );
@@ -4026,10 +4027,8 @@ mod tests {
             &storage,
             &manual_gate_registry("review"),
         );
-        let issue = crate::domain::types::fixture_issue(
-            "registry-race".to_string(),
-            "Registry race".to_string(),
-        );
+        let issue =
+            crate::domain::fixture_issue("registry-race".to_string(), "Registry race".to_string());
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
@@ -4233,8 +4232,7 @@ assert = {}
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue =
-            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4261,8 +4259,7 @@ enforce_leases = "off"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue =
-            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4283,8 +4280,7 @@ enforce_leases = "off"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue =
-            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4315,8 +4311,7 @@ enforce_leases = "strict"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue =
-            crate::domain::types::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 

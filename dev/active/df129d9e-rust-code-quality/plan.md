@@ -63,7 +63,7 @@ Every success response a handler returns is a type defined in the output module 
 
 ### `list-envelope` [implementation-produced] — One generic list envelope
 
-`ListEnvelope<K: CollectionKey, T, E = ()>` lives in the pure module `domain/list_envelope.rs`, so domain list types can use it, and output re-exports it as `output::ListEnvelope`. It serializes `count` (derived from the collection), the collection under `K::KEY`, and the flattened fields of `E`. Deserialization rejects a stored `count` that differs from the collection's length. A matching manual `JsonSchema` implementation names the same keys. `CollectionKey` is a marker trait carrying `const KEY: &'static str`. A key belongs to the response rather than the item type, since `MinimalIssue` appears under several keys. `ProfileCollection<T>` converges onto it. A "count struct" is a struct whose `count` states the length of a sibling collection. Tallies such as `StateCount` and `ProjectionRenderReport.count` are not list envelopes (D-9).
+`ListEnvelope<K: CollectionKey, T, E = ()>` lives in the pure module `domain/list_envelope.rs`, so domain list types can use it, and consumers import it through `domain::list_envelope::ListEnvelope`. It serializes `count` (derived from the collection), the collection under `K::KEY`, and the flattened fields of `E`. Deserialization rejects a stored `count` that differs from the collection's length. A matching manual `JsonSchema` implementation names the same keys. `CollectionKey` is a marker trait carrying `const KEY: &'static str`. A key belongs to the response rather than the item type, since `MinimalIssue` appears under several keys. `ProfileCollection<T>` converges onto it. A "count struct" is a struct whose `count` states the length of a sibling collection. Tallies such as `StateCount` and `ProjectionRenderReport.count` are not list envelopes (D-9).
 
 ### `issue-filter-args` [implementation-produced] — One issue-filter argument group
 
@@ -539,3 +539,7 @@ A row whose edge is already implied through `global-json-flag` is dropped as red
   - F-EXECUTOR-SURFACE, F-BYPASS, F-LINTS, F-HARNESS, F-BUDGET-SCRIPT and F-PRODLINES: area 3.
 - Audit rows A3, A24, A25, A26, S13 and S14 are defined in the investigation's [Audit findings folded into this epic](investigation.md#audit-findings-folded-into-this-epic) section.
 - [prodlines.py](prodlines.py) is the investigation's production-line counter, which becomes `scripts/production-lines.py`.
+
+## Canonical ownership amendment (2026-10-22)
+
+The steward superseded the output re-export location decision under `@/issue/63c11d08/requirement/REQ-03`: `ListEnvelope` and `CollectionKey` have only their owning `domain::list_envelope` paths. The wire format, schema, and behavior contracts are unchanged. The manifest and the descriptions of f7f01654 and 650e6a56 reflect this location amendment; their completed delivery history remains intact.

@@ -7,10 +7,11 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
+    use crate::domain::repository_inputs::ExclusionPattern;
     use crate::profile::contribution_drift::{DeclaredOverride, OverrideScope};
     use crate::profile::drift_report::{DriftCarrier, DriftReport, DriftSubject};
     use crate::profile::{
-        ExclusionPattern, LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
+        LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
     };
     use crate::repository_state::{
         render_managed_document, render_rules_and_gates_markdown, Contribution, KeyedArrayTarget,
@@ -1957,7 +1958,7 @@ mod tests {
             .expect("the package's rules parse");
         let graph_rules = ruleset.rules.iter().collect::<Vec<_>>();
 
-        let mut issue = crate::domain::types::fixture_issue("Subject".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("Subject".to_string(), String::new());
         issue.labels = labels;
         crate::validation::graph::evaluate_graph(
             &graph_rules,

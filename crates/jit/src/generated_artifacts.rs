@@ -92,7 +92,7 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     GeneratedArtifact {
         name: "events-reference",
         generator: crate::domain::event_catalog::test_support::REFERENCE_GENERATOR,
-        holds: "the event catalog declared in `jit::domain::event_catalog`",
+        holds: "the event catalog declared in `jit::domain::event_catalog::event_catalog`",
         render: ArtifactRender::InCrate {
             target: crate::domain::event_catalog::test_support::REFERENCE_PATH,
             render: render_events_reference,

@@ -1937,7 +1937,7 @@ mod tests {
     #[test]
     fn test_document_rescan_uses_image_and_identical_inventory_is_noop() {
         let storage = InMemoryStorage::new();
-        let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Docs".into(), String::new());
         issue.documents.push(document_reference("docs/guide.md"));
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -1968,7 +1968,7 @@ mod tests {
     #[test]
     fn test_document_add_retry_rederives_assets_and_preserves_unrelated_issue_changes() {
         let storage = InMemoryStorage::new();
-        let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Docs".into(), String::new());
         issue.documents.push(document_reference("docs/other.md"));
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -2079,7 +2079,7 @@ mod tests {
 
     #[test]
     fn test_document_remove_from_concurrent_image_preserves_other_fields() {
-        let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Docs".into(), String::new());
         issue.labels.push("owner:concurrent".into());
         issue
             .documents
@@ -2105,7 +2105,7 @@ mod tests {
     #[test]
     fn test_document_add_preserves_typed_invalid_path_error() {
         let storage = InMemoryStorage::new();
-        let issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
+        let issue = crate::domain::fixture_issue("Docs".into(), String::new());
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let executor =

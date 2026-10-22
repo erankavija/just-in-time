@@ -11,7 +11,8 @@ use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ContentIdentity, PlanError, PlanTarget, PlanWarning,
     ReferenceChange, WarningCode,
 };
-use crate::domain::{Event, EventLogError, Issue, State};
+use crate::domain::event_log::EventLogError;
+use crate::domain::{Event, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
 const OWNER: &str = "archive-execution";
@@ -462,7 +463,7 @@ pub(crate) fn captured_archive_events(
         .map_err(ProducerError::from)?
         .unwrap_or_default();
     let text = String::from_utf8(bytes.to_vec()).map_err(ProducerError::from)?;
-    crate::domain::parse_known_events(&text).map_err(ArchiveExecutionError::EventLog)
+    crate::domain::event_log::parse_known_events(&text).map_err(ArchiveExecutionError::EventLog)
 }
 
 /// A typed failure raised while finalizing one archive execution.
@@ -597,7 +598,7 @@ mod tests {
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
     };
-    use crate::domain::types::fixture_issue;
+    use crate::domain::fixture_issue;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
         RepositoryLayout, RepositoryRootEvidence,

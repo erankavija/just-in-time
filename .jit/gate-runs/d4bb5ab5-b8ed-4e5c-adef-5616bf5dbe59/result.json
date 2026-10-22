@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "109dbfdb046ddca0f1bf143118a00ff73ebdd8ab",
+  "completed_at": "2026-10-22T15:55:28.370820567Z",
+  "duration_ms": 287614,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/test_helpers.rs",
+        "id": "F1",
+        "line": 182,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/22355a56/requirement/REQ-01",
+          "@/issue/c780514e/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "Index-plus-rules early return skips required configuration seeding for partial stores."
+      }
+    ],
+    "summary": "Partial preseeded memory stores can bypass required product initialization.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "22355a56-9730-4409-b9a8-5a2381c35cf7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d4bb5ab5-b8ed-4e5c-adef-5616bf5dbe59",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:50:40.755961976Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3631 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1644e-aff8-7cb1-a26d-4e21fa72c813\n--------\nuser\n--- 3618 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 800ed79c6 and 366b7905e (`jit:22355a56`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/22355a56/requirement/REQ-01 (.jit/issues/22355a56-9730-4409-b9a8-5a2381c35cf7.json); @/issue/c780514e/requirement/REQ-06 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/invariant/shared-test-contracts (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-22T15:49:05Z; no stdout supplied)\nTruncation recovery: none\n\n1. F1 — blocking, issue-impact: [`memory_executor_declaring`](crates/jit/src/commands/test_helpers.rs:182) returns without initialization when only `.jit/index.json` and `.jit/rules.toml` exist. A partially seeded store missing `.jit/config.toml` therefore receives no configuration, violating REQ-01; product initialization would preserve those files while supplying its other `IfAbsent` scaffold files. Remove or strengthen this early-return condition and cover the partial-state case. References: @/issue/22355a56/requirement/REQ-01, @/issue/c780514e/requirement/REQ-06.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Partial preseeded memory stores can bypass required product initialization.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Index-plus-rules early return skips required configuration seeding for partial stores.\",\"file\":\"crates/jit/src/commands/test_helpers.rs\",\"line\":182,\"references\":[\"@/issue/22355a56/requirement/REQ-01\",\"@/issue/c780514e/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

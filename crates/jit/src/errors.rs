@@ -357,7 +357,7 @@ impl LinkedCheckoutWriteRefusedError {
 /// carries the underlying message verbatim so `Display` is unchanged, while the
 /// CLI downcasts to it to classify the failure without scanning the message text.
 /// Structured validation failures keep their dedicated types (e.g.
-/// [`TransitionBlockedError`], [`crate::GraphError`]); this covers the
+/// [`TransitionBlockedError`], [`crate::graph::GraphError`]); this covers the
 /// message-only cases.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]

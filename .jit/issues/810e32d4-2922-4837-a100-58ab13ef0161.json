@@ -26,7 +26,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Server image ships the git executable",
-  "updated_at": "2026-10-21T15:43:56.415122516Z"
+  "updated_at": "2026-10-22T19:21:30.476739295Z"
 }

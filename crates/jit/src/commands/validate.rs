@@ -212,7 +212,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -238,7 +238,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::IssueIdPrefix,
+        prefix: &crate::domain::issue_id::IssueIdPrefix,
         needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
@@ -337,7 +337,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
         mutation: bool,
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
@@ -792,7 +792,7 @@ fn discover_issue_closure(
     issues: &[Issue],
     config: &JitConfig,
     effective: &Effective<'_>,
-    precheck_target: Option<&crate::domain::IssueIdPrefix>,
+    precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -1018,7 +1018,7 @@ pub(crate) fn plan_content_with_issues(
 /// reporting: the CLI an error finding, the gate checker an `error` run.
 pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &crate::domain::IssueIdPrefix,
+    requested_issue_id: &crate::domain::issue_id::IssueIdPrefix,
     rule_name: &str,
 ) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
@@ -1194,7 +1194,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let new_label = label_utils::type_label(new_type);
 
         self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
-            crate::domain::IssueIdPrefix::of_stored(issue_id),
+            crate::domain::issue_id::IssueIdPrefix::of_stored(issue_id),
             CapturedLabelEdit::ReplaceExact {
                 old: old_label,
                 new: new_label,
@@ -1548,7 +1548,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let id = id.map(crate::domain::IssueIdPrefix::parse).transpose()?;
+        let id = id
+            .map(crate::domain::issue_id::IssueIdPrefix::parse)
+            .transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
         // for a binding into the unloadable source (REQ-01), and the parse problem
@@ -1745,7 +1747,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let container_id = crate::domain::IssueIdPrefix::parse(container_id)?;
+        let container_id = crate::domain::issue_id::IssueIdPrefix::parse(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
 
@@ -1871,7 +1873,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issue_id = crate::domain::IssueIdPrefix::parse(issue_id)?;
+        let issue_id = crate::domain::issue_id::IssueIdPrefix::parse(issue_id)?;
         let image = self.capture_validation_image()?;
         rule_validation_outcome(&image, &issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
@@ -1905,7 +1907,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
-        let id = crate::domain::IssueIdPrefix::parse(id)?;
+        let id = crate::domain::issue_id::IssueIdPrefix::parse(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
         // `load_issue` keys on the FULL id; resolve a short-id prefix first.
@@ -2524,17 +2526,14 @@ depends_on = ["planning"]
                 .unwrap();
         let template = registry.get("custom-plan").unwrap();
 
-        let mut container =
-            crate::domain::types::fixture_issue("container".to_string(), String::new());
+        let mut container = crate::domain::fixture_issue("container".to_string(), String::new());
         container.id = "container-12345678".to_string();
 
-        let mut planning =
-            crate::domain::types::fixture_issue("planning".to_string(), String::new());
+        let mut planning = crate::domain::fixture_issue("planning".to_string(), String::new());
         planning.id = "planning-12345678".to_string();
         planning.labels = vec!["type:planning".to_string()];
 
-        let mut breakdown =
-            crate::domain::types::fixture_issue("breakdown".to_string(), String::new());
+        let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
         breakdown.id = "breakdown-12345678".to_string();
         breakdown.labels = vec![
             "type:breakdown".to_string(),
@@ -2977,7 +2976,7 @@ source-of-truth = \"registry-first\"
     }
 
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue(title.to_string(), body.to_string());
+        let mut issue = crate::domain::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }
@@ -3326,7 +3325,7 @@ description = \"Full Rust CI pipeline must pass.\"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let issue = crate::domain::types::fixture_issue("Doc".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("Doc".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3375,8 +3374,8 @@ description = \"Full Rust CI pipeline must pass.\"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let target = crate::domain::types::fixture_issue("Target".to_string(), String::new());
-        let other = crate::domain::types::fixture_issue("Other".to_string(), String::new());
+        let target = crate::domain::fixture_issue("Target".to_string(), String::new());
+        let other = crate::domain::fixture_issue("Other".to_string(), String::new());
         let (target_id, other_id) = (target.id.clone(), other.id.clone());
         seed_issue(executor.storage(), target);
         seed_issue(executor.storage(), other);
@@ -3397,8 +3396,8 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
 
-    fn prefix(id: &str) -> crate::domain::IssueIdPrefix {
-        crate::domain::IssueIdPrefix::parse(id).unwrap()
+    fn prefix(id: &str) -> crate::domain::issue_id::IssueIdPrefix {
+        crate::domain::issue_id::IssueIdPrefix::parse(id).unwrap()
     }
 
     /// A session counting the capture rounds it opens.
@@ -3452,7 +3451,7 @@ description = \"Full Rust CI pipeline must pass.\"
 
         let executor = setup();
         let mut issues = ["Target", "Other"]
-            .map(|title| crate::domain::types::fixture_issue(title.to_string(), String::new()));
+            .map(|title| crate::domain::fixture_issue(title.to_string(), String::new()));
         issues[0].state = crate::domain::State::Ready;
         let target_id = issues[0].id.clone();
         issues

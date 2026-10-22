@@ -2,9 +2,9 @@
 
 use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
+use crate::domain::gate_findings::{GateFinding, GateFindings};
 use crate::domain::{
-    GateContext, GateEvaluationStability, GateFinding, GateFindings, GateRunResult, GateRunStatus,
-    GateStatus,
+    GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
@@ -762,7 +762,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::IssueIdPrefix,
+        prefix: &crate::domain::issue_id::IssueIdPrefix,
         gate_key: &str,
         run_paths: &[crate::repository_state::VirtualPath],
     ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
@@ -1058,7 +1058,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn declared_inputs_digest(
         &self,
         gate: &crate::declarations::GateDefinition,
-    ) -> Result<Option<crate::domain::InputsDigest>> {
+    ) -> Result<Option<crate::domain::repository_inputs::InputsDigest>> {
         let (Some(inputs), Some(layout)) = (gate.inputs.as_ref(), self.real_repo_layout()) else {
             return Ok(None);
         };
@@ -1596,9 +1596,8 @@ mod tests {
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
-    use crate::domain::{
-        GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
-    };
+    use crate::domain::gate_findings::GateFindings;
+    use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
@@ -1662,7 +1661,7 @@ mod tests {
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.labels = labels;
         issue.gates_required.push(gate_key.to_string());
         let issue_id = issue.id.clone();
@@ -1848,7 +1847,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
 
     #[test]
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
-        let mut issue = crate::domain::types::fixture_issue("Test".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Test".into(), String::new());
         issue.id = "issue-1".into();
         issue.gates_required = vec!["first".into(), "second".into()];
         let mut run = prior_run("", "first", 10, None);
@@ -1903,7 +1902,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -2208,7 +2207,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                         prompt_file: None,
                     }),
                     inputs: declaration.map(|(roots, exclude)| {
-                        crate::domain::RepositoryInputs::parse(roots, exclude)
+                        crate::domain::repository_inputs::RepositoryInputs::parse(roots, exclude)
                             .expect("a declarable input set")
                     }),
                     priority: 100,
@@ -2604,7 +2603,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let image = executor
             .capture_gate_evaluation_image(
                 session.as_mut(),
-                &crate::domain::IssueIdPrefix::parse(issue_id).unwrap(),
+                &crate::domain::issue_id::IssueIdPrefix::parse(issue_id).unwrap(),
                 gate_key,
                 &run_paths,
             )
@@ -2950,7 +2949,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_label_target_validation_passes_for_configured_target() {
         let executor = setup();
         let mut target =
-            crate::domain::types::fixture_issue("Container".to_string(), "Container".to_string());
+            crate::domain::fixture_issue("Container".to_string(), "Container".to_string());
         target.labels = vec!["type:task".to_string()];
         let target_id = target.id.clone();
         seed_issue(executor.storage(), target);
@@ -2995,17 +2994,15 @@ source-of-truth = "markdown-first"
         seed_repo_file(&executor.storage, ".jit/config.toml", config);
         seed_rule_validation_rules(&executor);
 
-        let mut container = crate::domain::types::fixture_issue(
+        let mut container = crate::domain::fixture_issue(
             "Selected container".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: selected work\n".to_string(),
         );
         container.labels = vec!["type:epic".to_string()];
         let container_short = container.short_id();
 
-        let mut child = crate::domain::types::fixture_issue(
-            "Selected implementation".to_string(),
-            String::new(),
-        );
+        let mut child =
+            crate::domain::fixture_issue("Selected implementation".to_string(), String::new());
         child.labels = vec![
             "type:task".to_string(),
             format!("satisfies:{container_short}/REQ-01"),
@@ -3026,7 +3023,7 @@ source-of-truth = "markdown-first"
             ],
         );
 
-        let mut local_failure = crate::domain::types::fixture_issue(
+        let mut local_failure = crate::domain::fixture_issue(
             "Unrelated local failure".to_string(),
             "See @/missing/item".to_string(),
         );
@@ -3038,7 +3035,7 @@ source-of-truth = "markdown-first"
         local_failure.gates_required = vec!["unrelated-pending".to_string()];
         seed_issue(&executor.storage, local_failure);
 
-        let mut unrelated_graph = crate::domain::types::fixture_issue(
+        let mut unrelated_graph = crate::domain::fixture_issue(
             "Unrelated graph failure".to_string(),
             "## Success Criteria\n\n- [hard] REQ-99: uncovered\n".to_string(),
         );
@@ -3104,10 +3101,8 @@ source-of-truth = "markdown-first"
         let ambiguous_executor = setup();
         seed_rule_validation_rules(&ambiguous_executor);
         for id in ["deadbeef-a", "deadbeef-b"] {
-            let mut target = crate::domain::types::fixture_issue(
-                format!("Ambiguous target {id}"),
-                String::new(),
-            );
+            let mut target =
+                crate::domain::fixture_issue(format!("Ambiguous target {id}"), String::new());
             target.id = id.to_string();
             target.labels = vec!["type:epic".to_string()];
             seed_issue(&ambiguous_executor.storage, target);
@@ -3228,7 +3223,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3271,7 +3266,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gate
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3331,7 +3326,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3400,7 +3395,7 @@ source-of-truth = "markdown-first"
             .gates
             .insert("tests".to_string(), make_auto_gate("tests", "exit 0"));
         seed_gate_registry(executor.storage(), &registry);
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
         issue.gates_required = vec!["review".to_string(), "tests".to_string()];
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -3481,7 +3476,7 @@ source-of-truth = "markdown-first"
             registry.gates.insert(gate.key.clone(), gate.clone());
         }
         seed_gate_registry(executor.storage(), &registry);
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
         issue.gates_required = gates.iter().map(|gate| gate.key.clone()).collect();
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -3543,7 +3538,7 @@ source-of-truth = "markdown-first"
             .gates
             .insert("review".to_string(), make_manual_gate("review"));
         seed_gate_registry(base.storage(), &registry);
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
         issue.gates_required = vec!["auto".to_string(), "review".to_string()];
         let issue_id = issue.id.clone();
         seed_issue(base.storage(), issue);
@@ -3646,7 +3641,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with both gates
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
@@ -3674,7 +3669,7 @@ source-of-truth = "markdown-first"
         }
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
@@ -3744,7 +3739,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with precheck
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -3903,7 +3898,7 @@ source-of-truth = "markdown-first"
             },
         );
         seed_gate_registry(executor.storage(), &registry);
-        let mut issue = crate::domain::types::fixture_issue("Test".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Test".into(), String::new());
         issue.state = State::Ready;
         issue.gates_required.push("precheck".to_string());
         let id = issue.id.clone();
@@ -3950,7 +3945,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with failing precheck
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -4101,7 +4096,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue in progress with postcheck
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -4155,7 +4150,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue in progress with failing postcheck
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -4215,7 +4210,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -4283,7 +4278,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -4345,7 +4340,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create an issue with the gate
-        let mut issue = crate::domain::types::fixture_issue(
+        let mut issue = crate::domain::fixture_issue(
             "Implement feature X".to_string(),
             "Add the X feature".to_string(),
         );
@@ -4420,7 +4415,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
@@ -4704,13 +4699,13 @@ source-of-truth = "markdown-first"
 
         let error = executor
             .check_gate(
-                &issue_id[..crate::domain::MIN_ID_PREFIX_LENGTH - 1],
+                &issue_id[..crate::domain::issue_id::MIN_ID_PREFIX_LENGTH - 1],
                 "short-id",
             )
             .unwrap_err();
         assert!(
             error
-                .downcast_ref::<crate::domain::InvalidIdPrefixError>()
+                .downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
                 .is_some(),
             "{error:?}"
         );
@@ -4804,7 +4799,7 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_check_gate_reuses_checker_result_after_apply_only_conflict() {
         let executor = setup();
-        let issue = crate::domain::types::fixture_issue("Apply race".into(), "Test".into());
+        let issue = crate::domain::fixture_issue("Apply race".into(), "Test".into());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         let temp = tempfile::tempdir().unwrap();
@@ -4999,7 +4994,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -5070,7 +5065,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
@@ -5116,7 +5111,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
@@ -5171,7 +5166,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
@@ -5217,7 +5212,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -5263,7 +5258,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -5326,7 +5321,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -5343,14 +5338,14 @@ source-of-truth = "markdown-first"
         let executor = setup();
 
         // Create two dependency issues
-        let dep1 = crate::domain::types::fixture_issue(
+        let dep1 = crate::domain::fixture_issue(
             "Setup database schema".to_string(),
             "Create tables".to_string(),
         );
         let dep1_id = dep1.id.clone();
         seed_issue(executor.storage(), dep1);
 
-        let dep2 = crate::domain::types::fixture_issue(
+        let dep2 = crate::domain::fixture_issue(
             "Implement auth module".to_string(),
             "OAuth2 flow".to_string(),
         );
@@ -5358,7 +5353,7 @@ source-of-truth = "markdown-first"
         seed_issue(executor.storage(), dep2);
 
         // Create main issue that depends on both
-        let mut main_issue = crate::domain::types::fixture_issue(
+        let mut main_issue = crate::domain::fixture_issue(
             "Build user dashboard".to_string(),
             "Dashboard feature".to_string(),
         );
@@ -5445,7 +5440,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Create issue with gates added in priority 30, 10, 20 order
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -5505,7 +5500,7 @@ source-of-truth = "markdown-first"
         seed_gate_registry(executor.storage(), &registry);
 
         // Add gates in specific insertion order
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "alpha".to_string()).unwrap();
@@ -5573,7 +5568,7 @@ source-of-truth = "markdown-first"
             .insert("g".to_string(), make_auto_gate("g", "exit 0"));
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
@@ -5591,7 +5586,7 @@ source-of-truth = "markdown-first"
             .insert("g".to_string(), make_auto_gate("g", "exit 0"));
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
@@ -5616,7 +5611,7 @@ source-of-truth = "markdown-first"
             .insert("gate-b".to_string(), make_auto_gate("gate-b", "exit 0"));
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor.add_gate(&issue_id, "gate-a".to_string()).unwrap();
@@ -5650,7 +5645,7 @@ source-of-truth = "markdown-first"
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor

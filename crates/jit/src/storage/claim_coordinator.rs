@@ -801,7 +801,8 @@ impl ClaimCoordinator {
     /// issue id. This is only a resolver-call shortlist: canonical equality after
     /// `resolve_issue_id` remains the identity decision.
     fn is_issue_identity_candidate(stored: &str, requested: &str) -> bool {
-        crate::domain::IssueIdPrefix::parse(stored).is_ok_and(|stored| stored.matches(requested))
+        crate::domain::issue_id::IssueIdPrefix::parse(stored)
+            .is_ok_and(|stored| stored.matches(requested))
     }
 
     /// Send a heartbeat for an indefinite lease.
@@ -1182,7 +1183,7 @@ impl ClaimCoordinator {
     /// Returns an error if the index cannot be loaded
     pub fn get_active_leases(
         &self,
-        issue_id: Option<&crate::domain::IssueIdPrefix>,
+        issue_id: Option<&crate::domain::issue_id::IssueIdPrefix>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
         // 1. Acquire exclusive lock with metadata (needed for evict_expired which writes)

@@ -162,6 +162,37 @@ fn test_config_validate_reports_invalid_project_name() {
 }
 
 #[test]
+fn test_config_validate_human_failure_lists_findings_on_stdout_and_summary_on_stderr() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path()).status.success());
+    fs::write(
+        temp.path().join(".jit/config.toml"),
+        "[project]\nname = \"Bad_Name\"\n",
+    )
+    .unwrap();
+
+    let out = Command::new(jit_binary())
+        .args(["config", "validate"])
+        .current_dir(temp.path())
+        .env("HOME", temp.path().join("isolated-home"))
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+        .output()
+        .expect("failed to run jit config validate");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stdout.starts_with("error [config] repo config:"),
+        "each error is a finding line with severity and rule, got: {stdout}"
+    );
+    assert!(
+        stderr.contains("Configuration validation failed with 1 error(s)"),
+        "the failure summary goes to stderr, got: {stderr}"
+    );
+    assert!(!stdout.contains("Errors:"));
+}
+
+#[test]
 fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path());

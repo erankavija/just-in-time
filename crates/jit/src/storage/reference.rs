@@ -11,11 +11,11 @@
 //! - The identifier widths come from the constants that enforce them:
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
 //!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
-//!   [`IssueIdPrefix`](crate::domain::IssueIdPrefix) accepts.
+//!   [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix) accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded by
 //!   [`serialize_event`] with the newline terminator the finalizer's positioned
 //!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
-//!   catalog's own projection ([`crate::domain::event_catalog`]), which this page
+//!   catalog's own projection ([`crate::domain::event_catalog::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
 //!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
@@ -29,11 +29,10 @@
 //!   the projection.
 
 use crate::declarations::GateStage;
-use crate::domain::MIN_ID_PREFIX_LENGTH;
-use crate::domain::{
-    EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
-    SHORT_ID_LENGTH,
-};
+use crate::domain::event_catalog::EventTag;
+use crate::domain::gate_findings::{GateFinding, GateFindings};
+use crate::domain::issue_id::MIN_ID_PREFIX_LENGTH;
+use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
 use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -339,7 +338,8 @@ fn sample_gate_run() -> GateRunResult {
         inputs_digest: Some({
             // Produced by the same builder the evaluator digests with, so the
             // sample cannot show a value the encoding could not have written.
-            let mut builder = crate::domain::InputsDigestBuilder::new(b"gate declaration");
+            let mut builder =
+                crate::domain::repository_inputs::InputsDigestBuilder::new(b"gate declaration");
             builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
             builder.finish()
         }),
@@ -664,7 +664,7 @@ mod tests {
     /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("Probe".to_string(), String::new());
 
         let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));

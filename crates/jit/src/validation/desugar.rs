@@ -1,7 +1,7 @@
 //! Desugar shorthand rule kinds into equivalent JSON Schema (Draft 2020-12).
 //!
 //! The validation engine has exactly one evaluation primitive: a JSON Schema run
-//! against the canonical [`Projection`](crate::domain::Projection) shape (DR §5,
+//! against the canonical [`Projection`](crate::domain::projection::Projection) shape (DR §5,
 //! §5.2). The ergonomic shorthand assertion kinds (`require-label`,
 //! `label-value-pattern`, `require-section`, `require-doc-type`) are therefore
 //! NOT a parallel mechanism — they are sugar that lowers to JSON Schema here, so
@@ -40,7 +40,7 @@ use crate::validation::engine::SECTION_HEADING_ANNOTATION;
 /// Returns `Some(schema)` for the four local shorthand kinds and `None` for the
 /// raw [`Assertion::JsonSchema`], the [`Assertion::CheckerCommand`] escape hatch,
 /// and the graph kinds (which carry no schema). The returned schema validates
-/// against the canonical [`Projection`](crate::domain::Projection) shape and is
+/// against the canonical [`Projection`](crate::domain::projection::Projection) shape and is
 /// safe to feed directly to the
 /// [`SchemaEngine`](crate::validation::engine::SchemaEngine).
 ///
@@ -197,7 +197,7 @@ fn desugar_label_value_pattern(namespace: &str, regex: &str) -> Value {
 ///
 /// The heading is normalized to its slug with
 /// [`slugify_heading`](crate::document::slugify_heading) so it matches the slug
-/// key the [`Projection`](crate::domain::Projection) uses for the section. The
+/// key the [`Projection`](crate::domain::projection::Projection) uses for the section. The
 /// section is required to exist and to carry at least one `items` entry
 /// (`minItems: 1`), which is what "the section is present" means for a parsed
 /// body.
@@ -568,13 +568,13 @@ mod tests {
         // from an issue body whose heading text differs in punctuation/case but
         // slugifies identically. The desugared schema must accept it.
         use crate::document::MarkdownContentParser;
-        use crate::domain::project;
+        use crate::domain::projection::project;
 
         let desugared = desugar(&Assertion::RequireSection {
             heading: "Success Criteria".to_string(),
         })
         .unwrap();
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "t".to_string(),
             "## Success / Criteria!\n\n- [hard] REQ-01\n".to_string(),
         );

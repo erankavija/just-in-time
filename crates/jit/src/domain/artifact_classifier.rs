@@ -3153,7 +3153,7 @@ mod tests {
     }
 
     fn container_issue(title: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
+        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
         issue.id = CONTAINER.into();
         issue.labels = labels.iter().map(|label| (*label).to_string()).collect();
         issue
