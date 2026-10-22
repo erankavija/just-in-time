@@ -18,9 +18,6 @@
 //! - **store_divergence**: Pure comparison naming the records two repository
 //!   stores disagree about
 //! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
-//! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
-//! - **validation**: Issue validation against configuration rules
-//! - **labels**: Label parsing, matching, and validation utilities
 //!
 //! The domain layer is independent of CLI orchestration and can be used
 //! directly for library integration.
@@ -47,45 +44,3 @@ pub mod type_taxonomy;
 mod types;
 
 pub use types::*;
-
-// Re-export the structured gate-findings parser and its types.
-pub use gate_findings::{parse_gate_findings, GateFinding, GateFindings};
-
-// Re-export the cross-store comparison and its finding model.
-pub use store_divergence::{
-    compare_stores, DivergenceClass, DivergentRecord, StoreDivergence, StoreRecords,
-};
-
-// Re-export the declared-input model and its digest.
-pub use repository_inputs::{
-    DeclaredRoot, ExclusionPattern, InputsDigest, InputsDigestBuilder, RepositoryInputs,
-};
-
-// Re-export the event-tag catalog and its projection.
-#[cfg(any(test, feature = "test-support"))]
-pub use event_catalog::render_event_reference;
-pub use event_catalog::{event_catalog, EventScope, EventTag, EventTagDoc};
-pub use event_log::{parse_known_events, EventLogError};
-
-// Re-export the projection layer for `use jit::domain::*` ergonomics.
-pub use projection::{project, ProjectedSection, Projection};
-
-// Re-export the list envelope.
-pub use list_envelope::{CollectionKey, ListEnvelope};
-
-// Re-export the issue-id matching rule.
-pub use issue_id::{InvalidIdPrefixError, IssueIdPrefix, MIN_ID_PREFIX_LENGTH};
-
-// Re-export the addressable-item model.
-pub use item::{
-    derive_scope_items, index_items, index_markdown_items, index_project_sources,
-    is_qualified_reference, qualified_id, resolve_item_kinds, AddressableItem, ItemError, ItemKind,
-    KindScope, ProjectSource, RawScopeItem, Scope,
-};
-
-// Re-export domain operations from sibling modules so that
-// `use jit::domain::*` gives access to types AND key operations.
-pub use crate::graph::{DependencyGraph, GraphError, GraphNode};
-pub use crate::labels::{
-    label_matches, matches_pattern, parse_label, validate_assignee_format, validate_label,
-};

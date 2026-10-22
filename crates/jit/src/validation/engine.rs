@@ -317,7 +317,7 @@ impl SchemaEngine {
         self.keywords.iter().map(|(name, _)| name.clone()).collect()
     }
 
-    /// Validate a serialized [`Projection`](crate::domain::Projection) against a
+    /// Validate a serialized [`Projection`](crate::domain::projection::Projection) against a
     /// rule's JSON Schema, returning one [`Finding`] per violation.
     ///
     /// The rule's compiled validator is fetched from (or inserted into) the cache

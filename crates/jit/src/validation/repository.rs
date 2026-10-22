@@ -12,12 +12,13 @@ use crate::declarations::rules::{RuleSet, Severity};
 use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
+use crate::domain::event_log::parse_known_events;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
     unqualified_link_message, AddressScope, ProjectSource, RawScopeItem,
 };
-use crate::domain::{parse_known_events, Issue, ReadinessCorrection, SHORT_ID_LENGTH};
+use crate::domain::{Issue, ReadinessCorrection, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::repository_state::{RepositoryImage, RepositoryIndex};
 use crate::validation::engine::Finding;
@@ -787,7 +788,7 @@ fn collect_item_link_findings(
                         Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
                     AddressScope::Issue(issue_ref) => {
-                        let prefix = crate::domain::IssueIdPrefix::parse(&issue_ref).ok();
+                        let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&issue_ref).ok();
                         let matches: Vec<&Issue> = issues
                             .iter()
                             .filter(|candidate| {

@@ -1000,7 +1000,7 @@ pub struct GateRunResult {
     /// Structured findings parsed from the checker's machine-readable block, if
     /// one was emitted. `None` for plain-text checkers and for runs recorded
     /// before this field existed; the raw [`stdout`](Self::stdout) is always
-    /// kept alongside. See [`parse_gate_findings`](crate::domain::parse_gate_findings).
+    /// kept alongside. See [`parse_gate_findings`](crate::domain::gate_findings::parse_gate_findings).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub findings: Option<GateFindings>,
     /// Digest of the repository files the gate declares its checker reads, taken
@@ -1012,7 +1012,7 @@ pub struct GateRunResult {
     /// paths, which is what makes [`origin`](Self::origin) able to carry a
     /// verdict from one to the other.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub inputs_digest: Option<crate::domain::InputsDigest>,
+    pub inputs_digest: Option<crate::domain::repository_inputs::InputsDigest>,
     /// Where this record's verdict came from: this run's own checker execution,
     /// an earlier run over the same declared inputs, or a manual attestation.
     #[serde(default)]
@@ -1034,7 +1034,11 @@ impl GateRunResult {
     /// to it. And the run must have reached a verdict — `passed` or `failed`;
     /// an errored run reports the checker never getting there (a timeout, a
     /// missing command), which says nothing about the inputs.
-    pub fn is_reusable_for(&self, gate_key: &str, digest: &crate::domain::InputsDigest) -> bool {
+    pub fn is_reusable_for(
+        &self,
+        gate_key: &str,
+        digest: &crate::domain::repository_inputs::InputsDigest,
+    ) -> bool {
         self.gate_key == gate_key
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
@@ -2026,7 +2030,7 @@ impl Event {
     ///
     /// The string is the value serde writes into the record's `type` field, and
     /// the value `jit events query --event-type` matches against. It is supplied
-    /// by [`EventTag::as_str`](crate::domain::EventTag::as_str), the single
+    /// by [`EventTag::as_str`](crate::domain::event_catalog::EventTag::as_str), the single
     /// definition of the tag vocabulary, via [`Event::tag`].
     pub fn get_type(&self) -> &str {
         self.tag().as_str()
@@ -2066,7 +2070,9 @@ mod tests {
 
     #[test]
     fn test_is_reusable_for_rejects_an_attestation_over_a_matching_digest() {
-        let digest = crate::domain::InputsDigestBuilder::new(b"gate declaration").finish();
+        let digest =
+            crate::domain::repository_inputs::InputsDigestBuilder::new(b"gate declaration")
+                .finish();
         let attestor: Assignee = "human:reviewer".parse().unwrap();
         let mut attested = GateRunResult::attestation(
             "issue",

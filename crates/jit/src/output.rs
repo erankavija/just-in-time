@@ -16,9 +16,11 @@ pub mod failure;
 pub use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 
 use crate::declarations::{GateMode, GateStage};
+use crate::domain::gate_findings::GateFindings;
+use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::{
-    GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
-    MinimalIssue, Priority, State, StoreDivergence,
+    GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
+    Priority, State,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -1269,7 +1271,9 @@ impl From<ErrorCode> for String {
 /// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
-    if let Some(prefix_error) = error.downcast_ref::<crate::domain::InvalidIdPrefixError>() {
+    if let Some(prefix_error) =
+        error.downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+    {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
     }
@@ -2512,7 +2516,7 @@ pub struct GateRunSummary {
     /// Omitted when the gate declares none. Two summaries carrying the same
     /// value describe evaluations over identical content.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inputs_digest: Option<crate::domain::InputsDigest>,
+    pub inputs_digest: Option<crate::domain::repository_inputs::InputsDigest>,
     /// Whether this run executed the checker (`{"derivation": "executed"}`),
     /// carried an earlier run's verdict
     /// (`{"derivation": "reused", "source_run": "<run-id>"}`), or records a
@@ -2671,7 +2675,7 @@ pub struct GateFlatReportResponse {
 ///
 /// The structured-findings view of a single gate's latest run. `verdict`,
 /// `summary`, and `findings` come straight from the checker's machine-readable
-/// block ([`GateFindings`](crate::domain::GateFindings)); they are present only
+/// block ([`GateFindings`](crate::domain::gate_findings::GateFindings)); they are present only
 /// when that run carried a block. `has_findings` is `false` for a plain-text
 /// checker (no block emitted) so a consumer can distinguish "ran, no structured
 /// findings" from "no findings recorded", without inspecting the optional
@@ -2689,7 +2693,7 @@ pub struct GateFindingsResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     /// Individual findings; empty when no block was emitted.
-    pub findings: Vec<crate::domain::GateFinding>,
+    pub findings: Vec<crate::domain::gate_findings::GateFinding>,
 }
 
 // ============================================================================
@@ -2720,7 +2724,7 @@ pub struct GateDefinition {
     /// declares none, which is what keeps its checker executing on every
     /// evaluation.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inputs: Option<crate::domain::RepositoryInputs>,
+    pub inputs: Option<crate::domain::repository_inputs::RepositoryInputs>,
 }
 
 impl From<crate::declarations::GateDefinition> for GateDefinition {
@@ -3314,7 +3318,7 @@ mod tests {
 
     #[test]
     fn test_gate_findings_response_preserves_populated_references_and_omits_empty() {
-        use crate::domain::GateFinding;
+        use crate::domain::gate_findings::GateFinding;
 
         let finding = |id: &str, references: Vec<String>| GateFinding {
             id: id.to_string(),

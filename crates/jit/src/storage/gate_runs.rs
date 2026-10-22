@@ -3,7 +3,8 @@
 #[cfg(test)]
 mod tests {
     use crate::declarations::GateStage;
-    use crate::domain::{GateFinding, GateFindings, GateRunResult, GateRunStatus};
+    use crate::domain::gate_findings::{GateFinding, GateFindings};
+    use crate::domain::{GateRunResult, GateRunStatus};
     use crate::repository_state::{
         finalize, gate_run_result_relative_path, CaptureBudget, CaptureSpec, MutationContext,
         MutationIntent, VirtualPath,

@@ -4,7 +4,8 @@
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
-use crate::domain::{parse_known_events, Event, GateRunResult, Issue};
+use crate::domain::event_log::parse_known_events;
+use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
     RepositoryRootClass, RootRelativePath, VirtualPath,
@@ -831,7 +832,7 @@ impl IssueStore for InMemoryStorage {
             .ok_or_else(|| PathReadError::NotFound(format!("Issue not found: {}", id)))
     }
 
-    fn resolve_issue_id(&self, prefix: &crate::domain::IssueIdPrefix) -> Result<String> {
+    fn resolve_issue_id(&self, prefix: &crate::domain::issue_id::IssueIdPrefix) -> Result<String> {
         crate::storage::resolve_issue_id_among(
             prefix,
             &Self::load_issues(&self.repository_state())?,
@@ -890,7 +891,7 @@ impl IssueStore for InMemoryStorage {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &crate::domain::InputsDigest,
+        digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<GateRunResult>> {
         Ok(crate::domain::latest_gate_run(self.read_gate_runs(
             |result| result.is_reusable_for(gate_key, digest),

@@ -1,7 +1,7 @@
 //! Tests for short hash issue ID resolution
 //!
 //! Validates that partial UUID prefixes work like git short hashes.
-use jit::domain::IssueIdPrefix;
+use jit::domain::issue_id::IssueIdPrefix;
 use jit::storage::{InMemoryStorage, IssueStore};
 use jit::test_harness::TestHarness;
 use proptest::prelude::*;
@@ -330,7 +330,7 @@ fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records
     let full = h.create_issue("Unreadable");
     h.storage
         .add_data_file(format!("issues/{full}.json"), "not an issue record");
-    let short = &full[..jit::domain::MIN_ID_PREFIX_LENGTH - 1];
+    let short = &full[..jit::domain::issue_id::MIN_ID_PREFIX_LENGTH - 1];
 
     let unrefused: Vec<String> = entry_points
         .iter()
