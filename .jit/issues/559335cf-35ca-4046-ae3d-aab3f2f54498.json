@@ -8,6 +8,7 @@
   ],
   "description": "Make the dependency-feature policy tests fail rather than pass when they cannot run cargo.\n\n## Background\n\n`crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs:168,185` print `SKIP: no cargo on PATH to resolve the dependency graph` and pass when `cargo tree` cannot run. Cargo passes its own path to test processes in the `CARGO` environment variable.\n\n## Success Criteria\n\n- [hard] REQ-01: Both tests run `cargo tree` through the cargo that runs the suite and fail, naming the missing tool, when it cannot run.\n- [hard] REQ-02: Neither test has a skip path.\n",
   "documents": [],
+  "done_at": "2026-10-22T21:00:44.687273247Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Dependency-feature policy tests fail when cargo is missing",
-  "updated_at": "2026-10-22T21:00:19.591884840Z"
+  "updated_at": "2026-10-22T21:00:44.687273247Z"
 }
