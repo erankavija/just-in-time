@@ -163,7 +163,8 @@ pub fn resolve_dotted_key(
 }
 
 /// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
-/// value and rejecting a post-edit document that does not parse as configuration.
+/// value and rejecting a post-edit document that does not parse as configuration
+/// as an invalid argument.
 ///
 /// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
 /// and ordering). Parsing the POST-mutation document makes a valid replacement
@@ -195,7 +196,8 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
 
     doc[section][field] = parsed_value;
 
-    crate::declarations::parse_configuration(doc.to_string().as_bytes())?;
+    crate::declarations::parse_configuration(doc.to_string().as_bytes())
+        .map_err(|e| InvalidArgumentError::new(e.to_string()))?;
     Ok(())
 }
 
