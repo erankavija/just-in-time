@@ -34,6 +34,25 @@ pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
     storage.seed_issue_fixture(&issue);
 }
 
+/// Seed the data root's engine-owned ignore file when the fixture lacks it, with
+/// the exact bytes its producer composes.
+pub(crate) fn seed_data_root_ignore(storage: &InMemoryStorage) {
+    if storage
+        .read_repo_file(".jit/.gitignore")
+        .expect("memory fixture ignore path is valid")
+        .is_some()
+    {
+        return;
+    }
+    let bytes = crate::repository_state::render_data_root_ignore(b"")
+        .expect("the engine-owned ignore region composes over an empty document");
+    seed_repo_file(
+        storage,
+        ".jit/.gitignore",
+        std::str::from_utf8(&bytes).expect("the composed ignore file is UTF-8"),
+    );
+}
+
 /// Seed one exact authored gate-registry precondition.
 pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegistry) {
     let bytes = crate::declarations::serialize_gate_registry(registry)
@@ -159,56 +178,21 @@ fn with_session_race(
     raced
 }
 
-/// Executor over `storage` whose repository is set up by product
-/// initialization.
-pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    memory_executor_declaring(storage, "")
-}
-
-/// [`memory_executor`] for a scenario that declares configuration.
+/// Attach the explicit synthetic layout to an in-memory executor fixture.
 ///
-/// `config` is the scenario's own `.jit/config.toml` body; an empty body
-/// declares nothing, and a configuration `storage` already holds wins.
-/// Initialization runs over a pristine store at `storage`'s root under that
-/// configuration, so the scenario's seeded records and injected faults never
-/// meet it, and fills every repository path `storage` does not already hold.
-/// A store that already holds an initialized repository, one carrying both an
-/// index and a rule registry, is left as it is.
-pub fn memory_executor_declaring(
-    storage: InMemoryStorage,
-    config: &str,
-) -> CommandExecutor<InMemoryStorage> {
-    let layout = storage.repository_layout();
-    let initialized = [".jit/index.json", ".jit/rules.toml"].iter().all(|path| {
-        storage
-            .read_repo_file(path)
-            .expect("memory fixture path is valid")
-            .is_some()
-    });
-    if initialized {
-        return CommandExecutor::new(storage).with_layout(layout);
-    }
-    let pristine = InMemoryStorage::rooted_at(storage.root());
-    let declared = storage
+/// The fixture repository is back-filled with the state every real repository
+/// carries and no test authors by hand: the minimum configuration, and the
+/// data root's engine-owned ignore file, whose absence is derived-state drift.
+pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
+    if storage
         .read_repo_file(".jit/config.toml")
-        .expect("memory fixture config path is valid");
-    match declared.as_deref() {
-        Some(held) => pristine.add_data_file("config.toml", held),
-        None if !config.is_empty() => pristine.add_data_file("config.toml", config),
-        None => {}
-    }
-    CommandExecutor::new(pristine.clone())
-        .with_layout(layout.clone())
-        .initialize_fresh_repository(storage.root(), None)
-        .expect("product initialization seeds the memory repository");
-    let initialized = pristine.repository_state().clone();
+        .expect("memory fixture config path is valid")
+        .is_none()
     {
-        let mut state = storage.repository_state();
-        state.data_root_exists |= initialized.data_root_exists;
-        for (path, entry) in initialized.entries {
-            state.entries.entry(path).or_insert(entry);
-        }
+        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
     }
+    seed_data_root_ignore(&storage);
+    let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }
 
@@ -218,52 +202,20 @@ pub fn memory_executor_declaring(
 ///
 /// * `mode` - Enforcement mode: "strict", "warn", or "off"
 pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
-    memory_executor_declaring(
-        InMemoryStorage::new(),
-        &format!("[worktree]\nenforce_leases = \"{mode}\"\n"),
-    )
+    let storage = InMemoryStorage::new();
+    let config_toml = format!(
+        r#"
+[worktree]
+enforce_leases = "{}"
+"#,
+        mode
+    );
+    storage.add_data_file("config.toml", &config_toml);
+
+    memory_executor(storage)
 }
 
 /// Create an executor with enforcement disabled (for backward compatibility tests).
 pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_memory_executor_declaring_matches_product_initialization_plus_declared_config() {
-        let declared = "[worktree]\nenforce_leases = \"warn\"\n";
-        let storage = InMemoryStorage::new();
-        memory_executor_declaring(storage.clone(), declared);
-
-        let reference = InMemoryStorage::rooted_at(storage.root());
-        reference.add_data_file("config.toml", declared);
-        CommandExecutor::new(reference.clone())
-            .with_layout(reference.repository_layout())
-            .initialize_fresh_repository(reference.root(), None)
-            .unwrap();
-
-        let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
-        assert_eq!(image(&storage), image(&reference));
-    }
-
-    #[test]
-    fn test_memory_executor_leaves_seeded_state_and_faults_out_of_initialization() {
-        let storage = InMemoryStorage::new();
-        storage.add_data_file("gates.toml", "# scenario gates\n");
-
-        memory_executor(storage.clone());
-
-        assert_eq!(
-            storage
-                .read_repo_file(".jit/gates.toml")
-                .unwrap()
-                .as_deref(),
-            Some("# scenario gates\n")
-        );
-        assert!(storage.read_repo_file(".jit/index.json").unwrap().is_some());
-    }
 }
