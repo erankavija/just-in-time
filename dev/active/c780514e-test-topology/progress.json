@@ -12,7 +12,7 @@
           "key": "cargo-ci-lock-status",
           "title": "Preserve infrastructure status through the CI build lock",
           "classification": "implementation",
-          "status": "implemented 784bf4f9c; focused red/green, shell selftest82 assertions and full CI4588+58 pass; pending merge/gates"
+          "status": "done"
         },
         {
           "id": "d423752b-cedc-431b-be9e-d327f8b61387",
@@ -132,7 +132,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "rework 2 dispatched in reused adoption checkout; owned-path isolation fix and focused red/green underway"
+          "status": "rework 2 implemented32bb5c27d; final full CI after lockfix integration underway"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -1342,6 +1342,36 @@
       "stale_narrative": "zero matches",
       "deferred_items": "no linked design documents",
       "holistic": "shared initialization and canonical record paths; all five prior integration failures pass"
+    },
+    "5c6c108a": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "c8a83598-dbfc-499a-91b3-e714676e27fe",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "8e214a7c-1cf1-4f55-860a-ae45f612e1eb",
+          "status": "passed"
+        },
+        {
+          "key": "cargo-ci-selftest",
+          "run_id": "ea6d5d55-013d-462b-be39-9d76030ac15e",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "scripts/cargo-ci.sh:137 acquisition is separate from child execution at148; deterministic child75 test passes",
+        "REQ-02": "acquisition remains bounded with path/duration diagnostic and exit2; owning real-wrapper test checks child never starts",
+        "REQ-03": "scripts/cargo-ci-selftest.sh:207 uses stub cargo and isolated lock, statuses0/1/2/75/255 and contention",
+        "REQ-04": "full4591tests+58doctests,82shell assertions; no budget changes; parent retains lock and child descriptor closed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "zero stale matches; progress status reconciled",
+      "deferred_items": "no linked design documents",
+      "holistic": "separate acquisition/child statuses preserve shared checker protocol and daemon descriptor isolation; exactly two script files"
     }
   }
 }
