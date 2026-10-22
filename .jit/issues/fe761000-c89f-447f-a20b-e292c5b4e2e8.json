@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T10:50:17.134726166Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -16,7 +16,14 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a28248d2-1d83-4141-a630-c596fd6ca617",
+      "status": "failed",
+      "updated_at": "2026-10-22T02:00:44.941715803Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fe761000-c89f-447f-a20b-e292c5b4e2e8",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove the auto and example-integration gate fields",
-  "updated_at": "2026-10-22T01:31:32.348650286Z"
+  "updated_at": "2026-10-22T02:00:44.941715803Z"
 }

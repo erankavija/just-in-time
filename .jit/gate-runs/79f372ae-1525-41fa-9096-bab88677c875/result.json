@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6d43f84cda88a8d962de5b787d11cb6e1a52460",
+  "completed_at": "2026-10-22T01:51:08.046291152Z",
+  "duration_ms": 261572,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied in the attributable current-tree changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "79f372ae-1525-41fa-9096-bab88677c875",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:46:46.473581926Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0cda458e, 88cfdca1, 282827ce, 278a5693, 12f6a06a\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-04 (issue description); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T01:46:19Z)\nTruncation recovery: bounded per-commit, per-file, and current-path reads for configuration parsing, CLI paths, tests, documentation, and merge-parent diffs\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied in the attributable current-tree changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
