@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a0607ae7-2936-4560-ab46-f0f84abe88f0",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:57:17.208288818Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a3dd995a-26d2-4039-8a69-332eca663885",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Profiled-repository fixture lock waits are bounded",
-  "updated_at": "2026-10-22T14:55:49.845844211Z"
+  "updated_at": "2026-10-22T14:57:17.208288818Z"
 }

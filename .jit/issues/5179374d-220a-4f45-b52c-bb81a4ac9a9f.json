@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "005a2315-2fc5-494a-8fce-5d8fb75bd730",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:55:21.334736212Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5179374d-220a-4f45-b52c-bb81a4ac9a9f",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove applied-profile records",
-  "updated_at": "2026-10-22T14:27:05.223008285Z"
+  "updated_at": "2026-10-22T14:55:21.334736212Z"
 }
