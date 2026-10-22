@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "19136324-fa38-46da-8492-59d6486b9134",
+    "58dbb1a0-3eb1-4d34-8ebc-44eb080348b3",
+    "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
+    "7995aa5c-7d47-43f0-91c4-5924c1ae67a8",
+    "9964af3f-46ff-455a-b9b6-ce55d778aff4",
+    "b612cde1-ee3f-48b3-a47d-90dffcb601d9",
+    "de880d9c-c9bf-475c-8d89-de0b2e55f620"
+  ],
+  "description": "Delete the `pub(crate)` issue-construction fixture in `domain/types.rs` once no library test calls it.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`; the unit tests in that module itself are its last callers.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/domain/types.rs` defines no issue-construction fixture, and no production module does.\n- [hard] REQ-02: The unit tests in `domain/types.rs` call the shared fixture and assert what they asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5a93e443-6dfb-49e6-ba9f-89641e11f3f2",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-06",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The library's own issue-construction fixture is deleted",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

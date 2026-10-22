@@ -1,0 +1,34 @@
+{
+  "assignee": "agent:planning-lead-c780514e",
+  "claimed_at": "2026-10-22T14:28:19.681488767Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Replace the inline `json!` list bodies of six commands with typed list envelopes declared as their output schemas, and fix the schema key that hides `graph rdeps`.\n\n## Background\n\n`crates/jit/src/schema.rs` maps commands to output schemas and falls back to `(None, \"CommandResponse\")` (`:730`) for unregistered ones. `ListEnvelope<K, T, E>` (`crates/jit/src/output.rs`, `crates/jit/src/domain/list_envelope.rs`) derives `count` from its collection and has a manual `JsonSchema`. A command whose JSON carries `count` beside a collection under the fallback is invisible to a schema-driven list check.\n\nSix commands build `count` beside a collection as inline `json!` in `crates/jit/src/main.rs`: `gate preset list` (`:4547`), `events tail` (`:4984`), `events query` (`:5005`), `label values` (`:5900`), `claim status` (`:7391`) and `claim list` (`:7476`). `graph rdeps` emits `GraphDownstreamResponse`, but `schema.rs:668` registers it under the key `graph_downstream`, so its schema falls back.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six commands emits a `ListEnvelope` instantiation declared as its output schema, and no inline `json!` body in `main.rs` carries a `count` key.\n- [hard] REQ-02: `graph rdeps` declares `GraphDownstreamResponse` as its output schema.\n- [hard] REQ-03: Each command's JSON output is unchanged apart from field order.\n- [hard] REQ-04: MCP tool generation and its unit tests pass against the regenerated schema.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:cli",
+    "satisfies:c780514e/REQ-04",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/single-source-prose",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Inline list bodies in main.rs become typed list envelopes",
+  "updated_at": "2026-10-22T14:28:20.003330792Z"
+}

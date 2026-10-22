@@ -1,0 +1,35 @@
+{
+  "assignee": "agent:planning-lead-c780514e",
+  "claimed_at": "2026-10-22T14:28:22.735457687Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Make the `scripts/docs-check-selftest.sh` self-test pass as the registered gate `docs-check-selftest` over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. Until planning, no gate ran it. The gate `docs-check-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete. The `docs-mechanical` gate runs the checkers over the tree, not their self-test. The registered gate's inputs omit files the self-test and its checkers read: the checker configurations `scripts/docs-policy-phrases.toml` (read at `docs-check-selftest.sh:607`), `scripts/docs-canonical-homes.toml` and `scripts/docs-package-content.toml`; the repository files the clone-based projection and policy assertions read, `docs/reference/configuration.md`, `docs/guide.md` and the projection targets such as `.jit/reference/rules-and-gates.md`; and `scripts/generate-shipped-policy-regions.sh` and `profiles/jit-fixture`, which the checkers invoke or read.\n\nThe self-test prints `SKIP` and continues to a passing exit when the read bit is not enforced, as for root: `:197` skips the nested-traversal assertions and `:201` skips the unreadable-path assertions, so on such a host the checkers' environment-error exits go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `docs-check-selftest` runs `scripts/docs-check-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `docs-check-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: The unreadable-path and nested-traversal assertions run on every host. Where the read bit is not enforced, the self-test either establishes an unreadable input another way or exits non-zero naming the precondition it could not establish. No branch prints a skip notice and continues to a passing exit.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-check-selftest"
+  ],
+  "gates_status": {},
+  "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:gates",
+    "satisfies:c780514e/REQ-10",
+    "per:@/charter/D-18",
+    "per:@/charter/D-2",
+    "enforces:@/invariant/no-ignored-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Documentation checker self-test runs as a declared gate",
+  "updated_at": "2026-10-22T14:28:23.046049967Z"
+}

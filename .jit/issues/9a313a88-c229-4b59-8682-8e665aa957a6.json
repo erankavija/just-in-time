@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "6bd02fa4-c44e-49f4-a729-59eae4edf400",
+    "f1c1acc8-4440-409d-9a8b-e2fa070befc2"
+  ],
+  "description": "Move the `issue show` id-prefix cases that only the exit-code suite tests beside the status projection tests, which already own the prefix error code.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1189` and `:1220`: an ambiguous and a too-short prefix on `issue show` (\"Ambiguous ID\", `AMBIGUOUS_ID`, \"at least 4 characters\"). `cli_issue/issue_status_projection_tests.rs` owns `INVALID_ID_PREFIX`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test in `cli_issue/issue_status_projection_tests.rs` with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test there already owns is not duplicated.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9a313a88-c229-4b59-8682-8e665aa957a6",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:testing",
+    "component:cli",
+    "satisfies:c780514e/REQ-01",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Issue-show prefix cases move beside their owner",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

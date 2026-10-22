@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "e2764021-758b-469f-86ce-9bedeb04a93d"
+  ],
+  "description": "Measure and report the cargo-ci suite clock and the per-test profile after the test-topology changes.\n\n## Background\n\nBefore this work, under the build turnstile, the warm `cargo-ci` suite clock was about 21.1 s (16.7 s test plus 4.4 s doctest; latest warm run `8e22dd96` at `0896fc29b`), and 24-29.6 s after a rebuild. The slowest tests were `server_integration` `graceful_shutdown…force_closes` (5.32 s), the cargo-ci self-test wrapper (3.99 s) and two `profile_cli_tests` (3.66 s), and the doctest substep took 4.4 s. `scripts/profile-test-suite.sh` produces per-test timings.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the build turnstile on a quiet host, the `cargo-ci` suite clock is measured on a warm target and after a rebuild, and reported beside the figures before.\n- [hard] REQ-02: A per-test profile of the default suite on a warm target at load ≤ 10 shows no test over 5 s and a doctest substep under 5 s, and the note records it.\n- [hard] REQ-03: Each figure names its commit, host load and command.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:docs",
+    "satisfies:c780514e/REQ-13",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Suite clock before and after the epic is reported",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

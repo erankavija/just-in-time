@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "a84d275f-1671-4360-b5d1-bf3ff0eed036"
+  ],
+  "description": "Make the shared memory executor set up its repository through product initialisation instead of hand-written configuration.\n\n## Background\n\n`crate::commands::test_helpers::memory_executor` seeds `[worktree] enforce_leases = \"off\"` and the data-root ignore file by hand; `TestHarness` (`crate::test_harness`) builds on it, and library command tests (`commands/{batch_create,bulk_update,dependency,gate_check,gate,issue,mod,validate}.rs`) call it. Product initialisation runs over any repository-state store. A second copy in the `fast_rules` suite root writes a literal index body.\n\n## Success Criteria\n\n- [hard] REQ-01: The shared `memory_executor` seeds configuration and index by running product initialisation over the memory store, and writes no literal configuration, schema version or index body.\n- [hard] REQ-02: `TestHarness` builds on it, and a library test that relied on the former fixture configuration declares that value itself and keeps the property it asserted.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "22355a56-9730-4409-b9a8-5a2381c35cf7",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-06",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Memory executor initialised through product initialisation",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

@@ -1,0 +1,33 @@
+{
+  "assignee": "agent:planning-lead-c780514e",
+  "claimed_at": "2026-10-22T14:28:16.189268229Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Make sure the repository-state layer owns every finalization case the storage tests cover, before the storage re-proof goes.\n\n## Background\n\n`crates/jit/src/storage/repository_state_store_tests.rs:1754-2585` (\"typed mutation determinism across both backends\", about 830 lines) re-proves mutation finalization against both backends. Its own header states that the finalizer's serialized issue, gate, provenance and event bytes, and the identifiers and timestamps it assigns, are a pure function of the captured image and the injected mutation context. The finalizer and its unit tests are in `crates/jit/src/repository_state/mutation.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each finalization property the section asserts has an owning unit test in `repository_state` that runs with no storage backend: serialized bytes, assigned identifiers and timestamps, and no-op operations that sample neither.\n- [hard] REQ-02: A property already owned there is not duplicated.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:storage-contracts",
+    "component:testing",
+    "component:storage",
+    "satisfies:c780514e/REQ-03",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Repository-state tests own each finalization case",
+  "updated_at": "2026-10-22T14:28:16.513479417Z"
+}

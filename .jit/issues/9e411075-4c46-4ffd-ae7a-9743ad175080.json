@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "22355a56-9730-4409-b9a8-5a2381c35cf7"
+  ],
+  "description": "Retire the `fast_rules` suite's own memory executor in favour of the shared one.\n\n## Background\n\n`memory_executor` in `crates/jit/tests/fast_rules/main.rs` seeds an empty configuration and a literal index body carrying `\"schema_version\": 2`, then delegates to the shared executor, which product initialisation now sets up. Its callers are `fast_rules/{example_rulesets,label_query,label_strategic,validate_rule_runner,validation}_tests.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_rules/main.rs`: `memory_executor` (`:21`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: `fast_rules/main.rs` defines no executor fixture, and no file in the suite writes a literal schema version or index body.\n- [hard] REQ-03: Each former caller uses the shared executor and asserts what it asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9e411075-4c46-4ffd-ae7a-9743ad175080",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-06",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "fast_rules uses the shared memory executor",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

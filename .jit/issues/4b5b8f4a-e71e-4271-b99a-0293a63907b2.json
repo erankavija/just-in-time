@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
+    "a618b8cc-8183-487a-905f-4fb8dfdf193e",
+    "ca5eb7ee-4e67-4685-b63d-78d7dcb05b3a"
+  ],
+  "description": "Retire the server's private file-backed repository and executor setups.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root. The server crate's tests duplicate them; `create_test_app` builds on `initialize_file_backed_test_repository`, and `repository_missing_its_index` builds a repository and then removes its index.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/server/src/lib.rs`: `repository_missing_its_index` (`:93`).\n- `crates/server/src/routes.rs`: `test_executor` (`:1054`), `initialize_file_backed_test_repository` (`:1104`), `create_test_app_with_html_doc` (`:1699`), `create_app_with_raw_fixture` (`:2621`).\n- `crates/server/tests/server_integration/graceful_shutdown_tests.rs`: `initialize_repository` (`:75`), `executor_for` (`:81`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No server test defines a function that creates a file-backed repository or opens a file-backed executor of its own; a scenario that damages a repository does so to one built by the shared constructor.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4b5b8f4a-e71e-4271-b99a-0293a63907b2",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "component:server",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Server tests use the shared file-backed constructors",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}
