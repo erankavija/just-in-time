@@ -47,15 +47,15 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "04a46d76-2e7d-416e-86e0-cdf1abecc372",
-      "status": "failed",
-      "updated_at": "2026-10-22T19:28:38.547037808Z",
+      "run_id": "050581f4-da58-45f9-b5e1-ff3d107a92bf",
+      "status": "passed",
+      "updated_at": "2026-10-22T19:41:38.098991116Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "run_id": "2557f21c-53ed-409a-ab39-4061e4a36e73",
+      "run_id": "d63f7806-b535-4fa6-84a2-e11253f815c2",
       "status": "passed",
-      "updated_at": "2026-10-22T19:22:40.882142955Z",
+      "updated_at": "2026-10-22T19:36:32.716484575Z",
       "updated_by": "auto:executor"
     }
   },
@@ -76,5 +76,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-22T19:36:30.219063303Z"
+  "updated_at": "2026-10-22T19:41:38.098991116Z"
 }
