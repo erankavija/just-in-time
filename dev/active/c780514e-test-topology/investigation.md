@@ -333,7 +333,7 @@ Matches that are not a test passing on a skip:
 
 ### D.6 Private setups across the workspace
 
-Mechanical sweep at `b80cd0da6`. It covers every non-`#[test]` function in three places:
+Mechanical sweep at `a5aac64b1`. It covers every non-`#[test]` function in three places:
 
 - a `#[cfg(test)]` module under `crates/*/src`;
 - a test file that a `#[cfg(test)]` `mod x;` includes, with or without `#[path = …]`: `storage/repository_state_store_tests.rs`, `storage/repository_state_store_contention_tests.rs`, `storage/claim_coordinator_proptests.rs`, `storage/contention_probe.rs`, `storage/redo_conformance.rs` and `repository_state/managed_document_property_tests.rs`;
@@ -355,7 +355,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 - **scenario**: arranges paths, writes scenario declarations or records into a repository it is given, or reads results.
 - **subject**: the backend, session, layout, image or wrapper under test.
 
-188 functions: 104 setup, 51 scenario, 33 subject.
+191 functions: 104 setup, 52 scenario, 35 subject.
 
 **Library (`crates/jit/src`)**
 
@@ -373,13 +373,13 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `commands/claim.rs` | `create_test_issue` | 1045 | setup | `library-file-setup-adoption` |
 | `commands/dependency.rs` | `mark_index_deleted` | 1213 | scenario | — |
 | `commands/events.rs` | `seeded_override_executor` | 52 | setup | `library-command-memory-setup-adoption` |
-| `commands/gate.rs` | `setup` | 1453 | setup | `library-command-memory-setup-adoption` |
-| `commands/gate_check.rs` | `setup` | 1667 | setup | `library-command-memory-setup-adoption` |
-| `commands/gate_check.rs` | `seed_rule_validation_rules` | 1706 | scenario | — |
-| `commands/gate_check.rs` | `setup_file_repository` | 2083 | setup | `library-file-setup-adoption` |
-| `commands/gate_check.rs` | `ReuseFixture::new` | 2157 | setup | `library-file-setup-adoption` |
-| `commands/gate_check.rs` | `ReuseFixture::rewrite_checker_command` | 2279 | scenario | — |
-| `commands/gate_check.rs` | `write_corrupt_gate_run` | 2584 | scenario | — |
+| `commands/gate.rs` | `setup` | 1445 | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs` | `setup` | 1665 | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs` | `seed_rule_validation_rules` | 1704 | scenario | — |
+| `commands/gate_check.rs` | `setup_file_repository` | 2077 | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs` | `ReuseFixture::new` | 2149 | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs` | `ReuseFixture::rewrite_checker_command` | 2269 | scenario | — |
+| `commands/gate_check.rs` | `write_corrupt_gate_run` | 2573 | scenario | — |
 | `commands/gate_cli_tests.rs` | `setup` | 11 | setup | `library-command-memory-setup-adoption` |
 | `commands/hooks.rs` | `diverged_strict_repo` | 254 | setup | `library-file-setup-adoption` |
 | `commands/init.rs` | `executor_with_layout` | 665 | setup | `library-file-setup-adoption` |
@@ -411,8 +411,8 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `document/reference.rs` | `layout` | 264 | subject | — |
 | `domain/item.rs` | `invariant_cfg` | 1656 | scenario | — |
 | `gate_execution.rs` | `worktree_with_data_root` | 977 | subject | — |
-| `main.rs` | `repository_declaring` | 7650 | setup | `library-file-setup-adoption` |
-| `main.rs` | `checkout_paths` | 7661 | scenario | — |
+| `main.rs` | `repository_declaring` | 7645 | setup | `library-file-setup-adoption` |
+| `main.rs` | `checkout_paths` | 7656 | scenario | — |
 | `profile/drift_report.rs` | `subject` | 181 | subject | — |
 | `profile/package_capture.rs` | `Fixture::new` | 557 | subject | — |
 | `repository_state/archive.rs` | `layout` | 608 | subject | — |
@@ -437,10 +437,12 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `storage/json.rs` | `configure_test_layout` | 1565 | subject | — |
 | `storage/json.rs` | `retained_storage` | 1614 | subject | — |
 | `storage/json.rs` | `storage_with_index_version` | 3020 | subject | — |
-| `storage/memory.rs` | `seeded` | 1299 | subject | — |
+| `storage/memory.rs` | `seeded` | 1298 | subject | — |
 | `storage/redo_apply.rs` | `repository` | 379 | subject | — |
 | `storage/repository_state_store_contention_tests.rs` | `labeled_layout` | 19 | subject | — |
 | `storage/repository_state_store_tests.rs` | `publish_issue` | 263 | subject | — |
+| `storage/repository_state_store_tests.rs` | `sessions_over` | 1188 | subject | — |
+| `storage/repository_state_store_tests.rs` | `capture_listing_errors` | 1278 | subject | — |
 | `storage/repository_state_store_tests.rs` | `capture_git_fixture` | 2587 | setup | `library-git-fixture-adoption` |
 | `storage/repository_state_store_tests.rs` | `WriteSetFixture::new` | 2801 | subject | — |
 | `storage/repository_state_store_tests.rs` | `FileSessionBackend::seeded` | 3273 | subject | — |
@@ -451,13 +453,13 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 
 | File | Function | Line | Class | Owner |
 | --- | --- | ---: | --- | --- |
-| `bracket_coverage_gate_run_test.rs` | `setup_bracket_repo` | 139 | setup | `cli-gate-migration` |
-| `bracket_coverage_gate_run_test.rs` | `assert_gate_run` | 192 | scenario | — |
+| `bracket_coverage_gate_run_test.rs` | `setup_bracket_repo` | 138 | setup | `cli-gate-migration` |
+| `bracket_coverage_gate_run_test.rs` | `assert_gate_run` | 191 | scenario | — |
 | `gate_cli_integration_test.rs` | `enable_warn_leases` | 75 | scenario | — |
 | `gate_evaluate_all_test.rs` | `define_review_placeholder_gate` | 90 | scenario | — |
 | `gate_evaluate_rerun_test.rs` | `gate_updated_by` | 106 | scenario | — |
 | `gate_update_test.rs` | `define_review_placeholder_gate` | 56 | scenario | — |
-| `gate_update_test.rs` | `read_only_issue_file` | 93 | scenario | — |
+| `gate_update_test.rs` | `read_only_issue_file` | 92 | scenario | — |
 
 **`crates/jit/tests/cli_issue`**
 
@@ -467,6 +469,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `container_rollup_tests.rs` | `delete_issue_file` | 94 | scenario | — |
 | `exit_code_tests.rs` | `make_ambiguous_prefix` | 1147 | scenario | — |
 | `failure_probe_fixture.rs` | `FailureFixture::apply` | 605 | scenario | — |
+| `issue_update_atomicity_tests.rs` | `repository_text` | 16 | scenario | — |
 | `issue_update_description_ops_tests.rs` | `assert_last_event_is_description_update` | 86 | scenario | — |
 | `serve_failure_envelope_tests.rs` | `setup` | 13 | setup | `cli-issue-envelope-migration` |
 
@@ -542,7 +545,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `planning_preset_tests.rs` | `file_backed_executor` | 21 | setup | `fast-docs-templates-file-setup-adoption` |
 | `template_apply_atomicity_tests.rs` | `memory_storage` | 380 | setup | `fast-docs-templates-memory-setup-adoption` |
 | `template_apply_atomicity_tests.rs` | `fixture` | 388 | subject | — |
-| `template_apply_atomicity_tests.rs` | `repository_image` | 447 | subject | — |
+| `template_apply_atomicity_tests.rs` | `repository_image` | 446 | subject | — |
 | `template_apply_tests.rs` | `declare_document_area` | 96 | scenario | — |
 | `template_binding_tests.rs` | `executor_with_templates` | 106 | setup | `fast-docs-templates-memory-setup-adoption` |
 | `templates_loader_tests.rs` | `setup` | 16 | setup | `fast-docs-templates-file-setup-adoption` |
