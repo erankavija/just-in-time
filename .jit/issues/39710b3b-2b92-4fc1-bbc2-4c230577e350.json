@@ -8,6 +8,7 @@
   ],
   "description": "A built-in gate checker that cannot judge the repository records an `error` run instead of a `failed` verdict or no run at all, so each gate-run record distinguishes a checker fault from a verdict on the content.\n\n## Background\n\nGate runs already carry an `error` status for exec checkers that time out, cannot be started, or are killed (`GateRunStatus`, `crates/jit/src/domain/types.rs:1098-1112`; mapping `crates/jit/src/gate_execution.rs:148-155`). An errored run is never reused (`types.rs:1022-1027`), so the next evaluation retries it.\n\nBuilt-in checker kinds (`crates/jit/src/declarations/gates.rs:108-147`, dispatch `crates/jit/src/commands/gate_check.rs:1052-1242`) record only passed or failed, synthesizing exit 0 or 4 (`gate_check.rs:1170-1174,1217-1221`):\n\n- Repository validation folds a structural or integrity fault into a blocking finding recorded as failed (`gate_check.rs:646-672`).\n- Label-target validation turns a misconfigured namespace or count into a blocking finding (`gate_check.rs:1108-1132`).\n- Rule validation turns a missing or misconfigured rule into an error-severity finding recorded as failed (`crates/jit/src/commands/validate.rs:1413-1430`).\n- Issue validation, and configuration or declaration load failures in each kind, propagate as errors with no run recorded (`gate_check.rs:468-469,476-477,535-536,558-559`; `validate.rs:1405-1411`). The process then exits with the gate error code, or 1 without JSON output, never the runner-error code (`ExitCode::ExternalError`, 10).\n\nEvaluation already reports a recorded `error` run from an exec checker with the runner-error code and JSON verdict `error`, so a built-in checker that records such a run reaches the same reporting.\n\n## Success Criteria\n\n- [hard] REQ-01: A built-in checker that cannot load its configuration or declarations records a run with status `error`.\n- [hard] REQ-02: A repository-integrity or configuration fault met by a built-in checker records `error`, while a finding about repository content records `failed`.\n- [hard] REQ-03: An evaluation that records an `error` run from a built-in checker exits with the runner-error exit code and reports verdict `error` in JSON output.\n- [hard] REQ-04: The existing `error` run status carries the fault; no run status is added.\n- [hard] REQ-05: Harness tests over gate checking own the classification for each built-in checker kind.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:08:00.303523787Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "cargo-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f2655d13-1f96-468e-8150-5935ac67d331",
-      "status": "failed",
-      "updated_at": "2026-10-22T06:32:17.735875383Z",
+      "run_id": "4cabc186-ae07-44be-a330-99b2941cd879",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:07:51.254276566Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -36,7 +37,7 @@
     "satisfies:3d9a0ce3/REQ-02"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record built-in checker faults as error runs",
-  "updated_at": "2026-10-22T06:34:05.135355045Z"
+  "updated_at": "2026-10-22T14:08:00.303523787Z"
 }

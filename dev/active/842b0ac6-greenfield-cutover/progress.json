@@ -272,7 +272,7 @@
           "title": "Remove cfg twins in repository_state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged-gate-pending"
+          "status": "done"
         },
         {
           "id": "afc2b698-34bb-43d1-b7e2-c859de8d8104",
@@ -299,7 +299,7 @@
           "title": "Remove cfg twins in storage",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged-gate-pending"
+          "status": "done"
         },
         {
           "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",

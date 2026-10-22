@@ -672,8 +672,9 @@ jit config get documentation.development_root
 jit config get namespaces.type.unique
 ```
 
-`worktree` and `coordination` resolve the repository's default-filled view. Every other section reads the repository's
-`config.toml` only, with no system/user merge or built-in defaults; an absent
+Every section resolves from the repository's `config.toml` alone.
+`worktree` and `coordination` fill omitted keys with built-in defaults; every
+other section reports exactly what the repository declares, and an absent
 section resolves to `{}`.
 `templates` and `invariants` are not part of this surface (they load from
 sibling files, not `config.toml`); read the graph templates in

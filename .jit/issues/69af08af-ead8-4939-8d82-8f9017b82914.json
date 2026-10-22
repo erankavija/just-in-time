@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T06:33:42.935212916Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,26 @@
   ],
   "description": "`repository_state` re-exports items twice under opposite `cfg` conditions, and holds an uncalled scaffold and a test-only membership-diff function.\n\n## Background\n\n- `crates/jit/src/repository_state/mod.rs` holds `cfg` re-export twins at `:34-51` (membership diff), `:80-99` (capture closure) and `:214-230` (`serialize_ruleset`, `SchemaFile`, `SerializedRuleSet`). Consumers include `commands/validate.rs` and the integration tests `tests/fast_rules/derived_state_repair_tests.rs:3,147`. Public items in a public module raise no unused lint, so an unconditional `pub use` serves both.\n- `neutral_files` (`repository_state/initialize.rs:325-344`) has no caller.\n- `default_rule_membership_diff` (`repository_state/default_rules.rs:404-421`, `allow(dead_code)`) and `DefaultRuleMembershipDiff::is_empty` (`:336-344`) are called only by their own tests and a doctest. Production uses `default_rule_membership_diff_from_identities` (`:434`).\n\n## Success Criteria\n\n- [hard] REQ-01: `repository_state/mod.rs` re-exports each item once, unconditionally, with no twin under opposite `test` or `test-support` conditions.\n- [hard] REQ-02: `neutral_files`, `default_rule_membership_diff` and `DefaultRuleMembershipDiff::is_empty` no longer exist.\n- [hard] REQ-03: No public item in `repository_state/` carries `allow(dead_code)`.\n\n## Notes\n\nThe `pub(crate)` allows at `repository_state/index.rs:100,118` mark code that is live in other build configurations, and they stay.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:10:08.784459588Z",
   "first_ready_at": "2026-10-21T06:04:50.570686219Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0bbe8da1-d896-405b-b873-7fef599c84be",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:08:44.744820858Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "939db13b-1a4f-4a51-9bf7-9e6079112aa6",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:09:54.063849061Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "69af08af-ead8-4939-8d82-8f9017b82914",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:842b0ac6/REQ-24"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove cfg twins in repository_state",
-  "updated_at": "2026-10-22T06:33:43.042687709Z"
+  "updated_at": "2026-10-22T14:10:08.784459588Z"
 }

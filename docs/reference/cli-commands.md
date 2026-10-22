@@ -3693,9 +3693,9 @@ enforce_leases = "strict"
 
 Resolve a dotted key against the WHOLE configuration surface — type
 hierarchy, label namespaces, item kinds, documentation paths, validation
-settings, project identity, schema version, and the system/user/repo-layered
-worktree and coordination settings — via a generic path walk over the
-config, not a hand-maintained list of recognised keys.
+settings, project identity, schema version, and the worktree and
+coordination settings — via a generic path walk over the repository
+`config.toml`, not a hand-maintained list of recognised keys.
 
 **Usage:**
 ```bash
@@ -3725,22 +3725,21 @@ jit config get namespaces.type.unique
 jit config get documentation --json
 # {"key": "documentation", "value": {"development_root": "dev", ...}}
 
-# The layered settings resolve through their precedence chain
-# (repo, then user, then system, then default); worktree.enforce_leases
-# reads the repo config only.
+# Worktree and coordination settings resolve from the repo config, then
+# their built-in defaults.
 jit config get worktree.enforce_leases
 jit config get coordination.max_indefinite_leases_per_agent
 ```
 
 **Two resolution strategies**, matching how the rest of jit already reads
 these sections — `config get` does not invent a third:
-- `worktree`, `coordination`: the
-  system/user/repo-merged, default-filled view.
+Both read the repository `config.toml` only; user and system configuration
+supply no value.
+- `worktree`, `coordination`: the repository values, filled with built-in
+  defaults.
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
-  `documentation`, `namespaces`, `item_kinds`, `projection`): read from the
-  REPO's `config.toml` only, with no
-  system/user merge and no built-in defaults layered in — jit has no concept
-  of a system/user override for a repo's type hierarchy or label namespaces.
+  `documentation`, `namespaces`, `item_kinds`, `projection`): exactly what
+  the repository declares, with no built-in defaults filled in.
   This means these sections reflect exactly what `config.toml` declares
   (an absent section resolves to `{}`), which can differ from `jit config
   show`'s built-in-default-filled view of the sections it covers (e.g.
@@ -3771,8 +3770,8 @@ jit config get documentation.bogus_field
 ### `jit config show`
 
 Display the effective configuration snapshot that `jit config get` resolves
-keys against: the merged, default-filled `worktree` and `coordination` views
-and the repository's other sections.
+keys against: the repository's default-filled `worktree` and `coordination`
+settings and its other sections.
 
 ```bash
 jit config show [--json]
