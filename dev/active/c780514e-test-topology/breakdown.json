@@ -715,7 +715,7 @@
   {
     "key": "auto-transition-domain-decision",
     "title": "Auto-transition readiness is decided by a pure domain function",
-    "description": "Give the dependency auto-transition a pure domain owner, so the command cascade only applies a decision the domain makes.\n\n## Background\n\nThe readiness predicates are tested in `crates/jit/src/domain/types.rs:2546-2703`, and `domain/types.rs` already decides the readiness change for one stored issue. The cascade to dependents is command-layer orchestration (`crates/jit/src/commands/issue.rs:816-859`, `crates/jit/src/commands/mod.rs:2791`). It is re-proven by four CLI tests in `crates/jit/tests/cli_repo_workflow/workflow_tests.rs` (`:529`, `:577`, `:646`, `:698`) and by harness tests (`commands/bulk_update.rs:2001`, `tests/fast_issue/lifecycle_timestamps_tests.rs:89`).\n\n## Success Criteria\n\n- [hard] REQ-01: One pure domain function takes a transitioned issue and the state of its dependents and returns the dependents that become ready. The command cascade applies that result and decides nothing itself.\n- [hard] REQ-02: Unit tests and a property-based test of that function own the auto-transition rules, including dependents with other unmet dependencies, rejected dependencies and dependents outside backlog.\n- [hard] REQ-03: Command behaviour and emitted events are unchanged.\n",
+    "description": "Give the dependency auto-transition a pure domain owner, so the command cascade only applies a decision the domain makes.\n\n## Background\n\nThe readiness predicates are tested in `crates/jit/src/domain/types.rs:2546-2703`, and `domain/types.rs` already decides the readiness change for one stored issue. The cascade to dependents is command-layer orchestration (`crates/jit/src/commands/issue.rs:816-859`, `crates/jit/src/commands/mod.rs:2791`). It is re-proven by four CLI tests in `crates/jit/tests/cli_repo_workflow/workflow_tests.rs` (`:529`, `:577`, `:646`, `:698`) and by harness tests (`commands/bulk_update.rs:2001`, `tests/fast_issue/lifecycle_timestamps_tests.rs:89`).\n\n## Success Criteria\n\n- [hard] REQ-01: One pure domain function takes a transitioned issue and the state of its dependents and returns the dependents that become ready. The command cascade applies that result and decides nothing itself.\n- [hard] REQ-02: Unit tests and a property-based test of that function own the auto-transition rules, including dependents with other unmet dependencies, rejected dependencies and dependents outside backlog, and each rule the four `workflow_tests.rs` cases and the lifecycle harness cascade assertions check.\n- [hard] REQ-03: Command behaviour and emitted events are unchanged.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1335,7 +1335,7 @@
   {
     "key": "cargo-ci-selftest-gate",
     "title": "cargo-ci self-test runs as a declared gate",
-    "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). `.jit/gates.toml` declares no script self-test gate. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/cargo-ci-selftest.sh`. Its inputs cover the script and the files it exercises, and it fails whenever the script exits non-zero, including exit 2 for a missing tool.\n- [hard] REQ-02: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-03: `dev/TESTING.md` describes the self-test as a gate.\n",
+    "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). `.jit/gates.toml` declares no script self-test gate. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/cargo-ci-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-04: `dev/TESTING.md` describes the self-test as a gate.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1383,7 +1383,7 @@
   {
     "key": "profile-suite-selftest-gate",
     "title": "Suite-profiler self-test runs as a declared gate",
-    "description": "Move the suite profiler's self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345` (`test_profile_test_suite_script_passes_its_own_self_test`) runs `scripts/profile-test-suite.sh --self-test` inside the default suite. `.jit/gates.toml` declares no script self-test gate.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/profile-test-suite.sh --self-test`, with inputs covering the script, and the gate fails whenever the self-test exits non-zero.\n- [hard] REQ-02: No test in the default suite runs the profiler's self-test.\n",
+    "description": "Move the suite profiler's self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345` (`test_profile_test_suite_script_passes_its_own_self_test`) runs `scripts/profile-test-suite.sh --self-test` inside the default suite. `.jit/gates.toml` declares no script self-test gate.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/profile-test-suite.sh --self-test`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: No test in the default suite runs the profiler's self-test.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1427,7 +1427,7 @@
   {
     "key": "build-budget-selftest-gate",
     "title": "Build-budget checker self-test runs as a declared gate",
-    "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: `.jit/gates.toml` declares a gate that runs that self-test, with inputs covering the script.\n- [hard] REQ-03: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
+    "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: `.jit/gates.toml` declares a gate that runs `scripts/rust-build-budget.sh --self-test`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-03: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-04: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1538,7 +1538,6 @@
       "storage-contracts",
       "shared-test-fixtures",
       "failure-corpus-in-suite",
-      "server-shutdown-test-bound",
       "doctest-substep-bound",
       "cargo-ci-selftest-gate",
       "profile-suite-selftest-gate",
@@ -3223,7 +3222,7 @@
   {
     "key": "fast-issue-memory-setup-adoption",
     "title": "fast_issue memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_issue` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_issue` helpers build their own store or executor: `store_with_rules` and `executor_for` in `graph_rule_validation_tests.rs` (`:15`, `:34`), `executor_with_rules` in `transition_graph_enforcement_tests.rs:24`, `executor` in `strictness_enforcement_tests.rs:42` and `strictness_transition_tests.rs:41`, and `make_storage` in `short_hash_tests.rs:389`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_issue` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_issue` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_issue` helpers build their own store or executor: `store_with_rules` and `executor_for` in `graph_rule_validation_tests.rs` (`:15`, `:34`), `executor_with_rules` in `transition_graph_enforcement_tests.rs:24`, `executor` in `strictness_enforcement_tests.rs:42` and `strictness_transition_tests.rs:41`, and `make_storage` in `short_hash_tests.rs:389`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_issue` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3273,7 +3272,7 @@
   {
     "key": "fast-rules-memory-setup-adoption",
     "title": "fast_rules memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_rules` helpers build their own store or executor: `store_with_rules` in `validate_rule_runner_tests.rs:21`, `executor_with_rules` in `local_rule_enforcement_tests.rs:20`, `storage_with` and `render_executor` in `project_render_harness_tests.rs` (`:77`, `:90`), `strategic_executor` in `label_strategic_tests.rs:13`, and `executor_with_sdd_example` and `research_coverage_executor` in `example_rulesets_tests.rs` (`:612`, `:1524`).\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. These `crates/jit/tests/fast_rules` helpers build their own store or executor: `store_with_rules` in `validate_rule_runner_tests.rs:21`, `executor_with_rules` in `local_rule_enforcement_tests.rs:20`, `storage_with` and `render_executor` in `project_render_harness_tests.rs` (`:77`, `:90`), `strategic_executor` in `label_strategic_tests.rs:13`, and `executor_with_sdd_example` and `research_coverage_executor` in `example_rulesets_tests.rs` (`:612`, `:1524`).\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_rules` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3324,7 +3323,7 @@
   {
     "key": "fast-docs-templates-memory-setup-adoption",
     "title": "fast_docs_templates memory-backed tests use the shared seeding",
-    "description": "Retire the private memory-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. `executor_with_templates` in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs:106` and `memory_storage` in `template_apply_atomicity_tests.rs:380` build their own store or executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Retire the private memory-backed setups of the `fast_docs_templates` suite.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor. Helpers that act on a `TestHarness` or executor they are given are scenario steps, not setups. `executor_with_templates` in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs:106` and `memory_storage` in `template_apply_atomicity_tests.rs:380` build their own store or executor.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3697,7 +3696,7 @@
   {
     "key": "query-cli-wiring-reduction",
     "title": "Query CLI tests assert one wiring case per subcommand and flag",
-    "description": "Cut the subprocess query suite to wiring cases, now that the domain owns query semantics.\n\n## Background\n\n`crates/jit/tests/cli_query_graph/query_tests.rs` has 25 subprocess tests (1,422 lines) and 32 `split_whitespace` sites. It re-proves filters and priority order that `crates/jit/src/domain/queries.rs` owns as pure functions. `dev/TESTING.md:619` cites the file as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `query_tests.rs` holds at most one case per `query` subcommand and per flag, each asserting that the command reaches the domain query, for example that a filter is applied, and not the query's semantics.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n- [hard] REQ-03: The remaining cases spawn `jit` through the shared CLI process fixture and read ids from `--json` output.\n- [hard] REQ-04: `dev/TESTING.md` describes the reduced suite.\n",
+    "description": "Cut the subprocess query suite to wiring cases, now that the domain owns query semantics.\n\n## Background\n\n`crates/jit/tests/cli_query_graph/query_tests.rs` has 25 subprocess tests (1,422 lines) and 32 `split_whitespace` sites. It re-proves filters and priority order that `crates/jit/src/domain/queries.rs` owns as pure functions. `dev/TESTING.md:619` cites the file as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `query_tests.rs` holds at most one case per `query` subcommand and per flag, each asserting that the command reaches the domain query, for example that a filter is applied, and not the query's semantics.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n- [hard] REQ-03: The remaining cases spawn `jit` through the shared CLI process fixture and read ids from `--json` output.\n- [hard] REQ-04: `dev/TESTING.md` describes the reduced suite.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3746,7 +3745,7 @@
   {
     "key": "label-query-cli-wiring-reduction",
     "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
-    "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic`. Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
+    "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic`. Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3794,7 +3793,7 @@
   {
     "key": "label-query-harness-reduction",
     "title": "Label and strategic executor tests keep one wiring case each",
-    "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs`; a case whose property has none stays.\n",
+    "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3839,7 +3838,7 @@
   {
     "key": "auto-transition-wiring-reduction",
     "title": "Workflow CLI tests keep one auto-transition wiring case",
-    "description": "Cut the CLI re-proofs of dependency auto-transitions to one wiring case.\n\n## Background\n\n`crates/jit/tests/cli_repo_workflow/workflow_tests.rs` re-proves dependency auto-transitions in four subprocess tests (`:529`, `:577`, `:646`, `:698`). A pure domain function owns the rules, with unit and property tests.\n\n## Success Criteria\n\n- [hard] REQ-01: `workflow_tests.rs` holds one auto-transition case, which shows that completing a dependency through the CLI readies its dependent; the other three cases no longer exist.\n- [hard] REQ-02: Each removed case's rule has an owning test of the domain function; a case whose rule has none stays.\n",
+    "description": "Cut the CLI re-proofs of dependency auto-transitions to one wiring case.\n\n## Background\n\n`crates/jit/tests/cli_repo_workflow/workflow_tests.rs` re-proves dependency auto-transitions in four subprocess tests (`:529`, `:577`, `:646`, `:698`). A pure domain function owns the rules, with unit and property tests.\n\n## Success Criteria\n\n- [hard] REQ-01: `workflow_tests.rs` holds one auto-transition case, which shows that completing a dependency through the CLI readies its dependent; the other three cases no longer exist.\n- [hard] REQ-02: Each removed case's rule has an owning test of the domain function before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4361,6 +4360,260 @@
     }
   },
   {
+    "key": "library-item-validate-memory-setup-adoption",
+    "title": "Item and validate unit tests use the shared memory seeding",
+    "description": "Retire the private memory executors of the item and validate command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/item.rs`: `executor_with` (`:613`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`) and `config_exec` (`:1536`).\n- `crates/jit/src/commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3042`, which writes a literal `\"schema_version\": 2` index at `:3053`) and `dangling_exec_with_rules_and_gates` (`:3103`).\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in `commands/item.rs` or `commands/validate.rs` defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding",
+      "harness-demo-case-moves"
+    ],
+    "planning": {
+      "outcome": "Item and validate unit tests build memory executors through the shared seeding, with no literal index.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "item-validate unit-test setups",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Fourteen helpers in two modules switch to one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "library-command-memory-setup-adoption",
+    "title": "Command unit tests use the shared memory seeding",
+    "description": "Retire the private memory executors of the remaining command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. These library test helpers build their own store or executor:\n\n- `crates/jit/src/commands/batch_create.rs`: `executor` (`:671`) and `coverage_executor` (`:926`).\n- `commands/bulk_update.rs`: `blocked_dependent_fixture` (`:1973`).\n- `commands/events.rs`: `seeded_override_executor` (`:51`).\n- `commands/gate.rs`: `setup` (`:1452`, literal `enforce_leases = \"off\"`).\n- `commands/gate_check.rs`: `setup` (`:1666`).\n- `commands/gate_cli_tests.rs`: `setup` (`:10`).\n- `commands/invariant.rs`: `exec` (`:76`).\n- `commands/issue.rs`: `setup` (`:916`).\n- `commands/mod.rs`: `precheck_evidence_fixture` (`:3571`).\n\nThe literal `schema_version` fields in `prior_run` (`gate_check.rs:1740`) and `prior_precheck_run` (`mod.rs:3672`) belong to gate-run records, not to a repository index, and stay.\n\n## Success Criteria\n\n- [hard] REQ-01: No test module in the files in this entry's footprint defines a function that constructs an `InMemoryStorage` or a memory executor, and none writes a literal configuration default or index body; scenario declarations stay in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding",
+      "harness-demo-case-moves",
+      "batch-cycle-adapter-reproof-removal",
+      "library-git-fixture-adoption"
+    ],
+    "planning": {
+      "outcome": "Command unit tests build memory stores and executors through the shared seeding.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "command unit-test setups",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "One small helper per module, in ten modules, switches to one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/batch_create.rs",
+            "crates/jit/src/commands/bulk_update.rs",
+            "crates/jit/src/commands/events.rs",
+            "crates/jit/src/commands/gate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/gate_cli_tests.rs",
+            "crates/jit/src/commands/invariant.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/mod.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "library-file-setup-adoption",
+    "title": "Library unit tests use the shared file-backed constructors",
+    "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. These library test helpers duplicate the shared constructors:\n\n- `crates/jit/src/commands/archive.rs`: `executor` (`:892`) and the repository builders `executable_document_repo` (`:994`), `configured_repo` (`:1764`), `development_root_repo` (`:1995`), `directory_link_repo` (`:2399`) and `executable_container_repo` (`:2494`).\n- `commands/gate_check.rs`: `setup_file_repository` (`:2082`).\n- `commands/hooks.rs`: `diverged_strict_repo` (`:254`).\n- `commands/profile.rs`: `fixture` (`:2265`).\n- `storage/gate_runs.rs`: `setup_storage` (`:16`), a copy of the shared `setup_test_repo`.\n- `validation/repository.rs`: `executor` (`:892`).\n- `main.rs` tests: `repository_declaring` (`:7669`), which writes a configuration into a temporary directory.\n\n## Success Criteria\n\n- [hard] REQ-01: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "library-command-memory-setup-adoption"
+    ],
+    "planning": {
+      "outcome": "Library unit tests build file-backed repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "library file-backed setups",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "About twelve helpers in seven modules switch to existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/hooks.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/storage/gate_runs.rs",
+            "crates/jit/src/validation/repository.rs",
+            "crates/jit/src/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "server-memory-setup-adoption",
+    "title": "Server tests use the shared memory seeding",
+    "description": "Retire the server's private memory stores, which write a literal index body.\n\n## Background\n\nShared test support builds a memory store from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. The server crate's tests reach `jit` test support through its `test-support` dev-dependency. Two copies of `test_memory_storage` write `enforce_leases = \"off\"` and a literal `{\"schema_version\":2,…}` index: `crates/server/src/routes.rs:1081-1100` and `crates/server/tests/server_integration/document_api_tests.rs:11-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that constructs an `InMemoryStorage`, and none writes a literal configuration default or index body.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "component:server",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "memory-declaration-seeding",
+      "server-git-fixture-adoption"
+    ],
+    "planning": {
+      "outcome": "Server tests build memory stores through the shared seeding, with no literal index.",
+      "contract_refs": [
+        "memory-declaration-seeding"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "server memory-store setups",
+        "test_boundary": "jit-server test suite",
+        "worker_sized_reason": "Two copies of one helper switch to one existing entry point.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs",
+            "crates/server/tests/server_integration/document_api_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "server-file-setup-adoption",
+    "title": "Server tests use the shared file-backed constructors",
+    "description": "Retire the server's private file-backed repository and executor setups.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root. The server crate's tests duplicate them: `initialize_file_backed_test_repository` (`crates/server/src/routes.rs:1103`), on which `create_test_app`, `create_test_app_with_html_doc` and `create_app_with_raw_fixture` build; `repository_missing_its_index` (`crates/server/src/lib.rs:93`), which builds a repository and then removes its index; and `initialize_repository` and `executor_for` (`crates/server/tests/server_integration/graceful_shutdown_tests.rs:75`, `:80`).\n\n## Success Criteria\n\n- [hard] REQ-01: No server test defines a function that creates a file-backed repository or opens a file-backed executor of its own; a scenario that damages a repository does so to one built by the shared constructor.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "component:server",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "file-backed-setup-constructors",
+      "server-memory-setup-adoption",
+      "server-shutdown-test-bound"
+    ],
+    "planning": {
+      "outcome": "Server tests build file-backed repositories and executors through the shared constructors.",
+      "contract_refs": [
+        "file-setup-constructors"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "server file-backed setups",
+        "test_boundary": "jit-server test suite",
+        "worker_sized_reason": "Four helpers in three files switch to existing constructors.",
+        "footprint": {
+          "touches": [
+            "crates/server/src/routes.rs",
+            "crates/server/src/lib.rs",
+            "crates/server/tests/server_integration/graceful_shutdown_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "exit-code-envelope-ownership",
     "title": "Exit codes and list envelopes each have one owning test",
     "description": "Aggregate the work that delivers this outcome: command exit codes and the list-envelope count each have one owning test.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite, which fails for a projected row without a binding case. Other subprocess tests assert only what they add.\n- [hard] REQ-02: The list-envelope `count` property is proven by one test that covers each list-emitting command, and no per-command test re-asserts it.\n",
@@ -4508,22 +4761,21 @@
       "cli-repo-checkout-migration",
       "cli-repo-profile-migration",
       "cli-repo-workflow-migration",
-      "library-git-fixture-adoption",
-      "server-git-fixture-adoption",
       "fast-docs-templates-git-fixture-adoption",
       "library-fixture-issue-adoption",
       "fast-issue-fixture-issue-adoption",
       "fast-docs-templates-fixture-issue-adoption",
       "fast-rules-fixture-issue-adoption",
-      "harness-shipped-item-kinds",
-      "unit-test-shipped-item-kinds",
       "cli-item-validate-shipped-item-kinds",
       "fast-rules-shipped-item-kinds",
       "fast-rules-file-setup-adoption",
       "fast-docs-templates-file-setup-adoption",
       "fast-issue-memory-setup-adoption",
       "fast-docs-templates-memory-setup-adoption",
-      "env-reading-tests-guarded"
+      "env-reading-tests-guarded",
+      "library-item-validate-memory-setup-adoption",
+      "library-file-setup-adoption",
+      "server-file-setup-adoption"
     ],
     "planning": {
       "outcome": "CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards",

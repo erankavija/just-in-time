@@ -359,6 +359,29 @@ Memory-backed setups. These are functions that build an `InMemoryStorage` or a m
 
 Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.
 
+Library test modules (`crates/jit/src`). The sweep covered helper functions in `#[cfg(test)]` modules that build an `InMemoryStorage` or a memory executor, create a file-backed repository or executor, or write a literal index body:
+
+- Memory-backed:
+  - `commands/item.rs`: `executor_with` (`:613`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`) and `config_exec` (`:1536`).
+  - `commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3042`, a literal `"schema_version": 2` index at `:3053`) and `dangling_exec_with_rules_and_gates` (`:3103`).
+  - `commands/batch_create.rs`: `executor` (`:671`) and `coverage_executor` (`:926`).
+  - One each in `commands/bulk_update.rs` (`blocked_dependent_fixture`, `:1973`), `commands/events.rs` (`seeded_override_executor`, `:51`), `commands/gate.rs` (`setup`, `:1452`, literal `enforce_leases = "off"`), `commands/gate_check.rs` (`setup`, `:1666`), `commands/gate_cli_tests.rs` (`setup`, `:10`), `commands/invariant.rs` (`exec`, `:76`), `commands/issue.rs` (`setup`, `:916`) and `commands/mod.rs` (`precheck_evidence_fixture`, `:3571`).
+- File-backed:
+  - `commands/archive.rs`: `executor` (`:892`) and five repository builders (`:994`, `:1764`, `:1995`, `:2399`, `:2494`).
+  - One each in `commands/gate_check.rs` (`setup_file_repository`, `:2082`), `commands/hooks.rs` (`diverged_strict_repo`, `:254`), `commands/profile.rs` (`fixture`, `:2265`), `storage/gate_runs.rs` (`setup_storage`, `:16`, a copy of `setup_test_repo`), `validation/repository.rs` (`executor`, `:892`) and `main.rs` tests (`repository_declaring`, `:7669`).
+- Not setups:
+  - `storage/memory.rs` and `storage/json.rs` backend tests construct the backend they test.
+  - `commands/worktree.rs` `linked_checkout_paths` (`:760`) only arranges paths.
+  - The `schema_version` fields in `gate_check.rs:1740` and `commands/mod.rs:3672` belong to gate-run records, not to an index.
+
+Server crate (`crates/server/src`, `crates/server/tests`):
+
+- Memory-backed: two copies of `test_memory_storage`, each writing `enforce_leases = "off"` and a literal `{"schema_version":2,…}` index. They are at `src/routes.rs:1081-1100` and `tests/server_integration/document_api_tests.rs:11-19`.
+- File-backed:
+  - `src/routes.rs`: `initialize_file_backed_test_repository` (`:1103`), under `create_test_app`, `create_test_app_with_html_doc` and `create_app_with_raw_fixture`.
+  - `src/lib.rs`: `repository_missing_its_index` (`:93`).
+  - `tests/server_integration/graceful_shutdown_tests.rs`: `initialize_repository` (`:75`) and `executor_for` (`:80`).
+
 ### D.7 Shell-script self-tests
 
 The sweep covered every committed shell file outside `dev/archive`: `*.sh`, `*.bash` and `*.bats` files under `scripts/`, `contrib/`, `.agents/`, `web/`, `mcp-server/`, `crates/`, `dev/` and `test-vectors/`, plus extensionless files with a shell shebang. It matched `test-*.sh`, `*-test.sh`, `*selftest*`, `--self-test` and `self_test`, then classified each match by what it tests. The tree has no bats files.
