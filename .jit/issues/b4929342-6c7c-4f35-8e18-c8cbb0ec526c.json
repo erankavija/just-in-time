@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T15:49:00.716412657Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -33,12 +33,26 @@
   ],
   "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase. The footprint lists the 39 files that name the path, measured by search at planning time; a file that gains such a path later is rewritten the same way.\n",
   "documents": [],
+  "done_at": "2026-10-22T16:05:16.684814860Z",
   "first_ready_at": "2026-10-22T15:48:55.961398525Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bb5386c7-4160-4e2c-9709-1ccd56142902",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:59:48.577204125Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "374c791a-2931-4ed6-a144-854f7ffb787c",
+      "status": "passed",
+      "updated_at": "2026-10-22T16:05:02.092668582Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4929342-6c7c-4f35-8e18-c8cbb0ec526c",
   "labels": [
     "type:task",
@@ -49,7 +63,7 @@
     "satisfies:842b0ac6/REQ-14"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Import domain type items through the domain facade",
-  "updated_at": "2026-10-22T15:49:00.783685931Z"
+  "updated_at": "2026-10-22T16:05:16.684814860Z"
 }

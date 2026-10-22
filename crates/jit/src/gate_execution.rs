@@ -7,9 +7,9 @@
 //! - Result storage for audit trail
 
 use crate::declarations::{GateChecker, GateStage};
+use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
-    DocumentReference, GateContext, GateRunResult, GateRunStatus, InputsDigest,
-    InputsDigestBuilder, RepositoryInputs, GATE_RUN_SCHEMA_VERSION,
+    DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
 use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
@@ -130,7 +130,7 @@ pub fn execute_gate_checker_with_context(
     // Parse the checker's machine-readable findings block (if any) once, at
     // record time, so every downstream view reads structured data instead of
     // re-grepping stdout. Absent or malformed blocks degrade to `None`.
-    let findings = crate::domain::parse_gate_findings(&execution_result.stdout);
+    let findings = crate::domain::gate_findings::parse_gate_findings(&execution_result.stdout);
 
     let status = match execution_result.exit_code {
         Some(0) => GateRunStatus::Passed,

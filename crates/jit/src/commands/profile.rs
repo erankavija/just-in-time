@@ -1,15 +1,15 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
-use crate::domain::ProfileLifecycleOperation;
+use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
 use crate::profile::profile_plan_entry;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
     read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfileOrigin, ProfilePackEntry,
-    ProfilePackResult, ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry,
-    ProfilePlanResult, ProfileShowEntry, ProfileShowResult, ProfileTargetAction,
-    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
-    ResolvedProfileGraph, SelectionObservation, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfilePackEntry, ProfilePackResult,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfileShowEntry, ProfileShowResult, ProfileTargetAction, ProfileTargetChange,
+    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
+    SelectionObservation, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,

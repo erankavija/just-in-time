@@ -12,7 +12,7 @@
           "key": "profiled-fixture-cold-build",
           "title": "No test waits on a cold profiled-repository fixture build",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "done"
         },
         {
           "id": "a3dd995a-26d2-4039-8a69-332eca663885",
@@ -76,7 +76,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "rework 1 (F2 rustdoc) dispatched; steward scope note added for F1"
+          "status": "done"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -124,7 +124,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 declaration_dir path traversal); rework with 0bf97911 F2 in one worktree"
+          "status": "rework 2 queued: code-review R2 F1 traversal test reads a fixed temp path (test_utils.rs:1214); cargo-ci needs post-revert rerun"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -401,7 +401,7 @@
           "key": "fixture-issue-commands-a-adoption",
           "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "recovery in existing worktree; reviewing preserved fixture path substitutions; awaiting import cutover before full validation"
         },
         {
           "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
@@ -473,7 +473,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "REVERTED on main (cf274f369); rework 1 (opus): cargo-ci 5 fast_issue graph_rule_validation failures (.jit/.gitignore stale) + code-review F1 early-return skips config seeding for partial stores"
+          "status": "rework 1 recovery in existing worktree; preserved 4db73f1d7; awaiting import cutover before full validation"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1250,7 +1250,7 @@
   "rework_counts": {
     "2b49f95b": 1,
     "0bf97911": 1,
-    "4a82ed46": 1,
+    "4a82ed46": 2,
     "22355a56": 1
   },
   "surfaced_pitfalls": [
@@ -1273,7 +1273,14 @@
   "traps": [
     "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back."
   ],
-  "rules": "Steward: worktrees only; merges under `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock`; `cargo test --doc -p jit` on the branch before merge; CARGO_INCREMENTAL=0; builds via turnstile + shared lock; full gates via turnstile + exclusive lock; <=2 live worktrees and >=60 GB free to dispatch; --force only for load-only cargo-ci failures; prefer sonnet/haiku; breakdown is fixed (changes only via steward escalation + new planning pass); escalate project-level questions to steward just-in-time-24; never ask the user.",
+  "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
-  "started_at": "2026-10-22T14:43:25+00:00"
+  "started_at": "2026-10-22T14:43:25+00:00",
+  "recovery": {
+    "started_at": "2026-10-22T22:08:55",
+    "backup": "/tmp/jit-c780514e-recovery-20261022T220855",
+    "coordinator_thread": "01a164c8-d7ba-7812-a630-db8dddcee05b",
+    "active_worktree_limit": 2,
+    "pending_external_landing": "63c11d08"
+  }
 }

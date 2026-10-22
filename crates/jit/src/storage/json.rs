@@ -7,7 +7,9 @@
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::declarations::GateRegistry;
-use crate::domain::{parse_known_events, Event, Issue, IssueIdPrefix};
+use crate::domain::event_log::parse_known_events;
+use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::{Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
@@ -1401,7 +1403,7 @@ impl IssueStore for JsonFileStorage {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &crate::domain::InputsDigest,
+        digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<crate::domain::GateRunResult>> {
         Ok(crate::domain::latest_gate_run(self.read_gate_runs(
             |result| result.is_reusable_for(gate_key, digest),

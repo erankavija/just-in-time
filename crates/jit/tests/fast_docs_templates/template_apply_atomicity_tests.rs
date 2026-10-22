@@ -136,7 +136,7 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
         self.inner.load_issue_or_not_found(id)
     }
-    fn resolve_issue_id(&self, prefix: &jit::domain::IssueIdPrefix) -> Result<String> {
+    fn resolve_issue_id(&self, prefix: &jit::domain::issue_id::IssueIdPrefix) -> Result<String> {
         assert_eq!(
             self.active_sessions.load(Ordering::SeqCst),
             0,
@@ -163,7 +163,7 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &jit::domain::InputsDigest,
+        digest: &jit::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<jit::domain::GateRunResult>> {
         self.inner.find_reusable_gate_run(gate_key, digest)
     }

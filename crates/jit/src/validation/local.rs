@@ -4,7 +4,7 @@
 //! write path needs (DR §7.5, plan step 5 "local"):
 //!
 //! 1. project the [`Issue`](crate::domain::Issue) into the canonical
-//!    [`Projection`](crate::domain::Projection) (cheap selector fields only);
+//!    [`Projection`](crate::domain::projection::Projection) (cheap selector fields only);
 //! 2. select the [`RuleScope::Local`] rules whose selector matches the issue —
 //!    graph-scope rules are SKIPPED entirely on write (DR §7.4);
 //! 3. lazily add the parsed `sections` view to the projection ONLY when a
@@ -33,7 +33,8 @@
 
 use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Severity};
 use crate::document::{content_parser_for, ContentParserError};
-use crate::domain::{project, ContentFormat, Issue, Projection};
+use crate::domain::projection::{project, Projection};
+use crate::domain::{ContentFormat, Issue};
 use crate::validation::desugar::desugar;
 use crate::validation::engine::{
     render_finding_message, Finding, SchemaCompileError, SchemaEngine,

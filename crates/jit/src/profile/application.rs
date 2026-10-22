@@ -1,4 +1,5 @@
-use crate::domain::{CollectionKey, ListEnvelope, ProfileOrigin};
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::ProfileOrigin;
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
 use schemars::JsonSchema;

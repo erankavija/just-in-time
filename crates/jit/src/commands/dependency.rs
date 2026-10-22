@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::IssueIdPrefix;
+use crate::domain::issue_id::IssueIdPrefix;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::{AmbiguousIdError, IssueNotFoundError};

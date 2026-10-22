@@ -1,4 +1,4 @@
-<!-- Generated from `jit::domain::event_catalog` — do not edit by hand. -->
+<!-- Generated from `jit::domain::event_catalog::event_catalog` — do not edit by hand. -->
 
 # Event Log Tags
 

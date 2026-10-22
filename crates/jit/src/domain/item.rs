@@ -43,7 +43,8 @@ use crate::config::{
     ItemKindConfig, ItemKindSource, KindScopeConfig, SourceOfTruth, TomlSourceDescriptor,
 };
 use crate::document::ContentParser;
-use crate::domain::{project, Issue};
+use crate::domain::projection::project;
+use crate::domain::Issue;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -1109,7 +1110,7 @@ pub fn index_items(
 /// here — that is [`derive_scope_items`]' job — so this stays a pure, reusable
 /// scanner.
 fn extract_raw_items(
-    sections: &std::collections::BTreeMap<String, crate::domain::ProjectedSection>,
+    sections: &std::collections::BTreeMap<String, crate::domain::projection::ProjectedSection>,
     kinds: &[ItemKind],
 ) -> Vec<RawScopeItem> {
     kinds
@@ -1165,7 +1166,7 @@ pub fn index_markdown_items(
 fn sections_from_markdown(
     markdown: &str,
     parser: &dyn ContentParser,
-) -> std::collections::BTreeMap<String, crate::domain::ProjectedSection> {
+) -> std::collections::BTreeMap<String, crate::domain::projection::ProjectedSection> {
     parser
         .parse(markdown)
         .sections

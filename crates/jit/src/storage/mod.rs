@@ -5,7 +5,8 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::{Event, Issue, IssueIdPrefix};
+use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::{Event, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -301,7 +302,7 @@ pub trait IssueStore: Clone {
     fn find_reusable_gate_run(
         &self,
         gate_key: &str,
-        digest: &crate::domain::InputsDigest,
+        digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<crate::domain::GateRunResult>>;
 
     /// Get the root directory path for this storage backend.
