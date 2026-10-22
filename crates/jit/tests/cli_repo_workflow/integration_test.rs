@@ -63,6 +63,36 @@ fn test_search_by_title() {
 }
 
 #[test]
+fn test_issue_search_human_output_indents_rows_and_ends_with_total() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+    let create = Command::new(jit)
+        .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id = String::from_utf8_lossy(&create.stdout)
+        .split_whitespace()
+        .nth(2)
+        .unwrap()
+        .to_string();
+
+    let output = Command::new(jit)
+        .args(["issue", "search", "bug"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let row = stdout
+        .lines()
+        .find(|line| line.contains(&id))
+        .expect("search output lists the issue");
+    assert!(row.starts_with("  "), "row is indented: {row:?}");
+    assert!(stdout.trim_end().ends_with("Total: 1"), "{stdout}");
+}
+
+#[test]
 fn test_search_by_description() {
     let temp = setup_test_repo();
     let jit = jit_binary();
