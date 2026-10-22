@@ -118,26 +118,18 @@ fn test_ureq_manifest_selects_exactly_one_tls_backend_explicitly() {
     );
 }
 
-/// Runs `cargo tree` for one package's own dependency subtree (normal + build
-/// edges only — dev-dependencies of test helpers, e.g. a TLS test-server
-/// fixture, are irrelevant to what the crate itself ships) and returns the
-/// text output.
-///
-/// A missing `cargo` binary (spawn `NotFound`) yields `None` so the caller
-/// can skip. Every other failure — including a non-zero `cargo tree` exit —
-/// panics: it means the query itself failed, and skipping would silently
-/// waive REQ-06's resolved-graph guard.
-fn cargo_tree_subtree(package: &str) -> Option<String> {
-    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let output = match Command::new(cargo)
+/// Query one package's normal/build dependency subtree with the suite's Cargo.
+/// Dev-dependencies do not describe the crate's shipped dependency graph.
+fn cargo_tree_subtree(package: &str) -> String {
+    let cargo =
+        std::env::var_os("CARGO").expect("CARGO must name the Cargo executable running this suite");
+    let output = Command::new(&cargo)
         .current_dir(workspace_root())
         .args(["tree", "-e", "normal,build", "-p", package])
         .output()
-    {
-        Ok(output) => output,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(e) => panic!("failed to spawn `cargo tree -p {package}`: {e}"),
-    };
+        .unwrap_or_else(|error| {
+            panic!("failed to spawn Cargo {cargo:?} for `tree -p {package}`: {error}")
+        });
 
     assert!(
         output.status.success(),
@@ -147,7 +139,7 @@ fn cargo_tree_subtree(package: &str) -> Option<String> {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
 /// A `cargo tree` line renders a dependency as `<name> v<version>`, so
@@ -162,10 +154,7 @@ fn tree_contains_package(tree: &str, name: &str) -> bool {
 
 #[test]
 fn test_jsonschema_resolved_subtree_excludes_remote_resolution_infrastructure() {
-    let Some(tree) = cargo_tree_subtree("jsonschema") else {
-        eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
-        return;
-    };
+    let tree = cargo_tree_subtree("jsonschema");
 
     for banned in ["reqwest", "hyper", "tokio-rustls", "aws-lc-rs", "rustls"] {
         assert!(
@@ -179,10 +168,7 @@ fn test_jsonschema_resolved_subtree_excludes_remote_resolution_infrastructure() 
 
 #[test]
 fn test_ureq_resolved_subtree_selects_exactly_one_tls_backend_with_explicit_gzip() {
-    let Some(tree) = cargo_tree_subtree("ureq") else {
-        eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
-        return;
-    };
+    let tree = cargo_tree_subtree("ureq");
 
     assert!(
         tree_contains_package(&tree, "rustls"),
@@ -205,8 +191,7 @@ fn test_ureq_resolved_subtree_selects_exactly_one_tls_backend_with_explicit_gzip
 fn test_workspace_manifest_has_no_stray_reqwest_or_native_tls_dependency() {
     // Belt-and-braces: confirm neither banned crate is declared as a direct
     // dependency anywhere a future edit could reintroduce it, independent of
-    // the resolved-graph checks above (which depend on a working `cargo` on
-    // PATH and so skip in constrained environments).
+    // resolved-graph checks above.
     for manifest_path in [
         "Cargo.toml",
         "crates/jit/Cargo.toml",
