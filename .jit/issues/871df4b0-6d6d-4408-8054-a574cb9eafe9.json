@@ -26,6 +26,7 @@
       "path": "dev/benchmarks/test-topology-c780514e/README.md"
     }
   ],
+  "done_at": "2026-10-22T20:47:24.186764724Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -59,7 +60,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Doctest substep fits within the per-test bound",
-  "updated_at": "2026-10-22T20:46:19.909957735Z"
+  "updated_at": "2026-10-22T20:47:24.186764724Z"
 }
