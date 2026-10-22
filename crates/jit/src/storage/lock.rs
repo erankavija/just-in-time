@@ -630,15 +630,6 @@ mod tests {
         );
     }
 
-    /// True when the mode just set on `path` actually denies this process the
-    /// write the test needs denied.
-    ///
-    /// The tests below express their precondition as a file mode, and a mode
-    /// does not bind every caller — root ignores it, and so does any platform
-    /// without Unix permissions. Asking the filesystem directly skips exactly
-    /// the runs where the precondition could not be established, where asking
-    /// who the process is would only approximate that and would need a
-    /// dependency feature of its own to answer.
     fn write_is_denied(path: &Path) -> bool {
         OpenOptions::new()
             .read(true)
@@ -649,16 +640,12 @@ mod tests {
             .is_err()
     }
 
-    fn skip_unless_write_is_denied(test_name: &str, path: &Path) -> bool {
-        if write_is_denied(path) {
-            return false;
-        }
-        eprintln!(
-            "skipping {test_name}: this process writes {} regardless of its mode, \
-             so the precondition cannot be established here",
+    fn assert_write_is_denied(path: &Path) {
+        assert!(
+            write_is_denied(path),
+            "required precondition not established: this process can open lock path {} for writing",
             path.display()
         );
-        true
     }
 
     #[test]
@@ -673,12 +660,7 @@ mod tests {
             std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o444)).unwrap();
         }
 
-        if skip_unless_write_is_denied(
-            "test_lock_shared_is_granted_when_the_lock_file_cannot_be_opened_for_writing",
-            &file_path,
-        ) {
-            return;
-        }
+        assert_write_is_denied(&file_path);
 
         let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
         let guard = locker.lock_shared(&file_path).unwrap();
@@ -726,12 +708,7 @@ mod tests {
         }
 
         let file_path = denied_dir.join("missing.lock");
-        if skip_unless_write_is_denied(
-            "test_lock_shared_is_granted_when_the_lock_file_cannot_be_created",
-            &file_path,
-        ) {
-            return;
-        }
+        assert_write_is_denied(&file_path);
 
         let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
         let guard = locker.lock_shared(&file_path).unwrap();
@@ -770,12 +747,7 @@ mod tests {
         }
 
         let file_path = denied_dir.join("missing.lock");
-        if skip_unless_write_is_denied(
-            "test_lock_exclusive_fails_when_it_cannot_open_its_lock_file",
-            &file_path,
-        ) {
-            return;
-        }
+        assert_write_is_denied(&file_path);
 
         let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
 
@@ -802,12 +774,7 @@ mod tests {
             std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o444)).unwrap();
         }
 
-        if skip_unless_write_is_denied(
-            "test_lock_shared_is_refused_while_the_exclusive_lock_is_held_when_only_read_open_is_possible",
-            &file_path,
-        ) {
-            return;
-        }
+        assert_write_is_denied(&file_path);
 
         let shared_try = FileLocker::new(EXPIRING_LOCK_WAIT)
             .try_lock_shared(&file_path)
