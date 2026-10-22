@@ -19463,3 +19463,12 @@
 {"id":"cea8e3b9-f862-439f-a7da-fae755c588c1","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T20:06:17.329120300Z","type":"issue_completed"}
 {"from":"backlog","id":"640e4250-8b2d-4ca2-a32d-e9fa9e0dd9f8","issue_id":"9e411075-4c46-4ffd-ae7a-9743ad175080","timestamp":"2026-10-22T20:06:17.454204575Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"5e1bf5cf-17d2-4c18-967d-34801fedc36a","issue_id":"ad1e6d0e-ec8a-4178-91a2-434ab80845c8","timestamp":"2026-10-22T20:06:17.546859863Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"9682d46f-c57e-46fb-ac2b-fc93bde599bb","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T20:11:12.418772091Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"239025fc-f031-4d16-8042-0d9e10a23833","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T20:14:43.690435440Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci-selftest","id":"f9b1958c-8e01-4252-90df-7200975d53bd","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T20:14:47.789335218Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"d20122ee-d2ac-4fe4-9173-ebc7e8396a13","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T20:15:29.858323115Z","to":"done","type":"issue_state_changed"}
+{"id":"00135c97-9460-4375-b5af-3f00185d00ba","issue_id":"5c6c108a-b14f-4d9b-9781-29b9e0193cb5","timestamp":"2026-10-22T20:15:29.858323115Z","type":"issue_completed"}
+{"from":"backlog","id":"8d79ebec-8bc7-497c-813d-0a29ef4cbe1e","issue_id":"aa28fe5f-fd2a-4fc1-8786-5234336f8361","timestamp":"2026-10-22T20:15:30.017543700Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"1d013631-2a68-4afd-b3db-b7c9742f12e7","issue_id":"871df4b0-6d6d-4408-8054-a574cb9eafe9","timestamp":"2026-10-22T20:15:45.920272684Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"8f4704c6-e378-443e-8dd0-e51b5f581235","issue_id":"871df4b0-6d6d-4408-8054-a574cb9eafe9","timestamp":"2026-10-22T20:15:45.920272684Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"bfbc1dab-8b13-4e5e-b458-2a50f201f300","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-10-22T20:15:46.054441991Z","type":"issue_updated","updated_by":"doc-add"}
