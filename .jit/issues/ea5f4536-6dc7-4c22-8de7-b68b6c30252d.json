@@ -1,0 +1,35 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T02:10:49.370855023Z",
+  "dependencies": [
+    "34361448-f21b-4efb-8437-2ee38ba584c6"
+  ],
+  "description": "Delete the user and system `config.toml` layers, which no longer feed any configuration key, together with the `config set --global` write path that targets them.\n\n## Background\n\nLease policy now resolves from the repository configuration only, through one resolver that `claim acquire` and the config commands share. That resolver was the only reader of the user (`~/.config/jit/config.toml`) and system (`/etc/jit/config.toml`) layers, so nothing reads those files any more. What remains is dead surface:\n\n- `config set --global` writes the user-global file through the user-config store (`crates/jit/src/storage/user_config_store.rs`, called from `commands/config.rs`).\n- CLI help and the configuration reference still describe user and system configuration files and a global scope.\n- Any remaining loader, path resolution or test fixture that names those files.\n\nThe agent identity file `~/.config/jit/agent.toml` is a separate mechanism that the agent-id resolver reads; it stays.\n\n## Success Criteria\n\n- [hard] REQ-01: `config set` has no global scope: the `--global` flag and its dispatch are removed, and the user-config store's write path is deleted unless something else uses it.\n- [hard] REQ-02: No code reads or resolves `~/.config/jit/config.toml` or `/etc/jit/config.toml`.\n- [hard] REQ-03: The configuration reference's file table lists only repository-level files and the environment, and CLI help and docs describe no user or system configuration layer.\n- [hard] REQ-04: A test proves that a `~/.config/jit/config.toml` present in the user's home has no effect on any configuration value or command.\n\n## Notes\n\n`~/.config/jit/agent.toml` is out of scope and keeps working. Removing a CLI flag changes the command schema: regenerate any projected CLI reference, and update MCP curated tools if a generated tool changes. Run the failure-corpus suite if a command's failure changes.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T02:10:49.370855023Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "per:@/charter/D-9",
+    "component:core",
+    "component:cli",
+    "component:docs",
+    "satisfies:842b0ac6/REQ-27"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove the user and system configuration layers",
+  "updated_at": "2026-10-22T02:11:01.137808556Z"
+}

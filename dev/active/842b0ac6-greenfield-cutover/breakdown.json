@@ -982,6 +982,58 @@
     }
   },
   {
+    "key": "remove-user-system-config-layers",
+    "title": "Remove the user and system configuration layers",
+    "description": "Delete the user and system `config.toml` layers, which no longer feed any configuration key, together with the `config set --global` write path that targets them.\n\n## Background\n\nLease policy now resolves from the repository configuration only, through one resolver that `claim acquire` and the config commands share. That resolver was the only reader of the user (`~/.config/jit/config.toml`) and system (`/etc/jit/config.toml`) layers, so nothing reads those files any more. What remains is dead surface:\n\n- `config set --global` writes the user-global file through the user-config store (`crates/jit/src/storage/user_config_store.rs`, called from `commands/config.rs`).\n- CLI help and the configuration reference still describe user and system configuration files and a global scope.\n- Any remaining loader, path resolution or test fixture that names those files.\n\nThe agent identity file `~/.config/jit/agent.toml` is a separate mechanism that the agent-id resolver reads; it stays.\n\n## Success Criteria\n\n- [hard] REQ-01: `config set` has no global scope: the `--global` flag and its dispatch are removed, and the user-config store's write path is deleted unless something else uses it.\n- [hard] REQ-02: No code reads or resolves `~/.config/jit/config.toml` or `/etc/jit/config.toml`.\n- [hard] REQ-03: The configuration reference's file table lists only repository-level files and the environment, and CLI help and docs describe no user or system configuration layer.\n- [hard] REQ-04: A test proves that a `~/.config/jit/config.toml` present in the user's home has no effect on any configuration value or command.\n\n## Notes\n\n`~/.config/jit/agent.toml` is out of scope and keeps working. Removing a CLI flag changes the command schema: regenerate any projected CLI reference, and update MCP curated tools if a generated tool changes. Run the failure-corpus suite if a command's failure changes.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:greenfield-cutover",
+      "milestone:v1.0",
+      "per:@/charter/D-18",
+      "per:@/charter/D-9",
+      "component:core",
+      "component:cli",
+      "component:docs",
+      "satisfies:842b0ac6/REQ-27"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "unify-lease-limit-resolution"
+    ],
+    "planning": {
+      "outcome": "Configuration has no user or system config.toml layer and config set has no global scope.",
+      "contract_refs": [
+        "removal-hygiene"
+      ],
+      "source_refs": [
+        "REQ-27"
+      ],
+      "terminal": {
+        "consumer_family": "user-global configuration consumers",
+        "test_boundary": "config command integration tests",
+        "worker_sized_reason": "One flag, one store write path and its docs removed, plus one owning test.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/src/commands/config.rs",
+            "crates/jit/src/storage/user_config_store.rs",
+            "crates/jit/src/storage/mod.rs",
+            "docs/reference/configuration.md",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "single-domain-types-path",
     "title": "Import domain type items through the domain facade",
     "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase. The footprint lists the 39 files that name the path, measured by search at planning time; a file that gains such a path later is rewritten the same way.\n",
@@ -1024,7 +1076,7 @@
       "remove-storage-cfg-twins",
       "remove-repository-state-cfg-twins",
       "remove-orphan-web-module",
-      "unify-lease-limit-resolution"
+      "remove-user-system-config-layers"
     ],
     "planning": {
       "outcome": "Items of domain/types.rs resolve through one compiler-enforced path, the domain facade.",

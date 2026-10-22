@@ -35,6 +35,7 @@ Every criterion is a removal or a convergence onto a surviving path (`@/charter/
 | REQ-24 | Split into a storage task and a `repository_state` task. Twins under opposite `test`/`test-support` conditions go, and re-exports become unconditional. Platform-conditional (`cfg(unix)`) implementations stay. | Investigation A, REQ-24 |
 | REQ-25 | Delete the one orphaned module. | Investigation C, REQ-25 |
 | REQ-26 | Route `claim acquire` and the config commands through one repository-only resolver for the coordination lease limits, the pattern bedf0962 set for lease enforcement. | `config.rs:1988-2026`, `commands/claim.rs:107-111` |
+| REQ-27 | Delete the user and system `config.toml` layers and `config set --global`, which no key reads once lease policy is repository-only; `agent.toml` is unaffected. | `config.rs` `EffectiveConfig::layered` (sole caller `coordination()`), `storage/user_config_store.rs` |
 
 ## Shared architectural contracts
 
@@ -79,7 +80,8 @@ An item defined in `domain/types.rs` is imported as `crate::domain::<Item>`, thr
 | derive-mermaid-state-classes | Derive mermaid state classes from the state enumeration | task | Mermaid export declares one class per lifecycle state, derived from the state enumeration. | removal-hygiene, lifecycle-state-tokens | REQ-12 | touches 2 | — | — |
 | remove-retired-name-scans | Remove source-scan tests for retired names | task | No test asserts the absence of retired names, and structural tests assert current ownership. | removal-hygiene | REQ-13, DEC-alias-test | touches 3 | — | adopt-manifest-version-two |
 | unify-lease-limit-resolution | Resolve the coordination lease limits through one resolver | task | Reported and enforced coordination lease limits come from one repository-only resolver. | removal-hygiene | REQ-26 | touches 4 | — | state-config-defaults-once |
-| single-domain-types-path | Import domain type items through the domain facade | task | Items of domain/types.rs resolve through one compiler-enforced path, the domain facade. | removal-hygiene, domain-import-path | REQ-14, DEC-domain-path | touches 39 | — | remove-bracket-breakdown, remove-silent-integrity-validator, keep-one-enforcement-drift, strict-config-toml-loading, strict-rule-declarations, unify-agent-configuration, remove-read-lock-sidecar-sweep, remove-lifecycle-backfill, require-archived-from, derive-mermaid-state-classes, remove-retired-name-scans, remove-taxonomy-dead-errors, move-state-symbol-to-output, remove-small-domain-helpers, remove-reference-builders, remove-adapter-link-rewrite, trim-git-revision-access, drop-claim-type-parameter, unify-gate-not-required-error, collapse-container-destination-states, gate-reference-renderers, single-file-lock-poll-loop, remove-storage-cfg-twins, remove-repository-state-cfg-twins, remove-orphan-web-module, unify-lease-limit-resolution |
+| remove-user-system-config-layers | Remove the user and system configuration layers | task | Configuration has no user or system config.toml layer and config set has no global scope. | removal-hygiene | REQ-27 | touches 7 | — | unify-lease-limit-resolution |
+| single-domain-types-path | Import domain type items through the domain facade | task | Items of domain/types.rs resolve through one compiler-enforced path, the domain facade. | removal-hygiene, domain-import-path | REQ-14, DEC-domain-path | touches 39 | — | remove-bracket-breakdown, remove-silent-integrity-validator, keep-one-enforcement-drift, strict-config-toml-loading, strict-rule-declarations, unify-agent-configuration, remove-read-lock-sidecar-sweep, remove-lifecycle-backfill, require-archived-from, derive-mermaid-state-classes, remove-retired-name-scans, remove-taxonomy-dead-errors, move-state-symbol-to-output, remove-small-domain-helpers, remove-reference-builders, remove-adapter-link-rewrite, trim-git-revision-access, drop-claim-type-parameter, unify-gate-not-required-error, collapse-container-destination-states, gate-reference-renderers, single-file-lock-poll-loop, remove-storage-cfg-twins, remove-repository-state-cfg-twins, remove-orphan-web-module, remove-user-system-config-layers |
 | single-domain-module-paths | Remove the remaining domain re-export paths | task | Domain submodule, graph, and label items resolve only by module path, with no crate-root copies. | removal-hygiene, domain-import-path | REQ-14, DEC-domain-path | touches 33 | — | single-domain-types-path |
 | prune-output-surface | Prune the uncalled output surface | task | Each output macro, error constructor, exit-code helper, and context method has a production caller. | removal-hygiene | REQ-15, DEC-exit-code-table | touches 3 | — | — |
 | remove-taxonomy-dead-errors | Remove dead taxonomy error and membership types | task | The taxonomy holds no discarded error enum, unconstructed variant, or test-only membership checker. | removal-hygiene | REQ-16, DEC-hierarchy-error | touches 4 | — | — |
@@ -121,25 +123,26 @@ flowchart LR
     N17["derive-mermaid-state-classes: Derive mermaid state classes from the state enumeration"]
     N18["remove-retired-name-scans: Remove source-scan tests for retired names"]
     N19["unify-lease-limit-resolution: Resolve the coordination lease limits through one resolver"]
-    N20["single-domain-types-path: Import domain type items through the domain facade"]
-    N21["single-domain-module-paths: Remove the remaining domain re-export paths"]
-    N22["prune-output-surface: Prune the uncalled output surface"]
-    N23["remove-taxonomy-dead-errors: Remove dead taxonomy error and membership types"]
-    N24["remove-skipped-gate-run-status: Remove the skipped gate-run status"]
-    N25["move-state-symbol-to-output: Render state symbols in the output layer"]
-    N26["remove-small-domain-helpers: Remove uncalled domain predicates and parsers"]
-    N27["remove-reference-builders: Remove the DocumentReference builder methods"]
-    N28["remove-adapter-link-rewrite: Remove the unimplemented link-rewrite adapter method"]
-    N29["trim-git-revision-access: Trim git revision access to production queries"]
-    N30["drop-claim-type-parameter: Drop the unused storage type parameter from claim commands"]
-    N31["unify-gate-not-required-error: Report a non-required gate through one typed error"]
-    N32["remove-test-only-gate-entry-points: Remove test-only gate entry points"]
-    N33["collapse-container-destination-states: Collapse container-destination classification to its outcomes"]
-    N34["gate-reference-renderers: Compile reference-page renderers only with test support"]
-    N35["single-file-lock-poll-loop: Give the file lock one poll loop"]
-    N36["remove-storage-cfg-twins: Remove cfg twins in storage"]
-    N37["remove-repository-state-cfg-twins: Remove cfg twins in repository_state"]
-    N38["remove-orphan-web-module: Remove the orphaned web hierarchy module"]
+    N20["remove-user-system-config-layers: Remove the user and system configuration layers"]
+    N21["single-domain-types-path: Import domain type items through the domain facade"]
+    N22["single-domain-module-paths: Remove the remaining domain re-export paths"]
+    N23["prune-output-surface: Prune the uncalled output surface"]
+    N24["remove-taxonomy-dead-errors: Remove dead taxonomy error and membership types"]
+    N25["remove-skipped-gate-run-status: Remove the skipped gate-run status"]
+    N26["move-state-symbol-to-output: Render state symbols in the output layer"]
+    N27["remove-small-domain-helpers: Remove uncalled domain predicates and parsers"]
+    N28["remove-reference-builders: Remove the DocumentReference builder methods"]
+    N29["remove-adapter-link-rewrite: Remove the unimplemented link-rewrite adapter method"]
+    N30["trim-git-revision-access: Trim git revision access to production queries"]
+    N31["drop-claim-type-parameter: Drop the unused storage type parameter from claim commands"]
+    N32["unify-gate-not-required-error: Report a non-required gate through one typed error"]
+    N33["remove-test-only-gate-entry-points: Remove test-only gate entry points"]
+    N34["collapse-container-destination-states: Collapse container-destination classification to its outcomes"]
+    N35["gate-reference-renderers: Compile reference-page renderers only with test support"]
+    N36["single-file-lock-poll-loop: Give the file lock one poll loop"]
+    N37["remove-storage-cfg-twins: Remove cfg twins in storage"]
+    N38["remove-repository-state-cfg-twins: Remove cfg twins in repository_state"]
+    N39["remove-orphan-web-module: Remove the orphaned web hierarchy module"]
     N4 --> N5
     N5 --> N6
     N13 --> N7
@@ -148,42 +151,43 @@ flowchart LR
     N9 --> N15
     N9 --> N18
     N5 --> N19
-    N0 --> N20
-    N1 --> N20
-    N2 --> N20
-    N6 --> N20
-    N7 --> N20
-    N8 --> N20
-    N10 --> N20
-    N12 --> N20
-    N16 --> N20
-    N17 --> N20
-    N18 --> N20
-    N23 --> N20
-    N25 --> N20
-    N26 --> N20
-    N27 --> N20
-    N28 --> N20
-    N29 --> N20
-    N30 --> N20
-    N31 --> N20
-    N33 --> N20
-    N34 --> N20
-    N35 --> N20
-    N36 --> N20
-    N37 --> N20
-    N38 --> N20
     N19 --> N20
+    N0 --> N21
+    N1 --> N21
+    N2 --> N21
+    N6 --> N21
+    N7 --> N21
+    N8 --> N21
+    N10 --> N21
+    N12 --> N21
+    N16 --> N21
+    N17 --> N21
+    N18 --> N21
+    N24 --> N21
+    N26 --> N21
+    N27 --> N21
+    N28 --> N21
+    N29 --> N21
+    N30 --> N21
+    N31 --> N21
+    N32 --> N21
+    N34 --> N21
+    N35 --> N21
+    N36 --> N21
+    N37 --> N21
+    N38 --> N21
+    N39 --> N21
     N20 --> N21
-    N13 --> N26
-    N15 --> N31
+    N21 --> N22
+    N13 --> N27
     N15 --> N32
-    N22 --> N34
-    N24 --> N34
-    N5 --> N34
-    N32 --> N34
-    N11 --> N36
-    N3 --> N37
+    N15 --> N33
+    N23 --> N35
+    N25 --> N35
+    N5 --> N35
+    N33 --> N35
+    N11 --> N37
+    N3 --> N38
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -218,6 +222,7 @@ flowchart LR
 | DEC-follow-ups | Not planned. Reported to the steward: the archive short-id destination fallback (`artifact_classifier.rs:417-431`, `storage/artifact_planning.rs:27-75`, `commands/archive.rs:203-224`), and f4d9502a background bullets that REQ-01 and REQ-18 make moot. |
 | In-flight overlap with d92f54aa, bedf0962, 6ff14f21, d23c58c0, cd2ed136 | File-level merge contention only. Each leaf can be delivered before or after these issues, whichever lands second rebases mechanically, and no external edge is needed. `state-config-defaults-once` states once every default present when it lands, including the `enforce_leases` `Strict` default and any coordination timing key d92f54aa has not yet removed. bedf0962 keeps the `enforce_leases` resolution and the mode commands enforce, so the leaf moves where that value is stated and leaves its behaviour alone. `strict-config-toml-loading` makes every configuration struct strict, whatever `CoordinationConfig` holds then, and d92f54aa's rejection test stays its own. The affected files and keys are: `config.rs`, `main.rs`, `commands/config.rs` and `docs/reference/configuration.md` (d92f54aa, bedf0962) for `remove-inert-config-keys`, `state-config-defaults-once`, `strict-config-toml-loading` and `unify-agent-configuration`; `commands/validate.rs`, the `config.rs` tests and `src/test_harness.rs` (6ff14f21, uncommitted test edits) for `remove-silent-integrity-validator`, `remove-inert-config-keys`, `unify-agent-configuration` and `route-test-gates-through-definition`; `domain/type_taxonomy.rs` (d23c58c0, disjoint hunks) for `remove-taxonomy-dead-errors`; `visualization.rs` (cd2ed136, already merged) for `derive-mermaid-state-classes`. |
 | Steward amendment REQ-26 | Added after breakdown by steward ruling (2026-10-21) to keep the lease-limit fix in the epic that owns `config.rs` defaults. `unify-lease-limit-resolution` depends on `state-config-defaults-once` in the manifest and on bedf0962 in the graph: unlike the overlaps above, it extends the resolver bedf0962 introduces, so that edge is a real prerequisite. |
+| Steward amendment REQ-27 | Added during execution by steward ruling (2026-10-22): REQ-26 left the user and system layers with no reader, so `remove-user-system-config-layers` deletes them and the global `config set` scope (D-9, D-18, canonical-cutover). Rejected: a separate issue (ships a known-dead flag) and keeping the layering (mechanism without consumer). |
 | Overlap 16d63038 | Mild, no edge. It edits the `IssueStore` trait and its impls, which `remove-read-lock-sidecar-sweep` also edits. Hunks are disjoint; whichever lands second rebases. |
 | Overlap df129d9e | Mild, no edge. It shares `main.rs`, `cli.rs`, `output.rs`, `output_macros.rs` and `schema.rs` with `remove-lifecycle-backfill`, `prune-output-surface` and `drop-claim-type-parameter`. If `output_macros.rs` ends up empty, whichever task lands second deletes it. |
 | Shared-file contention | The domain-path tasks are sed-driven and land after every other task, so no later task reintroduces a `domain::types::` path. Every other file shared by unordered leaves is touched in disjoint regions, so whichever leaf lands second rebases with textual conflicts at most; leaves whose regions interact are ordered by edges. Per-file evidence: [investigation, shared-file coordination](investigation.md#shared-file-coordination). |

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dccb52b0b1bf57302997a73d0c9b556f70f99bec",
+  "completed_at": "2026-10-22T02:04:17.784106887Z",
+  "duration_ms": 155255,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/architecture/core-system-design.md",
+        "id": "F1",
+        "line": 106,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/842b0ac6/requirement/REQ-10",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Core system design still describes automation with the removed `auto: true` field."
+      }
+    ],
+    "summary": "The core system design still documents the removed auto field.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fe761000-c89f-447f-a20b-e292c5b4e2e8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e407e3d3-eb3b-4982-968c-f8663c04c31e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T02:01:42.529002669Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12449 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16157-be05-7350-8afa-d1d89fdaac4e\n--------\nuser\n--- 12436 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7360d3a (implementation) and cef1cd74 (merge; identical patch ID)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-10 (issue description); @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T02:01:12Z); doc-review pending; docs-mechanical pending\nTruncation recovery: root-only policy discovery, per-commit/path patch reads, and narrowed source scans\n\n1. [blocking][issue-impact] `dev/architecture/core-system-design.md:106` still documents the removed declaration field as `auto: true`. This fails REQ-05’s requirement that the core design note describe neither removed field; document automation through `mode = \"auto\"` instead. References: @/issue/842b0ac6/requirement/REQ-10, @/invariant/canonical-cutover.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The core system design still documents the removed auto field.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Core system design still describes automation with the removed `auto: true` field.\",\"file\":\"dev/architecture/core-system-design.md\",\"line\":106,\"references\":[\"@/issue/842b0ac6/requirement/REQ-10\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

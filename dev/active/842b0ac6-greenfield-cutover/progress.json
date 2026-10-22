@@ -359,6 +359,15 @@
           "title": "Resolve the coordination lease limits through one resolver",
           "classification": "implementation",
           "model": "sonnet",
+          "status": "accepted-awaiting-merge"
+        },
+        {
+          "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
+          "short_id": "ea5f4536",
+          "key": "remove-user-system-config-layers",
+          "title": "Remove the user and system configuration layers",
+          "classification": "implementation",
+          "model": "sonnet",
           "status": "pending"
         }
       ]
@@ -414,6 +423,11 @@
       "id": "34361448",
       "key": "unify-lease-limit-resolution",
       "reason": "Steward-ruled scope addition REQ-26 (2026-10-21); depends on state-config-defaults-once and external bedf0962."
+    },
+    {
+      "id": "ea5f4536",
+      "key": "remove-user-system-config-layers",
+      "reason": "Steward-ruled REQ-27 (2026-10-22): after REQ-26, user/system config.toml layers had no reader."
     }
   ],
   "escalations": [
@@ -425,6 +439,14 @@
       "detail": "R3 code-review: web-ui-architecture.md:42 legend calls Backlog 'Open' (REQ-05). Recommended: counter reset plus case-insensitive sweep rework.",
       "resolution": "Steward approved option 1: counter reset once, sonnet rework with exhaustive case-insensitive sweep recorded in sweep-66bd4b5c.md; escalate before reworking if round 4 fails on this class.",
       "outcome": "Resolved: round 4 passed all gates (cargo-ci 24.4 s, code-review, mcp-ci)."
+    },
+    {
+      "issue": "34361448",
+      "category": "architectural decision",
+      "raised": "2026-10-22",
+      "to": "steward",
+      "detail": "REQ-26 leaves user/system config layers with no reader",
+      "resolution": "Option 1: accept 93a6be35d; add task ea5f4536 (REQ-27)."
     }
   ],
   "rework_counts": {
@@ -436,7 +458,8 @@
     "5e846743": 1,
     "459bb995": 2,
     "d125490a": 1,
-    "fbb661f2": 1
+    "fbb661f2": 1,
+    "34361448": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
@@ -457,7 +480,8 @@
     "459bb995 R2 code-review: restatements phrased as 'falls back to Markdown' escaped the R1 'default' sweep (same class). Rework 2 is the last before escalation.",
     "Suite clock near budget on a quiet host: 29.0 s at load 2.1 after 459bb995 (7f3449a19). Cutover deletions alone have not lowered it; watch further merges.",
     "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci.",
-    "Workers' focused checks skip nextest setup scripts (recorded failure corpus): fbb661f2 changed config set's failure and broke the corpus setup, which aborts the whole cargo-ci run. Prompt workers who change a command's failure behaviour to run `cargo nextest run -p jit --test cli_issue`."
+    "Workers' focused checks skip nextest setup scripts (recorded failure corpus): fbb661f2 changed config set's failure and broke the corpus setup, which aborts the whole cargo-ci run. Prompt workers who change a command's failure behaviour to run `cargo nextest run -p jit --test cli_issue`.",
+    "34361448 first attempt removed user/system config layering wholesale (contradicting 459bb995 REQ-02); lead review required repo-only resolution for lease policy only."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

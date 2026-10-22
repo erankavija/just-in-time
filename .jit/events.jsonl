@@ -18580,3 +18580,9 @@
 {"gate_key":"cargo-ci","id":"22c134c1-7f35-4bfa-a0ab-f3413de16268","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-22T02:01:37.326523906Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"f02ec4df-a8c8-4af3-871b-fcf9a63fd516","issue_id":"f866d9d8-384e-4b5e-9616-78bfa5e1b440","timestamp":"2026-10-22T02:03:52.692529383Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"07d81347-105b-41ab-9e88-3de2db44be50","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-22T02:04:18.003967902Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"704a2706-1919-4bb1-9d39-4fc55c30911f","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-22T02:07:43.715326891Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"a0480b2d-3a53-407b-a226-6bb046e1a9b9","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-22T02:10:35.356826327Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"8196d3ed-fadc-4cae-aa7b-6e1649be058a","issue_id":"ea5f4536-6dc7-4c22-8de7-b68b6c30252d","priority":"high","timestamp":"2026-10-22T02:10:49.370855023Z","title":"Remove the user and system configuration layers","type":"issue_created"}
+{"from":"ready","id":"0b9e3d0e-f81a-4a16-9a4a-98fccee55ded","issue_id":"ea5f4536-6dc7-4c22-8de7-b68b6c30252d","timestamp":"2026-10-22T02:11:01.137808556Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"cd5801e6-6b91-4635-b541-636ec1bbbd8c","issue_id":"ea5f4536-6dc7-4c22-8de7-b68b6c30252d","timestamp":"2026-10-22T02:11:01.137808556Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"10d9399b-553d-4864-8992-22d8e276c2d3","issue_id":"b4929342-6c7c-4f35-8e18-c8cbb0ec526c","timestamp":"2026-10-22T02:11:01.410979139Z","type":"issue_updated","updated_by":"dependency-add"}
