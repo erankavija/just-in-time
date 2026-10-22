@@ -270,7 +270,8 @@ fn test_config_set_rejects_invalid_project_name_without_writing() {
 }
 
 /// `config set` parses the edited document as configuration at both scopes and
-/// refuses an edit that would not load, leaving each file untouched.
+/// refuses an edit that would not load as an invalid argument, leaving each file
+/// untouched.
 #[test]
 fn test_config_set_rejects_unknown_key_at_repo_and_global_scope_without_writing() {
     let temp = TempDir::new().unwrap();
@@ -291,7 +292,11 @@ fn test_config_set_rejects_unknown_key_at_repo_and_global_scope_without_writing(
             .env_remove("JIT_WORKTREE_WRITE_POLICY")
             .output()
             .expect("failed to run jit config set");
-        assert!(!out.status.success(), "{scope:?}: unknown key accepted");
+        assert_eq!(
+            out.status.code(),
+            Some(ErrorCode::InvalidArgument.exit_code().code()),
+            "{scope:?}: an unknown key is an invalid argument"
+        );
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(
             stderr.contains("undeclared_key"),
