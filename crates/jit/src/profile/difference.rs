@@ -3,9 +3,8 @@
 //!
 //! A prepared materialization plan carries one decision per target and one per
 //! semantic identity each participating profile takes part in: the values it
-//! would create or update, the declarations it would publish, the recorded
-//! claims it would retain or remove, and the targets and declarations it cannot
-//! publish at all. [`profile_target_decisions`] and
+//! would create or update, the declarations it would publish, and the targets
+//! and declarations it cannot publish at all. [`profile_target_decisions`] and
 //! [`profile_contribution_decisions`] are the sole readers of that decision, and
 //! each has exactly two callers: the difference report, which states the
 //! decision without publishing any of it, and [`ensure_publishable_targets`],
@@ -15,10 +14,9 @@
 //!
 //! Both halves of the decision are read the same way because contributions
 //! compose by identity: a package claims a semantic declaration inside a
-//! registry rather than the registry file, so who owns a declaration, what
-//! publishing it would do, and whether it can be published at all are answered
-//! per identity and reported beside the file targets rather than folded into
-//! them.
+//! registry rather than the registry file, so what publishing it would do and
+//! whether it can be published at all are answered per identity and reported
+//! beside the file targets rather than folded into them.
 //!
 //! The refusal carries every conflicting decision rather than the first one,
 //! because a selection is refused as a whole and an adopter resolving one
@@ -76,7 +74,6 @@ fn profile_target_changes(
                 target.path.repository_relative(),
                 target_action(&target.disposition),
                 target.mode,
-                owner_names(&target.owners),
                 conflict_reason(&target.disposition),
             )
         })
@@ -93,7 +90,6 @@ fn profile_contribution_changes(
         .map(|contribution| ProfileContributionChange {
             identity: contribution.identity.to_string(),
             action: target_action(&contribution.disposition),
-            owners: owner_names(&contribution.owners),
             reason: conflict_reason(&contribution.disposition),
         })
         .collect()
@@ -137,8 +133,8 @@ pub(crate) fn profile_plan_entry(
 /// Refuse a plan whose profile decisions include a target or a declaration no
 /// publication may make.
 ///
-/// Every mutating profile route — application, reconfiguration, upgrade, their
-/// rehearsals, and a profiled initialization — passes through this refusal, so
+/// Every mutating profile route — application, its rehearsal, and a profiled
+/// initialization — passes through this refusal, so
 /// a conflicting decision stops a publication regardless of which command asked
 /// for it, and regardless of whether it was about a file or a declaration. The
 /// difference report is the one caller that reads the same decision without
@@ -200,8 +196,6 @@ fn target_action(disposition: &ProfileTargetDisposition) -> ProfileTargetAction 
         ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
         ProfileTargetDisposition::Create => ProfileTargetAction::Create,
         ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-        ProfileTargetDisposition::Retain => ProfileTargetAction::Retain,
-        ProfileTargetDisposition::Remove => ProfileTargetAction::Remove,
         ProfileTargetDisposition::Conflict(_) => ProfileTargetAction::Conflict,
     }
 }
@@ -219,9 +213,4 @@ fn refused(
         ProfileTargetDisposition::Conflict(conflict) => Some(conflict.clone()),
         _ => None,
     }
-}
-
-/// Name the packages that claim one decided subject, in package-id order.
-fn owner_names(owners: &BTreeSet<crate::repository_state::ProfilePackageId>) -> Vec<String> {
-    owners.iter().map(ToString::to_string).collect()
 }

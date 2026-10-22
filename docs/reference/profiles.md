@@ -6,7 +6,7 @@ Repository profiles install a coherent JIT workflow as one explicit operation.
 A profile is a package: a directory holding a manifest, the assets that
 manifest declares, and the managed-region sources it owns. This is the
 canonical adopter reference for the profile lifecycle: authoring,
-offline exchange, composition, variables and ownership, and drift recovery. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
+offline exchange, composition, variables, and recovery. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
 to inspect the exact packages a release or a repository currently carries.
 
 ## Obtaining a package
@@ -222,8 +222,7 @@ jit profile show --profile packages/jit-dogfood
 ```
 
 Report what a selection would change here, including the targets and registry
-declarations it could not publish and who claims each of them, before publishing
-any of it:
+declarations it could not publish, before publishing any of it:
 
 ```bash
 jit profile diff --profile packages/jit-dogfood
@@ -284,14 +283,14 @@ package that declared it beside the one that could not be found — so an adopte
 is never left diagnosing a package they did not name. Both refusals are raised
 over the whole set before any of it is applied.
 
-A registry declaration or asset target that two packages state differently is
-refused for the same reason: neither package holds authority over the other's
-declarations. The refusal is taken from the same decision
+A registry declaration or asset target that two packages being applied state
+differently is refused for the same reason: neither package holds authority over
+the other's declarations. The refusal is taken from the same decision
 [`jit profile diff`](cli-commands.md#jit-profile-diff) reports, so it names the
-package being applied, the declaration or target it carries, and who already
-holds it — the repository, or the package whose applied-profile record claims
-it. Identical restatements merge, so a package and its dependency may declare
-the same thing.
+package being applied, the declaration or target it carries, and every package
+defining it. Only the packages being applied are parties: the repository's
+current content never conflicts with a package. Identical restatements merge, so
+a package and its dependency may declare the same thing.
 
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
@@ -299,21 +298,19 @@ Profile enumeration and its handling of applied-profile records are defined in
 ## Inspect, recover, and evolve
 
 Use `jit profile diff` before a change to see every target and semantic
-declaration a selection would create, update, retain, remove, or conflict on.
-Each decision identifies every package that owns it; an empty owner list is
-repository-authored content, while several owners identify shared content.
+declaration a selection would create, update, leave unchanged, or conflict on.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `pack`, or `add` command, but writes no target, provenance record, or lifecycle
 event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
-operator can identify the conflicting target or declaration and its owner.
+operator can identify each conflicting target or declaration and the packages
+defining it.
 
-An owned target that has drifted is a conflict that publishes nothing. Restore
-the intended owner’s content before applying it. Do not use a
-profile operation to overwrite repository-authored or another profile’s
-conflicting content. Every conflict carries this choice as a
-typed remedy; see [the remedy contract](#the-remedy-contract) for the
-vocabulary and its machine-readable form.
+A refused publication's `PROFILE_CONFLICT` error carries
+`error.details.conflicts[]` in the [standard `--json` error
+envelope](cli-commands.md#cli-json-contracts), one entry per refused target or
+declaration as `{owner, subject, conflict}`; `conflict.owners` names the
+packages defining it differently.
 
 All profile commands support `--json` and use the standard count-wrapped
 `{"count": N, "profiles": [...]}` collection shape. A show response contains
@@ -339,44 +336,6 @@ no member of that selection is published separately. For an existing repository,
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
 tools.
-
-## The remedy contract
-
-A refused publication carries a typed remedy: the resolutions that apply to
-that finding, drawn from one
-fixed vocabulary rather than composed per command. This section is that vocabulary's data
-contract.
-
-| Resolution | What it does |
-|---|---|
-| `move-target-aside` | Move the repository-authored target aside before applying. |
-| `restore-recorded-content` | Restore the value this profile published. |
-| `stop-one-package-from-declaring-target` | Stop one of the two conflicting packages from declaring the target. |
-| `apply-one-of-conflicting-packages` | Apply only one of the packages that conflict over a target. |
-| `make-definitions-identical` | Make the competing semantic definitions identical. |
-| `apply-only-one-declaring-package` | Apply only one package that declares the contested definition. |
-| `restore-recorded-package` | Restore the package this profile recorded, at its recorded location. |
-
-A refused publication's conflict is one of three classes, each carrying a
-fixed remedy from that vocabulary — an occupied target's remedy further
-depends on who holds it:
-
-| Conflict class | Held by | Remedy |
-|---|---|---|
-| Occupied | the repository | `move-target-aside` |
-| Occupied | a package | `stop-one-package-from-declaring-target`, `apply-one-of-conflicting-packages` |
-| Diverged | — | `restore-recorded-content` |
-| Contested | — | `make-definitions-identical`, `apply-only-one-declaring-package` |
-
-The remedy reaches machine-readable output as part of the [standard `--json`
-error envelope](cli-commands.md#cli-json-contracts): a refused publication's
-`PROFILE_CONFLICT` error carries `error.details.conflicts[]`, one entry per
-refused target or declaration as `{owner, subject, conflict}`. `conflict.kind`
-names the conflict class and `conflict.remedy.resolutions` carries its remedy
-from the vocabulary above. `error.suggestions` carries the distinct resolution
-messages across every conflict in the refusal, in first-occurrence order.
-
-`jit --schema` is the field-level contract for both shapes.
 
 ## The `jit-dogfood` package
 
@@ -410,8 +369,7 @@ semantics and [Custom Gates](../how-to/custom-gates.md) for replacement.
 
 The profile changes configuration and installs files, but it never creates Git
 commits, rewrites existing issues, or treats the dogfood vocabulary as engine
-behavior. A semantic registry entry or one-to-one asset that collides with
-differing content is a conflict; that content is not silently overwritten.
+behavior.
 
 ## Derived state and managed regions
 
@@ -469,17 +427,9 @@ has its own provenance record. One repository-scoped `profile_lifecycle` audit
 event records the operation and its per-profile outcomes for the complete
 selection, published by the same redo record as the targets. Each
 provenance record stores the profile ID, version, origin, package hash,
-resolved public variable values with their source kinds, and sorted ownership
-claims. Each claim names one semantic declaration, file target, or managed
-region together with its published-base fingerprint and retention intent. That fingerprint is what
-a later application holds the repository's current content against, so a
-diverged conflict names the profile and the contribution that diverged. A managed region whose published body encloses a
-region another owner manages — a package's guidance region around a configured
-projection — is checked for presence rather than content: that nested body is
-rendered from what its own owner declares, so the enclosing profile's recorded
-base is not the whole of what sits between its delimiters. Validation and repair
-reuse the stored resolved variable values but load effective configuration from
-the declared registries; they do not read the current process environment. The
+and resolved public variable values with their source kinds. A record carries
+no ownership claim: composition never reads it, so a later application decides
+every target from the packages being applied alone. The
 audit event carries the resolved target hashes but never the resolved values.
 A provenance record does not state why a package was applied, so it reads the
 same whether the adopter named that package or received it as another's

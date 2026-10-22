@@ -1,9 +1,6 @@
 //! Convert an immutable profile package into image-independent repository-state claims.
 
-use super::{
-    resolve_package, resolve_package_from_record, ProfilePackage, RecordedValueAuthority,
-    ResolvedProfileContent, ResolvedVariables, VariableInputs,
-};
+use super::{resolve_package, ProfilePackage, ResolvedProfileContent, VariableInputs};
 use crate::repository_state::{
     FileMode, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim, ProfilePackageId,
     ProfileRegionClaim, TargetClaim,
@@ -30,35 +27,13 @@ pub fn build_profile_claims(
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
     let resolved = resolve_package(package, &VariableInputs::default())?;
-    build_profile_claims_from_resolved(&resolved, layout, false)
-}
-
-/// Build replacement claims from the exact public values stored in an applied
-/// profile record.
-///
-/// # Errors
-///
-/// Returns [`ProfileClaimError`] when the persisted provenance cannot resolve
-/// the current package or the resulting repository claims are invalid.
-pub fn build_profile_repair_claims(
-    package: &ProfilePackage,
-    variables: &ResolvedVariables,
-    layout: &crate::repository_state::RepositoryLayout,
-) -> Result<ProfileClaims, ProfileClaimError> {
-    let resolved = resolve_package_from_record(
-        package,
-        variables,
-        &VariableInputs::default(),
-        RecordedValueAuthority::Exact,
-    )?;
-    build_profile_claims_from_resolved(&resolved, layout, true)
+    build_profile_claims_from_resolved(&resolved, layout)
 }
 
 /// Convert already-resolved package content into repository-state claims.
 pub fn build_profile_claims_from_resolved(
     package: &ResolvedProfileContent,
     layout: &crate::repository_state::RepositoryLayout,
-    replace_owned: bool,
 ) -> Result<ProfileClaims, ProfileClaimError> {
     validate_target_overlaps(package)?;
     let contribution_claims = build_resolved_contribution_claims(package);
@@ -80,7 +55,6 @@ pub fn build_profile_claims_from_resolved(
                 } else {
                     FileMode::Regular
                 },
-                replace_owned,
             })
         })
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
@@ -107,11 +81,7 @@ pub fn build_profile_claims_from_resolved(
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
     Ok(ProfileClaims {
         package_id: ProfilePackageId::new(package.model().id.to_string()),
-        contributions: if replace_owned {
-            Vec::new()
-        } else {
-            contribution_claims
-        },
+        contributions: contribution_claims,
         assets,
         regions,
     })

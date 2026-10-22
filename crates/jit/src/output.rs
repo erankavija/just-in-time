@@ -925,8 +925,8 @@ impl ErrorCode {
             }
             ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
             ErrorCode::ProfileConflict => {
-                "Profile planning or validation found a conflict. For the resolutions each \
-                 conflict class carries, see [the remedy contract](profiles.md#the-remedy-contract)."
+                "Profile planning found packages being applied that define one target or \
+                 declaration differently."
             }
             ErrorCode::DependencyError => "A dependency command failed.",
             ErrorCode::GateError => "A gate command failed.",
@@ -954,7 +954,9 @@ impl ErrorCode {
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
-            ErrorCode::RecoveryFailed => "Applying a leftover redo record, or a recovery routine, failed.",
+            ErrorCode::RecoveryFailed => {
+                "Applying a leftover redo record, or a recovery routine, failed."
+            }
             ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
             ErrorCode::ClaimReleaseError => "Claim release failed.",
             ErrorCode::ClaimRenewError => "Claim renewal failed.",

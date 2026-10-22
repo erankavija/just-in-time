@@ -463,12 +463,8 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
         .downcast_ref::<crate::commands::ProfileDependencyError>()
         .is_some()
     {
-        return Ok(
-            command_json_error(error, ErrorCode::ProfileError).with_suggestion(
-                "Place the package it depends on beside it, or apply that package \
-                 first so this repository records where its bytes are",
-            ),
-        );
+        return Ok(command_json_error(error, ErrorCode::ProfileError)
+            .with_suggestion("Place the package it depends on beside it"));
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: every refused profile decision — a target or a
@@ -478,8 +474,7 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
     if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
         if let RepositoryStateError::ProfileTargetConflicts(conflicts) = state_error {
             return Ok(command_json_error(error, ErrorCode::ProfileConflict)
-                .with_details(serde_json::to_value(conflicts)?)
-                .with_suggestions(conflicts.suggestions()));
+                .with_details(serde_json::to_value(conflicts)?));
         }
         return Ok(command_json_error(error, ErrorCode::ProfileError));
     }
@@ -816,47 +811,32 @@ mod repository_state_classifier_tests {
     //! variant) fails here rather than silently changing a command's exit status.
 
     use super::{classify, profile_json_error};
-    use crate::profile::ThreeWayValue;
     use crate::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, Contribution, ContributionConflictOwner,
         GateRegistryEditError, InitializationError, ManagedDocumentError, ProducerError,
-        ProfileBaseFingerprint, ProfileConflictOccupant, ProfilePackageId, ProfileTargetConflict,
-        ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject,
-        ProjectionError, RepositoryLayoutError, RepositoryStateError, ScalarTarget, VirtualPath,
+        ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry,
+        ProfileTargetConflictsError, ProfileTargetSubject, ProjectionError, RepositoryLayoutError,
+        RepositoryStateError, ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
         VirtualPath::data("issues/abc123.json").unwrap()
     }
 
-    /// A refusal carrying every conflict reason, which is what a selection with
-    /// an occupied target, a concurrently edited one, and a declaration two
-    /// packages define differently produces.
+    /// A refusal carrying a contested file target and a contested declaration,
+    /// which is what a selection whose packages define both differently produces.
     fn target_conflicts() -> ProfileTargetConflictsError {
-        let fingerprint = || {
-            serde_json::from_str::<ProfileBaseFingerprint>(
-                "\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"",
-            )
-            .unwrap()
+        let contested = || ProfileTargetConflict::Contested {
+            owners: vec![
+                ContributionConflictOwner::Package(ProfilePackageId::new("candidate")),
+                ContributionConflictOwner::Package(ProfilePackageId::new("occupant")),
+            ],
         };
         ProfileTargetConflictsError::new(vec![
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
                 subject: ProfileTargetSubject::File(path()),
-                conflict: ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("occupant")),
-                },
-            },
-            ProfileTargetConflictEntry {
-                owner: "candidate".try_into().expect("a canonical profile id"),
-                subject: ProfileTargetSubject::File(
-                    VirtualPath::data("issues/def456.json").unwrap(),
-                ),
-                conflict: ProfileTargetConflict::Diverged {
-                    base: ThreeWayValue::Present(fingerprint()),
-                    current: ThreeWayValue::Present(fingerprint()),
-                    candidate: ThreeWayValue::Absent,
-                },
+                conflict: contested(),
             },
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
@@ -867,12 +847,7 @@ mod repository_state_classifier_tests {
                     }
                     .semantic_identity(),
                 ),
-                conflict: ProfileTargetConflict::Contested {
-                    owners: vec![
-                        ContributionConflictOwner::Repository,
-                        ContributionConflictOwner::Package(ProfilePackageId::new("occupant")),
-                    ],
-                },
+                conflict: contested(),
             },
         ])
     }
@@ -948,7 +923,7 @@ mod repository_state_classifier_tests {
 
     /// REQ-04: the conflict code, exit status, and rendered human message a
     /// refused publication carries are unaffected by attaching structured
-    /// details and suggestions beside them — the message stays exactly the
+    /// details beside them — the message stays exactly the
     /// sentence [`RepositoryStateError`]'s `Display` renders, byte for byte,
     /// carrying every fact its structured form carries so a reader of either
     /// acts on the same evidence.
@@ -964,13 +939,10 @@ mod repository_state_classifier_tests {
         assert_eq!(json.exit_code().code(), 4);
         assert_eq!(json.error.message, rendered);
         for expected in [
-            "3 profile decision(s) cannot be published",
+            "2 profile decision(s) cannot be published",
             ".jit/issues/abc123.json",
-            ".jit/issues/def456.json",
             "scalar:validation-default-type",
-            "stop one of the two packages",
-            "restore the value this profile published",
-            "make those definitions identical",
+            "package occupant",
         ] {
             assert!(
                 rendered.contains(expected),
@@ -979,11 +951,11 @@ mod repository_state_classifier_tests {
         }
     }
 
-    /// REQ-01/REQ-03: a refused publication's JSON envelope names every
-    /// conflicting target beside its conflict class and typed remedy, and
-    /// suggests capture only for the entry whose remedy allows it.
+    /// A refused publication's JSON envelope names every conflicting target
+    /// beside its conflict class and the packages defining it differently, and
+    /// suggests no resolution.
     #[test]
-    fn test_profile_json_error_conflict_attaches_structured_details_and_suggestions() {
+    fn test_profile_json_error_conflict_attaches_structured_details_without_remedies() {
         let state_error: RepositoryStateError = target_conflicts().into();
         let error = anyhow::Error::new(state_error);
 
@@ -993,53 +965,22 @@ mod repository_state_classifier_tests {
         let conflicts = details["conflicts"]
             .as_array()
             .expect("details carry the conflict list");
-        assert_eq!(conflicts.len(), 3);
-
-        let occupied = &conflicts[0];
-        assert_eq!(occupied["owner"], "candidate");
-        assert_eq!(occupied["subject"]["kind"], "file");
-        assert_eq!(occupied["subject"]["path"], ".jit/issues/abc123.json");
-        assert_eq!(occupied["conflict"]["kind"], "occupied");
-        assert_eq!(
-            occupied["conflict"]["remedy"]["resolutions"],
-            serde_json::json!([
-                "stop-one-package-from-declaring-target",
-                "apply-one-of-conflicting-packages"
-            ])
-        );
-
-        let diverged = &conflicts[1];
-        assert_eq!(diverged["conflict"]["kind"], "diverged");
-        assert_eq!(
-            diverged["conflict"]["remedy"]["resolutions"],
-            serde_json::json!(["restore-recorded-content"])
-        );
-
-        let contested = &conflicts[2];
-        assert_eq!(contested["subject"]["kind"], "contribution");
-        assert_eq!(contested["conflict"]["kind"], "contested");
-        assert_eq!(
-            contested["conflict"]["remedy"]["resolutions"],
-            serde_json::json!([
-                "make-definitions-identical",
-                "apply-only-one-declaring-package"
-            ])
-        );
-
+        assert_eq!(conflicts.len(), 2);
+        let file = &conflicts[0];
+        assert_eq!(file["owner"], "candidate");
+        assert_eq!(file["subject"]["kind"], "file");
+        assert_eq!(file["subject"]["path"], ".jit/issues/abc123.json");
+        assert_eq!(file["conflict"]["kind"], "contested");
+        assert_eq!(conflicts[1]["subject"]["kind"], "contribution");
         assert!(
-            json.error
-                .suggestions
+            conflicts
                 .iter()
-                .any(|suggestion| suggestion.contains("stop one of the two packages")),
-            "suggestions: {:?}",
-            json.error.suggestions
+                .all(|conflict| conflict["conflict"].get("remedy").is_none()),
+            "no conflict carries a remedy: {conflicts:?}"
         );
         assert!(
-            json.error
-                .suggestions
-                .iter()
-                .any(|suggestion| suggestion.contains("make those definitions identical")),
-            "suggestions: {:?}",
+            json.error.suggestions.is_empty(),
+            "{:?}",
             json.error.suggestions
         );
     }

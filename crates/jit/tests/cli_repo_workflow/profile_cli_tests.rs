@@ -267,56 +267,6 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
 }
 
 #[test]
-fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let base =
-        package_with_shared_namespace(repo.path(), "packages/base", "base", "Shared definition");
-    let workflow = package_with_shared_namespace(
-        repo.path(),
-        "packages/workflow",
-        "workflow",
-        "Shared definition",
-    );
-
-    let selectors = [base, workflow];
-    let args = [
-        "profile",
-        "apply",
-        "--profile",
-        selectors[0],
-        "--profile",
-        selectors[1],
-        "--json",
-    ];
-    let first = jit(repo.path(), &args);
-    assert!(first.status.success(), "{first:?}");
-
-    let fingerprints = ["base", "workflow"]
-        .into_iter()
-        .map(|id| {
-            let record: Value = serde_json::from_slice(
-                &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-            )
-            .unwrap();
-            record["claims"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|claim| {
-                    claim["identity"]["kind"] == "semantic"
-                        && claim["identity"]["identity"]["target"]["name"] == "shared"
-                })
-                .unwrap()["base_fingerprint"]
-                .as_str()
-                .unwrap()
-                .to_string()
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(fingerprints[0], fingerprints[1]);
-}
-
-#[test]
 fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_surface() {
     let repo = TempDir::new().unwrap();
 
@@ -1273,66 +1223,6 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     assert!(unchanged.status.success(), "{unchanged:?}");
     assert!(!published_anything(&json(&unchanged)));
     assert_eq!(fs::read(events_path).unwrap(), events_after_repairs);
-}
-
-#[test]
-fn test_profiled_init_conflict_preserves_the_occupant_and_publishes_no_conflicting_package() {
-    let repo = TempDir::new().unwrap();
-    fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
-    let occupant = repo.path().join("contrib/gates/ai-review.sh");
-    fs::write(&occupant, b"local script\n").unwrap();
-
-    let output = jit(
-        repo.path(),
-        &[
-            "init",
-            "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
-            "--json",
-        ],
-    );
-
-    assert_eq!(output.status.code(), Some(4));
-    assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
-    assert_eq!(fs::read(&occupant).unwrap(), b"local script\n");
-    // The package that collided published none of its own state: no provenance
-    // record, and no asset beside the one it refused to overwrite.
-    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
-    assert!(!repo
-        .path()
-        .join(".agents/skills/jit-manage/SKILL.md")
-        .exists());
-}
-
-#[test]
-fn test_existing_partial_profiled_init_conflict_preserves_authored_bytes_and_the_occupant() {
-    let repo = TempDir::new().unwrap();
-    fs::create_dir_all(repo.path().join(".jit")).unwrap();
-    let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
-    fs::write(repo.path().join(".jit/index.json"), index).unwrap();
-    fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
-    let occupant = repo.path().join("contrib/gates/ai-review.sh");
-    fs::write(&occupant, b"local script\n").unwrap();
-
-    let output = jit(
-        repo.path(),
-        &[
-            "init",
-            "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
-            "--json",
-        ],
-    );
-
-    assert_eq!(output.status.code(), Some(4));
-    assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
-    assert_eq!(fs::read(&occupant).unwrap(), b"local script\n");
-    assert_eq!(
-        fs::read(repo.path().join(".jit/index.json")).unwrap(),
-        index,
-        "authored neutral bytes must survive a refused application"
-    );
-    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
 }
 
 #[test]
