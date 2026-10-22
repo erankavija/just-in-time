@@ -8,6 +8,7 @@
   ],
   "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). The gate that runs it was registered in `.jit/gates.toml` at planning. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `cargo-ci-selftest` runs `scripts/cargo-ci-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `cargo-ci-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-04: `dev/TESTING.md` describes the self-test as a gate.\n",
   "documents": [],
+  "done_at": "2026-10-22T20:30:19.528313425Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -49,7 +50,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "cargo-ci self-test runs as a declared gate",
-  "updated_at": "2026-10-22T20:29:37.614609494Z"
+  "updated_at": "2026-10-22T20:30:19.528313425Z"
 }
