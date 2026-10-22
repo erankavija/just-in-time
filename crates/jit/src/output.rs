@@ -1198,6 +1198,7 @@ pub(crate) mod test_support {
 /// [`ErrorCode::exit_code`] respectively. Iterating [`ErrorCode::ALL`] keeps the
 /// page coupled to the same derive-checked member list used by the runtime's
 /// vocabulary conformance tests.
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_error_code_reference() -> String {
     let rows = ErrorCode::ALL
         .iter()
@@ -3176,7 +3177,7 @@ mod tests {
     #[test]
     fn test_show_response_root_shape_short_id_and_arrays() {
         // short_id is id[0..8]; labels and dependencies always serialize as arrays.
-        let issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         let expected_short = issue.short_id();
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
@@ -3200,7 +3201,7 @@ mod tests {
 
     #[test]
     fn test_show_response_surfaces_lifecycle_timestamps() {
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         let at = chrono::Utc::now();
         issue.mark_first_ready(at);
         issue.mark_claimed(at);
@@ -3225,14 +3226,12 @@ mod tests {
         // must surface in `dangling_dependency_ids` rather than vanish when
         // `enriched_deps` only contains the resolvable ones.
 
-        let mut issue =
-            crate::domain::types::fixture_issue("Parent".to_string(), "Body".to_string());
+        let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
         issue.dependencies = vec!["resolved-id".to_string(), "dangling-id".to_string()];
 
         // Simulate what `get_dependencies_enriched` would produce: only the
         // resolvable dependency's MinimalIssue, the dangling one absent.
-        let mut resolved_dep =
-            crate::domain::types::fixture_issue("Dep".to_string(), "".to_string());
+        let mut resolved_dep = crate::domain::fixture_issue("Dep".to_string(), "".to_string());
         resolved_dep.id = "resolved-id".to_string();
         let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
 
@@ -3255,16 +3254,13 @@ mod tests {
     fn test_show_response_omits_rejected_dependency_from_unmet() {
         use crate::domain::State;
 
-        let mut issue =
-            crate::domain::types::fixture_issue("Parent".to_string(), "Body".to_string());
+        let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
         issue.dependencies = vec!["rejected-id".to_string(), "pending-id".to_string()];
 
-        let mut rejected =
-            crate::domain::types::fixture_issue("Abandoned".to_string(), String::new());
+        let mut rejected = crate::domain::fixture_issue("Abandoned".to_string(), String::new());
         rejected.id = "rejected-id".to_string();
         rejected.state = State::Rejected;
-        let mut pending =
-            crate::domain::types::fixture_issue("Upstream".to_string(), String::new());
+        let mut pending = crate::domain::fixture_issue("Upstream".to_string(), String::new());
         pending.id = "pending-id".to_string();
         pending.state = State::InProgress;
         let enriched_deps = vec![MinimalIssue::from(&rejected), MinimalIssue::from(&pending)];
@@ -3287,14 +3283,14 @@ mod tests {
     fn test_show_response_exposes_content_format() {
         use crate::domain::ContentFormat;
         // Set -> appears in `jit issue show --json` (create/show parity).
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         issue.content_format = Some(ContentFormat::Html);
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
         assert_eq!(v["content_format"], "html");
 
         // Absent -> omitted (existing issues without the field stay clean).
-        let issue2 = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let issue2 = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         let resp2 = IssueShowResponse::from_issue(issue2, vec![], &[]);
         let v2 = serde_json::to_value(&resp2).unwrap();
         assert!(v2.get("content_format").is_none());
@@ -3304,7 +3300,7 @@ mod tests {
     fn test_show_response_gates_array_replaces_split_fields() {
         // `gates` replaces `gates_required`/`gates_status`; neither legacy field
         // appears in the `issue show --json` shape.
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         issue.gates_required = vec!["tests".to_string()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
@@ -3320,7 +3316,7 @@ mod tests {
     #[test]
     fn test_show_response_gate_never_run_is_null() {
         // Required-but-never-run gate: status pending, last_run_at/exit_code null.
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         issue.gates_required = vec!["tests".to_string()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
@@ -3340,7 +3336,7 @@ mod tests {
 
         // A gate that has run: status from GateState, last_run_at/exit_code from
         // the GateRunResult the state names.
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         issue.gates_required = vec!["tests".to_string()];
         let run_at = Utc::now();
         issue.gates_status.insert(

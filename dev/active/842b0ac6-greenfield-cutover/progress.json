@@ -1,7 +1,7 @@
 {
   "epic_id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
   "epic_short_id": "842b0ac6",
-  "current_wave": 3,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -368,7 +368,7 @@
           "title": "Remove the user and system configuration layers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-2-dispatched"
+          "status": "done"
         }
       ]
     },
@@ -383,7 +383,7 @@
           "title": "Compile reference-page renderers only with test support",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -398,7 +398,7 @@
           "title": "Import domain type items through the domain facade",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -485,7 +485,8 @@
     "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci.",
     "Workers' focused checks skip nextest setup scripts (recorded failure corpus): fbb661f2 changed config set's failure and broke the corpus setup, which aborts the whole cargo-ci run. Prompt workers who change a command's failure behaviour to run `cargo nextest run -p jit --test cli_issue`.",
     "34361448 first attempt removed user/system config layering wholesale (contradicting 459bb995 REQ-02); lead review required repo-only resolution for lease policy only.",
-    "287eef78 changed gate fail --json for a missing issue from GATE_ERROR (exit 6) to ISSUE_NOT_FOUND (exit 3) by routing through gate_pass_json_error; failure-lever registry row updated. Lead accepted as the type-derived contract (df129d9e REQ-13 direction)."
+    "287eef78 changed gate fail --json for a missing issue from GATE_ERROR (exit 6) to ISSUE_NOT_FOUND (exit 3) by routing through gate_pass_json_error; failure-lever registry row updated. Lead accepted as the type-derived contract (df129d9e REQ-13 direction).",
+    "Feature-off `cargo doc -p jit --no-deps` reports many pre-existing broken intra-doc links outside 842b0ac6's changes (noted by the 0e3b69fc worker); no gate runs cargo doc."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

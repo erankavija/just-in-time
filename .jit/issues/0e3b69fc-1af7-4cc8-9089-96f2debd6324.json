@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T15:04:15.138390725Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -10,13 +10,35 @@
     "c998dfd3-07a4-4f7c-ab5c-86c84867fc00"
   ],
   "description": "Seven reference-page renderers have one production consumer, the test-support `generated_artifacts` module, yet six of them compile into every adopter build.\n\n## Background\n\nRenderers and their gating today:\n\n- `output::render_error_code_reference` (`crates/jit/src/output.rs:1035`).\n- `domain::event_catalog::render_event_reference` (`domain/event_catalog.rs:525`, re-exported at `domain/mod.rs:61`).\n- `schema::render_exit_code_reference` (`schema.rs:1134`).\n- `gate_presets::reference::render_reference_markdown` (`gate_presets/reference.rs:96`, re-exported at `gate_presets.rs:20`).\n- `runtime_defaults::render_reference_markdown` (`runtime_defaults.rs:56`).\n- `storage::reference::render_reference_markdown` (`storage/reference.rs:456`, re-exported with `GateRunField` at `storage/mod.rs:78`).\n- `profile::template_region::render_template_registry` is already gated (`profile/mod.rs:37-38`).\n\n`generated_artifacts` is gated by `#[cfg(any(test, feature = \"test-support\"))]` (`lib.rs:20-21`). Each renderer's `test_support` path-constant submodule already uses that attribute (`output.rs:1016`, `schema.rs:1117`, `event_catalog.rs:34`, `gate_presets/reference.rs:11`, `runtime_defaults.rs:40`, `storage/reference.rs:42`). Renderer-only helpers would warn once gated: the `storage/reference.rs` samples, the `gate_presets/reference.rs` examples and the `event_catalog.rs` render helpers. `event_catalog()` stays live (`schema.rs:201`). Both reference modules can be gated whole.\n\nNo configured gate builds the library with `test-support` off. `scripts/cargo-ci.sh:369-492` builds with dev-dependencies, which turn the feature on. Intra-doc links from ungated docs to gated items (`runtime_defaults.rs:10`, `event_catalog.rs:7,504`, `output.rs:1027-1033`) break in a feature-off `cargo doc`. The feature comment at `crates/jit/Cargo.toml:85-95` says definitions \"compile unconditionally either way\", which is already inaccurate.\n\n## Success Criteria\n\n- [hard] REQ-01: Each reference-page renderer, its renderer-only helpers and its re-exports compile only under `cfg(any(test, feature = \"test-support\"))`.\n- [hard] REQ-02: With `test-support` off, the workspace compiles with warnings denied. The output of `RUSTFLAGS=-Dwarnings cargo check --workspace` is recorded as evidence.\n- [hard] REQ-03: No ungated rustdoc carries an intra-doc link to a gated renderer.\n- [hard] REQ-04: The `test-support` feature comment in `crates/jit/Cargo.toml` describes what the feature gates.\n- [hard] REQ-05: Regenerating the reference pages produces no diff.\n\n## Notes\n\nNo new feature or CI step is added.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/0e3b69fc/feature-off-check.md"
+    }
+  ],
+  "done_at": "2026-10-22T15:48:55.845305375Z",
   "first_ready_at": "2026-10-22T15:04:11.049823418Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "260bfd32-4ffc-4d74-809d-968c66656626",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:41:05.854408742Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e5ff41ae-fc9e-417c-973f-3acc30a91e73",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:48:43.341975004Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0e3b69fc-1af7-4cc8-9089-96f2debd6324",
   "labels": [
     "type:task",
@@ -27,7 +49,7 @@
     "satisfies:842b0ac6/REQ-22"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Compile reference-page renderers only with test support",
-  "updated_at": "2026-10-22T15:04:15.375815701Z"
+  "updated_at": "2026-10-22T15:48:55.845305375Z"
 }

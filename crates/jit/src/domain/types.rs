@@ -1192,11 +1192,6 @@ pub enum ProfileOrigin {
 }
 
 /// The lifecycle operation requested by a profile mutation.
-///
-/// The enum includes the post-apply operations so the event contract is stable
-/// before those command surfaces consume it. An audit record still names the
-/// operation that actually encountered the repository; it is never represented
-/// as a standalone operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileLifecycleOperation {
@@ -1204,10 +1199,6 @@ pub enum ProfileLifecycleOperation {
     Initialize,
     /// Apply a selected package closure.
     Apply,
-    /// Reconfigure an already installed package from new inputs.
-    Reconfigure,
-    /// Upgrade an already installed package to a newer package.
-    Upgrade,
 }
 
 /// The action observed for one profile in a lifecycle mutation.
@@ -1218,20 +1209,6 @@ pub enum ProfileLifecycleStatus {
     Installed,
     /// The profile and all of its materializations were already current.
     Unchanged,
-    /// Existing provenance was retained while its resolved inputs changed.
-    Reconfigured,
-    /// Existing package provenance was replaced by another package version or identity.
-    Upgraded,
-}
-
-/// One variable's non-sensitive provenance in a lifecycle event.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProfileLifecycleVariable {
-    /// The declared variable name. Its value is intentionally absent.
-    pub name: crate::profile::ProfileVariableName,
-    /// The source tier that supplied the value.
-    pub source: crate::profile::VariableSource,
 }
 
 /// One profile's lifecycle result within an aggregate mutation.
@@ -1240,10 +1217,12 @@ pub struct ProfileLifecycleVariable {
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
     pub id: crate::profile::ProfileId,
+    /// The package version applied.
+    pub version: String,
     /// The action observed for this profile.
     pub status: ProfileLifecycleStatus,
-    /// Variable names and source kinds, in stable name order.
-    pub variables: Vec<ProfileLifecycleVariable>,
+    /// The variable values applied, by name.
+    pub variables: std::collections::BTreeMap<crate::profile::ProfileVariableName, String>,
 }
 
 /// The stance on state-mutating commands inside a linked non-primary checkout.
@@ -1612,8 +1591,8 @@ pub enum Event {
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
     /// One record summarizes the requested operation and every profile in the
-    /// dependency-first aggregate. It carries variable provenance only, never
-    /// resolved values or rendered bytes.
+    /// dependency-first aggregate, with each package's id, version and applied
+    /// variable values.
     ProfileLifecycle {
         /// Event ID.
         id: String,
@@ -2217,10 +2196,8 @@ mod tests {
 
     #[test]
     fn test_new_issue_has_correct_defaults() {
-        let issue = crate::domain::types::fixture_issue(
-            "Test Issue".to_string(),
-            "Description".to_string(),
-        );
+        let issue =
+            crate::domain::fixture_issue("Test Issue".to_string(), "Description".to_string());
 
         assert_eq!(issue.title, "Test Issue");
         assert_eq!(issue.description, "Description");
@@ -2239,7 +2216,7 @@ mod tests {
 
     #[test]
     fn test_mark_lifecycle_timestamps_are_first_occurrence_only() {
-        let mut issue = crate::domain::types::fixture_issue("t".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
         let first = Utc::now();
         let later = first + chrono::Duration::hours(1);
 
@@ -2291,7 +2268,7 @@ mod tests {
 
     #[test]
     fn test_issue_with_timestamps_serializes_the_fields() {
-        let mut issue = crate::domain::types::fixture_issue("t".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
         let at = Utc::now();
         issue.mark_first_ready(at);
         issue.mark_claimed(at);
@@ -2310,7 +2287,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_with_no_dependencies_or_gates() {
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         let resolved = HashMap::new();
 
         assert!(!issue.is_blocked(&resolved));
@@ -2318,10 +2295,8 @@ mod tests {
 
     #[test]
     fn test_issue_blocked_by_unmet_dependency() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
-        let dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
 
         issue.dependencies.push(dependency.id.clone());
 
@@ -2333,10 +2308,9 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_done() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
         let mut dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Done;
 
         issue.dependencies.push(dependency.id.clone());
@@ -2349,7 +2323,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_unpassed_gate() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
 
         let resolved = HashMap::new();
@@ -2362,7 +2336,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_pending_gate() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -2384,7 +2358,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_by_failed_gate() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -2406,7 +2380,7 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_gate_passed() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
             "review".to_string(),
@@ -2439,8 +2413,7 @@ mod tests {
 
     #[test]
     fn test_issue_with_documents() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.documents.len(), 0);
 
         issue.documents.push(document_reference("docs/design.md"));
@@ -2450,8 +2423,7 @@ mod tests {
 
     #[test]
     fn test_issue_serialization_with_documents() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         issue.documents.push(DocumentReference {
             label: Some("Design".to_string()),
             ..document_reference_at("docs/design.md", "abc123")
@@ -2468,15 +2440,13 @@ mod tests {
 
     #[test]
     fn test_new_issue_starts_in_backlog() {
-        let issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.state, State::Backlog);
     }
 
     #[test]
     fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
-        let issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         let resolved = HashMap::new();
 
         assert_eq!(issue.state, State::Backlog);
@@ -2485,10 +2455,8 @@ mod tests {
 
     #[test]
     fn test_backlog_issue_should_not_transition_to_ready_when_blocked() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-        let dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         issue.dependencies.push(dependency.id.clone());
 
         let mut resolved = HashMap::new();
@@ -2500,10 +2468,8 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_demotes_a_ready_issue_an_unmet_dependency_blocks() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-        let dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
+        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         issue.state = State::Ready;
         issue.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
@@ -2516,10 +2482,9 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_promotes_a_backlog_issue_nothing_blocks() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         let mut dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Done;
         issue.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
@@ -2532,13 +2497,10 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_leaves_a_state_that_already_agrees_with_the_graph() {
-        let mut ready =
-            crate::domain::types::fixture_issue("Ready".to_string(), "Desc".to_string());
+        let mut ready = crate::domain::fixture_issue("Ready".to_string(), "Desc".to_string());
         ready.state = State::Ready;
-        let mut blocked =
-            crate::domain::types::fixture_issue("Blocked".to_string(), "Desc".to_string());
-        let dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let mut blocked = crate::domain::fixture_issue("Blocked".to_string(), "Desc".to_string());
+        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         blocked.dependencies.push(dependency.id.clone());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
 
@@ -2548,8 +2510,7 @@ mod tests {
 
     #[test]
     fn test_derive_readiness_correction_leaves_a_state_no_dependency_owns() {
-        let dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         let resolved = HashMap::from([(dependency.id.clone(), &dependency)]);
         let blocked_by_unmet_dependency = [
             State::InProgress,
@@ -2559,8 +2520,7 @@ mod tests {
             State::Archived,
         ]
         .map(|state| {
-            let mut issue =
-                crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+            let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
             issue.state = state;
             issue.dependencies.push(dependency.id.clone());
             issue
@@ -2578,8 +2538,7 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_auto_transition_to_done_when_gates_pass() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2597,8 +2556,7 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_pending() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2616,8 +2574,7 @@ mod tests {
 
     #[test]
     fn test_gated_issue_should_not_transition_to_done_when_gates_failed() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
         issue.gates_required.push("review".to_string());
         issue.gates_status.insert(
@@ -2635,8 +2592,7 @@ mod tests {
 
     #[test]
     fn test_in_progress_issue_should_not_auto_transition() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::InProgress;
 
         let resolved = HashMap::new();
@@ -2666,14 +2622,13 @@ mod tests {
 
     #[test]
     fn test_new_issue_has_empty_labels() {
-        let issue =
-            crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Description".to_string());
         assert!(issue.labels.is_empty());
     }
 
     #[test]
     fn test_issue_serialization_with_labels() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         issue.labels.push("milestone:v1.0".to_string());
         issue.labels.push("epic:auth".to_string());
         issue.labels.push("type:task".to_string());
@@ -2691,7 +2646,7 @@ mod tests {
 
     #[test]
     fn test_issue_labels_can_be_modified() {
-        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
         assert!(issue.labels.is_empty());
 
         issue.labels.push("component:backend".to_string());
@@ -2785,10 +2740,9 @@ mod tests {
 
     #[test]
     fn test_issue_not_blocked_when_dependency_is_rejected() {
-        let mut issue =
-            crate::domain::types::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let mut issue = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
         let mut dependency =
-            crate::domain::types::fixture_issue("Dependency".to_string(), "Desc".to_string());
+            crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
         dependency.state = State::Rejected;
 
         issue.dependencies.push(dependency.id.clone());
@@ -3167,8 +3121,7 @@ mod tests {
 
         #[test]
         fn test_issue_assignee_serializes_unchanged() {
-            let mut issue =
-                crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+            let mut issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
             issue.assignee = Some(Assignee::from_str("agent:copilot").unwrap());
 
             let json = serde_json::to_string(&issue).unwrap();
@@ -3181,7 +3134,7 @@ mod tests {
 
     #[test]
     fn test_issue_timestamps_serialize_as_rfc3339() {
-        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Desc".to_string());
+        let issue = crate::domain::fixture_issue("Test".to_string(), "Desc".to_string());
 
         let value: serde_json::Value =
             serde_json::from_str(&serde_json::to_string(&issue).unwrap()).unwrap();

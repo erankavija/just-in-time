@@ -542,6 +542,13 @@
       "status": "resolved",
       "date": "2026-10-22",
       "summary": "Plan-review attempt 4 failed on terminal sizing only (the CLI fixture migrations span 9-18 files; the library adoption spans 37 modules). Chosen (A): mechanical splits plus an explicit sizing rule (a leaf touches at most ~6 files, or one file family with one concern) applied to every terminal; attempt 5 authorised. If it fails only on leaves that meet the rule, escalate as a gate-consistency question. Rejected: accepting the current sizing against the gate, and pausing."
+    },
+    {
+      "container_short_id": "c780514e",
+      "issue": "0bf97911",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "summary": "code-review read the foundation task's REQ-01 as requiring adoption, which dependent sibling tasks own. Chosen (A): a steward-ruled scope note on every foundation-only task ('adds the shared definition only; existing copies are retired by the adoption tasks that depend on it'), with no criterion change. Rejected: (B) a breakdown change, (C) a manual pass. Escalate again if F1 persists."
     }
   ],
   "notes": [
@@ -585,7 +592,8 @@
     "2026-10-22 ~10:30-17:00: the WEEKLY usage limit was hit (resets 17:00 Helsinki); work was resumed at 17:01. just-in-time-59 has shown 'waiting' since ~09:30 (7.5 h). It is probably blocked on a permission prompt in its own terminal, which needs the user. Its b697a3f7 planning WIP was checkpointed by the steward (0c4ec0ae6).",
     "2026-10-22 ~17:45: c780514e plan-review passed on attempt 5; breakdown of 151 issues instantiated; B gates running. just-in-time-05 will execute it (same-session deviation, contained as for 842b0ac6), fixture-timeout fix and waves 1-2 first, preferring sonnet and haiku workers for weekly-quota pacing.",
     "2026-10-22 ~18:00: c780514e planning complete (B 3d7d8ab2 done; both gates passed). Execution started under just-in-time-05; wave 1a is the fixture-lock timeout fix (a3dd995a) and rule-warning tests down a layer (9a07026e).",
-    "2026-10-22 ~18:15: c780514e's a3dd995a and 9a07026e fixed the recurring fixture timeouts (bounded 12 s lock wait with a named error; cli_warnings now in-process at ~0.03 s). The force-rerun exemption for that signature is withdrawn. Suite clock is 23.6-23.7 s at load 10-17."
+    "2026-10-22 ~18:15: c780514e's a3dd995a and 9a07026e fixed the recurring fixture timeouts (bounded 12 s lock wait with a named error; cli_warnings now in-process at ~0.03 s). The force-rerun exemption for that signature is withdrawn. Suite clock is 23.6-23.7 s at load 10-17.",
+    "2026-10-22 ~18:40: a3dd995a's fix is incomplete. The first full run after a crate change builds the cold fixture key under contention for longer than the 12 s wait (lock timeout plus a 20 s TIMEOUT; suite 31.6 s). The force exemption is restored for exactly that signature; the fix is routed to c780514e as top priority."
   ],
   "started_at": "2026-07-03",
   "user_actions": [

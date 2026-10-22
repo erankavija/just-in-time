@@ -1233,8 +1233,8 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
         .1;
     let audit_types = production_source(&crate_root.join("src/domain/types.rs"));
     let profile_audit_inputs = audit_types
-        .split_once("/// One variable's non-sensitive provenance in a lifecycle event.")
-        .expect("profile lifecycle audit retains its variable provenance type")
+        .split_once("/// One profile's lifecycle result within an aggregate mutation.")
+        .expect("profile lifecycle audit retains its per-profile result type")
         .1
         .split_once("/// System event types for audit log")
         .expect("profile lifecycle audit inputs remain separate from unrelated event types")

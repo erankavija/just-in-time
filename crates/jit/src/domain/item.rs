@@ -1711,7 +1711,7 @@ mod tests {
     fn test_qualified_id_is_derived() {
         // REQ-01: qualified id is the uniform kind-segmented address, a pure
         // projection over (scope, kind, self-id).
-        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
         issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496".to_string();
         assert_eq!(
             qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01"),
@@ -1750,7 +1750,7 @@ mod tests {
 
     #[test]
     fn test_index_items_projects_requirements() {
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n".to_string(),
         );
@@ -1772,7 +1772,7 @@ mod tests {
     #[test]
     fn test_index_items_graceful_degradation() {
         // REQ-06: a list line with no self-id is plain prose, not an error.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: real\n- [hard] just prose, no id\n"
                 .to_string(),
@@ -1785,7 +1785,7 @@ mod tests {
     #[test]
     fn test_index_items_marker_filters_prose() {
         // An unmarked criterion line is ignored by a marker-gated kind.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: hard one\n- REQ-99: soft, no marker\n"
                 .to_string(),
@@ -1824,7 +1824,7 @@ mod tests {
         // jit:16402e14 REQ-01/REQ-02: a GitHub task-list checkbox ahead of the
         // marker (`- [ ] [hard] ...`, `- [x] [hard] ...`) does not hide the
         // criterion from the item projection.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n\
              - [ ] [hard] REQ-01: unchecked box\n\
@@ -1844,7 +1844,7 @@ mod tests {
     #[test]
     fn test_index_items_duplicate_self_id_is_error() {
         // REQ-02: self-id uniqueness within an issue is validated.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n- [hard] REQ-01: dup\n".to_string(),
         );
@@ -1872,7 +1872,7 @@ mod tests {
             },
         )
         .unwrap();
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
         );
@@ -1893,7 +1893,7 @@ mod tests {
 
     #[test]
     fn test_index_items_missing_section_is_empty() {
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Other\n\n- nothing here\n".to_string(),
         );
@@ -1917,7 +1917,7 @@ mod tests {
             aliases: None,
         };
         let kind = ItemKind::from_config("decision", &cfg).unwrap();
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Decisions\n\n- D-1: use json\n- D-2: atomic writes\n".to_string(),
         );
@@ -2362,7 +2362,7 @@ name = \"bare\"
     fn test_index_items_projects_decisions_with_canonical_kinds() {
         // The canonical kind set indexes a `## Decisions`
         // section's D-NN lines through the same generic parse path as requirements.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Decisions\n\n- D-01: use json\n- D-02: atomic writes\n".to_string(),
         );
@@ -2810,7 +2810,7 @@ name = \"bare\"
     fn test_same_self_id_distinct_across_scopes() {
         // REQ-04: the SAME self-id under two different scopes does not conflict and
         // yields two distinct qualified ids.
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: issue one\n".to_string(),
         );

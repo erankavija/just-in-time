@@ -24,7 +24,6 @@ use crate::declarations::invariants::{serialize_invariant_registry, InvariantReg
 use crate::declarations::{serialize_gate_registry, GateRegistry};
 use crate::domain::{
     Event, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
-    ProfileLifecycleVariable,
 };
 
 use super::default_rules::default_ruleset;
@@ -976,16 +975,11 @@ fn profile_lifecycle_profile(
     } else {
         ProfileLifecycleStatus::Unchanged
     };
-    let variables = profile
-        .variables
-        .sources()
-        .into_iter()
-        .map(|(name, source)| ProfileLifecycleVariable { name, source })
-        .collect();
     ProfileLifecycleProfile {
         id: profile.id.clone(),
+        version: profile.version.clone(),
         status,
-        variables,
+        variables: profile.variables.values(),
     }
 }
 
@@ -1150,6 +1144,16 @@ mod tests {
         assert_eq!(unpublished.status, ProfileLifecycleStatus::Unchanged);
         assert_eq!(published.variables, unpublished.variables);
         assert_eq!(published.id, profile.id);
+    }
+
+    #[test]
+    fn test_profile_lifecycle_profile_records_the_package_version_and_applied_values() {
+        let profile = profile_input("workflow");
+
+        let recorded = profile_lifecycle_profile(&profile, true);
+
+        assert_eq!(recorded.version, profile.version);
+        assert_eq!(recorded.variables, profile.variables.values());
     }
 
     #[test]

@@ -44,7 +44,7 @@
 //! function of the issue description and the supplied parser.
 
 use crate::document::{ContentParser, ParsedContent};
-use crate::domain::types::Issue;
+use crate::domain::Issue;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -213,12 +213,11 @@ fn sections_from_parsed(parsed: ParsedContent) -> BTreeMap<String, ProjectedSect
 mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
-    use crate::domain::types::Issue;
+    use crate::domain::Issue;
     use crate::test_utils::document_reference_typed;
 
     fn issue_with(labels: Vec<&str>, description: &str) -> Issue {
-        let mut issue =
-            crate::domain::types::fixture_issue("Title".to_string(), description.to_string());
+        let mut issue = crate::domain::fixture_issue("Title".to_string(), description.to_string());
         issue.labels = labels.into_iter().map(str::to_string).collect();
         issue
     }

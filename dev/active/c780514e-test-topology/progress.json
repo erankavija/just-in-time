@@ -7,6 +7,14 @@
       "wave_number": 1,
       "issues": [
         {
+          "id": "d423752b-cedc-431b-be9e-d327f8b61387",
+          "short_id": "d423752b",
+          "key": "profiled-fixture-cold-build",
+          "title": "No test waits on a cold profiled-repository fixture build",
+          "classification": "implementation",
+          "status": "dispatched (sonnet)"
+        },
+        {
           "id": "a3dd995a-26d2-4039-8a69-332eca663885",
           "short_id": "a3dd995a",
           "key": "profiled-fixture-build-lock",
@@ -20,7 +28,7 @@
           "key": "cli-process-fixture",
           "title": "Shared fixture for spawning jit in CLI tests",
           "classification": "implementation",
-          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 dev/TESTING.md:215 claims all CLI suites use JitCli); docs rework queued"
+          "status": "done"
         },
         {
           "id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
@@ -44,7 +52,7 @@
           "key": "server-shutdown-test-bound",
           "title": "Server shutdown force-close test stays under the per-test bound",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "done"
         },
         {
           "id": "d35c610b-f752-4fe3-89a9-7eca1b3d52b3",
@@ -68,7 +76,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "rework 1 (F2 rustdoc) dispatched; steward scope note added for F1"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -116,7 +124,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 declaration_dir path traversal); rework with 0bf97911 F2 in one worktree"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -465,7 +473,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged; gating"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1224,16 +1232,36 @@
     "shared-test-fixtures": "c5aafdc0-998c-46a0-a286-7f853f0b814a",
     "suite-cost": "45e3e442-e157-4d73-918c-2fc7df04accc"
   },
-  "created_during_execution": [],
-  "escalations": [],
+  "created_during_execution": [
+    {
+      "id": "d423752b",
+      "title": "No test waits on a cold profiled-repository fixture build",
+      "reason": "steward evidence: a3dd995a's bounded lock wait still fails on cold keys after a crate change (run 6978f6b9); steward-approved follow-up",
+      "wired": "suite-cost story and profiled-fixture-input-key depend on it"
+    }
+  ],
+  "escalations": [
+    {
+      "issue": "0bf97911",
+      "category": "gate consistency: foundation-only task failed code-review F1 'no consumers' while adoption is owned by dependent sibling tasks",
+      "status": "resolved: steward (A) scope note appended to foundation-only tasks (f9894e1d6)"
+    }
+  ],
   "rework_counts": {
-    "2b49f95b": 1
+    "2b49f95b": 1,
+    "0bf97911": 1,
+    "4a82ed46": 1
   },
   "surfaced_pitfalls": [
     {
       "from": "a3dd995a worker",
       "finding": "profiled-fixture consumers without a nextest setup-script entry still build directly (now bounded at 12 s with a named error); durable fix is per-input keys and setup-script removal",
       "disposition": "covered by planned profiled-fixture-input-key and fixture-setup-hook-removal"
+    },
+    {
+      "from": "0bf97911 worker",
+      "finding": "shipped `invariant` kind declares id-pattern [a-z][a-z0-9-]* with alias inv; the hand-copied CANONICAL_ITEM_KINDS lists use [A-Z][A-Z0-9]*-[0-9]+ and no alias, so the shipped-item-kinds adoption tasks change the kinds test fixtures declare",
+      "disposition": "pass to harness/unit/cli-item-validate/fast-rules shipped-item-kinds adoption workers"
     }
   ],
   "traps": [],

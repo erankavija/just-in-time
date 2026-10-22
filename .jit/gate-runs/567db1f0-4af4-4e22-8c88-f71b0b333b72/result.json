@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "99a610baaf49517541037e308d1bf97a7e9a44a9",
+  "completed_at": "2026-10-22T15:34:06.660139378Z",
+  "duration_ms": 214215,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/how-to/troubleshooting.md",
+        "id": "F1",
+        "line": 330,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Two troubleshooting snippets show an incomplete agent.toml file; it requires [agent], id, created_at, and description."
+      }
+    ],
+    "summary": "Repository-only configuration and removal of config set --global are accurately documented; one pre-existing advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "567db1f0-4af4-4e22-8c88-f71b0b333b72",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:30:32.444772093Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` (level 4), no resolved children. Reviewed six reachable `jit:ea5f4536` commits individually with rename detection; no attribution fallback was needed. The current docs accurately remove global/user/system configuration and document repository-only `config set`.\n\n1. F1 — low, advisory, pre-existing: [`docs/how-to/troubleshooting.md:330`](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:330) and line 464 show an invalid `agent.toml` snippet containing only `id`. The identity file requires `[agent]`, `id`, `created_at`, and `description`. This predates the issue’s wording-only update; replace both snippets with the canonical identity-file example.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Repository-only configuration and removal of config set --global are accurately documented; one pre-existing advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Two troubleshooting snippets show an incomplete agent.toml file; it requires [agent], id, created_at, and description.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":330}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

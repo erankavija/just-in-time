@@ -637,7 +637,7 @@ mod tests {
         let config = HierarchyConfig::new(types, associations).unwrap();
 
         let orphaned = |labels: &[&str]| {
-            let mut issue = crate::domain::types::fixture_issue("leaf".into(), String::new());
+            let mut issue = crate::domain::fixture_issue("leaf".into(), String::new());
             issue.labels = std::iter::once("type:task")
                 .chain(labels.iter().copied())
                 .map(String::from)

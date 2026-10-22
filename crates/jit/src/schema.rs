@@ -1064,6 +1064,7 @@ pub(crate) mod test_support {
 /// per-command mappings ([`CommandSchema::command_exit_codes`]) into markdown, so
 /// the committed doc is generated rather than hand-copied. A test asserts the
 /// committed file equals this output (@/inv/single-source-prose).
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_exit_code_reference() -> String {
     let mut out = String::new();
     out.push_str("# Exit Codes\n\n");

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "29774dd8bcb32c436caf32f24e6c9f014ebd311f",
+  "completed_at": "2026-10-22T15:30:29.464668458Z",
+  "duration_ms": 230729,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the prior documentation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0645b0a6-2bff-4aa8-ad6f-994a099773d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:26:38.734934864Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f18ad56a3, 3c849ae3c, 0c218aab3, 58eff15bc, d69f92e41, da444aa55 (`jit:ea5f4536`)\nPolicy sources: AGENTS.md\nResolved items: REQ-01–04 and REQ-27 (issue descriptions, markdown-first); D-9, D-18, D-20 (dev/vision/9db27a3a-charter.md, markdown-first); canonical-cutover, essential-code-prose, orthogonal-tests (.jit/invariants.toml, registry-first); jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T15:25:10Z); mcp-ci pending; doc-review pending; docs-mechanical pending\nTruncation recovery: Re-read the effective-config loader, regression test, configuration reference, targeted legacy-path searches, and each tagged merge’s first-parent patch in bounded calls.\n\n1. No findings. Prior F1 is resolved: [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:22) lists repository files only, and the repository-only loader plus isolated-home regression test verify the removed layer.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the prior documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

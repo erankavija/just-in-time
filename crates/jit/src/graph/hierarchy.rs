@@ -782,7 +782,7 @@ mod tests {
     }
 
     fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
-        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
+        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
         issue.labels = vec![format!(
             "type:{}",
             crate::test_taxonomy::test_taxonomy().type_at_level(level)

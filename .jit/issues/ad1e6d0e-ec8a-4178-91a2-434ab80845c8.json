@@ -1,11 +1,12 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-22T15:37:08.019533242Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
     "22355a56-9730-4409-b9a8-5a2381c35cf7"
   ],
-  "description": "Give in-process suites one way to build a memory store and executor from declared configuration, rules and templates on top of the shared memory executor.\n\n## Background\n\nThe shared memory executor (`crate::commands::test_helpers::memory_executor`) is set up by product initialisation. In-process suites build their own `InMemoryStorage` and write `config.toml`, `rules.toml` or `templates.toml` around it before calling it.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor.\n- [hard] REQ-02: A unit test proves that the supplied declarations are what the executor loads and that unsupplied ones are product defaults.\n",
+  "description": "Give in-process suites one way to build a memory store and executor from declared configuration, rules and templates on top of the shared memory executor.\n\n## Background\n\nThe shared memory executor (`crate::commands::test_helpers::memory_executor`) is set up by product initialisation. In-process suites build their own `InMemoryStorage` and write `config.toml`, `rules.toml` or `templates.toml` around it before calling it.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied configuration, rules and templates, on top of the shared memory executor.\n- [hard] REQ-02: A unit test proves that the supplied declarations are what the executor loads and that unsupplied ones are product defaults.\n\n\nScope (steward ruling): this task adds the shared definition only; existing copies are retired by the adoption tasks that depend on it.",
   "documents": [],
   "gates_required": [
     "cargo-ci",
@@ -27,5 +28,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Shared memory executor accepts declarations as data",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T15:37:08.129491562Z"
 }

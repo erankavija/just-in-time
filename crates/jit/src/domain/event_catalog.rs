@@ -4,7 +4,7 @@
 //! declaration tags every record with a snake-case `type` field. This module
 //! projects that vocabulary into a machine-consumable catalog ([`event_catalog`],
 //! carried by `jit --schema` as its `events` array) and into the committed
-//! markdown reference rendered by [`render_event_reference`].
+//! markdown reference rendered by `render_event_reference`.
 //!
 //! The catalog is derived from the type, never restated:
 //!
@@ -29,7 +29,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::types::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
+use super::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -251,8 +251,8 @@ impl EventTag {
             EventTag::GateDefinitionRemoved => "`jit gate remove` unregistered a gate.",
             EventTag::ProfileLifecycle => {
                 "A profile lifecycle operation reached its commit point, the redo record \
-                 carrying its writes; the event summarizes per-profile actions and variable \
-                 source kinds without resolved values or rendered content."
+                 carrying its writes; the event summarizes per-profile actions, recording \
+                 each package's id, version and applied variable values."
             }
             EventTag::LinkedCheckoutWriteOverridden => {
                 "An explicit per-invocation override permitted a state-mutating command inside a \
@@ -412,13 +412,15 @@ impl EventTag {
                     id: "example"
                         .try_into()
                         .expect("sample profile id is canonical"),
+                    version: "1.0.0".to_string(),
                     status: crate::domain::ProfileLifecycleStatus::Installed,
-                    variables: vec![crate::domain::ProfileLifecycleVariable {
-                        name: "NAME"
+                    variables: [(
+                        "NAME"
                             .try_into()
                             .expect("sample variable name is canonical"),
-                        source: crate::profile::VariableSource::Set,
-                    }],
+                        "value".to_string(),
+                    )]
+                    .into(),
                 }],
                 isolated_torn_tail: false,
             },
@@ -486,7 +488,7 @@ pub struct EventTagDoc {
 /// Project the event-tag catalog: one row per [`Event`] variant.
 ///
 /// Carried by `jit --schema` as its `events` array and rendered into the
-/// committed reference by [`render_event_reference`]. Every row is derived:
+/// committed reference by `render_event_reference`. Every row is derived:
 /// [`EventTag::as_str`] supplies the tag serde writes, [`EventTag::scope`] the
 /// association scope, and the `issue_id` presence is read off the sample record's
 /// serialized JSON object — the encoding the event log stores.
@@ -507,6 +509,7 @@ pub fn event_catalog() -> Vec<EventTagDoc> {
 /// The page projects [`event_catalog`] into markdown, so the committed doc is
 /// generated rather than hand-copied. A conformance test asserts the committed
 /// file equals this output (`@/inv/single-source-prose`).
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_event_reference() -> String {
     let catalog = event_catalog();
 

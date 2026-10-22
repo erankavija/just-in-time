@@ -212,7 +212,7 @@ Shared in-process helpers live in the `jit` library's `test-support` surface (fo
 `crates/jit/src/test_harness.rs`), so they never surface as their own test targets. Add a new integration case to the file that
 matches its subsystem, or add a module file plus a `mod` line in the suite's `main.rs`.
 
-The CLI suites spawn the compiled binary through `jit::test_cli::JitCli`, the one shared
+New and migrated CLI tests spawn `jit` through `jit::test_cli::JitCli`, the one shared
 subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
 `jit init`, or `with_repository(TempDir)` for one built by shared test support) and removes it
 on drop. `command(args)` yields a `std::process::Command` for the target's `jit` with the
@@ -221,8 +221,8 @@ repository as working directory, test mode on and every inherited `JIT_*` variab
 assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
 `create_issue` returns the created id from `--json`, and `init_git` (backed by
 `init_git_repository`, which in-process tests also call) initialises git with a fixed author
-identity and no dependence on global git configuration. Tests name no binary path,
-`CARGO_BIN_EXE_jit` or `cargo_bin!`, and scrape no human-readable output for ids.
+identity and no dependence on global git configuration. A test that uses the fixture names no binary path,
+`CARGO_BIN_EXE_jit` or `cargo_bin!`, and scrapes no human-readable output for ids.
 
 ```rust
 #[test]
