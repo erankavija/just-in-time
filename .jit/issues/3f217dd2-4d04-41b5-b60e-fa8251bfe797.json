@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "512e6159-47d4-4ddf-8076-0475dd944d7f",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:39:45.196783381Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "654da513-7e3e-42d6-b650-4bde5322101d",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:45:09.946358677Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f217dd2-4d04-41b5-b60e-fa8251bfe797",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record what was applied in the profile lifecycle event",
-  "updated_at": "2026-10-22T15:01:49.070998999Z"
+  "updated_at": "2026-10-22T15:45:09.946358677Z"
 }

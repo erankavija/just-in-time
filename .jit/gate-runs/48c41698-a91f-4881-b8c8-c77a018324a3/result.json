@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "855ccd2d9896ae39992d7fadf0f8479041628048",
+  "completed_at": "2026-10-22T15:44:25.398345450Z",
+  "duration_ms": 280380,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared fixture and corrected documentation meet the issue's scoped requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "48c41698-a91f-4881-b8c8-c77a018324a3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:39:45.017464873Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8ee5984dd, 8c2837ad5, ec4c76544, d318c03a7 (individual patches inspected; merge patches duplicate their branch changes)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2b49f95b/requirement/REQ-01–REQ-07 and @/issue/c780514e/requirement/REQ-05, REQ-09 (.jit/issues/*.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-22T15:39:42Z); prior code-review failed (exit 1, 2026-10-22T15:28:32Z)\nTruncation recovery: Re-read repository-local policy, per-commit patches, source line ranges, manifest, item sources, and gate registry in bounded calls after broad diagnostics truncated.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared fixture and corrected documentation meet the issue's scoped requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

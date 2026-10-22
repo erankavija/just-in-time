@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "8af43b7d-3982-4fcc-90ba-cf7f2f5b7333",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:28:32.821182633Z",
+      "run_id": "48c41698-a91f-4881-b8c8-c77a018324a3",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:44:25.621088188Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared fixture for spawning jit in CLI tests",
-  "updated_at": "2026-10-22T15:39:42.624105724Z"
+  "updated_at": "2026-10-22T15:44:25.621088188Z"
 }

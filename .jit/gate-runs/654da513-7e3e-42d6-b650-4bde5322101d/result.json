@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "855ccd2d9896ae39992d7fadf0f8479041628048",
+  "completed_at": "2026-10-22T15:45:09.716914347Z",
+  "duration_ms": 298328,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 1874,
+        "origin": "pre-existing",
+        "references": [
+          "@/gate/cargo-ci"
+        ],
+        "severity": "medium",
+        "summary": "cargo-ci's fixture-lock timeout occurs in untouched test_utils code, not this issue's lifecycle-event changes."
+      }
+    ],
+    "summary": "No issue-impact defects found; one pre-existing cargo-ci fixture-lock failure remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3f217dd2-4d04-41b5-b60e-fa8251bfe797",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "654da513-7e3e-42d6-b650-4bde5322101d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:40:11.388187121Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 958f9c195, 9feeaa5f6, 855ccd2d9 (`jit:3f217dd2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue description); @/inv/canonical-cutover, @/inv/essential-code-prose, @/inv/orthogonal-tests, @/inv/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (latest reused record, exit code none; source run exit 1); code-review pending\nTruncation recovery: re-read merge parent-specific diff, affected sources/tests, exact item lookup, and gate records after broad patch/search output truncated\n\n1. **[advisory | pre-existing | medium]** `cargo-ci` fails in untouched fixture code at `crates/jit/src/test_utils.rs:1874`: a profiled-repository fixture lock times out, causing one test failure and a second timeout. The issue’s attributable patches do not modify this code or its fixture synchronization. References: @/gate/cargo-ci.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found; one pre-existing cargo-ci fixture-lock failure remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"cargo-ci's fixture-lock timeout occurs in untouched test_utils code, not this issue's lifecycle-event changes.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":1874,\"references\":[\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
