@@ -187,6 +187,71 @@ pub fn render_archive_candidates(
     rendered
 }
 
+/// A column printed after `{id} | {title}` in a human issue-list row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IssueColumn {
+    State,
+    Priority,
+}
+
+/// One row of a human issue list: the issue and its optional reason lines.
+pub type IssueListRow<'a> = (&'a Issue, Vec<String>);
+
+/// Rows with no reason lines.
+pub fn plain_issue_rows(issues: &[Issue]) -> impl Iterator<Item = IssueListRow<'_>> {
+    issues.iter().map(|issue| (issue, Vec::new()))
+}
+
+/// Render a human issue list: `header`, two-space-indented rows (`id | title`
+/// plus `columns`, then one `    - reason` line per reason), and a blank-line
+/// separated `Total: N` footer. `quiet` drops the header and footer.
+pub fn render_issue_list<'a>(
+    header: &str,
+    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    columns: &[IssueColumn],
+    quiet: bool,
+) -> String {
+    use std::fmt::Write;
+
+    let mut lines = String::new();
+    let mut total = 0usize;
+    for (issue, reasons) in rows {
+        total += 1;
+        let _ = write!(lines, "  {} | {}", issue.id, issue.title);
+        for column in columns {
+            let _ = match column {
+                IssueColumn::State => write!(lines, " | {:?}", issue.state),
+                IssueColumn::Priority => write!(lines, " | {:?}", issue.priority),
+            };
+        }
+        lines.push('\n');
+        for reason in reasons {
+            let _ = writeln!(lines, "    - {reason}");
+        }
+    }
+    if quiet {
+        lines.truncate(lines.trim_end_matches('\n').len());
+        lines
+    } else {
+        format!("{header}\n{lines}\nTotal: {total}")
+    }
+}
+
+/// Print [`render_issue_list`]; quiet mode prints the rows alone and an empty
+/// quiet list prints nothing.
+pub fn print_issue_list<'a>(
+    ctx: &OutputContext,
+    header: &str,
+    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    columns: &[IssueColumn],
+) -> io::Result<()> {
+    let rendered = render_issue_list(header, rows, columns, ctx.quiet);
+    if ctx.json || (ctx.quiet && rendered.is_empty()) {
+        return Ok(());
+    }
+    writeln_safe(&rendered)
+}
+
 fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagnostics: &[T]) {
     use std::fmt::Write;
     if diagnostics.is_empty() {
@@ -233,6 +298,66 @@ fn display_optional(value: &str) -> &str {
         "(not configured)"
     } else {
         value
+    }
+}
+
+#[cfg(test)]
+mod issue_list_render_tests {
+    use super::*;
+
+    fn issue(id: &str, title: &str) -> Issue {
+        let mut issue = Issue::draft(title.into(), String::new());
+        issue.id = id.into();
+        issue
+    }
+
+    #[test]
+    fn test_render_issue_list_indents_rows_and_columns_reasons_and_total_footer() {
+        let issues = [issue("aaaa", "First"), issue("bbbb", "Second")];
+        let rows = vec![
+            (&issues[0], vec!["waits on x".to_string()]),
+            (&issues[1], Vec::new()),
+        ];
+
+        let rendered = render_issue_list(
+            "Header:",
+            rows,
+            &[IssueColumn::State, IssueColumn::Priority],
+            false,
+        );
+
+        assert_eq!(
+            rendered,
+            "Header:\n  aaaa | First | Backlog | Normal\n    - waits on x\n  bbbb | Second | Backlog | Normal\n\nTotal: 2"
+        );
+    }
+
+    #[test]
+    fn test_render_issue_list_without_columns_prints_id_and_title_only() {
+        let issues = [issue("aaaa", "First")];
+
+        let rendered = render_issue_list("H", plain_issue_rows(&issues), &[], false);
+
+        assert_eq!(rendered, "H\n  aaaa | First\n\nTotal: 1");
+    }
+
+    #[test]
+    fn test_render_issue_list_quiet_keeps_rows_and_drops_header_and_footer() {
+        let issues = [issue("aaaa", "First")];
+
+        let rendered = render_issue_list(
+            "H",
+            plain_issue_rows(&issues),
+            &[IssueColumn::Priority],
+            true,
+        );
+
+        assert_eq!(rendered, "  aaaa | First | Normal");
+    }
+
+    #[test]
+    fn test_render_issue_list_empty_prints_header_and_zero_total() {
+        assert_eq!(render_issue_list("H", [], &[], false), "H\n\nTotal: 0");
     }
 }
 

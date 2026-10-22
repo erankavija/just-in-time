@@ -114,6 +114,67 @@ fn test_graph_roots_json_output() {
     assert_eq!(json["roots"][0]["id"], id1);
 }
 
+/// Create a root issue and a dependent of it; returns `(root_id, dependent_id)`.
+fn create_root_and_dependent(temp: &crate::TaxonomyRepo) -> (String, String) {
+    let create = |title: &str| {
+        let output = Command::new(jit_binary())
+            .args(["issue", "create", "-t", title, "-d", "Desc"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&output.stdout)
+            .split_whitespace()
+            .nth(2)
+            .unwrap()
+            .to_string()
+    };
+    let root = create("Root Task");
+    let dependent = create("Dependent Task");
+    Command::new(jit_binary())
+        .args(["dep", "add", &dependent, &root])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    (root, dependent)
+}
+
+fn assert_indented_row_and_total(stdout: &str, id: &str) {
+    let row = stdout
+        .lines()
+        .find(|line| line.contains(id))
+        .unwrap_or_else(|| panic!("output lists {id}: {stdout}"));
+    assert!(row.starts_with("  "), "row is indented: {row:?}");
+    assert!(stdout.trim_end().ends_with("Total: 1"), "{stdout}");
+}
+
+#[test]
+fn test_graph_rdeps_human_output_ends_with_total() {
+    let temp = setup_test_repo();
+    let (root, dependent) = create_root_and_dependent(&temp);
+
+    let output = Command::new(jit_binary())
+        .args(["graph", "rdeps", &root])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert_indented_row_and_total(&String::from_utf8_lossy(&output.stdout), &dependent);
+}
+
+#[test]
+fn test_graph_roots_human_output_ends_with_total() {
+    let temp = setup_test_repo();
+    let (root, _) = create_root_and_dependent(&temp);
+
+    let output = Command::new(jit_binary())
+        .args(["graph", "roots"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert_indented_row_and_total(&String::from_utf8_lossy(&output.stdout), &root);
+}
+
 // ============================================================================
 // REQ-03 (jit:1a63ef75): `jit graph export --json` is sugar for `--format
 // json` on stdout, composes with `--full`, and conflicts with an explicit
