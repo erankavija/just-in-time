@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "448d0665-ddfb-4a46-aaf8-4d30cb15ca4f",
-      "status": "failed",
-      "updated_at": "2026-10-22T19:33:54.052274454Z",
+      "run_id": "b5a4e893-2beb-4c5e-8e71-f736268ef67e",
+      "status": "passed",
+      "updated_at": "2026-10-22T19:54:52.832059019Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T19:54:30.536779493Z"
+  "updated_at": "2026-10-22T19:54:52.832059019Z"
 }
