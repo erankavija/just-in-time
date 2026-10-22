@@ -244,10 +244,6 @@ fn test_init_idempotent_does_not_overwrite_index() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// REQ-03 (jit:1a63ef75): `--json` machine output
-// ---------------------------------------------------------------------------
-
 #[test]
 fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
     let temp = TempDir::new().unwrap();
@@ -300,11 +296,6 @@ fn test_init_json_reports_repository_id_inside_git() {
         "repository_id should be a worktree id, got: {repository_id}"
     );
 }
-
-// ---------------------------------------------------------------------------
-// Review follow-up (jit:1a63ef75 F1/F2): `.gitattributes` created/modified
-// reporting, and the atomic-write path it now goes through.
-// ---------------------------------------------------------------------------
 
 #[test]
 fn test_init_json_inside_git_reports_gitattributes_created() {
@@ -396,10 +387,8 @@ fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
         .ends_with("merge: unspecified\n"));
 }
 
-// Regression (jit:7a60f987): `.jit/claims.jsonl` never gets a merge-driver
-// entry. The claim log actually lives under the shared `.git/jit/` control
-// plane (see storage/claim_coordinator.rs), never under the versioned
-// `.jit/` data plane that `.gitattributes` covers.
+// The claim log lives under `.git/jit/`, outside the versioned `.jit/` paths
+// covered by `.gitattributes`.
 #[test]
 fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     let temp = TempDir::new().unwrap();
@@ -428,11 +417,8 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     );
 }
 
-// A re-init runs the same session-backed init publication as a fresh init
-// (jit:49adf23b increment 7 unified plain re-init onto `initialize_fresh_repository`), so
-// it too claims the worktree `.gitattributes` merge driver. When the block is
-// already configured the claim is `Unchanged`, so a re-init reports
-// `.gitattributes` in neither created nor modified.
+// Re-init reports an existing merge-driver claim as unchanged and excludes
+// `.gitattributes` from both created and modified paths.
 #[test]
 fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     let temp = TempDir::new().unwrap();
@@ -474,13 +460,7 @@ fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     );
 }
 
-// jit:49adf23b increment 7: pin that a PLAIN re-init asserts the worktree
-// `.gitattributes` merge-driver claim, not only a fresh init. Before the plain
-// re-init was unified onto the session-backed `initialize_fresh_repository`, a re-init
-// reported `.gitattributes` as `NotApplicable` and never restored it. Here the
-// first init creates it, the file is then deleted, and the re-init must re-create
-// it — proving the claim runs on the ordinary (non-fresh, non-profiled) re-init
-// path and that Git evidence, not the fresh/existing-root distinction, gates it.
+// Plain re-init restores a deleted `.gitattributes` merge-driver claim.
 #[test]
 fn test_init_json_reinit_reclaims_deleted_gitattributes() {
     let temp = TempDir::new().unwrap();
@@ -966,13 +946,8 @@ fn test_init_with_the_default_package_plans_archival_under_a_configured_policy()
     );
 }
 
-/// REQ-06 (jit:08b8c0ef): a repository initialized fresh inside git reports no
-/// untracked scratch content in its version-control status after a mutation.
-///
-/// The second half is what makes the first non-vacuous: a commit point placed
-/// under the data root's scratch directory — the state publication leaves there
-/// — is still absent from the status, so the silence is the composed ignore
-/// file's doing rather than an empty directory's.
+/// Init's ignore rules hide scratch content left by a mutation, including an
+/// explicitly populated commit point.
 #[test]
 fn test_init_inside_git_leaves_no_untracked_scratch_content_after_a_mutation() {
     let temp = TempDir::new().unwrap();

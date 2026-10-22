@@ -81,6 +81,16 @@ impl ProfilePackage {
     /// relative and may use ordinary path normalization, but the package root
     /// itself and every entry beneath it must not be a symbolic link.
     pub fn from_directory(directory: &Path) -> Result<Self, ProfilePackageError> {
+        let contents = read_package_directory(directory)?;
+        Self::from_files_with_modes(
+            contents.files,
+            contents.executable_sources,
+            ProfilePackageSource::Directory(contents.root),
+        )
+    }
+
+    /// Resolve a package root without admitting a symbolic-link selector.
+    pub(crate) fn resolve_directory(directory: &Path) -> Result<PathBuf, ProfilePackageError> {
         let metadata =
             fs::symlink_metadata(directory).map_err(|source| unreadable(directory, source))?;
         if metadata.file_type().is_symlink() {
@@ -88,12 +98,7 @@ impl ProfilePackage {
                 path: directory.display().to_string(),
             });
         }
-        let contents = read_package_directory(directory)?;
-        Self::from_files_with_modes(
-            contents.files,
-            contents.executable_sources,
-            ProfilePackageSource::Directory(contents.root),
-        )
+        fs::canonicalize(directory).map_err(|source| unreadable(directory, source))
     }
 
     /// Parse manifest bytes and validate everything they declare about
@@ -432,7 +437,7 @@ struct PackageDirectoryContents {
 }
 
 fn read_package_directory(root: &Path) -> Result<PackageDirectoryContents, ProfilePackageError> {
-    let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
+    let root = ProfilePackage::resolve_directory(root)?;
     let handle = CapDir::open_ambient_dir(&root, ambient_authority())
         .map_err(|source| unreadable(&root, source))?;
     let mut pending = vec![(handle, String::new())];

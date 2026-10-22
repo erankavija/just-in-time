@@ -474,12 +474,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             .iter()
             .map(|selector| {
                 let ProfileSelector::Path(location) = selector;
-                let requested = requested_package_directory(location, &layout);
-                if let Some(package) = read.get(&requested) {
+                let directory = supplied_package_directory(location, &layout)?;
+                if let Some(package) = read.get(&directory) {
                     return Ok(package.clone());
                 }
-                let package = self.resolve_profile_package(selector)?;
-                read.insert(requested, package.clone());
+                let package = read_supplied_package(&directory, location)?;
+                read.insert(directory, package.clone());
                 Ok(package)
             })
             .collect()
@@ -1480,31 +1480,36 @@ fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
     }
 }
 
-fn requested_package_directory(location: &Path, layout: &RepositoryLayout) -> PathBuf {
-    if location.is_absolute() {
+/// Resolve and classify a selector before a cached package can satisfy it.
+fn supplied_package_directory(location: &Path, layout: &RepositoryLayout) -> Result<PathBuf> {
+    let requested = if location.is_absolute() {
         location.to_path_buf()
     } else {
         layout.worktree_root().join(location)
-    }
+    };
+    let directory = ProfilePackage::resolve_directory(&requested).map_err(|source| {
+        ProfileResolutionError::UnreadableLocation {
+            location: location.display().to_string(),
+            source,
+        }
+    })?;
+    ensure_worktree_package_directory(&requested, layout)?;
+    ensure_worktree_package_directory(&directory, layout)?;
+    Ok(directory)
+}
+
+fn read_supplied_package(directory: &Path, location: &Path) -> Result<ProfilePackage> {
+    ProfilePackage::from_directory(directory)
+        .map_err(|source| ProfileResolutionError::UnreadableLocation {
+            location: location.display().to_string(),
+            source,
+        })
+        .map_err(Into::into)
 }
 
 /// Read the package at a location the caller supplied.
-///
-/// The package there supplies the id its selector resolves to.
 fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<ProfilePackage> {
-    let requested = requested_package_directory(location, layout);
-    let package = match fs::canonicalize(&requested) {
-        Ok(_) => {
-            ensure_worktree_package_directory(&requested, layout)?;
-            ProfilePackage::from_directory(&requested)
-        }
-        Err(_) => ProfilePackage::from_directory(&requested),
-    }
-    .map_err(|source| ProfileResolutionError::UnreadableLocation {
-        location: location.display().to_string(),
-        source,
-    })?;
-    Ok(package)
+    read_supplied_package(&supplied_package_directory(location, layout)?, location)
 }
 
 /// Reuse the repository layout's canonical root classification before reading a
@@ -4502,19 +4507,74 @@ template = true
     }
 
     #[test]
-    fn test_select_profiles_validates_equivalent_relative_and_absolute_selectors_once() {
+    fn test_select_profiles_validates_equivalent_directory_spellings_once() {
         let (temp, _storage, executor, _package) = fixture();
         let (absolute, closure) = dependent_selection(&temp, &executor);
-        let relative = ProfileSelector::path("vendor/workflow");
+        let selectors = vec![
+            ProfileSelector::path("vendor/workflow"),
+            absolute,
+            ProfileSelector::path("vendor/./workflow/"),
+            ProfileSelector::path("vendor/../vendor/workflow"),
+            ProfileSelector::path("vendor/workflow/../workflow"),
+        ];
+        #[cfg(unix)]
+        let selectors = {
+            std::os::unix::fs::symlink("vendor", temp.path().join("alias")).unwrap();
+            let mut selectors = selectors;
+            selectors.push(ProfileSelector::path("alias/workflow"));
+            selectors
+        };
         let (planned, stages) = selection_probe::observe(|| {
-            plan_selected(
-                &executor,
-                &[relative, absolute],
-                &ProfileVariableOptions::default(),
-            )
+            plan_selected(&executor, &selectors, &ProfileVariableOptions::default())
         });
-        assert_eq!(planned.unwrap().count(), closure + 1);
+        assert_eq!(planned.unwrap().count(), closure + selectors.len() - 1);
         assert_eq!(stages, selection_probe::once_per_invocation(closure));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_select_profiles_refuses_a_symlink_alias_of_a_cached_package() {
+        let (temp, _storage, executor, _package) = fixture();
+        let (selector, _) = dependent_selection(&temp, &executor);
+        std::os::unix::fs::symlink("workflow", temp.path().join("vendor/alias")).unwrap();
+
+        let result = executor.select_profiles(
+            &[selector, ProfileSelector::path("vendor/alias")],
+            &ProfileVariableOptions::default(),
+        );
+
+        let error = result
+            .err()
+            .expect("a cached package cannot admit a symlink selector");
+        assert!(matches!(
+            error.downcast_ref::<ProfileResolutionError>(),
+            Some(ProfileResolutionError::UnreadableLocation {
+                source: ProfilePackageError::SymlinkedSource { .. },
+                ..
+            })
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_select_profiles_refuses_a_directory_resolving_outside_the_worktree() {
+        let (temp, _storage, executor, _package) = fixture();
+        let outside = TempDir::new().unwrap();
+        package_declaring(&outside, "vendor/workflow", "workflow", &[]);
+        std::os::unix::fs::symlink(outside.path(), temp.path().join("outside")).unwrap();
+
+        let result = executor.select_profiles(
+            &[ProfileSelector::path("outside/vendor/workflow")],
+            &ProfileVariableOptions::default(),
+        );
+
+        let error = result
+            .err()
+            .expect("the resolved package must remain in the worktree");
+        assert!(matches!(
+            error.downcast_ref::<ProfileApplyError>(),
+            Some(ProfileApplyError::PackageOutsideWorktree { .. })
+        ));
     }
 
     #[test]
