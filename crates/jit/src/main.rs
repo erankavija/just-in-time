@@ -5938,13 +5938,25 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         message,
                         has_errors.then_some(ErrorCode::ValidationFailed),
                     )?;
-                } else if has_errors {
-                    println!("Errors:");
-                    for err in &result.errors {
-                        println!("  error: {}", err);
-                    }
                 } else {
-                    println!("Configuration is valid");
+                    let findings: Vec<_> = result
+                        .errors
+                        .iter()
+                        .map(|message| jit::validation::report::ReportedFinding {
+                            issue_id: None,
+                            rule: "config".to_string(),
+                            severity: jit::declarations::rules::Severity::Error,
+                            message: message.clone(),
+                        })
+                        .collect();
+                    jit::output::render_validation_findings(
+                        &findings,
+                        Some(jit::output::FindingsSummary {
+                            pass: "Configuration is valid",
+                            failure: "Configuration validation failed",
+                        }),
+                    )
+                    .print();
                 }
 
                 // A source that failed to load or carried an invalid value is a
@@ -6254,29 +6266,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         message,
                         exit_nonzero.then_some(ErrorCode::ValidationFailed),
                     )?;
-                } else if report.findings.is_empty() {
-                    println!("Scope validation passed");
                 } else {
-                    for finding in &report.findings {
-                        println!(
-                            "{} [{}] {}",
-                            if finding.is_error() {
-                                "error"
-                            } else {
-                                "warning"
-                            },
-                            finding.rule,
-                            finding.message
-                        );
-                    }
-                    if exit_nonzero {
-                        eprintln!(
-                            "Scope validation failed with {} error(s)",
-                            report.error_count()
-                        );
-                    } else {
-                        println!("Scope validation passed");
-                    }
+                    jit::output::render_validation_findings(
+                        &report.findings,
+                        Some(jit::output::FindingsSummary {
+                            pass: "Scope validation passed",
+                            failure: "Scope validation failed",
+                        }),
+                    )
+                    .print();
                 }
                 if exit_nonzero {
                     std::process::exit(jit::ExitCode::ValidationFailed.code());
@@ -6306,27 +6304,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         message,
                         exit_nonzero.then_some(ErrorCode::GenericError),
                     )?;
-                } else if report.findings.is_empty() {
-                    println!("Rule validation passed");
                 } else {
-                    for finding in &report.findings {
-                        println!(
-                            "{} [{}] {}",
-                            if finding.is_error() {
-                                "error"
-                            } else {
-                                "warning"
-                            },
-                            finding.rule,
-                            finding.message
-                        );
-                    }
-                    if exit_nonzero {
-                        eprintln!(
-                            "Rule validation failed with {} error(s)",
-                            report.error_count()
-                        );
-                    }
+                    jit::output::render_validation_findings(
+                        &report.findings,
+                        Some(jit::output::FindingsSummary {
+                            pass: "Rule validation passed",
+                            failure: "Rule validation failed",
+                        }),
+                    )
+                    .print();
                 }
                 if exit_nonzero {
                     std::process::exit(1);
@@ -6422,24 +6408,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         message,
                         exit_nonzero.then_some(ErrorCode::GenericError),
                     )?;
-                } else if report.findings.is_empty() {
-                    println!("Issue validation passed");
                 } else {
-                    for finding in &report.findings {
-                        println!(
-                            "{} [{}] {}",
-                            if finding.is_error() {
-                                "error"
-                            } else {
-                                "warning"
-                            },
-                            finding.rule,
-                            finding.message
-                        );
-                    }
-                    if exit_nonzero {
-                        eprintln!("Validation failed with {} error(s)", report.error_count());
-                    }
+                    jit::output::render_validation_findings(
+                        &report.findings,
+                        Some(jit::output::FindingsSummary {
+                            pass: "Issue validation passed",
+                            failure: "Validation failed",
+                        }),
+                    )
+                    .print();
                 }
                 if exit_nonzero {
                     std::process::exit(1);
@@ -6690,18 +6667,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // Every finding (errors AND warnings — including the built-in
                     // type-hierarchy warnings) is rendered through the rule report.
-                    for finding in &rule_report.findings {
-                        println!(
-                            "{} [{}] {}",
-                            if finding.is_error() {
-                                "error"
-                            } else {
-                                "warning"
-                            },
-                            finding.rule,
-                            finding.message
-                        );
-                    }
+                    jit::output::render_validation_findings(&rule_report.findings, None).print();
 
                     if !warning_findings.is_empty() {
                         println!("\nWarnings: {}", warning_findings.len());
