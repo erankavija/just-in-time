@@ -266,7 +266,11 @@ mod tests {
 
         memory_executor(storage.clone());
 
-        assert_eq!(counter.count(), 0, "initialization must not open the scenario store");
+        assert_eq!(
+            counter.count(),
+            0,
+            "initialization must not open the scenario store"
+        );
         let initialized = storage.repository_state();
         for (path, entry) in seeded {
             assert_eq!(initialized.entries.get(&path), Some(&entry), "{path:?}");
