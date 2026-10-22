@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f43aab5b07381a9b9a9d9639bfcb1d130d8c6615",
+  "completed_at": "2026-10-22T14:58:47.082907689Z",
+  "duration_ms": 227941,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The four warning properties now evaluate workflow-package declarations in memory; the slow file-backed fixture and its test module are removed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9a07026e-0666-4c3e-9868-5f083b293988",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7379c198-421f-47d5-8a48-f189793bad1c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:54:59.140940728Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c904cb0b9 and merge ccd80bdb0 (`jit:9a07026e`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-13 (issue Markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:53:17Z)\nTruncation recovery: re-read package capture, taxonomy, package declarations, and affected source ranges narrowly; unrelated historical gate records were outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The four warning properties now evaluate workflow-package declarations in memory; the slow file-backed fixture and its test module are removed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

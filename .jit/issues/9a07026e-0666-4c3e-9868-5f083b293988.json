@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-22T14:54:58.677299507Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7379c198-421f-47d5-8a48-f189793bad1c",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:58:47.308195191Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "9a07026e-0666-4c3e-9868-5f083b293988",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Create-time rule warnings proven in-process without a profiled repository",
-  "updated_at": "2026-10-22T14:54:58.677299507Z"
+  "updated_at": "2026-10-22T14:58:47.308195191Z"
 }
