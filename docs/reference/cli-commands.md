@@ -639,8 +639,9 @@ A package the resolved one declares a dependency on is looked for beside it,
 in a directory named by that dependency's own ID.
 One obtained directory of packages therefore applies as a set:
 `jit profile apply --profile packages/<PROFILE_ID>` reaches
-`packages/<DEPENDENCY_ID>` without naming it. Multiple selectors are resolved
-and applied in their occurrence order.
+`packages/<DEPENDENCY_ID>` without naming it. Only the selected packages and
+the dependencies found this way take part; a package applied earlier is not
+consulted. Multiple selectors are resolved and applied in their occurrence order.
 
 ### `jit profile show`
 
@@ -701,7 +702,7 @@ reason beneath one that cannot be published. JSON returns the count-wrapped `Pro
 `{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
 return, with `status` additionally reporting `would_conflict`.
 
-The report writes nothing: no target, no provenance record, and no audit event.
+The report writes nothing: no target and no audit event.
 It exits `0` when every participating profile can be published and `4` when any
 decided a target or a declaration that cannot be, so it serves as a repository
 check. The report

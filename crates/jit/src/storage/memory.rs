@@ -75,9 +75,8 @@ impl InMemoryStorage {
     /// An in-memory store whose synthetic layout is rooted at `root_path`.
     ///
     /// The aggregate stays in memory; the root only names the layout. A
-    /// repository whose applied-profile record names a worktree-relative
-    /// package location needs that name to reach a real directory, because
-    /// resolving such a record reads the package from the location it names.
+    /// worktree-relative package location needs that name to reach a real
+    /// directory, because a package is read from the location it names.
     /// [`new`](Self::new) mints a root that does not exist, which is what every
     /// other case wants.
     pub fn rooted_at(root_path: impl Into<std::path::PathBuf>) -> Self {

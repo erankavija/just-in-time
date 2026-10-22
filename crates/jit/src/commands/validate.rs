@@ -157,7 +157,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             self.storage(),
             &layout,
             "validation capture",
-            |session| match self.capture_validation_base(session, overrides, &[], None)? {
+            |session| match self.capture_proposed_base(session, overrides, &[], None)? {
                 None => Ok(SessionStep::Retry),
                 Some(base) if overrides.is_empty() => Ok(SessionStep::Done(base)),
                 Some(base) => Ok(SessionStep::Done(apply_overlay(&base, overrides.clone())?)),
@@ -173,7 +173,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// read-set conflict, or an error otherwise. `overrides` scopes the closure to
     /// the proposed declarations (so a proposed init/profile state captures what
     /// its passes read); `extra_paths` discovers additional delta targets (init
-    /// schema files, profile assets, directories, provenance) into the base so a
+    /// schema files, profile assets, directories) into the base so a
     /// subsequent `apply` finds each action's captured preimage; `start` is an
     /// image this session's round has already read, which the base grows from.
     /// The base also reads every issue document reference: its working-tree
@@ -189,36 +189,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_base_reading(session, overrides, extra_paths, start, true)
-    }
-
-    /// [`capture_proposed_base`](Self::capture_proposed_base) without the
-    /// applied-profile records: repository validation judges the repository's
-    /// declared state and reads no record, so it captures none.
-    pub(crate) fn capture_validation_base(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        overrides: &std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            Option<Vec<u8>>,
-        >,
-        extra_paths: &[crate::repository_state::VirtualPath],
-        start: Option<crate::repository_state::RepositoryImage>,
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_base_reading(session, overrides, extra_paths, start, false)
-    }
-
-    fn capture_base_reading(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        overrides: &std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            Option<Vec<u8>>,
-        >,
-        extra_paths: &[crate::repository_state::VirtualPath],
-        start: Option<crate::repository_state::RepositoryImage>,
-        applied_records: bool,
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         let Some((image, issues)) = self.capture_proposed_base_inner(
             session,
             start,
@@ -227,7 +197,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             false,
             false,
-            applied_records,
         )?
         else {
             return Ok(None);
@@ -253,7 +222,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             precheck_target,
             true,
             false,
-            true,
         )
         .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
     }
@@ -324,7 +292,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(prefix),
             true,
             false,
-            true,
         )?;
         Ok(grown.map(|(image, issues)| MutationPreflight {
             image,
@@ -347,7 +314,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             false,
             true,
-            true,
         )
         .map(|captured| captured.map(|(image, _)| image))
     }
@@ -356,8 +322,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// part of it already.
     ///
     /// The round reads the registries, the event log (as its length and tail
-    /// for a `mutation`, which also parses issues strictly), the profile
-    /// records when `applied_records` is set, and the caller's paths; then the
+    /// for a `mutation`, which also parses issues strictly) and the caller's
+    /// paths; then the
     /// validation closure those registries plan; then what the captured issues
     /// name: the plan documents, and a precheck target's prompt files and
     /// gate-run results.
@@ -374,7 +340,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         precheck_target: Option<&crate::domain::IssueIdPrefix>,
         mutation: bool,
         archive_scan: bool,
-        applied_records: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
@@ -411,9 +376,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 true => spec.discover_tail(VirtualPath::EVENTS)?,
                 false => spec.discover_paths([VirtualPath::EVENTS])?,
             }
-            if applied_records {
-                spec.discover_listings([VirtualPath::PROFILES])?;
-            }
             Ok(())
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
@@ -431,15 +393,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             base(spec)?;
             if spec != image.capture_spec() {
                 return Ok(());
-            }
-            if let Some(listing) = image.directory_listings().get(&VirtualPath::PROFILES) {
-                spec.discover_paths(
-                    listing
-                        .names()
-                        .iter()
-                        .map(|name| VirtualPath::data(format!("profiles/{name}")))
-                        .collect::<Result<Vec<_>, _>>()?,
-                )?;
             }
             // Closure planning is best-effort: a malformed registry cannot fail
             // the capture, because validation itself is the authority that
@@ -661,7 +614,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
 
         let Some(image) =
-            self.capture_validation_base(session, &std::collections::BTreeMap::new(), &[], None)?
+            self.capture_proposed_base(session, &std::collections::BTreeMap::new(), &[], None)?
         else {
             return Ok(None);
         };
@@ -682,7 +635,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     &image,
                     MaterializationRequest::RepairDerivedState {
                         declarations: declarations.borrowed(),
-                        profiles: Vec::new(),
                     },
                 ) {
                     Ok(plan) => Some(plan),
@@ -2737,39 +2689,6 @@ depends_on = ["planning"]
         );
     }
 
-    /// REQ-05: repository validation with nothing to do with profiles is
-    /// unaffected by which profile case the repository is in. One repository,
-    /// one non-profile drift, the record present and then absent.
-    #[test]
-    fn test_validate_diagnoses_non_profile_drift_identically_across_record_states() {
-        let repo = crate::test_utils::profiled_repository_fixture(
-            "jit-dogfood",
-            crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
-        let rules_path = repo.path().join(".jit/rules.toml");
-        let rules = std::fs::read_to_string(&rules_path).unwrap();
-        std::fs::write(&rules_path, drift_default_assertion(&rules).0).unwrap();
-
-        let with_record = format!("{:#}", executor.validate_silent().unwrap_err());
-        std::fs::remove_file(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap();
-        let without_record = format!("{:#}", executor.validate_silent().unwrap_err());
-
-        assert!(
-            with_record.contains("rules.toml"),
-            "the non-profile drift must be diagnosed: {with_record}"
-        );
-        assert_eq!(
-            with_record, without_record,
-            "the profile record must not change a non-profile diagnosis"
-        );
-    }
-
     /// REQ-01: repository validation reports a drifted profile-owned target as
     /// nothing. The target is an ordinary repository value, and git shows it.
     #[test]
@@ -2796,31 +2715,6 @@ depends_on = ["planning"]
         executor
             .validate_silent()
             .expect("a drifted profile-owned target is not a validation finding");
-    }
-
-    /// REQ-01: repository validation does not read an applied-profile record, so
-    /// a record that is not one cannot fail validation.
-    #[test]
-    fn test_validate_silent_does_not_read_applied_profile_records() {
-        let repo = crate::test_utils::profiled_repository_fixture(
-            "jit-dogfood",
-            crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
-        std::fs::write(
-            repo.path().join(".jit/profiles/jit-dogfood.json"),
-            "not an applied-profile record",
-        )
-        .unwrap();
-
-        executor
-            .validate_silent()
-            .expect("validation does not read an applied-profile record");
     }
 
     /// REQ-02: validation repair restores no profile-owned target, so a drifted

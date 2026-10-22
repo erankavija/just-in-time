@@ -13,12 +13,11 @@ use crate::profile::{
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
-    finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
-    CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
-    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim, RepositoryEntry,
-    RepositoryExportDestination, RepositoryExportIntent, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, RepositoryRootClass, RepositoryStateError, RootRelativePath,
-    TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    finalize_package_tree_capture, CaptureBudget, CapturedTreeFile, FileMode, MaterializationPlan,
+    MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
+    ProfileContributionClaim, RepositoryEntry, RepositoryExportDestination, RepositoryExportIntent,
+    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryStateError,
+    RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -152,9 +151,6 @@ impl ProfileSelector {
 /// Failure resolving which package bytes a command reads.
 ///
 /// Resolution names the route a selector addressed together with what failed.
-/// A recorded location that no longer resolves is one of these rather than
-/// an absent profile: a deleted directory is a repository whose record
-/// outlived its package, not a repository that never applied one.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileResolutionError {
     /// A supplied location holds no readable package.
@@ -173,19 +169,6 @@ pub enum ProfileResolutionError {
         location: String,
         /// Capture failure.
         source: PackageCaptureError,
-    },
-    /// A recorded location no longer holds a readable package.
-    #[error(
-        "applied profile record '{record}' names package location '{location}', \
-         which no longer holds a readable package: {source}"
-    )]
-    UnresolvableRecordedLocation {
-        /// Repository-relative applied-record path.
-        record: String,
-        /// Worktree-relative location the record names.
-        location: String,
-        /// Package-reader failure.
-        source: ProfilePackageError,
     },
 }
 
@@ -280,21 +263,7 @@ pub enum ProfileDependencyError {
 /// Profile application conflict detected before anything is published.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
-    /// The installed record is not readable provenance for its own profile.
-    #[error("installed profile record '{path}' is not a readable record for profile '{id}'")]
-    InstalledRecordConflict {
-        /// Repository-relative installed-record path.
-        path: String,
-        /// Profile the record's own name identifies.
-        id: String,
-    },
-    /// The installed-record directory has an unsafe occupant.
-    #[error("profile metadata path '{path}' has unsupported filesystem state")]
-    UnsupportedMetadataPath {
-        /// Repository-relative path.
-        path: String,
-    },
-    /// Final package, provenance, and event overlay failed validation.
+    /// Final package and event overlay failed validation.
     #[error("final profile application validation failed: {0}")]
     FinalValidation(#[from] RepositoryValidationFailure),
     /// Final overlay produced error-severity rule findings.
@@ -303,7 +272,7 @@ pub enum ProfileApplyError {
         /// Number of blocking findings.
         error_count: usize,
     },
-    /// Package targets overlap application-owned audit or provenance state.
+    /// Package targets overlap application-owned audit or scratch state.
     #[error("profile package target '{path}' is reserved for application state")]
     ReservedApplicationTarget {
         /// Conflicting repository-relative package target.
@@ -1046,92 +1015,34 @@ impl CommandExecutor<JsonFileStorage> {
             .map(|graph| graph.selected_packages())
     }
 
-    /// Resolve selected packages together with every package already recorded
-    /// as applied, then settle all dependency, incompatibility, and engine
-    /// range claims before a caller prepares a publication.
+    /// Resolve the selected packages' dependency closure, then settle every
+    /// dependency, incompatibility, and engine range claim before a caller
+    /// prepares a publication.
+    ///
+    /// Only the selection's own closure is a candidate: a package this
+    /// repository applied earlier takes no part unless the selection reaches it.
     pub fn resolve_profile_graph(
         &self,
         selected: &[ProfilePackage],
     ) -> Result<ResolvedProfileGraph> {
-        let applied = self.resolve_applied_profile_packages()?;
-        self.resolve_profile_graph_with_applied(selected, applied)
-    }
-
-    /// Compose selected and applied packages through the one recorded-package
-    /// resolution route.
-    fn resolve_profile_graph_with_applied(
-        &self,
-        selected: &[ProfilePackage],
-        applied: BTreeMap<ProfileId, ProfilePackage>,
-    ) -> Result<ResolvedProfileGraph> {
         let mut packages = BTreeMap::new();
         let mut selected_ids = BTreeSet::new();
-        let mut pending = VecDeque::new();
-
         for package in selected {
             selected_ids.insert(package.model().id.clone());
             insert_candidate_package(&mut packages, package.clone())?;
         }
-        pending.extend(selected_ids.iter().cloned());
-
-        // Load the selected closure first. A package explicitly obtained beside
-        // a selector is the candidate for that dependency; an applied record is
-        // the fallback when no such sibling exists.
-        self.load_package_dependencies(&mut packages, &applied, &mut pending)?;
-
-        // Applied packages that were not selected still participate in every
-        // graph decision. A selected closure candidate with the same id is the
-        // deliberate replacement; two different candidates discovered for one
-        // id never win by occurrence order.
-        for (id, package) in applied {
-            if packages.contains_key(&id) {
-                continue;
-            }
-            insert_candidate_package(&mut packages, package)?;
-            pending.push_back(id);
-        }
-        self.load_package_dependencies(&mut packages, &BTreeMap::new(), &mut pending)?;
+        let mut pending = selected_ids.iter().cloned().collect::<VecDeque<_>>();
+        self.load_package_dependencies(&mut packages, &mut pending)?;
 
         let engine = EngineVersion::running()
             .map_err(|source| anyhow::anyhow!("running JIT engine version is invalid: {source}"))?;
         ResolvedProfileGraph::resolve(packages, selected_ids, &engine).map_err(profile_graph_error)
     }
 
-    /// Load every package the repository's applied records currently name.
-    fn resolve_applied_profile_packages(&self) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
-        let layout = self.require_layout()?;
-        with_mutation_session(self.storage(), &layout, "profile graph read", |session| {
-            let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let mut packages = BTreeMap::new();
-            for id in ids {
-                let record_path = applied_record_path(&id)?;
-                let record = read_applied_record(&image, &record_path, &id)?.ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "applied profile record '{}' disappeared while resolving the profile graph",
-                        record_path.repository_relative()
-                    )
-                })?;
-                let package = recorded_package(&record, &record_path, &layout)?;
-                if package.model().id.as_str() != id {
-                    return Err(anyhow::anyhow!(
-                        "applied profile record '{id}' names package '{}'",
-                        package.model().id
-                    ));
-                }
-                insert_candidate_package(&mut packages, package)?;
-            }
-            Ok(SessionStep::Done(packages))
-        })
-    }
-
     /// Extend `packages` with dependencies in canonical id order.
     fn load_package_dependencies(
         &self,
         packages: &mut BTreeMap<ProfileId, ProfilePackage>,
-        applied: &BTreeMap<ProfileId, ProfilePackage>,
         pending: &mut VecDeque<ProfileId>,
     ) -> Result<()> {
         while let Some(id) = pending.pop_front() {
@@ -1150,7 +1061,7 @@ impl CommandExecutor<JsonFileStorage> {
                     continue;
                 }
                 let package = self
-                    .resolve_dependency_package_from(&declaring, dependency.id.as_str(), applied)
+                    .resolve_dependency_package_from(&declaring, dependency.id.as_str())
                     .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
@@ -1164,44 +1075,31 @@ impl CommandExecutor<JsonFileStorage> {
         Ok(())
     }
 
-    /// Resolve a dependency from a sibling package, then from the coherent
-    /// applied-package map.
+    /// Resolve a dependency from a sibling package.
     ///
     /// A package read from a directory states where its dependencies are by
     /// where it sits: the dependency is looked for beside it, in a directory
     /// named by the dependency's own id. A directory that is not there, or that
     /// holds a package declaring another profile, is not that dependency, so
-    /// resolution continues through the applied-package map. A
-    /// directory that is there and cannot be read as a package is reported
-    /// rather than passed over, because falling through would answer with a
-    /// package the adopter did not put there.
+    /// the dependency is not found. A directory that is there and cannot be
+    /// read as a package is reported rather than passed over, because its
+    /// failure is the actionable answer.
     fn resolve_dependency_package_from(
         &self,
         declaring: &ProfilePackage,
         dependency: &str,
-        applied: &BTreeMap<ProfileId, ProfilePackage>,
     ) -> Result<ProfilePackage> {
         let ProfilePackageSource::Directory(directory) = declaring.source();
-        let fallback = || -> Result<ProfilePackage> {
-            if let Some(package) = applied
-                .iter()
-                .find_map(|(id, package)| (id.as_str() == dependency).then_some(package))
-            {
-                Ok(package.clone())
-            } else {
-                Err(
-                    crate::errors::NotFoundError::new(format!("Profile not found: {dependency}"))
-                        .into(),
-                )
-            }
+        let not_found = || -> anyhow::Error {
+            crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
         let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
-            return fallback();
+            return Err(not_found());
         };
         match supplied_package(&location, &self.require_layout()?) {
             Ok(package) if package.model().id.as_str() == dependency => Ok(package),
-            Ok(_) => fallback(),
-            Err(error) if is_unreadable_location(&error) => fallback(),
+            Ok(_) => Err(not_found()),
+            Err(error) if is_unreadable_location(&error) => Err(not_found()),
             Err(error) => Err(error),
         }
     }
@@ -1479,7 +1377,6 @@ impl CommandExecutor<JsonFileStorage> {
                 package.hashes().targets.keys().map(String::as_str),
             )?;
         }
-        let profiles_dir = VirtualPath::PROFILES;
         let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
 
@@ -1501,16 +1398,9 @@ impl CommandExecutor<JsonFileStorage> {
                 .into_iter()
                 .flatten(),
         );
-        content_paths.extend(
-            packages
-                .iter()
-                .map(|package| applied_record_path(package.model().id.as_str()))
-                .collect::<Result<Vec<_>>>()?,
-        );
         content_paths.extend(crate::repository_state::profile_contribution_target_paths(
             contribution_context,
         )?);
-        content_paths.push(profiles_dir.clone());
         content_paths.push(events_path.clone());
 
         let base =
@@ -1519,8 +1409,7 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
 
-        let inputs =
-            profile_selection_inputs(packages, resolved, base.layout(), contribution_context)?;
+        let inputs = profile_selection_inputs(resolved, base.layout(), contribution_context)?;
         let contribution_base = apply_overlay(
             &base,
             crate::repository_state::profile_contribution_overrides(&base, contribution_context)?,
@@ -1547,8 +1436,7 @@ impl CommandExecutor<JsonFileStorage> {
         else {
             return Ok(None);
         };
-        let inputs =
-            profile_selection_inputs(packages, resolved, base.layout(), contribution_context)?;
+        let inputs = profile_selection_inputs(resolved, base.layout(), contribution_context)?;
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfileSelection {
@@ -1571,8 +1459,7 @@ impl CommandExecutor<JsonFileStorage> {
         else {
             return Ok(None);
         };
-        let inputs =
-            profile_selection_inputs(packages, resolved, probe.layout(), contribution_context)?;
+        let inputs = profile_selection_inputs(resolved, probe.layout(), contribution_context)?;
         let contribution_probe = apply_overlay(
             &probe,
             crate::repository_state::profile_contribution_overrides(&probe, contribution_context)?,
@@ -1710,36 +1597,6 @@ fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
     }
 }
 
-/// Root-relative depth of the paths an applied-record reading touches.
-///
-/// Every record is published and read at the one path [`applied_record_path`]
-/// builds — one name below the `.jit/profiles/` listing — so the reading reaches
-/// that listing and its children and nothing below them. The bound is that
-/// construction rather than a number stated beside it: the listing's own depth
-/// plus the record name it holds, which moves with the record location instead
-/// of having to be found and changed when it moves.
-fn applied_record_depth() -> usize {
-    VirtualPath::PROFILES.relative().depth().saturating_add(1)
-}
-
-/// Bounds for reading named applied-profile records.
-///
-/// One record per applied profile is read at the exact path its one listing
-/// names, or at the exact canonical path an id constructs for the single-record
-/// reader. This performs no discovery from payload:
-/// arbitrary record bytes cannot add a path or listing to the capture. Records
-/// carry adopter-supplied resolved variables, so the package model cannot bound
-/// their payload size; named-path bytes are therefore unbounded. Shape remains
-/// bounded to one listing and the depth [`applied_record_path`] constructs, and
-/// [`CaptureSpec`] confines the read to the declared paths.
-fn record_capture_budget() -> CaptureBudget {
-    CaptureBudget {
-        max_listings: 1,
-        max_bytes: u64::MAX,
-        max_depth: applied_record_depth(),
-    }
-}
-
 /// How many package-model byte budgets one package-tree publication may span.
 ///
 /// One is the tree being published. One more is what the destination already
@@ -1802,82 +1659,9 @@ fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
     }
 }
 
-/// Canonical applied-profile provenance path for one profile id.
-///
-/// Application publishes the record here and validation reads it back from the
-/// same construction, so the record's own name identifies the profile it
-/// records.
-pub(super) fn applied_record_path(id: &str) -> Result<VirtualPath> {
-    VirtualPath::data(format!("profiles/{id}.json")).map_err(Into::into)
-}
-
-/// The profile id an occupant of `.jit/profiles/` names, or `None` when the
-/// name is not a provenance-record name.
-pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
-    name.strip_suffix(".json").filter(|id| !id.is_empty())
-}
-
-/// Read this repository's applied-profile records through a held session.
-///
-/// The `.jit/profiles/` listing states which packages the repository carries,
-/// so the records it names are read in the same capture that re-reads that
-/// listing: the returned image holds every named record's bytes, and the ids
-/// are the profiles those records name.
-///
-/// `Ok(None)` reports a record set that moved while it was being read — a
-/// concurrent application or removal — which the caller retries rather than
-/// answering over an inventory no single repository state ever held.
-///
-/// Derived-state repair begins here, because a record is what names the
-/// location its package is read from: it cannot resolve a package before
-/// reading the records.
-pub(super) fn capture_applied_records(
-    session: &mut (dyn RepositoryMutationSession + '_),
-    profiles_dir: &VirtualPath,
-) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
-    let mut spec = CaptureSpec::new([], record_capture_budget())?;
-    spec.discover_listing(profiles_dir.clone())?;
-    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-        Ok(spec.discover_paths(
-            recorded_profile_ids(image, profiles_dir)?
-                .iter()
-                .map(|id| applied_record_path(id))
-                .collect::<Result<Vec<_>>>()?,
-        )?)
-    })?
-    else {
-        return Ok(None);
-    };
-    let recorded = recorded_profile_ids(&image, profiles_dir)?;
-    Ok(Some((image, recorded)))
-}
-
-/// Profile ids the repository's own applied-profile records name.
-///
-/// Application writes one record per applied profile at
-/// `.jit/profiles/<id>.json`, so the listing of that directory is where the
-/// repository states which packages it carries. A child whose name is not a
-/// record name is not a record.
-pub(super) fn recorded_profile_ids(
-    image: &RepositoryImage,
-    profiles_dir: &VirtualPath,
-) -> Result<BTreeSet<String>> {
-    Ok(image
-        .directory_listings()
-        .get(profiles_dir)
-        .ok_or_else(|| anyhow::anyhow!("capture did not list {profiles_dir:?}"))?
-        .names()
-        .iter()
-        .filter_map(|name| record_name_profile_id(name))
-        .map(str::to_string)
-        .collect())
-}
-
 /// Read the package at a location the caller supplied.
 ///
-/// The package there supplies the id for a `path:` selector. The caller may
-/// combine that selector with `id:` selectors, but a path package may not
-/// shadow a selected recorded id.
+/// The package there supplies the id its selector resolves to.
 fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<ProfilePackage> {
     let requested = if location.is_absolute() {
         location.to_path_buf()
@@ -1896,36 +1680,6 @@ fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<Profil
         source,
     })?;
     Ok(package)
-}
-
-/// Read the package one applied-profile record names.
-///
-/// The record's origin is the whole answer: the worktree-relative location it
-/// names is resolved against this repository's worktree root. A failure there
-/// names the record, so a repository whose package moved or was deleted reports
-/// the record that outlived it rather than an absent profile.
-pub(super) fn recorded_package(
-    record: &AppliedProfileRecord,
-    record_path: &VirtualPath,
-    layout: &RepositoryLayout,
-) -> Result<ProfilePackage> {
-    let ProfileOrigin::Directory(location) = &record.origin;
-    let requested = layout.worktree_root().join(location.as_path());
-    let package = match fs::canonicalize(&requested) {
-        Ok(_) => {
-            ensure_worktree_package_directory(&requested, layout)?;
-            ProfilePackage::from_directory(&requested)
-        }
-        Err(_) => ProfilePackage::from_directory(&requested),
-    };
-    package.map_err(|source| {
-        ProfileResolutionError::UnresolvableRecordedLocation {
-            record: record_path.repository_relative(),
-            location: location.as_path().display().to_string(),
-            source,
-        }
-        .into()
-    })
 }
 
 /// Reuse the repository layout's canonical root classification before reading a
@@ -1962,16 +1716,6 @@ fn is_unreadable_location(error: &anyhow::Error) -> bool {
         })
 }
 
-/// The provenance origin a package's own bytes came through.
-///
-/// The location is taken from the source the package recorded while reading
-/// itself, never from a path supplied beside it, so a record names the
-/// directory whose bytes it addresses. A directory that resolves outside the
-/// worktree is refused rather than recorded: the record is worktree-relative
-/// repository state, so a location it cannot express would make re-reading the
-/// package depend on machine state. The selected data root is not a worktree
-/// location even when it nests inside one, so a package placed under it is
-/// refused by the same rule.
 /// Resolve one caller-supplied package directory to worktree content.
 ///
 /// A package directory is repository material an adopter reads and commits, so
@@ -2038,6 +1782,14 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
     Ok(bytes)
 }
 
+/// The worktree-relative origin a package's own bytes came through.
+///
+/// The location is taken from the source the package recorded while reading
+/// itself, never from a path supplied beside it. A directory that resolves
+/// outside the worktree is refused, because a report names a package by a
+/// location that does not depend on machine state. The selected data root is
+/// not a worktree location even when it nests inside one, so a package placed
+/// under it is refused by the same rule.
 pub(super) fn package_origin(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
@@ -2083,78 +1835,34 @@ pub(super) fn applied_profile_result(
 /// Build one canonical aggregate input collection for a dependency-first
 /// selection.
 fn profile_selection_inputs(
-    packages: &[ProfilePackage],
     resolved: &[ResolvedProfileContent],
     layout: &RepositoryLayout,
     contribution_context: &[ProfileContributionClaim],
 ) -> Result<Vec<ProfileApplicationInput>> {
-    packages
+    resolved
         .iter()
-        .zip(resolved)
-        .map(|(package, resolved)| {
-            let record_path = applied_record_path(package.model().id.as_str())?;
-            Ok(
-                profile_application_input(package, resolved, layout, record_path)?
-                    .with_contribution_context(contribution_context),
-            )
+        .map(|resolved| {
+            Ok(profile_application_input(resolved, layout)?
+                .with_contribution_context(contribution_context))
         })
         .collect()
 }
 
-/// Convert an immutable package into neutral claims plus provenance metadata.
+/// Convert resolved package content into neutral claims.
 fn profile_application_input(
-    package: &ProfilePackage,
     resolved: &ResolvedProfileContent,
     layout: &RepositoryLayout,
-    record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
     let metadata = resolved.model();
     let claims = build_profile_claims_from_resolved(resolved, layout)?;
     Ok(ProfileApplicationInput {
         id: metadata.id.clone(),
         version: metadata.version.clone(),
-        compatible_jit: metadata.compatible_jit.clone(),
-        package_hash: package.hashes().package.clone(),
         variables: resolved.variables().clone(),
         target_hashes: resolved.target_hashes()?,
-        origin: package_origin(package, layout)?,
         contribution_context: claims.contributions.clone(),
         claims,
-        record_path,
     })
-}
-
-/// Read the captured installed record, or `None` when absent.
-fn read_applied_record(
-    base: &RepositoryImage,
-    record_path: &VirtualPath,
-    id: &str,
-) -> Result<Option<AppliedProfileRecord>> {
-    match base.entry(record_path)? {
-        RepositoryEntry::Absent => Ok(None),
-        RepositoryEntry::File { content, .. } => {
-            serde_json::from_slice::<AppliedProfileRecord>(content.bytes())
-                .and_then(|record| {
-                    (record.id.as_str() == id).then_some(record).ok_or_else(|| {
-                        serde_json::Error::io(std::io::Error::other(
-                            "record id does not match its canonical path",
-                        ))
-                    })
-                })
-                .map(Some)
-                .map_err(|_| {
-                    ProfileApplyError::InstalledRecordConflict {
-                        path: record_path.repository_relative(),
-                        id: id.to_string(),
-                    }
-                    .into()
-                })
-        }
-        _ => Err(ProfileApplyError::UnsupportedMetadataPath {
-            path: record_path.repository_relative(),
-        }
-        .into()),
-    }
 }
 
 pub(super) fn reject_reserved_application_targets<'a>(
@@ -2162,8 +1870,6 @@ pub(super) fn reject_reserved_application_targets<'a>(
 ) -> Result<()> {
     if let Some(path) = targets.into_iter().find(|path| {
         *path == ".jit/events.jsonl"
-            || *path == ".jit/profiles"
-            || path.starts_with(".jit/profiles/")
             || *path == ".jit/tmp"
             || path.starts_with(".jit/tmp/")
             || *path == ".git"
@@ -2253,7 +1959,7 @@ mod tests {
     /// Worktree-relative location [`fixture`] stages its package at.
     ///
     /// A package is applied from inside the repository it is applied to,
-    /// because the applied-profile record names its worktree-relative location.
+    /// because application refuses a package outside the worktree.
     const FIXTURE_LOCATION: &str = "packages/planner";
 
     /// A file-backed executor over a canonically initialized repository carrying
@@ -2288,11 +1994,6 @@ mod tests {
         ProfilePackage::from_directory(&root).expect("a valid package tree")
     }
 
-    /// The provenance record a repository stores for the fixture package.
-    fn stored_record(temp: &TempDir) -> AppliedProfileRecord {
-        record_for(temp, &fixture_id())
-    }
-
     /// Rewrite one authored source of the package tree at `relative`, and read
     /// the package back from there.
     ///
@@ -2303,15 +2004,6 @@ mod tests {
         let root = temp.path().join(relative);
         fs::write(root.join(source), bytes).unwrap();
         ProfilePackage::from_directory(&root).expect("a valid package tree")
-    }
-
-    /// The fixture package's id, which its manifest declares.
-    fn fixture_id() -> String {
-        ProfilePackage::from_directory(&fixture_package_tree())
-            .expect("the checked-in fixture tree is a valid package")
-            .model()
-            .id
-            .to_string()
     }
 
     /// The fixture package tree written at `relative`, rewritten to declare
@@ -2402,14 +2094,6 @@ mod tests {
                 _ => Vec::new(),
             })
             .collect()
-    }
-
-    /// The provenance record this repository stores for `id`.
-    fn record_for(temp: &TempDir, id: &str) -> AppliedProfileRecord {
-        serde_json::from_slice(
-            &fs::read(temp.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-        )
-        .unwrap()
     }
 
     /// The fixture package tree written at `relative`, rewritten to declare
@@ -2688,10 +2372,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["jit-default", "workflow"]
         );
-        assert_eq!(
-            record_for(&temp, "jit-default").origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/jit-default").unwrap())
-        );
     }
 
     #[test]
@@ -2805,36 +2485,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_applied_profile_packages_reports_a_recorded_location_that_no_longer_resolves() {
-        let (temp, _storage, executor, _package) = fixture();
-        let applied = package_read_from(&temp, "vendor/recorded");
-        executor.apply_profile_package(&applied).unwrap();
-        fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
-
-        let error = executor.resolve_applied_profile_packages().unwrap_err();
-
-        // The record outlived its package: naming the record and the location
-        // is what distinguishes that from a profile this repository never
-        // applied, which is what an absent-profile answer would claim.
-        let message = format!("{error:#}");
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileResolutionError>(),
-                Some(ProfileResolutionError::UnresolvableRecordedLocation { record, location, .. })
-                    if record == ".jit/profiles/planner-asset-only.json"
-                        && location == "vendor/recorded"
-            ),
-            "{message}"
-        );
-        assert!(
-            error
-                .downcast_ref::<crate::errors::NotFoundError>()
-                .is_none(),
-            "{message}"
-        );
-    }
-
-    #[test]
     fn test_profile_selector_parse_reads_a_bare_directory_path() {
         assert_eq!(
             "packages/workflow".parse::<ProfileSelector>(),
@@ -2894,44 +2544,43 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_records_the_worktree_location_it_read_the_package_from() {
+    fn test_apply_profile_package_reports_the_worktree_location_it_read_the_package_from() {
         let (temp, _storage, executor, _package) = fixture();
         let package = package_read_from(&temp, "vendor/profiles/planner");
 
-        executor.apply_profile_package(&package).unwrap();
+        let applied = executor.apply_profile_package(&package).unwrap();
 
-        // The stored location resolves, from the worktree root alone, back to
-        // the directory whose bytes were applied — which is the whole point of
-        // recording it.
-        let ProfileOrigin::Directory(location) = stored_record(&temp).origin;
+        // The reported location resolves, from the worktree root alone, back to
+        // the directory whose bytes were applied.
+        let ProfileOrigin::Directory(location) = &applied.requested().unwrap().origin;
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
-                .expect("the recorded location names a readable package")
+                .expect("the reported location names a readable package")
                 .hashes(),
             package.hashes()
         );
     }
 
     #[test]
-    fn test_apply_profile_package_records_the_directory_read_rather_than_a_peer_copy() {
+    fn test_apply_profile_package_reports_the_directory_read_rather_than_a_peer_copy() {
         // Two directories inside the worktree hold byte-identical packages.
         // Nothing but the directory a package was read through distinguishes
-        // them, so the recorded location must follow that and only that.
+        // them, so the reported location must follow that and only that.
         let (first_temp, _first_storage, first_executor, _package) = fixture();
         let (second_temp, _second_storage, second_executor, _package) = fixture();
         let first = package_read_from(&first_temp, "vendor/first");
         let second = package_read_from(&second_temp, "packages/second/tree");
         assert_eq!(first.hashes(), second.hashes());
 
-        first_executor.apply_profile_package(&first).unwrap();
-        second_executor.apply_profile_package(&second).unwrap();
+        let first_applied = first_executor.apply_profile_package(&first).unwrap();
+        let second_applied = second_executor.apply_profile_package(&second).unwrap();
 
         assert_eq!(
-            stored_record(&first_temp).origin,
+            first_applied.requested().unwrap().origin,
             ProfileOrigin::Directory(RootRelativePath::parse("vendor/first").unwrap())
         );
         assert_eq!(
-            stored_record(&second_temp).origin,
+            second_applied.requested().unwrap().origin,
             ProfileOrigin::Directory(RootRelativePath::parse("packages/second/tree").unwrap())
         );
     }
@@ -2957,14 +2606,13 @@ mod tests {
             "the refusal must name the package directory: {error:#}"
         );
         assert!(!temp.path().join("docs/profile.txt").exists());
-        assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
 
     #[test]
     fn test_apply_profile_package_refuses_a_package_read_from_the_data_root() {
         // The selected data root is not a worktree location, so a package
-        // placed under it has no worktree-relative location to record.
+        // placed under it has no worktree-relative location to report.
         let (temp, storage, executor, _package) = fixture();
         let package = package_read_from(&temp, ".jit/vendored");
 
@@ -2978,7 +2626,7 @@ mod tests {
             ),
             "the refusal must name the package directory: {error:#}"
         );
-        assert!(!temp.path().join(".jit/profiles").exists());
+        assert!(!temp.path().join("docs/profile.txt").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
 
@@ -3512,7 +3160,7 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_application_commits_targets_record_event_and_exact_no_op() {
+    fn test_profile_application_commits_targets_and_event_and_reapplies_as_exact_no_op() {
         let (temp, storage, executor, package) = fixture();
 
         let applied = executor.apply_profile_package(&package).unwrap();
@@ -3524,24 +3172,10 @@ mod tests {
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
             package.source_bytes("assets/profile.txt").unwrap()
         );
-        let record: AppliedProfileRecord = serde_json::from_slice(
-            &fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(record.id.as_str(), "planner-asset-only");
-        assert_eq!(
-            record.origin,
-            ProfileOrigin::Directory(RootRelativePath::parse(FIXTURE_LOCATION).unwrap())
-        );
+        assert!(!temp.path().join(".jit/profiles").exists());
         assert_eq!(storage.read_events().unwrap().len(), 1);
 
         let before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let compact_record = serde_json::to_vec(&record).unwrap();
-        fs::write(
-            temp.path().join(".jit/profiles/planner-asset-only.json"),
-            &compact_record,
-        )
-        .unwrap();
         let unchanged = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
             unchanged.requested().unwrap().status,
@@ -3551,17 +3185,12 @@ mod tests {
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             before
         );
-        assert_eq!(
-            fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
-            compact_record
-        );
     }
 
     #[test]
-    fn test_apply_profile_package_reapplies_changed_content_and_rewrites_its_record() {
+    fn test_apply_profile_package_reapplies_changed_content() {
         let (temp, _storage, executor, package) = fixture();
         executor.apply_profile_package(&package).unwrap();
-        let previous = stored_record(&temp);
         let unowned = temp.path().join("docs/repository-note.txt");
         fs::write(&unowned, "repository-authored\n").unwrap();
         let replacement = repackage(
@@ -3581,9 +3210,6 @@ mod tests {
             fs::read_to_string(temp.path().join("docs/profile.txt")).unwrap(),
             "replacement profile content\n"
         );
-        let rewritten = stored_record(&temp);
-        assert_ne!(rewritten.package_hash, previous.package_hash);
-        assert_eq!(rewritten.package_hash, replacement.hashes().package);
         assert_eq!(
             fs::read_to_string(unowned).unwrap(),
             "repository-authored\n",
@@ -3654,8 +3280,6 @@ template = true
             b"profile=resolved-value-last\n"
         );
         let event_bytes = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let record_bytes =
-            fs::read(temp.path().join(".jit/profiles/planner-variable.json")).unwrap();
         let events = storage.read_events().unwrap();
         assert!(matches!(
             events.as_slice(),
@@ -3667,18 +3291,6 @@ template = true
         assert!(!event_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
-        let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
-        assert!(record_bytes
-            .windows(resolved_value.len())
-            .any(|window| window == resolved_value.as_bytes()));
-        assert_eq!(
-            record.variables.values()[&"NAME".try_into().unwrap()],
-            "resolved-value-last"
-        );
-        assert_eq!(
-            record.variables.sources()[&"NAME".try_into().unwrap()],
-            crate::profile::VariableSource::Set
-        );
     }
 
     #[test]
@@ -3705,9 +3317,6 @@ template = true
             .collect::<Vec<_>>();
 
         assert!(paths.iter().any(|path| path == "docs/profile.txt"));
-        assert!(paths
-            .iter()
-            .any(|path| path == ".jit/profiles/planner-asset-only.json"));
         assert!(paths.iter().any(|path| path == ".jit/events.jsonl"));
         assert_eq!(changes.len(), 1);
     }
@@ -3752,10 +3361,6 @@ template = true
             vec!["planner-asset-only", "planner-asset-only"]
         );
         assert_eq!(storage.read_events().unwrap(), before);
-        assert!(!temp
-            .path()
-            .join(".jit/profiles/planner-asset-only.json")
-            .exists());
         assert!(!temp.path().join("docs/profile.txt").exists());
     }
 
@@ -3766,7 +3371,6 @@ template = true
 
         assert!(executor.apply_profile_package(&package).is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
-        assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
 
@@ -3794,7 +3398,7 @@ template = true
     #[test]
     fn test_apply_profile_package_applies_a_declared_dependency_before_the_package() {
         let (temp, storage, executor, _fixture) = fixture();
-        let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
+        package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
         let applied = executor.apply_profile_package(&dependant).unwrap();
@@ -3831,16 +3435,6 @@ template = true
                     && profiles.iter().all(|profile| profile.status
                         == ProfileLifecycleStatus::Installed)
         ));
-        // One record per package, each addressing its own package's bytes.
-        assert_eq!(
-            record_for(&temp, "base").package_hash,
-            dependency.hashes().package
-        );
-        assert_eq!(
-            record_for(&temp, "workflow").package_hash,
-            dependant.hashes().package
-        );
-        assert_ne!(dependency.hashes().package, dependant.hashes().package);
     }
 
     #[test]
@@ -3882,10 +3476,6 @@ template = true
             ]
         );
         for id in ["left", "right"] {
-            assert!(temp
-                .path()
-                .join(format!(".jit/profiles/{id}.json"))
-                .is_file());
             assert!(temp.path().join(format!("docs/{id}.txt")).is_file());
         }
         assert_eq!(applied_event_ids(&storage), vec!["left", "right"]);
@@ -3900,7 +3490,6 @@ template = true
             .apply_profile(&[package_selector(&left), package_selector(&right)])
             .unwrap();
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let records = ["left", "right"].map(|id| record_for(&temp, id));
         let publications = PublicationCounter::new();
         let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
@@ -3923,11 +3512,10 @@ template = true
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             events
         );
-        assert_eq!(["left", "right"].map(|id| record_for(&temp, id)), records);
     }
 
     #[test]
-    fn test_apply_profile_selection_recovers_target_record_and_audit_together_after_failure() {
+    fn test_apply_profile_selection_recovers_targets_and_audit_together_after_failure() {
         let temp = TempDir::new().unwrap();
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
@@ -3952,10 +3540,6 @@ template = true
         drop(recovered.open_mutation_session(layout).unwrap());
         for id in ["left", "right"] {
             assert!(!temp.path().join(format!("docs/{id}.txt")).exists());
-            assert!(!temp
-                .path()
-                .join(format!(".jit/profiles/{id}.json"))
-                .exists());
         }
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
@@ -4023,9 +3607,6 @@ template = true
             applied_event_ids(&storage),
             vec!["vocabulary", "base", "workflow"]
         );
-        for id in ["vocabulary", "base", "workflow"] {
-            assert_eq!(record_for(&temp, id).id.as_str(), id);
-        }
     }
 
     #[test]
@@ -4063,7 +3644,7 @@ template = true
     }
 
     #[test]
-    fn test_effective_configuration_loads_registry_not_record_claims() {
+    fn test_effective_configuration_loads_an_authored_edit_of_a_published_registry() {
         let (temp, storage, executor, _fixture) = fixture();
         let namespace = "registry-derived";
         let package = package_contributing(
@@ -4126,12 +3707,7 @@ template = true
                 ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
             ]
         );
-        for path in [
-            ".jit/profiles/base.json",
-            ".jit/profiles/workflow.json",
-            "docs/base.txt",
-            "docs/workflow.txt",
-        ] {
+        for path in ["docs/base.txt", "docs/workflow.txt"] {
             assert!(
                 !temp.path().join(path).exists(),
                 "the conflicting closure published {path}"
@@ -4203,18 +3779,16 @@ template = true
 
         let applied = executor.apply_profile_package(&restated).unwrap();
 
-        // A restatement of what is already there is not a conflict: neither
-        // package overrides the other, and both records stand.
+        // A restatement of what is already there is not a conflict, and it
+        // publishes nothing: the repository already holds its content.
         assert_eq!(
             applied.requested().unwrap().status,
-            ProfileApplicationStatus::Applied
+            ProfileApplicationStatus::Unchanged
         );
         assert_eq!(
             fs::read_to_string(temp.path().join(target)).unwrap(),
             "identical\n"
         );
-        assert_eq!(record_for(&temp, "stated").id.as_str(), "stated");
-        assert_eq!(record_for(&temp, "restated").id.as_str(), "restated");
     }
 
     #[test]
@@ -4283,15 +3857,14 @@ template = true
         // Neither package of the cycle reached the repository.
         assert!(!temp.path().join("docs/base.txt").exists());
         assert!(!temp.path().join("docs/workflow.txt").exists());
-        assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
 
     #[test]
     fn test_apply_profile_package_reports_a_dependency_that_cannot_be_resolved() {
         let (temp, storage, executor, _fixture) = fixture();
-        // Nothing sits beside the package under that name and this repository
-        // has no record for it, so no route resolves the dependency.
+        // Nothing sits beside the package under that name, so no route
+        // resolves the dependency.
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["absent-base"]);
 
         let error = executor.apply_profile_package(&dependant).unwrap_err();
@@ -4310,7 +3883,6 @@ template = true
         assert!(message.contains("workflow"), "{message}");
         assert!(message.contains("absent-base"), "{message}");
         assert!(!temp.path().join("docs/workflow.txt").exists());
-        assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
 
@@ -4426,7 +3998,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_includes_an_unselected_applied_profile_in_incompatibility_checks() {
+    fn test_apply_profile_excludes_a_previously_applied_package_from_incompatibility_checks() {
         let (temp, storage, executor, _fixture) = fixture();
         let base = package_v2(
             &temp,
@@ -4448,104 +4020,14 @@ template = true
             &[("base", "*")],
         );
 
-        let error = executor
-            .apply_profile(&[package_selector(&candidate)])
-            .unwrap_err();
-
-        let message = format!("{error:#}");
-        assert!(message.contains("candidate"), "{message}");
-        assert!(message.contains("base"), "{message}");
-        assert!(!temp.path().join("docs/candidate.txt").exists());
-        assert_eq!(storage.read_events().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn test_apply_profile_includes_an_unselected_applied_profile_in_engine_range_checks() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let applied = package_v2(
-            &temp,
-            "vendor/applied",
-            "applied",
-            "1.0.0",
-            ">=0.2.0, <2.0.0",
-            &[],
-            &[],
-        );
+        // `base` is in the repository but not in the selection, so the
+        // incompatibility it would answer has no party to hold against.
         executor
-            .apply_profile(&[package_selector(&applied)])
-            .unwrap();
-        let manifest = fs::read_to_string(temp.path().join("vendor/applied/manifest.toml"))
-            .unwrap()
-            .replace(
-                "compatible-jit = \">=0.2.0, <2.0.0\"",
-                "compatible-jit = \">=2.0.0\"",
-            );
-        fs::write(temp.path().join("vendor/applied/manifest.toml"), manifest).unwrap();
-        let candidate = package_v2(
-            &temp,
-            "vendor/candidate",
-            "candidate",
-            "1.0.0",
-            ">=0.2.0, <2.0.0",
-            &[],
-            &[],
-        );
-
-        let error = executor
             .apply_profile(&[package_selector(&candidate)])
-            .unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::IncompatibleEngine { package, .. })
-                    if package == "applied"
-            ),
-            "the unselected applied package must be named: {error:#}"
-        );
-        assert!(!temp.path().join("docs/candidate.txt").exists());
-        assert_eq!(storage.read_events().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn test_apply_profile_includes_an_unselected_applied_profile_in_dependency_checks() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let applied = package_v2(
-            &temp,
-            "vendor/applied",
-            "applied",
-            "1.0.0",
-            ">=0.2.0, <2.0.0",
-            &[],
-            &[],
-        );
-        executor
-            .apply_profile(&[package_selector(&applied)])
             .unwrap();
-        let manifest = format!(
-            "{}\n[[dependency]]\nid = \"missing-base\"\nversion = \"*\"\n",
-            fs::read_to_string(temp.path().join("vendor/applied/manifest.toml")).unwrap()
-        );
-        fs::write(temp.path().join("vendor/applied/manifest.toml"), manifest).unwrap();
-        let candidate = package_v2(
-            &temp,
-            "vendor/candidate",
-            "candidate",
-            "1.0.0",
-            ">=0.2.0, <2.0.0",
-            &[],
-            &[],
-        );
 
-        let error = executor
-            .apply_profile(&[package_selector(&candidate)])
-            .unwrap_err();
-
-        let message = format!("{error:#}");
-        assert!(message.contains("applied"), "{message}");
-        assert!(message.contains("missing-base"), "{message}");
-        assert!(!temp.path().join("docs/candidate.txt").exists());
-        assert_eq!(storage.read_events().unwrap().len(), 1);
+        assert!(temp.path().join("docs/candidate.txt").is_file());
+        assert_eq!(applied_event_ids(&storage), vec!["base", "candidate"]);
     }
 
     #[test]
@@ -4555,7 +4037,6 @@ template = true
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
         executor.apply_profile_package(&dependant).unwrap();
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let records = ["base", "workflow"].map(|id| record_for(&temp, id));
 
         let reapplied = executor.apply_profile_package(&dependant).unwrap();
 
@@ -4574,52 +4055,39 @@ template = true
             events
         );
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
-        assert_eq!(
-            ["base", "workflow"].map(|id| record_for(&temp, id)),
-            records
-        );
     }
 
     #[test]
-    fn test_apply_profile_package_resolves_a_dependency_from_the_record_when_none_sits_beside_it() {
-        let (temp, _storage, executor, _fixture) = fixture();
+    fn test_apply_profile_package_refuses_a_dependency_only_a_previous_application_supplied() {
+        let (temp, storage, executor, _fixture) = fixture();
         let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
         executor.apply_profile_package(&dependency).unwrap();
-        // A dependant elsewhere in the worktree, with no `base` beside it: what
-        // answers is this repository's own record for the dependency.
+        // A dependant elsewhere in the worktree, with no `base` beside it. The
+        // earlier application of `base` is not a candidate for the selection.
         let dependant = package_declaring(&temp, "elsewhere/workflow", "workflow", &["base"]);
         assert!(!temp.path().join("elsewhere/base").exists());
 
-        let applied = executor.apply_profile_package(&dependant).unwrap();
+        let error = executor.apply_profile_package(&dependant).unwrap_err();
 
-        assert_eq!(
-            applied
-                .items
-                .iter()
-                .map(|profile| (profile.id.as_str(), profile.status))
-                .collect::<Vec<_>>(),
-            vec![
-                ("base", ProfileApplicationStatus::Unchanged),
-                ("workflow", ProfileApplicationStatus::Applied),
-            ]
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                    if package == "workflow" && dependency == "base"
+            ),
+            "the refusal must name both packages: {error:#}"
         );
-        assert_eq!(
-            record_for(&temp, "base").package_hash,
-            dependency.hashes().package
-        );
+        assert!(!temp.path().join("docs/workflow.txt").exists());
+        assert_eq!(applied_event_ids(&storage), vec!["base"]);
     }
 
     #[test]
     fn test_resolve_profile_closure_reads_a_dependency_from_beside_the_declaring_package() {
         let (temp, _storage, executor, _fixture) = fixture();
-        // Two copies of the dependency, distinguishable by their bytes alone.
-        // The one beside the declaring package is the one its declaration means.
-        package_declaring(&temp, "elsewhere/base", "base", &[]);
-        let recorded = repackage(&temp, "elsewhere/base", "assets/profile.txt", "elsewhere\n");
-        executor.apply_profile_package(&recorded).unwrap();
+        // The package beside the declaring package is the one its declaration
+        // means.
         let beside = package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
-        assert_ne!(beside.hashes(), recorded.hashes());
 
         let closure = executor.resolve_profile_closure(&dependant).unwrap();
 
@@ -4922,10 +4390,6 @@ template = true
             decided_targets(&entry, ProfileTargetAction::Create).contains("docs/unapplied.txt"),
             "the report states the target the package would publish: {entry:?}"
         );
-        assert!(
-            !temp.path().join(".jit/profiles/unapplied.json").exists(),
-            "the report does not record the package it inspected"
-        );
         assert_eq!(
             repository_files(&temp),
             before,
@@ -5138,27 +4602,6 @@ template = true
         assert!(
             budget.max_bytes >= model_bytes as u64,
             "a publication reads the whole tree the package carries"
-        );
-    }
-
-    /// Applied records are exact paths named by their one listing, so adopter-
-    /// supplied resolved values do not become a discovery dimension to bound.
-    #[test]
-    fn test_record_capture_budget_does_not_limit_named_record_payloads() {
-        let budget = record_capture_budget();
-        assert_eq!(
-            budget.max_bytes,
-            u64::MAX,
-            "named record payloads are unbounded"
-        );
-        assert_eq!(budget.max_listings, 1);
-        assert_eq!(
-            budget.max_depth,
-            applied_record_path("workflow")
-                .expect("a canonical record path")
-                .relative()
-                .depth(),
-            "a record sits at the path the engine publishes it at"
         );
     }
 

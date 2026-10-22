@@ -76,7 +76,7 @@ region="shipped-documentation-policy"
 package="jit-default"
 package_source="profiles/$package"
 # Where the package is placed inside the throwaway repository, worktree-relative
-# because that is the form a `path:` selector and applied record use.
+# because application refuses a package outside the worktree.
 package_location="packages/$package"
 
 # --- the shipped table, read out of a throwaway repository --------------------

@@ -92,8 +92,8 @@ fn assert_canonical_authority(
     (owners == [expected.clone()]).then_some(()).ok_or_else(|| {
         format!(
             "forbidden duplicate {authority} authority: found {owners:?}, expected only \
-             {expected:?}; the clean-cut lifecycle contract has one canonical package decoder, model, and \
-             applied-record inventory reader rather than parallel formats or readers"
+             {expected:?}; the clean-cut lifecycle contract has one canonical package decoder and \
+             model rather than parallel formats"
         )
     })
 }
@@ -240,13 +240,6 @@ fn top_level_enum_variants(body: &str) -> Vec<String> {
         .collect()
 }
 
-fn functions_with_shape<'a>(source: &'a str, required: &[&str]) -> Vec<&'a str> {
-    function_bodies(source)
-        .into_iter()
-        .filter(|function| required.iter().all(|needle| function.contains(needle)))
-        .collect()
-}
-
 fn profile_origin_schema_definitions(value: &serde_json::Value) -> Vec<&serde_json::Value> {
     match value {
         serde_json::Value::Array(values) => values
@@ -297,7 +290,7 @@ fn assert_directory_only_profile_sources(
     schema: &serde_json::Value,
 ) -> Result<(), String> {
     for (surface, declaration, source) in [
-        ("applied profile origin", "pub enum ProfileOrigin", domain),
+        ("reported profile origin", "pub enum ProfileOrigin", domain),
         (
             "runtime profile package source",
             "pub enum ProfilePackageSource",
@@ -309,54 +302,20 @@ fn assert_directory_only_profile_sources(
         let variants = top_level_enum_variants(body);
         if variants != ["Directory"] {
             return Err(format!(
-                "forbidden non-directory {surface}: found variants {variants:?}; profile packages and their applied records have one repository-directory source"
+                "forbidden non-directory {surface}: found variants {variants:?}; profile packages have one repository-directory source"
             ));
         }
     }
 
     let resolution_errors = enum_body(commands, "pub enum ProfileResolutionError")
         .ok_or_else(|| "profile resolution error declaration disappeared".to_string())?;
-    let record_only_errors = top_level_enum_entries(resolution_errors)
-        .into_iter()
-        .filter(|entry| {
-            entry.contains("record: String")
-                && !entry.contains("location: String")
-                && !entry.contains("source: ProfilePackageError")
-        })
-        .collect::<Vec<_>>();
-    if !record_only_errors.is_empty() {
-        return Err(format!(
-            "forbidden record-only profile resolver error returned ({record_only_errors:?}); an unsupported package source is not a resolver case and must fail at strict applied-record decoding"
-        ));
-    }
     let retired_error_terms = ["embedded", "compiled", "provenance"]
         .into_iter()
         .filter(|term| resolution_errors.to_ascii_lowercase().contains(term))
         .collect::<Vec<_>>();
     if !retired_error_terms.is_empty() {
         return Err(format!(
-            "forbidden source-only profile resolver error returned ({retired_error_terms:?}); unsupported origins must fail at strict applied-record decoding"
-        ));
-    }
-
-    let exclusion_scans =
-        functions_with_shape(commands, &["capture_applied_records(", "record.origin"]);
-    if !exclusion_scans.is_empty() {
-        return Err(
-            "forbidden applied-record source exclusion scan returned; every applied record must resolve through recorded_package".to_string(),
-        );
-    }
-    let graph_routes = functions_with_shape(
-        commands,
-        &[
-            "Result<ResolvedProfileGraph>",
-            "self.resolve_profile_graph_with_applied(",
-        ],
-    );
-    if graph_routes.len() != 1 {
-        return Err(format!(
-            "forbidden profile graph resolver bypass: found {} graph entry points feeding the applied-package graph, expected the one canonical route",
-            graph_routes.len()
+            "forbidden source-only profile resolver error returned ({retired_error_terms:?}); a package resolves only from a repository directory"
         ));
     }
 
@@ -1236,8 +1195,7 @@ fn test_profile_lifecycle_has_one_canonical_package_authority() {
 }
 
 /// Profile packages enter through one worktree-relative directory contract.
-/// The source enums prove the runtime and record vocabularies, the graph shape
-/// proves mutations cannot silently omit records based on provenance, and the
+/// The source enums prove the runtime and reported-origin vocabularies, and the
 /// live command schema proves every CLI/MCP output projection carries the same
 /// single wire option. The archive plan's separately scoped `Embedded` variant
 /// is intentionally outside these semantic profile surfaces.
@@ -1378,10 +1336,7 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
     let directory_domain = "pub enum ProfileOrigin { Directory(RootRelativePath), }";
     let directory_package = "pub enum ProfilePackageSource { Directory(PathBuf), }";
     let canonical_commands = r#"
-pub enum ProfileResolutionError { UnresolvableRecordedLocation { record: String, location: String, source: ProfilePackageError }, }
-    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
-        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
-    }
+pub enum ProfileResolutionError { UnreadableLocation { location: String, source: ProfilePackageError }, }
 "#;
     let directory_schema = serde_json::json!({
         "definitions": {
@@ -1407,7 +1362,7 @@ pub enum ProfileResolutionError { UnresolvableRecordedLocation { record: String,
             directory_package,
             canonical_commands,
             directory_schema.clone(),
-            "forbidden non-directory applied profile origin",
+            "forbidden non-directory reported profile origin",
         ),
         (
             directory_domain,
@@ -1420,44 +1375,10 @@ pub enum ProfileResolutionError { UnresolvableRecordedLocation { record: String,
             directory_domain,
             directory_package,
             r#"
-pub enum ProfileResolutionError { StaticRecordCannotResolve { record: String }, }
-    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
-        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
-    }
+pub enum ProfileResolutionError { EmbeddedSourceCannotResolve { location: String }, }
 "#,
             directory_schema.clone(),
-            "forbidden record-only profile resolver error returned",
-        ),
-        (
-            directory_domain,
-            directory_package,
-            r#"
-pub enum ProfileResolutionError { UnresolvableRecordedLocation { source: ProfilePackageError }, }
-    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
-        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
-    }
-    fn collect_ownership_only_ids(&self) -> Result<BTreeSet<String>> {
-        capture_applied_records(session, path)?;
-        read(record.origin)
-    }
-"#,
-            directory_schema.clone(),
-            "forbidden applied-record source exclusion scan returned",
-        ),
-        (
-            directory_domain,
-            directory_package,
-            r#"
-pub enum ProfileResolutionError { UnresolvableRecordedLocation { source: ProfilePackageError }, }
-    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
-        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
-    }
-    fn resolve_mutating_graph(&self) -> Result<ResolvedProfileGraph> {
-        self.resolve_profile_graph_with_applied(selected, filtered_applied()?)
-    }
-"#,
-            directory_schema.clone(),
-            "forbidden profile graph resolver bypass",
+            "forbidden source-only profile resolver error returned",
         ),
         (
             directory_domain,

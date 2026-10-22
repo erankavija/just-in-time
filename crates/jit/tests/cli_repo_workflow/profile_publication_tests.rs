@@ -22,7 +22,6 @@ use tempfile::TempDir;
 
 const PROFILE_ID: &str = "lifecycle-interruption";
 pub(super) const PACKAGE_LOCATION: &str = "packages/lifecycle-interruption";
-const RECORD_PATH: &str = ".jit/profiles/lifecycle-interruption.json";
 const EVENT_PATH: &str = ".jit/events.jsonl";
 const MANAGED_TARGETS: [&str; 2] = [
     "docs/lifecycle-interruption/added.txt",
@@ -32,8 +31,6 @@ const MANAGED_TARGETS: [&str; 2] = [
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LifecycleState {
     worktree_bytes: BTreeMap<&'static str, Option<Vec<u8>>>,
-    ownership_bytes: Vec<u8>,
-    ownership: Value,
     audit_bytes: Vec<u8>,
     audit: Vec<Value>,
 }
@@ -51,8 +48,6 @@ impl LifecycleState {
                 (path, bytes)
             })
             .collect();
-        let ownership_bytes = fs::read(repository.join(RECORD_PATH)).unwrap();
-        let ownership = serde_json::from_slice(&ownership_bytes).unwrap();
         let audit_bytes = fs::read(repository.join(EVENT_PATH)).unwrap();
         let audit = audit_bytes
             .split(|byte| *byte == b'\n')
@@ -67,18 +62,13 @@ impl LifecycleState {
             .collect();
         Self {
             worktree_bytes,
-            ownership_bytes,
-            ownership,
             audit_bytes,
             audit,
         }
     }
 
     pub(super) fn is_semantically_equivalent_to(&self, other: &Self) -> bool {
-        self.worktree_bytes == other.worktree_bytes
-            && self.ownership_bytes == other.ownership_bytes
-            && self.ownership == other.ownership
-            && self.audit == other.audit
+        self.worktree_bytes == other.worktree_bytes && self.audit == other.audit
     }
 }
 
@@ -160,7 +150,6 @@ pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
     );
     write_package(repository.path(), "2.0.0");
     let prior = LifecycleState::capture(repository.path());
-    assert_eq!(prior.ownership["version"], "1.0.0");
     assert_eq!(prior.audit.len(), 1);
     assert_eq!(
         prior.worktree_bytes["docs/lifecycle-interruption/retained.txt"],
@@ -191,7 +180,6 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         "the applied change must reach the repository through one shared publication"
     );
     let published = LifecycleState::capture(repository.path());
-    assert_eq!(published.ownership["version"], "2.0.0");
     assert_eq!(
         published.audit.len(),
         prior.audit.len() + 1,
@@ -221,6 +209,6 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
     assert_eq!(
         LifecycleState::capture(repository.path()),
         published,
-        "an unchanged application must not rewrite targets, ownership, or audit bytes"
+        "an unchanged application must not rewrite targets or audit bytes"
     );
 }

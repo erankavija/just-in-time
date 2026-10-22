@@ -266,7 +266,6 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     );
     assert_eq!(preview["count"], 1);
     assert_eq!(preview["profiles"][0]["status"], "would_apply");
-    assert!(!existing.path.join(".jit/profiles").exists());
 
     let applied = success_json(
         &existing.path,
@@ -383,9 +382,7 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
     assert_eq!(applied_ids(&applied), vec!["base", "workflow"]);
     assert_eq!(applied["count"], 2);
     assert_eq!(requested_profile(&applied)["status"], "applied");
-    // Each package has its own provenance record; the selection has one aggregate event.
-    assert!(repo.path.join(".jit/profiles/base.json").is_file());
-    assert!(repo.path.join(".jit/profiles/workflow.json").is_file());
+    // The selection has one aggregate event.
     let events = normalized_events(&repo.path);
     assert_eq!(events.len(), 1, "one aggregate lifecycle event is appended");
     assert_eq!(events[0]["type"], "profile_lifecycle");
@@ -479,7 +476,6 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
         .unwrap_or_else(|| panic!("a failure carries a message: {failure}"));
     assert!(message.contains("workflow"), "{message}");
     assert!(message.contains("absent-base"), "{message}");
-    assert!(!repo.path.join(".jit/profiles").exists());
     assert!(normalized_events(&repo.path).is_empty());
 }
 
@@ -833,12 +829,6 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         show_schema["definitions"]["ProfilePackageModel"]["additionalProperties"], false,
         "ProfilePackageModel must reject undeclared lifecycle fields"
     );
-    assert!(
-        show_schema["definitions"]
-            .get("AppliedProfileRecord")
-            .is_none(),
-        "profile show carries no applied-record provenance"
-    );
 
     let apply_schemas = commands["apply"]["output"]["success_schema"]["oneOf"]
         .as_array()
@@ -995,8 +985,19 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
         profiled.status.success(),
         "profiled init failed: {profiled:?}"
     );
-    assert!(repo.path.join(".jit/profiles/jit-default.json").is_file());
-    assert!(repo.path.join(".jit/profiles/jit-dogfood.json").is_file());
+    let lifecycle = normalized_events(&repo.path)
+        .into_iter()
+        .find(|event| event["type"] == "profile_lifecycle")
+        .expect("the profiled init audits its application");
+    assert_eq!(
+        lifecycle["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["id"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["jit-default", "jit-dogfood"]
+    );
 }
 
 // ===========================================================================

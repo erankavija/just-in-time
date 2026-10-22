@@ -57,7 +57,7 @@ pub(super) fn applied_ids(applied: &Value) -> Vec<&str> {
 /// `location`, and return that location.
 ///
 /// A package is applied from inside the repository it is applied to, because
-/// the applied-profile record names its worktree-relative location.
+/// application refuses a package outside the worktree.
 fn package_at<'a>(repo: &Path, location: &'a str) -> &'a str {
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/profile-packages")
@@ -102,15 +102,6 @@ fn package_with_shared_namespace<'a>(
     )
     .unwrap();
     location
-}
-
-/// The record this repository stores for the fixture package.
-fn stored_record(repo: &Path) -> Value {
-    let path = repo.join(format!(".jit/profiles/{FIXTURE_PROFILE}.json"));
-    serde_json::from_slice(&fs::read(&path).unwrap_or_else(|error| {
-        panic!("failed to read {}: {error}", path.display());
-    }))
-    .expect("a stored record is JSON")
 }
 
 /// Write a small v2 package whose templated asset makes the resolved value
@@ -261,8 +252,6 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
         assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
         assert_eq!(fs::read(&config_path).unwrap(), config_before, "{output:?}");
         assert_eq!(fs::read(&events_path).unwrap(), events_before);
-        assert!(!repo.path().join(".jit/profiles/base.json").exists());
-        assert!(!repo.path().join(".jit/profiles/workflow.json").exists());
     }
 }
 
@@ -412,8 +401,8 @@ fn test_profile_show_human_renders_each_selected_occurrence() {
 fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
-    // A package beside the repository rather than inside it. The location a
-    // record would have to name is worktree-relative, so there is none.
+    // A package beside the repository rather than inside it, so it has no
+    // worktree-relative location.
     let elsewhere = TempDir::new().unwrap();
     package_at(elsewhere.path(), "planner");
 
@@ -492,8 +481,7 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
             .any(|target| target["path"] == "docs/profile.txt"),
         "{preview}"
     );
-    // A preview writes nothing, the record included.
-    assert!(!repo.path().join(".jit/profiles").exists());
+    // A preview writes nothing.
     assert!(!repo.path().join("docs/profile.txt").exists());
 }
 
@@ -624,18 +612,18 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
 }
 
 #[test]
-fn test_profile_variable_record_keeps_the_resolved_value_out_of_events_and_validates() {
+fn test_profile_variable_keeps_the_resolved_value_out_of_events_and_validates() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     write_variable_package(
         repo.path(),
-        "packages/recorded-vars",
+        "packages/resolved-vars",
         VariablePackageSpec {
-            id: "recorded-vars",
+            id: "resolved-vars",
             variable: "NAME",
             default: None,
-            environment: Some("JIT_PROFILE_RECORDED_NAME"),
-            target: "docs/recorded-vars.txt",
+            environment: Some("JIT_PROFILE_RESOLVED_NAME"),
+            target: "docs/resolved-vars.txt",
             body: "NAME={{jit:var:NAME}}\n",
             dependency: None,
         },
@@ -646,25 +634,21 @@ fn test_profile_variable_record_keeps_the_resolved_value_out_of_events_and_valid
             "profile",
             "apply",
             "--profile",
-            "packages/recorded-vars",
+            "packages/resolved-vars",
             "--set",
             &format!("NAME={resolved_value}"),
             "--json",
         ])
-        .env("JIT_PROFILE_RECORDED_NAME", "environment-at-apply")
+        .env("JIT_PROFILE_RESOLVED_NAME", "environment-at-apply")
         .current_dir(repo.path())
         .output()
         .unwrap();
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(
-        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
+        fs::read_to_string(repo.path().join("docs/resolved-vars.txt")).unwrap(),
         format!("NAME={resolved_value}\n")
     );
 
-    let record_path = repo.path().join(".jit/profiles/recorded-vars.json");
-    let record: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
-    assert_eq!(record["variables"]["NAME"]["value"], resolved_value);
-    assert_eq!(record["variables"]["NAME"]["source"], "set");
     let events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
     assert!(!events
         .windows(resolved_value.len())
@@ -672,7 +656,7 @@ fn test_profile_variable_record_keeps_the_resolved_value_out_of_events_and_valid
 
     let validate = Command::new(env!("CARGO_BIN_EXE_jit"))
         .args(["validate", "--json"])
-        .env("JIT_PROFILE_RECORDED_NAME", "different-current-environment")
+        .env("JIT_PROFILE_RESOLVED_NAME", "different-current-environment")
         .current_dir(repo.path())
         .output()
         .unwrap();
@@ -740,7 +724,6 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
         events_before,
         "dry-run must not append events"
     );
-    assert!(!repo.path().join(".jit/profiles/second.json").exists());
     assert!(!repo.path().join("docs/second.txt").exists());
 
     let human = jit(
@@ -788,7 +771,7 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     );
     assert!(repo.path().join("docs/profile.txt").is_file());
     assert_eq!(
-        stored_record(repo.path())["origin"],
+        requested_profile(&json(&init)["profile"])["origin"],
         serde_json::json!({ "source": "directory", "location": location })
     );
 }
@@ -854,24 +837,19 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
     assert_eq!(applied_ids(applied), vec!["jit-default", FIXTURE_PROFILE]);
     assert_eq!(requested_profile(applied)["status"], "applied");
 
-    // Both packages reached the created repository: each has its provenance
-    // record naming the directory it was read from, and the named package
-    // published its asset.
+    // Both packages reached the created repository: each reports the
+    // directory it was read from, and the named package published its asset.
     assert_eq!(
-        serde_json::from_slice::<Value>(
-            &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap()
-        )
-        .unwrap()["origin"],
+        applied["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": dependency })
     );
     assert_eq!(
-        stored_record(repo.path())["origin"],
+        requested_profile(applied)["origin"],
         serde_json::json!({ "source": "directory", "location": location })
     );
     assert!(repo.path().join("docs/profile.txt").is_file());
 
-    // Validation compares every record against the repository state it
-    // describes, so a clean report is both applications having landed whole.
+    // A clean report is both applications having landed whole.
     let validate = jit(repo.path(), &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
@@ -1004,7 +982,6 @@ fn test_profiled_init_publishes_a_valid_repo() {
     );
     let init = json(&init);
     assert_eq!(requested_profile(&init["profile"])["status"], "applied");
-    assert!(repo.path().join(".jit/profiles/jit-dogfood.json").is_file());
     assert!(repo
         .path()
         .join(".agents/skills/jit-manage/SKILL.md")
@@ -1070,7 +1047,6 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
         events_before
     );
-    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
 
     let applied = jit(
         repo.path(),
@@ -1254,7 +1230,6 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
         "config.toml",
         "rules.toml",
         "issues",
-        "profiles/jit-dogfood.json",
     ] {
         assert!(
             repo.path().join(".jit").join(path).exists(),
