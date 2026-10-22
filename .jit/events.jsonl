@@ -18564,3 +18564,11 @@
 {"gate_key":"code-review","id":"1bb19c68-84ea-46b2-a004-6e83dc62b07b","issue_id":"fbb661f2-31f6-476f-b125-1cd6bcfdbd7c","timestamp":"2026-10-22T01:51:08.263865466Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"09ceeddc-7c68-498a-b87d-032d6d4ab89f","issue_id":"fbb661f2-31f6-476f-b125-1cd6bcfdbd7c","timestamp":"2026-10-22T01:54:02.386113055Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"51a388eb-7a01-4dd4-8eec-7811d68e31d9","issue_id":"f866d9d8-384e-4b5e-9616-78bfa5e1b440","timestamp":"2026-10-22T01:56:08.435501724Z","type":"gate_failed","updated_by":"auto:executor"}
+{"from":"ready","id":"20a27432-b171-4bd8-a152-2e8b1d7311ed","issue_id":"39710b3b-2b92-4fc1-bbc2-4c230577e350","timestamp":"2026-10-22T01:56:50.248294393Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"49cd8c3d-767b-4a0d-8848-2abc1447b228","issue_id":"39710b3b-2b92-4fc1-bbc2-4c230577e350","timestamp":"2026-10-22T01:56:50.248294393Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"d2947a60-577a-48cd-9a17-f0cfd9f9ad03","issue_id":"f866d9d8-384e-4b5e-9616-78bfa5e1b440","timestamp":"2026-10-22T01:57:44.699604623Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"9ea61cb4-69bb-4c9e-a97f-79fe89ce5b58","issue_id":"fbb661f2-31f6-476f-b125-1cd6bcfdbd7c","timestamp":"2026-10-22T01:58:30.005022738Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"e714a82b-bbcb-4f43-9ace-bf90e6967ae6","issue_id":"f866d9d8-384e-4b5e-9616-78bfa5e1b440","timestamp":"2026-10-22T01:58:35.864494773Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"54d0d4c7-48ae-4c3c-ab1d-1c131761ca8e","issue_id":"856f0520-7af9-4c2d-9297-5abbd9eae365","priority":"high","timestamp":"2026-10-22T01:58:45.768280485Z","title":"Classify cargo-ci load from a pre-run baseline","type":"issue_created"}
+{"assignee":"agent:jit-execution-lead","id":"b5796953-ec2a-408e-b96e-8d44e278d592","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-22T01:58:53.173480477Z","type":"issue_claimed"}
+{"fields":["dependencies"],"id":"9d3216b9-828f-4aba-b24a-40fdf990e1fa","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-10-22T01:58:54.570642347Z","type":"issue_updated","updated_by":"dependency-add"}
