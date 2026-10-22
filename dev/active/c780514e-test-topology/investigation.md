@@ -333,7 +333,15 @@ Matches that are not a test passing on a skip:
 
 ### D.6 Private setups across the workspace
 
-Mechanical sweep. It covers every non-`#[test]` function in a `#[cfg(test)]` module under `crates/*/src` and in every file under `crates/*/tests`, excluding the shared test-support modules (`test_utils.rs`, `test_harness.rs`, `commands/test_helpers.rs`, `test_taxonomy.rs`, `storage/test_support.rs`). A function is listed when its body does one of these:
+Mechanical sweep at `b80cd0da6`. It covers every non-`#[test]` function in three places:
+
+- a `#[cfg(test)]` module under `crates/*/src`;
+- a test file that a `#[cfg(test)]` `mod x;` includes, with or without `#[path = …]`: `storage/repository_state_store_tests.rs`, `storage/repository_state_store_contention_tests.rs`, `storage/claim_coordinator_proptests.rs`, `storage/contention_probe.rs`, `storage/redo_conformance.rs` and `repository_state/managed_document_property_tests.rs`;
+- every file under `crates/*/tests`.
+
+The shared test-support modules are excluded: `test_utils.rs`, `test_harness.rs`, `commands/test_helpers.rs`, `test_taxonomy.rs` and `storage/test_support.rs`.
+
+A function is listed when its body does one of these:
 
 - constructs a `CommandExecutor` (`CommandExecutor::new` or `.with_layout(`);
 - constructs a storage backend (`InMemoryStorage::new` or `rooted_at`, `JsonFileStorage::new`);
@@ -341,246 +349,251 @@ Mechanical sweep. It covers every non-`#[test]` function in a `#[cfg(test)]` mod
 - writes `.jit/` files (`add_data_file`, a `.jit` path, `initialize_fresh_repository`, `run_initialization`);
 - or writes a `config.toml`, `templates.toml`, `rules.toml` or `gates.toml` into a fresh `TempDir`.
 
-Each listed function is classified as one of:
+A row's identity is its file and function name (`Type::method` inside an `impl`). The line is context at the sweep commit. Each listed function is classified as one of:
 
-- **setup**: builds a repository, store, executor or declaration directory from scratch, or opens an executor over a store it is given. The owner entry retires it.
+- **setup**: builds a repository, store, executor or declaration directory from scratch, opens an executor over a store it is given, or hand-rolls `git init`. The owner entry names it under "Helpers to retire".
 - **scenario**: arranges paths, writes scenario declarations or records into a repository it is given, or reads results.
-- **subject**: the backend, layout, image or wrapper under test.
+- **subject**: the backend, session, layout, image or wrapper under test.
 
-183 functions: 103 setup, 52 scenario, 28 subject.
+188 functions: 104 setup, 51 scenario, 33 subject.
 
-**library (`crates/jit/src`)**
+**Library (`crates/jit/src`)**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `commands/archive.rs:892` `executor` | setup | `library-file-setup-adoption` |
-| `commands/archive.rs:994` `executable_document_repo` | setup | `library-file-setup-adoption` |
-| `commands/archive.rs:1764` `configured_repo` | setup | `library-file-setup-adoption` |
-| `commands/archive.rs:1995` `development_root_repo` | setup | `library-file-setup-adoption` |
-| `commands/archive.rs:2399` `directory_link_repo` | setup | `library-file-setup-adoption` |
-| `commands/archive.rs:2494` `executable_container_repo` | setup | `library-file-setup-adoption` |
-| `commands/batch_create.rs:671` `executor` | setup | `library-command-memory-setup-adoption` |
-| `commands/batch_create.rs:926` `coverage_executor` | setup | `library-command-memory-setup-adoption` |
-| `commands/bulk_update.rs:1973` `blocked_dependent_fixture` | setup | `library-command-memory-setup-adoption` |
-| `commands/claim.rs:1045` `create_test_issue` | setup | `library-file-setup-adoption` |
-| `commands/dependency.rs:1213` `mark_index_deleted` | scenario | — |
-| `commands/events.rs:51` `seeded_override_executor` | setup | `library-command-memory-setup-adoption` |
-| `commands/gate.rs:1452` `setup` | setup | `library-command-memory-setup-adoption` |
-| `commands/gate_check.rs:1666` `setup` | setup | `library-command-memory-setup-adoption` |
-| `commands/gate_check.rs:1705` `seed_rule_validation_rules` | scenario | — |
-| `commands/gate_check.rs:2082` `setup_file_repository` | setup | `library-file-setup-adoption` |
-| `commands/gate_check.rs:2157` `new` | setup | `library-file-setup-adoption` |
-| `commands/gate_check.rs:2279` `rewrite_checker_command` | scenario | — |
-| `commands/gate_check.rs:2583` `write_corrupt_gate_run` | scenario | — |
-| `commands/gate_cli_tests.rs:10` `setup` | setup | `library-command-memory-setup-adoption` |
-| `commands/hooks.rs:254` `diverged_strict_repo` | setup | `library-file-setup-adoption` |
-| `commands/init.rs:665` `executor_with_layout` | setup | `library-file-setup-adoption` |
-| `commands/init.rs:675` `assert_repo_valid` | setup | `library-file-setup-adoption` |
-| `commands/init.rs:748` `declare_before_init` | subject | — |
-| `commands/invariant.rs:76` `exec` | setup | `library-command-memory-setup-adoption` |
-| `commands/issue.rs:916` `setup` | setup | `library-command-memory-setup-adoption` |
-| `commands/issue.rs:920` `setup_over` | setup | `library-command-memory-setup-adoption` |
-| `commands/item.rs:613` `executor_with` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:629` `project_exec_with_name` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:728` `project_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:826` `two_project_kinds_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1122` `policy_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1207` `registry_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1225` `registry_exec_with_rules` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1344` `registry_exec_with_gates` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1428` `registry_exec_with_rules_and_gates` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/item.rs:1536` `config_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/mod.rs:3571` `precheck_evidence_fixture` | setup | `library-command-memory-setup-adoption` |
-| `commands/profile.rs:2265` `fixture` | setup | `library-file-setup-adoption` |
-| `commands/profile.rs:2411` `record_for` | scenario | — |
-| `commands/profile.rs:2701` `edit_contributed_description` | scenario | — |
-| `commands/profile.rs:3143` `bare_repository_beside_shipped_packages` | setup | `library-file-setup-adoption` |
-| `commands/profile.rs:3171` `published_configuration` | scenario | — |
-| `commands/validate.rs:3004` `dangling_exec` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/validate.rs:3023` `dangling_exec_with_namespaces` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/validate.rs:3042` `finish_dangling_executor` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/validate.rs:3103` `dangling_exec_with_rules_and_gates` | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/worktree.rs:760` `linked_checkout_paths` | scenario | — |
-| `document/reference.rs:263` `layout` | subject | — |
-| `domain/item.rs:1655` `invariant_cfg` | scenario | — |
-| `gate_execution.rs:977` `worktree_with_data_root` | subject | — |
-| `main.rs:7669` `repository_declaring` | setup | `library-file-setup-adoption` |
-| `main.rs:7680` `checkout_paths` | scenario | — |
-| `profile/drift_report.rs:181` `subject` | subject | — |
-| `profile/package_capture.rs:557` `new` | subject | — |
-| `repository_state/archive.rs:607` `layout` | subject | — |
-| `repository_state/export.rs:310` `layout` | subject | — |
-| `repository_state/image.rs:1449` `layout` | subject | — |
-| `repository_state/initialize.rs:1304` `image_with_records` | subject | — |
-| `repository_state/materialize.rs:696` `layout` | subject | — |
-| `repository_state/materialize.rs:1449` `assert_duplicate_name_is_non_repairable` | subject | — |
-| `repository_state/materialize.rs:1581` `ns_and_projection_config` | subject | — |
-| `repository_state/materialize.rs:1837` `image_with_ignore` | scenario | — |
-| `repository_state/mod.rs:1236` `layout` | subject | — |
-| `repository_state/mutation.rs:1369` `layout` | subject | — |
-| `repository_state/overlay.rs:154` `layout` | subject | — |
-| `repository_state/profile_apply.rs:3385` `image_owning` | subject | — |
-| `repository_state/profile_apply.rs:3520` `merge_authored_contribution` | subject | — |
-| `storage/claim_coordinator.rs:1535` `coordinator_with_lock_wait` | subject | — |
-| `storage/discovery.rs:112` `index_in` | subject | — |
-| `storage/external_publish.rs:329` `external_target` | subject | — |
-| `storage/gate_runs.rs:16` `setup_storage` | setup | `library-file-setup-adoption` |
-| `storage/gate_runs.rs:24` `record_gate_run` | scenario | — |
-| `storage/json.rs:1564` `configure_test_layout` | subject | — |
-| `storage/json.rs:1613` `retained_storage` | subject | — |
-| `storage/json.rs:3020` `storage_with_index_version` | subject | — |
-| `storage/memory.rs:1299` `seeded` | subject | — |
-| `storage/redo_apply.rs:379` `repository` | subject | — |
-| `validation/repository.rs:865` `fixture` | scenario | — |
-| `validation/repository.rs:892` `executor` | setup | `library-file-setup-adoption` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `commands/archive.rs` | `executor` | 893 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `executable_document_repo` | 994 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `configured_repo` | 1764 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `development_root_repo` | 1995 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `directory_link_repo` | 2399 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `executable_container_repo` | 2494 | setup | `library-file-setup-adoption` |
+| `commands/batch_create.rs` | `executor` | 672 | setup | `library-command-memory-setup-adoption` |
+| `commands/batch_create.rs` | `coverage_executor` | 926 | setup | `library-command-memory-setup-adoption` |
+| `commands/bulk_update.rs` | `blocked_dependent_fixture` | 1973 | setup | `library-command-memory-setup-adoption` |
+| `commands/claim.rs` | `create_test_issue` | 1045 | setup | `library-file-setup-adoption` |
+| `commands/dependency.rs` | `mark_index_deleted` | 1213 | scenario | — |
+| `commands/events.rs` | `seeded_override_executor` | 52 | setup | `library-command-memory-setup-adoption` |
+| `commands/gate.rs` | `setup` | 1453 | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs` | `setup` | 1667 | setup | `library-command-memory-setup-adoption` |
+| `commands/gate_check.rs` | `seed_rule_validation_rules` | 1706 | scenario | — |
+| `commands/gate_check.rs` | `setup_file_repository` | 2083 | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs` | `ReuseFixture::new` | 2157 | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs` | `ReuseFixture::rewrite_checker_command` | 2279 | scenario | — |
+| `commands/gate_check.rs` | `write_corrupt_gate_run` | 2584 | scenario | — |
+| `commands/gate_cli_tests.rs` | `setup` | 11 | setup | `library-command-memory-setup-adoption` |
+| `commands/hooks.rs` | `diverged_strict_repo` | 254 | setup | `library-file-setup-adoption` |
+| `commands/init.rs` | `executor_with_layout` | 665 | setup | `library-file-setup-adoption` |
+| `commands/init.rs` | `assert_repo_valid` | 675 | setup | `library-file-setup-adoption` |
+| `commands/init.rs` | `declare_before_init` | 748 | subject | — |
+| `commands/invariant.rs` | `exec` | 76 | setup | `library-command-memory-setup-adoption` |
+| `commands/issue.rs` | `setup` | 917 | setup | `library-command-memory-setup-adoption` |
+| `commands/issue.rs` | `setup_over` | 921 | setup | `library-command-memory-setup-adoption` |
+| `commands/item.rs` | `executor_with` | 614 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `project_exec_with_name` | 629 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `project_exec` | 728 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `two_project_kinds_exec` | 826 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `policy_exec` | 1122 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `registry_exec` | 1207 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `registry_exec_with_rules` | 1225 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `registry_exec_with_gates` | 1344 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `registry_exec_with_rules_and_gates` | 1428 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/item.rs` | `config_exec` | 1536 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/mod.rs` | `precheck_evidence_fixture` | 3572 | setup | `library-command-memory-setup-adoption` |
+| `commands/profile.rs` | `fixture` | 2262 | setup | `library-file-setup-adoption` |
+| `commands/profile.rs` | `record_for` | 2408 | scenario | — |
+| `commands/profile.rs` | `bare_repository_beside_shipped_packages` | 3016 | setup | `library-file-setup-adoption` |
+| `commands/profile.rs` | `published_configuration` | 3044 | scenario | — |
+| `commands/validate.rs` | `dangling_exec` | 3004 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs` | `dangling_exec_with_namespaces` | 3023 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs` | `finish_dangling_executor` | 3043 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/validate.rs` | `dangling_exec_with_rules_and_gates` | 3103 | setup | `library-item-validate-memory-setup-adoption` |
+| `commands/worktree.rs` | `linked_checkout_paths` | 760 | scenario | — |
+| `document/reference.rs` | `layout` | 264 | subject | — |
+| `domain/item.rs` | `invariant_cfg` | 1656 | scenario | — |
+| `gate_execution.rs` | `worktree_with_data_root` | 977 | subject | — |
+| `main.rs` | `repository_declaring` | 7650 | setup | `library-file-setup-adoption` |
+| `main.rs` | `checkout_paths` | 7661 | scenario | — |
+| `profile/drift_report.rs` | `subject` | 181 | subject | — |
+| `profile/package_capture.rs` | `Fixture::new` | 557 | subject | — |
+| `repository_state/archive.rs` | `layout` | 608 | subject | — |
+| `repository_state/export.rs` | `layout` | 311 | subject | — |
+| `repository_state/image.rs` | `layout` | 1450 | subject | — |
+| `repository_state/initialize.rs` | `image_with_records` | 1299 | subject | — |
+| `repository_state/materialize.rs` | `layout` | 697 | subject | — |
+| `repository_state/materialize.rs` | `assert_duplicate_name_is_non_repairable` | 1449 | subject | — |
+| `repository_state/materialize.rs` | `ns_and_projection_config` | 1581 | subject | — |
+| `repository_state/materialize.rs` | `image_with_ignore` | 1836 | scenario | — |
+| `repository_state/mod.rs` | `layout` | 1195 | subject | — |
+| `repository_state/mutation.rs` | `layout` | 1370 | subject | — |
+| `repository_state/overlay.rs` | `layout` | 155 | subject | — |
+| `repository_state/profile_apply.rs` | `image_holding` | 1938 | subject | — |
+| `repository_state/profile_apply.rs` | `merge_authored_contribution` | 2001 | subject | — |
+| `storage/claim_coordinator.rs` | `coordinator_with_lock_wait` | 1535 | subject | — |
+| `storage/claim_coordinator_proptests.rs` | `setup_coordinator` | 14 | subject | — |
+| `storage/discovery.rs` | `index_in` | 112 | subject | — |
+| `storage/external_publish.rs` | `external_target` | 330 | subject | — |
+| `storage/gate_runs.rs` | `setup_storage` | 17 | setup | `library-file-setup-adoption` |
+| `storage/gate_runs.rs` | `record_gate_run` | 25 | scenario | — |
+| `storage/json.rs` | `configure_test_layout` | 1565 | subject | — |
+| `storage/json.rs` | `retained_storage` | 1614 | subject | — |
+| `storage/json.rs` | `storage_with_index_version` | 3020 | subject | — |
+| `storage/memory.rs` | `seeded` | 1299 | subject | — |
+| `storage/redo_apply.rs` | `repository` | 379 | subject | — |
+| `storage/repository_state_store_contention_tests.rs` | `labeled_layout` | 19 | subject | — |
+| `storage/repository_state_store_tests.rs` | `publish_issue` | 263 | subject | — |
+| `storage/repository_state_store_tests.rs` | `capture_git_fixture` | 2587 | setup | `library-git-fixture-adoption` |
+| `storage/repository_state_store_tests.rs` | `WriteSetFixture::new` | 2801 | subject | — |
+| `storage/repository_state_store_tests.rs` | `FileSessionBackend::seeded` | 3273 | subject | — |
+| `validation/repository.rs` | `fixture` | 866 | scenario | — |
+| `validation/repository.rs` | `executor` | 892 | setup | `library-file-setup-adoption` |
 
 **`crates/jit/tests/cli_gate`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `bracket_coverage_gate_run_test.rs:139` `setup_bracket_repo` | setup | `cli-gate-migration` |
-| `bracket_coverage_gate_run_test.rs:192` `assert_gate_run` | scenario | — |
-| `gate_cli_integration_test.rs:74` `enable_warn_leases` | scenario | — |
-| `gate_evaluate_all_test.rs:90` `define_review_placeholder_gate` | scenario | — |
-| `gate_evaluate_rerun_test.rs:106` `gate_updated_by` | scenario | — |
-| `gate_update_test.rs:56` `define_review_placeholder_gate` | scenario | — |
-| `gate_update_test.rs:93` `read_only_issue_file` | scenario | — |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `bracket_coverage_gate_run_test.rs` | `setup_bracket_repo` | 139 | setup | `cli-gate-migration` |
+| `bracket_coverage_gate_run_test.rs` | `assert_gate_run` | 192 | scenario | — |
+| `gate_cli_integration_test.rs` | `enable_warn_leases` | 75 | scenario | — |
+| `gate_evaluate_all_test.rs` | `define_review_placeholder_gate` | 90 | scenario | — |
+| `gate_evaluate_rerun_test.rs` | `gate_updated_by` | 106 | scenario | — |
+| `gate_update_test.rs` | `define_review_placeholder_gate` | 56 | scenario | — |
+| `gate_update_test.rs` | `read_only_issue_file` | 93 | scenario | — |
 
 **`crates/jit/tests/cli_issue`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `command_exit_code_projection_tests.rs:110` `setup_prospective_cycle` | scenario | — |
-| `container_rollup_tests.rs:94` `delete_issue_file` | scenario | — |
-| `exit_code_tests.rs:1147` `make_ambiguous_prefix` | scenario | — |
-| `failure_probe_fixture.rs:604` `apply` | scenario | — |
-| `issue_update_description_ops_tests.rs:86` `assert_last_event_is_description_update` | scenario | — |
-| `serve_failure_envelope_tests.rs:12` `setup` | setup | `cli-issue-envelope-migration` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `command_exit_code_projection_tests.rs` | `setup_prospective_cycle` | 111 | scenario | — |
+| `container_rollup_tests.rs` | `delete_issue_file` | 94 | scenario | — |
+| `exit_code_tests.rs` | `make_ambiguous_prefix` | 1147 | scenario | — |
+| `failure_probe_fixture.rs` | `FailureFixture::apply` | 605 | scenario | — |
+| `issue_update_description_ops_tests.rs` | `assert_last_event_is_description_update` | 86 | scenario | — |
+| `serve_failure_envelope_tests.rs` | `setup` | 13 | setup | `cli-issue-envelope-migration` |
 
 **`crates/jit/tests/cli_item_validate`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `decision_kind_tests.rs:48` `setup_test_repo` | setup | `cli-item-validate-migration` |
-| `decision_kind_tests.rs:163` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
-| `decision_risk_story_tests.rs:58` `setup_test_repo` | setup | `cli-item-validate-migration` |
-| `decision_risk_story_tests.rs:119` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
-| `derived_state_repair_tests.rs:42` `file_snapshot` | scenario | — |
-| `invariant_check_cli_tests.rs:33` `write_rules` | scenario | — |
-| `invariant_check_cli_tests.rs:36` `write_invariants` | scenario | — |
-| `invariant_registry_story_tests.rs:33` `setup_jit_root_with_invariants_toml` | setup | `cli-item-validate-migration` |
-| `invariant_registry_story_tests.rs:68` `setup_cli_repo` | setup | `cli-item-validate-migration` |
-| `item_cli_tests.rs:315` `configure_project_scope_kind` | scenario | — |
-| `item_cli_tests.rs:687` `register_link_namespaces` | scenario | — |
-| `markdown_kind_source_path_tests.rs:53` `configure_policy_kind` | scenario | — |
-| `project_render_cli_tests.rs:35` `append_projection` | scenario | — |
-| `risk_kind_tests.rs:50` `setup_test_repo` | setup | `cli-item-validate-migration` |
-| `risk_kind_tests.rs:129` `default_executor_with` | setup | `cli-item-validate-in-process-setup-adoption` |
-| `validate_cli_rule_tests.rs:27` `setup_repo_with_rules` | setup | `cli-item-validate-migration` |
-| `validate_cli_rule_tests.rs:608` `configure_review_placeholder` | scenario | — |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `decision_kind_tests.rs` | `setup_test_repo` | 48 | setup | `cli-item-validate-migration` |
+| `decision_kind_tests.rs` | `default_executor_with` | 163 | setup | `cli-item-validate-in-process-setup-adoption` |
+| `decision_risk_story_tests.rs` | `setup_test_repo` | 58 | setup | `cli-item-validate-migration` |
+| `decision_risk_story_tests.rs` | `default_executor_with` | 119 | setup | `cli-item-validate-in-process-setup-adoption` |
+| `derived_state_repair_tests.rs` | `file_snapshot` | 43 | scenario | — |
+| `invariant_check_cli_tests.rs` | `write_rules` | 33 | scenario | — |
+| `invariant_check_cli_tests.rs` | `write_invariants` | 37 | scenario | — |
+| `invariant_registry_story_tests.rs` | `setup_jit_root_with_invariants_toml` | 33 | setup | `cli-item-validate-migration` |
+| `invariant_registry_story_tests.rs` | `setup_cli_repo` | 68 | setup | `cli-item-validate-migration` |
+| `item_cli_tests.rs` | `configure_project_scope_kind` | 315 | scenario | — |
+| `item_cli_tests.rs` | `register_link_namespaces` | 687 | scenario | — |
+| `markdown_kind_source_path_tests.rs` | `configure_policy_kind` | 53 | scenario | — |
+| `project_render_cli_tests.rs` | `append_projection` | 35 | scenario | — |
+| `risk_kind_tests.rs` | `setup_test_repo` | 50 | setup | `cli-item-validate-migration` |
+| `risk_kind_tests.rs` | `default_executor_with` | 129 | setup | `cli-item-validate-in-process-setup-adoption` |
+| `validate_cli_rule_tests.rs` | `setup_repo_with_rules` | 27 | setup | `cli-item-validate-migration` |
+| `validate_cli_rule_tests.rs` | `configure_review_placeholder` | 609 | scenario | — |
 
 **`crates/jit/tests/cli_query_graph`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `label_constraints_tests.rs:19` `setup_repo` | setup | `cli-query-graph-in-process-setup-adoption` |
-| `scope_validation_tests.rs:161` `executor_with_rules_and_templates` | setup | `cli-query-graph-in-process-setup-adoption` |
-| `scope_validation_tests.rs:1118` `executor` | setup | `cli-query-graph-in-process-setup-adoption` |
-| `scope_validation_tests.rs:1298` `setup_spine` | scenario | — |
-| `search_tests.rs:7` `create_test_repo` | setup | `cli-query-graph-migration` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `label_constraints_tests.rs` | `setup_repo` | 20 | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs` | `executor_with_rules_and_templates` | 161 | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs` | `executor` | 1118 | setup | `cli-query-graph-in-process-setup-adoption` |
+| `scope_validation_tests.rs` | `setup_spine` | 1298 | scenario | — |
+| `search_tests.rs` | `create_test_repo` | 8 | setup | `cli-query-graph-migration` |
 
 **`crates/jit/tests/cli_repo_workflow`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `apply_cli_tests.rs:88` `setup_repo` | setup | `cli-repo-profile-migration` |
-| `archive_preview_cli_tests.rs:121` `set_documentation_policy` | scenario | — |
-| `archive_preview_cli_tests.rs:135` `initialize_with_policy` | setup | `cli-repo-checkout-migration` |
-| `archive_preview_cli_tests.rs:1558` `document_contents` | scenario | — |
-| `artifact_conformance_cli_tests.rs:157` `declare_issue_scoped_areas` | scenario | — |
-| `claim_integration_tests.rs:113` `acquire_selected_linked_lease` | scenario | — |
-| `cross_substrate_generality_tests.rs:82` `write_jit_file` | scenario | — |
-| `divergence_recovery_journey_tests.rs:70` `store_of` | scenario | — |
-| `divergence_recovery_journey_tests.rs:254` `stage_documented_store_paths` | scenario | — |
-| `doc_show_tests.rs:176` `initialized_repo` | setup | `cli-repo-checkout-migration` |
-| `format_compat_cli_tests.rs:19` `setup_too_new_repo` | setup | `cli-repo-workflow-migration` |
-| `init_tests.rs:687` `packaged_documentation_policy` | scenario | — |
-| `linked_checkout_write_policy_tests.rs:147` `linked_checkout_fixture` | setup | `cli-repo-checkout-migration` |
-| `linked_checkout_write_policy_tests.rs:212` `declare_stance` | scenario | — |
-| `linked_checkout_write_policy_tests.rs:222` `durable_events` | scenario | — |
-| `linked_checkout_write_policy_tests.rs:425` `store_bytes` | scenario | — |
-| `linked_checkout_write_policy_tests.rs:700` `redeclare_stance` | scenario | — |
-| `profile_acceptance_tests.rs:116` `normalized_events` | scenario | — |
-| `profile_acceptance_tests.rs:143` `is_machine_local_path` | scenario | — |
-| `profile_cli_tests.rs:108` `stored_record` | scenario | — |
-| `profile_publication_tests.rs:107` `executor_with_interruptions` | subject | — |
-| `profile_publication_tests.rs:117` `ordinary_executor` | setup | `cli-repo-workflow-in-process-setup-adoption` |
-| `serve_cli_tests.rs:175` `write_stale_pid` | scenario | — |
-| `steering_scenarios.rs:150` `setup_scenario_repo` | setup | `cli-repo-workflow-migration` |
-| `template_binding_cli_tests.rs:136` `setup_repo` | setup | `cli-repo-profile-migration` |
-| `worktree_identity_tests.rs:13` `identity_paths` | scenario | — |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `apply_cli_tests.rs` | `setup_repo` | 88 | setup | `cli-repo-profile-migration` |
+| `archive_preview_cli_tests.rs` | `set_documentation_policy` | 121 | scenario | — |
+| `archive_preview_cli_tests.rs` | `initialize_with_policy` | 135 | setup | `cli-repo-checkout-migration` |
+| `archive_preview_cli_tests.rs` | `document_contents` | 1558 | scenario | — |
+| `artifact_conformance_cli_tests.rs` | `declare_issue_scoped_areas` | 157 | scenario | — |
+| `claim_integration_tests.rs` | `acquire_selected_linked_lease` | 113 | scenario | — |
+| `cross_substrate_generality_tests.rs` | `write_jit_file` | 82 | scenario | — |
+| `divergence_recovery_journey_tests.rs` | `store_of` | 70 | scenario | — |
+| `divergence_recovery_journey_tests.rs` | `stage_documented_store_paths` | 254 | scenario | — |
+| `doc_show_tests.rs` | `initialized_repo` | 176 | setup | `cli-repo-checkout-migration` |
+| `format_compat_cli_tests.rs` | `setup_too_new_repo` | 19 | setup | `cli-repo-workflow-migration` |
+| `init_tests.rs` | `packaged_documentation_policy` | 687 | scenario | — |
+| `linked_checkout_write_policy_tests.rs` | `linked_checkout_fixture` | 147 | setup | `cli-repo-checkout-migration` |
+| `linked_checkout_write_policy_tests.rs` | `declare_stance` | 212 | scenario | — |
+| `linked_checkout_write_policy_tests.rs` | `durable_events` | 222 | scenario | — |
+| `linked_checkout_write_policy_tests.rs` | `store_bytes` | 425 | scenario | — |
+| `linked_checkout_write_policy_tests.rs` | `redeclare_stance` | 700 | scenario | — |
+| `profile_acceptance_tests.rs` | `normalized_events` | 117 | scenario | — |
+| `profile_acceptance_tests.rs` | `is_machine_local_path` | 144 | scenario | — |
+| `profile_cli_tests.rs` | `stored_record` | 108 | scenario | — |
+| `profile_publication_tests.rs` | `executor_with_interruptions` | 107 | subject | — |
+| `profile_publication_tests.rs` | `ordinary_executor` | 117 | setup | `cli-repo-workflow-in-process-setup-adoption` |
+| `serve_cli_tests.rs` | `write_stale_pid` | 176 | scenario | — |
+| `steering_scenarios.rs` | `setup_scenario_repo` | 150 | setup | `cli-repo-workflow-migration` |
+| `template_binding_cli_tests.rs` | `setup_repo` | 136 | setup | `cli-repo-profile-migration` |
+| `worktree_identity_tests.rs` | `identity_paths` | 14 | scenario | — |
 
 **`crates/jit/tests/fast_docs_templates`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `artifact_discovery_tests.rs:62` `new` | setup | `fast-docs-templates-file-setup-adoption` |
-| `main.rs:24` `seed_memory_data_file` | scenario | — |
-| `planning_preset_tests.rs:21` `file_backed_executor` | setup | `fast-docs-templates-file-setup-adoption` |
-| `template_apply_atomicity_tests.rs:379` `memory_storage` | setup | `fast-docs-templates-memory-setup-adoption` |
-| `template_apply_atomicity_tests.rs:387` `fixture` | subject | — |
-| `template_apply_atomicity_tests.rs:446` `repository_image` | subject | — |
-| `template_apply_tests.rs:96` `declare_document_area` | scenario | — |
-| `template_binding_tests.rs:106` `executor_with_templates` | setup | `fast-docs-templates-memory-setup-adoption` |
-| `templates_loader_tests.rs:16` `setup` | setup | `fast-docs-templates-file-setup-adoption` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `artifact_discovery_tests.rs` | `Repo::new` | 62 | setup | `fast-docs-templates-file-setup-adoption` |
+| `main.rs` | `seed_memory_data_file` | 25 | scenario | — |
+| `planning_preset_tests.rs` | `file_backed_executor` | 21 | setup | `fast-docs-templates-file-setup-adoption` |
+| `template_apply_atomicity_tests.rs` | `memory_storage` | 380 | setup | `fast-docs-templates-memory-setup-adoption` |
+| `template_apply_atomicity_tests.rs` | `fixture` | 388 | subject | — |
+| `template_apply_atomicity_tests.rs` | `repository_image` | 447 | subject | — |
+| `template_apply_tests.rs` | `declare_document_area` | 96 | scenario | — |
+| `template_binding_tests.rs` | `executor_with_templates` | 106 | setup | `fast-docs-templates-memory-setup-adoption` |
+| `templates_loader_tests.rs` | `setup` | 16 | setup | `fast-docs-templates-file-setup-adoption` |
 
 **`crates/jit/tests/fast_issue`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `graph_rule_validation_tests.rs:15` `store_with_rules` | setup | `fast-issue-memory-setup-adoption` |
-| `graph_rule_validation_tests.rs:33` `executor_for` | setup | `fast-issue-memory-setup-adoption` |
-| `short_hash_tests.rs:389` `make_storage` | setup | `fast-issue-memory-setup-adoption` |
-| `strictness_enforcement_tests.rs:42` `executor` | setup | `fast-issue-memory-setup-adoption` |
-| `strictness_transition_tests.rs:41` `executor` | setup | `fast-issue-memory-setup-adoption` |
-| `transition_graph_enforcement_tests.rs:24` `executor_with_rules` | setup | `fast-issue-memory-setup-adoption` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `graph_rule_validation_tests.rs` | `store_with_rules` | 15 | setup | `fast-issue-memory-setup-adoption` |
+| `graph_rule_validation_tests.rs` | `executor_for` | 34 | setup | `fast-issue-memory-setup-adoption` |
+| `short_hash_tests.rs` | `make_storage` | 389 | setup | `fast-issue-memory-setup-adoption` |
+| `strictness_enforcement_tests.rs` | `executor` | 42 | setup | `fast-issue-memory-setup-adoption` |
+| `strictness_transition_tests.rs` | `executor` | 41 | setup | `fast-issue-memory-setup-adoption` |
+| `transition_graph_enforcement_tests.rs` | `executor_with_rules` | 24 | setup | `fast-issue-memory-setup-adoption` |
 
 **`crates/jit/tests/fast_rules`**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `cli_warnings_integration_tests.rs:24` `setup_test_repo` | setup | `rule-warning-tests-down-a-layer` |
-| `default_rules_registry_derivation_tests.rs:17` `executor` | setup | `fast-rules-file-setup-adoption` |
-| `default_rules_registry_derivation_tests.rs:28` `setup_initialized_repo` | setup | `fast-rules-file-setup-adoption` |
-| `effective_rules_tests.rs:16` `repo` | setup | `fast-rules-file-setup-adoption` |
-| `effective_rules_tests.rs:35` `executor` | setup | `fast-rules-file-setup-adoption` |
-| `example_rulesets_tests.rs:612` `executor_with_sdd_example` | setup | `fast-rules-memory-setup-adoption` |
-| `example_rulesets_tests.rs:1524` `research_coverage_executor` | setup | `fast-rules-memory-setup-adoption` |
-| `label_strategic_tests.rs:13` `strategic_executor` | setup | `fast-rules-memory-setup-adoption` |
-| `local_rule_enforcement_tests.rs:20` `executor_with_rules` | setup | `fast-rules-memory-setup-adoption` |
-| `main.rs:20` `memory_executor` | setup | `fast-rules-memory-executor-adoption` |
-| `project_render_harness_tests.rs:77` `storage_with` | setup | `fast-rules-memory-setup-adoption` |
-| `project_render_harness_tests.rs:90` `render_executor` | setup | `fast-rules-memory-setup-adoption` |
-| `type_hierarchy_schema_regen_tests.rs:9` `executor` | setup | `fast-rules-file-setup-adoption` |
-| `type_hierarchy_schema_regen_tests.rs:15` `setup_initialized_repo` | setup | `fast-rules-file-setup-adoption` |
-| `undeclared_taxonomy_tests.rs:20` `scaffold_declaring` | setup | `fast-rules-file-setup-adoption` |
-| `validate_rule_runner_tests.rs:21` `store_with_rules` | setup | `fast-rules-memory-setup-adoption` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `cli_warnings_integration_tests.rs` | `setup_test_repo` | 24 | setup | `rule-warning-tests-down-a-layer` |
+| `default_rules_registry_derivation_tests.rs` | `executor` | 18 | setup | `fast-rules-file-setup-adoption` |
+| `default_rules_registry_derivation_tests.rs` | `setup_initialized_repo` | 28 | setup | `fast-rules-file-setup-adoption` |
+| `effective_rules_tests.rs` | `repo` | 16 | setup | `fast-rules-file-setup-adoption` |
+| `effective_rules_tests.rs` | `executor` | 36 | setup | `fast-rules-file-setup-adoption` |
+| `example_rulesets_tests.rs` | `executor_with_sdd_example` | 612 | setup | `fast-rules-memory-setup-adoption` |
+| `example_rulesets_tests.rs` | `research_coverage_executor` | 1524 | setup | `fast-rules-memory-setup-adoption` |
+| `label_strategic_tests.rs` | `strategic_executor` | 13 | setup | `fast-rules-memory-setup-adoption` |
+| `local_rule_enforcement_tests.rs` | `executor_with_rules` | 20 | setup | `fast-rules-memory-setup-adoption` |
+| `main.rs` | `memory_executor` | 21 | setup | `fast-rules-memory-executor-adoption` |
+| `project_render_harness_tests.rs` | `storage_with` | 77 | setup | `fast-rules-memory-setup-adoption` |
+| `project_render_harness_tests.rs` | `render_executor` | 90 | setup | `fast-rules-memory-setup-adoption` |
+| `type_hierarchy_schema_regen_tests.rs` | `executor` | 10 | setup | `fast-rules-file-setup-adoption` |
+| `type_hierarchy_schema_regen_tests.rs` | `setup_initialized_repo` | 16 | setup | `fast-rules-file-setup-adoption` |
+| `undeclared_taxonomy_tests.rs` | `scaffold_declaring` | 20 | setup | `fast-rules-file-setup-adoption` |
+| `validate_rule_runner_tests.rs` | `store_with_rules` | 21 | setup | `fast-rules-memory-setup-adoption` |
 
-**server crate**
+**Server crate (`crates/server`)**
 
-| Function | Class | Owner |
-| --- | --- | --- |
-| `src/lib.rs:93` `repository_missing_its_index` | setup | `server-file-setup-adoption` |
-| `src/routes.rs:1053` `test_executor` | setup | `server-file-setup-adoption` |
-| `src/routes.rs:1081` `test_memory_storage` | setup | `server-memory-setup-adoption` |
-| `src/routes.rs:1103` `initialize_file_backed_test_repository` | setup | `server-file-setup-adoption` |
-| `src/routes.rs:1699` `create_test_app_with_html_doc` | setup | `server-file-setup-adoption` |
-| `src/routes.rs:2621` `create_app_with_raw_fixture` | setup | `server-file-setup-adoption` |
-| `tests/server_integration/document_api_tests.rs:11` `test_memory_storage` | setup | `server-memory-setup-adoption` |
-| `tests/server_integration/document_api_tests.rs:23` `create_test_server` | setup | `server-memory-setup-adoption` |
-| `tests/server_integration/document_api_tests.rs:39` `create_test_server_with_issue` | setup | `server-memory-setup-adoption` |
-| `tests/server_integration/graceful_shutdown_tests.rs:75` `initialize_repository` | setup | `server-file-setup-adoption` |
-| `tests/server_integration/graceful_shutdown_tests.rs:80` `executor_for` | setup | `server-file-setup-adoption` |
+| File | Function | Line | Class | Owner |
+| --- | --- | ---: | --- | --- |
+| `src/lib.rs` | `repository_missing_its_index` | 93 | setup | `server-file-setup-adoption` |
+| `src/routes.rs` | `test_executor` | 1054 | setup | `server-file-setup-adoption` |
+| `src/routes.rs` | `test_memory_storage` | 1082 | setup | `server-memory-setup-adoption` |
+| `src/routes.rs` | `initialize_file_backed_test_repository` | 1104 | setup | `server-file-setup-adoption` |
+| `src/routes.rs` | `create_test_app_with_html_doc` | 1699 | setup | `server-file-setup-adoption` |
+| `src/routes.rs` | `create_app_with_raw_fixture` | 2621 | setup | `server-file-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs` | `test_memory_storage` | 12 | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs` | `create_test_server` | 23 | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/document_api_tests.rs` | `create_test_server_with_issue` | 39 | setup | `server-memory-setup-adoption` |
+| `tests/server_integration/graceful_shutdown_tests.rs` | `initialize_repository` | 75 | setup | `server-file-setup-adoption` |
+| `tests/server_integration/graceful_shutdown_tests.rs` | `executor_for` | 81 | setup | `server-file-setup-adoption` |
 
 ### D.7 Shell-script self-tests
 
