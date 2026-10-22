@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dd2f4ed9-9cf7-4133-99e2-aaa9e0acb717",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:54:42.295552474Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "613c2939-feff-4388-ba39-ee82c7659057",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:57:51.304800317Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Repository-state tests own each finalization case",
-  "updated_at": "2026-10-22T21:35:58.515651860Z"
+  "updated_at": "2026-10-22T21:57:51.304800317Z"
 }
