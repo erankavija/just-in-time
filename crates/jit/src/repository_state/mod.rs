@@ -149,13 +149,12 @@ pub use path::{
     WORKTREE_IDENTITY_FILE,
 };
 pub use profile_apply::{
-    compose_resolved_contributions, AppliedProfileRecord, CompleteProjectionConfig,
-    ComposedContribution, Contribution, ContributionConflictOwner, ContributionIdentity,
-    ContributionIdentityTarget, ContributionOutcome, ContributionRegistry, KeyedArrayTarget,
-    MapEntryTarget, ProfileApplicationInput, ProfileAssetClaim, ProfileClaims,
-    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict,
-    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
-    SetStringTarget,
+    compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,
+    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
+    ContributionOutcome, ContributionRegistry, KeyedArrayTarget, MapEntryTarget,
+    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
+    ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict, ProfileTargetConflictEntry,
+    ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
     profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
@@ -683,9 +682,6 @@ pub enum MaterializationRequest<'a> {
     RepairDerivedState {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Profile claims layered over the declared state; validation repair
-        /// supplies none.
-        profiles: Vec<ProfileClaims>,
     },
     /// Derive a fresh or missing-file repository scaffold.
     Initialize {
@@ -730,11 +726,8 @@ pub fn derive_materialization(
             let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
             (MaterializationDerivation::new(delta), counts)
         }
-        MaterializationRequest::RepairDerivedState {
-            declarations,
-            profiles,
-        } => {
-            let delta = derive_repair(image, &declarations, profiles)?;
+        MaterializationRequest::RepairDerivedState { declarations } => {
+            let delta = derive_repair(image, &declarations)?;
             (MaterializationDerivation::new(delta), Default::default())
         }
         MaterializationRequest::Initialize { scaffold, context } => (
@@ -868,9 +861,6 @@ pub enum RepositoryStateError {
 /// `Display` impl. Composed into [`RepositoryStateError::AmbiguousOwnership`].
 #[derive(Debug, thiserror::Error)]
 pub enum AmbiguousOwnershipError {
-    /// More than one installed profile claims the same materialization target.
-    #[error("multiple installed profiles claim {0:?}")]
-    MultipleProfileClaims(VirtualPath),
     /// `rules.toml` declares more than one rule with the same name, so
     /// default-rule and schema ownership cannot be proven.
     #[error(
@@ -930,7 +920,7 @@ fn derive_project_render(
     ))
 }
 
-/// Repair intent: the same complete expected state, whose per-target composition is
+/// Repair intent: the semantic-mutation expected state, whose per-target composition is
 /// itself ownership-safe — `rules.toml` splices only generated default spans,
 /// region projections splice only their managed region, and full-file projections
 /// replace a target the declaration proves. Ambiguous ownership fails before
@@ -938,36 +928,8 @@ fn derive_project_render(
 fn derive_repair(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
-    profiles: Vec<ProfileClaims>,
 ) -> Result<RepositoryDelta, RepositoryStateError> {
-    let mut actions = compose_complete(image, declarations)?;
-    let mut claimed = std::collections::BTreeSet::new();
-    for claims in profiles {
-        for (path, (bytes, mode)) in profile_apply::compose_profile_targets(image, claims)?.targets
-        {
-            if !claimed.insert(path.clone()) {
-                return Err(AmbiguousOwnershipError::MultipleProfileClaims(path.clone()).into());
-            }
-            actions.retain(|action| action.path() != &path);
-            let expected = ExpectedPreimage::of(image.entry(&path).map_err(ProducerError::from)?);
-            if !matches!(
-                image.entry(&path).map_err(ProducerError::from)?,
-                RepositoryEntry::File {
-                    content: existing,
-                    mode: existing_mode,
-                } if existing.bytes() == bytes && *existing_mode == mode
-            ) {
-                actions.push(RepositoryAction::WriteFile {
-                    path,
-                    owner: "profile-repair".to_string(),
-                    expected,
-                    bytes,
-                    mode,
-                });
-            }
-        }
-    }
-    Ok(RepositoryDelta::new(image.layout(), actions)?)
+    derive_semantic_mutation(image, declarations)
 }
 
 /// Enumerate the drift-independent set of paths `derive_repair` may materialize.
@@ -975,13 +937,12 @@ fn derive_repair(
 /// The returned set names every target repair could write, independent of whether
 /// `image` currently drifts from it — unlike `derive_repair`, which is drift-
 /// filtered at every family (a projection skips when its composed bytes already
-/// match the captured occupant, the default ruleset writes only on diff, a profile
-/// target pushes only when its entry differs). Walking `derive_repair`'s own
+/// match the captured occupant, the default ruleset writes only on diff). Walking `derive_repair`'s own
 /// actions therefore enumerates only the paths currently drifting, not the
 /// complete target space; this function enumerates the target space directly, so a
 /// coverage test can hold it independent of current repository state.
 ///
-/// Four families compose the result:
+/// Three families compose the result:
 /// - Default-ruleset targets: `rules.toml` is a member exactly when the capture
 ///   spec captured it AND it is present (an absent `rules.toml` is the
 ///   in-memory-defaults case `derive_repair` never materializes anything for); its
@@ -994,9 +955,6 @@ fn derive_repair(
 /// - Configured-projection targets: every projection declared in `declarations`'
 ///   configuration contributes its own target unconditionally, since a declared
 ///   projection's target is always part of the operation's capture closure.
-/// - Profile targets: the keys of `compose_profile_targets` for each installed
-///   profile's claims (its composed bytes and mode are irrelevant to a path-only
-///   authority).
 ///
 /// Obsolete-schema deletions are deliberately excluded: they are occupant-proven
 /// repair actions (a captured schema file whose sole default-rule reference is
@@ -1006,11 +964,10 @@ fn derive_repair(
 /// `derive_repair` is not refactored to consume this set — it needs each target's
 /// composed bytes, which a path set cannot supply — so a caller needing both the
 /// target set and the composed delta invokes this function and `derive_repair`
-/// separately over the same `image`, `declarations`, and `profiles`.
+/// separately over the same `image` and `declarations`.
 pub fn repair_target_paths(
     image: &RepositoryImage,
     declarations: RepositoryDeclarations<'_>,
-    profiles: Vec<ProfileClaims>,
 ) -> Result<std::collections::BTreeSet<VirtualPath>, RepositoryStateError> {
     let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
     let mut targets = std::collections::BTreeSet::new();
@@ -1050,16 +1007,6 @@ pub fn repair_target_paths(
             let target = require_target(projection, name)?;
             targets.insert(image.layout().classify_repository_relative(target)?);
         }
-    }
-
-    // Profile targets: the exact keys of each installed profile's composed target
-    // set.
-    for claims in profiles {
-        targets.extend(
-            profile_apply::compose_profile_targets(image, claims)?
-                .targets
-                .into_keys(),
-        );
     }
 
     Ok(targets)

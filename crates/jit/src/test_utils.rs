@@ -287,8 +287,8 @@ pub fn profiled_repository_fixture(
 
 /// A verified applied-profile repository imported into isolated memory state.
 ///
-/// The returned temporary repository owns both the package locations used by
-/// applied-profile provenance and the file-backed baseline clone. Keep it
+/// The returned temporary repository owns both the package locations the
+/// profile was applied from and the file-backed baseline clone. Keep it
 /// alive for as long as commands use the accompanying memory store.
 pub fn profiled_in_memory_repository_fixture(
     id: &str,
@@ -1637,12 +1637,12 @@ mod tests {
             profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
         let second =
             profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
-        let profile_record = Path::new(".jit/profiles/jit-dogfood.json");
+        let profile_asset = Path::new(".agents/skills/jit-manage/SKILL.md");
 
-        assert!(first.path().join(profile_record).is_file());
+        assert!(first.path().join(profile_asset).is_file());
         assert_eq!(
-            fs::read(first.path().join(profile_record)).unwrap(),
-            fs::read(second.path().join(profile_record)).unwrap()
+            fs::read(first.path().join(profile_asset)).unwrap(),
+            fs::read(second.path().join(profile_asset)).unwrap()
         );
         fs::write(first.path().join("AGENTS.md"), b"mutated clone").unwrap();
         assert_ne!(
@@ -1666,7 +1666,7 @@ mod tests {
 
         const EXECUTABLE: &str =
             ".agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh";
-        const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
+        const REGULAR: &str = ".agents/skills/jit-manage/SKILL.md";
         let (first_source, first) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
         let (second_source, second) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
 
@@ -1684,13 +1684,13 @@ mod tests {
             FileMode::Executable
         );
         assert_eq!(
-            first.repository_file_mode_fixture(PROFILE_RECORD).unwrap(),
+            first.repository_file_mode_fixture(REGULAR).unwrap(),
             FileMode::Regular
         );
         assert_eq!(
-            first.read_repo_file(PROFILE_RECORD).unwrap(),
-            Some(fs::read_to_string(first_source.path().join(PROFILE_RECORD)).unwrap()),
-            "the memory adapter must retain the baseline's exact applied-profile record"
+            first.read_repo_file(REGULAR).unwrap(),
+            Some(fs::read_to_string(first_source.path().join(REGULAR)).unwrap()),
+            "the memory adapter must retain the baseline's exact regular profile asset"
         );
 
         first.add_worktree_file("AGENTS.md", "mutated memory clone");

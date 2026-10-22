@@ -205,7 +205,7 @@ pub struct ProfileContributionChange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfilePlanStatus {
-    /// Package targets and installed provenance already match.
+    /// Package targets already match.
     Unchanged,
     /// Applying the plan would publish at least one change.
     WouldApply,
@@ -273,115 +273,6 @@ impl ProfileCollection<ProfilePlanEntry> {
         self.items
             .iter()
             .filter(|profile| profile.status == ProfilePlanStatus::WouldConflict)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::repository_state::AppliedProfileRecord;
-    use crate::repository_state::RootRelativePath;
-
-    /// A record naming the package at the worktree-relative `location`.
-    fn record_at(location: &str) -> AppliedProfileRecord {
-        record(ProfileOrigin::Directory(
-            RootRelativePath::parse(location).expect("a canonical package location"),
-        ))
-    }
-
-    fn record(origin: ProfileOrigin) -> AppliedProfileRecord {
-        AppliedProfileRecord::new(
-            "example".try_into().expect("test profile id is canonical"),
-            "1.0.0",
-            "*",
-            origin,
-            "package",
-            crate::profile::ResolvedVariables::default(),
-        )
-    }
-
-    /// A record whose `origin` is replaced by `origin`, as stored bytes.
-    fn stored_with_origin(origin: serde_json::Value) -> Vec<u8> {
-        let mut value: serde_json::Value =
-            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
-        value["origin"] = origin;
-        serde_json::to_vec(&value).unwrap()
-    }
-
-    #[test]
-    fn test_installed_record_is_canonical_stable_json() {
-        let value: serde_json::Value =
-            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
-        assert_eq!(
-            value
-                .as_object()
-                .unwrap()
-                .keys()
-                .cloned()
-                .collect::<Vec<_>>(),
-            vec![
-                "compatible_jit",
-                "id",
-                "origin",
-                "package_hash",
-                "record_version",
-                "variables",
-                "version"
-            ]
-        );
-    }
-
-    #[test]
-    fn test_installed_record_round_trips_the_location_a_directory_origin_names() {
-        // The location survives the round trip through stored bytes, which is
-        // what a later run reads to find the package again, and two records
-        // naming different locations are distinguishable in the stored image.
-        let location = RootRelativePath::parse("profiles/example").unwrap();
-        let stored = record_at("profiles/example").to_bytes().unwrap();
-
-        let read: AppliedProfileRecord = serde_json::from_slice(&stored).unwrap();
-        assert_eq!(read.origin, ProfileOrigin::Directory(location));
-        assert_ne!(
-            stored,
-            record_at("vendor/elsewhere").to_bytes().unwrap(),
-            "records naming different locations must not store the same image"
-        );
-    }
-
-    #[test]
-    fn test_installed_record_rejects_pre_release_embedded_origin_through_strict_decoding() {
-        let mut stored: serde_json::Value =
-            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
-        stored["origin"] = serde_json::json!({ "source": "embedded" });
-
-        assert!(
-            serde_json::from_value::<AppliedProfileRecord>(stored).is_err(),
-            "the retired pre-release source tag must fail at the ordinary strict wire boundary"
-        );
-    }
-
-    #[test]
-    fn test_installed_record_rejects_an_absent_or_malformed_directory_location() {
-        // Every one of these is a stored record a repository could hold, and
-        // each must fail the read rather than resolve to a package the record
-        // does not actually name.
-        for origin in [
-            serde_json::json!({ "source": "directory" }),
-            serde_json::json!({ "source": "directory", "location": "../outside" }),
-            serde_json::json!({ "source": "directory", "location": "/absolute" }),
-            serde_json::json!({ "source": "directory", "location": "a/./b" }),
-            serde_json::json!({ "source": "directory", "location": 7 }),
-            // A source the origin vocabulary does not carry is refused
-            // outright rather than read past to its location.
-            serde_json::json!({ "source": "unsupported", "location": "profiles/example" }),
-            serde_json::json!({ "source": "unknown", "location": "profiles/example" }),
-        ] {
-            let stored = stored_with_origin(origin.clone());
-            assert!(
-                serde_json::from_slice::<AppliedProfileRecord>(&stored).is_err(),
-                "{origin} must not read as a valid record"
-            );
-        }
     }
 }
 

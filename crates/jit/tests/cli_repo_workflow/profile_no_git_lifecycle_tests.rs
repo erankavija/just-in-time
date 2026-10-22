@@ -81,12 +81,6 @@ fn test_profile_lifecycle_completes_without_git() {
         applied_ids(&resolved),
         vec!["gitless-base", "gitless-workflow"]
     );
-    for id in ["gitless-base", "gitless-workflow"] {
-        assert!(
-            repo.join(format!(".jit/profiles/{id}.json")).is_file(),
-            "dependency resolution did not record {id}"
-        );
-    }
 
     let lifecycle_id = "gitless-lifecycle";
     write_lifecycle_package(repo, "packages/lifecycle", lifecycle_id, "1.0.0");

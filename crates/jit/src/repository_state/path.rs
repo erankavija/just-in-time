@@ -333,8 +333,6 @@ mod identity {
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
         GATE_RUNS: Data = "gate-runs";
-        /// Applied-profile provenance directory under the data root (`.jit/profiles`).
-        PROFILES: Data = "profiles";
         /// JSON Schema directory under the data root (`.jit/schemas`).
         SCHEMAS: Data = "schemas";
         /// Nested configuration directory under the data root (`.jit/config`).

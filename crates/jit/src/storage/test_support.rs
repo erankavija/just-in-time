@@ -65,9 +65,9 @@ impl InMemoryStorage {
     /// The adapter reads ordinary files and directories without following
     /// symbolic links, preserves normalized executable modes, and assigns the
     /// nested `.jit` tree to the data root. It is intentionally test-only: the
-    /// source tree remains live beside the aggregate so profile records can
-    /// resolve their worktree-relative package locations through the same real
-    /// filesystem boundary as production commands.
+    /// source tree remains live beside the aggregate so worktree-relative
+    /// package locations resolve through the same real filesystem boundary as
+    /// production commands.
     #[doc(hidden)]
     pub fn seed_repository_tree_fixture(&self, repository_root: &Path) -> Result<()> {
         if self.root() != repository_root {

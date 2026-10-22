@@ -380,7 +380,7 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Capture the neutral proposed base and convert one resolved package into
-    /// complete neutral claims and provenance metadata.
+    /// complete neutral claims.
     ///
     /// The base is captured under the held session, overlaid with the neutral
     /// scaffold state init will publish (schemas always; an existing
@@ -401,7 +401,6 @@ impl CommandExecutor<JsonFileStorage> {
             package.hashes().targets.keys().map(String::as_str),
         )?;
         let metadata = package.model();
-        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
         let layout = self.require_layout()?;
         let resolved = resolve_package(
             package,
@@ -411,14 +410,10 @@ impl CommandExecutor<JsonFileStorage> {
         Ok(ProfileApplicationInput {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
-            compatible_jit: metadata.compatible_jit.clone(),
-            package_hash: package.hashes().package.clone(),
             variables: resolved.variables().clone(),
             target_hashes: resolved.target_hashes()?,
-            origin: super::profile::package_origin(package, &layout)?,
             contribution_context: claims.contributions.clone(),
             claims,
-            record_path,
         })
     }
 }
@@ -581,8 +576,7 @@ fn git_events_pattern(relative: &Path) -> String {
 mod tests {
     use super::*;
     use crate::commands::ProfileSelector;
-    use crate::profile::ProfileOrigin;
-    use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
+    use crate::repository_state::{Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
     use std::fs;
     use std::path::PathBuf;
@@ -590,8 +584,8 @@ mod tests {
     use std::sync::{Arc, Barrier};
 
     /// Count each apply's own pre-commit check, the one boundary every
-    /// publication crosses on both the record and the absent-root path, and no
-    /// read-only capture.
+    /// publication crosses on both the redo-record and the absent-root path,
+    /// and no read-only capture.
     struct PublicationCounter(AtomicUsize);
 
     impl PublicationCounter {
@@ -893,8 +887,6 @@ source-of-truth = \"registry-first\"\n";
         );
         assert!(repo.path().join("docs/base.txt").is_file());
         assert!(repo.path().join("docs/workflow.txt").is_file());
-        assert!(repo.path().join(".jit/profiles/base.json").is_file());
-        assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
     }
 
     #[test]
@@ -1019,7 +1011,7 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
-    fn test_fresh_profile_init_records_every_package_of_the_selected_closure() {
+    fn test_fresh_profile_init_applies_every_package_of_the_selected_closure() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
@@ -1048,20 +1040,6 @@ source-of-truth = \"registry-first\"\n";
                 .collect::<Vec<_>>(),
             ids,
             "initialization applies the whole set the named profile resolves to"
-        );
-        let unrecorded = ids
-            .iter()
-            .filter(|id| {
-                !repo
-                    .path()
-                    .join(format!(".jit/profiles/{id}.json"))
-                    .is_file()
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(
-            unrecorded,
-            Vec::<&&str>::new(),
-            "each entry is an applied package the created repository has no record of"
         );
         assert_repo_valid(repo.path());
     }
@@ -1113,18 +1091,7 @@ source-of-truth = \"registry-first\"\n";
             ]
         );
         // Both packages reached the published repository: the dependency's own
-        // vocabulary, the named package's asset, and a provenance record each.
-        let record: AppliedProfileRecord = serde_json::from_slice(
-            &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(
-            record.origin,
-            ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("packages/jit-default").unwrap()
-            )
-        );
-        assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+        // vocabulary and the named package's asset.
         assert!(repo.path().join("docs/workflow.txt").is_file());
         let published = fs::read(repo.path().join(".jit/config.toml")).unwrap();
         let types = crate::declarations::parse_configuration(&published)
@@ -1205,7 +1172,6 @@ source-of-truth = \"registry-first\"\n";
             ProfileApplicationStatus::Applied
         );
         assert!(repo.path().join(".jit/index.json").is_file());
-        assert!(repo.path().join(".jit/profiles/jit-dogfood.json").is_file());
         assert!(repo
             .path()
             .join(".agents/skills/jit-manage/SKILL.md")
@@ -1239,18 +1205,6 @@ source-of-truth = \"registry-first\"\n";
         )
         .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let compact_record = {
-            let record: AppliedProfileRecord = serde_json::from_slice(
-                &fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
-            )
-            .unwrap();
-            serde_json::to_vec(&record).unwrap()
-        };
-        fs::write(
-            repo.path().join(".jit/profiles/jit-dogfood.json"),
-            &compact_record,
-        )
-        .unwrap();
         let before_events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
         // A second `jit init` is a fresh process that re-discovers the layout over
@@ -1274,10 +1228,6 @@ source-of-truth = \"registry-first\"\n";
         assert_eq!(
             fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
             before_events
-        );
-        assert_eq!(
-            fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
-            compact_record
         );
     }
 
@@ -1363,8 +1313,8 @@ source-of-truth = \"registry-first\"\n";
         )
         .unwrap();
 
-        // Read from inside the worktree it is prepared against, because the
-        // preparation records the package's worktree-relative location.
+        // Read from inside the worktree it is prepared against, as an adopter
+        // stages it.
         let package = crate::test_utils::capture_repository_package(
             "jit-dogfood",
             &repo.path().join("profiles/jit-dogfood"),
