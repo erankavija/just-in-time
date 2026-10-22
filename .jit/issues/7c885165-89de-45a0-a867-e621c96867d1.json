@@ -46,15 +46,16 @@
       "path": "dev/active/c780514e-test-topology/breakdown.json"
     }
   ],
+  "done_at": "2026-10-22T14:27:23.137157480Z",
   "first_ready_at": "2026-10-21T15:41:03.807437171Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "95979a63-4861-419b-a6c8-a94adb6041b0",
-      "status": "failed",
-      "updated_at": "2026-10-22T02:28:26.136366197Z",
+      "run_id": "84c830b9-ab94-4da7-b490-46cd80f5c1ff",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:26:54.379688519Z",
       "updated_by": "auto:executor"
     }
   },
@@ -70,7 +71,7 @@
     "type:planning"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T06:33:34.283026335Z"
+  "updated_at": "2026-10-22T14:27:23.137157480Z"
 }
