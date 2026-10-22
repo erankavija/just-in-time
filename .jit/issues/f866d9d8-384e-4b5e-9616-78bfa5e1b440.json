@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f3e1fc9d-58d7-4291-9ffb-def7c5807bcb",
+      "status": "failed",
+      "updated_at": "2026-10-22T01:56:08.435501724Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f866d9d8-384e-4b5e-9616-78bfa5e1b440",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove three-way profile publication",
-  "updated_at": "2026-10-21T21:12:42.519243044Z"
+  "updated_at": "2026-10-22T01:56:08.435501724Z"
 }
