@@ -76,7 +76,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "rework 1 merged; gating"
+          "status": "done"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -401,7 +401,7 @@
           "key": "fixture-issue-commands-a-adoption",
           "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "dispatched (haiku)"
+          "status": "recovery in existing worktree; reviewing preserved fixture path substitutions; awaiting import cutover before full validation"
         },
         {
           "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
@@ -473,7 +473,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "REVERTED on main (cf274f369); rework 1 (opus): cargo-ci 5 fast_issue graph_rule_validation failures (.jit/.gitignore stale) + code-review F1 early-return skips config seeding for partial stores"
+          "status": "rework 1 recovery in existing worktree; preserved 4db73f1d7; awaiting import cutover before full validation"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1273,7 +1273,14 @@
   "traps": [
     "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back."
   ],
-  "rules": "Steward: worktrees only; merges under `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock`; `cargo test --doc -p jit` on the branch before merge; CARGO_INCREMENTAL=0; builds via turnstile + shared lock; full gates via turnstile + exclusive lock; <=2 live worktrees and >=60 GB free to dispatch; --force only for load-only cargo-ci failures; prefer sonnet/haiku; breakdown is fixed (changes only via steward escalation + new planning pass); escalate project-level questions to steward just-in-time-24; never ask the user. Pre-merge (steward, binding, replaces doctest-only): on the task branch with current main merged in, run `cargo nextest run --workspace && cargo test --doc --workspace` (turnstile + shared lock, CARGO_INCREMENTAL=0); merge only if both pass. Lead helper: scratchpad/premerge.sh.",
+  "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
-  "started_at": "2026-10-22T14:43:25+00:00"
+  "started_at": "2026-10-22T14:43:25+00:00",
+  "recovery": {
+    "started_at": "2026-10-22T22:08:55",
+    "backup": "/tmp/jit-c780514e-recovery-20261022T220855",
+    "coordinator_thread": "01a164c8-d7ba-7812-a630-db8dddcee05b",
+    "active_worktree_limit": 2,
+    "pending_external_landing": "63c11d08"
+  }
 }
