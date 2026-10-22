@@ -44,7 +44,7 @@
           "key": "doctest-substep-bound",
           "title": "Doctest substep fits within the per-test bound",
           "classification": "implementation",
-          "status": "in_progress; audit maps20 removals and11 retained examples; reused memory checkout"
+          "status": "implemented c7bb5037d;33 examples removed with owning tests; integrated aa main final CI queued"
         },
         {
           "id": "9a07026e-0666-4c3e-9868-5f083b293988",
@@ -172,7 +172,7 @@
           "key": "profile-suite-selftest-gate",
           "title": "Suite-profiler self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; reuse adoption checkout; remove default-suite profiler wrapper"
         },
         {
           "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
@@ -1298,7 +1298,7 @@
     "pending_external_landing": null,
     "worktrees": {
       "agent-22355a56": "worktree-agent-871df4b0",
-      "agent-de880d9c": "worktree-agent-aa28fe5f"
+      "agent-de880d9c": "worktree-agent-7a412cb0"
     }
   },
   "lead_reviews": {
