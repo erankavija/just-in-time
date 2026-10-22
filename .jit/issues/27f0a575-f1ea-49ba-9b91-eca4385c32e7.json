@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5ca1589d-66ca-410c-95f8-f41d8c826b76",
+      "status": "failed",
+      "updated_at": "2026-10-22T02:28:52.860571848Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "27f0a575-f1ea-49ba-9b91-eca4385c32e7",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue lifecycle methods behind an issues facade",
-  "updated_at": "2026-10-22T01:50:19.480646350Z"
+  "updated_at": "2026-10-22T02:28:52.860571848Z"
 }

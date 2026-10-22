@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e582a1856d9d0af22622d4c783791bc3f4ffc72",
+  "completed_at": "2026-10-22T02:27:48.831480105Z",
+  "duration_ms": 172689,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 25,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "User and system configuration are still presented as effective defaults despite repository-only resolution; clarify or remove those source claims and state that --global does not affect lease limits."
+      }
+    ],
+    "summary": "Configuration-source guidance contradicts the issue's repository-only lease-limit resolution.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b46f7023-a297-48c4-afd2-68945b5e8a86",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T02:24:56.142365446Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.ij9JJuJQ48: binary file matches\n--- agent stderr (first 12 of 31767 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1616d-01cf-7c31-96ac-5d05594f3106\n--------\n--- 31755 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf issue `34361448`; inspected its implementation patch `93a6be35` and empty merge patch `a1fd176c`. Current resolver and integration test confirm user-layer lease limits are ignored.\n\nDocumentation impact: the new resolution rule is correct, but adjacent configuration-source guidance now contradicts it.\n\n1. **F1 — blocking, issue-impact:** The configuration-files table still calls `~/.config/jit/config.toml` and `/etc/jit/config.toml` “User defaults” and “System defaults” ([docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:25)), while the issue changes effective resolution to repository configuration plus built-in defaults only. The generic `--global` example at line 698 further implies user settings are effective. Replace these descriptions with their actual supported roles (or remove the system entry), and explicitly state that `--global` writes a user config but does not affect effective configuration or coordination lease limits.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Configuration-source guidance contradicts the issue's repository-only lease-limit resolution.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"User and system configuration are still presented as effective defaults despite repository-only resolution; clarify or remove those source claims and state that --global does not affect lease limits.\",\"file\":\"docs/reference/configuration.md\",\"line\":25}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
