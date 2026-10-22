@@ -8,6 +8,7 @@
   ],
   "description": "Prove the create-time graph-rule warnings without cloning a profiled repository onto disk, so these tests stop timing out after a rebuild.\n\n## Background\n\n`crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs` holds four tests of the orphan-leaf and strategic-consistency warnings: an epic without its label, a task without a parent, and their no-warning counterparts. The workflow profile's graph rules produce these warnings. Each test clones a `jit-dogfood` profiled repository onto disk and drives `CommandExecutor<JsonFileStorage>`. Quiet and warm they take 0.22-0.24 s. After a rebuild, their cold fixture key under host load drives them past the 20 s nextest bound.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs`: `setup_test_repo` (`:24`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists: it is deleted together with `cli_warnings_integration_tests.rs` once the file's cases have moved down a layer.\n- [hard] REQ-02: Each of the four warning properties is proven at the cheapest layer that observes it: the workflow profile's graph rules evaluated in memory over the issues the test creates, with no file-backed repository.\n- [hard] REQ-03: The rules come from the workflow profile package's own declarations, not a restated copy.\n- [hard] REQ-04: No test of these properties exceeds 5 s on a warm target at load ≤ 10.\n- [hard] REQ-05: `cli_warnings_integration_tests.rs` no longer exists once no case remains in it.\n- [hard] REQ-06: None of the four cases calls the profiled-repository fixture or takes its cross-process build lock, so neither a missing setup-script receipt nor lock contention can affect them.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:59:08.619272702Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Create-time rule warnings proven in-process without a profiled repository",
-  "updated_at": "2026-10-22T14:58:47.308195191Z"
+  "updated_at": "2026-10-22T14:59:08.619272702Z"
 }
