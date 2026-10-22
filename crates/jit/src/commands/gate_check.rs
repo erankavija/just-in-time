@@ -623,35 +623,107 @@ fn gate_findings_from_rule_report(
 /// Convert one whole-repository validation result into the built-in gate finding
 /// contract.
 ///
-/// Structural failure remains authoritative while its partial semantic report
-/// is converted once through the same severity/disposition mapping as a clean
-/// validation result.
+/// A structural failure or an unloadable rules declaration is a fault the checker
+/// cannot judge through, so it returns `Err`; rule findings about content convert through the
+/// same severity/disposition mapping as any validation report.
 fn gate_findings_from_report(
     result: std::result::Result<
         crate::validation::repository::RepositoryValidationReport,
         crate::validation::repository::RepositoryValidationFailure,
     >,
-) -> (Vec<GateFinding>, bool) {
-    let (structural_error, report) = match result {
-        Ok(report) => (None, report),
-        Err(failure) => {
-            let (error, report) = failure.into_parts();
-            (Some(error), report)
-        }
+) -> Result<(Vec<GateFinding>, bool)> {
+    let report = result.map_err(|failure| failure.into_error())?;
+    if !report
+        .passes
+        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas)
+    {
+        let causes = report
+            .rule_report
+            .findings
+            .iter()
+            .filter(|finding| finding.is_error())
+            .map(|finding| finding.message.as_str())
+            .collect::<Vec<_>>()
+            .join("; ");
+        anyhow::bail!("rules declaration did not load: {causes}");
+    }
+    let failed = report.rule_report.has_errors();
+    Ok((gate_findings_from_rule_report(&report.rule_report), failed))
+}
+
+/// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
+///
+/// A missing, repeated, or empty target is a configuration fault.
+fn label_target_report(
+    image: &crate::repository_state::RepositoryImage,
+    issue_id: &str,
+    label_namespace: &str,
+) -> Result<crate::validation::report::RuleReport> {
+    let issues = super::captured_active_issues(image)?;
+    let issue = issues
+        .iter()
+        .find(|issue| issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
+    let prefix = format!("{label_namespace}:");
+    let targets: Vec<&str> = issue
+        .labels
+        .iter()
+        .filter_map(|label| label.strip_prefix(&prefix))
+        .collect();
+    if label_namespace.is_empty() {
+        anyhow::bail!("label_namespace is empty");
+    }
+    let [target] = targets[..] else {
+        anyhow::bail!(
+            "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found {}",
+            targets.len()
+        );
     };
-    let mut findings = gate_findings_from_rule_report(&report.rule_report);
-    findings.extend(structural_error.as_ref().map(|error| GateFinding {
-        id: "repository-integrity".to_string(),
-        severity: "high".to_string(),
-        disposition: Some("blocking".to_string()),
-        origin: Some("issue-impact".to_string()),
-        summary: format!("{error:#}"),
-        file: None,
-        line: None,
-        references: Vec::new(),
-    }));
-    let failed = report.rule_report.has_errors() || structural_error.is_some();
-    (findings, failed)
+    if target.is_empty() {
+        anyhow::bail!(
+            "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found an empty target"
+        );
+    }
+    let target = super::resolve_issue_from_capture(&issues, &IssueIdPrefix::parse(target)?)?;
+    captured_scope_rule_report(image, &target)
+}
+
+/// The `error` run of a built-in checker that could not judge the repository,
+/// distinct from a `failed` verdict on its content.
+fn builtin_fault_run(
+    gate_key: &str,
+    issue_id: &str,
+    stage: GateStage,
+    command: &str,
+    started_at: chrono::DateTime<chrono::Utc>,
+    start: std::time::Instant,
+    fault: &anyhow::Error,
+) -> GateRunResult {
+    let summary = format!("Built-in checker could not judge the repository: {fault:#}");
+    GateRunResult {
+        schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
+        // Repository mutation finalization assigns the durable run identity.
+        run_id: String::new(),
+        gate_key: gate_key.to_string(),
+        stage,
+        issue_id: issue_id.to_string(),
+        commit: None,
+        branch: None,
+        status: GateRunStatus::Error,
+        started_at,
+        completed_at: Some(chrono::Utc::now()),
+        duration_ms: Some(start.elapsed().as_millis() as u64),
+        exit_code: Some(gate_execution::CHECKER_TEMPFAIL_EXIT),
+        stdout: String::new(),
+        stderr: summary,
+        command: command.to_string(),
+        by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
+        message: None,
+        findings: None,
+        inputs_digest: None,
+        origin: crate::domain::GateVerdictOrigin::Executed,
+        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
+    }
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -1031,94 +1103,38 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::GateChecker;
-        use crate::validation::report::RuleReport;
 
         let started_at = chrono::Utc::now();
         let start = std::time::Instant::now();
 
-        let (command, mut findings, explicit_failure) = match checker {
-            GateChecker::RepositoryValidation => {
-                let (findings, failed) = gate_findings_from_report(
-                    crate::validation::repository::validate_repository(repository_image),
-                );
-                ("builtin:repository_validation", findings, failed)
-            }
-            GateChecker::IssueValidation => {
-                let report = captured_issue_rule_report(repository_image, issue_id)?;
-                let failed = report.has_errors();
-                (
-                    "builtin:issue_validation",
-                    gate_findings_from_rule_report(&report),
-                    failed,
-                )
-            }
-            GateChecker::RuleValidation { rule } => {
-                let report = super::validate::rule_validation_report(
-                    repository_image,
-                    &IssueIdPrefix::of_stored(issue_id),
-                    rule,
-                )?;
-                let failed = report.has_errors();
-                (
-                    "builtin:rule_validation",
-                    gate_findings_from_rule_report(&report),
-                    failed,
-                )
-            }
+        let command = match checker {
+            GateChecker::RepositoryValidation => "builtin:repository_validation",
+            GateChecker::IssueValidation => "builtin:issue_validation",
+            GateChecker::RuleValidation { .. } => "builtin:rule_validation",
+            GateChecker::LabelTargetValidation { .. } => "builtin:label_target_validation",
+            GateChecker::ReviewPlaceholder => "builtin:review_placeholder",
+            GateChecker::Exec { .. } => unreachable!("exec checker is dispatched separately"),
+        };
+        // An `Err` is a fault: the checker could not judge the repository.
+        // An `Ok` carries a verdict on the content.
+        let judged: Result<(Vec<GateFinding>, bool)> = match checker {
+            GateChecker::RepositoryValidation => gate_findings_from_report(
+                crate::validation::repository::validate_repository(repository_image),
+            ),
+            GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
+                .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
+            GateChecker::RuleValidation { rule } => super::validate::rule_validation_outcome(
+                repository_image,
+                &IssueIdPrefix::of_stored(issue_id),
+                rule,
+            )
+            .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
+            .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
             GateChecker::LabelTargetValidation { label_namespace } => {
-                let captured_issues = super::captured_active_issues(repository_image)?;
-                let issue = captured_issues
-                    .iter()
-                    .find(|issue| issue.id == issue_id)
-                    .cloned()
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
-                let prefix = format!("{label_namespace}:");
-                let targets: Vec<&str> = issue
-                    .labels
-                    .iter()
-                    .filter_map(|label| label.strip_prefix(&prefix))
-                    .collect();
-                if label_namespace.is_empty() || targets.len() != 1 || targets[0].is_empty() {
-                    let detail = if label_namespace.is_empty() {
-                        "label_namespace is empty".to_string()
-                    } else {
-                        format!(
-                            "expected exactly one non-empty '{}:<target-id>' label on issue {}, found {}",
-                            label_namespace,
-                            issue_id,
-                            targets.len()
-                        )
-                    };
-                    (
-                        "builtin:label_target_validation",
-                        vec![GateFinding {
-                            id: "label-target".to_string(),
-                            severity: "high".to_string(),
-                            disposition: Some("blocking".to_string()),
-                            origin: Some("issue-impact".to_string()),
-                            summary: detail,
-                            file: None,
-                            line: None,
-                            references: Vec::new(),
-                        }],
-                        true,
-                    )
-                } else {
-                    let target = super::resolve_issue_from_capture(
-                        &captured_issues,
-                        &IssueIdPrefix::parse(targets[0])?,
-                    )?;
-                    let report: RuleReport = captured_scope_rule_report(repository_image, &target)?;
-                    let failed = report.has_errors();
-                    (
-                        "builtin:label_target_validation",
-                        gate_findings_from_rule_report(&report),
-                        failed,
-                    )
-                }
+                label_target_report(repository_image, issue_id, label_namespace)
+                    .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
             }
-            GateChecker::ReviewPlaceholder => (
-                "builtin:review_placeholder",
+            GateChecker::ReviewPlaceholder => Ok((
                 vec![GateFinding {
                     id: "review-placeholder".to_string(),
                     severity: "high".to_string(),
@@ -1130,8 +1146,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     references: Vec::new(),
                 }],
                 false,
-            ),
+            )),
             GateChecker::Exec { .. } => unreachable!("exec checker is dispatched separately"),
+        };
+        let (mut findings, explicit_failure) = match judged {
+            Ok(judged) => judged,
+            Err(fault) => {
+                return Ok(builtin_fault_run(
+                    gate_key, issue_id, stage, command, started_at, start, &fault,
+                ))
+            }
         };
 
         // Stable ids make findings useful as data regardless of the configured
@@ -2799,23 +2823,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
 
         assert_eq!(planned.command, "builtin:repository_validation");
-        assert_eq!(planned.status, GateRunStatus::Failed);
-        assert_eq!(planned.exit_code, Some(4));
-        let findings = planned.findings.unwrap().findings;
+        assert_eq!(planned.status, GateRunStatus::Error);
         assert!(
-            findings.iter().any(|finding| {
-                finding.id == "repository-integrity"
-                    && finding.severity == "high"
-                    && finding.disposition.as_deref() == Some("blocking")
-                    && finding.summary.contains("does not exist")
-            }),
-            "{findings:#?}"
+            planned.stderr.contains("does not exist"),
+            "{}",
+            planned.stderr
         );
-        assert!(findings.iter().any(|finding| {
-            finding.severity == "high"
-                && finding.disposition.as_deref() == Some("blocking")
-                && finding.summary.contains("planned-task-needs-summary")
-        }));
     }
 
     #[test]
@@ -2862,14 +2875,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
 
-        assert_eq!(result.status, GateRunStatus::Failed);
-        assert_eq!(result.exit_code, Some(4));
-        assert!(result
-            .findings
-            .unwrap()
-            .findings
-            .iter()
-            .any(|finding| finding.summary.contains("index.json")));
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert!(result.stderr.contains("index.json"), "{}", result.stderr);
     }
 
     #[test]
@@ -2900,7 +2907,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_label_target_validation_reports_missing_configured_pointer_as_finding() {
+    fn test_label_target_validation_records_missing_configured_pointer_as_error_run() {
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
@@ -2915,13 +2922,53 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .check_gate(&issue_id, "arbitrary-coverage-key")
             .unwrap();
 
-        assert_eq!(result.status, GateRunStatus::Failed);
-        assert_eq!(result.exit_code, Some(4));
-        let findings = result.findings.unwrap();
-        assert_eq!(findings.verdict, "fail");
-        assert!(findings.findings[0]
-            .summary
-            .contains("parent-pointer:<target-id>"));
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert_eq!(
+            result.exit_code,
+            Some(crate::gate_execution::CHECKER_TEMPFAIL_EXIT)
+        );
+        assert!(result.stderr.contains("parent-pointer:<target-id>"));
+    }
+
+    #[test]
+    fn test_label_target_validation_records_empty_namespace_as_error_run() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "arbitrary-coverage-key",
+            GateChecker::LabelTargetValidation {
+                label_namespace: String::new(),
+            },
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Error);
+    }
+
+    #[test]
+    fn test_label_target_validation_records_unresolvable_target_as_error_run() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "arbitrary-coverage-key",
+            GateChecker::LabelTargetValidation {
+                label_namespace: "coverage-target".to_string(),
+            },
+            vec![
+                "type:task".to_string(),
+                "coverage-target:no-such-issue".to_string(),
+            ],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Error);
     }
 
     #[test]
@@ -3111,6 +3158,67 @@ source-of-truth = "markdown-first"
             .findings
             .iter()
             .any(|finding| finding.summary.contains("ambiguous")));
+    }
+
+    #[test]
+    fn test_rule_validation_checker_records_missing_rule_as_error_run() {
+        let executor = setup();
+        seed_rule_validation_rules(&executor);
+        let issue_id = add_builtin_gate(
+            &executor,
+            "coverage-preview",
+            GateChecker::RuleValidation {
+                rule: "no-such-rule".to_string(),
+            },
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor.check_gate(&issue_id, "coverage-preview").unwrap();
+
+        assert_eq!(result.command, "builtin:rule_validation");
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert!(result.stderr.contains("no-such-rule"), "{}", result.stderr);
+    }
+
+    #[test]
+    fn test_builtin_checker_records_unloadable_declarations_as_error_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        std::fs::write(repo.path().join(".jit/rules.toml"), "[[rules\nnot toml").unwrap();
+        for checker in [
+            GateChecker::IssueValidation,
+            GateChecker::RepositoryValidation,
+            GateChecker::RuleValidation {
+                rule: "any".to_string(),
+            },
+        ] {
+            let image = executor
+                .capture_validation_image_with(&std::collections::BTreeMap::new())
+                .unwrap();
+            let result = executor
+                .execute_builtin_checker_with_repository_view(
+                    "not-a-reserved-repository-key",
+                    &issue_id,
+                    GateStage::Postcheck,
+                    &checker,
+                    &image,
+                )
+                .unwrap();
+
+            assert_eq!(result.status, GateRunStatus::Error, "{checker:?}");
+        }
+    }
+
+    #[test]
+    fn test_builtin_checker_records_content_finding_as_failed_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
+        std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
+
+        let result = executor
+            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Failed);
     }
 
     #[test]

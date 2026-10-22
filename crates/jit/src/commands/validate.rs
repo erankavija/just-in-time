@@ -1059,14 +1059,16 @@ pub(crate) fn plan_content_with_issues(
 /// The selected issue is the sole firing subject. The complete captured issue
 /// set is retained as graph and resolution context, and all rule/configuration
 /// lookup plus selected plan-document projection comes from the same image.
-/// This is the shared report boundary for the live CLI and native gate checker.
-pub(super) fn rule_validation_report(
+/// This is the shared evaluation boundary for the live CLI and native gate checker.
+///
+/// A rule that is missing, disabled, non-graph, or inapplicable to the issue is
+/// a configuration fault, returned as the inner `Err` so each caller chooses its
+/// reporting: the CLI an error finding, the gate checker an `error` run.
+pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
     requested_issue_id: &crate::domain::IssueIdPrefix,
     rule_name: &str,
-) -> Result<crate::validation::report::RuleReport> {
-    use crate::declarations::rules::Severity;
-    use crate::validation::engine::Finding;
+) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
 
     let issues = super::captured_active_issues(image)?;
@@ -1085,16 +1087,11 @@ pub(super) fn rule_validation_report(
     ) {
         Ok(rule) => rule,
         Err(message) => {
-            return Ok(RuleReport {
-                findings: vec![ReportedFinding::new(
-                    Some(issue.id.clone()),
-                    &Finding {
-                        rule: rule_name.to_string(),
-                        severity: Severity::Error,
-                        message,
-                    },
-                )],
-            });
+            return Ok(Err(RuleSelectionFault {
+                issue_id: issue.id.clone(),
+                rule: rule_name.to_string(),
+                message,
+            }));
         }
     };
 
@@ -1123,12 +1120,38 @@ pub(super) fn rule_validation_report(
     };
     let findings =
         crate::validation::graph::evaluate_graph_rule(rule, std::slice::from_ref(issue), &context);
-    Ok(RuleReport {
+    Ok(Ok(RuleReport {
         findings: findings
             .into_iter()
             .map(|finding| ReportedFinding::new(finding.issue_id, &finding.finding))
             .collect(),
-    })
+    }))
+}
+
+/// A configured rule that cannot be evaluated against the selected issue.
+pub(super) struct RuleSelectionFault {
+    issue_id: String,
+    rule: String,
+    pub(super) message: String,
+}
+
+impl RuleSelectionFault {
+    fn into_report(self) -> crate::validation::report::RuleReport {
+        use crate::declarations::rules::Severity;
+        use crate::validation::engine::Finding;
+        use crate::validation::report::{ReportedFinding, RuleReport};
+
+        RuleReport {
+            findings: vec![ReportedFinding::new(
+                Some(self.issue_id),
+                &Finding {
+                    rule: self.rule,
+                    severity: Severity::Error,
+                    message: self.message,
+                },
+            )],
+        }
+    }
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -1898,7 +1921,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let issue_id = crate::domain::IssueIdPrefix::parse(issue_id)?;
         let image = self.capture_validation_image()?;
-        rule_validation_report(&image, &issue_id, rule_name)
+        rule_validation_outcome(&image, &issue_id, rule_name)
+            .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
     }
 
     /// Build the `--explain` report for one issue: EVERY rule in the ruleset,
