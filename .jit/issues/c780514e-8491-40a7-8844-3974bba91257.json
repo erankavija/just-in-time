@@ -30,6 +30,13 @@
       "format": "markdown",
       "label": "Test topology measurements",
       "path": "dev/benchmarks/test-topology-c780514e/README.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Paused execution handoff",
+      "path": "dev/active/c780514e-test-topology/handoff.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.837021516Z",
@@ -113,5 +120,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T20:42:55.623942875Z"
+  "updated_at": "2026-10-22T22:10:37.600802487Z"
 }

@@ -1727,5 +1727,29 @@
       "build_processes_at_check": [],
       "scope": "Coordinator-approved incremental subdirectories only; profile owner confirmed idle; turnstile and exclusive build lock held"
     }
-  ]
+  ],
+  "execution_status": "paused_by_user",
+  "handoff": "dev/active/c780514e-test-topology/handoff.md",
+  "pause_checkpoint": {
+    "reason": "User requested handoff via coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b",
+    "main_before_handoff": "66941bb60",
+    "workers_paused": true,
+    "active_processes": "none from this epic; verify on resume",
+    "df505379": {
+      "branch": "worktree-agent-df505379",
+      "head": "ce23d3b19546d7b2bbac431d7eff91fd9bb54007",
+      "worktree": ".agents/worktrees/agent-22355a56",
+      "dirty": false,
+      "implementation": "not started; no checks run",
+      "lease": "released at pause; issue remains in_progress"
+    },
+    "fa9bf296": {
+      "branch": "worktree-agent-fa9bf296",
+      "head": "163e3a371",
+      "worktree": ".agents/worktrees/agent-de880d9c",
+      "dirty": false,
+      "implementation": "WIP gate input roots only; projection/selftest/gates pending",
+      "lease": "released at pause; issue remains in_progress"
+    }
+  }
 }
