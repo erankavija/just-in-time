@@ -674,9 +674,11 @@ The selection is resolved, closed over the packages it depends on, and planned
 through the same preparation a publication runs, so the report is the decision
 the publication would act on rather than a second opinion about it. For each
 participating profile it states every target that profile decided: the values it
-would `create` or `update`, the ones already `unchanged`, the recorded claims it
-would `retain` or `remove`, and the targets it cannot publish at all
-(`conflict`), each with the reason and the remedy.
+would `create` or `update`, the ones already `unchanged`, and the targets it
+cannot publish at all (`conflict`), each with its reason. A conflict arises only
+when selected packages define one target or declaration differently, and its
+reason names those packages; the repository's current content is never a party
+to it.
 
 Beside those targets it states the registry declarations that profile decided,
 in the same vocabulary and each named by its semantic identity — the registry,
@@ -687,10 +689,6 @@ declarations by identity rather than by the registry file holding them, so
 several packages contribute to one registry and each declaration is decided on
 its own.
 
-Every target and declaration names the packages that claim it. An empty owner
-list means no package claims it, so its content is the repository's own; more
-than one owner names every owner of shared content.
-
 A package this repository has not applied is reported as readily as one it has:
 select its directory to inspect it before applying it.
 
@@ -698,7 +696,7 @@ select its directory to inspect it before applying it.
 [`jit profile apply`](#jit-profile-apply).
 
 Human output shows one line per profile with its ID, version, origin, and status, then one line per
-decision with its action and owners — targets first, then declarations — and the
+decision with its action — targets first, then declarations — and the
 reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
 return, with `status` additionally reporting `would_conflict`.
