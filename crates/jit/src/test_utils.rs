@@ -1070,29 +1070,129 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     Ok(())
 }
 
-/// Build a repository from the fixture's explicitly declared custom taxonomy.
+/// An executor over the file-backed repository rooted at `worktree`, whose data
+/// root is `worktree/.jit`, carrying the layout discovered for that pair.
 ///
-/// The configuration is written before initialization, so the initializer's
-/// existing-configuration path consumes these declarations and derives the
-/// repository's coupled rules and schemas from them. The returned taxonomy is
-/// the same value used to author that configuration, allowing callers to build
-/// labels and assertions without repeating vocabulary literals.
-pub fn setup_test_repo_with_taxonomy() -> Result<(TempDir, JsonFileStorage, TestTaxonomy)> {
-    let taxonomy = test_taxonomy();
-    let temp = TempDir::new()?;
-    let jit_root = temp.path().join(".jit");
-    fs::create_dir_all(&jit_root)?;
-    fs::write(jit_root.join("config.toml"), taxonomy.config_fragment())?;
+/// Opens what exists; it neither creates nor initialises the repository.
+pub fn file_executor(worktree: &Path) -> Result<CommandExecutor<JsonFileStorage>> {
+    let jit_root = worktree.join(".jit");
+    let layout = discover_repository_layout(worktree, &jit_root)?;
+    Ok(CommandExecutor::new(JsonFileStorage::new(&jit_root)).with_layout(layout))
+}
 
-    let storage = JsonFileStorage::new(&jit_root);
-    let layout = discover_repository_layout(temp.path(), &jit_root)?;
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), None)?;
+/// Build an initialised file-backed repository whose `.jit/config.toml` is
+/// `config`, written before initialization so the initializer's
+/// existing-configuration path derives the repository's coupled rules and
+/// schemas from the caller's declarations.
+///
+/// Returns the temporary directory (removed on drop) and the executor over it.
+pub fn setup_test_repo_with_config(
+    config: &str,
+) -> Result<(TempDir, CommandExecutor<JsonFileStorage>)> {
+    let temp = TempDir::new()?;
+    fs::create_dir_all(temp.path().join(".jit"))?;
+    fs::write(temp.path().join(".jit/config.toml"), config)?;
+
+    let executor = file_executor(temp.path())?;
+    executor.initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 
-    Ok((temp, storage, taxonomy))
+    Ok((temp, executor))
+}
+
+/// A temporary directory holding exactly `files`, each a worktree-relative path
+/// (parents created) with its contents.
+pub fn declaration_dir(files: &[(&str, &str)]) -> Result<TempDir> {
+    let dir = TempDir::new()?;
+    files.iter().try_for_each(|(relative, contents)| {
+        let path = dir.path().join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, contents).map_err(anyhow::Error::from)
+    })?;
+    Ok(dir)
+}
+
+/// Build a repository from the fixture's explicitly declared custom taxonomy.
+///
+/// The returned taxonomy is the same value used to author the configuration,
+/// allowing callers to build labels and assertions without repeating vocabulary
+/// literals.
+pub fn setup_test_repo_with_taxonomy() -> Result<(TempDir, JsonFileStorage, TestTaxonomy)> {
+    let taxonomy = test_taxonomy();
+    let (temp, executor) = setup_test_repo_with_config(&taxonomy.config_fragment())?;
+    Ok((temp, executor.storage().clone(), taxonomy))
+}
+
+#[cfg(test)]
+mod file_setup_tests {
+    use super::*;
+
+    const CALLER_CONFIG: &str = "[worktree]\nenforce_leases = \"off\"\n";
+
+    #[test]
+    fn test_setup_test_repo_with_config_keeps_the_callers_configuration() {
+        let (temp, _executor) = setup_test_repo_with_config(CALLER_CONFIG).unwrap();
+
+        let config: toml::Value =
+            toml::from_str(&fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap())
+                .unwrap();
+        assert_eq!(config["worktree"]["enforce_leases"].as_str(), Some("off"));
+    }
+
+    #[test]
+    fn test_setup_test_repo_with_config_yields_an_initialised_repository() {
+        let (_temp, executor) = setup_test_repo_with_config(CALLER_CONFIG).unwrap();
+
+        executor.validate_repository_report().unwrap().unwrap();
+    }
+
+    #[test]
+    fn test_file_executor_layout_is_the_discovered_layout_of_the_repository() {
+        let (temp, _storage) = setup_test_repo().unwrap();
+
+        let executor = file_executor(temp.path()).unwrap();
+
+        let discovered = discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap();
+        assert_eq!(executor.repository_layout().unwrap(), &discovered);
+        assert_eq!(executor.storage().root(), temp.path().join(".jit"));
+    }
+
+    #[test]
+    fn test_declaration_dir_holds_exactly_the_supplied_files() {
+        let dir = declaration_dir(&[("rules.toml", "a"), ("nested/gates.toml", "b")]).unwrap();
+
+        let mut found = Vec::new();
+        let mut pending = vec![dir.path().to_path_buf()];
+        while let Some(current) = pending.pop() {
+            for entry in fs::read_dir(&current).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    pending.push(path);
+                } else {
+                    let relative = path.strip_prefix(dir.path()).unwrap().to_path_buf();
+                    found.push((relative, fs::read_to_string(&path).unwrap()));
+                }
+            }
+        }
+        found.sort();
+        assert_eq!(
+            found,
+            vec![
+                (PathBuf::from("nested/gates.toml"), "b".to_string()),
+                (PathBuf::from("rules.toml"), "a".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_declaration_dir_without_files_is_empty() {
+        let dir = declaration_dir(&[]).unwrap();
+
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
 }
 
 /// The checkout these sources were compiled from.
