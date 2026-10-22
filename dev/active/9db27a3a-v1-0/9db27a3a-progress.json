@@ -574,7 +574,8 @@
     "2026-10-22 ~00:05: 8673dc5e and 3754095f are done, unblocking df129d9e's d8176fd3; a third df129d9e execution lead was dispatched from handoff-3. The steward reinstalled the dogfood binary at b12262ecc after 842b0ac6's 2492ab29 removed `migrate lifecycle-timestamps`. mcp-server tests pass at 69/0 and 14/0.",
     "2026-10-22: standing permission. Any lead whose merge changes the CLI surface may reinstall the dogfood binary from a clean main via `CARGO_INCREMENTAL=0 flock turnstile flock -x lock ./scripts/install-jit.sh`, then notify all leads. This is the interim until the user decides mcp-ci option B.",
     "2026-10-22 ~00:30-04:30: sixth shared usage-limit stall, with all sessions idle; everyone was resumed at 04:31. Pattern: about 3-4 h of five-lead concurrency exhausts the quota, then a 3-4 h stall follows. Throughput is bounded by the quota, not by session count.",
-    "2026-10-22 ~05:30: main went red after 842b0ac6's fbb661f2 (config set exit-code contract) and was fixed forward at 12f6a06aa within the 45-min cap (user args give INVALID_ARGUMENT; a corrupt file gives PARSE_ERROR). df129d9e's d8176fd3 (global --json) is done with all gates passed; wave 3 has started (27f0a575 in flight; handoff-6)."
+    "2026-10-22 ~05:30: main went red after 842b0ac6's fbb661f2 (config set exit-code contract) and was fixed forward at 12f6a06aa within the 45-min cap (user args give INVALID_ARGUMENT; a corrupt file gives PARSE_ERROR). df129d9e's d8176fd3 (global --json) is done with all gates passed; wave 3 has started (27f0a575 in flight; handoff-6).",
+    "2026-10-22 ~05:30-09:30: seventh shared usage-limit stall; work was resumed at 09:31. just-in-time-59 showed a 'waiting' state (possibly a permission prompt in its terminal that needs the user); it was asked to record any such block."
   ],
   "started_at": "2026-07-03",
   "user_actions": [

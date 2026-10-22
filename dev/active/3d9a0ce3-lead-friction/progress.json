@@ -88,7 +88,7 @@
           "title": "Record built-in checker faults as error runs",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged (with lead-requested fix: projection source); gates running"
         },
         {
           "id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
@@ -112,7 +112,7 @@
           "title": "Gate status reports a manual attestation as never run",
           "classification": "implementation",
           "model": "opus",
-          "status": "done (rework 2 + steward-approved run_id conversion e2f2693d8)"
+          "status": "done"
         },
         {
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
@@ -128,7 +128,15 @@
           "title": "Report load-only cargo-ci failures as infrastructure faults",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched (sonnet)"
+          "status": "done"
+        },
+        {
+          "id": "856f0520-7af9-4c2d-9297-5abbd9eae365",
+          "short_id": "856f0520",
+          "title": "Classify cargo-ci load from a pre-run baseline",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "dispatched"
         }
       ],
       "note": "24268b05 waits on 756ec5ec (842b0ac6)"
@@ -172,7 +180,7 @@
           "title": "Remove the profile selector tags",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged; cargo-ci passed; mcp-ci blocked by another epic's uncurated jit_migrate_lifecycle-timestamps (reported to steward); code-review failed only on mcp-ci"
+          "status": "done"
         },
         {
           "id": "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
@@ -193,7 +201,7 @@
           "title": "Remove three-way profile publication",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "merged; cargo-ci passed (forced after fixture TIMEOUT signature, steward ruling); code-review R1 failed (Repository conflict owner variant, stale record-claim rustdoc); rework 1 queued"
         }
       ]
     },
@@ -489,6 +497,11 @@
       "short_id": "494f1d4b",
       "reason": "steward-approved option A: load-only cargo-ci failures reused by digest as verdicts",
       "approved_by": "milestone steward"
+    },
+    {
+      "short_id": "856f0520",
+      "reason": "494f1d4b load threshold measured the run's own build; steward approved 0.17 x nproc pre-run baseline",
+      "approved_by": "milestone steward"
     }
   ],
   "escalations": [
@@ -527,7 +540,8 @@
     "24268b05: ProfileResolution::RestoreRecordedPackage is dead; remove with remedies in f866d9d8 (noted in its lead notes).",
     "8673dc5e: manual passes recorded before the change have no run record (accepted, greenfield); removing and re-adding a gate leaves old run records visible in latest-run (pre-existing, outside REQ-03 per lead).",
     "1a989754: PROFILE_NOT_FOUND error code has no reachable route; an absent package dir returns PROFILE_ERROR exit 1. Candidate for 0f648627 (graph error merge) or a follow-up.",
-    "2dd6b833: repository_state/package_tree.rs republication machinery (TreeFileDisposition::Remove, expand_destination_closure) is unreachable now that add publishes only to an absent destination; candidate for 56b89d9a entrypoint pruning."
+    "2dd6b833: repository_state/package_tree.rs republication machinery (TreeFileDisposition::Remove, expand_destination_closure) is unreachable now that add publishes only to an absent destination; candidate for 56b89d9a entrypoint pruning.",
+    "f866d9d8 took parts of d721ab14 (Occupied variant deleted) and 9e703435 (ProfileTargetConflict derives Serialize); those workers must start from main and only finish what remains."
   ],
   "rework_counts": {
     "d6bbe05f": 2,
@@ -535,7 +549,9 @@
     "ae2e3739": 1,
     "66986f88": 1,
     "24268b05": 1,
-    "8673dc5e": 2
+    "8673dc5e": 2,
+    "f866d9d8": 1,
+    "39710b3b": 1
   },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock"

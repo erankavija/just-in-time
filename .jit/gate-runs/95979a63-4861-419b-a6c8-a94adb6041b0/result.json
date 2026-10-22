@@ -1,0 +1,78 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4b163edeab11c5b72784cedca6ef0b2604591b9d",
+  "completed_at": "2026-10-22T02:28:25.887074404Z",
+  "duration_ms": 116302,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F1",
+        "line": 53,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/shared-test-contracts",
+          "@/inv/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "Eight target-wide CLI fixture migrations span 9–18 files and multiple independent setup, environment, parsing, and taxonomy changes without concrete sizing overrides."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F2",
+        "line": 2303,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "library-fixture-issue-adoption combines a production-fixture deletion with migrations across 37 library test modules, exceeding one focused worker cycle."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F3",
+        "line": 4423,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "medium",
+        "summary": "library-command-memory-setup-adoption retires ten heterogeneous helpers across nine modules and three acceptance clusters in one leaf."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F4",
+        "line": 4480,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "medium",
+        "summary": "library-file-setup-adoption retires seventeen heterogeneous helpers across nine modules and four acceptance clusters in one leaf."
+      }
+    ],
+    "summary": "Four manifest leaves remain materially oversized despite passing structural validation.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7c885165-89de-45a0-a867-e621c96867d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "95979a63-4861-419b-a6c8-a94adb6041b0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T02:26:29.584806245Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7579 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1616e-6ed2-7f60-b05d-12246e6e61b4\n--------\nuser\n--- 7566 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact, high:** Eight “one migration per target” leaves are materially oversized: `cli-issue-command-migration`, `cli-issue-envelope-migration`, `cli-item-validate-migration`, `cli-query-graph-migration`, `cli-repo-checkout-migration`, `cli-repo-profile-migration`, `cli-repo-workflow-migration`, and `cli-gate-migration` span 9–18 files each, multiple setup forms, environment handling, ID parsing, and 4–6 acceptance clusters. The generic “one integration target” rationale is not a concrete per-code sizing override. Split each by coherent setup/consumer family, preserving dependencies on the shared fixture. [plan.md:16](dev/active/c780514e-test-topology/plan.md:16); [breakdown.json:53](dev/active/c780514e-test-topology/breakdown.json:53).\n\n2. **F2 — blocking, issue-impact, high:** `library-fixture-issue-adoption` requires a production-fixture deletion plus path migrations across 37 library test modules. This crosses several component families and cannot receive focused implementation and review in one worker cycle. Split it into bounded module families behind `shared-fixture-issue`, with the final deletion depending on all adopters. [breakdown.json:2303](dev/active/c780514e-test-topology/breakdown.json:2303).\n\n3. **F3 — blocking, issue-impact, medium:** `library-command-memory-setup-adoption` combines retirement of ten distinct helpers in nine modules with three separate acceptance clusters. Its scope needs module-family leaves or an explicit, concrete per-code sizing override; the current generic “one small helper per module” rationale is insufficient. [breakdown.json:4423](dev/active/c780514e-test-topology/breakdown.json:4423).\n\n4. **F4 — blocking, issue-impact, medium:** `library-file-setup-adoption` retires seventeen heterogeneous helpers across nine modules and four acceptance clusters in one leaf. Split by constructor/use family and sequence the removals after `file-backed-setup-constructors`. [breakdown.json:4480](dev/active/c780514e-test-topology/breakdown.json:4480).\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four manifest leaves remain materially oversized despite passing structural validation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Eight target-wide CLI fixture migrations span 9–18 files and multiple independent setup, environment, parsing, and taxonomy changes without concrete sizing overrides.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":53,\"references\":[\"@/inv/shared-test-contracts\",\"@/inv/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"library-fixture-issue-adoption combines a production-fixture deletion with migrations across 37 library test modules, exceeding one focused worker cycle.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":2303,\"references\":[\"@/inv/shared-test-contracts\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"library-command-memory-setup-adoption retires ten heterogeneous helpers across nine modules and three acceptance clusters in one leaf.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":4423,\"references\":[\"@/inv/shared-test-contracts\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"library-file-setup-adoption retires seventeen heterogeneous helpers across nine modules and four acceptance clusters in one leaf.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":4480,\"references\":[\"@/inv/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
