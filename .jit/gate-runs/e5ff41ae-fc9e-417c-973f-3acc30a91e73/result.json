@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "18cfa037ddd930760a2fb0b10165532a176c19d3",
+  "completed_at": "2026-10-22T15:48:42.658336868Z",
+  "duration_ms": 199512,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior missing feature-off build evidence is now recorded and the current implementation gates each renderer and related surface correctly.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0e3b69fc-1af7-4cc8-9089-96f2debd6324",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e5ff41ae-fc9e-417c-973f-3acc30a91e73",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:45:23.146312087Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `2a0254cdc`, `5f3e8140d`, `18cfa037d` (`jit:0e3b69fc`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/0e3b69fc/requirement/REQ-01`–`REQ-05` and `@/issue/842b0ac6/requirement/REQ-22` (issue Markdown); `@/charter/D-18` (`dev/vision/9db27a3a-charter.md`); `@/invariant/single-source-prose`, `@/invariant/essential-code-prose`, `@/invariant/domain-agnostic` (`.jit/invariants.toml`); `@/gate/cargo-ci`, `@/gate/code-review` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed, exit 0 (2026-10-22T15:40:44Z); prior `code-review` failed solely for missing REQ-02 evidence, now addressed by `dev/active/0e3b69fc/feature-off-check.md`\nTruncation recovery: focused reads of every renderer’s cfg boundary, re-export, generated-artifact caller, freshness test, and gate policy after the initial broad search truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior missing feature-off build evidence is now recorded and the current implementation gates each renderer and related surface correctly.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,7 +1,7 @@
 {
   "epic_id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
   "epic_short_id": "842b0ac6",
-  "current_wave": 3,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -383,7 +383,7 @@
           "title": "Compile reference-page renderers only with test support",
           "classification": "implementation",
           "model": "opus",
-          "status": "awaiting-merge"
+          "status": "done"
         }
       ]
     },
@@ -398,7 +398,7 @@
           "title": "Import domain type items through the domain facade",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
