@@ -2672,10 +2672,10 @@ depends_on = ["planning"]
                 "<!-- jit:invariants:begin -->\n<!-- jit:invariants:begin -->",
                 1,
             );
+        let mut executor = memory_executor(storage.clone());
         seed_repo_file(&storage, ".jit/rules.toml", &rules);
         seed_repo_file(&storage, "AGENTS.md", &agents);
 
-        let mut executor = memory_executor(storage.clone());
         let error = executor.validate_with_fix(true, false).unwrap_err();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
         assert_eq!(

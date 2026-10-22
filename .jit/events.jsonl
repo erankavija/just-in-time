@@ -19457,3 +19457,9 @@
 {"gate_key":"cargo-ci","id":"6ebfffbc-1113-4355-9c9d-3177bb0adff6","issue_id":"de880d9c-c9bf-475c-8d89-de0b2e55f620","timestamp":"2026-10-22T19:54:52.832059019Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"ee36d435-d23b-4a6d-8a05-4e9a3d7f1784","issue_id":"de880d9c-c9bf-475c-8d89-de0b2e55f620","timestamp":"2026-10-22T19:57:15.371480023Z","to":"done","type":"issue_state_changed"}
 {"id":"c3e2597c-b1f8-4093-9df8-1c2ddffa48ad","issue_id":"de880d9c-c9bf-475c-8d89-de0b2e55f620","timestamp":"2026-10-22T19:57:15.371480023Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"e5fbc024-3a72-477e-ae16-b59a9f90dcb6","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T20:00:36.697703362Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"66428fcf-4efa-43c9-9843-4890f8aea0a9","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T20:04:33.241865509Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"cf25f6f0-a1f9-4945-a05e-fe19b2e9dae8","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T20:06:17.329120300Z","to":"done","type":"issue_state_changed"}
+{"id":"cea8e3b9-f862-439f-a7da-fae755c588c1","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T20:06:17.329120300Z","type":"issue_completed"}
+{"from":"backlog","id":"640e4250-8b2d-4ca2-a32d-e9fa9e0dd9f8","issue_id":"9e411075-4c46-4ffd-ae7a-9743ad175080","timestamp":"2026-10-22T20:06:17.454204575Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"5e1bf5cf-17d2-4c18-967d-34801fedc36a","issue_id":"ad1e6d0e-ec8a-4178-91a2-434ab80845c8","timestamp":"2026-10-22T20:06:17.546859863Z","to":"ready","type":"issue_state_changed"}
