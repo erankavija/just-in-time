@@ -17,6 +17,12 @@
       "status": "failed",
       "updated_at": "2026-10-22T15:51:51.400736585Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "152b9f78-ede5-49ab-84b0-b05870e9c42f",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:57:03.702870985Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d423752b-cedc-431b-be9e-d327f8b61387",
@@ -32,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "No test waits on a cold profiled-repository fixture build",
-  "updated_at": "2026-10-22T15:51:51.400736585Z"
+  "updated_at": "2026-10-22T15:57:03.702870985Z"
 }
