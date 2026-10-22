@@ -19418,3 +19418,4 @@
 {"from":"backlog","id":"3275fed9-cd94-487f-9111-4cfb2d9ea128","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-22T19:21:30.562190405Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"cargo-ci","id":"23fe1c5b-d232-4494-85dc-ddb9260fc720","issue_id":"9cc3056a-7147-4a9a-89bf-f0e6fd53806b","timestamp":"2026-10-22T16:25:25.545159342Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"a98711d9-bc66-4101-a0ff-7aba3689eb6a","issue_id":"9cc3056a-7147-4a9a-89bf-f0e6fd53806b","timestamp":"2026-10-22T16:26:55.831320134Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"5110dc54-4f81-4b45-948f-9d8406811e58","issue_id":"abe963dd-7fba-49c8-930c-1767d3bce945","timestamp":"2026-10-22T19:31:46.099318085Z","type":"gate_failed","updated_by":"auto:executor"}
