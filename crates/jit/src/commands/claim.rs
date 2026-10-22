@@ -1063,7 +1063,7 @@ mod tests {
         title: &str,
     ) -> Result<String> {
         let mut issue =
-            crate::domain::fixture_issue(title.to_string(), "Test description".to_string());
+            crate::test_utils::fixture_issue(title.to_string(), "Test description".to_string());
         issue.id = id.to_string();
         let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
         std::fs::write(

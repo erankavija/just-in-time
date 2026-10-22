@@ -1023,10 +1023,10 @@ mod captured_tests {
     fn test_dependency_add_rederives_and_preserves_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let dependency = crate::domain::fixture_issue("dependency".into(), String::new());
+        let dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.state = State::Ready;
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
@@ -1062,11 +1062,11 @@ mod captured_tests {
         let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
 
-        let mut dependency = crate::domain::fixture_issue("dependency".into(), String::new());
+        let mut dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
         dependency.state = State::Done;
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.state = State::Backlog;
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
@@ -1116,11 +1116,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let layout = storage.repository_layout();
 
-        let mut dependency = crate::domain::fixture_issue("dependency".into(), String::new());
+        let mut dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
         dependency.state = State::Done;
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.state = State::Backlog;
         source.labels = vec!["type:epic".into()];
         source.dependencies = vec![dependency_id.clone()];
@@ -1152,10 +1152,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "");
         let layout = storage.repository_layout();
-        let dependency = crate::domain::fixture_issue("dependency".into(), String::new());
+        let dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
@@ -1175,14 +1175,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_single_removal_rejects_a_dependency_prefix_matching_several_issues() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let mut dependency = crate::domain::fixture_issue("dep".into(), String::new());
+        let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.id = "11111111111111111111111111111111".to_string();
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut collision = crate::domain::fixture_issue("collision".into(), String::new());
+        let mut collision = crate::test_utils::fixture_issue("collision".into(), String::new());
         collision.id = "22222222222222222222222222222222".to_string();
         crate::commands::test_helpers::seed_issue(&storage, collision);
         let executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1228,9 +1228,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_single_removal_rejects_a_dependency_the_index_marks_deleted() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let mut dependency = crate::domain::fixture_issue("dep".into(), String::new());
+        let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
         dependency.id = "22221111111111111111111111111111".to_string();
-        let mut source = crate::domain::fixture_issue("source".into(), String::new());
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
         source.id = "11111111111111111111111111111111".to_string();
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
