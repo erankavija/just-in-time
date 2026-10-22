@@ -1234,6 +1234,11 @@
       "from": "a3dd995a worker",
       "finding": "profiled-fixture consumers without a nextest setup-script entry still build directly (now bounded at 12 s with a named error); durable fix is per-input keys and setup-script removal",
       "disposition": "covered by planned profiled-fixture-input-key and fixture-setup-hook-removal"
+    },
+    {
+      "from": "0bf97911 worker",
+      "finding": "shipped `invariant` kind declares id-pattern [a-z][a-z0-9-]* with alias inv; the hand-copied CANONICAL_ITEM_KINDS lists use [A-Z][A-Z0-9]*-[0-9]+ and no alias, so the shipped-item-kinds adoption tasks change the kinds test fixtures declare",
+      "disposition": "pass to harness/unit/cli-item-validate/fast-rules shipped-item-kinds adoption workers"
     }
   ],
   "traps": [],
