@@ -140,7 +140,7 @@
           "key": "finalization-owner-gaps",
           "title": "Repository-state tests own each finalization case",
           "classification": "implementation",
-          "status": "in_progress; Luna xhigh selected for bounded single-file unit ownership completion, stronger lead audit and unchanged independent gates; reused memory checkout"
+          "status": "implemented1299a02fb;31 focused tests and full4584+25 pass; main review next"
         },
         {
           "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
@@ -156,7 +156,7 @@
           "key": "lock-tests-deterministic-precondition",
           "title": "Read-only lock tests establish their precondition on any host",
           "classification": "implementation",
-          "status": "in_progress; Luna xhigh for bounded single-file skip-to-precondition assertion change, unchanged assertions and independent gates; reused adoption checkout"
+          "status": "implemented4239fc42f;15 focused lock tests pass; waiting finalization source before fullCI"
         },
         {
           "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
@@ -1625,5 +1625,18 @@
       "holistic": "Only permission-precondition failure behavior and gate input coverage change; full checker assertions retained"
     }
   },
-  "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates."
+  "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
+  "resource_actions": [
+    {
+      "paths": {
+        "/home/vkaskivuo/Projects/just-in-time/target/debug/incremental": 4826648576,
+        "/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-22355a56/target/debug/incremental": 6598578176
+      },
+      "before_free_bytes": 65841442816,
+      "after_free_bytes": 70583156736,
+      "observed_reclaimed_bytes": 4741713920,
+      "build_processes_at_check": [],
+      "scope": "Coordinator-approved incremental subdirectories only; profile owner confirmed idle; turnstile and exclusive build lock held"
+    }
+  ]
 }
