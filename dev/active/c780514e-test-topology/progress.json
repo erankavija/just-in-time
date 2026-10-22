@@ -188,7 +188,7 @@
           "key": "session-cost-benchmark-selftest-gate",
           "title": "Session-cost benchmark self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
