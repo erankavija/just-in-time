@@ -1201,10 +1201,6 @@ pub enum GateCommands {
         #[arg(long)]
         auto: bool,
 
-        /// Optional example integration snippet recorded with the definition
-        #[arg(long)]
-        example: Option<String>,
-
         /// Command to execute for automated gates
         #[arg(long)]
         checker_command: Option<String>,
@@ -2537,12 +2533,10 @@ pub enum ProfileCommands {
     /// Resolves the selection, closes it over the packages it depends on, and
     /// plans it through the same preparation a publication runs, then states
     /// what each participating profile decided: the targets it would create or
-    /// update, the registry declarations it would publish, the recorded claims
-    /// it would retain or remove, and the targets and declarations it cannot
-    /// publish, each named beside the packages that claim it. A target or
-    /// declaration no package claims is repository-authored content, and a
-    /// declaration is named by its semantic identity rather than by the
-    /// registry file holding it.
+    /// update, the registry declarations it would publish, and the targets and
+    /// declarations it cannot publish because the selected packages define them
+    /// differently. A declaration is named by its semantic identity rather than
+    /// by the registry file holding it.
     ///
     /// A conflicting decision is reported rather than refused, which is the
     /// difference from `--dry-run` on the lifecycle commands: a rehearsal fails

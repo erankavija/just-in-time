@@ -52,7 +52,6 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
                 prompt_file: None,
             }),
             100,
-            None,
         )
         .expect("define durability gate");
     let (issue_id, _) = executor

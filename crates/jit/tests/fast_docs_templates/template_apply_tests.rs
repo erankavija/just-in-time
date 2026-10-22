@@ -968,7 +968,6 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
             GateMode::Auto,
             Some(GateChecker::RepositoryValidation),
             100,
-            None,
         )
         .unwrap();
 

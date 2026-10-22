@@ -894,11 +894,11 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     );
     assert_eq!(
         property_keys(plan_schema, "ProfileTargetChange"),
-        expected_keys(&["action", "executable", "owners", "path", "reason"])
+        expected_keys(&["action", "executable", "path", "reason"])
     );
     assert_eq!(
         property_keys(plan_schema, "ProfileContributionChange"),
-        expected_keys(&["action", "identity", "owners", "reason"])
+        expected_keys(&["action", "identity", "reason"])
     );
 }
 
@@ -1010,12 +1010,17 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
 /// The report is the answer whether or not the selection can be published, so
 /// an unpublishable run's report is unwrapped from the shared typed error
 /// envelope rather than read as a different shape.
-fn profile_difference(repo: &Path, selector: &str) -> (Option<i32>, Value) {
-    let output = jit_with_path(
-        repo,
-        &["profile", "diff", "--profile", selector, "--json"],
-        None,
-    );
+fn profile_difference(repo: &Path, selectors: &[&str]) -> (Option<i32>, Value) {
+    let args = ["profile", "diff"]
+        .into_iter()
+        .chain(
+            selectors
+                .iter()
+                .flat_map(|selector| ["--profile", *selector]),
+        )
+        .chain(["--json"])
+        .collect::<Vec<_>>();
+    let output = jit_with_path(repo, &args, None);
     let parsed = parse_json(&output);
     let report = parsed
         .pointer("/error/details")
@@ -1030,8 +1035,8 @@ fn profile_difference(repo: &Path, selector: &str) -> (Option<i32>, Value) {
 }
 
 /// The decisions the report carries for profile `id`, each as its action beside
-/// the target it names and the packages that claim it.
-fn decisions(report: &Value, id: &str) -> Vec<(String, String, Vec<String>)> {
+/// the target it names.
+fn decisions(report: &Value, id: &str) -> Vec<(String, String)> {
     report["profiles"]
         .as_array()
         .unwrap_or_else(|| panic!("the report carries a profile collection: {report}"))
@@ -1051,17 +1056,6 @@ fn decisions(report: &Value, id: &str) -> Vec<(String, String, Vec<String>)> {
                     .as_str()
                     .expect("a decision names its target")
                     .to_string(),
-                target["owners"]
-                    .as_array()
-                    .expect("a decision names the packages that claim its target")
-                    .iter()
-                    .map(|owner| {
-                        owner
-                            .as_str()
-                            .expect("an owner is a package id")
-                            .to_string()
-                    })
-                    .collect(),
             )
         })
         .collect()
@@ -1095,16 +1089,12 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
     let before = snapshot_tree(&repo.path);
     let events = normalized_events(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "packages/planner");
+    let (status, report) = profile_difference(&repo.path, &["packages/planner"]);
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
-        decisions(&report, "planner-asset-only").contains(&(
-            "create".to_string(),
-            target.clone(),
-            Vec::new()
-        )),
-        "the report states the target the package would publish, claimed by no package: {report}"
+        decisions(&report, "planner-asset-only").contains(&("create".to_string(), target.clone())),
+        "the report states the target the package would publish: {report}"
     );
     assert_eq!(
         snapshot_tree(&repo.path),
@@ -1114,23 +1104,36 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
     assert_eq!(normalized_events(&repo.path), events);
 }
 
-/// A target the repository authored cannot be published, and stating that keeps
-/// the report as the answer while carrying the repository-check exit status
-/// (REQ-01, REQ-02).
+/// A target two selected packages define differently cannot be published, and
+/// stating that keeps the report as the answer while carrying the
+/// repository-check exit status (REQ-01, REQ-02).
 #[test]
 fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
     let (repo, target) = repository_with_unapplied_planner();
-    let authored = repo.path.join(&target);
-    fs::create_dir_all(
-        authored
-            .parent()
-            .expect("the target sits below the worktree"),
+    let rival = repo.path.join("packages/rival");
+    jit::test_utils::write_package_declaring(&composition_package(), &rival, "rival", &[]);
+    let declared = jit::profile::ProfilePackage::from_directory(&rival)
+        .expect("a valid package tree")
+        .model()
+        .assets
+        .first()
+        .expect("the fixture package declares one asset")
+        .clone();
+    let manifest = rival.join(jit::profile::MANIFEST_FILE_NAME);
+    let authored = fs::read_to_string(&manifest).expect("read the rival manifest");
+    fs::write(
+        &manifest,
+        authored.replace(
+            &format!("target = \"{}\"", declared.target),
+            &format!("target = \"{target}\""),
+        ),
     )
-    .expect("create the authored target's directory");
-    fs::write(&authored, b"authored by hand\n").expect("author the target by hand");
+    .expect("point the rival asset at the planner's target");
+    fs::write(rival.join(&declared.source), b"the rival package's bytes\n")
+        .expect("rewrite the asset");
     let before = snapshot_tree(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "packages/planner");
+    let (status, report) = profile_difference(&repo.path, &["packages/planner", "packages/rival"]);
 
     assert_eq!(
         status,
@@ -1138,12 +1141,9 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
         "a selection that cannot be published fails the check: {report}"
     );
     assert!(
-        decisions(&report, "planner-asset-only").contains(&(
-            "conflict".to_string(),
-            target.clone(),
-            Vec::new()
-        )),
-        "the report states the target it cannot publish, claimed by no package: {report}"
+        decisions(&report, "planner-asset-only")
+            .contains(&("conflict".to_string(), target.clone())),
+        "the report states the target it cannot publish: {report}"
     );
     assert_eq!(
         snapshot_tree(&repo.path),
@@ -1153,8 +1153,8 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
 }
 
 /// The declaration decisions the report carries for profile `id`, each as its
-/// action beside the semantic identity it names and the packages that claim it.
-fn declarations(report: &Value, id: &str) -> Vec<(String, String, Vec<String>)> {
+/// action beside the semantic identity it names.
+fn declarations(report: &Value, id: &str) -> Vec<(String, String)> {
     report["profiles"]
         .as_array()
         .unwrap_or_else(|| panic!("the report carries a profile collection: {report}"))
@@ -1174,17 +1174,6 @@ fn declarations(report: &Value, id: &str) -> Vec<(String, String, Vec<String>)> 
                     .as_str()
                     .expect("a decision names the declaration it is about")
                     .to_string(),
-                declaration["owners"]
-                    .as_array()
-                    .expect("a decision names the packages that claim its declaration")
-                    .iter()
-                    .map(|owner| {
-                        owner
-                            .as_str()
-                            .expect("an owner is a package id")
-                            .to_string()
-                    })
-                    .collect(),
             )
         })
         .collect()
@@ -1228,9 +1217,8 @@ fn contributed_identity() -> String {
 }
 
 /// A report states the declarations a selection would publish beside its file
-/// targets: one no package claims is created and unowned, and one two packages
-/// define differently is stated as the conflict it is, named by the package
-/// that claims it (REQ-01, REQ-02).
+/// targets: one the registry lacks is created, and one two selected packages
+/// define differently is stated as the conflict it is (REQ-01, REQ-02).
 #[test]
 fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
     let repo = TestRepo::new();
@@ -1243,26 +1231,17 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "The workflow meaning.",
     );
 
-    let (status, report) = profile_difference(&repo.path, "packages/base");
+    let (status, report) = profile_difference(&repo.path, &["packages/base"]);
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
-        declarations(&report, "base").contains(&(
-            "create".to_string(),
-            contributed_identity(),
-            Vec::new()
-        )),
-        "the report states the declaration the package would publish, claimed by no package: \
-         {report}"
+        declarations(&report, "base").contains(&("create".to_string(), contributed_identity())),
+        "the report states the declaration the package would publish: {report}"
     );
 
-    success_json(
-        &repo.path,
-        &["profile", "apply", "--profile", "packages/base", "--json"],
-    );
     let before = snapshot_tree(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "packages/workflow");
+    let (status, report) = profile_difference(&repo.path, &["packages/base", "packages/workflow"]);
 
     assert_eq!(
         status,
@@ -1270,13 +1249,9 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "a selection that cannot be published fails the check: {report}"
     );
     assert!(
-        declarations(&report, "workflow").contains(&(
-            "conflict".to_string(),
-            contributed_identity(),
-            vec!["base".to_string()]
-        )),
-        "the report states the declaration it cannot publish, claimed by the package that \
-         declared it first: {report}"
+        declarations(&report, "workflow")
+            .contains(&("conflict".to_string(), contributed_identity())),
+        "the report states the declaration it cannot publish: {report}"
     );
     assert_eq!(
         snapshot_tree(&repo.path),

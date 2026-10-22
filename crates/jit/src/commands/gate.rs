@@ -621,8 +621,6 @@ fn updated_gate_definition(current: GateDefinition, update: GateUpdate) -> Resul
         inputs: current.inputs,
         priority: update.priority.unwrap_or(current.priority),
         reserved: current.reserved,
-        auto: final_mode == GateMode::Auto,
-        example_integration: current.example_integration,
     })
 }
 
@@ -1094,12 +1092,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Define a new gate with full control over stage, mode, and checker.
     ///
-    /// `example_integration` is an optional usage snippet stored on the gate
-    /// definition (surfaced by `jit gate show`). Returns an error if `key` is
-    /// already registered, or if `mode` is [`GateMode::Auto`](crate::declarations::GateMode)
-    /// without a `checker`. A `gate_definition_created` event is appended
-    /// (@/inv/event-log), mirroring [`update_gate`](Self::update_gate)'s
-    /// `gate_definition_updated` event.
+    /// Returns an error if `key` is already registered, or if `mode` is
+    /// [`GateMode::Auto`](crate::declarations::GateMode) without a `checker`. A
+    /// `gate_definition_created` event is appended (@/inv/event-log), mirroring
+    /// [`update_gate`](Self::update_gate)'s `gate_definition_updated` event.
     #[allow(clippy::too_many_arguments)]
     pub fn define_gate(
         &self,
@@ -1110,7 +1106,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         mode: crate::declarations::GateMode,
         checker: Option<crate::declarations::GateChecker>,
         priority: u32,
-        example_integration: Option<String>,
     ) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1144,8 +1139,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 inputs: None,
                 priority,
                 reserved: std::collections::HashMap::new(),
-                auto: mode == crate::declarations::GateMode::Auto,
-                example_integration,
             },
         ))?;
         Ok(())
@@ -1190,7 +1183,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         GateMode::Manual,
     ///         None,
     ///         100,
-    ///         None,
     ///     )
     ///     .unwrap();
     ///
@@ -1489,8 +1481,6 @@ enforce_leases = "off"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1541,8 +1531,6 @@ enforce_leases = "off"
                 inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1622,8 +1610,6 @@ enforce_leases = "off"
                 }),
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1677,8 +1663,6 @@ enforce_leases = "off"
                 inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1785,7 +1769,6 @@ enforce_leases = "off"
                 GateMode::Manual,
                 None,
                 100,
-                None,
             )
             .is_err());
 
@@ -2086,7 +2069,6 @@ style = "full"
                 GateMode::Manual,
                 None,
                 100,
-                None,
             )
             .unwrap();
 
@@ -2144,8 +2126,6 @@ style = "full"
             checker: None,
             priority: 100,
             reserved: HashMap::new(),
-            auto: false,
-            example_integration: None,
             inputs: None,
         });
         let context = MutationContext::deterministic(
@@ -2202,8 +2182,6 @@ style = "full"
                 inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
             },
         );
         seed_gate_registry(&storage, &concurrent);

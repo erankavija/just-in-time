@@ -3601,8 +3601,6 @@ mod tests {
                 }),
                 priority: 1,
                 reserved: HashMap::new(),
-                auto: true,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3618,8 +3616,6 @@ mod tests {
                 checker: None,
                 priority: 2,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -3758,8 +3754,6 @@ mod tests {
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),
-            auto: false,
-            example_integration: None,
             inputs: None,
         };
         GateRegistry {

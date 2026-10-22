@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d6d43f84cda88a8d962de5b787d11cb6e1a52460",
+  "completed_at": "2026-10-22T01:44:36.836382658Z",
+  "duration_ms": 98401,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "f2d77ece6a279ad2df5d091f494a2e4aaaf6f289be06967f692958f7757610e2",
+  "issue_id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dbb5a415-dcbe-4958-895b-6051b9b1110f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:42:58.434639111Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 30918 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 30918 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 38173 ms, warmed 17 executables (2032409672 bytes) in 76 ms.\n  ✓ fmt: ok (1564 ms)\n  ✓ clippy: ok (27469 ms)\n  ✓ suite-build: built in 38173 ms, warmed 17 executables (2032409672 bytes) in 76 ms (38252 ms)\n  ✓ test: 4601 passed, 0 failed, 0 skipped (26585 ms)\n  ✓ doctest: 60 passed, 0 failed, 0 ignored (4316 ms)\n  ✓ suite-clock: 30918 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (82 ms)\n\ncargo-ci: verdict (exit 1): failing steps (budget) are environment-sensitive but host load1=7.40 < threshold 30.00 (1.25 x 24 CPUs); a quiet-host failure is a real regression to investigate\n"
+}

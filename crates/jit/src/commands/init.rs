@@ -407,7 +407,7 @@ impl CommandExecutor<JsonFileStorage> {
             package,
             &variable_inputs.for_declarations(&package.model().variables),
         )?;
-        let claims = build_profile_claims_from_resolved(&resolved, &layout, false)?;
+        let claims = build_profile_claims_from_resolved(&resolved, &layout)?;
         Ok(ProfileApplicationInput {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
@@ -936,56 +936,6 @@ source-of-truth = \"registry-first\"\n";
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-    }
-
-    #[test]
-    fn test_fresh_profile_init_records_shared_owners_across_its_closure() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        composition_package_with_namespace(
-            &repo,
-            "packages/base",
-            "base",
-            &[],
-            "Shared initialization definition.",
-        );
-        composition_package_with_namespace(
-            &repo,
-            "packages/workflow",
-            "workflow",
-            &["base"],
-            "Shared initialization definition.",
-        );
-
-        executor_with_layout(&storage, repo.path())
-            .initialize_profiled_repository(
-                repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
-            )
-            .unwrap();
-
-        let shared_claims = ["base", "workflow"]
-            .into_iter()
-            .map(|id| {
-                let record: AppliedProfileRecord = serde_json::from_slice(
-                    &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-                )
-                .unwrap();
-                let semantic = record
-                    .claims
-                    .into_iter()
-                    .filter(|claim| {
-                        matches!(
-                            claim.identity,
-                            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                assert_eq!(semantic.len(), 1);
-                semantic.into_iter().next().unwrap()
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(shared_claims[0], shared_claims[1]);
     }
 
     #[test]

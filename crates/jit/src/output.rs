@@ -925,8 +925,8 @@ impl ErrorCode {
             }
             ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
             ErrorCode::ProfileConflict => {
-                "Profile planning or validation found a conflict. For the resolutions each \
-                 conflict class carries, see [the remedy contract](profiles.md#the-remedy-contract)."
+                "Profile planning found packages being applied that define one target or \
+                 declaration differently."
             }
             ErrorCode::DependencyError => "A dependency command failed.",
             ErrorCode::GateError => "A gate command failed.",
@@ -954,7 +954,9 @@ impl ErrorCode {
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
-            ErrorCode::RecoveryFailed => "Applying a leftover redo record, or a recovery routine, failed.",
+            ErrorCode::RecoveryFailed => {
+                "Applying a leftover redo record, or a recovery routine, failed."
+            }
             ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
             ErrorCode::ClaimReleaseError => "Claim release failed.",
             ErrorCode::ClaimRenewError => "Claim renewal failed.",
@@ -2560,8 +2562,6 @@ pub struct GateDefinition {
     pub key: String,
     pub title: String,
     pub description: String,
-    pub auto: bool,
-    pub example_integration: Option<String>,
     /// Execution stage; serializes as `"precheck"` or `"postcheck"`.
     pub stage: GateStage,
     /// Execution mode; serializes as `"manual"` or `"auto"`.
@@ -2582,8 +2582,6 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
             key: gate.key,
             title: gate.title,
             description: gate.description,
-            auto: gate.auto,
-            example_integration: gate.example_integration,
             stage: gate.stage,
             mode: gate.mode,
             checker: gate.checker,
@@ -2906,8 +2904,6 @@ mod tests {
             }),
             priority: 100,
             reserved: Default::default(),
-            auto: true,
-            example_integration: None,
             inputs: None,
         };
 
@@ -3779,8 +3775,6 @@ mod tests {
             key: "ci".to_string(),
             title: "CI".to_string(),
             description: "Continuous integration".to_string(),
-            auto: true,
-            example_integration: None,
             stage: GateStage::Postcheck,
             mode: GateMode::Auto,
             checker: None,
@@ -3794,8 +3788,6 @@ mod tests {
             key: "lint".to_string(),
             title: "Lint".to_string(),
             description: "Linting".to_string(),
-            auto: false,
-            example_integration: None,
             stage: GateStage::Precheck,
             mode: GateMode::Manual,
             checker: None,
@@ -3819,8 +3811,6 @@ mod tests {
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),
-            auto: true,
-            example_integration: None,
             inputs: None,
         };
         let def = GateDefinition::from(gate);

@@ -60,7 +60,7 @@ fn test_gate_list_json_output() {
     assert_eq!(json["count"], 1);
     assert_eq!(json["gates"][0]["key"], "test-gate");
     assert_eq!(json["gates"][0]["title"], "Test Gate");
-    assert_eq!(json["gates"][0]["auto"], true);
+    assert_eq!(json["gates"][0]["mode"], "auto");
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn test_gate_show_json_output() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Define a gate with an example-integration snippet
+    // Define an automated gate
     Command::new(jit)
         .args([
             "gate",
@@ -81,8 +81,6 @@ fn test_gate_show_json_output() {
             "--auto",
             "--checker-command",
             "true",
-            "--example",
-            "Example command",
         ])
         .current_dir(temp.path())
         .output()
@@ -103,8 +101,7 @@ fn test_gate_show_json_output() {
     assert_eq!(json["key"], "test-gate");
     assert_eq!(json["title"], "Test Gate");
     assert_eq!(json["description"], "A test gate description");
-    assert_eq!(json["auto"], true);
-    assert_eq!(json["example_integration"], "Example command");
+    assert_eq!(json["mode"], "auto");
 }
 
 #[test]

@@ -979,8 +979,6 @@ mod tests {
                     checker: None,
                     priority: 100,
                     reserved: HashMap::new(),
-                    auto: false,
-                    example_integration: None,
                     inputs: None,
                 },
             );
@@ -1153,8 +1151,6 @@ mod tests {
                 checker: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1214,8 +1210,6 @@ mod tests {
                 checker: None,
                 priority: 100,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );
@@ -1463,8 +1457,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 checker: None,
                 priority: 1,
                 reserved: HashMap::new(),
-                auto: false,
-                example_integration: None,
                 inputs: None,
             },
         );

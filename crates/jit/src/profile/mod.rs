@@ -14,7 +14,6 @@ mod package;
 pub mod package_archive;
 pub mod package_capture;
 mod repository_package;
-mod three_way;
 mod variables;
 mod wire;
 // Repository-local check seam: this checkout's packaged contributions bound to
@@ -46,8 +45,8 @@ pub use application::{
     ProfileShowResult, ProfileTargetAction, ProfileTargetChange, ProfilesKey,
 };
 pub use apply_claims::{
-    build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
-    build_resolved_contribution_claims, ProfileClaimError,
+    build_profile_claims, build_profile_claims_from_resolved, build_resolved_contribution_claims,
+    ProfileClaimError,
 };
 pub(crate) use difference::{ensure_publishable_targets, profile_plan_entry};
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
@@ -68,9 +67,6 @@ pub use package_archive::{
 };
 pub use package_capture::{
     capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,
-};
-pub use three_way::{
-    decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,
 };
 pub use variables::{
     resolve_package, resolve_package_from_record, resolve_variables, resolve_variables_from_record,

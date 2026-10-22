@@ -404,7 +404,6 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             GateMode::Auto,
             Some(GateChecker::RepositoryValidation),
             100,
-            None,
         )
         .unwrap();
     let (upstream, _) = executor

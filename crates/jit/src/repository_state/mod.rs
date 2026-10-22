@@ -185,16 +185,13 @@ pub use path::{
     WORKTREE_IDENTITY_FILE,
 };
 pub use profile_apply::{
-    applied_profile_records, compose_resolved_contributions, remedy_suggestions,
-    AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
-    AppliedProfileClaimIdentity, AppliedProfileRecord, CompleteProjectionConfig,
+    compose_resolved_contributions, AppliedProfileRecord, CompleteProjectionConfig,
     ComposedContribution, Contribution, ContributionConflictOwner, ContributionIdentity,
-    ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
-    ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput,
-    ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims, ProfileConflictOccupant,
-    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileRemedy,
-    ProfileResolution, ProfileTargetConflict, ProfileTargetConflictEntry,
-    ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
+    ContributionIdentityTarget, ContributionOutcome, ContributionRegistry, KeyedArrayTarget,
+    MapEntryTarget, ProfileApplicationInput, ProfileAssetClaim, ProfileClaims,
+    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict,
+    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
+    SetStringTarget,
 };
 pub(crate) use profile_apply::{
     profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
@@ -301,29 +298,6 @@ pub enum ProducerError {
         #[source]
         source: Box<ProfileRegistryParseError>,
     },
-    /// An applied-profile provenance record could not be decoded while resolving
-    /// the owner of a conflicting target.
-    #[error("invalid applied profile record '{path}': {source}")]
-    ProfileRecordParse {
-        /// Repository-relative record path.
-        path: String,
-        /// JSON decoding failure.
-        source: serde_json::Error,
-    },
-    /// A provenance record was stored under a name other than its package id.
-    #[error("applied profile record '{path}' names package '{id}', expected '{expected}'")]
-    ProfileRecordPathMismatch {
-        /// Repository-relative record path.
-        path: String,
-        /// Record package identity.
-        id: String,
-        /// Canonical record path for that package identity.
-        expected: String,
-    },
-    /// A canonical profile-claim fingerprint could not serialize its resolved
-    /// semantic value.
-    #[error("could not fingerprint profile claim: {0}")]
-    ProfileClaimFingerprint(#[source] serde_json::Error),
     /// A supported archive edge target is absent from the proposed plan.
     #[error("supported archive edge target is absent from plan: {target}")]
     ProposedLayoutTargetAbsent { target: String },
@@ -582,24 +556,18 @@ pub struct MaterializationPlan {
 
 /// What one profile decided about one target it participates in.
 ///
-/// The vocabulary is the shared three-way decision's: a value the profile
-/// publishes is created, updated, or already exact; a recorded claim the
-/// profile stopped contributing is retained or removed; and a value that cannot
-/// be changed safely is a conflict carrying its own reason. A publication acts
-/// on this vocabulary and a difference report states it, so neither can
-/// describe an outcome the other would not.
+/// A value the profile publishes is created, updated, or already exact, and a
+/// value packages being applied define differently is a conflict carrying its
+/// own reason. A publication acts on this vocabulary and a difference report
+/// states it, so neither can describe an outcome the other would not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ProfileTargetDisposition {
     /// The repository already holds the value this profile would publish.
     Unchanged,
     /// The target is absent and would be created.
     Create,
-    /// The target holds another value this profile may safely replace.
+    /// The target holds another value this profile replaces.
     Update,
-    /// This profile stopped contributing the target and its value survives.
-    Retain,
-    /// This profile stopped contributing unchanged, solely owned content.
-    Remove,
     /// The target cannot be published, for the reason it carries.
     Conflict(ProfileTargetConflict),
 }
@@ -616,19 +584,14 @@ pub(crate) struct ProfileTargetMaterialization {
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,
-    /// Packages whose applied records claim this target, in package-id order.
-    ///
-    /// Empty means no package owns it, which is what separates
-    /// repository-authored content from content a package published.
-    pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
 /// What one profile decided about one semantic identity it participates in.
 ///
 /// Contributions compose by identity rather than by the registry file that
 /// holds them, so this is what a plan carries beside its file-target decisions:
-/// the same disposition vocabulary and the same ownership fact, stated for the
-/// declaration an adopter reads and resolves.
+/// the same disposition vocabulary, stated for the declaration an adopter reads
+/// and resolves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileContributionMaterialization {
     /// Package whose composed claims decided this declaration.
@@ -636,11 +599,6 @@ pub(crate) struct ProfileContributionMaterialization {
     /// Canonical semantic identity the decision is about.
     pub(crate) identity: ContributionIdentity,
     pub(crate) disposition: ProfileTargetDisposition,
-    /// Packages whose applied records claim this identity, in package-id order.
-    ///
-    /// Empty means no package owns the declaration, so it is the repository's
-    /// own.
-    pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
 /// Complete producer output awaiting the shared plan tail.
@@ -1462,8 +1420,6 @@ mod tests {
             checker: None,
             priority: 100,
             reserved: std::collections::HashMap::new(),
-            auto: false,
-            example_integration: None,
             inputs: None,
         }
     }

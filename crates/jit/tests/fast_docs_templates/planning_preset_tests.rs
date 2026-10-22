@@ -41,7 +41,6 @@ fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
             GateMode::Manual,
             None,
             100,
-            None,
         )
         .unwrap_or_else(|error| panic!("define the {key} gate: {error}"));
 }

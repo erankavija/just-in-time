@@ -882,17 +882,16 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
+    contested_assets: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composed = super::profile_apply::compose_profile_targets_with_context(
         base,
         profile.claims.clone(),
         profile.contribution_context.clone(),
+        contested_assets,
     )
     .map_err(rule_materialization_error)?;
-    let record = profile
-        .record(&composed)
-        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-    let removals = composed.removals().cloned().collect::<Vec<_>>();
+    let record = profile.record();
     // The composition already decided every target this profile participates in.
     // Publication reads those decisions rather than re-deriving them, so what a
     // difference report states and what this candidate writes are one answer.
@@ -904,18 +903,18 @@ fn derive_profile_application_candidate(
             path: path.clone(),
             disposition: decision.disposition.clone(),
             mode: decision.mode,
-            owners: decision.owners.clone(),
         })
         .collect::<Vec<_>>();
     let contributions = composed
         .contribution_decisions
         .iter()
-        .map(|(identity, decision)| ProfileContributionMaterialization {
-            owner: profile.id.clone(),
-            identity: identity.clone(),
-            disposition: decision.disposition.clone(),
-            owners: decision.owners.clone(),
-        })
+        .map(
+            |(identity, disposition)| ProfileContributionMaterialization {
+                owner: profile.id.clone(),
+                identity: identity.clone(),
+                disposition: disposition.clone(),
+            },
+        )
         .collect::<Vec<_>>();
     let publishable = composed
         .decisions
@@ -942,15 +941,6 @@ fn derive_profile_application_candidate(
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
-    for path in removals {
-        if matches!(base.entry(&path)?, RepositoryEntry::File { .. }) {
-            actions.push(RepositoryAction::DeleteFile {
-                path: path.clone(),
-                owner: PROFILE_OWNER.to_string(),
-                expected: ExpectedPreimage::of(base.entry(&path)?),
-            });
-        }
-    }
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
     if profile.target_hashes.contains_key(".jit/config.toml")
@@ -1009,7 +999,7 @@ fn derive_profile_application_candidate(
 /// that name. `forced_changed` carries coupled initialization materializations
 /// that are derived before the profile candidates themselves. Keeping both
 /// facts in this planner means initialization and every lifecycle command share
-/// one composition, one event shape, and one three-way decision.
+/// one composition and one event shape.
 pub(super) fn derive_profile_applications(
     base: &RepositoryImage,
     profiles: &[ProfileApplicationInput],
@@ -1024,10 +1014,14 @@ pub(super) fn derive_profile_applications(
     let mut lifecycle_profiles = Vec::with_capacity(profiles.len());
     let mut applied_profiles = forced_changed.clone();
     let mut aggregate_changed = !forced_changed.is_empty();
+    let contested_assets = super::profile_apply::contested_asset_targets(
+        profiles.iter().map(|profile| &profile.claims),
+    );
 
     for profile in profiles {
         let status_base = proposed.clone();
-        let candidate = derive_profile_application_candidate(&proposed, profile)?;
+        let candidate =
+            derive_profile_application_candidate(&proposed, profile, &contested_assets)?;
         let candidate_actions = candidate
             .delta
             .actions()
@@ -1256,7 +1250,7 @@ mod tests {
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryLayout,
         RepositoryRootEvidence,
     };
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
 
     const LINE: &str = ".jit/events.jsonl merge=union";
 
@@ -1343,7 +1337,6 @@ mod tests {
                     unchanged.origin.clone(),
                     "same",
                     variables("value"),
-                    BTreeSet::new(),
                 ),
             ),
             (
@@ -1355,7 +1348,6 @@ mod tests {
                     reconfigured.origin.clone(),
                     "same",
                     variables("old"),
-                    BTreeSet::new(),
                 ),
             ),
             (
@@ -1367,7 +1359,6 @@ mod tests {
                     upgraded.origin.clone(),
                     "old",
                     variables("value"),
-                    BTreeSet::new(),
                 ),
             ),
         ];

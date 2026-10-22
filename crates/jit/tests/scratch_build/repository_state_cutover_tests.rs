@@ -156,16 +156,6 @@ fn is_package_model(source: &str) -> bool {
     .all(|field| source.contains(field))
 }
 
-/// An applied-record inventory authority lists the profile directory and
-/// returns the records that listing names. Known-path readers do neither: they
-/// receive a path from a caller and only decode that one record. The image's
-/// `directory_listings()` accessor marks the listing read, since it is the one
-/// way a producer learns which record names exist.
-fn is_applied_record_inventory_reader(source: &str) -> bool {
-    source.contains("Result<Vec<(VirtualPath, AppliedProfileRecord)>")
-        && source.contains("directory_listings()")
-}
-
 fn production_sources(root: &Path) -> Vec<(PathBuf, String)> {
     let mut pending = vec![root.to_path_buf()];
     let mut sources = Vec::new();
@@ -1228,13 +1218,11 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
     }
 }
 
-/// The package lifecycle has one decoder, one runtime model, and one reader
-/// for the repository's applied-record inventory. A helper that reads a known
-/// record path is not another inventory: its caller already chose that path.
-/// These ownership checks therefore guard only declarations that can become a
-/// competing format authority.
+/// The package lifecycle has one decoder and one runtime model. These
+/// ownership checks guard only declarations that can become a competing format
+/// authority.
 #[test]
-fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
+fn test_profile_lifecycle_has_one_canonical_package_authority() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for (authority, expected, classify) in [
         (
@@ -1243,11 +1231,6 @@ fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
             is_manifest_decoder as fn(&str) -> bool,
         ),
         ("package model", "profile/manifest.rs", is_package_model),
-        (
-            "applied-record inventory reader",
-            "repository_state/profile_apply.rs",
-            is_applied_record_inventory_reader,
-        ),
     ] {
         assert_canonical_authority(
             authority,
@@ -1347,13 +1330,6 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
             is_package_model,
             "struct ProfilePackageModel { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
             "struct AlternatePackageShape { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
-        ),
-        (
-            "applied-record inventory reader",
-            "repository_state/profile_apply.rs",
-            is_applied_record_inventory_reader,
-            "fn applied_profile_records() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { directory_listings(); }",
-            "fn collect_installed_provenance() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { directory_listings(); }",
         ),
     ] {
         let duplicate = assert_canonical_authority(

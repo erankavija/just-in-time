@@ -132,9 +132,8 @@ pub type ProfileShowResult = ProfileCollection<ProfileShowEntry>;
 
 /// What one profile would do to one target or declaration it participates in.
 ///
-/// The vocabulary is the whole three-way decision a profile selection makes, so
-/// a reader of a rehearsal and a reader of a difference report name the same
-/// outcomes, and a file and a declaration are named in one vocabulary rather
+/// The vocabulary is the whole decision a profile selection makes, so a reader
+/// of a rehearsal and a reader of a difference report name the same outcomes, and a file and a declaration are named in one vocabulary rather
 /// than two. A rehearsal fails on [`Self::Conflict`] rather than reporting it,
 /// which is the only difference between the two surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -146,9 +145,7 @@ pub enum ProfileTargetAction {
     Create,
     /// Existing target would be replaced by the package projection.
     Update,
-    /// The profile stopped contributing the target and its value survives.
-    Retain,
-    /// The profile stopped contributing unchanged, solely owned content.
+    /// Existing target is not declared and would be removed.
     Remove,
     /// The target cannot be published, for the reason the change carries.
     Conflict,
@@ -163,13 +160,6 @@ pub struct ProfileTargetChange {
     pub action: ProfileTargetAction,
     /// Platform-neutral file-mode intent.
     pub executable: bool,
-    /// Packages whose applied records claim this target, in package-id order.
-    ///
-    /// An empty list states that no package owns the target, so an adopter
-    /// reading a conflict knows whether to edit its own content or resolve a
-    /// package's claim; more than one entry names every owner of shared
-    /// content.
-    pub owners: Vec<String>,
     /// Why an unpublishable target cannot be published, absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -182,14 +172,12 @@ impl ProfileTargetChange {
         path: String,
         action: ProfileTargetAction,
         mode: FileMode,
-        owners: Vec<String>,
         reason: Option<String>,
     ) -> Self {
         Self {
             path,
             action,
             executable: mode == FileMode::Executable,
-            owners,
             reason,
         }
     }
@@ -208,13 +196,6 @@ pub struct ProfileContributionChange {
     pub identity: String,
     /// Planned operation.
     pub action: ProfileTargetAction,
-    /// Packages whose applied records claim this declaration, in package-id
-    /// order.
-    ///
-    /// An empty list states that no package owns the declaration, so it is the
-    /// repository's own; more than one entry names every owner of a shared
-    /// declaration.
-    pub owners: Vec<String>,
     /// Why an unpublishable declaration cannot be published, absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -316,7 +297,6 @@ mod tests {
             origin,
             "package",
             crate::profile::ResolvedVariables::default(),
-            std::collections::BTreeSet::new(),
         )
     }
 
@@ -340,7 +320,6 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>(),
             vec![
-                "claims",
                 "compatible_jit",
                 "id",
                 "origin",
@@ -403,21 +382,6 @@ mod tests {
                 "{origin} must not read as a valid record"
             );
         }
-    }
-
-    #[test]
-    fn test_installed_record_requires_ownership_claim_evidence() {
-        let mut stored: serde_json::Value =
-            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
-        stored
-            .as_object_mut()
-            .expect("an installed record serializes as an object")
-            .remove("claims");
-
-        assert!(
-            serde_json::from_value::<AppliedProfileRecord>(stored).is_err(),
-            "greenfield records must not silently drop semantic ownership evidence"
-        );
     }
 }
 
