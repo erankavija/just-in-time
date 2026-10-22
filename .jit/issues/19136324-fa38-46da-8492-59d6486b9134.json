@@ -7,6 +7,7 @@
   ],
   "description": "Move the domain query, item and output unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `type_taxonomy.rs`, `item.rs`, `visualization.rs`, `output.rs`, `queries.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T15:28:20.866671787Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Domain query, item and output unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T15:28:20.866671787Z"
 }
