@@ -103,7 +103,7 @@ Rationale: fewer conflicts in collaborative edits, smaller diffs, easy partial r
 ## Quality gating
 - Gate lifecycle statuses: pending (default) → passed | failed.
 - An issue cannot transition to `ready` or `done` until all gates listed in gates_required have status `passed`.
-- Gate registry defines whether automation may mark a gate passed (auto: true).
+- Gate registry defines whether automation may mark a gate passed (`mode = "auto"`).
 - CLI will offer commands for marking gates passed/failed, and future integrations will allow CI to write gate status artifacts that the CLI reads to auto-pass gates.
 
 Example common gates:
