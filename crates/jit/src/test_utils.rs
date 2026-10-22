@@ -1278,7 +1278,6 @@ fn set_captured_mode(path: &Path, mode: FileMode) -> Result<()> {
 fn set_captured_mode(_path: &Path, _mode: FileMode) -> Result<()> {
     Ok(())
 }
-/// The shipped default package's manifest id.
 const SHIPPED_PACKAGE_ID: &str = "jit-default";
 
 /// The item-kind declarations `manifest` contributes, keyed by kind name.
