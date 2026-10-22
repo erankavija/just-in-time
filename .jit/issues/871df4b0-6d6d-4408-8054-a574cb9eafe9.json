@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e191bd72-1723-42af-9995-02500660e11c",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:34:02.464579450Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "94f44886-b688-4304-a35e-10ef7f3d67d0",
+      "status": "failed",
+      "updated_at": "2026-10-22T20:39:23.054407575Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Doctest substep fits within the per-test bound",
-  "updated_at": "2026-10-22T20:15:45.920272684Z"
+  "updated_at": "2026-10-22T20:39:23.054407575Z"
 }
