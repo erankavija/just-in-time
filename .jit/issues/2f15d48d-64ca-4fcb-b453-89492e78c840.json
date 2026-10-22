@@ -8,12 +8,26 @@
   ],
   "description": "Human issue lists, today printed by eight hand-written loops in six formats, go through one renderer in the output module.\n\n## Background\n\nThe issue list is rendered inline in `crates/jit/src/main.rs` (or in the command group's handler module where it has moved) at: `run_query_all` (issue list, list, query all, bare query), `IssueCommands::Search`, `GraphCommands::Rdeps`, `GraphCommands::Roots`, and `QueryCommands::Available`, `Strategic`, `Closed` and `Blocked`. Each prints a command-specific header through `print_info` (suppressed by `-q`). Seven of eight indent rows by two spaces; `issue search` does not. Five print a `\\nTotal: N` footer; search, rdeps and roots print none. Columns after `{id} | {title}` vary per command (state and priority, priority only, state only, or none), and blocked rows add indented `- {reason}` lines. Differences resolve to the form most sites print, and every command whose output changes gets a test.\n\n## Success Criteria\n\n- [hard] REQ-01: One renderer in the output module takes the header, the rows, the per-command column set and optional per-row reason lines, and prints two-space-indented rows followed by a `Total: N` footer.\n- [hard] REQ-02: Every command listed in the Background prints its issue list through that renderer and contains no row-printing loop of its own.\n- [hard] REQ-03: `issue search` (indent and footer added) and `graph rdeps` and `graph roots` (footer added) have tests stating their new human output.\n- [hard] REQ-04: One unit test owns the renderer's format; the other commands' human output is unchanged and their existing suites pass without weakened assertions.\n\n## Notes\n\nThe `GraphCommands::Tree` view is a tree, not a list, and is out of scope. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:30:18.832342498Z",
   "first_ready_at": "2026-10-22T01:49:45.898818418Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "154d5725-b4d3-4bf6-9af7-ffabd84b1846",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:28:46.480266410Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b990e98e-f706-47a6-b7f5-10064ef4a42d",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:30:14.025791618Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f15d48d-64ca-4fcb-b453-89492e78c840",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Render issue lists through one output renderer",
-  "updated_at": "2026-10-22T14:02:16.085785590Z"
+  "updated_at": "2026-10-22T14:30:18.832342498Z"
 }

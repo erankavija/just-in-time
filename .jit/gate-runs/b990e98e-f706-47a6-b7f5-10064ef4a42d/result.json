@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "63b2b50c1c0292f905c6fb8cf7002a3ef7df46a9",
+  "completed_at": "2026-10-22T14:30:13.784170691Z",
+  "duration_ms": 86981,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable issue-list rendering changes satisfy the scoped criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2f15d48d-64ca-4fcb-b453-89492e78c840",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b990e98e-f706-47a6-b7f5-10064ef4a42d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:28:46.803086190Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 24385f797, f65005395, b1df0b2f4 (all `jit:2f15d48d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-09 and REQ-21 (parent issue Success Criteria); @/invariant/orthogonal-tests and essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci and code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:27:06Z); code-review pending (unrun)\nTruncation recovery: bounded per-file refactor patches, live call-site reads, test diffs, and merge-parent diffs\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable issue-list rendering changes satisfy the scoped criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
