@@ -1717,8 +1717,6 @@ Gates:
       "key": "tests",
       "title": "All Tests Pass",
       "description": "Full test suite must pass",
-      "auto": true,
-      "example_integration": null,
       "stage": "postcheck",
       "mode": "auto"
     }

@@ -3410,7 +3410,6 @@ fn run() -> Result<()> {
                 stage,
                 mode,
                 auto,
-                example,
                 checker_command,
                 timeout,
                 working_dir,
@@ -3490,7 +3489,6 @@ fn run() -> Result<()> {
                     mode,
                     checker,
                     priority,
-                    example,
                 ) {
                     Ok(_) => {
                         if json {
@@ -3707,9 +3705,6 @@ fn run() -> Result<()> {
                         println!("  Description: {}", gate.description);
                         println!("  Stage: {:?}", gate.stage);
                         println!("  Mode: {:?}", gate.mode);
-                        if let Some(example) = &gate.example_integration {
-                            println!("  Example Integration: {}", example);
-                        }
                         if let Some(checker) = gate.checker {
                             match checker {
                                 jit::declarations::GateChecker::Exec {

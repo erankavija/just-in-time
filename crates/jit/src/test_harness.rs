@@ -215,7 +215,6 @@ source-of-truth = \"registry-first\"
                 mode,
                 checker,
                 100,
-                None,
             )
             .unwrap();
     }
@@ -320,8 +319,6 @@ pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
                 inputs: None,
                 priority: 100,
                 reserved: std::collections::HashMap::new(),
-                auto: false,
-                example_integration: None,
             },
         )
     }));

@@ -15,7 +15,7 @@ does not already carry, and, with `--timeout <seconds>`, overwriting the key wit
 the overridden checker timeout — and then adds those keys to each issue's required
 gates. `--no-precheck`, `--no-postcheck`, and `--except <key>` narrow which of the
 preset's gates are applied. Each gate materializes into the registry with
-`version = 1`, `priority = 100`, and `auto` set from its mode.
+`version = 1` and `priority = 100`.
 
 The gates a project enforces live in its own `.jit/gates.toml`, its settings in
 `.jit/config.toml`; render those with `jit project render` (see
@@ -59,7 +59,6 @@ description = "Validate the whole repository"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "repository_validation"
@@ -72,7 +71,6 @@ description = "Validate the gated issue"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "issue_validation"
@@ -85,7 +83,6 @@ description = "Validate the container named by the covers label"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "label_target_validation"
@@ -99,7 +96,6 @@ description = "Evaluate one configured graph rule for the gated issue"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "rule_validation"
@@ -113,7 +109,6 @@ description = "Passing placeholder until a reviewer is configured"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "review_placeholder"

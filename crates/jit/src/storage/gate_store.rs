@@ -19,7 +19,8 @@ const GATES_FILE: &str = "gates.toml";
 ///
 /// Two `[[gates]]` rows carrying the same `key` are an error: the key is the
 /// registry identity (and the `gate` item kind's addressable self-id), and
-/// silently keeping one row would discard the other.
+/// silently keeping one row would discard the other. A parse failure keeps its
+/// typed source for exit-code classification and names the offending key.
 pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
     let path = jit_root.join(GATES_FILE);
     if !path.exists() {
@@ -27,7 +28,7 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
     }
     let content =
         std::fs::read(&path).with_context(|| format!("Failed to read file: {}", path.display()))?;
-    parse_gate_registry(&content).context("Failed to deserialize gate registry")
+    Ok(parse_gate_registry(&content)?)
 }
 
 #[cfg(test)]
@@ -53,7 +54,6 @@ description = \"first entry\"
 stage = \"postcheck\"
 mode = \"manual\"
 priority = 100
-auto = false
 
 [[gates]]
 version = 1
@@ -63,7 +63,6 @@ description = \"duplicate key\"
 stage = \"postcheck\"
 mode = \"manual\"
 priority = 100
-auto = false
 ";
         std::fs::write(dir.path().join("gates.toml"), registry_toml).unwrap();
 
@@ -72,6 +71,27 @@ auto = false
         assert!(
             msg.contains("duplicate gate key 'cargo-ci'"),
             "error names the duplicate key: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_load_gate_registry_unknown_key_is_named_parse_error() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("gates.toml"),
+            "[[gates]]\nkey = \"review\"\ntitle = \"Review\"\ndescription = \"Review\"\n\
+             stage = \"postcheck\"\nmode = \"auto\"\nundeclared_key = true\n",
+        )
+        .unwrap();
+
+        let err = load_gate_registry(dir.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("unknown field `undeclared_key`"),
+            "error names the unknown key: {err}"
+        );
+        assert_eq!(
+            crate::output::failure::classify(&err).error.code,
+            crate::output::ErrorCode::ParseError
         );
     }
 }

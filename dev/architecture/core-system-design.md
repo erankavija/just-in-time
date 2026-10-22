@@ -57,8 +57,7 @@ Gate Definition (global registry, .jit/gates.toml)
 - key: string (unique)
 - title: string
 - description: string
-- auto: boolean (true = automation can pass it; false = manual)
-- example_integration: optional string (how automation might satisfy this)
+- mode: enum {manual, auto} (auto = an automated checker can pass it)
 
 System metadata (.jit/index.json)
 - schema_version: integer

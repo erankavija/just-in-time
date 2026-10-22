@@ -67,7 +67,6 @@ description = "External review placeholder"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "review_placeholder"

@@ -1316,10 +1316,6 @@ pub enum GateCommands {
         #[arg(long)]
         auto: bool,
 
-        /// Optional example integration snippet recorded with the definition
-        #[arg(long)]
-        example: Option<String>,
-
         /// Command to execute for automated gates
         #[arg(long)]
         checker_command: Option<String>,

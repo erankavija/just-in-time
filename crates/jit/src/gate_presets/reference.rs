@@ -27,7 +27,6 @@ description = "Validate the whole repository"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "repository_validation"
@@ -40,7 +39,6 @@ description = "Validate the gated issue"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "issue_validation"
@@ -53,7 +51,6 @@ description = "Validate the container named by the covers label"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "label_target_validation"
@@ -67,7 +64,6 @@ description = "Evaluate one configured graph rule for the gated issue"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "rule_validation"
@@ -81,7 +77,6 @@ description = "Passing placeholder until a reviewer is configured"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "review_placeholder""#;
@@ -112,7 +107,7 @@ pub fn render_reference_markdown() -> String {
          the overridden checker timeout — and then adds those keys to each issue's required\n\
          gates. `--no-precheck`, `--no-postcheck`, and `--except <key>` narrow which of the\n\
          preset's gates are applied. Each gate materializes into the registry with\n\
-         `version = 1`, `priority = 100`, and `auto` set from its mode.\n\
+         `version = 1` and `priority = 100`.\n\
          \n\
          The gates a project enforces live in its own `.jit/gates.toml`, its settings in\n\
          `.jit/config.toml`; render those with `jit project render` (see\n\
