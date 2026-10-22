@@ -376,7 +376,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
     ///     executor
-    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], vec![], None, None, false)
     ///         .unwrap()
     ///         .0
@@ -386,7 +386,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let child = new("Child");
     /// executor.add_dependency(&epic, &child).unwrap();
     ///
-    /// let response = executor.issue_children(&epic).unwrap();
+    /// let response = executor.issues().issue_children(&epic).unwrap();
     /// assert_eq!(response.extras.container.title, "Epic");
     /// assert_eq!(response.count(), 1);
     /// assert_eq!(response.items[0].title, "Child");
@@ -431,7 +431,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
     /// let new = |title: &str| {
     ///     executor
-    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], vec![], None, None, false)
     ///         .unwrap()
     ///         .0
@@ -443,11 +443,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// executor.add_dependency(&epic, &done).unwrap();
     /// executor.add_dependency(&epic, &todo).unwrap();
     /// executor
-    ///     .update_issue(&done, None, None, None, Some(State::Done),
+    ///     .issues().update_issue(&done, None, None, None, Some(State::Done),
     ///         vec![], vec![], None, None, false)
     ///     .unwrap();
     ///
-    /// let progress = executor.issue_progress(&epic).unwrap();
+    /// let progress = executor.issues().issue_progress(&epic).unwrap();
     /// assert_eq!(progress.rollup.extras.total, 2);
     /// assert_eq!(progress.rollup.extras.done, 1);
     /// assert_eq!(progress.rollup.extras.percent, 50);
