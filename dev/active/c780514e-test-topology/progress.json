@@ -12,7 +12,7 @@
           "key": "profiled-fixture-cold-build",
           "title": "No test waits on a cold profiled-repository fixture build",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "done"
         },
         {
           "id": "a3dd995a-26d2-4039-8a69-332eca663885",
@@ -76,7 +76,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "rework 1 (F2 rustdoc) dispatched; steward scope note added for F1"
+          "status": "rework 1 merged; gating"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -124,7 +124,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 declaration_dir path traversal); rework with 0bf97911 F2 in one worktree"
+          "status": "rework 2 queued: code-review R2 F1 traversal test reads a fixed temp path (test_utils.rs:1214); cargo-ci needs post-revert rerun"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -401,7 +401,7 @@
           "key": "fixture-issue-commands-a-adoption",
           "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched (haiku)"
         },
         {
           "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
@@ -1250,7 +1250,7 @@
   "rework_counts": {
     "2b49f95b": 1,
     "0bf97911": 1,
-    "4a82ed46": 1,
+    "4a82ed46": 2,
     "22355a56": 1
   },
   "surfaced_pitfalls": [
