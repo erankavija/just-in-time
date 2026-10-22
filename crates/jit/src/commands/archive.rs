@@ -932,7 +932,7 @@ mod tests {
         .unwrap();
         let issue =
             |id: &str, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
-                let mut issue = crate::domain::types::fixture_issue(id.to_string(), String::new());
+                let mut issue = crate::domain::fixture_issue(id.to_string(), String::new());
                 issue.id = id.to_string();
                 issue.state = state;
                 issue.archived_from = archived_from;
@@ -1015,7 +1015,7 @@ mod tests {
         let ids = (0..owner_count)
             .map(|index| {
                 let mut issue =
-                    crate::domain::types::fixture_issue(format!("Owner {index}"), String::new());
+                    crate::domain::fixture_issue(format!("Owner {index}"), String::new());
                 issue.state = State::Done;
                 let mut document = document_reference("fixtures/root.md");
                 document.assets.push(crate::document::Asset {
@@ -1101,7 +1101,7 @@ mod tests {
             "See `fixtures/root.md`.\n",
         )
         .unwrap();
-        let mut issue = crate::domain::types::fixture_issue("Owner".into(), String::new());
+        let mut issue = crate::domain::fixture_issue("Owner".into(), String::new());
         issue.state = State::Done;
         issue.documents = vec![document_reference("fixtures/root.md")];
         seed_archive_issue_precondition(&storage, issue);
@@ -1622,7 +1622,7 @@ mod tests {
             .unwrap();
 
         let mut container =
-            crate::domain::types::fixture_issue("Owned archive layout".into(), String::new());
+            crate::domain::fixture_issue("Owned archive layout".into(), String::new());
         container.state = State::Done;
         let container_type = taxonomy.type_at_level(1);
         let container_namespace = taxonomy
@@ -1726,7 +1726,7 @@ mod tests {
         git(repo.path(), &["commit", "-qm", "fixture"]);
         let commit = git(repo.path(), &["rev-parse", "HEAD"]);
 
-        let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
+        let mut container = crate::domain::fixture_issue("Container".into(), String::new());
         container.state = State::Done;
         container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
         container.documents = vec![
@@ -1735,8 +1735,7 @@ mod tests {
         ];
         let container_id = container.id.clone();
         seed_archive_issue_precondition(&storage, container);
-        let mut outside =
-            crate::domain::types::fixture_issue("Outside active".into(), String::new());
+        let mut outside = crate::domain::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
         outside.labels = vec![format!("type:{}", taxonomy.type_at_level(4))];
         outside.documents = vec![document_reference("fixtures/root.md")];
@@ -1800,7 +1799,7 @@ mod tests {
         fs::write(repo.path().join("fixtures/bundle/image.png"), b"png").unwrap();
         fs::write(repo.path().join("fixtures/data.csv"), "a,b\n1,2\n").unwrap();
 
-        let mut epic = crate::domain::types::fixture_issue("Archive fixture".into(), String::new());
+        let mut epic = crate::domain::fixture_issue("Archive fixture".into(), String::new());
         epic.state = State::Done;
         let epic_type = taxonomy.type_at_level(1);
         let epic_namespace = taxonomy
@@ -2023,8 +2022,7 @@ mod tests {
             "workspace/active/target.md",
             "workspace/scratch/notes.md",
         ] {
-            let mut issue =
-                crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
+            let mut issue = crate::domain::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
             issue.documents = vec![document_reference(path)];
             seed_archive_issue_precondition(&storage, issue);
@@ -2081,8 +2079,7 @@ mod tests {
             fs::write(file, content).unwrap();
         }
         for path in ["workspace/active/target.md", "workspace/notes/other.md"] {
-            let mut issue =
-                crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
+            let mut issue = crate::domain::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
             issue.documents = vec![document_reference(path)];
             seed_archive_issue_precondition(&storage, issue);
@@ -2373,7 +2370,7 @@ mod tests {
         )
         .unwrap();
         let mut outside =
-            crate::domain::types::fixture_issue("Active outside owner".into(), String::new());
+            crate::domain::fixture_issue("Active outside owner".into(), String::new());
         outside.state = State::InProgress;
         outside.documents = vec![document_reference("docs/outside.md")];
         seed_archive_issue_precondition(&owner_storage, outside);
@@ -2416,7 +2413,7 @@ mod tests {
         fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
 
         let mut epic =
-            crate::domain::types::fixture_issue("Directory link container".into(), String::new());
+            crate::domain::fixture_issue("Directory link container".into(), String::new());
         epic.state = State::Done;
         let epic_type = taxonomy.type_at_level(1);
         let epic_namespace = taxonomy
@@ -2512,7 +2509,7 @@ mod tests {
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
-        let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
+        let mut container = crate::domain::fixture_issue("Container".into(), String::new());
         container.state = state;
         container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
         container.documents = vec![document_reference("fixtures/root.md")];
@@ -2635,7 +2632,7 @@ mod tests {
         // terminal, so it is not an active owner and the document still moves.
         let (_repo, executor, _) = executable_document_repo(1, "shared doc");
         let mut archived_owner =
-            crate::domain::types::fixture_issue("Independently archived".into(), String::new());
+            crate::domain::fixture_issue("Independently archived".into(), String::new());
         archived_owner.state = State::Archived;
         archived_owner.archived_from = Some(State::Done);
         archived_owner.documents = vec![document_reference("fixtures/root.md")];

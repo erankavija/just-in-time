@@ -574,7 +574,7 @@ mod tests {
             heading: "Success Criteria".to_string(),
         })
         .unwrap();
-        let issue = crate::domain::types::fixture_issue(
+        let issue = crate::domain::fixture_issue(
             "t".to_string(),
             "## Success / Criteria!\n\n- [hard] REQ-01\n".to_string(),
         );

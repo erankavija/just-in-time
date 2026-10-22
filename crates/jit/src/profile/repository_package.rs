@@ -1957,7 +1957,7 @@ mod tests {
             .expect("the package's rules parse");
         let graph_rules = ruleset.rules.iter().collect::<Vec<_>>();
 
-        let mut issue = crate::domain::types::fixture_issue("Subject".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("Subject".to_string(), String::new());
         issue.labels = labels;
         crate::validation::graph::evaluate_graph(
             &graph_rules,

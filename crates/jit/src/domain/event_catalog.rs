@@ -29,7 +29,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::types::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
+use super::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {

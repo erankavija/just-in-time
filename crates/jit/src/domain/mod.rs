@@ -44,9 +44,8 @@ pub mod queries;
 pub mod repository_inputs;
 pub mod store_divergence;
 pub mod type_taxonomy;
-pub mod types;
+mod types;
 
-// Re-export all types for backward compatibility
 pub use types::*;
 
 // Re-export the structured gate-findings parser and its types.
@@ -86,7 +85,6 @@ pub use item::{
 
 // Re-export domain operations from sibling modules so that
 // `use jit::domain::*` gives access to types AND key operations.
-// The original modules remain at their top-level paths for backward compatibility.
 pub use crate::graph::{DependencyGraph, GraphError, GraphNode};
 pub use crate::labels::{
     label_matches, matches_pattern, parse_label, validate_assignee_format, validate_label,

@@ -746,7 +746,7 @@ mod tests {
     mod store_divergence {
         use super::*;
         use crate::domain::store_divergence::{DivergenceClass, DivergentRecord};
-        use crate::domain::types::{fixture_issue, Priority};
+        use crate::domain::{fixture_issue, Priority};
         use crate::domain::{Event, Issue};
         use std::collections::BTreeMap;
         use std::path::{Path, PathBuf};

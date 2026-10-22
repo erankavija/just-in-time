@@ -15,7 +15,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::types::{Event, Issue};
+use super::{Event, Issue};
 
 /// The kind of record a [`StoreDivergence`] names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -164,7 +164,7 @@ fn group_by_identity<'a, T>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::types::{fixture_issue, Priority};
+    use crate::domain::{fixture_issue, Priority};
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &str, title: &str) -> Event {

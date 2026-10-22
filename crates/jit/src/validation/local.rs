@@ -418,7 +418,7 @@ mod tests {
     }
 
     fn epic_without_req() -> Issue {
-        let mut issue = crate::domain::types::fixture_issue("An epic".to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue("An epic".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string()];
         issue
     }
@@ -754,7 +754,7 @@ enforce = true
 assert = { require-doc-type = { doc-type = "design" } }
 "#,
         );
-        let mut task = crate::domain::types::fixture_issue("A task".to_string(), String::new());
+        let mut task = crate::domain::fixture_issue("A task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         // No design doc -> blocks.
         assert!(evaluate_local(&task, &rules, ContentFormat::Markdown)
