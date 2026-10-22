@@ -28,7 +28,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Profiled-repository fixture lock waits are bounded",
-  "updated_at": "2026-10-22T14:28:16.947229270Z"
+  "updated_at": "2026-10-22T14:43:00.324888834Z"
 }

@@ -26,7 +26,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Create-time rule warnings proven in-process without a profiled repository",
-  "updated_at": "2026-10-22T14:28:17.388049833Z"
+  "updated_at": "2026-10-22T14:43:00.162013751Z"
 }

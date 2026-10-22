@@ -19136,3 +19136,4 @@
 {"from":"backlog","id":"9f8ba7de-3b19-4cbb-b632-62eb6ca04366","issue_id":"d35c610b-f752-4fe3-89a9-7eca1b3d52b3","timestamp":"2026-10-22T14:43:00.711271112Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"2ff33429-376d-4d23-a99d-c2d66c4dabb6","issue_id":"df505379-385f-4fe7-b7bd-4af3bb3b88aa","timestamp":"2026-10-22T14:43:00.775639865Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"d2dd310b-e26f-476d-9ff5-61b093a35b58","issue_id":"fa9bf296-4375-4c86-9bf0-80a128cd74c8","timestamp":"2026-10-22T14:43:00.839952967Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"d63f7ba4-1f80-4d42-97ed-a309d1743679","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-10-22T14:43:25.533509500Z","type":"issue_claimed"}
