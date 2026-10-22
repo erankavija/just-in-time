@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "148648d78ef4de70cdf3803945b1b4c29165a876",
+  "completed_at": "2026-10-22T21:28:01.241653195Z",
+  "duration_ms": 106699,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "61fbb3dcea1ebaeb1be5f61b0becb2464ea471ef7636d49ffe050347de65a70a",
+  "issue_id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fe708443-21d9-4b79-81e1-6b8b15ebc175",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:26:14.542456870Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 34565 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 34565 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 40668 ms, warmed 17 executables (1983436144 bytes) in 70 ms.\n  ✓ fmt: ok (1530 ms)\n  ✓ clippy: ok (29628 ms)\n  ✓ suite-build: built in 40668 ms, warmed 17 executables (1983436144 bytes) in 70 ms (40741 ms)\n  ✓ test: 4580 passed, 0 failed, 0 skipped (31902 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2644 ms)\n  ✓ suite-clock: 34565 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (85 ms)\n\ncargo-ci: verdict (exit 1): failing steps (budget) are environment-sensitive but baseline load1=2.98 < threshold 4.08 (0.17 x 24 CPUs); a quiet-host failure is a real regression to investigate\n"
+}

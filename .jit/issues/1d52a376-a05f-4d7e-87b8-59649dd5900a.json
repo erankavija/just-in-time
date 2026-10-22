@@ -7,6 +7,7 @@
   ],
   "description": "Give the domain query tests an owning case for every query property the CLI and executor re-proofs assert, before those re-proofs are cut to wiring.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns the query filters, label queries (`query_by_label`, `query_by_labels`, `query_strategic` at `:278`, `:318`, `:336`) and the available-work order, with unit and property tests. Subprocess and executor tests re-prove those semantics. In `cli_query_graph` they are `query_tests.rs` (25), `label_filter_repeatable_query_tests.rs` (17), `label_query_json_tests.rs` (7), `query_json_tests.rs` (5) and `label_hierarchy_e2e_test.rs` (4). In `fast_rules` they are `label_query_tests.rs` (12) and `label_strategic_tests.rs` (7).\n\n## Success Criteria\n\n- [hard] REQ-01: For each query property those files assert (filter membership, AND semantics, pattern matching, case sensitivity, strategic selection, empty repositories, ordering), `domain/queries.rs` has an owning test.\n- [hard] REQ-02: A property already owned there is not duplicated.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T21:35:57.994455694Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Domain query tests own each property the query re-proofs assert",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T21:35:57.994455694Z"
 }

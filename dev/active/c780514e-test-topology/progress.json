@@ -140,7 +140,7 @@
           "key": "finalization-owner-gaps",
           "title": "Repository-state tests own each finalization case",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; Luna xhigh selected for bounded single-file unit ownership completion, stronger lead audit and unchanged independent gates; reused memory checkout"
         },
         {
           "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
@@ -180,7 +180,7 @@
           "key": "query-available-domain-order",
           "title": "Available-work filtering and priority order become a pure domain query",
           "classification": "implementation",
-          "status": "implementedc789459ce;4 focused domain/wiring tests pass; finalCI pending"
+          "status": "done"
         },
         {
           "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
@@ -1283,6 +1283,10 @@
       "from": "22355a56 and rework-tu1 workers",
       "finding": "test_utils::tests::test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target fails intermittently in worktree lib runs ('compile the isolated setup artifact: error: Current directory is invalid'); it spawns a nested cargo build",
       "disposition": "owned by fixture-setup-hook-removal (removes the receipt path) and REQ-10 (no nested cargo build); watch for it in gate runs"
+    },
+    {
+      "finding": "Main query gate fe708443 failed 34.565s suite budget while same-source worker passed17.799s; main launcher omitted required CARGO_INCREMENTAL=0. Input-key reuse63c1d94d correctly retained failure despite changed external environment.",
+      "disposition": "Resolved operational mismatch by explicit export0 in ephemeral land/regate scripts. Raw nextest diagnostic13.237s at normal priority is not comparable gate proof; authoritative normal-nice gate911fbb9e passed14.542s suite,4580tests+25docs. No source or budget change; timing causation not proven. Always set0 explicitly and investigate before forced checker execution."
     }
   ],
   "traps": [
@@ -1566,6 +1570,30 @@
       "stale_narrative": "tracked alias sweep finds historical investigations, benchmark logs and changelog only; current TESTING and rendered gate description updated",
       "deferred_items": "no linked design documents",
       "holistic": "same budget values and normal checker preserved; fixtures now owned by checker; inherited BUSY_HOST_OVERRIDE cleared for child fixtures; no Cargo in self-test"
+    },
+    "368df0c1": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "911fbb9e-f593-4912-97cf-09212ed34d25",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "cfa9a7e4-6f07-49ad-bd46-eb0081f7d767",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "domain::queries::query_available composes existing pure readiness/label/priority filters and stable priority ordering; query command and claim path delegate without local sorts",
+        "REQ-02": "domain unit matrix covers absent/all priorities and empty/exact/wildcard/AND/repeated/nonmatching labels; ties unit and randomized composition/order property preserve input order",
+        "REQ-03": "command validates patterns and reads one issue snapshot; existing claim and CLI boundary tests retained and full CI passed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "active Rust/Markdown sweep found no pending or future claims for query_available or AvailableFilter; raw historical benchmark inventory matches are measurement data",
+      "deferred_items": "no linked design documents",
+      "holistic": "Pure domain composition reuses canonical query functions; claim expression context still derives from all issues; no new I/O or layer dependency"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates."
