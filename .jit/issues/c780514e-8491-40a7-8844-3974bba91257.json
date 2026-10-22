@@ -13,6 +13,23 @@
       "doc_type": "implementation",
       "label": "Execution progress",
       "path": "dev/active/c780514e-test-topology/progress.json"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "b2bc900087b9bd24adb8eae71f57b3144246015ff2f77c2b1b9821768be2820f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../active/c780514e-test-topology/plan.md",
+          "resolved_path": "dev/active/c780514e-test-topology/plan.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Test topology measurements",
+      "path": "dev/benchmarks/test-topology-c780514e/README.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:37.837021516Z",
@@ -96,5 +113,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T20:15:46.054441991Z"
+  "updated_at": "2026-10-22T20:42:55.623942875Z"
 }
