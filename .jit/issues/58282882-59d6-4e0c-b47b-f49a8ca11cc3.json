@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-22T02:15:28.860201545Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -25,5 +26,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove uncalled domain predicates and parsers",
-  "updated_at": "2026-10-21T15:36:13.482718725Z"
+  "updated_at": "2026-10-22T02:15:33.850931715Z"
 }

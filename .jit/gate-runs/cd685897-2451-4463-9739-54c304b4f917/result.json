@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b80cd0da631bf3282107b4623e368d869bbc82c7",
+  "completed_at": "2026-10-22T02:03:52.469395710Z",
+  "duration_ms": 430009,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/profile_apply.rs",
+        "id": "F1",
+        "line": 228,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "A public serializable Repository conflict owner remains although repository content is no longer a conflict party."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F2",
+        "line": 910,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Recurring rustdoc still describes removed recorded-claim and shared-ownership behavior."
+      }
+    ],
+    "summary": "Two issue-impact defects remain: an obsolete repository conflict-output variant and recurring stale record-ownership rustdoc.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f866d9d8-384e-4b5e-9616-78bfa5e1b440",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cd685897-2451-4463-9739-54c304b4f917",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:56:42.459987043Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 19202 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16153-29e1-7581-b864-07975a04d81c\n--------\nuser\n--- 19189 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 753323290, 4f5db64b9, 30fd493f7, b80cd0da6, 5f7502314\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue description); @/invariant/canonical-cutover and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-22T01:58:35Z (supersedes earlier failures); code-review pending\nTruncation recovery: partitioned patches by commit/path, recovered with hunk inventories and current line ranges; inspected merge against its first-parent issue patch\n\n1. **[blocking, issue-impact]** `ContributionConflictOwner::Repository` remains a public, serializable conflict-output variant even though profile conflicts now promise that only selected packages are parties. `ProfileTargetConflict::Contested` accepts this type directly, so callers can still emit a repository-party conflict. Remove the obsolete variant and its display arm. This is a leftover representation after the cutover. `crates/jit/src/repository_state/profile_apply.rs:228` References: @/charter/D-8, @/invariant/canonical-cutover\n\n2. **[blocking, issue-impact]** Three retained rustdoc blocks describe removed record-claim ownership behavior: records deriving shared ownership, diff retaining/removing recorded claims, and records carrying ownership evidence. They now contradict the implementation and recur across the affected command path. Update or remove them. `crates/jit/src/commands/profile.rs:910` References: @/charter/D-8, @/invariant/essential-code-prose\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact defects remain: an obsolete repository conflict-output variant and recurring stale record-ownership rustdoc.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A public serializable Repository conflict owner remains although repository content is no longer a conflict party.\",\"file\":\"crates/jit/src/repository_state/profile_apply.rs\",\"line\":228,\"references\":[\"@/charter/D-8\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recurring rustdoc still describes removed recorded-claim and shared-ownership behavior.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":910,\"references\":[\"@/charter/D-8\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

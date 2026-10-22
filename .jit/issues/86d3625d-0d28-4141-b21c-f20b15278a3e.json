@@ -7,6 +7,7 @@
   ],
   "description": "The gate subsystem holds a validation-rule constructor in its presets, a checker entry point and a one-line passthrough, none of which production reaches.\n\n## Background\n\n- `preview_coverage_rule` (`crates/jit/src/gate_presets/planning.rs:81`) is called only by its own tests (`:159-249`) and a doctest (`:44-57`). It is re-exported at `gate_presets.rs:15,19`, and the 252-line module holds nothing else. `sdd_bracket_tests.rs:109` and `research_bracket_tests.rs:117` share the name but check example rules.\n- `gate_execution::execute_gate_checker` (`gate_execution.rs:26-39`) is called only by about ten tests in `gate_execution.rs`. Production calls `execute_gate_checker_with_context` (`commands/gate_check.rs:1342`).\n- `reusable_verdict` (`commands/gate_check.rs:1043-1049`) forwards to `self.storage.find_reusable_gate_run` and has one caller (`:928`).\n\n## Success Criteria\n\n- [hard] REQ-01: `gate_presets/planning.rs` and its re-exports no longer exist, and gate presets hold no validation-rule constructor.\n- [hard] REQ-02: `execute_gate_checker` no longer exists, and its tests call the context-taking entry point production uses.\n- [hard] REQ-03: `reusable_verdict` no longer exists, and its caller queries storage directly.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T02:15:10.056109765Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:842b0ac6/REQ-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove test-only gate entry points",
-  "updated_at": "2026-10-21T00:54:09.217003678Z"
+  "updated_at": "2026-10-22T02:15:10.056109765Z"
 }

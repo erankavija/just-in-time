@@ -1573,6 +1573,112 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
     }
 }
 
+#[test]
+fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
+    // Each state once diverged: `config show` layered the user config over the
+    // repository's while `claim acquire` read the repository config alone.
+    let section = |agent: Option<u32>, repo: Option<u32>| {
+        let line = |key: &str, value: Option<u32>| {
+            value.map_or(String::new(), |v| format!("{key} = {v}\n"))
+        };
+        format!(
+            "[coordination]\n{}{}",
+            line("max_indefinite_leases_per_agent", agent),
+            line("max_indefinite_leases_per_repo", repo)
+        )
+    };
+    // (repo section, user section, whether the per-agent or per-repo limit is probed)
+    let states = [
+        (String::new(), None, "per_agent"),
+        (section(Some(1), None), None, "per_agent"),
+        (String::new(), Some(section(Some(1), None)), "per_agent"),
+        (
+            section(None, Some(2)),
+            Some(section(None, Some(5))),
+            "per_repo",
+        ),
+        (String::new(), Some(section(None, Some(1))), "per_repo"),
+    ];
+    for (repo_section, user_section, probe) in states {
+        let repo = setup_repo();
+        let config_path = repo.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        config.push_str(&format!("\n{repo_section}"));
+        fs::write(&config_path, config).unwrap();
+        let home = repo.path().join("isolated-home");
+        fs::create_dir_all(home.join(".config/jit")).unwrap();
+        if let Some(user_section) = &user_section {
+            fs::write(home.join(".config/jit/config.toml"), user_section).unwrap();
+        }
+        let jit = |args: &[&str]| {
+            Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+                .current_dir(repo.path())
+                .env("HOME", &home)
+                .args(args)
+                .output()
+                .unwrap()
+        };
+
+        let show = jit(&["config", "show", "--json"]);
+        assert!(show.status.success(), "config show failed: {show:?}");
+        let reported: Value = serde_json::from_slice(&show.stdout).unwrap();
+        let reported = reported["coordination"][format!("max_indefinite_leases_{probe}")]
+            .as_u64()
+            .expect("config show reports the limit");
+
+        let mut granted = 0;
+        for attempt in 0..=reported {
+            let issue_id = create_issue(repo.path(), &format!("Limit probe {attempt}"));
+            let agent = match probe {
+                "per_agent" => "agent:limit-probe".to_string(),
+                _ => format!("agent:limit-probe-{attempt}"),
+            };
+            let acquire = jit(&[
+                "claim",
+                "acquire",
+                &issue_id,
+                "--ttl",
+                "0",
+                "--reason",
+                "limit probe",
+                "--agent-id",
+                &agent,
+            ]);
+            if acquire.status.success() {
+                granted += 1;
+            }
+        }
+        assert_eq!(
+            granted, reported,
+            "repo {repo_section:?}, user {user_section:?}: config show reported {probe} \
+             limit {reported} but claim acquire granted {granted}"
+        );
+    }
+}
+
+#[test]
+fn test_claim_acquire_fails_on_a_malformed_repository_config() {
+    let repo = setup_repo();
+    let issue_id = create_issue(repo.path(), "Malformed config probe");
+    fs::write(repo.path().join(".jit/config.toml"), "not = valid = toml").unwrap();
+
+    let acquire = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:malformed",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!acquire.status.success(), "{acquire:?}");
+}
+
 /// `claim status --issue` resolves a full id in any case or hyphenation to the
 /// issue's lease.
 #[test]

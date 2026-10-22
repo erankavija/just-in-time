@@ -18,7 +18,7 @@ Fixtures land first, then the per-target migrations onto them; owners gain missi
 | REQ-07 | `shipped-item-kinds-fixture` derivation (wave 1), then one adoption each for the harness tables, command unit tests, `cli_item_validate` and `fast_rules`. | §1 #20–#21 |
 | REQ-08 | `issue-store-conformance` (absorbs the three ad-hoc tests), then the in-memory path-read fix, then backend-test pruning. | §1 #22–#24 |
 | REQ-09 | The receipt env lock goes with the runner hook; an audit puts unguarded environment readers under `EnvGuard`. | §1 #25, §4 |
-| REQ-10 | `script-self-test-gates`: every repository shell-script self-test becomes a declared gate (investigation §D.7). The three that the default suite wraps leave it, and seven that ran nowhere or only in CI gain gates, including three skill-script suites under `.agents/`. The corpus setup's nested cargo test is replaced by an in-suite fixture, and every skip-and-pass path fails instead: the cargo and node skips, the root-only lock tests, and the read-bit and actionlint skips inside the docs-check and workflow-contract self-tests. | §1 #26–#28, #32, §D.5, §D.7 |
+| REQ-10 | `script-self-test-gates`: every repository shell-script self-test runs as a gate (investigation §D.7). The ten gates are registered at planning (D-05, bootstrap) and required by their tasks and by the container. The three that the default suite wraps leave it, and seven that ran nowhere or only in CI gain gates, including three skill-script suites under `.agents/`. The corpus setup's nested cargo test is replaced by an in-suite fixture, and every skip-and-pass path fails instead: the cargo and node skips, the root-only lock tests, and the read-bit and actionlint skips inside the docs-check and workflow-contract self-tests. | §1 #26–#28, #32, §D.5, §D.7 |
 | REQ-11 | `input-keyed-fixture-cache`, then removal of the hidden subcommand, receipts and setup scripts. | §1 #29–#32, §A |
 | REQ-12 | Final footprint report under `suite-measurement-protocol`. | §1 #34, §C |
 | REQ-13 | Early relief: input key, in-memory rule-warning tests, short-deadline server drain, doctest pruning. Final suite-clock report. | §A; D-01 |
@@ -70,7 +70,7 @@ This covers every shell-script self-test in the repository (investigation §D.7)
 
 Shell files that test no script (CI replays, product walkthroughs, image smoke, the MCP test runner) are recorded as such in §D.7.
 
-`scripts/setup-recorded-failure-corpus.sh --self-test` is deleted together with its script. Each self-test is a `.jit/gates.toml` gate with `[gates.inputs]` covering the script and what it exercises. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test. No test or self-test passes by printing a skip notice, whether a tool is missing or a host precondition such as an enforced read bit is absent: it establishes the precondition or fails. Investigation §D.5 lists each skip-and-pass path and its owner, and the matches that are not test skips. New gates carry `mode` and no deprecated `auto` key.
+`scripts/setup-recorded-failure-corpus.sh --self-test` is deleted together with its script. Each self-test runs as a `.jit/gates.toml` gate whose `[gates.inputs]` cover the script and what it exercises. The ten gate keys are registered at planning (steward ruling D-05, bootstrap): `cargo-ci-selftest`, `profile-suite-selftest`, `build-budget-selftest`, `docs-check-selftest`, `shipped-policy-regions-selftest`, `workflow-contract-selftest`, `session-cost-benchmark-selftest`, `standards-scan-test`, `standards-fix-test` and `manifest-tool-test`. Each gate task requires its own gate and makes it pass, and the container c780514e requires all ten. Only c780514e's issues require them. Where a script still has a skip branch, its gate's checker also fails on a printed `SKIP:` line, so that gate starts out failing until its task lands. `build-budget-selftest` starts out failing until its script gains `--self-test`. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test. No test or self-test passes by printing a skip notice, whether a tool is missing or a host precondition such as an enforced read bit is absent: it establishes the precondition or fails. Investigation §D.5 lists each skip-and-pass path and its owner, and the matches that are not test skips. New gates carry `mode` and no deprecated `auto` key.
 
 ### `suite-measurement-protocol` [plan-fixed] — How suite cost is measured
 
@@ -82,7 +82,6 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
 | cli-process-fixture | Shared fixture for spawning jit in CLI tests | task | One shared test-support fixture spawns jit over a temporary repository it owns, with inherited JIT_* variables removed. | — | REQ-05, REQ-09, D-02 | creates 1, touches 3 | — | — |
-| cli-gate-migration | cli_gate tests spawn jit through the shared process fixture | task | The cli_gate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
 | cli-issue-command-migration | cli_issue command tests spawn jit through the shared process fixture | task | The cli_issue command test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, REQ-06, D-02 | touches 18 | — | cli-process-fixture, shared-taxonomy-repo |
 | cli-issue-envelope-migration | cli_issue envelope tests spawn jit through the shared process fixture | task | The cli_issue envelope and failure test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 15 | — | cli-process-fixture |
 | cli-item-validate-migration | cli_item_validate tests spawn jit through the shared process fixture | task | The cli_item_validate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
@@ -104,7 +103,7 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | backend-specific-test-pruning | Backend tests keep only backend-specific behaviour | task | JSON and in-memory storage tests assert only behaviour their own backend has. | issue-store-conformance | REQ-08 | touches 3 | — | memory-backend-path-reads |
 | profiled-fixture-input-key | Profiled-repository fixture keyed only on its inputs | task | The profiled-repository fixture key derives from package bytes and crate source, and stale entries are collected. | — | REQ-11, REQ-13, D-01 | touches 8 | — | — |
 | fixture-setup-hook-removal | Fixture setup runs inside the suite with no runner hook | task | The product binary has no hidden fixture subcommand, and the runner configuration has no profiled-fixture setup script. | input-keyed-fixture-cache | REQ-11, REQ-09 | touches 6 | — | profiled-fixture-input-key |
-| failure-corpus-in-suite | Recorded-failure corpus built in the suite under an input key | task | The recorded-failure corpus comes from the input-keyed fixture cache, with no nested cargo test or setup script. | input-keyed-fixture-cache | REQ-10, REQ-11 | touches 8 | — | fixture-setup-hook-removal, cli-issue-envelope-migration |
+| failure-corpus-in-suite | Recorded-failure corpus built in the suite under an input key | task | The recorded-failure corpus comes from the input-keyed fixture cache, with no nested cargo test or setup script. | input-keyed-fixture-cache | REQ-10, REQ-11 | touches 9 | — | fixture-setup-hook-removal, cli-issue-envelope-migration |
 | rule-warning-tests-down-a-layer | Create-time rule warnings proven in-process without a profiled repository | task | The four create-time warning cases run in memory against the workflow profile's rules. | suite-measurement-protocol | REQ-13, D-01 | touches 2, uncertain | — | — |
 | doctest-substep-bound | Doctest substep fits within the per-test bound | task | The doctest substep takes under 5 s warm at load 10 or less, with each removed example's property owned by a unit test. | suite-measurement-protocol | REQ-13, D-01 | touches 8, uncertain | — | — |
 | cargo-ci-selftest-gate | cargo-ci self-test runs as a declared gate | task | The cargo-ci self-test runs as its own gate over the script, outside the default suite. | script-self-test-gates | REQ-10 | touches 5 | — | — |
@@ -115,6 +114,7 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | suite-clock-report | Suite clock before and after the epic is reported | task | The benchmark note records the suite clock before and after, and a per-test profile with no test over 5 s. | suite-measurement-protocol | REQ-13, D-01 | touches 1 | — | build-footprint-report |
 | exit-code-envelope-case-moves | Blocked-transition and startup envelope cases move beside their owners | task | Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness |
 | exit-code-claim-delete-case-moves | Claim and confirmed-delete cases move beside their owners | task | Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness, cli-repo-checkout-migration, cli-repo-workflow-migration |
+| cli-gate-migration | cli_gate tests spawn jit through the shared process fixture | task | The cli_gate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
 | exit-code-reassertion-cli-gate | cli_gate tests stop re-asserting projected exit codes | task | The cli_gate suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 9 | — | exit-code-binding-completeness, cli-gate-migration |
 | exit-code-reassertion-cli-issue | cli_issue tests stop re-asserting projected exit codes | task | The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 13 | — | exit-code-envelope-case-moves, exit-code-issue-prefix-case-moves |
 | exit-code-reassertion-cli-query-graph | cli_query_graph tests stop re-asserting projected exit codes | task | The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 5 | — | label-query-cli-wiring-reduction |
@@ -189,39 +189,39 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 ```mermaid
 flowchart LR
     N0["cli-process-fixture: Shared fixture for spawning jit in CLI tests"]
-    N1["cli-gate-migration: cli_gate tests spawn jit through the shared process fixture"]
-    N2["cli-issue-command-migration: cli_issue command tests spawn jit through the shared process fixture"]
-    N3["cli-issue-envelope-migration: cli_issue envelope tests spawn jit through the shared process fixture"]
-    N4["cli-item-validate-migration: cli_item_validate tests spawn jit through the shared process fixture"]
-    N5["cli-query-graph-migration: cli_query_graph tests spawn jit through the shared process fixture"]
-    N6["cli-repo-checkout-migration: Git-backed workflow tests spawn jit through the shared process fixture"]
-    N7["cli-repo-profile-migration: Profile workflow tests spawn jit through the shared process fixture"]
-    N8["cli-repo-workflow-migration: Remaining workflow tests spawn jit through the shared process fixture"]
-    N9["env-reading-tests-guarded: Tests read shared process environment only under the environment guard"]
-    N10["exit-code-binding-completeness: Exit-code projection suite proves a binding behind each row"]
-    N11["exit-code-reproof-deletion: Exit-code re-proof suites are deleted"]
-    N12["query-available-domain-order: Available-work filtering and priority order become a pure domain query"]
-    N13["auto-transition-domain-decision: Auto-transition readiness is decided by a pure domain function"]
-    N14["harness-demo-case-moves: Unique harness demonstration cases move beside their owners"]
-    N15["harness-demo-deletion: The harness demonstration suite is deleted"]
-    N16["finalization-owner-gaps: Repository-state tests own each finalization case"]
-    N17["finalization-reproof-deletion: Storage tests stop re-proving mutation finalization"]
-    N18["issue-store-conformance-suite: Shared IssueStore conformance suite runs against both backends"]
-    N19["memory-backend-path-reads: In-memory path reads serve the store's own commit-pinned state"]
-    N20["backend-specific-test-pruning: Backend tests keep only backend-specific behaviour"]
-    N21["profiled-fixture-input-key: Profiled-repository fixture keyed only on its inputs"]
-    N22["fixture-setup-hook-removal: Fixture setup runs inside the suite with no runner hook"]
-    N23["failure-corpus-in-suite: Recorded-failure corpus built in the suite under an input key"]
-    N24["rule-warning-tests-down-a-layer: Create-time rule warnings proven in-process without a profiled repository"]
-    N25["doctest-substep-bound: Doctest substep fits within the per-test bound"]
-    N26["cargo-ci-selftest-gate: cargo-ci self-test runs as a declared gate"]
-    N27["profile-suite-selftest-gate: Suite-profiler self-test runs as a declared gate"]
-    N28["build-budget-selftest-gate: Build-budget checker self-test runs as a declared gate"]
-    N29["dependency-policy-tool-failure: Dependency-feature policy tests fail when cargo is missing"]
-    N30["build-footprint-report: Build-footprint figures before and after the epic are reported"]
-    N31["suite-clock-report: Suite clock before and after the epic is reported"]
-    N32["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
-    N33["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
+    N1["cli-issue-command-migration: cli_issue command tests spawn jit through the shared process fixture"]
+    N2["cli-issue-envelope-migration: cli_issue envelope tests spawn jit through the shared process fixture"]
+    N3["cli-item-validate-migration: cli_item_validate tests spawn jit through the shared process fixture"]
+    N4["cli-query-graph-migration: cli_query_graph tests spawn jit through the shared process fixture"]
+    N5["cli-repo-checkout-migration: Git-backed workflow tests spawn jit through the shared process fixture"]
+    N6["cli-repo-profile-migration: Profile workflow tests spawn jit through the shared process fixture"]
+    N7["cli-repo-workflow-migration: Remaining workflow tests spawn jit through the shared process fixture"]
+    N8["env-reading-tests-guarded: Tests read shared process environment only under the environment guard"]
+    N9["exit-code-binding-completeness: Exit-code projection suite proves a binding behind each row"]
+    N10["exit-code-reproof-deletion: Exit-code re-proof suites are deleted"]
+    N11["query-available-domain-order: Available-work filtering and priority order become a pure domain query"]
+    N12["auto-transition-domain-decision: Auto-transition readiness is decided by a pure domain function"]
+    N13["harness-demo-case-moves: Unique harness demonstration cases move beside their owners"]
+    N14["harness-demo-deletion: The harness demonstration suite is deleted"]
+    N15["finalization-owner-gaps: Repository-state tests own each finalization case"]
+    N16["finalization-reproof-deletion: Storage tests stop re-proving mutation finalization"]
+    N17["issue-store-conformance-suite: Shared IssueStore conformance suite runs against both backends"]
+    N18["memory-backend-path-reads: In-memory path reads serve the store's own commit-pinned state"]
+    N19["backend-specific-test-pruning: Backend tests keep only backend-specific behaviour"]
+    N20["profiled-fixture-input-key: Profiled-repository fixture keyed only on its inputs"]
+    N21["fixture-setup-hook-removal: Fixture setup runs inside the suite with no runner hook"]
+    N22["failure-corpus-in-suite: Recorded-failure corpus built in the suite under an input key"]
+    N23["rule-warning-tests-down-a-layer: Create-time rule warnings proven in-process without a profiled repository"]
+    N24["doctest-substep-bound: Doctest substep fits within the per-test bound"]
+    N25["cargo-ci-selftest-gate: cargo-ci self-test runs as a declared gate"]
+    N26["profile-suite-selftest-gate: Suite-profiler self-test runs as a declared gate"]
+    N27["build-budget-selftest-gate: Build-budget checker self-test runs as a declared gate"]
+    N28["dependency-policy-tool-failure: Dependency-feature policy tests fail when cargo is missing"]
+    N29["build-footprint-report: Build-footprint figures before and after the epic are reported"]
+    N30["suite-clock-report: Suite clock before and after the epic is reported"]
+    N31["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
+    N32["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
+    N33["cli-gate-migration: cli_gate tests spawn jit through the shared process fixture"]
     N34["exit-code-reassertion-cli-gate: cli_gate tests stop re-asserting projected exit codes"]
     N35["exit-code-reassertion-cli-issue: cli_issue tests stop re-asserting projected exit codes"]
     N36["exit-code-reassertion-cli-query-graph: cli_query_graph tests stop re-asserting projected exit codes"]
@@ -293,72 +293,72 @@ flowchart LR
     N102["shared-test-fixtures: Tests run on shared fixtures and guards"]
     N103["suite-cost: The default suite runs within its time and footprint budgets"]
     N0 --> N1
+    N44 --> N1
     N0 --> N2
-    N44 --> N2
     N0 --> N3
     N0 --> N4
+    N44 --> N4
+    N50 --> N4
     N0 --> N5
-    N44 --> N5
-    N50 --> N5
     N0 --> N6
     N0 --> N7
-    N0 --> N8
-    N22 --> N9
-    N3 --> N10
-    N32 --> N11
-    N33 --> N11
-    N69 --> N11
-    N70 --> N11
-    N71 --> N11
-    N12 --> N13
-    N55 --> N14
-    N52 --> N14
-    N56 --> N14
-    N14 --> N15
+    N21 --> N8
+    N2 --> N9
+    N31 --> N10
+    N32 --> N10
+    N69 --> N10
+    N70 --> N10
+    N71 --> N10
+    N11 --> N12
+    N55 --> N13
+    N52 --> N13
+    N56 --> N13
+    N13 --> N14
+    N15 --> N16
     N16 --> N17
     N17 --> N18
     N18 --> N19
-    N19 --> N20
+    N20 --> N21
     N21 --> N22
-    N22 --> N23
-    N3 --> N23
-    N99 --> N30
-    N100 --> N30
-    N101 --> N30
-    N102 --> N30
-    N23 --> N30
-    N25 --> N30
-    N26 --> N30
-    N27 --> N30
-    N28 --> N30
+    N2 --> N22
+    N99 --> N29
+    N100 --> N29
+    N101 --> N29
+    N102 --> N29
+    N22 --> N29
+    N24 --> N29
+    N25 --> N29
+    N26 --> N29
+    N27 --> N29
+    N28 --> N29
+    N42 --> N29
+    N83 --> N29
+    N84 --> N29
+    N85 --> N29
+    N86 --> N29
+    N87 --> N29
+    N88 --> N29
+    N89 --> N29
+    N90 --> N29
     N29 --> N30
-    N42 --> N30
-    N83 --> N30
-    N84 --> N30
-    N85 --> N30
-    N86 --> N30
-    N87 --> N30
-    N88 --> N30
-    N89 --> N30
-    N90 --> N30
-    N30 --> N31
-    N10 --> N32
-    N10 --> N33
-    N6 --> N33
-    N8 --> N33
-    N10 --> N34
-    N1 --> N34
-    N32 --> N35
+    N9 --> N31
+    N9 --> N32
+    N5 --> N32
+    N7 --> N32
+    N0 --> N33
+    N9 --> N34
+    N33 --> N34
+    N31 --> N35
     N69 --> N35
     N77 --> N36
-    N10 --> N37
-    N4 --> N37
-    N33 --> N38
+    N9 --> N37
+    N3 --> N37
+    N32 --> N38
     N71 --> N38
     N39 --> N40
     N0 --> N41
     N40 --> N41
-    N4 --> N42
+    N3 --> N42
     N45 --> N46
     N45 --> N47
     N45 --> N48
@@ -369,49 +369,49 @@ flowchart LR
     N54 --> N55
     N54 --> N56
     N54 --> N57
-    N4 --> N57
+    N3 --> N57
     N54 --> N58
     N67 --> N58
     N0 --> N59
     N0 --> N60
     N0 --> N61
     N62 --> N63
-    N24 --> N63
+    N23 --> N63
     N62 --> N64
     N52 --> N65
     N65 --> N66
     N65 --> N67
     N53 --> N67
     N65 --> N68
-    N10 --> N69
-    N2 --> N69
-    N10 --> N70
-    N5 --> N70
-    N10 --> N71
-    N7 --> N71
+    N9 --> N69
+    N1 --> N69
+    N9 --> N70
+    N4 --> N70
+    N9 --> N71
+    N6 --> N71
     N41 --> N72
-    N2 --> N72
+    N1 --> N72
     N41 --> N73
-    N5 --> N73
+    N4 --> N73
     N41 --> N74
-    N8 --> N74
     N7 --> N74
     N6 --> N74
-    N12 --> N75
+    N5 --> N74
+    N11 --> N75
     N75 --> N76
-    N5 --> N76
+    N4 --> N76
     N75 --> N77
     N70 --> N77
     N75 --> N78
     N67 --> N78
-    N13 --> N79
-    N8 --> N79
-    N13 --> N80
-    N8 --> N82
+    N12 --> N79
+    N7 --> N79
+    N12 --> N80
+    N7 --> N82
     N65 --> N91
-    N14 --> N91
+    N13 --> N91
     N65 --> N92
-    N14 --> N92
+    N13 --> N92
     N81 --> N92
     N59 --> N92
     N62 --> N93
@@ -425,10 +425,10 @@ flowchart LR
     N57 --> N96
     N62 --> N97
     N65 --> N97
-    N5 --> N97
+    N4 --> N97
     N62 --> N98
-    N7 --> N98
-    N11 --> N99
+    N6 --> N98
+    N10 --> N99
     N72 --> N99
     N73 --> N99
     N74 --> N99
@@ -442,15 +442,15 @@ flowchart LR
     N80 --> N100
     N81 --> N100
     N82 --> N100
-    N15 --> N100
+    N14 --> N100
     N77 --> N100
     N78 --> N100
-    N20 --> N101
+    N19 --> N101
+    N33 --> N102
     N1 --> N102
     N2 --> N102
-    N3 --> N102
-    N6 --> N102
-    N8 --> N102
+    N5 --> N102
+    N7 --> N102
     N61 --> N102
     N46 --> N102
     N47 --> N102
@@ -461,14 +461,14 @@ flowchart LR
     N64 --> N102
     N66 --> N102
     N68 --> N102
-    N9 --> N102
+    N8 --> N102
     N91 --> N102
     N93 --> N102
     N95 --> N102
     N96 --> N102
     N97 --> N102
     N98 --> N102
-    N31 --> N103
+    N30 --> N103
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -489,6 +489,7 @@ flowchart LR
 | Server drain test | Chosen: a unit test of `run_shutdown_sequence` passes a short deadline (its existing parameter) to own the entitlement, and the process test uses the existing short-deadline seam. Rejected: a paused tokio clock, which needs the `test-util` dependency feature (`@/inv/bounded-rust-build-footprint`); shortening `GRACEFUL_DRAIN_TIMEOUT`, which changes product behaviour. |
 | A test over 5 s at report time | `suite-clock-report`'s criterion fails if any test exceeds 5 s, so the report cannot pass over a regression. The execution lead adds a remediation terminal under `suite-cost` for each named test (owning the move down a layer, like the rule-warning and server cases), makes the report depend on it, and re-runs the report. The likeliest candidates are the two `profile_cli_tests` cases (3.66 s quiet). |
 | Steward ruling: execution order | Waves 1–2 are on 2195c98f's critical path: the IssueId retype chain (0af95f14 onward) depends on the overlap-derived c780514e terminals in the external-edge table; the steward assigns c780514e execution with waves 1–2 first. |
+| Steward ruling D-05: gate bootstrap | The ten self-test gate keys are registered in .jit/gates.toml at planning; each gate task and the container c780514e require them; the container requirement is added at breakdown with `gate add`. |
 | Measurement ordering | Chosen: `build-footprint-report` depends on the four other stories and the remaining suite-cost terminals, so "after" covers all changes. Risk: the stories' holistic reviews then sit on the critical path to the report. |
 | Same-file ordering | `exit-code-dependency-guard-case-moves` → `label-query-cli-wiring-reduction` → `exit-code-reassertion-cli-query-graph` serialises `query_json_tests.rs` and `label_query_json_tests.rs`; the wiring cut keeps the moved parent-filter guard. `fast-rules-memory-executor-adoption` → `fast-rules-memory-setup-adoption` → `label-query-harness-reduction` and `fast-rules-shipped-item-kinds` serialise the `fast_rules` executor files. The rule-warning move precedes `fast-rules-file-setup-adoption`, and `cli-query-graph-fixture-issue-adoption` precedes `cli-query-graph-migration` (`main.rs`). Query reductions depend on `query-domain-owner-gaps`, so each cut lands with its domain owner already present. |
 | Shared-file contention | `test_utils.rs`, `dev/TESTING.md`, `.jit/gates.toml`, `.config/nextest.toml`, `repository_state_store_tests.rs` and `commands/issue.rs` are edited by several entries. Edges serialise same-region rewrites: query extraction before the auto-transition decision, finalization deletion before the conformance suite, hook removal before the corpus fixture, and migrations before the re-assertion and wiring cuts in their files. Workers rebase over the remaining advisories. |

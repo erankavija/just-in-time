@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-10-22T01:58:35.864494773Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cd685897-2451-4463-9739-54c304b4f917",
+      "status": "failed",
+      "updated_at": "2026-10-22T02:03:52.692529383Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "f866d9d8-384e-4b5e-9616-78bfa5e1b440",
@@ -34,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove three-way profile publication",
-  "updated_at": "2026-10-22T01:58:35.864494773Z"
+  "updated_at": "2026-10-22T02:03:52.692529383Z"
 }

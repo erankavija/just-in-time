@@ -521,6 +521,21 @@
       "status": "resolved",
       "date": "2026-10-22",
       "summary": "494f1d4b's load classifier sampled load after the run's own build and judged against 1.25\u00d7nproc (30), so it almost never called a host loaded. Approved: a new 3d9a0ce3 task classifies load from one load1 sample before the first step, judged against 0.17\u00d7nproc (~4 on 24 cores, the steward quiet rule), printing baseline, threshold and classification. Known profiled-fixture TIMEOUT-only failures may be forced; f866d9d8 is held behind c780514e's fixture task if they persist."
+    },
+    {
+      "container_short_id": "842b0ac6",
+      "issue": "34361448",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "decision": "@/charter/D-18, @/charter/D-9, @/inv/canonical-cutover",
+      "summary": "After REQ-26 (lease limits repository-only), the user and system config layers feed nothing. Chosen: accept 93a6be35d's removal of ConfigLoader layering, plus a new 842b0ac6 task removing `config set --global`, the user and system config read and write paths, and their docs, with a test that a stray user config has no effect. Rejected: a separate later issue (ships a dead flag) and keeping dead layering."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "decision": "@/charter/D-2",
+      "summary": "Plan-review failed 3 times; the last finding was that the ten new self-test gates were declared but never required. Chosen (A): bootstrap the ten gate keys in .jit/gates.toml at planning (no change to existing gates), required only by c780514e's issues and the container, with descriptions noting they start failing until their tasks land. A 4th plan-review attempt is authorised. Rejected: (B) execution-time wiring (invisible in the plan), (C) folding into cargo-ci (contradicts REQ-10)."
     }
   ],
   "notes": [
@@ -606,7 +621,7 @@
     },
     {
       "date": "2026-10-21",
-      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones. A working one-off converter exists, built out-of-tree at /tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/5d9082fe-576b-47d5-869b-e30710dfc656/scratchpad/convert/ (`gate-run-id-backfill [--dry-run] <repo>`). It is not in the repository; the scratchpad is session-local, so copy it if you want to keep it. Also for adopter release notes: since 842b0ac6 (fbb661f2, cd7b6c4a, fe761000), config.toml, gates.toml and rule declarations with unknown keys (including the removed gate `auto`/`example_integration` fields and the inert config sections) fail to load and name the key. Adopter repositories with such keys must remove them on upgrade."
+      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones. A working one-off converter exists, built out-of-tree at /tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/5d9082fe-576b-47d5-869b-e30710dfc656/scratchpad/convert/ (`gate-run-id-backfill [--dry-run] <repo>`). It is not in the repository; the scratchpad is session-local, so copy it if you want to keep it. Also for adopter release notes: since 842b0ac6 (fbb661f2, cd7b6c4a, fe761000), config.toml, gates.toml and rule declarations with unknown keys (including the removed gate `auto`/`example_integration` fields and the inert config sections) fail to load and name the key. Adopter repositories with such keys must remove them on upgrade. Also: `jit config set --global` and the user and system config files (~/.config/jit/config.toml, /etc/jit/config.toml) are removed (842b0ac6). Nothing read them except the lease limits, which are now repository-only."
     },
     {
       "date": "2026-10-21",
