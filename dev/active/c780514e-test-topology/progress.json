@@ -140,7 +140,7 @@
           "key": "finalization-owner-gaps",
           "title": "Repository-state tests own each finalization case",
           "classification": "implementation",
-          "status": "implemented1299a02fb;31 focused tests and full4584+25 pass; main review next"
+          "status": "done"
         },
         {
           "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
@@ -1623,6 +1623,29 @@
       "stale_narrative": "script skip comments and planning-only gate narrative replaced; active script/docs/config sweep finds no obsolete permission-skip claims; projection rendered from registry",
       "deferred_items": "no linked design documents",
       "holistic": "Only permission-precondition failure behavior and gate input coverage change; full checker assertions retained"
+    },
+    "5d7020b9": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "dd2f4ed9-9cf7-4133-99e2-aaa9e0acb717",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "613c2939-feff-4388-ba39-ee82c7659057",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "Pure finalizer owners cover claim, empty intents, event and gate/provenance records, mixed creation/order/ID allocation and deterministic output bytes; commit1299a02fb maps every source property to its owner",
+        "REQ-02": "Existing map canonicalization, lifecycle/index, gate linkage and reflected-claim owners reused; only four missing scenarios added, two owners extended; one shared panic clock replaces local copies"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "No pending finalization claims found in active Rust/Markdown sweep; backend reproof intentionally remains for its later task",
+      "deferred_items": "no linked design documents",
+      "holistic": "Only mutation.rs test code changed; no backend I/O or production behavior; combined gate/event identity allocation is covered"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
