@@ -1749,7 +1749,6 @@ kind = "advisory"
                 .unwrap(),
                 bytes: b"CORRECT ASSET\n".to_vec(),
                 mode: FileMode::Regular,
-                replace_owned: true,
             }],
             regions: vec![ProfileRegionClaim {
                 claim: TargetClaim::new(

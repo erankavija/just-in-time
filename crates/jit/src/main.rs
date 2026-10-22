@@ -594,26 +594,14 @@ fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
     }
 }
 
-/// Render one decision: what it would do, what it is about, who claims it, and
-/// why it cannot be published when it cannot.
+/// Render one decision: what it would do, what it is about, and why it cannot
+/// be published when it cannot.
 fn print_profile_decision(
     action: jit::profile::ProfileTargetAction,
     subject: &str,
-    owners: &[String],
     reason: Option<&str>,
 ) {
-    // An empty owner list is the fact that no package claims the subject, which
-    // is what separates repository content from published content; it is not a
-    // claim by the repository.
-    let owners = if owners.is_empty() {
-        "claimed by no package".to_string()
-    } else {
-        format!("claimed by {}", owners.join(", "))
-    };
-    println!(
-        "  {}: {subject} ({owners})",
-        profile_target_action_label(action)
-    );
+    println!("  {}: {subject}", profile_target_action_label(action));
     if let Some(reason) = reason {
         println!("      {reason}");
     }
@@ -640,18 +628,12 @@ fn print_profile_decisions(
     contributions: &[jit::profile::ProfileContributionChange],
 ) {
     for target in targets {
-        print_profile_decision(
-            target.action,
-            &target.path,
-            &target.owners,
-            target.reason.as_deref(),
-        );
+        print_profile_decision(target.action, &target.path, target.reason.as_deref());
     }
     for contribution in contributions {
         print_profile_decision(
             contribution.action,
             &contribution.identity,
-            &contribution.owners,
             contribution.reason.as_deref(),
         );
     }
@@ -665,7 +647,6 @@ fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'s
         ProfileTargetAction::Unchanged => "unchanged",
         ProfileTargetAction::Create => "create",
         ProfileTargetAction::Update => "update",
-        ProfileTargetAction::Retain => "retain",
         ProfileTargetAction::Remove => "remove",
         ProfileTargetAction::Conflict => "conflict",
     }

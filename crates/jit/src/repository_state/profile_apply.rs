@@ -23,14 +23,10 @@ use super::{
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
-use crate::profile::{
-    decide_three_way, ProfileId, RegionId, ResolvedVariables, ThreeWayDecision, ThreeWayInput,
-    ThreeWayValue,
-};
+use crate::profile::{ProfileId, RegionId, ResolvedVariables};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sha2::{Digest, Sha256};
 use toml_edit::{Array, ArrayOfTables, DocumentMut, InlineTable, Item, Table, Value};
 
 /// A semantic contribution to one JIT registry.
@@ -216,15 +212,6 @@ pub struct ProfileContributionClaim {
     pub(crate) contribution: Contribution,
 }
 
-/// A prior semantic definition at the composition boundary.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExistingContributionClaim {
-    /// A repository-authored definition with no package provenance.
-    Repository(Contribution),
-    /// A definition owned by an installed package.
-    Package(ProfileContributionClaim),
-}
-
 /// A definition that survived semantic composition with all package owners.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComposedContribution {
@@ -241,7 +228,7 @@ pub struct ComposedContribution {
 pub enum ContributionConflictOwner {
     /// The repository itself authored one of the conflicting definitions.
     Repository,
-    /// An installed or selected package authored one of the definitions.
+    /// A package being applied authored one of the definitions.
     Package(ProfilePackageId),
 }
 
@@ -284,54 +271,17 @@ impl ContributionOutcome {
     }
 }
 
-enum ContributionClaimSource {
-    Repository,
-    Package(ProfilePackageId),
-}
-
-struct CompositionInput {
-    source: ContributionClaimSource,
-    contribution: Contribution,
-}
-
-/// Compose resolved package claims with existing semantic claims.
+/// Compose resolved package claims by semantic identity.
 ///
-/// Existing claims owned by a selected package are excluded before comparison:
-/// its new resolved definition replaces its own prior identity claim rather
-/// than conflicting with it. Different package definitions for an identity
-/// decide one order-independent [`ContributionOutcome::Contested`] naming all
-/// owners. Repository-authored definitions remain distinct from package-owned
-/// definitions in that outcome.
+/// Only the packages being applied are parties: different package definitions
+/// for an identity decide one order-independent
+/// [`ContributionOutcome::Contested`] naming every package that declares it.
 pub fn compose_resolved_contributions(
-    existing: impl IntoIterator<Item = ExistingContributionClaim>,
     candidates: impl IntoIterator<Item = ProfileContributionClaim>,
 ) -> Vec<ContributionOutcome> {
-    let candidates = candidates.into_iter().collect::<Vec<_>>();
-    let selected_packages = candidates
-        .iter()
-        .map(|claim| claim.package_id.clone())
-        .collect::<BTreeSet<_>>();
-    let existing = existing.into_iter().filter_map(|claim| match claim {
-        ExistingContributionClaim::Repository(contribution) => Some(CompositionInput {
-            source: ContributionClaimSource::Repository,
-            contribution,
-        }),
-        ExistingContributionClaim::Package(claim)
-            if selected_packages.contains(&claim.package_id) =>
-        {
-            None
-        }
-        ExistingContributionClaim::Package(claim) => Some(CompositionInput {
-            source: ContributionClaimSource::Package(claim.package_id),
-            contribution: claim.contribution,
-        }),
-    });
     let mut positions = BTreeMap::<ContributionIdentity, usize>::new();
-    let mut grouped = Vec::<(ContributionIdentity, Vec<CompositionInput>)>::new();
-    for claim in existing.chain(candidates.into_iter().map(|claim| CompositionInput {
-        source: ContributionClaimSource::Package(claim.package_id),
-        contribution: claim.contribution,
-    })) {
+    let mut grouped = Vec::<(ContributionIdentity, Vec<ProfileContributionClaim>)>::new();
+    for claim in candidates {
         let identity = claim.contribution.semantic_identity();
         if let Some(index) = positions.get(&identity) {
             grouped[*index].1.push(claim);
@@ -349,38 +299,29 @@ pub fn compose_resolved_contributions(
 
 fn compose_contribution_identity(
     identity: ContributionIdentity,
-    claims: Vec<CompositionInput>,
+    claims: Vec<ProfileContributionClaim>,
 ) -> Option<ContributionOutcome> {
-    let first = claims.first()?;
-    let definition = first.contribution.clone();
-    if claims.iter().any(|claim| claim.contribution != definition) {
-        let owners = claims
-            .iter()
-            .map(|claim| match &claim.source {
-                ContributionClaimSource::Repository => ContributionConflictOwner::Repository,
-                ContributionClaimSource::Package(package_id) => {
-                    ContributionConflictOwner::Package(package_id.clone())
-                }
-            })
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        return Some(ContributionOutcome::Contested { identity, owners });
-    }
+    let definition = claims.first()?.contribution.clone();
+    let contested = claims.iter().any(|claim| claim.contribution != definition);
     let owners = claims
         .into_iter()
-        .filter_map(|claim| match claim.source {
-            ContributionClaimSource::Repository => None,
-            ContributionClaimSource::Package(package_id) => Some(package_id),
+        .map(|claim| claim.package_id)
+        .collect::<BTreeSet<_>>();
+    Some(if contested {
+        ContributionOutcome::Contested {
+            identity,
+            owners: owners
+                .into_iter()
+                .map(ContributionConflictOwner::Package)
+                .collect(),
+        }
+    } else {
+        ContributionOutcome::Agreed(ComposedContribution {
+            identity,
+            definition,
+            owners: owners.into_iter().collect(),
         })
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    Some(ContributionOutcome::Agreed(ComposedContribution {
-        identity,
-        definition,
-        owners,
-    }))
+    })
 }
 
 #[derive(
@@ -566,7 +507,6 @@ pub struct ProfileAssetClaim {
     pub claim: TargetClaim,
     pub bytes: Vec<u8>,
     pub mode: FileMode,
-    pub replace_owned: bool,
 }
 
 #[derive(Clone)]
@@ -574,29 +514,6 @@ pub struct ProfileRegionClaim {
     pub claim: TargetClaim,
     pub region_id: RegionId,
     pub content: Vec<u8>,
-}
-
-/// The source that already owns a conflicting repository declaration or target.
-///
-/// Repository-authored content is deliberately distinct from a package occupant:
-/// an adopter needs to know whether it must change its own file or resolve a
-/// package composition conflict.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ProfileConflictOccupant {
-    /// The repository authored the existing declaration or target.
-    Repository,
-    /// An already-applied package authored the existing declaration or target.
-    Package(ProfilePackageId),
-}
-
-impl std::fmt::Display for ProfileConflictOccupant {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Repository => formatter.write_str("the repository"),
-            Self::Package(id) => write!(formatter, "package {id}"),
-        }
-    }
 }
 
 /// Stable semantic identity of a profile package.
@@ -625,242 +542,42 @@ impl std::fmt::Display for ProfilePackageId {
     }
 }
 
-/// Why one profile-owned target cannot be published.
+/// Why one profile-owned target or declaration cannot be published.
 ///
-/// Each reason refuses the same publication and an adopter resolves them
-/// differently: an occupied target names who holds it, a diverged target names
-/// the values that no longer agree, and a contested declaration names the
-/// owners that define it differently. The values are domain-separated
-/// fingerprints: the durable provenance this layer records, without turning
-/// provenance into configuration authority. [`Self::message`] is how any of
-/// them reaches a reader.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Only the packages being applied are parties to a conflict; the repository's
+/// current value never is. [`Self::message`] is how a conflict reaches a reader.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProfileTargetConflict {
-    /// The target holds content this package never published.
-    Occupied {
-        /// Who holds the target now.
-        occupant: ProfileConflictOccupant,
-    },
-    /// The target changed independently after this package recorded it.
-    Diverged {
-        /// Fingerprint recorded when this package last published the target.
-        base: ThreeWayValue<ProfileBaseFingerprint>,
-        /// Fingerprint observed in the captured repository image.
-        current: ThreeWayValue<ProfileBaseFingerprint>,
-        /// Fingerprint resolved from the candidate package.
-        candidate: ThreeWayValue<ProfileBaseFingerprint>,
-    },
-    /// One semantic identity has more than one definition among its owners.
+    /// Packages being applied define one target or semantic identity
+    /// differently.
     ///
-    /// No owner holds authority over another's declarations, so composition
-    /// picks no winner and the identity keeps whatever the registry holds.
+    /// No package holds authority over another's definitions, so composition
+    /// picks no winner and the publication is refused.
     Contested {
-        /// Every repository or package owner of a differing definition, sorted
-        /// independently of selector occurrence.
+        /// Every package declaring the target or identity, sorted independently
+        /// of selector occurrence.
         owners: Vec<ContributionConflictOwner>,
     },
 }
 
 impl ProfileTargetConflict {
-    /// The resolutions that apply to this conflict.
-    pub fn remedy(&self) -> ProfileRemedy {
-        match self {
-            Self::Occupied {
-                occupant: ProfileConflictOccupant::Repository,
-            } => ProfileRemedy::new([ProfileResolution::MoveTargetAside]),
-            Self::Occupied {
-                occupant: ProfileConflictOccupant::Package(_),
-            } => ProfileRemedy::new([
-                ProfileResolution::StopOnePackageFromDeclaringTarget,
-                ProfileResolution::ApplyOneOfConflictingPackages,
-            ]),
-            Self::Diverged { .. } => {
-                ProfileRemedy::new([ProfileResolution::RestoreRecordedContent])
-            }
-            Self::Contested { .. } => ProfileRemedy::new([
-                ProfileResolution::MakeDefinitionsIdentical,
-                ProfileResolution::ApplyOnlyOneDeclaringPackage,
-            ]),
-        }
-    }
-
-    /// A human clause naming why the target cannot be published and what
-    /// resolves it.
+    /// A human clause naming why the target cannot be published.
     ///
     /// The refusal message and the difference report's reason are both this
     /// sentence, so an adopter who inspected a decision and an adopter whose
-    /// publication refused it act on the same words. Every value it names is
-    /// rendered rather than debug-printed: a fingerprint reaches a reader as its
-    /// leading digits, never as the wrapper types that carry it.
+    /// publication refused it read the same words.
     pub fn message(&self) -> String {
         match self {
-            Self::Occupied { occupant } => format!(
-                "is held by {occupant} with content this profile did not publish: {}",
-                self.remedy().message(),
-            ),
-            Self::Diverged {
-                base,
-                current,
-                candidate,
-            } => format!(
-                "changed after this profile published it (recorded {}, now {}, would publish {}): \
-                 {}",
-                fingerprint_label(base),
-                fingerprint_label(current),
-                fingerprint_label(candidate),
-                self.remedy().message(),
-            ),
             Self::Contested { owners } => format!(
-                "is defined differently by {}: {}",
+                "is defined differently by {}",
                 owners
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
-                self.remedy().message(),
             ),
         }
-    }
-}
-
-/// One action that can resolve a profile conflict or divergence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum ProfileResolution {
-    /// Move the repository-authored target aside before applying the profile.
-    MoveTargetAside,
-    /// Restore the content recorded when this profile last published the target.
-    RestoreRecordedContent,
-    /// Stop one of the conflicting packages from declaring the shared target.
-    StopOnePackageFromDeclaringTarget,
-    /// Apply only one of the packages that conflict over a target.
-    ApplyOneOfConflictingPackages,
-    /// Make the competing semantic definitions identical.
-    MakeDefinitionsIdentical,
-    /// Apply only one package that declares the contested definition.
-    ApplyOnlyOneDeclaringPackage,
-    /// Restore the recorded package source before recovering its content.
-    RestoreRecordedPackage,
-}
-
-impl ProfileResolution {
-    fn message(self) -> &'static str {
-        match self {
-            Self::MoveTargetAside => "move it aside before applying",
-            Self::RestoreRecordedContent => "restore the value this profile published",
-            Self::StopOnePackageFromDeclaringTarget => {
-                "stop one of the two packages from declaring it"
-            }
-            Self::ApplyOneOfConflictingPackages => "apply only one of them",
-            Self::MakeDefinitionsIdentical => "make those definitions identical",
-            Self::ApplyOnlyOneDeclaringPackage => "apply only one package that declares it",
-            Self::RestoreRecordedPackage => "restore the package this profile recorded",
-        }
-    }
-}
-
-/// The complete set of resolutions that applies to one profile finding.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProfileRemedy {
-    resolutions: Vec<ProfileResolution>,
-}
-
-impl ProfileRemedy {
-    pub(crate) fn new(resolutions: impl IntoIterator<Item = ProfileResolution>) -> Self {
-        Self {
-            resolutions: resolutions.into_iter().collect(),
-        }
-    }
-
-    /// The individually named resolutions that apply.
-    pub fn resolutions(&self) -> &[ProfileResolution] {
-        &self.resolutions
-    }
-
-    /// Render the resolutions as the human prose attached to a finding.
-    pub fn message(&self) -> String {
-        self.resolutions
-            .iter()
-            .map(|resolution| resolution.message())
-            .collect::<Vec<_>>()
-            .join(", or ")
-    }
-}
-
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum ProfileTargetConflictWire<'a> {
-    Occupied {
-        occupant: &'a ProfileConflictOccupant,
-        remedy: ProfileRemedy,
-    },
-    Diverged {
-        base: Option<&'a ProfileBaseFingerprint>,
-        current: Option<&'a ProfileBaseFingerprint>,
-        candidate: Option<&'a ProfileBaseFingerprint>,
-        remedy: ProfileRemedy,
-    },
-    Contested {
-        owners: &'a [ContributionConflictOwner],
-        remedy: ProfileRemedy,
-    },
-}
-
-impl Serialize for ProfileTargetConflict {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let wire = match self {
-            Self::Occupied { occupant } => ProfileTargetConflictWire::Occupied {
-                occupant,
-                remedy: self.remedy(),
-            },
-            Self::Diverged {
-                base,
-                current,
-                candidate,
-            } => ProfileTargetConflictWire::Diverged {
-                base: three_way_fingerprint(base),
-                current: three_way_fingerprint(current),
-                candidate: three_way_fingerprint(candidate),
-                remedy: self.remedy(),
-            },
-            Self::Contested { owners } => ProfileTargetConflictWire::Contested {
-                owners,
-                remedy: self.remedy(),
-            },
-        };
-        wire.serialize(serializer)
-    }
-}
-
-fn three_way_fingerprint(
-    value: &ThreeWayValue<ProfileBaseFingerprint>,
-) -> Option<&ProfileBaseFingerprint> {
-    match value {
-        ThreeWayValue::Absent => None,
-        ThreeWayValue::Present(fingerprint) => Some(fingerprint),
-    }
-}
-
-/// How many leading digits of a fingerprint a message names.
-///
-/// The whole digest is the decision's own evidence and stays on the typed
-/// conflict; a reader comparing three of them in one sentence needs only enough
-/// to tell them apart.
-const FINGERPRINT_MESSAGE_DIGITS: usize = 12;
-
-/// Name one observed fingerprint for a reader, including the absence of a value.
-fn fingerprint_label(value: &ThreeWayValue<ProfileBaseFingerprint>) -> String {
-    match value {
-        ThreeWayValue::Absent => "absent".to_string(),
-        ThreeWayValue::Present(fingerprint) => fingerprint
-            .to_string()
-            .chars()
-            .take(FINGERPRINT_MESSAGE_DIGITS)
-            .collect(),
     }
 }
 
@@ -958,29 +675,6 @@ impl ProfileTargetConflictsError {
     pub fn new(conflicts: Vec<ProfileTargetConflictEntry>) -> Self {
         Self { conflicts }
     }
-
-    /// Distinct resolutions across every refused decision.
-    pub fn suggestions(&self) -> Vec<String> {
-        remedy_suggestions(self.conflicts.iter().map(|entry| entry.conflict.remedy()))
-    }
-}
-
-/// Distinct resolution messages carried by `remedies`, in first-occurrence
-/// order — what a JSON envelope attaches as `suggestions` beside a refusal or
-/// a divergence report. A resolution named by more than one remedy in the
-/// sequence is suggested once.
-pub fn remedy_suggestions(remedies: impl IntoIterator<Item = ProfileRemedy>) -> Vec<String> {
-    let mut seen = Vec::new();
-    let mut suggestions = Vec::new();
-    for remedy in remedies {
-        for resolution in remedy.resolutions() {
-            if !seen.contains(resolution) {
-                seen.push(*resolution);
-                suggestions.push(resolution.message().to_string());
-            }
-        }
-    }
-    suggestions
 }
 
 /// A profile package's contribution to a repository, in canonical repository-state
@@ -1035,275 +729,6 @@ impl Contribution {
 /// readers.
 pub const APPLIED_PROFILE_RECORD_VERSION: u8 = 2;
 
-/// A domain-separated SHA-256 fingerprint of one profile-owned base value.
-///
-/// The string representation is deliberately constrained at deserialization so
-/// a record can never claim a digest this implementation could not have
-/// produced. The domain is part of every preimage; semantic declarations,
-/// static files, and managed regions therefore cannot collide merely because
-/// their raw bytes happen to be equal.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(with = "String")]
-pub struct ProfileBaseFingerprint(String);
-
-impl ProfileBaseFingerprint {
-    /// Borrow the canonical lowercase hexadecimal digest.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    fn from_digest(digest: impl Into<String>) -> Result<Self, String> {
-        let digest = digest.into();
-        if digest.len() == 64
-            && digest
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            Ok(Self(digest))
-        } else {
-            Err("expected 64 lowercase hexadecimal characters".to_string())
-        }
-    }
-}
-
-impl std::fmt::Display for ProfileBaseFingerprint {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for ProfileBaseFingerprint {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Self::from_digest(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
-    }
-}
-
-/// The typed target component of an asset or managed-region ownership claim.
-///
-/// A virtual repository path cannot deserialize independently of a repository
-/// layout. This representation preserves its root discriminator and canonical
-/// root-relative path so records stay portable while avoiding an unqualified
-/// target string protocol.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedClaimTarget {
-    /// Selected repository root containing the target.
-    pub root: super::RepositoryRootClass,
-    /// Canonical path below `root`.
-    pub path: super::RootRelativePath,
-    /// Mode that is part of the published content identity.
-    pub mode: FileMode,
-}
-
-/// Typed target location of a managed-region identity. Unlike an asset, a
-/// region's mode belongs to its base fingerprint rather than its identity.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedManagedRegionTarget {
-    /// Selected repository root containing the managed region.
-    pub root: super::RepositoryRootClass,
-    /// Canonical path below `root`.
-    pub path: super::RootRelativePath,
-}
-
-impl AppliedManagedRegionTarget {
-    fn from_virtual_path(path: &VirtualPath) -> Self {
-        Self {
-            root: path.root_class(),
-            path: path.relative().clone(),
-        }
-    }
-}
-
-impl AppliedClaimTarget {
-    fn from_virtual_path(path: &VirtualPath, mode: FileMode) -> Self {
-        Self {
-            root: path.root_class(),
-            path: path.relative().clone(),
-            mode,
-        }
-    }
-}
-
-/// Canonical ownership identity for exactly one profile contribution.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
-pub enum AppliedProfileClaimIdentity {
-    /// One semantic registry declaration. Its value is fingerprinted, never
-    /// embedded in provenance.
-    Semantic { identity: ContributionIdentity },
-    /// One exact package asset and its mode.
-    Asset { target: AppliedClaimTarget },
-    /// One managed region, distinguished from a whole-file asset by its region
-    /// identifier and fingerprinted over its source body and mode.
-    ManagedRegion {
-        target: AppliedManagedRegionTarget,
-        region_id: RegionId,
-    },
-}
-
-impl AppliedProfileClaimIdentity {
-    /// The repository path this claim's value is read from.
-    ///
-    /// A semantic declaration is read from the registry its identity names, and
-    /// an asset or managed region from the path it occupies. A capture that
-    /// reads a claim must cover this path.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`RepositoryLayoutError`](super::RepositoryLayoutError) when the
-    /// stored target is not a canonical path below its recorded root.
-    pub fn claimed_path(
-        &self,
-        layout: &super::RepositoryLayout,
-    ) -> Result<VirtualPath, super::RepositoryLayoutError> {
-        match self {
-            Self::Semantic { identity } => {
-                layout.classify_repository_relative(identity.registry.path())
-            }
-            Self::Asset { target } => VirtualPath::from_root(target.root, target.path.clone()),
-            Self::ManagedRegion { target, .. } => {
-                VirtualPath::from_root(target.root, target.path.clone())
-            }
-        }
-    }
-}
-
-/// The repository-relative name of what one claim owns.
-///
-/// A semantic declaration is named by its own canonical identity, which already
-/// begins with its registry path; an asset by the repository path it occupies;
-/// and a managed region by its document and region id.
-impl std::fmt::Display for AppliedProfileClaimIdentity {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Semantic { identity } => identity.fmt(formatter),
-            Self::Asset { target } => {
-                formatter.write_str(&super::repository_relative_path(target.root, &target.path))
-            }
-            Self::ManagedRegion { target, region_id } => write!(
-                formatter,
-                "{}#{region_id}",
-                super::repository_relative_path(target.root, &target.path)
-            ),
-        }
-    }
-}
-
-/// Provenance for one contribution a profile owns at its recorded base.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedProfileClaim {
-    /// Typed identity of the owned contribution.
-    pub identity: AppliedProfileClaimIdentity,
-    /// Domain-separated fingerprint of the contribution when it was published.
-    pub base_fingerprint: ProfileBaseFingerprint,
-    /// Preserve an adopted repository baseline if this becomes the last owner.
-    pub retain_if_unowned: bool,
-}
-
-impl AppliedProfileClaim {
-    fn semantic(
-        contribution: &Contribution,
-        retain_if_unowned: bool,
-    ) -> Result<Self, serde_json::Error> {
-        Ok(Self {
-            identity: AppliedProfileClaimIdentity::Semantic {
-                identity: contribution.semantic_identity(),
-            },
-            base_fingerprint: fingerprint_semantic_contribution(contribution)?,
-            retain_if_unowned,
-        })
-    }
-
-    fn asset(target: &VirtualPath, bytes: &[u8], mode: FileMode, retain_if_unowned: bool) -> Self {
-        Self {
-            identity: AppliedProfileClaimIdentity::Asset {
-                target: AppliedClaimTarget::from_virtual_path(target, mode),
-            },
-            base_fingerprint: fingerprint_profile_asset(bytes, mode),
-            retain_if_unowned,
-        }
-    }
-
-    fn managed_region(
-        target: &VirtualPath,
-        region_id: RegionId,
-        content: &[u8],
-        mode: FileMode,
-        retain_if_unowned: bool,
-    ) -> Self {
-        Self {
-            identity: AppliedProfileClaimIdentity::ManagedRegion {
-                target: AppliedManagedRegionTarget::from_virtual_path(target),
-                region_id: region_id.clone(),
-            },
-            base_fingerprint: fingerprint_managed_region(&region_id, content, mode),
-            retain_if_unowned,
-        }
-    }
-}
-
-/// Fingerprint one resolved semantic contribution under the v2 semantic domain.
-pub fn fingerprint_semantic_contribution(
-    contribution: &Contribution,
-) -> Result<ProfileBaseFingerprint, serde_json::Error> {
-    canonical_json_bytes(contribution)
-        .map(|bytes| fingerprint_bytes(b"jit-profile-record-v2:semantic\0", &[bytes.as_slice()]))
-}
-
-fn fingerprint_bytes(domain: &[u8], fields: &[&[u8]]) -> ProfileBaseFingerprint {
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    fields.iter().for_each(|field| {
-        hasher.update((field.len() as u64).to_be_bytes());
-        hasher.update(field);
-    });
-    // SHA-256 always produces this exact canonical spelling.
-    ProfileBaseFingerprint(format!("{:x}", hasher.finalize()))
-}
-
-/// Fingerprint exact profile asset bytes and mode under the sole asset domain.
-fn fingerprint_profile_asset(bytes: &[u8], mode: FileMode) -> ProfileBaseFingerprint {
-    fingerprint_bytes(
-        b"jit-profile-record-v2:asset\0",
-        &[bytes, &file_mode_bytes(mode)],
-    )
-}
-
-/// Fingerprint one managed region's published body and target mode under the
-/// sole managed-region domain.
-///
-/// Publication records this over the body it splices in; the ownership check
-/// recomputes it over the body the document currently holds, so both sides of
-/// that comparison are the same construction.
-fn fingerprint_managed_region(
-    region_id: &RegionId,
-    content: &[u8],
-    mode: FileMode,
-) -> ProfileBaseFingerprint {
-    fingerprint_bytes(
-        b"jit-profile-record-v2:managed-region\0",
-        &[
-            region_id.as_str().as_bytes(),
-            content,
-            &file_mode_bytes(mode),
-        ],
-    )
-}
-
 /// The byte prefix every managed-region delimiter this engine writes begins
 /// with. Text carrying it holds a region some owner manages.
 const REGION_MARKER_PREFIX: &[u8] = b"<!-- jit:";
@@ -1323,39 +748,11 @@ fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
     (delimiter("begin"), delimiter("end"))
 }
 
-fn file_mode_bytes(mode: FileMode) -> Vec<u8> {
-    match mode {
-        FileMode::Regular => b"regular".to_vec(),
-        FileMode::Executable => b"executable".to_vec(),
-    }
-}
-
-fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
-    serde_json::to_vec(&canonicalize_json(serde_json::to_value(value)?))
-}
-
-fn canonicalize_json(value: JsonValue) -> JsonValue {
-    match value {
-        JsonValue::Array(values) => {
-            JsonValue::Array(values.into_iter().map(canonicalize_json).collect())
-        }
-        JsonValue::Object(values) => JsonValue::Object(
-            values
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_json(value)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect(),
-        ),
-        scalar => scalar,
-    }
-}
-
 /// Canonical repository-local provenance for one installed profile.
 ///
-/// This record deliberately carries no registry definitions or effective
-/// configuration. Registry loaders remain the sole source of behavior; claims
-/// are only identities, historical fingerprints, and retention intent.
+/// This record deliberately carries no registry definitions, ownership claims,
+/// or effective configuration. Registry loaders remain the sole source of
+/// behavior.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AppliedProfileRecord {
@@ -1374,28 +771,6 @@ pub struct AppliedProfileRecord {
     pub package_hash: String,
     /// Canonical public values and source kinds used to resolve this package.
     pub variables: ResolvedVariables,
-    /// One sorted ownership claim for every semantic, asset, or managed-region
-    /// contribution this profile published.
-    #[serde(deserialize_with = "deserialize_applied_profile_claims")]
-    pub claims: BTreeSet<AppliedProfileClaim>,
-}
-
-fn deserialize_applied_profile_claims<'de, D>(
-    deserializer: D,
-) -> Result<BTreeSet<AppliedProfileClaim>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let claims = Vec::<AppliedProfileClaim>::deserialize(deserializer)?;
-    let identities = claims
-        .iter()
-        .map(|claim| claim.identity.clone())
-        .collect::<BTreeSet<_>>();
-    (identities.len() == claims.len())
-        .then(|| claims.into_iter().collect())
-        .ok_or_else(|| {
-            serde::de::Error::custom("applied profile record contains duplicate claim identities")
-        })
 }
 
 fn deserialize_current_record_version<'de, D>(deserializer: D) -> Result<u8, D::Error>
@@ -1421,7 +796,6 @@ impl AppliedProfileRecord {
         origin: ProfileOrigin,
         package_hash: impl Into<String>,
         variables: ResolvedVariables,
-        claims: BTreeSet<AppliedProfileClaim>,
     ) -> Self {
         Self {
             record_version: APPLIED_PROFILE_RECORD_VERSION,
@@ -1431,45 +805,15 @@ impl AppliedProfileRecord {
             origin,
             package_hash: package_hash.into(),
             variables,
-            claims,
         }
     }
 
-    /// Whether immutable package provenance agrees, excluding mutable
-    /// contribution ownership and repository content.
-    pub fn matches_package_provenance(&self, expected: &Self) -> bool {
-        self.record_version == APPLIED_PROFILE_RECORD_VERSION
-            && self.id == expected.id
-            && self.version == expected.version
-            && self.compatible_jit == expected.compatible_jit
-            && self.origin == expected.origin
-            && self.package_hash == expected.package_hash
-            && self.variables == expected.variables
-    }
-
-    /// Encode the stable current record image. Claims remain in identity order
-    /// by construction because the record owns a `BTreeSet`.
+    /// Encode the stable current record image.
     pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         let mut bytes = serde_json::to_vec_pretty(self)?;
         bytes.push(b'\n');
         Ok(bytes)
     }
-}
-
-/// Verify that a persisted provenance record occupies the only canonical path
-/// for its package identity. Ownership readers call this before trusting claims.
-pub(crate) fn validate_applied_record_path(
-    path: &VirtualPath,
-    record: &AppliedProfileRecord,
-) -> Result<(), ProducerError> {
-    let expected = VirtualPath::data(format!("profiles/{}.json", record.id))?;
-    (path == &expected)
-        .then_some(())
-        .ok_or_else(|| ProducerError::ProfileRecordPathMismatch {
-            path: path.repository_relative(),
-            id: record.id.to_string(),
-            expected: expected.repository_relative(),
-        })
 }
 
 /// Neutral profile package input consumed by the one materialization dispatcher.
@@ -1489,9 +833,9 @@ pub struct ProfileApplicationInput {
     /// Resolved candidates sharing one of this package's semantic identities.
     ///
     /// The command supplies this scoped selection or dependency-closure context
-    /// before aggregate selection publication begins. It lets every affected record
-    /// retain the same complete owner set without making unrelated package
-    /// declarations part of this package's materialization.
+    /// before aggregate selection publication begins, so composition compares
+    /// this package's definitions with the selection's without making unrelated
+    /// package declarations part of this package's materialization.
     pub(crate) contribution_context: Vec<ProfileContributionClaim>,
     pub record_path: VirtualPath,
 }
@@ -1527,76 +871,15 @@ impl ProfileApplicationInput {
             || self.target_hashes.contains_key(".jit/rules.toml")
     }
 
-    pub(super) fn record(
-        &self,
-        composition: &ProfileTargetComposition,
-    ) -> Result<AppliedProfileRecord, serde_json::Error> {
-        let semantic = self
-            .claims
-            .contributions
-            .iter()
-            .map(|claim| {
-                let identity = AppliedProfileClaimIdentity::Semantic {
-                    identity: claim.contribution.semantic_identity(),
-                };
-                AppliedProfileClaim::semantic(
-                    &claim.contribution,
-                    composition.retained_claims.contains(&identity),
-                )
-            })
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        let assets = self
-            .claims
-            .assets
-            .iter()
-            .map(|asset| {
-                let (bytes, mode) =
-                    composition
-                        .targets
-                        .get(asset.claim.target())
-                        .ok_or_else(|| {
-                            serde_json::Error::io(std::io::Error::other(
-                                "profile composition omitted a declared asset target",
-                            ))
-                        })?;
-                let identity = AppliedProfileClaimIdentity::Asset {
-                    target: AppliedClaimTarget::from_virtual_path(asset.claim.target(), *mode),
-                };
-                Ok(AppliedProfileClaim::asset(
-                    asset.claim.target(),
-                    bytes,
-                    *mode,
-                    composition.retained_claims.contains(&identity),
-                ))
-            })
-            .collect::<Result<BTreeSet<_>, serde_json::Error>>()?;
-        let regions = self.claims.regions.iter().map(|region| {
-            let mode = composition
-                .targets
-                .get(region.claim.target())
-                .map(|(_, mode)| *mode)
-                .unwrap_or(FileMode::Regular);
-            let identity = AppliedProfileClaimIdentity::ManagedRegion {
-                target: AppliedManagedRegionTarget::from_virtual_path(region.claim.target()),
-                region_id: region.region_id.clone(),
-            };
-            AppliedProfileClaim::managed_region(
-                region.claim.target(),
-                region.region_id.clone(),
-                &region.content,
-                mode,
-                composition.retained_claims.contains(&identity),
-            )
-        });
-        Ok(AppliedProfileRecord::new(
+    pub(super) fn record(&self) -> AppliedProfileRecord {
+        AppliedProfileRecord::new(
             self.id.clone(),
             self.version.clone(),
             self.compatible_jit.clone(),
             self.origin.clone(),
             self.package_hash.clone(),
             self.variables.clone(),
-            semantic.into_iter().chain(assets).chain(regions).collect(),
-        ))
+        )
     }
 }
 
@@ -1605,16 +888,6 @@ pub(crate) fn profile_capture_closure(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
 ) -> Result<Vec<VirtualPath>, RepositoryStateError> {
-    let record_paths = applied_profile_record_paths(base)?;
-    let replacement_paths = replacement_asset_paths(base, &profile.claims.package_id)?;
-    let mut required_paths = record_paths.clone();
-    required_paths.extend(replacement_paths);
-    if required_paths
-        .iter()
-        .any(|path| !base.capture_spec().contains_path(path))
-    {
-        return Ok(required_paths);
-    }
     let composition = compose_profile_contributions(base, &profile.contribution_context)?;
     let composed =
         owned_composed_contributions(composition.definitions, &profile.claims.package_id);
@@ -1632,95 +905,83 @@ pub(crate) fn profile_capture_closure(
         .map(|bytes| String::from_utf8(bytes.to_vec()))
         .transpose()
         .map_err(ProducerError::from)?;
-    let mut closure = record_paths.into_iter().collect::<BTreeSet<_>>();
-    closure.extend(super::materialize::render_capture_closure(
+    Ok(super::materialize::render_capture_closure(
         proposed.layout(),
         &config,
         &[],
         rules.as_deref(),
-    )?);
-    Ok(closure.into_iter().collect())
+    )?
+    .into_iter()
+    .collect::<BTreeSet<_>>()
+    .into_iter()
+    .collect())
 }
 
-/// Target bytes and semantic owner evidence derived by profile composition.
+/// Target bytes and the decisions profile composition derived for one package.
 #[derive(Debug)]
 pub(super) struct ProfileTargetComposition {
     pub targets: BTreeMap<VirtualPath, (Vec<u8>, FileMode)>,
-    /// Claims whose matching captured content was repository-authored rather
-    /// than already claimed by a package.
-    pub retained_claims: BTreeSet<AppliedProfileClaimIdentity>,
-    /// What this package decided about every target it participates in: the
-    /// targets it composes and the recorded claims it stopped contributing
-    /// alike.
+    /// What this package decided about every target it composes.
     ///
     /// This is half of the whole decision, the other half being
     /// [`Self::contribution_decisions`]. A publication writes the composed
-    /// values it names, removes what it says to remove, and refuses when it
-    /// names a conflict; a difference report states the same decision without
-    /// publishing any of it.
+    /// values it names and refuses when it names a conflict; a difference
+    /// report states the same decision without publishing any of it.
     pub decisions: BTreeMap<VirtualPath, ProfileTargetDecision>,
-    /// What this package decided about every semantic identity it participates
-    /// in: the declarations it composes and the recorded claims it stopped
-    /// declaring alike.
+    /// What this package decided about every semantic identity it declares.
     ///
     /// A declaration is decided by its identity rather than by the registry
-    /// file that holds it, because that is how contributions compose: several
-    /// packages contribute distinct identities to one registry, and each of
-    /// them is decided on its own.
-    pub contribution_decisions: BTreeMap<ContributionIdentity, ProfileContributionDecision>,
+    /// file that holds it, because several packages contribute distinct
+    /// identities to one registry and each of them is decided on its own.
+    pub contribution_decisions: BTreeMap<ContributionIdentity, ProfileTargetDisposition>,
 }
 
-impl ProfileTargetComposition {
-    /// Targets this package's departing claims may safely remove.
-    pub fn removals(&self) -> impl Iterator<Item = &VirtualPath> {
-        self.decisions
-            .iter()
-            .filter(|(_, decision)| decision.disposition == ProfileTargetDisposition::Remove)
-            .map(|(path, _)| path)
-    }
-}
-
-/// One target a package participates in, and what it decided about it.
+/// One target a package composes, and what it decided about it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileTargetDecision {
     /// What this package decided.
     pub(crate) disposition: ProfileTargetDisposition,
-    /// Platform-neutral mode of the value the decision concerns: the composed
-    /// mode for a target the package publishes, the captured mode for one it
-    /// stopped contributing.
+    /// Platform-neutral mode of the composed value.
     pub(crate) mode: FileMode,
-    /// Packages whose applied records claim this target, in package-id order.
-    ///
-    /// An empty set states that no package owns the target, which is what
-    /// distinguishes repository-authored content from content a package
-    /// published; more than one entry names every owner of shared content.
-    pub(crate) owners: BTreeSet<ProfilePackageId>,
 }
 
-/// One semantic identity a package participates in, and what it decided.
+/// Asset targets that packages being applied declare with differing content,
+/// each beside every package declaring it.
 ///
-/// The vocabulary is the target decision's, because a declaration is decided
-/// the same way a file is: composed values that are already exact or newly
-/// created, recorded claims the package stopped declaring, and declarations
-/// that cannot be published at all.
-///
-/// Which of those a declaration can take follows from what publishing a
-/// declaration does. A registry render publishes one only where the registry
-/// has none, so a declaration is created or unchanged and never rewritten in
-/// place; and it withdraws none it published, so a departing declaration is
-/// retained and never removed. A definition its owners disagree about is a
-/// conflict.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProfileContributionDecision {
-    /// What this package decided.
-    pub(crate) disposition: ProfileTargetDisposition,
-    /// Packages whose applied records claim this identity, in package-id order.
-    ///
-    /// This is the same ownership fact a target decision carries, read from the
-    /// same applied records: an empty set states that no package owns the
-    /// declaration, so it is the repository's own, and more than one entry
-    /// names every owner of a shared declaration.
-    pub(crate) owners: BTreeSet<ProfilePackageId>,
+/// An asset target is one key, so it composes by the rule a semantic identity
+/// composes by: identical restatements merge, and differing definitions are a
+/// conflict naming every declaring package.
+pub(super) fn contested_asset_targets<'a>(
+    selection: impl IntoIterator<Item = &'a ProfileClaims>,
+) -> BTreeMap<VirtualPath, Vec<ContributionConflictOwner>> {
+    let mut declared =
+        BTreeMap::<&VirtualPath, Vec<(&ProfilePackageId, &ProfileAssetClaim)>>::new();
+    for claims in selection {
+        for asset in &claims.assets {
+            declared
+                .entry(asset.claim.target())
+                .or_default()
+                .push((&claims.package_id, asset));
+        }
+    }
+    declared
+        .into_iter()
+        .filter(|(_, declarations)| {
+            declarations.iter().any(|(_, asset)| {
+                (&asset.bytes, asset.mode) != (&declarations[0].1.bytes, declarations[0].1.mode)
+            })
+        })
+        .map(|(path, declarations)| {
+            let owners = declarations
+                .into_iter()
+                .map(|(package_id, _)| package_id.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(ContributionConflictOwner::Package)
+                .collect();
+            (path.clone(), owners)
+        })
+        .collect()
 }
 
 /// Derive every profile-owned target's exact final bytes and mode from a captured
@@ -1744,45 +1005,41 @@ pub(super) fn compose_profile_targets(
     claims: ProfileClaims,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
     let contribution_context = claims.contributions.clone();
-    compose_profile_targets_with_context(base, claims, contribution_context)
+    compose_profile_targets_with_context(base, claims, contribution_context, &BTreeMap::new())
 }
 
-/// Derive profile-owned targets with an identity-scoped candidate context.
-/// Definitions outside the package's own identities remain outside its
-/// scoped contribution materialization, while equal definitions retain their full owner set
-/// in every affected provenance record.
+/// Derive profile-owned targets within the selection being applied.
+///
+/// `contribution_context` holds the selected packages' definitions of this
+/// package's semantic identities, and `contested_assets` the asset targets
+/// selected packages declare differently ([`contested_asset_targets`]). The
+/// repository's current content decides only whether a value is created,
+/// updated, or already exact; it is never a conflict party.
 pub(super) fn compose_profile_targets_with_context(
     base: &RepositoryImage,
     claims: ProfileClaims,
     contribution_context: Vec<ProfileContributionClaim>,
+    contested_assets: &BTreeMap<VirtualPath, Vec<ContributionConflictOwner>>,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
-    let ownership = profile_target_ownership(base)?;
-    let mut retained_claims = retained_semantic_claim_identities(base, &claims.contributions)?;
-    retained_claims.extend(retained_claim_identities_for_package(
-        base,
-        &claims.package_id,
-    )?);
     let declared_identities = claims
         .contributions
         .iter()
         .map(|claim| claim.contribution.semantic_identity())
         .collect::<BTreeSet<_>>();
     let composition = compose_profile_contributions(base, &contribution_context)?;
-    let mut contribution_decisions = composition
+    let contribution_decisions = composition
         .decisions
         .into_iter()
         .filter(|(identity, _)| declared_identities.contains(identity))
         .collect::<BTreeMap<_, _>>();
-    contribution_decisions.extend(departing_contribution_decisions(
-        base,
-        &claims.package_id,
-        &declared_identities,
-    )?);
     let composed = owned_composed_contributions(composition.definitions, &claims.package_id);
     let mut targets = render_composed_contributions(base, &composed)?;
-    let package_id = claims.package_id.clone();
-    let asset_claims = claims.assets.to_vec();
     let projection_targets = configured_projection_targets(base, &targets)?;
+    let asset_paths = claims
+        .assets
+        .iter()
+        .map(|asset| asset.claim.target().clone())
+        .collect::<BTreeSet<_>>();
     for asset in claims.assets {
         let path = asset.claim.target().clone();
         targets.insert(path, (asset.bytes, asset.mode));
@@ -1805,25 +1062,6 @@ pub(super) fn compose_profile_targets_with_context(
     });
     for (path, bytes) in compose_managed_documents(base, regions)? {
         let mode = existing_file_mode(base, &path)?;
-        if matches!(
-            base.entry(&path).map_err(ProducerError::from)?,
-            RepositoryEntry::File { content: existing, mode: existing_mode }
-                if existing.bytes() == bytes.as_slice() && *existing_mode == mode
-        ) && matches!(
-            profile_conflict_occupant(&ownership, &path),
-            ProfileConflictOccupant::Repository
-        ) {
-            claims
-                .regions
-                .iter()
-                .filter(|region| region.claim.target() == &path)
-                .for_each(|region| {
-                    retained_claims.insert(AppliedProfileClaimIdentity::ManagedRegion {
-                        target: AppliedManagedRegionTarget::from_virtual_path(&path),
-                        region_id: region.region_id.clone(),
-                    });
-                });
-        }
         targets.insert(path, (bytes, mode));
     }
 
@@ -1867,57 +1105,33 @@ pub(super) fn compose_profile_targets_with_context(
         }
     }
 
-    // An asset claim describes the bytes ultimately published. A projection may
-    // rewrite a declared asset target, so adoption is evaluated only after that
-    // final target image is known.
-    let mut conflicts = BTreeMap::new();
-    for asset in &asset_claims {
-        let path = asset.claim.target();
-        let Some((bytes, mode)) = targets.get(path) else {
-            continue;
-        };
-        if !asset.replace_owned && !projection_targets.contains(path) {
-            if let Some(conflict) =
-                decide_asset_replacement(base, &ownership, &package_id, path, bytes, *mode)?
-            {
-                conflicts.insert(path.clone(), conflict);
-            }
-        }
-        if matches!(
-            base.entry(path).map_err(ProducerError::from)?,
-            RepositoryEntry::File { content: existing, mode: existing_mode }
-                if existing.bytes() == bytes.as_slice() && *existing_mode == *mode
-        ) && matches!(
-            profile_conflict_occupant(&ownership, path),
-            ProfileConflictOccupant::Repository
-        ) {
-            retained_claims.insert(AppliedProfileClaimIdentity::Asset {
-                target: AppliedClaimTarget::from_virtual_path(path, *mode),
-            });
-        }
-    }
-    // Any composed target, not just a directly declared asset or region, keeps
-    // a former asset path alive. A declaration-derived target can legitimately
-    // reuse that path during the same aggregate application.
-    let candidate_paths = targets.keys().cloned().collect::<BTreeSet<_>>();
-    let mut decisions = departing_asset_decisions(base, &ownership, &package_id, &candidate_paths)?;
-    for (path, (bytes, mode)) in &targets {
-        let disposition = match conflicts.remove(path) {
-            Some(conflict) => ProfileTargetDisposition::Conflict(conflict),
-            None => composed_target_disposition(base, path, bytes, *mode)?,
-        };
-        decisions.insert(
-            path.clone(),
-            ProfileTargetDecision {
-                disposition,
-                mode: *mode,
-                owners: target_owners(&ownership, path),
-            },
-        );
-    }
+    // A configured projection derives the final bytes of an asset target it
+    // rewrites, so the bytes packages declare there are not what they publish.
+    let decisions = targets
+        .iter()
+        .map(|(path, (bytes, mode))| {
+            let contested = contested_assets
+                .get(path)
+                .filter(|_| asset_paths.contains(path) && !projection_targets.contains(path));
+            let disposition = match contested {
+                Some(owners) => {
+                    ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested {
+                        owners: owners.clone(),
+                    })
+                }
+                None => composed_target_disposition(base, path, bytes, *mode)?,
+            };
+            Ok((
+                path.clone(),
+                ProfileTargetDecision {
+                    disposition,
+                    mode: *mode,
+                },
+            ))
+        })
+        .collect::<Result<_, RepositoryStateError>>()?;
     Ok(ProfileTargetComposition {
         targets,
-        retained_claims,
         decisions,
         contribution_decisions,
     })
@@ -1940,277 +1154,6 @@ fn composed_target_disposition(
         }
         _ => ProfileTargetDisposition::Update,
     })
-}
-
-/// Decide whether an asset target can replace its package's recorded base.
-///
-/// A target with no matching prior claim remains the ordinary first-application
-/// collision case. A matching claim takes the shared pure three-way path, so a
-/// changed package updates its own unchanged content while a concurrent edit is
-/// reported before the aggregate selection publishes anything.
-///
-/// The answer is a decision rather than a refusal: composition decides every
-/// asset it was asked about, so a selection carrying two conflicting targets
-/// reports both. Refusing the publication is the caller's, once it holds the
-/// whole decision.
-fn decide_asset_replacement(
-    base: &RepositoryImage,
-    ownership: &ProfileTargetOwnership,
-    package_id: &ProfilePackageId,
-    path: &VirtualPath,
-    candidate_bytes: &[u8],
-    candidate_mode: FileMode,
-) -> Result<Option<ProfileTargetConflict>, RepositoryStateError> {
-    let RepositoryEntry::File {
-        content: current,
-        mode: current_mode,
-    } = base.entry(path).map_err(ProducerError::from)?
-    else {
-        return Ok(None);
-    };
-    let current_bytes = current.bytes();
-    if current_bytes == candidate_bytes && *current_mode == candidate_mode {
-        return Ok(None);
-    }
-    let Some(recorded) = recorded_asset_claim(base, package_id, path)? else {
-        return Ok(Some(ProfileTargetConflict::Occupied {
-            occupant: profile_conflict_occupant(ownership, path),
-        }));
-    };
-    let decision = decide_three_way(ThreeWayInput {
-        target: path.clone(),
-        owner: package_id.clone(),
-        base: ThreeWayValue::Present(recorded.base_fingerprint),
-        current: ThreeWayValue::Present(fingerprint_profile_asset(current_bytes, *current_mode)),
-        candidate: ThreeWayValue::Present(fingerprint_profile_asset(
-            candidate_bytes,
-            candidate_mode,
-        )),
-        surviving_owners: 0,
-        retain_if_unowned: recorded.retain_if_unowned,
-    });
-    Ok(match decision {
-        ThreeWayDecision::Update | ThreeWayDecision::Unchanged => None,
-        ThreeWayDecision::Conflict(conflict) => Some(ProfileTargetConflict::Diverged {
-            base: conflict.base,
-            current: conflict.current,
-            candidate: conflict.candidate,
-        }),
-        ThreeWayDecision::Retain | ThreeWayDecision::Remove => {
-            unreachable!("a present candidate is always update, unchanged, or conflict")
-        }
-    })
-}
-
-fn recorded_asset_claim(
-    base: &RepositoryImage,
-    package_id: &ProfilePackageId,
-    path: &VirtualPath,
-) -> Result<Option<AppliedProfileClaim>, RepositoryStateError> {
-    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
-    if !base.capture_spec().contains_path(&record_path) {
-        return Ok(None);
-    }
-    let RepositoryEntry::File { content, .. } =
-        base.entry(&record_path).map_err(ProducerError::from)?
-    else {
-        return Ok(None);
-    };
-    let record: AppliedProfileRecord =
-        serde_json::from_slice(content.bytes()).map_err(|source| {
-            ProducerError::ProfileRecordParse {
-                path: record_path.repository_relative(),
-                source,
-            }
-        })?;
-    validate_applied_record_path(&record_path, &record)?;
-    Ok(record
-        .claims
-        .into_iter()
-        .find(|claim| match &claim.identity {
-            AppliedProfileClaimIdentity::Asset { target } => {
-                target.root == path.root_class() && target.path == *path.relative()
-            }
-            AppliedProfileClaimIdentity::Semantic { .. }
-            | AppliedProfileClaimIdentity::ManagedRegion { .. } => false,
-        }))
-}
-
-/// Target paths named by the package's former asset claims.
-///
-/// Capture planning asks for these before deciding removal so its final plan has
-/// both the recorded base and the current repository value under one session.
-fn replacement_asset_paths(
-    base: &RepositoryImage,
-    package_id: &ProfilePackageId,
-) -> Result<Vec<VirtualPath>, RepositoryStateError> {
-    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
-    if !base.capture_spec().contains_path(&record_path) {
-        return Ok(Vec::new());
-    }
-    let RepositoryEntry::File { content, .. } =
-        base.entry(&record_path).map_err(ProducerError::from)?
-    else {
-        return Ok(Vec::new());
-    };
-    let record: AppliedProfileRecord =
-        serde_json::from_slice(content.bytes()).map_err(|source| {
-            ProducerError::ProfileRecordParse {
-                path: record_path.repository_relative(),
-                source,
-            }
-        })?;
-    validate_applied_record_path(&record_path, &record)?;
-    record
-        .claims
-        .into_iter()
-        .filter_map(|claim| match claim.identity {
-            AppliedProfileClaimIdentity::Asset { target } => Some(target),
-            AppliedProfileClaimIdentity::Semantic { .. }
-            | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
-        })
-        .map(|target| VirtualPath::from_root(target.root, target.path).map_err(Into::into))
-        .collect()
-}
-
-/// Decide what happens to each recorded asset claim this package stopped
-/// contributing.
-///
-/// Every departing claim is decided, not only the ones that may be removed: a
-/// value that survives its departing owner is as much a decision an adopter
-/// reads before publishing as a value that disappears.
-fn departing_asset_decisions(
-    base: &RepositoryImage,
-    ownership: &ProfileTargetOwnership,
-    package_id: &ProfilePackageId,
-    candidate_paths: &BTreeSet<VirtualPath>,
-) -> Result<BTreeMap<VirtualPath, ProfileTargetDecision>, RepositoryStateError> {
-    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
-    if !base.capture_spec().contains_path(&record_path) {
-        return Ok(BTreeMap::new());
-    }
-    let RepositoryEntry::File { content, .. } =
-        base.entry(&record_path).map_err(ProducerError::from)?
-    else {
-        return Ok(BTreeMap::new());
-    };
-    let record: AppliedProfileRecord =
-        serde_json::from_slice(content.bytes()).map_err(|source| {
-            ProducerError::ProfileRecordParse {
-                path: record_path.repository_relative(),
-                source,
-            }
-        })?;
-    validate_applied_record_path(&record_path, &record)?;
-    record
-        .claims
-        .into_iter()
-        .filter_map(|claim| {
-            let target = match &claim.identity {
-                AppliedProfileClaimIdentity::Asset { target } => Some(target.clone()),
-                AppliedProfileClaimIdentity::Semantic { .. }
-                | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
-            }?;
-            Some((claim, target))
-        })
-        .map(|(claim, target)| {
-            let path = VirtualPath::from_root(target.root, target.path)?;
-            if candidate_paths.contains(&path) {
-                return Ok(None);
-            }
-            let (current, mode) = match base.entry(&path).map_err(ProducerError::from)? {
-                RepositoryEntry::Absent => (ThreeWayValue::Absent, FileMode::Regular),
-                RepositoryEntry::File { content, mode } => (
-                    ThreeWayValue::Present(fingerprint_profile_asset(content.bytes(), *mode)),
-                    *mode,
-                ),
-                _ => return Ok(None),
-            };
-            let decision = decide_three_way(ThreeWayInput {
-                target: path.clone(),
-                owner: package_id.clone(),
-                base: ThreeWayValue::Present(claim.base_fingerprint),
-                current,
-                candidate: ThreeWayValue::Absent,
-                surviving_owners: surviving_target_owners(ownership, package_id, &path),
-                retain_if_unowned: claim.retain_if_unowned,
-            });
-            let disposition = match decision {
-                ThreeWayDecision::Remove => ProfileTargetDisposition::Remove,
-                _ => ProfileTargetDisposition::Retain,
-            };
-            Ok(Some((
-                path.clone(),
-                ProfileTargetDecision {
-                    disposition,
-                    mode,
-                    owners: target_owners(ownership, &path),
-                },
-            )))
-        })
-        .filter_map(Result::transpose)
-        .collect()
-}
-
-/// Which packages claim each repository target, read once from the applied
-/// records the profiles listing names.
-///
-/// Every question about who holds a target — the occupant a first application
-/// collides with, the owners that survive a departing claim, and the ownership
-/// a difference report states — is answered from this one reading, so the
-/// answers cannot disagree and the records are parsed once per composition
-/// rather than once per target.
-type ProfileTargetOwnership = BTreeMap<VirtualPath, BTreeSet<ProfilePackageId>>;
-
-/// Read every applied record's file-occupying claims into the ownership map.
-///
-/// A semantic declaration is deliberately absent: it owns an identity inside a
-/// registry, not the registry file, so a package contributing one does not hold
-/// the file against another package's asset.
-fn profile_target_ownership(
-    base: &RepositoryImage,
-) -> Result<ProfileTargetOwnership, RepositoryStateError> {
-    let mut ownership = ProfileTargetOwnership::new();
-    for (_, record) in applied_profile_records(base)? {
-        let owner = ProfilePackageId::new(record.id.to_string());
-        for claim in &record.claims {
-            let target = match &claim.identity {
-                AppliedProfileClaimIdentity::Semantic { .. } => continue,
-                AppliedProfileClaimIdentity::Asset { target } => {
-                    VirtualPath::from_root(target.root, target.path.clone())?
-                }
-                AppliedProfileClaimIdentity::ManagedRegion { target, .. } => {
-                    VirtualPath::from_root(target.root, target.path.clone())?
-                }
-            };
-            ownership.entry(target).or_default().insert(owner.clone());
-        }
-    }
-    Ok(ownership)
-}
-
-/// The packages that claim `target`, in package-id order.
-fn target_owners(
-    ownership: &ProfileTargetOwnership,
-    target: &VirtualPath,
-) -> BTreeSet<ProfilePackageId> {
-    ownership.get(target).cloned().unwrap_or_default()
-}
-
-/// How many packages other than `package_id` still claim `target`.
-///
-/// A managed region counts: removing a file another package publishes a region
-/// into destroys that package's contribution just as removing an asset it owns
-/// would.
-fn surviving_target_owners(
-    ownership: &ProfileTargetOwnership,
-    package_id: &ProfilePackageId,
-    target: &VirtualPath,
-) -> usize {
-    ownership
-        .get(target)
-        .map(|owners| owners.iter().filter(|owner| *owner != package_id).count())
-        .unwrap_or_default()
 }
 
 /// Render the complete selected contribution set into a proposed registry view.
@@ -2254,11 +1197,11 @@ struct ContributionComposition {
     /// keeps what it holds and the publication is refused from the decision.
     definitions: Vec<ComposedContribution>,
     /// One decision per semantic identity the candidate context declares.
-    decisions: BTreeMap<ContributionIdentity, ProfileContributionDecision>,
+    decisions: BTreeMap<ContributionIdentity, ProfileTargetDisposition>,
 }
 
-/// Compose a candidate context with the repository's per-identity ownership
-/// evidence before any registry renderer receives a definition.
+/// Compose a candidate context before any registry renderer receives a
+/// definition.
 ///
 /// Every identity is decided rather than the first disagreement refusing the
 /// whole composition: a contested identity is one decision an adopter reads
@@ -2268,65 +1211,24 @@ fn compose_profile_contributions(
     base: &RepositoryImage,
     candidates: &[ProfileContributionClaim],
 ) -> Result<ContributionComposition, RepositoryStateError> {
-    let (recorded, repository) = existing_contribution_claims(base, candidates)?;
     let mut definitions = Vec::new();
     let mut decisions = BTreeMap::new();
-    for outcome in compose_resolved_contributions(repository, candidates.iter().cloned()) {
-        // Who owns the identity and who defines it are different facts: a
-        // decision reports the packages whose records claim it, while a
-        // conflict names the owners whose definitions disagree.
-        let owners = recorded_identity_owners(&recorded, outcome.identity());
-        let (identity, disposition, definition) = match outcome {
-            ContributionOutcome::Contested {
-                identity,
-                owners: defining,
-            } => (
-                identity,
-                ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested {
-                    owners: defining,
-                }),
-                None,
-            ),
-            ContributionOutcome::Agreed(contribution) => {
-                let candidate = fingerprint_semantic_contribution(&contribution.definition)
-                    .map_err(ProducerError::ProfileClaimFingerprint)?;
-                let claimed = recorded
-                    .iter()
-                    .filter(|claim| claim.identity == contribution.identity)
-                    .collect::<Vec<_>>();
-                let disposition = contribution_disposition(
-                    base,
-                    &contribution.identity,
-                    &contribution.owners,
-                    &candidate,
-                    &claimed,
-                )?;
-                let publishable = !matches!(disposition, ProfileTargetDisposition::Conflict(_));
-                (
-                    contribution.identity.clone(),
-                    disposition,
-                    publishable.then(|| ComposedContribution {
-                        owners: contribution
-                            .owners
-                            .iter()
-                            .cloned()
-                            .chain(owners.iter().cloned())
-                            .collect::<BTreeSet<_>>()
-                            .into_iter()
-                            .collect(),
-                        ..contribution
-                    }),
-                )
+    for outcome in compose_resolved_contributions(candidates.iter().cloned()) {
+        match outcome {
+            ContributionOutcome::Contested { identity, owners } => {
+                decisions.insert(
+                    identity,
+                    ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested { owners }),
+                );
             }
-        };
-        definitions.extend(definition);
-        decisions.insert(
-            identity,
-            ProfileContributionDecision {
-                disposition,
-                owners,
-            },
-        );
+            ContributionOutcome::Agreed(contribution) => {
+                decisions.insert(
+                    contribution.identity.clone(),
+                    contribution_disposition(base, &contribution.identity)?,
+                );
+                definitions.push(contribution);
+            }
+        }
     }
     Ok(ContributionComposition {
         definitions,
@@ -2334,164 +1236,19 @@ fn compose_profile_contributions(
     })
 }
 
-/// What publishing one agreed definition would do to the declaration the
-/// repository holds under its identity.
+/// What publishing one agreed definition does to the registry.
 ///
-/// Three values decide it, exactly as they decide a file target: the value each
-/// record claiming the identity published, the value the registry holds now, and
-/// the value this composition would publish. The registry is the authority for
-/// the effective value — [`render_composed_contribution`] preserves an entry
-/// that is already there, whatever it says — so what a publication can still put
-/// right is the record, and what it cannot is a registry holding something else.
-///
-/// * A declaration the registry does not carry is created.
-/// * A registry already holding the composing definition publishes nothing, and
-///   is [`ProfileTargetDisposition::Unchanged`] when every record claiming it
-///   recorded that same definition. A record that recorded another value is
-///   stale provenance over a registry the package now agrees with, so the
-///   publication refreshes the record and the decision is
-///   [`ProfileTargetDisposition::Update`].
-/// * A registry holding a value a record published, against a composing
-///   definition that moved, is [`ProfileTargetConflict::Contested`]: the package
-///   states one definition and a record states another, and no publication can
-///   pick between them.
-/// * A registry holding a value no owner ever published is
-///   [`ProfileTargetConflict::Diverged`], the same refusal an asset edited after
-///   its owner published it receives, and with the same remedy — restore the
-///   published value.
-///
-/// The last case is why this reads the registry rather than the record alone:
-/// repository-wide validation reports exactly that declaration as diverged, so a
-/// decision calling it unchanged would let a difference report call a selection
-/// clean while validation fails on the same declaration.
+/// A registry render publishes a declaration only where the registry has none
+/// under its identity ([`render_composed_contribution`]), so an absent
+/// declaration is created and a held one is left unchanged, whatever it says.
 fn contribution_disposition(
     base: &RepositoryImage,
     identity: &ContributionIdentity,
-    definers: &[ProfilePackageId],
-    candidate: &ProfileBaseFingerprint,
-    claimed: &[&RecordedSemanticClaim],
 ) -> Result<ProfileTargetDisposition, RepositoryStateError> {
-    let Some(held) = repository_definition(base, identity)? else {
-        return Ok(ProfileTargetDisposition::Create);
-    };
-    let current =
-        fingerprint_semantic_contribution(&held).map_err(ProducerError::ProfileClaimFingerprint)?;
-    if &current == candidate {
-        return Ok(
-            if claimed
-                .iter()
-                .all(|claim| &claim.base_fingerprint == candidate)
-            {
-                ProfileTargetDisposition::Unchanged
-            } else {
-                ProfileTargetDisposition::Update
-            },
-        );
-    }
-    let holding = claimed
-        .iter()
-        .any(|claim| claim.base_fingerprint == current);
-    Ok(ProfileTargetDisposition::Conflict(if holding {
-        ProfileTargetConflict::Contested {
-            owners: definers
-                .iter()
-                .cloned()
-                .chain(
-                    claimed
-                        .iter()
-                        .filter(|claim| &claim.base_fingerprint != candidate)
-                        .map(|claim| claim.package_id.clone()),
-                )
-                .map(ContributionConflictOwner::Package)
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect(),
-        }
-    } else {
-        // One recorded base names what this declaration's owners published.
-        // Owners that recorded different values already disagree with each
-        // other, and every one of them disagrees with what the registry holds,
-        // so the earliest is as complete an answer as any of them.
-        ProfileTargetConflict::Diverged {
-            base: claimed
-                .iter()
-                .map(|claim| claim.base_fingerprint.clone())
-                .min()
-                .map_or(ThreeWayValue::Absent, ThreeWayValue::Present),
-            current: ThreeWayValue::Present(current),
-            candidate: ThreeWayValue::Present(candidate.clone()),
-        }
-    }))
-}
-
-/// The packages whose applied records claim `identity`, in package-id order.
-///
-/// This is the semantic half of the one ownership question
-/// [`profile_target_ownership`] answers for files, read from the same records:
-/// a declaration no record claims is the repository's own.
-fn recorded_identity_owners(
-    recorded: &[RecordedSemanticClaim],
-    identity: &ContributionIdentity,
-) -> BTreeSet<ProfilePackageId> {
-    recorded
-        .iter()
-        .filter(|claim| &claim.identity == identity)
-        .map(|claim| claim.package_id.clone())
-        .collect()
-}
-
-/// Decide what happens to each recorded semantic claim this package stopped
-/// declaring.
-///
-/// Every departing declaration is retained: a registry render publishes a
-/// declaration only where the registry has none and withdraws none it
-/// published, so the value a departing owner leaves behind stays in the
-/// registry and survives without an owner. The decision states that survival
-/// rather than leaving the identity unreported, exactly as a departing asset
-/// whose value survives is stated rather than dropped.
-fn departing_contribution_decisions(
-    base: &RepositoryImage,
-    package_id: &ProfilePackageId,
-    declared: &BTreeSet<ContributionIdentity>,
-) -> Result<BTreeMap<ContributionIdentity, ProfileContributionDecision>, RepositoryStateError> {
-    let departing = recorded_package_identities(base, package_id)?
-        .into_iter()
-        .filter(|identity| !declared.contains(identity))
-        .collect::<BTreeSet<_>>();
-    if departing.is_empty() {
-        return Ok(BTreeMap::new());
-    }
-    let recorded = recorded_semantic_claims(base, &departing)?;
-    Ok(departing
-        .into_iter()
-        .map(|identity| {
-            let owners = recorded_identity_owners(&recorded, &identity);
-            (
-                identity,
-                ProfileContributionDecision {
-                    disposition: ProfileTargetDisposition::Retain,
-                    owners,
-                },
-            )
-        })
-        .collect())
-}
-
-/// The semantic identities one package's own applied record claims.
-fn recorded_package_identities(
-    base: &RepositoryImage,
-    package_id: &ProfilePackageId,
-) -> Result<BTreeSet<ContributionIdentity>, RepositoryStateError> {
-    Ok(applied_profile_records(base)?
-        .into_iter()
-        .filter(|(_, record)| record.id.as_str() == package_id.as_str())
-        .flat_map(|(_, record)| record.claims)
-        .filter_map(|claim| match claim.identity {
-            AppliedProfileClaimIdentity::Semantic { identity } => Some(identity),
-            AppliedProfileClaimIdentity::Asset { .. }
-            | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
-        })
-        .collect())
+    Ok(match repository_definition(base, identity)? {
+        None => ProfileTargetDisposition::Create,
+        Some(_) => ProfileTargetDisposition::Unchanged,
+    })
 }
 
 fn owned_composed_contributions(
@@ -2538,188 +1295,10 @@ fn render_composed_contributions(
         .collect()
 }
 
-/// Every applied-profile record the profiles listing names, each beside the
-/// path it is filed under.
-///
-/// A record is the repository's own statement about one profile, so a record
-/// that does not parse, or that is filed under a name other than its own
-/// profile's, fails the read rather than dropping that profile from the answer.
-/// An occupant of the listing that is not a regular file is not a record and
-/// contributes nothing.
-///
-/// Composition and adoption-intent retention both begin here, so the record
-/// inventory is enumerated and read under one rule.
-///
-/// # Errors
-///
-/// Returns [`RepositoryStateError`] when a listed record is outside the capture,
-/// does not parse, or names a profile other than the one its path does.
-pub fn applied_profile_records(
-    base: &RepositoryImage,
-) -> Result<Vec<(VirtualPath, AppliedProfileRecord)>, RepositoryStateError> {
-    applied_profile_record_paths(base)?
-        .into_iter()
-        .map(|path| {
-            let RepositoryEntry::File { content, .. } =
-                base.entry(&path).map_err(ProducerError::from)?
-            else {
-                return Ok(None);
-            };
-            let record: AppliedProfileRecord =
-                serde_json::from_slice(content.bytes()).map_err(|source| {
-                    ProducerError::ProfileRecordParse {
-                        path: path.repository_relative(),
-                        source,
-                    }
-                })?;
-            validate_applied_record_path(&path, &record)?;
-            Ok(Some((path, record)))
-        })
-        .filter_map(Result::transpose)
-        .collect()
-}
-
-/// Discover every captured applied-profile record named by the profiles listing.
-fn applied_profile_record_paths(
-    base: &RepositoryImage,
-) -> Result<Vec<VirtualPath>, RepositoryStateError> {
-    let Some(listing) = base.directory_listings().get(&VirtualPath::PROFILES) else {
-        return Ok(Vec::new());
-    };
-    listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .map(|name| VirtualPath::data(format!("profiles/{name}")).map_err(Into::into))
-        .collect()
-}
-
-/// One ownership fact read from an existing v2 record. It intentionally has no
-/// definition: the registry remains the authority for every effective value.
-struct RecordedSemanticClaim {
-    package_id: ProfilePackageId,
-    identity: ContributionIdentity,
-    base_fingerprint: ProfileBaseFingerprint,
-}
-
-/// Every applied record's ownership claim over one of `identities`.
-///
-/// This is the one reading behind both the ownership a decision reports and the
-/// recorded definition a composition compares against, so the two cannot
-/// disagree about who claims a declaration.
-fn recorded_semantic_claims(
-    base: &RepositoryImage,
-    identities: &BTreeSet<ContributionIdentity>,
-) -> Result<Vec<RecordedSemanticClaim>, RepositoryStateError> {
-    Ok(applied_profile_records(base)?
-        .into_iter()
-        .flat_map(|(_, record)| {
-            let package_id = ProfilePackageId::new(record.id.to_string());
-            record
-                .claims
-                .into_iter()
-                .filter_map(|claim| match claim.identity {
-                    AppliedProfileClaimIdentity::Semantic { identity } => {
-                        Some((identity, claim.base_fingerprint))
-                    }
-                    _ => None,
-                })
-                .filter(|(identity, _)| identities.contains(identity))
-                .map(move |(identity, base_fingerprint)| RecordedSemanticClaim {
-                    package_id: package_id.clone(),
-                    identity,
-                    base_fingerprint,
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect())
-}
-
-/// Read only ownership facts from current records and registry definitions from
-/// the captured registries. No behavior is reconstructed from a record.
-fn existing_contribution_claims(
-    base: &RepositoryImage,
-    candidates: &[ProfileContributionClaim],
-) -> Result<(Vec<RecordedSemanticClaim>, Vec<ExistingContributionClaim>), RepositoryStateError> {
-    let candidate_identities = candidates
-        .iter()
-        .map(|claim| claim.contribution.semantic_identity())
-        .collect::<BTreeSet<_>>();
-    let recorded = recorded_semantic_claims(base, &candidate_identities)?;
-    let owned_identities = recorded
-        .iter()
-        .map(|claim| claim.identity.clone())
-        .collect::<BTreeSet<_>>();
-    let repository = candidates
-        .iter()
-        .filter(|claim| !owned_identities.contains(&claim.contribution.semantic_identity()))
-        .map(|claim| repository_definition(base, &claim.contribution.semantic_identity()))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .map(ExistingContributionClaim::Repository)
-        .collect();
-    Ok((recorded, repository))
-}
-
-/// Preserve adoption intent when the same package record is re-applied or is
-/// replaced by another version of the same package. The record remains
-/// ownership provenance only; registry values are still read from the captured
-/// image.
-fn retained_claim_identities_for_package(
-    base: &RepositoryImage,
-    package_id: &ProfilePackageId,
-) -> Result<BTreeSet<AppliedProfileClaimIdentity>, RepositoryStateError> {
-    applied_profile_records(base)?
-        .into_iter()
-        .map(|(_, record)| {
-            Ok(if record.id.as_str() == package_id.as_str() {
-                record
-                    .claims
-                    .into_iter()
-                    .filter(|claim| claim.retain_if_unowned)
-                    .map(|claim| claim.identity)
-                    .collect()
-            } else {
-                BTreeSet::new()
-            })
-        })
-        .collect::<Result<Vec<BTreeSet<_>>, RepositoryStateError>>()
-        .map(|sets| sets.into_iter().flatten().collect())
-}
-
-/// Find repository-authored semantic values a new profile adopts unchanged.
-///
-/// The record is only an ownership witness: definitions are always read from
-/// the captured registries, then compared to the resolved package value.
-fn retained_semantic_claim_identities(
-    base: &RepositoryImage,
-    candidates: &[ProfileContributionClaim],
-) -> Result<BTreeSet<AppliedProfileClaimIdentity>, RepositoryStateError> {
-    let (_, repository) = existing_contribution_claims(base, candidates)?;
-    Ok(repository
-        .into_iter()
-        .filter_map(|claim| match claim {
-            ExistingContributionClaim::Repository(contribution) => Some(contribution),
-            ExistingContributionClaim::Package(_) => None,
-        })
-        .filter(|existing| {
-            candidates
-                .iter()
-                .any(|candidate| candidate.contribution == *existing)
-        })
-        .map(|contribution| AppliedProfileClaimIdentity::Semantic {
-            identity: contribution.semantic_identity(),
-        })
-        .collect())
-}
-
 /// Read the repository definition carrying one semantic identity, if authored.
 ///
 /// The identity alone decides both which registry is read and which declaration
-/// inside it answers, so a caller holding an identity without the contribution
-/// that minted it — a recorded ownership claim — reads the current value through
-/// the same function composition uses.
+/// inside it answers.
 fn repository_definition(
     base: &RepositoryImage,
     identity: &ContributionIdentity,
@@ -2743,8 +1322,8 @@ fn repository_definition(
 /// text, if that registry declares it.
 ///
 /// This is where a registry's text answers an identity, and it is deliberately
-/// separate from where the text comes from: composition and the ownership check
-/// read it out of a captured image.
+/// separate from where the text comes from: composition reads it out of a
+/// captured image.
 ///
 /// # Errors
 ///
@@ -3125,28 +1704,6 @@ fn semantic_document(
         .map_err(|error| profile_registry_error(registry, error.into()))
 }
 
-/// Who already holds `target`: an applied package, or the repository itself.
-///
-/// An applied-profile record states the targets its package published, keyed by
-/// the same repository-relative spelling
-/// ([`VirtualPath::repository_relative`]) the package's manifest addresses them
-/// with, so a target no record claims is the repository's own content. Shared
-/// content has more than one owner and is named by the first of them in
-/// package-id order; the complete owner set reaches an adopter through the
-/// decision's own [`ProfileTargetDecision::owners`].
-fn profile_conflict_occupant(
-    ownership: &ProfileTargetOwnership,
-    target: &VirtualPath,
-) -> ProfileConflictOccupant {
-    ownership
-        .get(target)
-        .and_then(|owners| owners.first())
-        .cloned()
-        .map_or(ProfileConflictOccupant::Repository, |owner| {
-            ProfileConflictOccupant::Package(owner)
-        })
-}
-
 fn ensure_table<'a>(
     parent: &'a mut Table,
     key: &str,
@@ -3369,109 +1926,56 @@ fn existing_file_mode(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, DirectoryListing, EntryIdentity,
-        RepositoryLayout, RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, CapturedBytes, RepositoryLayout, RepositoryRootEvidence,
     };
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
 
-    /// A captured image holding each named target, with the applied records
-    /// that claim it.
+    /// A captured image whose configuration registry holds `config` and whose
+    /// named targets hold their bytes, every other registry absent.
     ///
-    /// Each entry is one repository file, its bytes, and the packages whose
-    /// applied records claim it: no package for repository-authored content,
-    /// one for a target a package published, several for shared content. Every
-    /// ownership shape a composition decides against is stated through this one
-    /// builder rather than a second image (`@/invariant/shared-test-contracts`).
-    fn image_owning(
-        targets: &[(VirtualPath, &[u8], &[&str])],
+    /// Every repository shape a composition decides against is stated through
+    /// this one builder (`@/inv/shared-test-contracts`).
+    fn image_holding(
+        config: &[u8],
+        targets: &[(VirtualPath, &[u8])],
     ) -> (RepositoryImage, RepositoryLayout) {
-        let layout = super::super::RepositoryLayout::new(
-            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
-            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        let owners = targets
-            .iter()
-            .flat_map(|(_, _, owners)| owners.iter().copied())
-            .collect::<BTreeSet<_>>();
-        let records = owners
-            .into_iter()
-            .map(|owner| {
-                let claims = targets
-                    .iter()
-                    .filter(|(_, _, target_owners)| target_owners.contains(&owner))
-                    .map(|(target, bytes, _)| {
-                        AppliedProfileClaim::asset(target, bytes, FileMode::Regular, false)
-                    })
-                    .collect();
-                let record = AppliedProfileRecord::new(
-                    owner.try_into().expect("test profile id is canonical"),
-                    "1.0.0",
-                    "*",
-                    ProfileOrigin::Directory(
-                        crate::repository_state::RootRelativePath::parse(format!(
-                            "packages/{owner}"
-                        ))
-                        .expect("a canonical package location"),
-                    ),
-                    "package-hash",
-                    ResolvedVariables::default(),
-                    claims,
-                );
-                (
-                    format!("{owner}.json"),
-                    VirtualPath::data(format!("profiles/{owner}.json")).unwrap(),
-                    CapturedBytes::new("record", record.to_bytes().unwrap()).unwrap(),
-                )
-            })
-            .collect::<Vec<_>>();
-        let profiles = VirtualPath::PROFILES;
-        let mut requested = vec![
+        let registries = [
             VirtualPath::CONFIG,
             VirtualPath::GATES,
             VirtualPath::INVARIANTS,
             VirtualPath::RULES,
             VirtualPath::TEMPLATES,
-            profiles.clone(),
         ];
-        requested.extend(records.iter().map(|(_, path, _)| path.clone()));
-        requested.extend(targets.iter().map(|(target, _, _)| target.clone()));
         let mut spec = CaptureSpec::new(
-            requested,
+            registries
+                .iter()
+                .cloned()
+                .chain(targets.iter().map(|(target, _)| target.clone())),
             CaptureBudget {
-                max_listings: 1,
+                max_listings: 0,
                 max_bytes: 65536,
                 max_depth: 8,
             },
         )
         .unwrap();
-        spec.discover_listing(profiles.clone()).unwrap();
-        let mut entries = BTreeMap::from([
-            (
-                VirtualPath::CONFIG,
-                RepositoryEntry::File {
-                    content: CapturedBytes::new("config", Vec::new()).unwrap(),
-                    mode: FileMode::Regular,
-                },
-            ),
-            (
-                profiles.clone(),
-                RepositoryEntry::Directory {
-                    identity: EntryIdentity::for_bytes("profiles", b"directory").unwrap(),
-                    mode: FileMode::Regular,
-                },
-            ),
-        ]);
-        entries.extend(records.iter().map(|(_, path, content)| {
-            (
-                path.clone(),
-                RepositoryEntry::File {
-                    content: content.clone(),
-                    mode: FileMode::Regular,
-                },
-            )
-        }));
-        entries.extend(targets.iter().map(|(target, bytes, _)| {
+        spec.discover_paths([]).unwrap();
+        let mut entries = registries
+            .into_iter()
+            .map(|path| (path, RepositoryEntry::Absent))
+            .collect::<BTreeMap<_, _>>();
+        entries.insert(
+            VirtualPath::CONFIG,
+            RepositoryEntry::File {
+                content: CapturedBytes::new("config", config.to_vec()).unwrap(),
+                mode: FileMode::Regular,
+            },
+        );
+        entries.extend(targets.iter().map(|(target, bytes)| {
             (
                 target.clone(),
                 RepositoryEntry::File {
@@ -3480,40 +1984,17 @@ mod tests {
                 },
             )
         }));
-        entries.extend(
-            [
-                VirtualPath::GATES,
-                VirtualPath::INVARIANTS,
-                VirtualPath::RULES,
-                VirtualPath::TEMPLATES,
-            ]
-            .into_iter()
-            .map(|path| (path, RepositoryEntry::Absent)),
-        );
-        let listings = BTreeMap::from([(
-            profiles,
-            DirectoryListing::new(records.iter().map(|(name, _, _)| name.clone())).unwrap(),
-        )]);
         (
-            RepositoryImage::close(layout.clone(), spec, entries, listings, BTreeMap::new())
-                .unwrap(),
+            RepositoryImage::close(
+                layout.clone(),
+                spec,
+                entries,
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
+            .unwrap(),
             layout,
         )
-    }
-
-    /// A captured image whose one target is repository-authored or published by
-    /// the base package.
-    fn image_with_profile_owner(
-        target: &VirtualPath,
-        target_bytes: &[u8],
-        package_owns_target: bool,
-    ) -> (RepositoryImage, RepositoryLayout) {
-        let owners: &[&str] = if package_owns_target {
-            &["base-package"]
-        } else {
-            &[]
-        };
-        image_owning(&[(target.clone(), target_bytes, owners)])
     }
 
     /// Render one contribution that has already passed semantic composition.
@@ -3539,11 +2020,49 @@ mod tests {
         }
     }
 
-    fn fixture_profile_origin() -> ProfileOrigin {
-        ProfileOrigin::Directory(
-            crate::repository_state::RootRelativePath::parse("profiles/example")
-                .expect("fixture package source is canonical"),
-        )
+    fn package_owners(packages: &[&str]) -> Vec<ContributionConflictOwner> {
+        packages
+            .iter()
+            .map(|package| ContributionConflictOwner::Package(ProfilePackageId::new(*package)))
+            .collect()
+    }
+
+    /// One package's asset claims, every target carrying `bytes`.
+    fn asset_claims(
+        layout: &RepositoryLayout,
+        package: &str,
+        targets: &[VirtualPath],
+        bytes: &[u8],
+    ) -> ProfileClaims {
+        ProfileClaims {
+            package_id: ProfilePackageId::new(package),
+            contributions: Vec::new(),
+            assets: targets
+                .iter()
+                .map(|target| ProfileAssetClaim {
+                    claim: TargetClaim::new(
+                        layout,
+                        target.clone(),
+                        format!("profile-asset:{}", target.repository_relative()),
+                    )
+                    .unwrap(),
+                    bytes: bytes.to_vec(),
+                    mode: FileMode::Regular,
+                })
+                .collect(),
+            regions: Vec::new(),
+        }
+    }
+
+    fn disposition_of<'a>(
+        composition: &'a ProfileTargetComposition,
+        target: &VirtualPath,
+    ) -> &'a ProfileTargetDisposition {
+        &composition
+            .decisions
+            .get(target)
+            .expect("the composition decided this target")
+            .disposition
     }
 
     /// The definitions `outcomes` agreed on, in the order they were decided.
@@ -3579,15 +2098,7 @@ mod tests {
     }
 
     #[test]
-    fn test_applied_profile_record_v2_wire_is_strict_and_claims_are_sorted() {
-        let alpha = namespace_contribution("alpha", "First namespace.");
-        let beta = namespace_contribution("beta", "Second namespace.");
-        let claims = [
-            AppliedProfileClaim::semantic(&beta, false).unwrap(),
-            AppliedProfileClaim::semantic(&alpha, false).unwrap(),
-        ]
-        .into_iter()
-        .collect::<BTreeSet<_>>();
+    fn test_applied_profile_record_wire_is_strict_about_version_and_fields() {
         let record = AppliedProfileRecord::new(
             "example".try_into().expect("test profile id is canonical"),
             "1.2.3",
@@ -3598,24 +2109,9 @@ mod tests {
             ),
             "a".repeat(64),
             ResolvedVariables::default(),
-            claims,
         );
 
         let wire = serde_json::to_value(&record).expect("record serializes");
-        assert_eq!(wire["record_version"], serde_json::json!(2));
-        assert_eq!(wire["id"], serde_json::json!("example"));
-        assert_eq!(wire["version"], serde_json::json!("1.2.3"));
-        assert_eq!(wire["compatible_jit"], serde_json::json!(">=1.0.0"));
-        assert_eq!(wire["package_hash"], serde_json::json!("a".repeat(64)));
-        assert_eq!(
-            wire["claims"]
-                .as_array()
-                .expect("claims are an array")
-                .iter()
-                .map(|claim| claim["identity"]["identity"]["target"]["name"].clone())
-                .collect::<Vec<_>>(),
-            vec![serde_json::json!("alpha"), serde_json::json!("beta")]
-        );
         assert_eq!(
             serde_json::from_value::<AppliedProfileRecord>(wire.clone())
                 .expect("exact current record reads"),
@@ -3626,211 +2122,12 @@ mod tests {
         obsolete_version["record_version"] = serde_json::json!(1);
         assert!(serde_json::from_value::<AppliedProfileRecord>(obsolete_version).is_err());
 
-        let mut missing_claims = wire.clone();
-        missing_claims
-            .as_object_mut()
-            .expect("record is an object")
-            .remove("claims");
-        assert!(serde_json::from_value::<AppliedProfileRecord>(missing_claims).is_err());
-
         let mut unknown = wire;
         unknown
             .as_object_mut()
             .expect("record is an object")
-            .insert("unexpected".to_string(), serde_json::json!(true));
+            .insert("claims".to_string(), serde_json::json!([]));
         assert!(serde_json::from_value::<AppliedProfileRecord>(unknown).is_err());
-    }
-
-    #[test]
-    fn test_applied_profile_record_rejects_duplicate_claim_identities() {
-        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
-        let claim = AppliedProfileClaim::asset(&target, b"content", FileMode::Regular, false);
-        let record = AppliedProfileRecord::new(
-            "example".try_into().expect("test profile id is canonical"),
-            "1.0.0",
-            "*",
-            fixture_profile_origin(),
-            "a".repeat(64),
-            ResolvedVariables::default(),
-            BTreeSet::from([claim]),
-        );
-        let mut wire = serde_json::to_value(record).expect("current record serializes");
-        let duplicate = wire["claims"][0].clone();
-        wire["claims"]
-            .as_array_mut()
-            .expect("claims are an array")
-            .push(duplicate);
-
-        assert!(serde_json::from_value::<AppliedProfileRecord>(wire).is_err());
-    }
-
-    #[test]
-    fn test_applied_profile_record_wire_rejects_duplicate_json_member_names() {
-        let record = AppliedProfileRecord::new(
-            "example".try_into().expect("test profile id is canonical"),
-            "1.0.0",
-            "*",
-            fixture_profile_origin(),
-            "a".repeat(64),
-            ResolvedVariables::default(),
-            BTreeSet::new(),
-        );
-        let wire = String::from_utf8(record.to_bytes().expect("record serializes"))
-            .expect("record wire is UTF-8");
-        let duplicate = wire.replacen(
-            "\"record_version\": 2,",
-            "\"record_version\": 2,\n  \"record_version\": 2,",
-            1,
-        );
-
-        assert!(serde_json::from_str::<AppliedProfileRecord>(&duplicate).is_err());
-    }
-
-    #[test]
-    fn test_validate_applied_record_path_rejects_a_record_under_another_package_id() {
-        let record = AppliedProfileRecord::new(
-            "example".try_into().expect("test profile id is canonical"),
-            "1.0.0",
-            "*",
-            fixture_profile_origin(),
-            "a".repeat(64),
-            ResolvedVariables::default(),
-            BTreeSet::new(),
-        );
-        let path = VirtualPath::data("profiles/other.json").expect("canonical path");
-
-        assert!(matches!(
-            validate_applied_record_path(&path, &record),
-            Err(ProducerError::ProfileRecordPathMismatch { .. })
-        ));
-    }
-
-    #[test]
-    fn test_profile_application_record_fingerprints_the_final_derived_asset_target() {
-        let layout = RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .expect("layout is valid");
-        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
-        let claims = ProfileClaims {
-            package_id: ProfilePackageId::new("example"),
-            contributions: Vec::new(),
-            assets: vec![ProfileAssetClaim {
-                claim: TargetClaim::new(&layout, target.clone(), "example")
-                    .expect("target claim is valid"),
-                bytes: b"declared bytes".to_vec(),
-                mode: FileMode::Regular,
-                replace_owned: false,
-            }],
-            regions: Vec::new(),
-        };
-        let input = ProfileApplicationInput {
-            id: "example".try_into().expect("test profile id is canonical"),
-            version: "1.0.0".into(),
-            compatible_jit: "*".into(),
-            package_hash: "a".repeat(64),
-            variables: ResolvedVariables::default(),
-            target_hashes: BTreeMap::new(),
-            origin: fixture_profile_origin(),
-            claims,
-            contribution_context: Vec::new(),
-            record_path: VirtualPath::data("profiles/example.json").expect("record path"),
-        };
-        let composition = ProfileTargetComposition {
-            targets: BTreeMap::from([(
-                target.clone(),
-                (b"derived projection bytes".to_vec(), FileMode::Executable),
-            )]),
-            retained_claims: BTreeSet::new(),
-            decisions: BTreeMap::new(),
-            contribution_decisions: BTreeMap::new(),
-        };
-
-        let record = input.record(&composition).expect("record is derived");
-        let expected = AppliedProfileClaim::asset(
-            &target,
-            b"derived projection bytes",
-            FileMode::Executable,
-            false,
-        );
-        assert_eq!(record.claims, BTreeSet::from([expected]));
-    }
-
-    #[test]
-    fn test_profile_claim_fingerprints_canonicalize_semantic_values_and_separate_domains() {
-        let first = Contribution::MapEntry {
-            target: MapEntryTarget::Namespaces,
-            identity: "example".to_string(),
-            value: serde_json::from_str(r#"{"description":"Example.","rank":1}"#)
-                .expect("valid JSON"),
-        };
-        let reordered = Contribution::MapEntry {
-            target: MapEntryTarget::Namespaces,
-            identity: "example".to_string(),
-            value: serde_json::from_str(r#"{"rank":1,"description":"Example."}"#)
-                .expect("valid JSON"),
-        };
-        let different_identity = Contribution::MapEntry {
-            target: MapEntryTarget::Namespaces,
-            identity: "other".to_string(),
-            value: first_value(&first),
-        };
-        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
-        let asset = AppliedProfileClaim::asset(&target, b"same bytes", FileMode::Regular, false);
-        let executable =
-            AppliedProfileClaim::asset(&target, b"same bytes", FileMode::Executable, false);
-        let region = AppliedProfileClaim::managed_region(
-            &target,
-            "example-region"
-                .try_into()
-                .expect("test region id is canonical"),
-            b"same bytes",
-            FileMode::Regular,
-            false,
-        );
-
-        assert_eq!(
-            fingerprint_semantic_contribution(&first).expect("first fingerprint"),
-            fingerprint_semantic_contribution(&reordered).expect("reordered fingerprint")
-        );
-        assert_ne!(
-            fingerprint_semantic_contribution(&first).expect("first fingerprint"),
-            fingerprint_semantic_contribution(&different_identity)
-                .expect("different identity fingerprint")
-        );
-        assert_ne!(asset.base_fingerprint, executable.base_fingerprint);
-        assert_ne!(asset.base_fingerprint, region.base_fingerprint);
-        assert_ne!(asset.identity, region.identity);
-    }
-
-    #[test]
-    fn test_managed_region_identity_ignores_mode_while_its_fingerprint_includes_mode() {
-        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
-        let regular = AppliedProfileClaim::managed_region(
-            &target,
-            "guidance".try_into().expect("canonical region id"),
-            b"region body",
-            FileMode::Regular,
-            true,
-        );
-        let executable = AppliedProfileClaim::managed_region(
-            &target,
-            "guidance".try_into().expect("canonical region id"),
-            b"region body",
-            FileMode::Executable,
-            true,
-        );
-
-        assert_eq!(regular.identity, executable.identity);
-        assert_ne!(regular.base_fingerprint, executable.base_fingerprint);
-    }
-
-    fn first_value(contribution: &Contribution) -> JsonValue {
-        match contribution {
-            Contribution::MapEntry { value, .. } => value.clone(),
-            _ => unreachable!("test fixture is a map entry"),
-        }
     }
 
     #[test]
@@ -3877,13 +2174,10 @@ mod tests {
     fn test_compose_resolved_contributions_records_sorted_shared_owners() {
         let contribution = namespace_contribution("shared", "Shared vocabulary.");
 
-        let composed = agreed_definitions(compose_resolved_contributions(
-            [],
-            [
-                contribution_claim("workflow", contribution.clone()),
-                contribution_claim("base", contribution),
-            ],
-        ));
+        let composed = agreed_definitions(compose_resolved_contributions([
+            contribution_claim("workflow", contribution.clone()),
+            contribution_claim("base", contribution),
+        ]));
 
         assert_eq!(composed.len(), 1);
         assert_eq!(
@@ -3900,10 +2194,6 @@ mod tests {
         let shared_identity = "shared";
         let first = namespace_contribution(shared_identity, "First definition.");
         let second = namespace_contribution(shared_identity, "Second definition.");
-        let expected_owners = vec![
-            ContributionConflictOwner::Package(ProfilePackageId::new("base")),
-            ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
-        ];
 
         for claims in [
             vec![
@@ -3915,39 +2205,19 @@ mod tests {
                 contribution_claim("base", first.clone()),
             ],
         ] {
-            let (identity, owners) = contested_outcome(compose_resolved_contributions([], claims));
+            let (identity, owners) = contested_outcome(compose_resolved_contributions(claims));
 
             assert_eq!(identity, first.semantic_identity());
-            assert_eq!(owners, expected_owners);
+            assert_eq!(owners, package_owners(&["base", "workflow"]));
         }
     }
 
     #[test]
-    fn test_compose_resolved_contributions_replaces_a_package_owned_identity() {
-        let existing = namespace_contribution("shared", "Previous definition.");
-        let replacement = namespace_contribution("shared", "Replacement definition.");
-
-        let composed = agreed_definitions(compose_resolved_contributions(
-            [ExistingContributionClaim::Package(contribution_claim(
-                "workflow", existing,
-            ))],
-            [contribution_claim("workflow", replacement.clone())],
-        ));
-
-        assert_eq!(composed.len(), 1);
-        assert_eq!(composed[0].definition, replacement);
-        assert_eq!(composed[0].owners, vec![ProfilePackageId::new("workflow")]);
-    }
-
-    #[test]
     fn test_compose_resolved_contributions_keeps_distinct_identities_in_one_registry() {
-        let composed = agreed_definitions(compose_resolved_contributions(
-            [],
-            [
-                contribution_claim("workflow", namespace_contribution("one", "First.")),
-                contribution_claim("workflow", namespace_contribution("two", "Second.")),
-            ],
-        ));
+        let composed = agreed_definitions(compose_resolved_contributions([
+            contribution_claim("workflow", namespace_contribution("one", "First.")),
+            contribution_claim("workflow", namespace_contribution("two", "Second.")),
+        ]));
 
         assert_eq!(composed.len(), 2);
         assert!(composed
@@ -3955,232 +2225,158 @@ mod tests {
             .all(|contribution| contribution.owners == [ProfilePackageId::new("workflow")]));
     }
 
+    /// The repository is never a conflict party: a registry already declaring
+    /// the identity differently keeps its entry and the decision is no conflict.
     #[test]
-    fn test_compose_resolved_contributions_distinguishes_repository_and_package_conflicts() {
-        let existing = namespace_contribution("shared", "Existing definition.");
-        let replacement = namespace_contribution("shared", "Replacement definition.");
-        let candidate = contribution_claim("workflow", replacement);
-
-        let cases = [
-            (
-                ExistingContributionClaim::Repository(existing.clone()),
-                vec![
-                    ContributionConflictOwner::Repository,
-                    ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
-                ],
-            ),
-            (
-                ExistingContributionClaim::Package(contribution_claim("base", existing)),
-                vec![
-                    ContributionConflictOwner::Package(ProfilePackageId::new("base")),
-                    ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
-                ],
-            ),
-        ];
-
-        for (existing, expected_owners) in cases {
-            let (identity, owners) = contested_outcome(compose_resolved_contributions(
-                [existing],
-                [candidate.clone()],
-            ));
-
-            assert_eq!(identity, candidate.contribution.semantic_identity());
-            assert_eq!(owners, expected_owners);
-        }
-    }
-
-    #[test]
-    fn test_profile_target_conflict_reports_package_occupant_and_candidate() {
-        let target = VirtualPath::data("custom.txt").unwrap();
-        let (image, layout) = image_with_profile_owner(&target, b"authored by package", true);
+    fn test_compose_profile_targets_never_contests_a_differing_registry_declaration() {
+        let (image, layout) = image_holding(
+            b"[namespaces.shared]\ndescription = \"Repository definition.\"\nunique = false\n",
+            &[],
+        );
+        let contribution = namespace_contribution("shared", "Package definition.");
         let claims = ProfileClaims {
-            package_id: ProfilePackageId::new("workflow-package"),
-            contributions: Vec::new(),
-            assets: vec![ProfileAssetClaim {
-                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
-                    .unwrap(),
-                bytes: b"different package bytes".to_vec(),
-                mode: FileMode::Regular,
-                replace_owned: false,
-            }],
-            regions: Vec::new(),
+            contributions: vec![contribution_claim("workflow", contribution.clone())],
+            ..asset_claims(&layout, "workflow", &[], b"")
         };
 
-        let composition = compose_profile_targets(&image, claims)
-            .expect("a conflicting target is decided, not refused, by composition");
+        let composition = compose_profile_targets(&image, claims).unwrap();
 
         assert_eq!(
             composition
-                .decisions
-                .get(&target)
-                .map(|decision| &decision.disposition),
-            Some(&ProfileTargetDisposition::Conflict(
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new(
-                        "base-package"
-                    ))
-                }
-            ))
+                .contribution_decisions
+                .get(&contribution.semantic_identity()),
+            Some(&ProfileTargetDisposition::Unchanged)
         );
     }
 
-    /// One asset claim per target, all with bytes that differ from what the
-    /// image holds, so every one of them is a decision a publication refuses.
-    fn colliding_asset_claims(
-        layout: &RepositoryLayout,
-        package: &str,
-        targets: &[VirtualPath],
-    ) -> ProfileClaims {
-        ProfileClaims {
-            package_id: ProfilePackageId::new(package),
-            contributions: Vec::new(),
-            assets: targets
-                .iter()
-                .map(|target| ProfileAssetClaim {
-                    claim: TargetClaim::new(
-                        layout,
-                        target.clone(),
-                        format!("profile-asset:{}", target.repository_relative()),
-                    )
-                    .unwrap(),
-                    bytes: b"bytes this package would publish".to_vec(),
-                    mode: FileMode::Regular,
-                    replace_owned: false,
-                })
-                .collect(),
-            regions: Vec::new(),
+    /// The repository is never a conflict party: a package asset over a file
+    /// holding other bytes replaces it.
+    #[test]
+    fn test_compose_profile_targets_updates_an_asset_over_differing_repository_content() {
+        let target = VirtualPath::worktree("docs/custom.txt").unwrap();
+        let (image, layout) = image_holding(b"", &[(target.clone(), b"repository bytes")]);
+        let claims = asset_claims(
+            &layout,
+            "workflow",
+            std::slice::from_ref(&target),
+            b"package bytes",
+        );
+
+        let composition = compose_profile_targets(&image, claims).unwrap();
+
+        assert_eq!(
+            disposition_of(&composition, &target),
+            &ProfileTargetDisposition::Update
+        );
+    }
+
+    /// An asset target is one key: packages being applied that declare it
+    /// differently contest it, whatever order they are selected in, and an
+    /// identical restatement composes.
+    #[test]
+    fn test_contested_asset_targets_names_every_package_declaring_a_target_differently() {
+        let contested = VirtualPath::worktree("docs/contested.txt").unwrap();
+        let restated = VirtualPath::worktree("docs/restated.txt").unwrap();
+        let (_, layout) = image_holding(b"", &[]);
+        let base = ProfileClaims {
+            assets: asset_claims(
+                &layout,
+                "base",
+                std::slice::from_ref(&contested),
+                b"base bytes",
+            )
+            .assets
+            .into_iter()
+            .chain(asset_claims(&layout, "base", std::slice::from_ref(&restated), b"same").assets)
+            .collect(),
+            ..asset_claims(&layout, "base", &[], b"")
+        };
+        let workflow = ProfileClaims {
+            assets: asset_claims(
+                &layout,
+                "workflow",
+                std::slice::from_ref(&contested),
+                b"workflow bytes",
+            )
+            .assets
+            .into_iter()
+            .chain(asset_claims(&layout, "workflow", &[restated], b"same").assets)
+            .collect(),
+            ..asset_claims(&layout, "workflow", &[], b"")
+        };
+
+        for selection in [[&base, &workflow], [&workflow, &base]] {
+            assert_eq!(
+                contested_asset_targets(selection),
+                BTreeMap::from([(contested.clone(), package_owners(&["base", "workflow"]))])
+            );
         }
     }
 
-    /// Every target the decision refused, beside why it refused it.
-    fn refused_decisions(
-        composition: &ProfileTargetComposition,
-    ) -> BTreeMap<String, ProfileTargetConflict> {
-        composition
-            .decisions
-            .iter()
-            .filter_map(|(path, decision)| match &decision.disposition {
-                ProfileTargetDisposition::Conflict(conflict) => {
-                    Some((path.repository_relative(), conflict.clone()))
-                }
-                _ => None,
-            })
-            .collect()
+    /// A composition decides every target it was asked about, so a package
+    /// contesting three targets answers with three refusals rather than the
+    /// first one it reached.
+    #[test]
+    fn test_compose_profile_targets_with_context_refuses_every_contested_asset_target() {
+        let targets = ["first.txt", "second.txt", "third.txt"]
+            .map(|name| VirtualPath::worktree(name).unwrap())
+            .to_vec();
+        let (image, layout) = image_holding(b"", &[]);
+        let workflow = asset_claims(&layout, "workflow", &targets, b"workflow bytes");
+        let base = asset_claims(&layout, "base", &targets, b"base bytes");
+        let contested = contested_asset_targets([&workflow, &base]);
+
+        let composition =
+            compose_profile_targets_with_context(&image, workflow, Vec::new(), &contested)
+                .expect("a contested target is decided, not refused, by composition");
+
+        for target in &targets {
+            assert_eq!(
+                disposition_of(&composition, target),
+                &ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested {
+                    owners: package_owners(&["base", "workflow"]),
+                }),
+                "every contested target is decided, not only the first one reached"
+            );
+        }
     }
 
-    /// Every reason a target can be refused reaches a reader as rendered facts
-    /// and a remedy, never as the Rust types that carry them.
+    /// A refusal reaches a reader as rendered facts, never as the Rust types
+    /// that carry them, and states no remedy.
     #[test]
-    fn test_profile_target_conflict_message_states_a_remedy_without_debug_formatted_values() {
-        let fingerprint = |seed: &str| {
-            ThreeWayValue::Present(
-                serde_json::from_str::<ProfileBaseFingerprint>(&format!("\"{}\"", seed.repeat(64)))
-                    .expect("a canonical fingerprint"),
-            )
-        };
+    fn test_profile_target_conflict_entry_message_names_profile_subject_and_packages() {
         let identity = namespace_contribution("shared", "Shared vocabulary.").semantic_identity();
         let entries = [
-            (
-                ProfileTargetSubject::File(VirtualPath::data("custom.txt").unwrap()),
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Repository,
-                },
-            ),
-            (
-                ProfileTargetSubject::File(VirtualPath::data("custom.txt").unwrap()),
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new(
-                        "base-package",
-                    )),
-                },
-            ),
-            (
-                ProfileTargetSubject::File(VirtualPath::data("custom.txt").unwrap()),
-                ProfileTargetConflict::Diverged {
-                    base: fingerprint("a"),
-                    current: fingerprint("b"),
-                    candidate: ThreeWayValue::Absent,
-                },
-            ),
-            (
-                ProfileTargetSubject::Contribution(identity.clone()),
-                ProfileTargetConflict::Contested {
-                    owners: vec![
-                        ContributionConflictOwner::Repository,
-                        ContributionConflictOwner::Package(ProfilePackageId::new("base-package")),
-                    ],
-                },
-            ),
+            ProfileTargetSubject::File(VirtualPath::data("custom.txt").unwrap()),
+            ProfileTargetSubject::Contribution(identity),
         ]
-        .map(|(subject, conflict)| ProfileTargetConflictEntry {
+        .map(|subject| ProfileTargetConflictEntry {
             owner: "workflow".try_into().expect("a canonical profile id"),
             subject,
-            conflict,
+            conflict: ProfileTargetConflict::Contested {
+                owners: package_owners(&["base-package", "workflow"]),
+            },
         });
 
         for entry in &entries {
             let message = entry.to_string();
-            for leaked in [
-                "Present(",
-                "Absent",
-                "ProfileBaseFingerprint",
-                "ThreeWayValue",
-                "ProfileConflictOccupant",
-                "ContributionConflictOwner",
-                "Package(",
-                "{",
-            ] {
+            for leaked in ["ContributionConflictOwner", "Package(", "{"] {
                 assert!(
                     !message.contains(leaked),
                     "a refusal names facts, not Rust syntax: {message}"
                 );
             }
-            assert!(
-                entry
-                    .conflict
-                    .remedy()
-                    .resolutions()
-                    .iter()
-                    .all(|resolution| message.contains(resolution.message())),
-                "a refusal states every resolution its remedy carries: {message}"
-            );
             let subject = match &entry.subject {
                 ProfileTargetSubject::File(path) => path.repository_relative(),
                 ProfileTargetSubject::Contribution(identity) => identity.to_string(),
             };
             assert!(
-                message.contains(&subject) && message.contains(entry.owner.as_str()),
-                "a refusal names the profile and what it is about: {message}"
+                message.contains(&subject)
+                    && message.contains(entry.owner.as_str())
+                    && message.contains("base-package"),
+                "a refusal names the profile, its subject, and every party: {message}"
             );
         }
-        let diverged = entries[2].to_string();
-        assert!(
-            diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS))
-                && diverged.contains(&"b".repeat(FINGERPRINT_MESSAGE_DIGITS))
-                && !diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS + 1)),
-            "the values that disagree reach the reader as their leading digits: {diverged}"
-        );
-    }
-
-    #[test]
-    fn test_profile_target_conflict_serializes_its_typed_remedy_with_the_conflict_evidence() {
-        let conflict = ProfileTargetConflict::Diverged {
-            base: ThreeWayValue::Absent,
-            current: ThreeWayValue::Absent,
-            candidate: ThreeWayValue::Absent,
-        };
-
-        let serialized = serde_json::to_value(&conflict).expect("a conflict serializes");
-
-        assert_eq!(serialized["kind"], "diverged");
-        assert_eq!(
-            serialized["remedy"]["resolutions"],
-            serde_json::json!(["restore-recorded-content"])
-        );
-        assert_eq!(
-            conflict.remedy().resolutions(),
-            &[ProfileResolution::RestoreRecordedContent]
-        );
     }
 
     #[test]
@@ -4190,8 +2386,8 @@ mod tests {
             subject: ProfileTargetSubject::File(
                 VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
             ),
-            conflict: ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Repository,
+            conflict: ProfileTargetConflict::Contested {
+                owners: package_owners(&["captured", "other"]),
             },
         };
 
@@ -4200,11 +2396,12 @@ mod tests {
         assert_eq!(serialized["owner"], "captured");
         assert_eq!(serialized["subject"]["kind"], "file");
         assert_eq!(serialized["subject"]["path"], "docs/guide.md");
-        assert_eq!(serialized["conflict"]["kind"], "occupied");
+        assert_eq!(serialized["conflict"]["kind"], "contested");
         assert_eq!(
-            serialized["conflict"]["remedy"]["resolutions"],
-            serde_json::json!(["move-target-aside"])
+            serialized["conflict"]["owners"].as_array().map(Vec::len),
+            Some(2)
         );
+        assert!(serialized["conflict"].get("remedy").is_none());
     }
 
     #[test]
@@ -4231,10 +2428,8 @@ mod tests {
             subject: ProfileTargetSubject::File(
                 VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
             ),
-            conflict: ProfileTargetConflict::Diverged {
-                base: ThreeWayValue::Absent,
-                current: ThreeWayValue::Absent,
-                candidate: ThreeWayValue::Absent,
+            conflict: ProfileTargetConflict::Contested {
+                owners: package_owners(&["captured", "other"]),
             },
         };
         let error = ProfileTargetConflictsError::new(vec![entry]);
@@ -4243,256 +2438,7 @@ mod tests {
 
         assert_eq!(serialized["conflicts"].as_array().unwrap().len(), 1);
         assert_eq!(serialized["conflicts"][0]["owner"], "captured");
-        assert_eq!(serialized["conflicts"][0]["conflict"]["kind"], "diverged");
-    }
-
-    #[test]
-    fn test_profile_target_conflicts_error_suggestions_dedupes_across_entries() {
-        let entry = |owner: &str| ProfileTargetConflictEntry {
-            owner: ProfileId::try_from(owner).expect("a canonical test profile id"),
-            subject: ProfileTargetSubject::File(
-                VirtualPath::worktree(format!("{owner}.txt")).expect("a canonical worktree path"),
-            ),
-            conflict: ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
-            },
-        };
-
-        // Two entries carry the identical remedy, so their resolutions collapse
-        // into one suggestion apiece rather than repeating.
-        let suggestions =
-            ProfileTargetConflictsError::new(vec![entry("first"), entry("second")]).suggestions();
-
-        assert_eq!(
-            suggestions.len(),
-            2,
-            "a package-occupied remedy names two resolutions, deduplicated across entries: \
-             {suggestions:?}"
-        );
-    }
-
-    /// A composition decides every target it was asked about, so a package
-    /// colliding with three repository files answers with three refusals rather
-    /// than the first one it reached (REQ-01).
-    #[test]
-    fn test_compose_profile_targets_refuses_every_colliding_target_rather_than_only_the_first() {
-        let targets = ["first.txt", "second.txt", "third.txt"]
-            .map(|name| VirtualPath::data(name).unwrap())
-            .to_vec();
-        let occupants = targets
-            .iter()
-            .map(|target| {
-                (
-                    target.clone(),
-                    b"authored by the repository".as_slice(),
-                    &[][..],
-                )
-            })
-            .collect::<Vec<_>>();
-        let (image, layout) = image_owning(&occupants);
-        let claims = colliding_asset_claims(&layout, "workflow-package", &targets);
-
-        let composition = compose_profile_targets(&image, claims)
-            .expect("a colliding target is decided, not refused, by composition");
-
-        assert_eq!(
-            refused_decisions(&composition)
-                .into_keys()
-                .collect::<BTreeSet<_>>(),
-            targets
-                .iter()
-                .map(VirtualPath::repository_relative)
-                .collect::<BTreeSet<_>>(),
-            "every colliding target is decided, not only the first one reached"
-        );
-    }
-
-    /// A decision names the packages that claim each target it reports, so a
-    /// reader separates repository-authored content from published content and
-    /// sees every owner of shared content (REQ-02).
-    #[test]
-    fn test_compose_profile_targets_names_every_package_that_claims_a_decided_target() {
-        let shared = VirtualPath::data("shared.txt").unwrap();
-        let authored = VirtualPath::data("authored.txt").unwrap();
-        let bytes = b"content two packages published".as_slice();
-        let (image, layout) = image_owning(&[
-            (shared.clone(), bytes, &["base-package", "other-package"]),
-            (authored.clone(), b"authored by the repository", &[]),
-        ]);
-        let claims = colliding_asset_claims(
-            &layout,
-            "workflow-package",
-            &[shared.clone(), authored.clone()],
-        );
-
-        let composition = compose_profile_targets(&image, claims)
-            .expect("a colliding target is decided, not refused, by composition");
-
-        let owners = |target: &VirtualPath| {
-            composition
-                .decisions
-                .get(target)
-                .map(|decision| {
-                    decision
-                        .owners
-                        .iter()
-                        .map(ProfilePackageId::as_str)
-                        .map(str::to_string)
-                        .collect::<BTreeSet<_>>()
-                })
-                .expect("the composition decided this target")
-        };
-        assert_eq!(
-            owners(&shared),
-            BTreeSet::from(["base-package".to_string(), "other-package".to_string()]),
-            "shared content names every package that claims it"
-        );
-        assert!(
-            owners(&authored).is_empty(),
-            "a target no package claims is the repository's own content"
-        );
-        assert!(
-            matches!(
-                refused_decisions(&composition).get(&authored.repository_relative()),
-                Some(ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Repository
-                })
-            ),
-            "an unowned occupant is distinguished from an owned one"
-        );
-    }
-
-    #[test]
-    fn test_profile_target_conflict_reports_repository_occupant() {
-        let target = VirtualPath::data("custom.txt").unwrap();
-        let (image, layout) = image_with_profile_owner(&target, b"repository bytes", false);
-        let claims = ProfileClaims {
-            package_id: ProfilePackageId::new("workflow-package"),
-            contributions: Vec::new(),
-            assets: vec![ProfileAssetClaim {
-                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
-                    .unwrap(),
-                bytes: b"different package bytes".to_vec(),
-                mode: FileMode::Regular,
-                replace_owned: false,
-            }],
-            regions: Vec::new(),
-        };
-
-        let composition = compose_profile_targets(&image, claims)
-            .expect("a repository-authored occupant is decided, not refused, by composition");
-
-        assert_eq!(
-            composition
-                .decisions
-                .get(&target)
-                .map(|decision| &decision.disposition),
-            Some(&ProfileTargetDisposition::Conflict(
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Repository
-                }
-            ))
-        );
-    }
-
-    #[test]
-    fn test_profile_record_retains_adopted_identical_repository_asset_baseline() {
-        let target = VirtualPath::data("custom.txt").unwrap();
-        let (image, layout) = image_with_profile_owner(&target, b"repository bytes", false);
-        let claims = ProfileClaims {
-            package_id: ProfilePackageId::new("workflow-package"),
-            contributions: Vec::new(),
-            assets: vec![ProfileAssetClaim {
-                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
-                    .unwrap(),
-                bytes: b"repository bytes".to_vec(),
-                mode: FileMode::Regular,
-                replace_owned: false,
-            }],
-            regions: Vec::new(),
-        };
-        let composition = compose_profile_targets(&image, claims.clone())
-            .expect("identical repository asset is adoptable");
-        let input = ProfileApplicationInput {
-            id: "workflow-package"
-                .try_into()
-                .expect("test profile id is canonical"),
-            version: "1.0.0".to_string(),
-            compatible_jit: "*".to_string(),
-            package_hash: "a".repeat(64),
-            variables: ResolvedVariables::default(),
-            target_hashes: BTreeMap::new(),
-            origin: ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("profiles/workflow-package")
-                    .expect("canonical package source"),
-            ),
-            claims,
-            contribution_context: Vec::new(),
-            record_path: VirtualPath::data("profiles/workflow-package.json")
-                .expect("canonical record path"),
-        };
-        let identity = AppliedProfileClaimIdentity::Asset {
-            target: AppliedClaimTarget::from_virtual_path(&target, FileMode::Regular),
-        };
-
-        assert!(composition.retained_claims.contains(&identity));
-        assert!(input
-            .record(&composition)
-            .expect("record serializes")
-            .claims
-            .iter()
-            .any(|claim| claim.identity == identity && claim.retain_if_unowned));
-    }
-
-    #[test]
-    fn test_retained_semantic_claim_identities_marks_an_adopted_registry_definition() {
-        let layout = super::super::RepositoryLayout::new(
-            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
-            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap();
-        let config =
-            b"[namespaces.adopted]\ndescription = \"Repository definition.\"\nunique = false\n";
-        let mut spec = CaptureSpec::new(
-            [VirtualPath::CONFIG],
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 4096,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        spec.discover_paths([]).unwrap();
-        let image = RepositoryImage::close(
-            layout,
-            spec,
-            BTreeMap::from([(
-                VirtualPath::CONFIG,
-                RepositoryEntry::File {
-                    content: CapturedBytes::new("config", config.to_vec()).unwrap(),
-                    mode: FileMode::Regular,
-                },
-            )]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
-        let contribution = Contribution::MapEntry {
-            target: MapEntryTarget::Namespaces,
-            identity: "adopted".to_string(),
-            value: serde_json::json!({
-                "description": "Repository definition.",
-                "unique": false,
-            }),
-        };
-        let candidate = contribution_claim("workflow", contribution.clone());
-
-        assert_eq!(
-            retained_semantic_claim_identities(&image, &[candidate]).unwrap(),
-            BTreeSet::from([AppliedProfileClaimIdentity::Semantic {
-                identity: contribution.semantic_identity(),
-            }])
-        );
+        assert_eq!(serialized["conflicts"][0]["conflict"]["kind"], "contested");
     }
 
     #[test]

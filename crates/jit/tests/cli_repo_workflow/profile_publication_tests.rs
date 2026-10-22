@@ -24,9 +24,8 @@ const PROFILE_ID: &str = "lifecycle-interruption";
 pub(super) const PACKAGE_LOCATION: &str = "packages/lifecycle-interruption";
 const RECORD_PATH: &str = ".jit/profiles/lifecycle-interruption.json";
 const EVENT_PATH: &str = ".jit/events.jsonl";
-const MANAGED_TARGETS: [&str; 3] = [
+const MANAGED_TARGETS: [&str; 2] = [
     "docs/lifecycle-interruption/added.txt",
-    "docs/lifecycle-interruption/departing.txt",
     "docs/lifecycle-interruption/retained.txt",
 ];
 
@@ -129,8 +128,7 @@ fn write_package(repository: &Path, version: &str) {
     let manifest = if version == "1.0.0" {
         format!(
             "[profile]\nmanifest-version = 2\nid = \"{PROFILE_ID}\"\nversion = \"1.0.0\"\ncompatible-jit = \"*\"\n\n\
-             [[asset]]\nsource = \"assets/retained.txt\"\ntarget = \"docs/lifecycle-interruption/retained.txt\"\n\n\
-             [[asset]]\nsource = \"assets/departing.txt\"\ntarget = \"docs/lifecycle-interruption/departing.txt\"\n"
+             [[asset]]\nsource = \"assets/retained.txt\"\ntarget = \"docs/lifecycle-interruption/retained.txt\"\n"
         )
     } else {
         format!(
@@ -145,14 +143,7 @@ fn write_package(repository: &Path, version: &str) {
         format!("retained content from {version}\n"),
     )
     .unwrap();
-    if version == "1.0.0" {
-        fs::write(assets.join("departing.txt"), "departing content\n").unwrap();
-    } else {
-        match fs::remove_file(assets.join("departing.txt")) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => panic!("remove departing package asset: {error}"),
-        }
+    if version != "1.0.0" {
         fs::write(assets.join("added.txt"), "newly added content\n").unwrap();
     }
 }
@@ -176,7 +167,6 @@ pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
         Some(b"retained content from 1.0.0\n".to_vec())
     );
     assert!(prior.worktree_bytes["docs/lifecycle-interruption/added.txt"].is_none());
-    assert!(prior.worktree_bytes["docs/lifecycle-interruption/departing.txt"].is_some());
     (repository, prior)
 }
 
@@ -207,7 +197,6 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         prior.audit.len() + 1,
         "the publication carries the lifecycle run's audit event"
     );
-    assert!(published.worktree_bytes["docs/lifecycle-interruption/departing.txt"].is_none());
     assert_eq!(
         published.worktree_bytes["docs/lifecycle-interruption/retained.txt"],
         Some(b"retained content from 2.0.0\n".to_vec())

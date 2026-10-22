@@ -339,7 +339,6 @@ fn tree_target_changes(outcomes: &[TreeFileOutcome]) -> Vec<ProfileTargetChange>
                 outcome.path.repository_relative(),
                 action,
                 outcome.mode,
-                Vec::new(),
                 None,
             )
         })
@@ -530,7 +529,6 @@ impl CommandExecutor<JsonFileStorage> {
                     output.display().to_string(),
                     ProfileTargetAction::Create,
                     FileMode::Regular,
-                    Vec::new(),
                     None,
                 )],
                 status: if publish {
@@ -938,7 +936,7 @@ impl CommandExecutor<JsonFileStorage> {
         resolved
             .iter()
             .map(|resolved| {
-                build_profile_claims_from_resolved(resolved, &layout, false)
+                build_profile_claims_from_resolved(resolved, &layout)
                     .map(|claims| claims.contributions)
                     .map_err(anyhow::Error::from)
             })
@@ -2111,7 +2109,7 @@ fn profile_application_input(
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
     let metadata = resolved.model();
-    let claims = build_profile_claims_from_resolved(resolved, layout, false)?;
+    let claims = build_profile_claims_from_resolved(resolved, layout)?;
     Ok(ProfileApplicationInput {
         id: metadata.id.clone(),
         version: metadata.version.clone(),
@@ -2186,9 +2184,8 @@ mod tests {
     use crate::profile::{ProfileContributionChange, ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
-        ProfileConflictOccupant, ProfilePackageId, ProfileTargetConflict,
-        ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
-        ScalarTarget, SetStringTarget,
+        ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
+        RepositoryStateError, RootRelativePath, ScalarTarget, SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
@@ -2470,20 +2467,6 @@ mod tests {
         authored_package(temp, relative, id, target, content, "")
     }
 
-    /// Rewrite an installed test package to stop contributing every asset.
-    fn package_without_assets(temp: &TempDir, relative: &str, id: &str) -> ProfilePackage {
-        fs::remove_file(temp.path().join(relative).join("assets/profile.txt"))
-            .expect("remove the former asset source");
-        repackage(
-            temp,
-            relative,
-            crate::profile::MANIFEST_FILE_NAME,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"2.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n"
-            ),
-        )
-    }
-
     /// A package tree at `relative` holding `manifest` and exactly the named
     /// `sources`, read back from there.
     ///
@@ -2622,35 +2605,6 @@ mod tests {
         }
     }
 
-    /// The one target `error` refused, for a case that states exactly one.
-    fn refused_target(error: &anyhow::Error) -> &ProfileTargetConflictEntry {
-        let refused = refused_targets(error);
-        assert_eq!(
-            refused.len(),
-            1,
-            "this selection states one unpublishable target: {refused:?}"
-        );
-        &refused[0]
-    }
-
-    /// The recorded, observed, and resolved values a diverged refusal reports.
-    fn diverged_values(
-        entry: &ProfileTargetConflictEntry,
-    ) -> (
-        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
-        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
-        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
-    ) {
-        match &entry.conflict {
-            ProfileTargetConflict::Diverged {
-                base,
-                current,
-                candidate,
-            } => (base, current, candidate),
-            other => panic!("a concurrent profile edit refuses as a divergence: {other:?}"),
-        }
-    }
-
     /// The repository target one refused decision names.
     fn refused_path(entry: &ProfileTargetConflictEntry) -> String {
         match &entry.subject {
@@ -2693,34 +2647,6 @@ mod tests {
             .expect("the refused declaration")
     }
 
-    /// Rewrite the description this repository's configuration declares for
-    /// label namespace `namespace`, leaving everything else it declares alone.
-    ///
-    /// This is one contributed value edited in place, which is what an adopter
-    /// does when a package's wording does not suit their repository.
-    fn edit_contributed_description(temp: &TempDir, published: &str, adopted: &str) {
-        let config_path = temp.path().join(".jit/config.toml");
-        let config = fs::read_to_string(&config_path).unwrap();
-        assert!(
-            config.contains(published),
-            "the published wording is not what this repository holds"
-        );
-        fs::write(config_path, config.replace(published, adopted)).unwrap();
-    }
-
-    /// What the difference report says about the declaration named `subject`.
-    fn reported_contribution_actions(
-        entry: &ProfilePlanEntry,
-        subject: &str,
-    ) -> Vec<ProfileTargetAction> {
-        entry
-            .contributions
-            .iter()
-            .filter(|contribution| contribution.identity.contains(subject))
-            .map(|contribution| contribution.action)
-            .collect()
-    }
-
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
         let (temp, _storage, executor, _package) = fixture();
@@ -2734,59 +2660,6 @@ mod tests {
             package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
             ProfileOrigin::Directory(RootRelativePath::parse("vendor/supplied").unwrap())
         );
-    }
-
-    #[test]
-    fn test_apply_profile_package_retains_an_adopted_managed_region_across_reapplication() {
-        let (temp, _storage, executor, _package) = fixture();
-        let package_root = temp.path().join("vendor/managed-region");
-        fs::create_dir_all(package_root.join("assets")).unwrap();
-        fs::write(
-            package_root.join("manifest.toml"),
-            r#"
-[profile]
-manifest-version = 2
-id = "managed-region"
-version = "1.0.0"
-compatible-jit = "*"
-
-[[region]]
-source = "assets/guidance.md"
-target = "AGENTS.md"
-region-id = "guidance"
-placement = "append"
-"#,
-        )
-        .unwrap();
-        fs::write(
-            package_root.join("assets/guidance.md"),
-            b"Repository guidance.\n",
-        )
-        .unwrap();
-        fs::write(
-            temp.path().join("AGENTS.md"),
-            b"Repository policy.\n\n<!-- jit:guidance:begin -->\nRepository guidance.\n<!-- jit:guidance:end -->\n",
-        )
-        .unwrap();
-        let package = ProfilePackage::from_directory(&package_root).unwrap();
-
-        executor.apply_profile_package(&package).unwrap();
-        let first = record_for(&temp, "managed-region");
-        assert!(first.claims.iter().any(|claim| {
-            matches!(
-                claim.identity,
-                crate::repository_state::AppliedProfileClaimIdentity::ManagedRegion { .. }
-            ) && claim.retain_if_unowned
-        }));
-
-        executor.apply_profile_package(&package).unwrap();
-        let second = record_for(&temp, "managed-region");
-        assert!(second.claims.iter().any(|claim| {
-            matches!(
-                claim.identity,
-                crate::repository_state::AppliedProfileClaimIdentity::ManagedRegion { .. }
-            ) && claim.retain_if_unowned
-        }));
     }
 
     #[test]
@@ -3719,126 +3592,6 @@ placement = "append"
     }
 
     #[test]
-    fn test_apply_profile_package_removes_only_unchanged_sole_asset_claims() {
-        let (temp, _storage, executor, package) = fixture();
-        executor.apply_profile_package(&package).unwrap();
-        let replacement = package_without_assets(&temp, FIXTURE_LOCATION, "planner-asset-only");
-
-        let applied = executor.apply_profile_package(&replacement).unwrap();
-
-        assert_eq!(
-            applied.requested().unwrap().status,
-            ProfileApplicationStatus::Applied
-        );
-        assert!(
-            !temp.path().join("docs/profile.txt").exists(),
-            "an unchanged, solely-owned, unretained former asset is removable"
-        );
-        assert!(stored_record(&temp).claims.is_empty());
-    }
-
-    #[test]
-    fn test_apply_profile_package_retains_stopped_assets_that_are_changed_shared_or_adopted() {
-        let retained_cases = [
-            ("changed", "repository edit\n", false),
-            ("adopted", "Portable profile fixture.\n", true),
-        ];
-        for (name, current, adopt_before_apply) in retained_cases {
-            let (temp, _storage, executor, package) = fixture();
-            let target = temp.path().join("docs/profile.txt");
-            fs::create_dir_all(target.parent().unwrap()).unwrap();
-            if adopt_before_apply {
-                fs::write(&target, current).unwrap();
-            }
-            executor.apply_profile_package(&package).unwrap();
-            if !adopt_before_apply {
-                fs::write(&target, current).unwrap();
-            }
-            let replacement = package_without_assets(&temp, FIXTURE_LOCATION, "planner-asset-only");
-
-            executor.apply_profile_package(&replacement).unwrap();
-
-            assert_eq!(
-                fs::read_to_string(&target).unwrap(),
-                current,
-                "{name} former content must survive"
-            );
-            assert!(
-                stored_record(&temp).claims.is_empty(),
-                "{name} content is no longer owned by the replacement package"
-            );
-        }
-
-        let (temp, _storage, executor, _fixture) = fixture();
-        let target = "docs/shared.txt";
-        let base = package_publishing(&temp, "vendor/base", "base", target, "shared\n");
-        let survivor = package_publishing(&temp, "vendor/survivor", "survivor", target, "shared\n");
-        executor.apply_profile_package(&base).unwrap();
-        executor.apply_profile_package(&survivor).unwrap();
-        let replacement = package_without_assets(&temp, "vendor/base", "base");
-
-        executor.apply_profile_package(&replacement).unwrap();
-
-        assert_eq!(
-            fs::read_to_string(temp.path().join(target)).unwrap(),
-            "shared\n"
-        );
-        assert!(record_for(&temp, "base").claims.is_empty());
-        assert!(record_for(&temp, "survivor")
-            .claims
-            .iter()
-            .any(|claim| matches!(
-                claim.identity,
-                crate::repository_state::AppliedProfileClaimIdentity::Asset { .. }
-            )));
-    }
-
-    #[test]
-    fn test_apply_profile_package_rejects_concurrent_target_edits_without_publishing() {
-        let (temp, _storage, executor, package) = fixture();
-        executor.apply_profile_package(&package).unwrap();
-        let record_before =
-            fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap();
-        let target = temp.path().join("docs/profile.txt");
-        fs::write(&target, "repository edit\n").unwrap();
-        let replacement = repackage(
-            &temp,
-            FIXTURE_LOCATION,
-            "assets/profile.txt",
-            "replacement profile content\n",
-        );
-
-        let error = executor.apply_profile_package(&replacement).unwrap_err();
-
-        let conflict = refused_target(&error);
-        assert_eq!(refused_path(conflict), "docs/profile.txt");
-        assert_eq!(conflict.owner.as_str(), "planner-asset-only");
-        let (base, current, candidate) = diverged_values(conflict);
-        for observed in [base, current, candidate] {
-            assert!(matches!(
-                observed,
-                crate::profile::ThreeWayValue::Present(_)
-            ));
-        }
-        let message = error.to_string();
-        for expected in ["docs/profile.txt", "planner-asset-only"] {
-            assert!(
-                message.contains(expected),
-                "the refusal omits '{expected}': {message}"
-            );
-        }
-        assert!(
-            message.contains(&conflict.conflict.message()),
-            "the refusal carries the reason the report states: {message}"
-        );
-        assert_eq!(fs::read_to_string(&target).unwrap(), "repository edit\n");
-        assert_eq!(
-            fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
-            record_before
-        );
-    }
-
-    #[test]
     fn test_profile_application_substitutes_values_without_auditing_resolved_content() {
         let (temp, storage, executor, _package) = fixture();
         let package_root = temp.path().join(FIXTURE_LOCATION);
@@ -3903,11 +3656,6 @@ template = true
         let event_bytes = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let record_bytes =
             fs::read(temp.path().join(".jit/profiles/planner-variable.json")).unwrap();
-        let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
-        assert!(record
-            .claims
-            .iter()
-            .all(|claim| claim.base_fingerprint.as_str().len() == 64));
         let events = storage.read_events().unwrap();
         assert!(matches!(
             events.as_slice(),
@@ -3919,6 +3667,7 @@ template = true
         assert!(!event_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
+        let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
         assert!(record_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
@@ -4314,54 +4063,6 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_records_shared_owners_for_its_dependency_closure() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let namespace = "closure-shared";
-        let base = package_declaring_contribution(
-            &temp,
-            "vendor/base",
-            "base",
-            &[],
-            namespace,
-            "Shared closure definition.",
-        );
-        let workflow = package_declaring_contribution(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            &["base"],
-            namespace,
-            "Shared closure definition.",
-        );
-
-        executor.apply_profile_package(&workflow).unwrap();
-
-        let shared_claims = [base, workflow]
-            .into_iter()
-            .map(|package| {
-                let record = record_for(&temp, package.model().id.as_str());
-                let semantic = record
-                    .claims
-                    .into_iter()
-                    .filter(|claim| {
-                        matches!(
-                            claim.identity,
-                            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                        )
-                    })
-                    .collect::<Vec<_>>();
-                assert_eq!(semantic.len(), 1);
-                semantic.into_iter().next().unwrap()
-            })
-            .collect::<Vec<_>>();
-        assert!(shared_claims.iter().all(|claim| matches!(
-            claim.identity,
-            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-        )));
-        assert_eq!(shared_claims[0], shared_claims[1]);
-    }
-
-    #[test]
     fn test_effective_configuration_loads_registry_not_record_claims() {
         let (temp, storage, executor, _fixture) = fixture();
         let namespace = "registry-derived";
@@ -4373,11 +4074,6 @@ template = true
             "Published definition.",
         );
         executor.apply_profile_package(&package).unwrap();
-        let record = record_for(&temp, "workflow");
-        assert!(record.claims.iter().any(|claim| matches!(
-            claim.identity,
-            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-        )));
 
         let config_path = temp.path().join(".jit/config.toml");
         let registry = fs::read_to_string(&config_path)
@@ -4444,139 +4140,41 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_names_both_packages_of_a_conflicting_asset_target() {
+    fn test_apply_profile_from_sources_names_both_packages_of_a_conflicting_asset_target() {
         let (temp, _storage, executor, _fixture) = fixture();
         let target = "docs/shared.txt";
-        let occupant = package_publishing(&temp, "vendor/base", "base", target, "first\n");
-        let candidate =
-            package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
-        executor.apply_profile_package(&occupant).unwrap();
+        let base = package_publishing(&temp, "vendor/base", "base", target, "first\n");
+        let workflow = package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
 
-        let error = executor.apply_profile_package(&candidate).unwrap_err();
+        let error = executor
+            .apply_profile_from_sources(
+                &[package_selector(&base), package_selector(&workflow)],
+                &supplied_values(&[]),
+            )
+            .unwrap_err();
 
-        let conflict = refused_target(&error);
+        let refused = refused_targets(&error);
         assert_eq!(
-            conflict.conflict,
-            ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new(
-                    occupant.model().id.to_string()
-                ))
-            }
+            refused.len(),
+            2,
+            "each declaring package decides the target"
         );
-        assert_eq!(conflict.owner.as_str(), candidate.model().id.as_str());
-        assert_eq!(refused_path(conflict), target);
-        // The occupant's bytes stand: a conflict applies nothing.
-        assert_eq!(
-            fs::read_to_string(temp.path().join(target)).unwrap(),
-            "first\n"
-        );
-    }
-
-    #[test]
-    fn test_apply_profile_package_reports_semantic_conflicts_without_an_order_winner() {
-        let namespace = "shared-namespace";
-        let expected_owners = vec![
-            ContributionConflictOwner::Package(ProfilePackageId::new("base")),
-            ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
-        ];
-
-        for (first_id, first_description, second_id, second_description) in [
-            (
-                "base",
-                "The base meaning.",
-                "workflow",
-                "The workflow meaning.",
-            ),
-            (
-                "workflow",
-                "The workflow meaning.",
-                "base",
-                "The base meaning.",
-            ),
-        ] {
-            let (temp, _storage, executor, _fixture) = fixture();
-            let first = package_contributing(
-                &temp,
-                &format!("vendor/{first_id}"),
-                first_id,
-                namespace,
-                first_description,
-            );
-            let second = package_contributing(
-                &temp,
-                &format!("vendor/{second_id}"),
-                second_id,
-                namespace,
-                second_description,
-            );
-            executor.apply_profile_package(&first).unwrap();
-
-            let error = executor.apply_profile_package(&second).unwrap_err();
-
-            let (identity, owners) = refused_declaration(&error);
-            assert_eq!(owners, expected_owners);
+        for entry in refused {
+            assert_eq!(refused_path(entry), target);
             assert_eq!(
-                identity.to_string(),
-                Contribution::MapEntry {
-                    target: MapEntryTarget::Namespaces,
-                    identity: namespace.to_string(),
-                    value: serde_json::json!({ "description": first_description, "unique": false }),
+                entry.conflict,
+                ProfileTargetConflict::Contested {
+                    owners: vec![
+                        ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+                        ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+                    ]
                 }
-                .semantic_identity()
-                .to_string()
-            );
-            assert!(
-                !temp
-                    .path()
-                    .join(format!(".jit/profiles/{second_id}.json"))
-                    .exists(),
-                "the conflicting candidate must not gain a record"
-            );
-            assert!(
-                fs::read_to_string(temp.path().join(".jit/config.toml"))
-                    .unwrap()
-                    .contains(first_description),
-                "the first definition remains the repository state"
             );
         }
-    }
-
-    #[test]
-    fn test_apply_profile_package_reports_the_repository_as_the_occupant_it_authored() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let target = "docs/shared.txt";
-        // A package is applied first, so what distinguishes the answer is which
-        // targets a record claims rather than whether any record exists.
-        let applied = package_publishing(
-            &temp,
-            "vendor/applied",
-            "applied",
-            "docs/applied.txt",
-            "applied\n",
+        assert!(
+            !temp.path().join(target).exists(),
+            "a conflict applies nothing"
         );
-        executor.apply_profile_package(&applied).unwrap();
-        let authored = temp.path().join(target);
-        fs::create_dir_all(authored.parent().unwrap()).unwrap();
-        fs::write(&authored, "authored here\n").unwrap();
-        let candidate = package_publishing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            target,
-            "package bytes\n",
-        );
-
-        let error = executor.apply_profile_package(&candidate).unwrap_err();
-
-        let conflict = refused_target(&error);
-        assert_eq!(
-            conflict.conflict,
-            ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Repository
-            }
-        );
-        assert_eq!(refused_path(conflict), target);
-        assert_eq!(fs::read_to_string(&authored).unwrap(), "authored here\n");
     }
 
     #[test]
@@ -4616,19 +4214,7 @@ template = true
             "identical\n"
         );
         assert_eq!(record_for(&temp, "stated").id.as_str(), "stated");
-        let record = record_for(&temp, "restated");
-        assert_eq!(record.id.as_str(), "restated");
-        assert_eq!(
-            record
-                .claims
-                .iter()
-                .filter(|claim| matches!(
-                    claim.identity,
-                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                ))
-                .count(),
-            1
-        );
+        assert_eq!(record_for(&temp, "restated").id.as_str(), "restated");
     }
 
     #[test]
@@ -4648,18 +4234,6 @@ template = true
         assert_eq!(
             reapplied.requested().unwrap().status,
             ProfileApplicationStatus::Unchanged
-        );
-        let record = record_for(&temp, "workflow");
-        assert_eq!(
-            record
-                .claims
-                .iter()
-                .filter(|claim| matches!(
-                    claim.identity,
-                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                ))
-                .count(),
-            1
         );
     }
 
@@ -4686,52 +4260,6 @@ template = true
         let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
         assert!(config.contains("First registry definition."));
         assert!(config.contains("Second registry definition."));
-        let record = record_for(&temp, "workflow");
-        assert_eq!(
-            record
-                .claims
-                .iter()
-                .filter(|claim| matches!(
-                    claim.identity,
-                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                ))
-                .count(),
-            1
-        );
-    }
-
-    #[test]
-    fn test_apply_profile_package_reports_repository_and_package_semantic_owners() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let namespace = "repository-owned";
-        let config_path = temp.path().join(".jit/config.toml");
-        let mut config = fs::read_to_string(&config_path).unwrap();
-        config.push_str(
-            "\n[namespaces.repository-owned]\ndescription = \"Repository definition.\"\nunique = false\n",
-        );
-        fs::write(config_path, config).unwrap();
-        let candidate = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            namespace,
-            "Package definition.",
-        );
-
-        let error = executor.apply_profile_package(&candidate).unwrap_err();
-
-        let (_, owners) = refused_declaration(&error);
-        assert_eq!(
-            owners,
-            vec![
-                ContributionConflictOwner::Repository,
-                ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
-            ]
-        );
-        assert!(
-            !temp.path().join(".jit/profiles/workflow.json").exists(),
-            "a rejected repository conflict must not publish provenance"
-        );
     }
 
     #[test]
@@ -5235,12 +4763,6 @@ template = true
                     "the rehearsal said it would publish {}",
                     target.path
                 ),
-                ProfileTargetAction::Retain => assert_eq!(
-                    before.get(&path),
-                    after.get(&path),
-                    "the rehearsal said {} survives its departing owner",
-                    target.path
-                ),
                 ProfileTargetAction::Conflict => panic!(
                     "a rehearsal refuses an unpublishable decision rather than reporting {}",
                     target.path
@@ -5306,15 +4828,6 @@ template = true
             .collect()
     }
 
-    /// Write repository-authored content at each worktree-relative path.
-    fn author_repository_files(temp: &TempDir, files: &[(&str, &str)]) {
-        for (relative, content) in files {
-            let path = temp.path().join(relative);
-            fs::create_dir_all(path.parent().expect("a target has a parent")).unwrap();
-            fs::write(path, content).expect("author repository content");
-        }
-    }
-
     /// The report states every target the selection cannot publish, not the
     /// first one it reached, and the publication it precedes refuses exactly
     /// that set — while the report itself writes nothing (REQ-01, REQ-03).
@@ -5322,14 +4835,19 @@ template = true
     fn test_diff_profiles_from_sources_states_every_unpublishable_target_the_apply_refuses() {
         let (temp, _storage, executor, _fixture) = fixture();
         let targets = ["docs/first.txt", "docs/second.txt", "docs/third.txt"];
-        author_repository_files(&temp, &targets.map(|target| (target, "authored by hand\n")));
         let package = package_publishing_each(
             &temp,
             "packages/collider",
             "collider",
             &targets.map(|target| (target, "the package's own bytes\n")),
         );
-        let selectors = [package_selector(&package)];
+        let other = package_publishing_each(
+            &temp,
+            "packages/other",
+            "other",
+            &targets.map(|target| (target, "the other package's bytes\n")),
+        );
+        let selectors = [package_selector(&package), package_selector(&other)];
         let before = repository_files(&temp);
 
         let report = executor
@@ -5342,6 +4860,15 @@ template = true
             decided_targets(&entry, ProfileTargetAction::Conflict),
             targets.map(str::to_string).into_iter().collect(),
             "the report states every target the selection cannot publish"
+        );
+        assert!(
+            entry
+                .decided(ProfileTargetAction::Conflict)
+                .all(|target| target
+                    .reason
+                    .as_ref()
+                    .is_some_and(|reason| reason.contains("other"))),
+            "each refusal names the other package defining the target: {entry:?}"
         );
         assert_eq!(
             repository_files(&temp),
@@ -5368,39 +4895,6 @@ template = true
                 .map(|refused| (refused_path(refused), refused.conflict.message()))
                 .collect::<BTreeMap<_, _>>(),
             "the report and the refusal describe each target in one vocabulary"
-        );
-    }
-
-    /// A refused target names the package that already claims it, so an adopter
-    /// separates a package's claim from its own content (REQ-02).
-    #[test]
-    fn test_diff_profiles_from_sources_names_the_package_that_claims_a_contested_target() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let target = "docs/shared.txt";
-        let occupant = package_publishing(&temp, "vendor/base", "base", target, "first\n");
-        let candidate =
-            package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
-        executor.apply_profile_package(&occupant).unwrap();
-
-        let report = executor
-            .diff_profiles_from_sources(&[package_selector(&candidate)], &supplied_values(&[]))
-            .expect("a contested target is reported, not refused");
-
-        let contested = reported(&report, "workflow")
-            .decided(ProfileTargetAction::Conflict)
-            .find(|decided| decided.path == target)
-            .cloned()
-            .unwrap_or_else(|| panic!("the report states the contested target: {report:?}"));
-        assert_eq!(
-            contested.owners,
-            vec!["base".to_string()],
-            "the report names the package that claims the target"
-        );
-        assert!(
-            contested
-                .reason
-                .is_some_and(|reason| reason.contains("base")),
-            "the refusal reason names the occupant"
         );
     }
 
@@ -5459,123 +4953,6 @@ template = true
         assert_planned_targets_match_published(&before, &after, &report);
     }
 
-    /// A recorded claim the selection stops contributing is reported in its own
-    /// right, so an adopter sees what the repository would stop carrying
-    /// (REQ-01).
-    #[test]
-    fn test_diff_profiles_from_sources_reports_a_departing_claim_the_apply_would_remove() {
-        let (temp, _storage, executor, fixture_package) = fixture();
-        let published = fixture_package
-            .model()
-            .assets
-            .first()
-            .expect("the fixture package declares one asset")
-            .target
-            .clone();
-        executor.apply_profile_package(&fixture_package).unwrap();
-        let departing = package_without_assets(&temp, FIXTURE_LOCATION, fixture_id().as_str());
-        let before = repository_files(&temp);
-
-        let report = executor
-            .diff_profiles_from_sources(&[package_selector(&departing)], &supplied_values(&[]))
-            .expect("a departing claim is reportable");
-
-        assert!(
-            decided_targets(
-                &reported(&report, fixture_id().as_str()),
-                ProfileTargetAction::Remove
-            )
-            .contains(&published),
-            "the report states the target the selection would stop carrying: {report:?}"
-        );
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "the report publishes nothing"
-        );
-    }
-
-    /// A package whose only claim is the managed region `region_id`, published
-    /// into `target` with `body` between its delimiters.
-    fn region_package(
-        temp: &TempDir,
-        relative: &str,
-        id: &str,
-        target: &str,
-        region_id: &str,
-        body: &str,
-    ) -> ProfilePackage {
-        authored_manifest_package(
-            temp,
-            relative,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n[[region]]\nsource = \"assets/region.md\"\n\
-                 target = \"{target}\"\nregion-id = \"{region_id}\"\nplacement = \"append\"\n"
-            ),
-            &[("assets/region.md", body)],
-        )
-    }
-
-    /// A file another package publishes a managed region into survives the
-    /// package that published the file: the region owner is a surviving owner
-    /// of the target, so a departing asset claim retains it rather than
-    /// removing content that is not solely owned.
-    ///
-    /// Removal is the one decision that destroys content, so what counts as a
-    /// surviving owner is asserted rather than left to the ownership reading.
-    #[test]
-    fn test_diff_profiles_from_sources_retains_a_departing_asset_a_region_owner_still_claims() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let target = "docs/guidance.md";
-        let body = "Shared guidance.\n";
-        let published = format!(
-            "Package guidance.\n\n<!-- jit:guidance:begin -->\n{body}<!-- jit:guidance:end -->\n"
-        );
-        let asset = package_publishing(&temp, "vendor/asset", "asset", target, &published);
-        let region = region_package(&temp, "vendor/region", "region", target, "guidance", body);
-        executor.apply_profile_package(&asset).unwrap();
-        executor.apply_profile_package(&region).unwrap();
-        assert_eq!(
-            fs::read_to_string(temp.path().join(target)).unwrap(),
-            published,
-            "the region owner composes into the file the asset owner published"
-        );
-        let departing = package_without_assets(&temp, "vendor/asset", "asset");
-        let selectors = [package_selector(&departing)];
-
-        let report = executor
-            .diff_profiles_from_sources(&selectors, &supplied_values(&[]))
-            .expect("a departing claim is reportable");
-
-        let entry = reported(&report, "asset");
-        let decided = entry
-            .targets
-            .iter()
-            .find(|decided| decided.path == target)
-            .unwrap_or_else(|| panic!("the report states the departing target: {entry:?}"));
-        assert_eq!(
-            decided.action,
-            ProfileTargetAction::Retain,
-            "a target another package publishes a region into is not solely owned: {decided:?}"
-        );
-        assert_eq!(
-            decided.owners,
-            vec!["asset".to_string(), "region".to_string()],
-            "the region owner is named among the packages that claim the target"
-        );
-
-        executor
-            .apply_profile_from_sources(&selectors, &supplied_values(&[]))
-            .expect("the departing selection applies");
-
-        assert_eq!(
-            fs::read_to_string(temp.path().join(target)).ok(),
-            Some(published),
-            "removing the file would destroy the region another package publishes into it"
-        );
-    }
-
     /// The canonical identity of the label-namespace declaration named
     /// `namespace`, which is what a report names a declaration by.
     ///
@@ -5602,15 +4979,15 @@ template = true
             .clone()
     }
 
-    /// A declaration two packages define differently is stated by the report
-    /// as the decision it is — named by its semantic identity, beside the
-    /// package that claims it — and the publication it precedes refuses that
+    /// A declaration two selected packages define differently is stated by the
+    /// report as the decision it is — named by its semantic identity, beside the
+    /// packages defining it — and the publication it precedes refuses that
     /// declaration for that same reason (REQ-01, REQ-02, REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_states_a_contested_declaration_the_apply_refuses() {
         let (temp, _storage, executor, _fixture) = fixture();
         let namespace = "contested-vocabulary";
-        let installed =
+        let base =
             package_contributing(&temp, "vendor/base", "base", namespace, "The base meaning.");
         let candidate = package_contributing(
             &temp,
@@ -5619,8 +4996,7 @@ template = true
             namespace,
             "The workflow meaning.",
         );
-        executor.apply_profile_package(&installed).unwrap();
-        let selectors = [package_selector(&candidate)];
+        let selectors = [package_selector(&base), package_selector(&candidate)];
         let before = repository_files(&temp);
 
         let report = executor
@@ -5631,10 +5007,12 @@ template = true
         assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
         let contested = declared(&entry, &namespace_identity(namespace));
         assert_eq!(contested.action, ProfileTargetAction::Conflict);
-        assert_eq!(
-            contested.owners,
-            vec!["base".to_string()],
-            "the report names the package that claims the declaration"
+        assert!(
+            contested
+                .reason
+                .as_ref()
+                .is_some_and(|reason| reason.contains("base")),
+            "the report names the other package defining the declaration: {contested:?}"
         );
         assert_eq!(
             repository_files(&temp),
@@ -5669,9 +5047,8 @@ template = true
     }
 
     /// The report states what the selection would do to each declaration it
-    /// carries, and who claims it: a declaration no package owns is created and
-    /// unowned, and after the publication the same declaration is unchanged and
-    /// claimed by the package that published it (REQ-01, REQ-02, REQ-03).
+    /// carries: a declaration the registry lacks is created, and after the
+    /// publication the same declaration is unchanged (REQ-01, REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_decides_the_declarations_the_apply_it_precedes_publishes() {
         let (temp, _storage, executor, _fixture) = fixture();
@@ -5688,10 +5065,6 @@ template = true
 
         let created = declared(&reported(&planned, "workflow"), &identity);
         assert_eq!(created.action, ProfileTargetAction::Create);
-        assert!(
-            created.owners.is_empty(),
-            "a declaration no package claims is the repository's own: {created:?}"
-        );
 
         executor
             .apply_profile_from_sources(&selectors, &supplied_values(&[]))
@@ -5708,130 +5081,35 @@ template = true
             .expect("an applied declaration is reportable");
         let published = declared(&reported(&republished, "workflow"), &identity);
         assert_eq!(published.action, ProfileTargetAction::Unchanged);
-        assert_eq!(
-            published.owners,
-            vec!["workflow".to_string()],
-            "the report names the package that claims the published declaration"
-        );
     }
 
-    /// A declaration the selection stops carrying is stated as retained: the
-    /// definition it left in the registry survives its departing owner, so the
-    /// report says so rather than leaving the declaration unreported (REQ-01).
+    /// A package reapplied with a changed definition of its own declaration
+    /// is not a conflict party with itself: the repository's current value
+    /// never contests the package being applied.
     #[test]
-    fn test_diff_profiles_from_sources_reports_a_departing_declaration_the_registry_keeps() {
+    fn test_apply_profile_package_reapplies_a_changed_contribution_without_a_conflict() {
         let (temp, _storage, executor, _fixture) = fixture();
-        let namespace = "departing-vocabulary";
-        let description = "The workflow meaning.";
-        let package =
-            package_contributing(&temp, "vendor/workflow", "workflow", namespace, description);
-        executor.apply_profile_package(&package).unwrap();
-        // The same package, re-authored so it declares the asset it always did
-        // and no longer declares the namespace.
-        let departing = package_publishing(
+        let namespace = "reviewed";
+        executor
+            .apply_profile_package(&package_contributing(
+                &temp,
+                "vendor/workflow",
+                "workflow",
+                namespace,
+                "The first wording.",
+            ))
+            .unwrap();
+        let changed = package_contributing(
             &temp,
             "vendor/workflow",
             "workflow",
-            "docs/workflow.txt",
-            "workflow",
-        );
-        let selectors = [package_selector(&departing)];
-        let identity = namespace_identity(namespace);
-
-        let report = executor
-            .diff_profiles_from_sources(&selectors, &supplied_values(&[]))
-            .expect("a departing declaration is reportable");
-
-        let departed = declared(&reported(&report, "workflow"), &identity);
-        assert_eq!(departed.action, ProfileTargetAction::Retain);
-        assert_eq!(
-            departed.owners,
-            vec!["workflow".to_string()],
-            "the departing owner still claims the declaration it is leaving behind"
+            namespace,
+            "The second wording.",
         );
 
-        executor
-            .apply_profile_from_sources(&selectors, &supplied_values(&[]))
-            .expect("the departing selection applies");
+        let applied = executor.apply_profile_package(&changed);
 
-        assert!(
-            fs::read_to_string(temp.path().join(".jit/config.toml"))
-                .unwrap()
-                .contains(description),
-            "the retained declaration survives its departing owner"
-        );
-        assert!(
-            !record_for(&temp, "workflow")
-                .claims
-                .iter()
-                .any(|claim| matches!(
-                    &claim.identity,
-                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
-                )),
-            "the departing owner stops claiming the declaration it no longer declares"
-        );
-    }
-
-    /// The label namespace the contribution-refresh scenarios publish, and the
-    /// two wordings the package and the adopter give it.
-    const REFRESH_NAMESPACE: &str = "reviewed";
-    const PUBLISHED_WORDING: &str = "The wording this package published.";
-    const ADOPTED_WORDING: &str = "The wording this repository chose instead.";
-
-    /// Apply a package contributing [`REFRESH_NAMESPACE`], then edit the value
-    /// it published in place, and answer the package location.
-    fn applied_then_edited_contribution(
-        temp: &TempDir,
-        executor: &CommandExecutor<JsonFileStorage>,
-    ) -> &'static str {
-        let location = "vendor/workflow";
-        let package = package_contributing(
-            temp,
-            location,
-            "workflow",
-            REFRESH_NAMESPACE,
-            PUBLISHED_WORDING,
-        );
-        executor.apply_profile_package(&package).unwrap();
-        edit_contributed_description(temp, PUBLISHED_WORDING, ADOPTED_WORDING);
-        location
-    }
-
-    /// A contributed value changed in place is reported as a conflict, and the
-    /// publication refuses the same declaration.
-    #[test]
-    fn test_diff_profiles_from_sources_reports_an_edited_contribution_as_a_conflict() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let location = applied_then_edited_contribution(&temp, &executor);
-
-        let reported = executor
-            .diff_profiles_from_sources(
-                &[ProfileSelector::path(temp.path().join(location))],
-                &ProfileVariableOptions::default(),
-            )
-            .expect("the difference report reads the repository");
-
-        let entry = reported
-            .items
-            .iter()
-            .find(|entry| entry.id == "workflow")
-            .expect("the selection reports the package");
-        assert_eq!(
-            reported_contribution_actions(entry, REFRESH_NAMESPACE),
-            vec![ProfileTargetAction::Conflict],
-            "the report called an edited declaration clean"
-        );
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
-        // The refusal the report states is the refusal a publication makes.
-        let refused = executor
-            .apply_profile_package(
-                &ProfilePackage::from_directory(&temp.path().join(location)).unwrap(),
-            )
-            .expect_err("a diverged declaration cannot be published");
-        assert!(refused_targets(&refused).iter().any(
-            |entry| matches!(&entry.subject, ProfileTargetSubject::Contribution(identity)
-                if identity.to_string().contains(REFRESH_NAMESPACE))
-        ));
+        assert!(applied.is_ok(), "{:#}", applied.unwrap_err());
     }
 
     /// Every dimension of the publication budget clears what the package model
