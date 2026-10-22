@@ -102,7 +102,7 @@
           "short_id": "27f0a575",
           "title": "Issue lifecycle methods behind an issues facade",
           "classification": "implementation",
-          "status": "in_progress (sonnet worker w-27f0a575, worktree base b81e5227f)"
+          "status": "done (merged d144d3d84; doctest fix be0d9ab53 after cargo-ci caught stale doc examples; cargo-ci, code-review passed)"
         },
         {
           "key": "issue-list-renderer",
