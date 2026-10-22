@@ -59,8 +59,14 @@ pub const DRAIN_DEADLINE_MS_ENV: &str = "JIT_SERVER_DRAIN_DEADLINE_MS";
 #[cfg(feature = "test-support")]
 #[must_use]
 pub fn configured_drain_deadline() -> Duration {
-    std::env::var(DRAIN_DEADLINE_MS_ENV)
-        .ok()
+    drain_deadline_from(std::env::var(DRAIN_DEADLINE_MS_ENV).ok().as_deref())
+}
+
+/// The deadline `milliseconds` configures; absent or malformed input leaves
+/// [`GRACEFUL_DRAIN_TIMEOUT`].
+#[cfg(feature = "test-support")]
+fn drain_deadline_from(milliseconds: Option<&str>) -> Duration {
+    milliseconds
         .and_then(|milliseconds| milliseconds.parse().ok())
         .map_or(GRACEFUL_DRAIN_TIMEOUT, Duration::from_millis)
 }
@@ -431,6 +437,47 @@ mod tests {
             .expect("the stalled connection is closed within the test budget")
             .expect("read the closed connection");
         assert_eq!(read, 0, "the stalled connection must be force-closed");
+    }
+
+    #[test]
+    fn test_drain_deadline_from_enforces_the_graceful_timeout_unless_configured() {
+        assert_eq!(drain_deadline_from(None), GRACEFUL_DRAIN_TIMEOUT);
+        assert_eq!(drain_deadline_from(Some("soon")), GRACEFUL_DRAIN_TIMEOUT);
+        assert_eq!(drain_deadline_from(Some("250")), Duration::from_millis(250));
+    }
+
+    #[tokio::test]
+    async fn test_run_shutdown_sequence_keeps_a_stalled_connection_running_for_the_whole_deadline()
+    {
+        let deadline = Duration::from_millis(300);
+        let handle = ServerHandle::new();
+        let (addr, _serving) = serve_on_loopback(&handle).await;
+        let mut stalled = open_stalled_connection(addr).await;
+        wait_for_connection_count(&handle, 1).await;
+
+        // `sleep` never completes early, so load can lengthen the measured
+        // interval but never shorten it below the deadline.
+        let started = Instant::now();
+        run_shutdown_sequence(
+            handle.clone(),
+            CancellationToken::new(),
+            deadline,
+            std::future::ready(Ok(ShutdownSignal::Terminate)),
+        )
+        .await
+        .expect("a delivered signal is not an error");
+        let mut byte = [0u8; 1];
+        let read = timeout(TEST_BUDGET, stalled.read(&mut byte))
+            .await
+            .expect("the stalled connection is closed within the test budget")
+            .expect("read the closed connection");
+
+        assert_eq!(read, 0, "the stalled connection must be force-closed");
+        assert!(
+            started.elapsed() >= deadline,
+            "the connection was closed {:?} into a {deadline:?} deadline",
+            started.elapsed()
+        );
     }
 
     #[tokio::test]
