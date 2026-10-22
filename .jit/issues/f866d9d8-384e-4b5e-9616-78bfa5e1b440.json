@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T21:12:42.519243044Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Remove three-way profile publication",
-  "updated_at": "2026-10-21T21:12:30.128463009Z"
+  "updated_at": "2026-10-21T21:12:42.519243044Z"
 }
