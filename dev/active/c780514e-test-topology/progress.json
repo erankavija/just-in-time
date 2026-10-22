@@ -156,7 +156,7 @@
           "key": "lock-tests-deterministic-precondition",
           "title": "Read-only lock tests establish their precondition on any host",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; Luna xhigh for bounded single-file skip-to-precondition assertion change, unchanged assertions and independent gates; reused adoption checkout"
         },
         {
           "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
