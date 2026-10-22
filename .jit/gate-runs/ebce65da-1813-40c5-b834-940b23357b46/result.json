@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "419cf98cdea2eae046827eaced851111d931fed2",
+  "completed_at": "2026-10-22T20:22:31.753920665Z",
+  "duration_ms": 264681,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior parallel-test isolation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ebce65da-1813-40c5-b834-940b23357b46",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T20:18:07.072346192Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 024e9ce5f, bfd2077fc, 84971a76c, 0bba22f71, 32bb5c27d, 419cf98c; all affect `crates/jit/src/test_utils.rs`\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a82ed46/requirement/REQ-01 and REQ-02 (.jit issue source); @/issue/c780514e/requirement/REQ-05 (.jit issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T20:16:41Z); prior code-review failed (exit 1, run bc802dec) and its fixed-path test concern is resolved\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior parallel-test isolation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
