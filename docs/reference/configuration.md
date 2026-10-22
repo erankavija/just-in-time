@@ -22,7 +22,6 @@ or customize individual settings.
 |------|---------|
 | `.jit/config.toml` | Repository config (schema + runtime) |
 | `.jit/templates.toml` | Graph templates and their [role/anchor bindings](#template-bindings-jittemplatestoml) |
-| `~/.config/jit/agent.toml` | Agent identity |
 
 `.jit/config.toml` accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
 
@@ -593,9 +592,10 @@ unit and operational scope, are listed in
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
 
-## Agent Config (`~/.config/jit/agent.toml`)
+## Agent Identity (`~/.config/jit/agent.toml`)
 
-Agent-specific configuration for persistent identity.
+`~/.config/jit/agent.toml` holds an agent's persistent identity. It is read by
+agent-id resolution only and sets no configuration key.
 
 ```toml
 [agent]
@@ -617,7 +617,7 @@ Agent identity in `type:identifier` format. Examples:
 
 #### `created_at`
 
-ISO 8601 timestamp when this agent config was created.
+ISO 8601 timestamp when this identity file was created.
 
 #### `description`
 
