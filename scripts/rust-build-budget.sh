@@ -26,6 +26,8 @@
 #                        execution cost rather than compilation or first-touch
 #                        artifact I/O; absent: skip this check.
 #
+#   --self-test          exercise the checker with synthetic inputs; no Cargo.
+#
 # Exit codes:
 #   0 — every budget and policy holds
 #   1 — a budget or policy is violated (full diagnostics on stderr)
@@ -52,6 +54,167 @@ TEST_SUITE_MS_PROVIDED=false
 usage() {
   sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
+
+# Exercise the shipped checker against owned synthetic inputs, never Cargo.
+self_test() (
+  local tool work fixture script expected actual token value
+  for tool in jq mktemp mkdir rm truncate cat awk grep head sort stat dirname sed ln; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      echo "rust-build-budget: self-test requires '$tool' on PATH" >&2
+      exit 2
+    }
+  done
+  work=$(mktemp -d)
+  trap 'rm -rf -- "$work"' EXIT
+  script="$SCRIPT_DIR/rust-build-budget.sh"
+
+  seed_fixture() {
+    fixture="$work/$1"
+    mkdir -p "$fixture/crates/jit"
+    cat >"$fixture/Cargo.toml" <<'EOF'
+[profile.dev]
+debug = "line-tables-only"
+incremental = true
+[profile.test]
+debug = "line-tables-only"
+incremental = true
+EOF
+    cat >"$fixture/crates/jit/Cargo.toml" <<'EOF'
+[dependencies]
+jsonschema = { version = "0.46", default-features = false }
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+EOF
+    write_metadata "$((MAX_INTEGRATION_TARGETS - 1))"
+    truncate -s 1 "$fixture/a"
+    jq -nc --arg exe "$fixture/a" \
+      '{reason:"compiler-artifact",profile:{test:true},executable:$exe},
+       {reason:"build-script-executed",package_id:"x"}' >"$fixture/artifacts.jsonl"
+  }
+
+  write_metadata() {
+    jq -nc --argjson count "$1" \
+      '{packages:[{targets:([range($count) | {kind:["test"],name:("t"+tostring)}]
+       + [{kind:["lib"],name:"jit"}])}]}' >"$fixture/metadata.json"
+  }
+
+  run_checker() {
+    expected="$1"
+    shift
+    actual=0
+    (
+      unset BUSY_HOST_OVERRIDE
+      "$BASH" "$script" --root "$fixture" \
+        --metadata-json "$fixture/metadata.json" \
+        --artifacts-json "$fixture/artifacts.jsonl" "$@"
+    ) >"$fixture/stdout" 2>"$fixture/stderr" || actual=$?
+    if [ "$actual" -ne "$expected" ]; then
+      echo "FAIL: ${fixture##*/}: expected exit $expected, observed $actual" >&2
+      cat "$fixture/stdout" "$fixture/stderr" >&2
+      exit 1
+    fi
+  }
+
+  assert_report() {
+    local report="$1"
+    shift
+    for token in "$@"; do
+      if ! grep -qF -- "$token" "$fixture/$report"; then
+        echo "FAIL: ${fixture##*/}: $report lacks '$token'" >&2
+        cat "$fixture/$report" >&2
+        exit 1
+      fi
+    done
+    echo "PASS: ${fixture##*/}"
+  }
+
+  seed_fixture exact-boundaries
+  write_metadata "$MAX_INTEGRATION_TARGETS"
+  truncate -s "$((MAX_EXECUTABLE_BYTES / 2))" "$fixture/a" "$fixture/b" "$fixture/bin"
+  jq -nc --arg a "$fixture/a" --arg b "$fixture/b" \
+    '[$a,$b,$a][] | {reason:"compiler-artifact",profile:{test:true},executable:.}' \
+    >"$fixture/artifacts.jsonl"
+  jq -nc --arg bin "$fixture/bin" \
+    '{reason:"compiler-artifact",profile:{test:false},executable:$bin},
+     {reason:"build-script-executed",package_id:"x"}' >>"$fixture/artifacts.jsonl"
+  run_checker 0
+  assert_report stdout "integration-targets=$MAX_INTEGRATION_TARGETS/$MAX_INTEGRATION_TARGETS" \
+    "bytes=$MAX_EXECUTABLE_BYTES/$MAX_EXECUTABLE_BYTES" "active-executables=2"
+
+  seed_fixture targets-over-limit
+  write_metadata "$((MAX_INTEGRATION_TARGETS + 1))"
+  run_checker 1
+  assert_report stderr "$((MAX_INTEGRATION_TARGETS + 1))" "$MAX_INTEGRATION_TARGETS" consolidate
+
+  seed_fixture bytes-over-limit
+  truncate -s "$((MAX_EXECUTABLE_BYTES / 2))" "$fixture/a"
+  truncate -s "$((MAX_EXECUTABLE_BYTES / 2 + 1))" "$fixture/b"
+  jq -nc --arg a "$fixture/a" --arg b "$fixture/b" \
+    '[$a,$b][] | {reason:"compiler-artifact",profile:{test:true},executable:.}' \
+    >"$fixture/artifacts.jsonl"
+  run_checker 1
+  assert_report stderr "$((MAX_EXECUTABLE_BYTES + 1))" "2 GiB" shrink
+
+  seed_fixture profile-drift
+  sed -i '0,/line-tables-only/s//full/' "$fixture/Cargo.toml"
+  run_checker 1
+  assert_report stderr "profile drift" '"full"' line-tables-only
+
+  seed_fixture remote-resolver
+  sed -i 's/jsonschema = .*/jsonschema = { version = "0.46", features = ["resolve-http"] }/' \
+    "$fixture/crates/jit/Cargo.toml"
+  run_checker 1
+  assert_report stderr "resolver reintroduction" jsonschema default-features
+
+  seed_fixture duplicate-tls
+  sed -i 's/"rustls",/"rustls", "native-tls",/' "$fixture/crates/jit/Cargo.toml"
+  run_checker 1
+  assert_report stderr "duplicate TLS backend" native-tls ureq
+
+  seed_fixture duration-absent
+  run_checker 0
+  assert_report stdout suite-duration=skipped
+
+  for value in 29.999 -1 ""; do
+    seed_fixture "duration-invalid-${value:-empty}"
+    run_checker 2 --test-suite-ms "$value"
+    assert_report stderr test-suite-ms integer
+  done
+
+  seed_fixture duration-below
+  value=$((MAX_TEST_SUITE_SECONDS * 1000 - 1))
+  run_checker 0 --test-suite-ms "$value"
+  assert_report stdout "suite-duration=${value}ms"
+
+  seed_fixture duration-at-threshold
+  value=$((MAX_TEST_SUITE_SECONDS * 1000))
+  run_checker 1 --test-suite-ms "$value"
+  assert_report stderr "$value" threshold
+
+  seed_fixture duration-above-and-diagnostic
+  value=$((MAX_TEST_SUITE_SECONDS * 1500))
+  run_checker 1 --test-suite-ms "$value"
+  assert_report stderr "$value" threshold warm first-touch "Corrective area"
+
+  # Only dirname is needed before tool preflight; this PATH deliberately lacks jq.
+  mkdir "$work/no-jq"
+  ln -s "$(command -v dirname)" "$work/no-jq/dirname"
+  seed_fixture missing-jq
+  actual=0
+  PATH="$work/no-jq" "$BASH" "$script" --self-test \
+    >"$fixture/stdout" 2>"$fixture/stderr" || actual=$?
+  if [ "$actual" -ne 2 ]; then
+    echo "FAIL: missing jq must exit 2, observed $actual" >&2
+    exit 1
+  fi
+  assert_report stderr jq
+  echo "rust-build-budget: self-test passed"
+)
+
+if [ "${1:-}" = "--self-test" ]; then
+  [ "$#" -eq 1 ] || { echo "rust-build-budget: --self-test takes no other arguments" >&2; exit 2; }
+  self_test
+  exit 0
+fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
