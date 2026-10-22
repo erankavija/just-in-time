@@ -33,13 +33,14 @@ set -euo pipefail
 #   - `budget` whose only violation is the suite-duration budget.
 # Any other failing step (fmt, clippy, doctest, excluded-tests, a test FAIL, a
 # footprint budget violation, a reporter failure) makes the run a verdict.
-# "Loaded" means the 1-minute load average from /proc/loadavg, the higher of the
-# samples taken immediately before and after the suite clock, is at least
-# LOAD_THRESHOLD_PER_CPU x `nproc`. The threshold sits above 1.0 per CPU because
-# this run's own nextest fan-out keeps the load average near 1.0 per CPU; only
-# load beyond that is the host's. A suite-duration overrun or test timeout on a
-# quiet host is a real regression against the change that crossed it and exits
-# 1. The run output records the observed load and the threshold either way.
+# "Loaded" means the 1-minute load average from /proc/loadavg, sampled before
+# the run's first step, is at least LOAD_THRESHOLD_PER_CPU x `nproc`. The
+# baseline predates the run's own fmt, clippy and build fan-out, so it measures
+# the host alone; a later sample would measure this run. The threshold is the
+# steward's quiet-host bound (load below about 4 on 24 CPUs). A suite-duration
+# overrun or test timeout on a quiet host is a real regression against the
+# change that crossed it and exits 1. The classification line names the
+# baseline sample, the threshold and the classification either way.
 #
 # `./scripts/cargo-ci.sh --classify <work-dir> <load1> <cpus> [failed-step...]`
 # runs only the classifier over a directory holding the steps' `<step>.out`
@@ -51,22 +52,15 @@ set -euo pipefail
 # command. Use this mode for compilation-heavy targeted checks; invoke the
 # script without arguments only when the complete gate is intended.
 
-readonly LOAD_THRESHOLD_PER_CPU="1.25"
+readonly LOAD_THRESHOLD_PER_CPU="0.17"
 
-# Steps that failed, in run order, and the load sample the classifier judges.
+# Steps that failed, in run order, and the pre-run load sample the classifier judges.
 failed_steps=()
-suite_load1=""
+baseline_load1=""
 
 # 1-minute load average, empty when the host exposes none.
 sample_load1() {
   awk 'NR == 1 { print $1 }' /proc/loadavg 2>/dev/null || true
-}
-
-# Higher of two load samples; an empty sample is ignored.
-peak_load() {
-  awk -v a="${1:-}" -v b="${2:-}" 'BEGIN {
-    if (a == "") print b; else if (b == "") print a; else print (a + 0 > b + 0 ? a : b)
-  }'
 }
 
 # nextest reported a TIMEOUT and nothing that is a verdict on the test itself.
@@ -82,7 +76,7 @@ budget_failed_only_by_duration() {
 }
 
 # Judges the failed steps in $failed_steps against the outputs in $WORK and the
-# load in $suite_load1 over $cpu_count CPUs; prints the diagnosis and returns
+# baseline load in $baseline_load1 over $cpu_count CPUs; prints the diagnosis and returns
 # the exit status the run takes: 75 for an infrastructure fault, 1 for a verdict.
 classify_failure() {
   local step threshold
@@ -97,18 +91,18 @@ classify_failure() {
     }
   done
   threshold=$(awk -v n="$cpu_count" -v r="$LOAD_THRESHOLD_PER_CPU" 'BEGIN { printf "%.2f", n * r }')
-  if [ -n "$suite_load1" ] &&
-    awk -v l="$suite_load1" -v t="$threshold" 'BEGIN { exit !(l + 0 >= t + 0) }'; then
-    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive; host load1=${suite_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
+  if [ -n "$baseline_load1" ] &&
+    awk -v l="$baseline_load1" -v t="$threshold" 'BEGIN { exit !(l + 0 >= t + 0) }'; then
+    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive; baseline load1=${baseline_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
     return 75
   fi
-  echo "cargo-ci: verdict (exit 1): failing steps (${failed_steps[*]}) are environment-sensitive but host load1=${suite_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
+  echo "cargo-ci: verdict (exit 1): failing steps (${failed_steps[*]}) are environment-sensitive but baseline load1=${baseline_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
   return 1
 }
 
 if [ "${1:-}" = "--classify" ]; then
   [ "$#" -ge 4 ] || { echo "usage: cargo-ci.sh --classify <work-dir> <load1> <cpus> [failed-step...]" >&2; exit 2; }
-  WORK="$2" suite_load1="$3" cpu_count="$4"
+  WORK="$2" baseline_load1="$3" cpu_count="$4"
   shift 4
   failed_steps=("$@")
   rc=0
@@ -455,6 +449,9 @@ if [ -z "${CARGO_CI_NO_NICE:-}" ]; then
   command -v ionice >/dev/null 2>&1 && NICE_PREFIX+=(ionice -c2 -n7)
 fi
 
+# Host load before this run's first step; the classifier judges it.
+baseline_load1=$(sample_load1)
+
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
@@ -539,12 +536,10 @@ run_step suite-build prepare_measured_suite
 # starts immediately before the pinned workspace suite and ends after the
 # separately reported doctest substep, leaving lock acquisition, preflight,
 # formatting, linting, and the suite build above outside it.
-load_before_suite=$(sample_load1)
 suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
 suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
-suite_load1=$(peak_load "$load_before_suite" "$(sample_load1)")
 summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
 
 # This judges the run's own skipped/ignored counts, because those reporter
