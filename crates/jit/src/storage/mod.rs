@@ -33,6 +33,7 @@ pub mod redo_apply;
 #[cfg(test)]
 mod redo_conformance;
 pub mod redo_record;
+#[cfg(any(test, feature = "test-support"))]
 pub mod reference;
 pub mod repo_lock;
 pub mod repository_state_store;
@@ -75,6 +76,7 @@ pub use redo_apply::{
 pub use redo_record::{
     EventAppend, PutFile, RedoRecord, RedoRecordError, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
+#[cfg(any(test, feature = "test-support"))]
 pub use reference::{render_reference_markdown, GateRunField};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use repository_state_store::{

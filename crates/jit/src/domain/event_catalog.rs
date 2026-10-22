@@ -4,7 +4,7 @@
 //! declaration tags every record with a snake-case `type` field. This module
 //! projects that vocabulary into a machine-consumable catalog ([`event_catalog`],
 //! carried by `jit --schema` as its `events` array) and into the committed
-//! markdown reference rendered by [`render_event_reference`].
+//! markdown reference rendered by `render_event_reference`.
 //!
 //! The catalog is derived from the type, never restated:
 //!
@@ -486,7 +486,7 @@ pub struct EventTagDoc {
 /// Project the event-tag catalog: one row per [`Event`] variant.
 ///
 /// Carried by `jit --schema` as its `events` array and rendered into the
-/// committed reference by [`render_event_reference`]. Every row is derived:
+/// committed reference by `render_event_reference`. Every row is derived:
 /// [`EventTag::as_str`] supplies the tag serde writes, [`EventTag::scope`] the
 /// association scope, and the `issue_id` presence is read off the sample record's
 /// serialized JSON object — the encoding the event log stores.
@@ -507,6 +507,7 @@ pub fn event_catalog() -> Vec<EventTagDoc> {
 /// The page projects [`event_catalog`] into markdown, so the committed doc is
 /// generated rather than hand-copied. A conformance test asserts the committed
 /// file equals this output (`@/inv/single-source-prose`).
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_event_reference() -> String {
     let catalog = event_catalog();
 

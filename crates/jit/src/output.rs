@@ -1140,6 +1140,7 @@ pub(crate) mod test_support {
 /// [`ErrorCode::exit_code`] respectively. Iterating [`ErrorCode::ALL`] keeps the
 /// page coupled to the same derive-checked member list used by the runtime's
 /// vocabulary conformance tests.
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_error_code_reference() -> String {
     let rows = ErrorCode::ALL
         .iter()

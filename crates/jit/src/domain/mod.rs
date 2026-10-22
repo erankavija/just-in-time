@@ -63,7 +63,9 @@ pub use repository_inputs::{
 };
 
 // Re-export the event-tag catalog and its projection.
-pub use event_catalog::{event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc};
+#[cfg(any(test, feature = "test-support"))]
+pub use event_catalog::render_event_reference;
+pub use event_catalog::{event_catalog, EventScope, EventTag, EventTagDoc};
 pub use event_log::{parse_known_events, EventLogError};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.

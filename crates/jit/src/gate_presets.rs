@@ -7,14 +7,16 @@
 //!
 //! Every preset is a project's own: [`PresetManager`] loads them from
 //! `.jit/config/gate-presets/`, where gate keys, titles, and checkers belong
-//! (`@/inv/domain-agnostic`, `@/charter/D-2`). The [`reference`] submodule
-//! projects the preset contract and the portable checker syntax into the
-//! committed markdown reference.
+//! (`@/inv/domain-agnostic`, `@/charter/D-2`). The test-support `reference`
+//! submodule projects the preset contract and the portable checker syntax into
+//! the committed markdown reference.
 
 mod manager;
+#[cfg(any(test, feature = "test-support"))]
 pub mod reference;
 
 pub use manager::PresetManager;
+#[cfg(any(test, feature = "test-support"))]
 pub use reference::render_reference_markdown;
 
 use crate::declarations::GateDefinition;

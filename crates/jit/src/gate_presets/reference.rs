@@ -8,7 +8,6 @@
 //! without regenerating the reference fails the test suite
 //! (`@/inv/single-source-prose`).
 
-#[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
     /// Repo-relative path of the committed gate-preset reference.
     pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
