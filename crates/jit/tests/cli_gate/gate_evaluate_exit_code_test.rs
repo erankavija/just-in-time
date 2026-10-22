@@ -5,7 +5,7 @@
 //!   checker failure     -> exit 4,  verdict "fail"   (checker ran, non-zero exit)
 //!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code, exit 75, or a built-in checker fault)
 //!   issue not found     -> exit 3,  no verdict
-//!   gate not required   -> exit 2,  no verdict
+//!   gate not required   -> exit 2,  no verdict (evaluate and fail)
 //!   manual gate, no --by -> exit 2, no verdict (jit:1d59070d REQ-03)
 
 use std::process::Command;
@@ -294,6 +294,35 @@ fn test_gate_evaluate_gate_not_required_non_json_exit_2() {
         .unwrap();
 
     assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn test_gate_fail_gate_not_required_exit_2() {
+    let temp = setup_repo();
+
+    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "create", "--title", "No gates", "--json"])
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
+    let id = json["id"].as_str().unwrap().to_string();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "fail", &id, "not-a-gate", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]

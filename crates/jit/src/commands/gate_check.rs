@@ -199,11 +199,11 @@ fn required_automated_gate<'a>(
     gate_key: &str,
 ) -> Result<&'a crate::declarations::GateDefinition> {
     if !issue.gates_required.iter().any(|key| key == gate_key) {
-        anyhow::bail!(
-            "Gate '{}' is not required for issue '{}'",
-            gate_key,
-            issue.id
-        );
+        return Err(super::gate::GateNotRequiredError {
+            issue_id: issue.id.to_string(),
+            gate_key: gate_key.to_string(),
+        }
+        .into());
     }
     let gate = registry
         .gates
