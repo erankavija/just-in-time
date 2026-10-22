@@ -787,7 +787,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             .iter()
             .map(|flag| flag["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["dry-run", "json", "profile", "set", "values-file"]),
+        expected_keys(&["dry-run", "profile", "set", "values-file"]),
         "apply exposes one lifecycle input surface"
     );
 
