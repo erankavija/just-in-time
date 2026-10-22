@@ -4,7 +4,7 @@
   "context": {},
   "created_at": "2026-10-21T15:40:49.485551803Z",
   "dependencies": [],
-  "description": "Plan Give each test property one owning test on shared fixtures and contracts (c780514e) against every hard success criterion, write the concise design at dev/active/c780514e-test-topology/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "description": "Plan Give each test property one owning test on shared fixtures and contracts (c780514e) against every hard success criterion, write the concise design at dev/active/c780514e-test-topology/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.\n\n## Escalation (2026-10-22)\n\nplan-review failed three times; the third finding is that the ten new self-test gates are declared but required by no issue. Further gate attempts await the milestone steward's ruling on how the gates are registered and attached (bootstrap the declarations before instantiation, attach at execution, or fold the self-tests into the existing gate).",
   "documents": [
     {
       "commit": null,
@@ -52,9 +52,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "d58ad9c4-7122-4c4b-88cc-cc5b474c2ea7",
+      "run_id": "082e0596-0e77-496f-ab80-b8c562fd1118",
       "status": "failed",
-      "updated_at": "2026-10-21T21:22:59.129790330Z",
+      "updated_at": "2026-10-22T02:15:03.217539752Z",
       "updated_by": "auto:executor"
     }
   },
@@ -72,5 +72,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-21T21:22:59.129790330Z"
+  "updated_at": "2026-10-22T02:15:40.118413573Z"
 }

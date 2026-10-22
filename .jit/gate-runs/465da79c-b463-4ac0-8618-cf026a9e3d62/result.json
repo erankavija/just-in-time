@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "11c3e28d5324796b894ce1bbfaeee32a3e187a74",
+  "completed_at": "2026-10-22T02:13:02.493504512Z",
+  "duration_ms": 318352,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six hard criteria are satisfied; the prior core-design finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fe761000-c89f-447f-a20b-e292c5b4e2e8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "465da79c-b463-4ac0-8618-cf026a9e3d62",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T02:07:44.140943160Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7360d3aec, cef1cd74e, 36460abf, 2929c4493 (`jit:fe761000`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-10 (issue description); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending; prior code-review failure was addressed by 36460abf\nTruncation recovery: Per-commit/path patch, source, registry/profile, documentation, and test reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard criteria are satisfied; the prior core-design finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -28,7 +28,7 @@ or customize individual settings.
 
 Every `config.toml` layer accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
 
-Priority (how the merged effective configuration is resolved, e.g. for `jit config`): repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
+Priority (how the effective configuration is resolved for `jit config`): repository > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. The [`[coordination]`](#coordination-section) limits are repository-scoped like `enforce_leases`: they resolve from `.jit/config.toml` alone, then the built-in defaults, for `jit config` and `jit claim acquire` alike.
 
 ---
 
@@ -655,7 +655,7 @@ jit config get <dotted.key> [--json]
 
 Resolves a dotted key against the WHOLE configuration surface — type
 hierarchy, label namespaces, item kinds, documentation paths, validation
-settings, project identity, schema version, and the system/user/repo-layered
+settings, project identity, schema version, and the repository-scoped
 worktree and coordination settings below — via a generic path walk,
 not a hand-maintained list of recognised keys. A dotted path mirrors
 `config.toml`'s own structure, including a section's kebab-case keys (e.g.
@@ -672,7 +672,7 @@ jit config get documentation.development_root
 jit config get namespaces.type.unique
 ```
 
-`worktree` and `coordination` resolve the merged, default-filled view. Every other section reads the repository's
+`worktree` and `coordination` resolve the repository's default-filled view. Every other section reads the repository's
 `config.toml` only, with no system/user merge or built-in defaults; an absent
 section resolves to `{}`.
 `templates` and `invariants` are not part of this surface (they load from

@@ -529,6 +529,13 @@
       "date": "2026-10-22",
       "decision": "@/charter/D-18, @/charter/D-9, @/inv/canonical-cutover",
       "summary": "After REQ-26 (lease limits repository-only), the user and system config layers feed nothing. Chosen: accept 93a6be35d's removal of ConfigLoader layering, plus a new 842b0ac6 task removing `config set --global`, the user and system config read and write paths, and their docs, with a test that a stray user config has no effect. Rejected: a separate later issue (ships a dead flag) and keeping dead layering."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "decision": "@/charter/D-2",
+      "summary": "Plan-review failed 3 times; the last finding was that the ten new self-test gates were declared but never required. Chosen (A): bootstrap the ten gate keys in .jit/gates.toml at planning (no change to existing gates), required only by c780514e's issues and the container, with descriptions noting they start failing until their tasks land. A 4th plan-review attempt is authorised. Rejected: (B) execution-time wiring (invisible in the plan), (C) folding into cargo-ci (contradicts REQ-10)."
     }
   ],
   "notes": [
