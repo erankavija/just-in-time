@@ -12,7 +12,7 @@
           "key": "profiled-fixture-cold-build",
           "title": "No test waits on a cold profiled-repository fixture build",
           "classification": "implementation",
-          "status": "pending (next priority)"
+          "status": "dispatched (sonnet)"
         },
         {
           "id": "a3dd995a-26d2-4039-8a69-332eca663885",
@@ -28,7 +28,7 @@
           "key": "cli-process-fixture",
           "title": "Shared fixture for spawning jit in CLI tests",
           "classification": "implementation",
-          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 dev/TESTING.md:215 claims all CLI suites use JitCli); docs rework queued"
+          "status": "done"
         },
         {
           "id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
@@ -76,7 +76,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 no consumers, F2 rustdoc); escalated"
+          "status": "rework 1 (F2 rustdoc) dispatched; steward scope note added for F1"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -124,7 +124,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 declaration_dir path traversal); rework with 0bf97911 F2 in one worktree"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -473,7 +473,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "merged; gating"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1244,11 +1244,13 @@
     {
       "issue": "0bf97911",
       "category": "gate consistency: foundation-only task failed code-review F1 'no consumers' while adoption is owned by dependent sibling tasks",
-      "status": "open; awaiting steward ruling (options: Notes clarification / absorb one adoption / none)"
+      "status": "resolved: steward (A) scope note appended to foundation-only tasks (f9894e1d6)"
     }
   ],
   "rework_counts": {
-    "2b49f95b": 1
+    "2b49f95b": 1,
+    "0bf97911": 1,
+    "4a82ed46": 1
   },
   "surfaced_pitfalls": [
     {
