@@ -8,6 +8,7 @@
   ],
   "description": "Give in-process suites shared constructors for file-backed repositories, executors and declaration directories.\n\n## Background\n\nIn-process suites define private helpers that create a temporary repository from a configuration, run `jit init`, open a `JsonFileStorage` executor with a discovered layout, or write declaration files into a temporary directory. Shared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`), which take no configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository root, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: Unit tests prove each constructor's result: the configuration is the caller's, the executor's layout is the repository's, and the directory holds exactly the supplied files.\n\n\nScope (steward ruling): this task adds the shared definition only; existing copies are retired by the adoption tasks that depend on it.",
   "documents": [],
+  "done_at": "2026-10-22T20:22:57.866908030Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Shared constructors for file-backed in-process test repositories",
-  "updated_at": "2026-10-22T20:22:31.968577256Z"
+  "updated_at": "2026-10-22T20:22:57.866908030Z"
 }
