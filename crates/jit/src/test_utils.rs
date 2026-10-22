@@ -60,6 +60,29 @@ pub fn document_reference_typed(
     }
 }
 
+/// A drafted issue carrying a fresh random id.
+pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
+    let mut issue = crate::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}
+
+#[cfg(test)]
+mod fixture_issue_tests {
+    use super::fixture_issue;
+
+    #[test]
+    fn test_fixture_issue_carries_title_description_and_distinct_ids() {
+        let first = fixture_issue("Title".into(), "Body".into());
+        let second = fixture_issue("Title".into(), "Body".into());
+        assert_eq!(
+            (first.title.as_str(), first.description.as_str()),
+            ("Title", "Body")
+        );
+        assert_ne!(first.id, second.id);
+    }
+}
+
 /// Serializes tests that temporarily change the process-wide working directory.
 ///
 /// The mutex is recovered after poisoning because a panic while a guard is
