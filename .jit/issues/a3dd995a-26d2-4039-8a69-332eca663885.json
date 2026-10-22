@@ -8,6 +8,7 @@
   ],
   "description": "Stop profiled-fixture consumers from timing out on the fixture's cross-process build lock or silently rebuilding a cold entry under it.\n\n## Background\n\n`profiled_repository_fixture` in `crates/jit/src/test_utils.rs` serves a nextest setup-script receipt when one exists and otherwise builds the entry directly under a cross-process lock.\n\nOn main at load 12, six consumers of the `jit-dogfood` profile time out at 20 s: the four `fast_rules cli_warnings_integration_tests` and the two `test_utils::tests::test_profiled_*` tests. Each calls `profiled_repository_fixture(\"jit-dogfood\", …)`. With no nextest setup-script receipt for its test, the fixture falls back to a direct build under a cross-process lock. `.config/nextest.toml` names the setup-script consumers test by test, so these six get no receipt. They then either wait on the lock or each rebuild a cold key.\n\n## Success Criteria\n\n- [hard] REQ-01: A consumer that finds no setup-script receipt takes the direct path deliberately and builds the entry at most once per key across the run. Concurrent consumers of the same key wait for that one build and then read the published entry, so no consumer rebuilds silently under the lock.\n- [hard] REQ-02: A wait on the cross-process build lock is bounded below the per-test timeout. A wait that reaches the bound fails, naming the lock, the key and the holder, instead of running into the test runner's timeout.\n- [hard] REQ-03: Tests observe both causes on a cold cache with no receipt environment. Several concurrent consumers of one profile finish within 5 s at load ≤ 10 and build the entry exactly once. A consumer facing a lock held past the bound fails with the named error.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:01:17.939698307Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
@@ -18,6 +19,12 @@
       "run_id": "a0607ae7-2936-4560-ab46-f0f84abe88f0",
       "status": "passed",
       "updated_at": "2026-10-22T14:57:17.208288818Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "46a49bf5-9210-43e0-9285-614defaea289",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:01:00.676414817Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Profiled-repository fixture lock waits are bounded",
-  "updated_at": "2026-10-22T14:57:17.208288818Z"
+  "updated_at": "2026-10-22T15:01:17.939698307Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5ce85553c708b618ef3b71e23180389c61e8abcc",
+  "completed_at": "2026-10-22T15:01:00.453682635Z",
+  "duration_ms": 219858,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The bounded metadata-aware fixture lock and focused tests satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a3dd995a-26d2-4039-8a69-332eca663885",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "46a49bf5-9210-43e0-9285-614defaea289",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:57:20.595449966Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 617984ac9; 6bceb1ad3 (merge first-parent patch duplicates implementation)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-11 and REQ-13 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:55:50Z); code-review pending\nTruncation recovery: inspected each tagged commit and parent-specific merge patch, affected paths, lock implementation, tests, configuration, and policy sources in bounded reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The bounded metadata-aware fixture lock and focused tests satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
