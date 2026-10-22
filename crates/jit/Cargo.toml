@@ -88,11 +88,9 @@ xml = ["dep:quick-xml"]
 # Exposes the test-only fixture and interruption-entry surface
 # (`InMemoryStorage::seed_issue_fixture`, `commands::test_helpers`,
 # `JsonFileStorage::with_mutation_interruptions`) as part of the crate's public
-# API. The definitions compile unconditionally either way — this feature only
-# widens their visibility from `pub(crate)` to `pub` — so `cargo build` and
-# release builds drop the surface while the self dev-dependency below (and
-# `crates/server`'s) turns it on for `cargo test`. The vocabulary those entry
-# points take (`MutationPoint`, `RedoPoint`, and their injector traits) is
+# API. Only the self dev-dependency below (and `crates/server`'s) turns it on,
+# so `cargo build` and release builds drop the surface. The vocabulary those
+# entry points take (`MutationPoint`, `RedoPoint`, and their injector traits) is
 # public either way.
 # OFF by default.
 test-support = []

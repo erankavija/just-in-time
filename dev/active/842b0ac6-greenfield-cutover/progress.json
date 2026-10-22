@@ -272,7 +272,7 @@
           "title": "Remove cfg twins in repository_state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "afc2b698-34bb-43d1-b7e2-c859de8d8104",
@@ -290,7 +290,7 @@
           "title": "Remove uncalled domain predicates and parsers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged-gate-pending"
         },
         {
           "id": "ec190bd5-af89-4776-969f-81f48412592a",
@@ -299,7 +299,7 @@
           "title": "Remove cfg twins in storage",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
@@ -359,7 +359,7 @@
           "title": "Resolve the coordination lease limits through one resolver",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "accepted-awaiting-merge"
+          "status": "merged-gate-pending"
         },
         {
           "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
@@ -492,7 +492,8 @@
     "Resource policy (steward): dispatch only with >=60 GB free on /, max 2 live worktrees, remove worktrees at merge, CARGO_INCREMENTAL=0, full gates via turnstile+exclusive flock, other cargo via turnstile+shared flock.",
     "Foreign leaks into main (df129d9e lints, 3d9a0ce3 profile.rs test fix) blocked merges/gates twice; steward routed both.",
     "mkprompt.py read a non-existent gates field until 4c216a28's dispatch; earlier prompts named no gates. Fixed; lead evaluated the real gates on every issue.",
-    "fbb661f2 dispatch note: JitConfig::load hides the serde cause (config.rs ~1335, printed with {} at main.rs ~1663). 5e846743 folded the cause into AgentConfig::load_from's message; fbb661f2 must converge on one convention for both loaders (DEC-config-errors)."
+    "fbb661f2 dispatch note: JitConfig::load hides the serde cause (config.rs ~1335, printed with {} at main.rs ~1663). 5e846743 folded the cause into AgentConfig::load_from's message; fbb661f2 must converge on one convention for both loaders (DEC-config-errors).",
+    "Main red from 27f0a575 (df129d9e) doctests; gates for 34361448 and 58282882 held until fixed."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }

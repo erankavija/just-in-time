@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T02:15:28.860201545Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d2673ecb-bc0d-426b-8949-1fefd0294879",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:37:33.688662882Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8a6f59e9-5aae-4422-9c4c-b14958a158a4",
+      "status": "failed",
+      "updated_at": "2026-10-22T06:40:22.452040417Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "58282882-59d6-4e0c-b47b-f49a8ca11cc3",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove uncalled domain predicates and parsers",
-  "updated_at": "2026-10-22T02:15:33.850931715Z"
+  "updated_at": "2026-10-22T06:40:22.452040417Z"
 }

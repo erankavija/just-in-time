@@ -3781,7 +3781,8 @@ jit config show [--json]
 ### `jit config set`
 
 Set a `section.field` key in the repository (or, with `--global`, the
-user-global) `config.toml`. A repository-level set that changes the namespace
+user-global) `config.toml`. The user-global file is currently read by no
+configuration lookup, so `--global` changes no effective value. A repository-level set that changes the namespace
 registry also synchronizes the default `namespace-unique-*` rows in
 `rules.toml` (same write-through as re-init; custom rules and policy edits are
 untouched).

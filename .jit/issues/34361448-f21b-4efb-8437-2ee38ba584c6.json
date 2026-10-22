@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T02:01:16.237356085Z",
   "context": {},
   "created_at": "2026-10-21T05:49:10.044364505Z",
@@ -16,7 +16,26 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e874a634-0057-4bee-a18c-d795edfe2f9b",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:40:22.765266506Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c57b1c12-4e35-476d-99e6-19953d26bc71",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:45:03.895707323Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "e4bbf5f4-89ba-4c14-90b1-cd2bc23312c2",
+      "status": "failed",
+      "updated_at": "2026-10-22T06:47:14.770738137Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "34361448-f21b-4efb-8437-2ee38ba584c6",
   "labels": [
     "type:task",
@@ -31,5 +50,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Resolve the coordination lease limits through one resolver",
-  "updated_at": "2026-10-22T02:01:16.294809284Z"
+  "updated_at": "2026-10-22T06:47:14.770738137Z"
 }

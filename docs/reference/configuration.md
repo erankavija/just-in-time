@@ -22,9 +22,9 @@ or customize individual settings.
 |------|---------|
 | `.jit/config.toml` | Repository config (schema + runtime) |
 | `.jit/templates.toml` | Graph templates and their [role/anchor bindings](#template-bindings-jittemplatestoml) |
-| `~/.config/jit/config.toml` | User defaults |
+| `~/.config/jit/config.toml` | Written by `jit config set --global`; no configuration value is read from it |
 | `~/.config/jit/agent.toml` | Agent identity |
-| `/etc/jit/config.toml` | System defaults |
+| `/etc/jit/config.toml` | No configuration value is read from it |
 
 Every `config.toml` layer accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
 
@@ -695,12 +695,13 @@ jit config get bogus_section
 # Set in repository config
 jit config set worktree.enforce_leases warn
 
-# Set in user config
+# Write the user config file (currently has no effect on any value)
 jit config set <section.field> <value> --global
 ```
 
 A repository-scoped key such as `worktree.enforce_leases` takes effect only in
-the repository config. At either scope, `jit config set` refuses an edit after
+the repository config. `--global` writes `~/.config/jit/config.toml`, which nothing
+reads, so it changes no effective value, including the lease limits. At either scope, `jit config set` refuses an edit after
 which the file would not load, and leaves the file unchanged.
 
 ### Validate Config

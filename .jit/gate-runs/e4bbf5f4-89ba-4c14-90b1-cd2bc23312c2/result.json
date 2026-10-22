@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "be0d9ab5375b4c0b0a1196f69f0a7f4ec9c6ac3f",
+  "completed_at": "2026-10-22T06:47:14.556049681Z",
+  "duration_ms": 130363,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 3696,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "CLI configuration documentation incorrectly says worktree and coordination settings merge user and system configuration despite repository-only resolution."
+      }
+    ],
+    "summary": "The CLI command reference still contradicts the repository-only lease-policy resolver introduced by this issue.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e4bbf5f4-89ba-4c14-90b1-cd2bc23312c2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T06:45:04.192387811Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3307 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1625b-2abf-72b3-b482-9db4ce3cfe37\n--------\nuser\n--- 3294 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf (level 4; no resolved children). I reviewed the individually tagged patches for `jit:34361448` and verified current resolver behavior; uncommitted `.jit` changes were excluded. The prior configuration-reference finding is fixed, but the CLI reference remains contradictory.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3696) still says `worktree` and `coordination` use system/user/repository layering, and repeats that claim at lines 3728–38 and 3773–75. The current resolver and `claim acquire` read only `.jit/config.toml`, then built-in defaults. Replace these passages to state repository-only, default-filled resolution and that `config show` reports that same view.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The CLI command reference still contradicts the repository-only lease-policy resolver introduced by this issue.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CLI configuration documentation incorrectly says worktree and coordination settings merge user and system configuration despite repository-only resolution.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3696}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

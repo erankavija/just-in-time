@@ -1,0 +1,57 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "be0d9ab5375b4c0b0a1196f69f0a7f4ec9c6ac3f",
+  "completed_at": "2026-10-22T06:40:22.234841767Z",
+  "duration_ms": 168131,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/item.rs",
+        "id": "F1",
+        "line": 396,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/58282882/requirement/REQ-01",
+          "@/issue/842b0ac6/requirement/REQ-16",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "REQ-01 remains unmet: KindScope parsing APIs, PROJECT_TOKEN, and InvalidScope remain."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/types.rs",
+        "id": "F2",
+        "line": 64,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/58282882/requirement/REQ-02",
+          "@/issue/842b0ac6/requirement/REQ-16",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "REQ-02 remains unmet: State::is_closed and LabelNamespaces::contains remain."
+      }
+    ],
+    "summary": "Two hard removal criteria remain unmet in the shipping tree.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "58282882-59d6-4e0c-b47b-f49a8ca11cc3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8a6f59e9-5aae-4422-9c4c-b14958a158a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T06:37:34.103453503Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2880 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16254-4c9a-7681-ab99-a255692d42d1\n--------\nuser\n--- 2867 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `90aa7bf33`, `354542941` (`jit:58282882`); both yield the same `errors.rs` deletion\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-18` — `dev/vision/9db27a3a-charter.md`; `@/issue/842b0ac6/requirement/REQ-16`, `@/issue/58282882/requirement/REQ-01`, `REQ-02`, `REQ-03` — markdown-first issue descriptions\nGate evidence: `cargo-ci`: passed 2026-10-22T06:37:33Z; exit code not recorded\nTruncation recovery: Narrowed the initially truncated AGENTS discovery, merge per-parent patch, scoped source reads, and identifier searches\n\n1. **[blocking][issue-impact] F1 — REQ-01 remains unmet.** `KindScope::PROJECT_TOKEN`, `parse`, and `parse_for` remain in [`crates/jit/src/domain/item.rs:396`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:396), and `ItemError::InvalidScope` remains at line 473. The tagged change removed only the unrelated Git helper, so the issue does not contribute its promised removal. References: `@/issue/58282882/requirement/REQ-01`, `@/issue/842b0ac6/requirement/REQ-16`, `@/charter/D-18`.\n\n2. **[blocking][issue-impact] F2 — REQ-02 remains unmet.** `State::is_closed` remains at [`crates/jit/src/domain/types.rs:64`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:64), and the dead-code-marked `LabelNamespaces::contains` remains at line 3414. References: `@/issue/58282882/requirement/REQ-02`, `@/issue/842b0ac6/requirement/REQ-16`, `@/charter/D-18`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two hard removal criteria remain unmet in the shipping tree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 remains unmet: KindScope parsing APIs, PROJECT_TOKEN, and InvalidScope remain.\",\"file\":\"crates/jit/src/domain/item.rs\",\"line\":396,\"references\":[\"@/issue/58282882/requirement/REQ-01\",\"@/issue/842b0ac6/requirement/REQ-16\",\"@/charter/D-18\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-02 remains unmet: State::is_closed and LabelNamespaces::contains remain.\",\"file\":\"crates/jit/src/domain/types.rs\",\"line\":64,\"references\":[\"@/issue/58282882/requirement/REQ-02\",\"@/issue/842b0ac6/requirement/REQ-16\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
