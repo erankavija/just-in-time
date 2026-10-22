@@ -19240,3 +19240,10 @@
 {"from":"backlog","id":"f6cefe8a-fa5c-4237-810f-510f4eeb85cb","issue_id":"0e3b69fc-1af7-4cc8-9089-96f2debd6324","timestamp":"2026-10-22T15:04:11.049823418Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"d440f52e-8f8e-4183-8555-0cd137e1e7ac","issue_id":"0e3b69fc-1af7-4cc8-9089-96f2debd6324","timestamp":"2026-10-22T15:04:15.138390725Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"bc184706-b385-4d32-81c2-635c78351aa3","issue_id":"0e3b69fc-1af7-4cc8-9089-96f2debd6324","timestamp":"2026-10-22T15:04:15.375815701Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"3f1d3f56-34c0-4a02-acbd-e28d157eb0fd","issue_id":"9fa12e75-2632-4e68-8d67-b80caf78770d","timestamp":"2026-10-22T15:05:30.549474950Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"ac92f0dd-9585-447d-aa51-9366cb93e057","issue_id":"0973ed93-e516-41fd-8f55-9eef33ab2fa8","timestamp":"2026-10-22T15:06:12.111465367Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"613a1bfc-75d2-4e51-872a-e6ec8d97f965","issue_id":"0973ed93-e516-41fd-8f55-9eef33ab2fa8","timestamp":"2026-10-22T15:07:41.242358902Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"10fc679b-f761-4f44-9ebd-a5de5c840594","issue_id":"ea5f4536-6dc7-4c22-8de7-b68b6c30252d","timestamp":"2026-10-22T15:11:17.821337583Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"5b11d9f7-c8e4-4ca1-af9e-08c6593b9a22","issue_id":"0973ed93-e516-41fd-8f55-9eef33ab2fa8","timestamp":"2026-10-22T15:12:21.847629069Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"103e6ff6-c2fd-4b90-9928-75a8bbc5d3e1","issue_id":"0973ed93-e516-41fd-8f55-9eef33ab2fa8","timestamp":"2026-10-22T15:12:33.874012837Z","to":"done","type":"issue_state_changed"}
+{"id":"b9c8ea00-2740-4217-8af5-760ebb595dba","issue_id":"0973ed93-e516-41fd-8f55-9eef33ab2fa8","timestamp":"2026-10-22T15:12:33.874012837Z","type":"issue_completed"}

@@ -8,12 +8,26 @@
   ],
   "description": "Define the taxonomy-initialised CLI test repository once in shared test support, so the suite copies can be retired.\n\n## Background\n\n`TaxonomyRepo` and its constructor `setup_test_repo_with_taxonomy` are defined twice, in `crates/jit/tests/cli_issue/main.rs` and `crates/jit/tests/cli_query_graph/main.rs`. Each is a thin wrapper over `jit::test_utils::setup_test_repo_with_taxonomy` that pairs a temporary repository with the `TestTaxonomy` declaration that authored its vocabulary, so a subprocess test reads type names from that declaration. `cli_query_graph/main.rs` adds `type_label`, `membership_label` and `membership_namespace` helpers.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support, beside `TestTaxonomy`, defines `TaxonomyRepo`, its constructor and the label helpers, with the behaviour of the suite copies.\n- [hard] REQ-02: A unit test proves the repository declares the taxonomy it carries.\n\n## Notes\n\nThe CLI process fixture can take ownership of this repository; the taxonomy stays with the test that reads it. The suite copies are retired by each suite's own adoption.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:12:33.874012837Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "87fa6244-94df-4245-8900-eec02107693e",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:12:21.847629069Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bb1035b2-798a-4fa9-b5c2-1fcd877ef32c",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:07:41.242358902Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0973ed93-e516-41fd-8f55-9eef33ab2fa8",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Shared taxonomy repository type for CLI tests",
-  "updated_at": "2026-10-22T15:03:46.550529685Z"
+  "updated_at": "2026-10-22T15:12:33.874012837Z"
 }
