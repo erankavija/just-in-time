@@ -30,7 +30,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Query assignee filters parse to an Assignee",
-  "updated_at": "2026-10-21T05:32:18.845023269Z"
+  "updated_at": "2026-10-22T19:43:35.083270092Z"
 }

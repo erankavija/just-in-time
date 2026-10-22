@@ -27,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "One macro declares a closed wire vocabulary",
-  "updated_at": "2026-10-21T05:32:19.296289917Z"
+  "updated_at": "2026-10-22T19:43:22.259340637Z"
 }
