@@ -5,7 +5,7 @@
 use crate::commands::CommandExecutor;
 use crate::declarations::GateRegistry;
 use crate::domain::Issue;
-use crate::repository_state::RepositoryIndex;
+use crate::repository_state::{RepositoryIndex, VirtualPath};
 use crate::storage::{InMemoryStorage, IssueStore, MutationPoint};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -32,25 +32,6 @@ pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &st
 /// product mutation path. Lifecycle timestamps are preserved verbatim.
 pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
     storage.seed_issue_fixture(&issue);
-}
-
-/// Seed the data root's engine-owned ignore file when the fixture lacks it, with
-/// the exact bytes its producer composes.
-pub(crate) fn seed_data_root_ignore(storage: &InMemoryStorage) {
-    if storage
-        .read_repo_file(".jit/.gitignore")
-        .expect("memory fixture ignore path is valid")
-        .is_some()
-    {
-        return;
-    }
-    let bytes = crate::repository_state::render_data_root_ignore(b"")
-        .expect("the engine-owned ignore region composes over an empty document");
-    seed_repo_file(
-        storage,
-        ".jit/.gitignore",
-        std::str::from_utf8(&bytes).expect("the composed ignore file is UTF-8"),
-    );
 }
 
 /// Seed one exact authored gate-registry precondition.
@@ -178,21 +159,61 @@ fn with_session_race(
     raced
 }
 
-/// Attach the explicit synthetic layout to an in-memory executor fixture.
-///
-/// The fixture repository is back-filled with the state every real repository
-/// carries and no test authors by hand: the minimum configuration, and the
-/// data root's engine-owned ignore file, whose absence is derived-state drift.
+/// Executor over `storage` whose repository is set up by product
+/// initialization.
 pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    if storage
-        .read_repo_file(".jit/config.toml")
-        .expect("memory fixture config path is valid")
-        .is_none()
-    {
-        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-    }
-    seed_data_root_ignore(&storage);
+    memory_executor_declaring(storage, "")
+}
+
+/// [`memory_executor`] for a scenario that declares configuration.
+///
+/// `config` is the scenario's own `.jit/config.toml` body; an empty body
+/// declares nothing, and a configuration `storage` already holds wins.
+/// Initializes a fault-free declaration copy, excluding [`VirtualPath::RECORDS`],
+/// then fills absent paths without changing seeded state. Seed declarations
+/// that initialization rejects (such as malformed rules) after this call.
+pub fn memory_executor_declaring(
+    storage: InMemoryStorage,
+    config: &str,
+) -> CommandExecutor<InMemoryStorage> {
     let layout = storage.repository_layout();
+    let pristine = InMemoryStorage::rooted_at(storage.root());
+    {
+        let held = storage.repository_state();
+        let mut declarations = pristine.repository_state();
+        declarations.data_root_exists = held.data_root_exists;
+        declarations.entries = held
+            .entries
+            .iter()
+            .filter(|(path, _)| {
+                !VirtualPath::RECORDS.iter().any(|record| {
+                    record.root_class() == path.root_class()
+                        && record.relative().contains(path.relative().as_str())
+                })
+            })
+            .map(|(path, entry)| (path.clone(), entry.clone()))
+            .collect();
+    }
+    if !config.is_empty()
+        && storage
+            .read_repo_file(".jit/config.toml")
+            .expect("memory fixture config path is valid")
+            .is_none()
+    {
+        pristine.add_data_file("config.toml", config);
+    }
+    CommandExecutor::new(pristine.clone())
+        .with_layout(layout.clone())
+        .initialize_fresh_repository(storage.root(), None)
+        .expect("product initialization seeds the memory repository");
+    let initialized = pristine.repository_state().clone();
+    {
+        let mut state = storage.repository_state();
+        state.data_root_exists |= initialized.data_root_exists;
+        for (path, entry) in initialized.entries {
+            state.entries.entry(path).or_insert(entry);
+        }
+    }
     CommandExecutor::new(storage).with_layout(layout)
 }
 
@@ -202,20 +223,82 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
 ///
 /// * `mode` - Enforcement mode: "strict", "warn", or "off"
 pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
-    let storage = InMemoryStorage::new();
-    let config_toml = format!(
-        r#"
-[worktree]
-enforce_leases = "{}"
-"#,
-        mode
-    );
-    storage.add_data_file("config.toml", &config_toml);
-
-    memory_executor(storage)
+    memory_executor_declaring(
+        InMemoryStorage::new(),
+        &format!("[worktree]\nenforce_leases = \"{mode}\"\n"),
+    )
 }
 
 /// Create an executor with enforcement disabled (for backward compatibility tests).
 pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_executor_declaring_matches_product_initialization_plus_declared_config() {
+        let declared = "[worktree]\nenforce_leases = \"warn\"\n";
+        let storage = InMemoryStorage::new();
+        memory_executor_declaring(storage.clone(), declared);
+
+        let reference = InMemoryStorage::rooted_at(storage.root());
+        reference.add_data_file("config.toml", declared);
+        CommandExecutor::new(reference.clone())
+            .with_layout(reference.repository_layout())
+            .initialize_fresh_repository(reference.root(), None)
+            .unwrap();
+
+        let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
+        assert_eq!(image(&storage), image(&reference));
+    }
+
+    #[test]
+    fn test_memory_executor_leaves_seeded_state_and_faults_out_of_initialization() {
+        let counter = SessionOpenCounter::new();
+        let storage = InMemoryStorage::with_mutation_interruptions(counter.clone());
+        let issue = crate::test_utils::fixture_issue("seeded issue".into(), String::new());
+        seed_issue(&storage, issue);
+        storage.add_data_file("gates.toml", "# scenario gates\n");
+        let seeded = storage.repository_state().entries.clone();
+
+        memory_executor(storage.clone());
+
+        assert_eq!(counter.count(), 0, "initialization must not open the scenario store");
+        let initialized = storage.repository_state();
+        for (path, entry) in seeded {
+            assert_eq!(initialized.entries.get(&path), Some(&entry), "{path:?}");
+        }
+    }
+
+    #[test]
+    fn test_memory_executor_fills_every_initialization_path_a_partially_seeded_store_lacks() {
+        let reference = InMemoryStorage::new();
+        memory_executor(reference.clone());
+        let held = [".jit/index.json", ".jit/rules.toml"];
+        let storage = InMemoryStorage::rooted_at(reference.root());
+        for path in held {
+            let initialized = reference.read_repo_file(path).unwrap().unwrap();
+            seed_repo_file(&storage, path, &format!("{initialized}\n"));
+        }
+
+        let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
+        let before = image(&storage);
+        memory_executor(storage.clone());
+
+        let (seeded, initialized) = (image(&storage), image(&reference));
+        assert_eq!(
+            seeded.keys().collect::<Vec<_>>(),
+            initialized.keys().collect::<Vec<_>>()
+        );
+        for (path, entry) in &initialized {
+            let is_file = matches!(entry, crate::repository_state::RepositoryEntry::File { .. });
+            if is_file {
+                let expected = before.get(path).unwrap_or(entry);
+                assert_eq!(seeded.get(path), Some(expected), "{path:?}");
+            }
+        }
+    }
 }
