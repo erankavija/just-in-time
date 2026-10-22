@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "39bfaefa-fb75-4601-84a9-2e157980bbd1",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:50:34.806347751Z",
+      "run_id": "076cb8c4-29cd-46a5-8cf7-e23576620551",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:00:36.697703362Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "d4bb5ab5-b8ed-4e5c-adef-5616bf5dbe59",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:55:28.599686471Z",
+      "run_id": "7cb49f35-c5d2-4fd1-8bb5-aff1e5037849",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:04:33.241865509Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Memory executor initialised through product initialisation",
-  "updated_at": "2026-10-22T15:55:28.599686471Z"
+  "updated_at": "2026-10-22T20:04:33.241865509Z"
 }
