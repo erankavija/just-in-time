@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "98a340179b5912f620fbb5de0a7a7a928d9ddbff",
+  "completed_at": "2026-10-22T14:23:03.418875852Z",
+  "duration_ms": 306919,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/config.rs",
+        "id": "F1",
+        "line": 323,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The rustdoc still claims EffectiveConfig probes system and user config and resolves the home directory, but it now loads only the repository config."
+      }
+    ],
+    "summary": "Lease-limit resolution, enforcement, regression coverage, and documentation meet the hard criteria; one isolated stale rustdoc comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "325872b9-8ede-4765-9f39-770147929574",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:17:56.499022354Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93a6be35d, a1fd176cb, 26b32610a, 1bcf37544, 57584e6c3, 98a340179\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 and @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/842b0ac6/requirement/REQ-26 and @/issue/459bb995/requirement/REQ-03 (issue descriptions)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:16:23Z); code-review passed (exit 0, 2026-10-22T06:40:23Z); doc-review failed (exit 1, 2026-10-22T06:45:04Z); docs-mechanical pending\nTruncation recovery: Re-read the resolver patch with zero context and inspected bounded current ranges for affected code, tests, and documentation after an unrelated broad search truncated.\n\n1. [advisory, issue-impact] `crates/jit/src/commands/config.rs:323` still says `EffectiveConfig::load` probes system/user configuration and resolves the home directory, but it now loads only the repository configuration. Update the stale rustdoc contract. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Lease-limit resolution, enforcement, regression coverage, and documentation meet the hard criteria; one isolated stale rustdoc comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The rustdoc still claims EffectiveConfig probes system and user config and resolves the home directory, but it now loads only the repository config.\",\"file\":\"crates/jit/src/commands/config.rs\",\"line\":323,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

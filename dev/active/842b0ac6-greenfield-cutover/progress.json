@@ -290,7 +290,7 @@
           "title": "Remove uncalled domain predicates and parsers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-dispatched"
+          "status": "done"
         },
         {
           "id": "ec190bd5-af89-4776-969f-81f48412592a",
@@ -350,7 +350,7 @@
           "title": "Report a non-required gate through one typed error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "34361448-f21b-4efb-8437-2ee38ba584c6",
@@ -359,7 +359,7 @@
           "title": "Resolve the coordination lease limits through one resolver",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-2-dispatched"
+          "status": "done"
         },
         {
           "id": "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
@@ -368,7 +368,7 @@
           "title": "Remove the user and system configuration layers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },

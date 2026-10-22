@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e338a7ca-3e4b-49ba-b824-956fd0be1b98",
+      "run_id": "d0678fc4-628e-4b80-85d1-0f8a5f05eeaa",
       "status": "passed",
-      "updated_at": "2026-10-22T01:58:35.864494773Z",
+      "updated_at": "2026-10-22T14:22:26.003618224Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove three-way profile publication",
-  "updated_at": "2026-10-22T02:03:52.692529383Z"
+  "updated_at": "2026-10-22T14:22:26.003618224Z"
 }
