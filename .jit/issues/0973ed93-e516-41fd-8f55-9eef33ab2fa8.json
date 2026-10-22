@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:20.558691828Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -28,5 +28,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared taxonomy repository type for CLI tests",
-  "updated_at": "2026-10-22T14:55:50.183381472Z"
+  "updated_at": "2026-10-22T15:03:46.550529685Z"
 }
