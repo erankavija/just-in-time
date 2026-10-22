@@ -608,9 +608,11 @@ test_ignored_doctest_is_rejected() {
 # --- the exit-status classifier ----------------------------------------------
 # A failure is an infrastructure fault (75) only when every failing step is a
 # test TIMEOUT with no FAIL, or a suite-duration-only budget violation, and the
-# host was loaded; everything else is a verdict (1). Synthetic nextest and
+# host was loaded before the run started; everything else is a verdict (1). Synthetic nextest and
 # budget output stand in for the steps, so no suite runs.
 readonly LOADED_LOAD1=9.00 QUIET_LOAD1=0.50 FIXTURE_CPUS=4
+# Baselines on each side of the 0.17 x FIXTURE_CPUS = 0.68 threshold.
+readonly JUST_BELOW_LOAD1=0.67 AT_THRESHOLD_LOAD1=0.68
 readonly TIMEOUT_LINE='        TIMEOUT [  60.001s] jit commands::slow::test_slow'
 readonly FAIL_LINE='        FAIL [   0.120s] jit commands::x::test_broken'
 readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
@@ -635,10 +637,10 @@ expect_classification() { # expect_classification <message> <exit> <load1> <test
   check "$msg: exits $want" test "$classify_rc" -eq "$want"
   grep -q 'failed on repository content' "$scratch/classify/diagnosis" ||
     check "$msg: the diagnosis records the observed load" \
-      grep -q "load1=${1:-unknown}" "$scratch/classify/diagnosis"
+      grep -q "baseline load1=${1:-unknown}" "$scratch/classify/diagnosis"
   [ "$want" -ne 75 ] ||
     check "$msg: the diagnosis records the classifying threshold" \
-      grep -qF "threshold 5.00 (1.25 x ${FIXTURE_CPUS} CPUs)" "$scratch/classify/diagnosis"
+      grep -qF "threshold 0.68 (0.17 x ${FIXTURE_CPUS} CPUs)" "$scratch/classify/diagnosis"
 }
 
 test_classifier_exit_paths() {
@@ -657,6 +659,8 @@ test_classifier_exit_paths() {
   expect_classification "loaded duration overrun beside a footprint failure" 1 "$LOADED_LOAD1" "" "$DURATION_VIOLATION"$'\n'"$FOOTPRINT_VIOLATION" budget
   expect_classification "loaded timeout beside a clippy failure" 1 "$LOADED_LOAD1" "$TIMEOUT_LINE" "" test clippy
   expect_classification "loaded test step failing without any TIMEOUT result" 1 "$LOADED_LOAD1" "error: could not compile" "" test
+  expect_classification "timeout with a baseline just below the threshold" 1 "$JUST_BELOW_LOAD1" "$TIMEOUT_LINE" "" test
+  expect_classification "timeout with a baseline at the threshold" 75 "$AT_THRESHOLD_LOAD1" "$TIMEOUT_LINE" "" test
   expect_classification "unknown load" 1 "" "$TIMEOUT_LINE" "" test
 }
 
