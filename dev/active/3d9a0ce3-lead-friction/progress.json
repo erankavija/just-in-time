@@ -1,7 +1,7 @@
 {
   "epic_id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
   "epic_short_id": "3d9a0ce3",
-  "current_wave": 3,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -88,7 +88,7 @@
           "title": "Record built-in checker faults as error runs",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged (with lead-requested fix: projection source); gates running"
+          "status": "done"
         },
         {
           "id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
@@ -136,7 +136,7 @@
           "title": "Classify cargo-ci load from a pre-run baseline",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "done"
         }
       ],
       "note": "24268b05 waits on 756ec5ec (842b0ac6)"
@@ -201,7 +201,7 @@
           "title": "Remove three-way profile publication",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged; cargo-ci passed (forced after fixture TIMEOUT signature, steward ruling); code-review R1 failed (Repository conflict owner variant, stale record-claim rustdoc); rework 1 queued"
+          "status": "done"
         }
       ]
     },
@@ -214,7 +214,7 @@
           "title": "Remove applied-profile records",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -227,7 +227,7 @@
           "title": "Record what was applied in the profile lifecycle event",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5c0bd3ad-1d1b-4eae-a003-08e08a7a3206",
@@ -248,7 +248,7 @@
           "title": "Build one profile selection per invocation",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched (opus)"
         }
       ]
     },
@@ -528,6 +528,10 @@
     {
       "topic": "mcp-ci red on main from another epic (jit_migrate_lifecycle-timestamps uncurated)",
       "resolution": "reported to steward; pending"
+    },
+    {
+      "topic": "fixture contention TIMEOUT/lock-wait signature in cargo-ci",
+      "resolution": "steward: force allowed for that exact signature until c780514e's cold-key fix lands"
     }
   ],
   "surfaced_pitfalls": [
