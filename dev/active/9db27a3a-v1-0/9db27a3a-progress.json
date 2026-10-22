@@ -536,6 +536,12 @@
       "date": "2026-10-22",
       "decision": "@/charter/D-2",
       "summary": "Plan-review failed 3 times; the last finding was that the ten new self-test gates were declared but never required. Chosen (A): bootstrap the ten gate keys in .jit/gates.toml at planning (no change to existing gates), required only by c780514e's issues and the container, with descriptions noting they start failing until their tasks land. A 4th plan-review attempt is authorised. Rejected: (B) execution-time wiring (invisible in the plan), (C) folding into cargo-ci (contradicts REQ-10)."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "summary": "Plan-review attempt 4 failed on terminal sizing only (the CLI fixture migrations span 9-18 files; the library adoption spans 37 modules). Chosen (A): mechanical splits plus an explicit sizing rule (a leaf touches at most ~6 files, or one file family with one concern) applied to every terminal; attempt 5 authorised. If it fails only on leaves that meet the rule, escalate as a gate-consistency question. Rejected: accepting the current sizing against the gate, and pausing."
     }
   ],
   "notes": [
