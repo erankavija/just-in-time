@@ -35,10 +35,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     ///
     /// The selection was built before this runs, so an unresolvable selector,
     /// dependency, or variable input fails before a repository is created.
-    /// The first package of its closure — the one nothing else in it depends
-    /// on — is published together with the scaffold, because a package needs a
-    /// repository to be applied to; the rest follow in closure order through
-    /// the ordinary application and one aggregate lifecycle event.
+    /// The complete dependency-first closure and neutral scaffold publish in
+    /// one delta with one aggregate lifecycle event.
     pub fn initialize_fresh_repository(
         &self,
         repo_dir: &Path,

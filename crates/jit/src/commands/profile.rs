@@ -468,16 +468,18 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         crate::profile::selection_probe::record(
             crate::profile::selection_probe::SelectionStage::SelectorResolution,
         );
-        let mut read = BTreeMap::<&Path, ProfilePackage>::new();
+        let layout = self.require_layout()?;
+        let mut read = BTreeMap::<PathBuf, ProfilePackage>::new();
         selectors
             .iter()
             .map(|selector| {
                 let ProfileSelector::Path(location) = selector;
-                if let Some(package) = read.get(location.as_path()) {
+                let requested = requested_package_directory(location, &layout);
+                if let Some(package) = read.get(&requested) {
                     return Ok(package.clone());
                 }
                 let package = self.resolve_profile_package(selector)?;
-                read.insert(location, package.clone());
+                read.insert(requested, package.clone());
                 Ok(package)
             })
             .collect()
@@ -1478,15 +1480,19 @@ fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
     }
 }
 
+fn requested_package_directory(location: &Path, layout: &RepositoryLayout) -> PathBuf {
+    if location.is_absolute() {
+        location.to_path_buf()
+    } else {
+        layout.worktree_root().join(location)
+    }
+}
+
 /// Read the package at a location the caller supplied.
 ///
 /// The package there supplies the id its selector resolves to.
 fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<ProfilePackage> {
-    let requested = if location.is_absolute() {
-        location.to_path_buf()
-    } else {
-        layout.worktree_root().join(location)
-    };
+    let requested = requested_package_directory(location, layout);
     let package = match fs::canonicalize(&requested) {
         Ok(_) => {
             ensure_worktree_package_directory(&requested, layout)?;
@@ -4493,6 +4499,22 @@ template = true
         let root = package_declaring(temp, "vendor/workflow", "workflow", &["base"]);
         let closure = executor.resolve_profile_closure(&root).unwrap().len();
         (package_selector(&root), closure)
+    }
+
+    #[test]
+    fn test_select_profiles_validates_equivalent_relative_and_absolute_selectors_once() {
+        let (temp, _storage, executor, _package) = fixture();
+        let (absolute, closure) = dependent_selection(&temp, &executor);
+        let relative = ProfileSelector::path("vendor/workflow");
+        let (planned, stages) = selection_probe::observe(|| {
+            plan_selected(
+                &executor,
+                &[relative, absolute],
+                &ProfileVariableOptions::default(),
+            )
+        });
+        assert_eq!(planned.unwrap().count(), closure + 1);
+        assert_eq!(stages, selection_probe::once_per_invocation(closure));
     }
 
     #[test]
