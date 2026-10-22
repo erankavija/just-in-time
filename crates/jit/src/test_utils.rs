@@ -25,7 +25,7 @@ use std::fs;
 use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
@@ -1103,7 +1103,17 @@ pub fn setup_test_repo_with_config(
 
 /// A temporary directory holding exactly `files`, each a worktree-relative path
 /// (parents created) with its contents.
+///
+/// Fails before writing when a path is absolute or has a `..`, root or prefix
+/// component, since it would leave the directory.
 pub fn declaration_dir(files: &[(&str, &str)]) -> Result<TempDir> {
+    if let Some((escaping, _)) = files.iter().find(|(relative, _)| {
+        !Path::new(relative)
+            .components()
+            .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+    }) {
+        anyhow::bail!("declaration path '{escaping}' is not confined to its directory");
+    }
     let dir = TempDir::new()?;
     files.iter().try_for_each(|(relative, contents)| {
         let path = dir.path().join(relative);
@@ -1185,6 +1195,25 @@ mod file_setup_tests {
                 (PathBuf::from("rules.toml"), "a".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn test_declaration_dir_rejects_paths_leaving_the_directory_before_writing() {
+        let outside = TempDir::new().unwrap();
+        let absolute = outside.path().join("escaped.toml");
+        let absolute = absolute.to_str().unwrap();
+        let traversing = "../escaped-by-traversal.toml";
+
+        [absolute, traversing].iter().for_each(|escaping| {
+            let error = declaration_dir(&[("inside.toml", "a"), (escaping, "b")]).unwrap_err();
+
+            assert!(error.to_string().contains(escaping), "{error}");
+        });
+
+        assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
+        assert!(!std::env::temp_dir()
+            .join("escaped-by-traversal.toml")
+            .exists());
     }
 
     #[test]
@@ -1278,7 +1307,6 @@ fn set_captured_mode(path: &Path, mode: FileMode) -> Result<()> {
 fn set_captured_mode(_path: &Path, _mode: FileMode) -> Result<()> {
     Ok(())
 }
-/// The shipped default package's manifest id.
 const SHIPPED_PACKAGE_ID: &str = "jit-default";
 
 /// The item-kind declarations `manifest` contributes, keyed by kind name.
