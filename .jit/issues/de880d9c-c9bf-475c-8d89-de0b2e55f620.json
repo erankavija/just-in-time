@@ -19,6 +19,12 @@
       "status": "failed",
       "updated_at": "2026-10-22T19:33:54.052274454Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d8b8bac7-63a9-4312-921a-91cd39c141d1",
+      "status": "passed",
+      "updated_at": "2026-10-22T19:54:30.536779493Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "de880d9c-c9bf-475c-8d89-de0b2e55f620",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T19:33:54.052274454Z"
+  "updated_at": "2026-10-22T19:54:30.536779493Z"
 }
