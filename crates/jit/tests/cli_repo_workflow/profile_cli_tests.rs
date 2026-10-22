@@ -612,7 +612,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
 }
 
 #[test]
-fn test_profile_variable_keeps_the_resolved_value_out_of_events_and_validates() {
+fn test_profile_variable_records_the_resolved_value_in_the_event_and_validates() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     write_variable_package(
@@ -649,10 +649,16 @@ fn test_profile_variable_keeps_the_resolved_value_out_of_events_and_validates() 
         format!("NAME={resolved_value}\n")
     );
 
-    let events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
-    assert!(!events
-        .windows(resolved_value.len())
-        .any(|window| window == resolved_value.as_bytes()));
+    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
+    let lifecycle = events
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|event| event["type"] == "profile_lifecycle")
+        .expect("the apply is audited");
+    let recorded = &lifecycle["profiles"][0];
+    assert_eq!(recorded["id"], "resolved-vars");
+    assert_eq!(recorded["version"], "1.0.0");
+    assert_eq!(recorded["variables"]["NAME"], resolved_value);
 
     let validate = Command::new(env!("CARGO_BIN_EXE_jit"))
         .args(["validate", "--json"])

@@ -43,7 +43,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_definition_updated` | registry | no | `jit gate update` edited a registered gate. |
 | `gate_definition_created` | registry | no | `jit gate define` registered a gate. |
 | `gate_definition_removed` | registry | no | `jit gate remove` unregistered a gate. |
-| `profile_lifecycle` | repository | no | A profile lifecycle operation reached its commit point, the redo record carrying its writes; the event summarizes per-profile actions and variable source kinds without resolved values or rendered content. |
+| `profile_lifecycle` | repository | no | A profile lifecycle operation reached its commit point, the redo record carrying its writes; the event summarizes per-profile actions, recording each package's id, version and applied variable values. |
 | `linked_checkout_write_overridden` | repository | no | An explicit per-invocation override permitted a state-mutating command inside a linked checkout that the declared write stance refuses; the record names the checkout, the refusing stance, and the permitting override. |
 
 For the commands that read the log, see

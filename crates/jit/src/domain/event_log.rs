@@ -102,8 +102,9 @@ mod tests {
                 id: "example"
                     .try_into()
                     .expect("the profile marker has a canonical identifier"),
+                version: "1.0.0".to_string(),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Vec::new(),
+                variables: Default::default(),
             }],
             isolated_torn_tail,
         }

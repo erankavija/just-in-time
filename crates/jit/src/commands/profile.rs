@@ -3218,7 +3218,7 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_application_substitutes_values_without_auditing_resolved_content() {
+    fn test_profile_application_audits_the_values_it_substituted() {
         let (temp, storage, executor, _package) = fixture();
         let package_root = temp.path().join(FIXTURE_LOCATION);
         fs::write(
@@ -3279,18 +3279,15 @@ template = true
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
             b"profile=resolved-value-last\n"
         );
-        let event_bytes = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let events = storage.read_events().unwrap();
+        let name: crate::profile::ProfileVariableName = "NAME".try_into().unwrap();
         assert!(matches!(
             events.as_slice(),
             [Event::ProfileLifecycle { profiles, .. }]
                 if profiles.len() == 1
-                    && profiles[0].variables[0].name.as_ref() == "NAME"
-                    && profiles[0].variables[0].source == crate::profile::VariableSource::Set
+                    && profiles[0].variables.get(&name).map(String::as_str)
+                        == Some("resolved-value-last")
         ));
-        assert!(!event_bytes
-            .windows(resolved_value.len())
-            .any(|window| window == resolved_value.as_bytes()));
     }
 
     #[test]
@@ -4172,8 +4169,9 @@ template = true
             operation: ProfileLifecycleOperation::Apply,
             profiles: vec![crate::domain::ProfileLifecycleProfile {
                 id: "prior".try_into().unwrap(),
+                version: "1.0.0".to_string(),
                 status: ProfileLifecycleStatus::Installed,
-                variables: Vec::new(),
+                variables: Default::default(),
             }],
             isolated_torn_tail: false,
         };

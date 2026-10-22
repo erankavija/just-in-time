@@ -1192,11 +1192,6 @@ pub enum ProfileOrigin {
 }
 
 /// The lifecycle operation requested by a profile mutation.
-///
-/// The enum includes the post-apply operations so the event contract is stable
-/// before those command surfaces consume it. An audit record still names the
-/// operation that actually encountered the repository; it is never represented
-/// as a standalone operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileLifecycleOperation {
@@ -1204,10 +1199,6 @@ pub enum ProfileLifecycleOperation {
     Initialize,
     /// Apply a selected package closure.
     Apply,
-    /// Reconfigure an already installed package from new inputs.
-    Reconfigure,
-    /// Upgrade an already installed package to a newer package.
-    Upgrade,
 }
 
 /// The action observed for one profile in a lifecycle mutation.
@@ -1218,20 +1209,6 @@ pub enum ProfileLifecycleStatus {
     Installed,
     /// The profile and all of its materializations were already current.
     Unchanged,
-    /// Existing provenance was retained while its resolved inputs changed.
-    Reconfigured,
-    /// Existing package provenance was replaced by another package version or identity.
-    Upgraded,
-}
-
-/// One variable's non-sensitive provenance in a lifecycle event.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ProfileLifecycleVariable {
-    /// The declared variable name. Its value is intentionally absent.
-    pub name: crate::profile::ProfileVariableName,
-    /// The source tier that supplied the value.
-    pub source: crate::profile::VariableSource,
 }
 
 /// One profile's lifecycle result within an aggregate mutation.
@@ -1240,10 +1217,12 @@ pub struct ProfileLifecycleVariable {
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
     pub id: crate::profile::ProfileId,
+    /// The package version applied.
+    pub version: String,
     /// The action observed for this profile.
     pub status: ProfileLifecycleStatus,
-    /// Variable names and source kinds, in stable name order.
-    pub variables: Vec<ProfileLifecycleVariable>,
+    /// The variable values applied, by name.
+    pub variables: std::collections::BTreeMap<crate::profile::ProfileVariableName, String>,
 }
 
 /// The stance on state-mutating commands inside a linked non-primary checkout.
@@ -1612,8 +1591,8 @@ pub enum Event {
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
     /// One record summarizes the requested operation and every profile in the
-    /// dependency-first aggregate. It carries variable provenance only, never
-    /// resolved values or rendered bytes.
+    /// dependency-first aggregate, with each package's id, version and applied
+    /// variable values.
     ProfileLifecycle {
         /// Event ID.
         id: String,
