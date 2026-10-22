@@ -19250,3 +19250,10 @@
 {"gate_key":"cargo-ci","id":"35e7a551-7506-4f7d-8fd1-b370e71d0bdd","issue_id":"ea5f4536-6dc7-4c22-8de7-b68b6c30252d","timestamp":"2026-10-22T15:13:58.516319934Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"3a8ea485-351d-4cbb-bdf2-421b3d7022f7","issue_id":"d35c610b-f752-4fe3-89a9-7eca1b3d52b3","timestamp":"2026-10-22T15:14:39.155171604Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"98db8e6d-9259-424d-ab81-f02a1402064c","issue_id":"d35c610b-f752-4fe3-89a9-7eca1b3d52b3","timestamp":"2026-10-22T15:14:39.155171604Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"3858944f-5100-4c53-ad0c-fadab604f724","issue_id":"a84d275f-1671-4360-b5d1-bf3ff0eed036","timestamp":"2026-10-22T15:14:44.740706336Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"971be16f-7216-485c-a330-e77d2c066c4a","issue_id":"9fa12e75-2632-4e68-8d67-b80caf78770d","timestamp":"2026-10-22T15:16:39.475371966Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"120be894-d8b2-4c7d-b85b-7abe0c21bad4","issue_id":"a84d275f-1671-4360-b5d1-bf3ff0eed036","timestamp":"2026-10-22T15:16:39.701300580Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"c4c84259-d417-4f49-802a-f1bd8599aae4","issue_id":"a84d275f-1671-4360-b5d1-bf3ff0eed036","timestamp":"2026-10-22T15:17:53.892300728Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"c677f4d7-d9ce-459c-baa3-99d10f54e344","issue_id":"a84d275f-1671-4360-b5d1-bf3ff0eed036","timestamp":"2026-10-22T15:18:11.063027386Z","to":"done","type":"issue_state_changed"}
+{"id":"8243a62e-1576-438f-993a-bfea8bd791d5","issue_id":"a84d275f-1671-4360-b5d1-bf3ff0eed036","timestamp":"2026-10-22T15:18:11.063027386Z","type":"issue_completed"}
+{"from":"backlog","id":"9a87aa6a-fa27-4943-bc2b-a828e424b901","issue_id":"22355a56-9730-4409-b9a8-5a2381c35cf7","timestamp":"2026-10-22T15:18:12.967634036Z","to":"ready","type":"issue_state_changed"}
