@@ -6,19 +6,15 @@
 //! cleanup threshold, the claim lease defaults, and the indefinite-lease limits.
 //! Call sites reference the constants here instead of inline literals, so each
 //! default value has one definition. The configuration defaults owned by their
-//! value types (each type's `DEFAULT`, such as [`EnforcementMode::DEFAULT`]) and
+//! value types (each type's `DEFAULT`, such as
+//! [`EnforcementMode::DEFAULT`](crate::config::EnforcementMode::DEFAULT)) and
 //! the name-derived projection region markers are projected alongside them.
 //!
-//! [`render_reference_markdown`] projects these constants into the committed
-//! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
-//! committed copy matches the projection, so changing a default without
-//! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
-
-use crate::config::{
-    default_region_begin, default_region_end, EnforcementMode, ProjectionMode, ProjectionStyle,
-};
-use crate::domain::{ContentFormat, LinkedCheckoutWriteStance};
-use crate::validation::Strictness;
+//! The test-support `render_reference_markdown` projects these constants into
+//! the committed reference `docs/reference/runtime-defaults.md`; a conformance
+//! test asserts the committed copy matches the projection, so changing a default
+//! without refreshing the reference fails the test suite
+//! (`@/inv/single-source-prose`).
 
 /// Maximum time, in seconds, a caller waits to acquire a file lock before
 /// failing. Every production lock resolves its wait through
@@ -73,7 +69,14 @@ pub(crate) mod test_support {
 /// value derives from the constants in this module, so the projection cannot
 /// drift from the values the code uses. The conformance test in this module
 /// asserts the committed file equals this output.
+#[cfg(any(test, feature = "test-support"))]
 pub fn render_reference_markdown() -> String {
+    use crate::config::{
+        default_region_begin, default_region_end, EnforcementMode, ProjectionMode, ProjectionStyle,
+    };
+    use crate::domain::{ContentFormat, LinkedCheckoutWriteStance};
+    use crate::validation::Strictness;
+
     // (label, value-with-unit, operational scope). Values format the constants
     // so the table is a pure projection of the source of truth above.
     let rows = [
@@ -178,6 +181,7 @@ pub fn render_reference_markdown() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::EnforcementMode;
     use std::path::PathBuf;
 
     /// Absolute path of the committed reference, resolved from the crate root so

@@ -85,13 +85,15 @@ html = ["dep:tl"]
 # XML content parser (document/parser/xml.rs). Pulls the `quick-xml` reader.
 # OFF by default.
 xml = ["dep:quick-xml"]
-# Exposes the test-only fixture and interruption-entry surface
-# (`InMemoryStorage::seed_issue_fixture`, `commands::test_helpers`,
-# `JsonFileStorage::with_mutation_interruptions`) as part of the crate's public
-# API. Only the self dev-dependency below (and `crates/server`'s) turns it on,
-# so `cargo build` and release builds drop the surface. The vocabulary those
-# entry points take (`MutationPoint`, `RedoPoint`, and their injector traits) is
-# public either way.
+# Compiles the test-only surface into the library: the fixture and
+# interruption entry points (`commands::test_helpers`, `test_harness`,
+# `JsonFileStorage::with_mutation_interruptions`), the test taxonomy, the
+# `__test-fixture-setup` binary entry, and the reference-page renderers with the
+# `generated_artifacts` drift checks that are their only consumer. Only the self
+# dev-dependency below (and `crates/server`'s) turns it on, so `cargo build` and
+# release builds drop the surface. The vocabulary the interruption entry points
+# take (`MutationPoint`, `RedoPoint`, and their injector traits) is public
+# either way.
 # OFF by default.
 test-support = []
 

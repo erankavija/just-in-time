@@ -39,7 +39,6 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
 
-#[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
     /// Repo-relative path of the committed reference this module projects.
     pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
