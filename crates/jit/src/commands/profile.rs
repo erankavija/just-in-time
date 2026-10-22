@@ -907,7 +907,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Resolve the semantic candidates that every selected package contributes.
     ///
     /// The candidate vector is carried into the one aggregate materialization so
-    /// each affected record derives its shared ownership from the same selection.
+    /// every package composes its shared identities against the same selection.
     pub(super) fn profile_contribution_candidates(
         &self,
         packages: &[ProfilePackage],
@@ -926,7 +926,7 @@ impl CommandExecutor<JsonFileStorage> {
         self.profile_contribution_candidates_from_resolved(&resolved)
     }
 
-    /// Build semantic ownership candidates from content whose variables have
+    /// Build semantic contribution candidates from content whose variables have
     /// already been resolved by one lifecycle operation.
     fn profile_contribution_candidates_from_resolved(
         &self,
@@ -971,11 +971,11 @@ impl CommandExecutor<JsonFileStorage> {
     /// over its dependencies, and planned through the same preparation a
     /// publication runs, and every target and registry declaration each
     /// participating profile decided is then stated — the values it would
-    /// create or update, the recorded claims it would retain or remove, and the
-    /// ones it cannot publish, each named beside the packages that claim it. A
-    /// conflict is reported rather than refused, which is the whole difference
-    /// from the rehearsal the lifecycle commands run, so an adopter can read a
-    /// conflicting decision before it decides whether to publish one.
+    /// create or update and the ones it cannot publish, each named beside the
+    /// packages that define it. A conflict is reported rather than refused,
+    /// which is the whole difference from the rehearsal the lifecycle commands
+    /// run, so an adopter can read a conflicting decision before it decides
+    /// whether to publish one.
     ///
     /// A package that is not installed is reported as readily as one that is:
     /// the selection is resolved from the location a `path:` selector names, so
@@ -1237,8 +1237,8 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Apply one package closure with already captured variable inputs.
     ///
-    /// The closure is one aggregate application. Its scoped context gives every
-    /// affected record complete shared ownership evidence on the first run.
+    /// The closure is one aggregate application, so every package composes its
+    /// shared identities against the whole closure.
     pub fn apply_profile_package_with_inputs(
         &self,
         package: &ProfilePackage,
