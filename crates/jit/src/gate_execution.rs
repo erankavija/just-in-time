@@ -24,21 +24,6 @@ use std::time::{Duration, Instant};
 /// behind it, which matters when a gate is later redefined to manual mode.
 pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
 
-/// Execute a gate checker and return the result (without context).
-///
-/// Convenience wrapper around [`execute_gate_checker_with_context`] that passes `None`
-/// for context and no linked documents. Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`,
-/// `JIT_STAGE`, `JIT_ISSUE_DOCS`) are still set.
-pub fn execute_gate_checker(
-    gate_key: &str,
-    issue_id: &str,
-    stage: GateStage,
-    checker: &GateChecker,
-    working_dir: &Path,
-) -> Result<GateRunResult> {
-    execute_gate_checker_with_context(gate_key, issue_id, stage, checker, working_dir, None, &[])
-}
-
 /// One entry in the `JIT_ISSUE_DOCS` env var: the fields a checker needs to
 /// inline a linked document into a review prompt.
 #[derive(serde::Serialize)]
@@ -605,12 +590,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "test-gate",
             "test-issue",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -633,12 +620,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "test-gate",
             "test-issue",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -660,12 +649,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "test-gate",
             "test-issue",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -697,12 +688,14 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let start = Instant::now();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "test-gate",
             "test-issue",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         )
         .unwrap();
 
@@ -1123,9 +1116,16 @@ mod tests {
             prompt: None,
             prompt_file: None,
         };
-        let result =
-            execute_gate_checker("g", "issue-1", GateStage::Postcheck, &checker, temp.path())
-                .unwrap();
+        let result = execute_gate_checker_with_context(
+            "g",
+            "issue-1",
+            GateStage::Postcheck,
+            &checker,
+            temp.path(),
+            None,
+            &[],
+        )
+        .unwrap();
 
         assert!(result.commit.is_some());
         assert_eq!(result.commit, get_git_commit(temp.path()));
@@ -1152,12 +1152,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "test-gate",
             "test-issue",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         );
 
         assert!(result.is_ok());
@@ -1180,12 +1182,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "my-gate",
             "issue-123",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         )
         .unwrap();
 
@@ -1282,12 +1286,14 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker(
+        let result = execute_gate_checker_with_context(
             "my-gate",
             "issue-123",
             GateStage::Postcheck,
             &checker,
             &temp_dir,
+            None,
+            &[],
         )
         .unwrap();
 
