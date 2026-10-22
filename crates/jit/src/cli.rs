@@ -2227,9 +2227,7 @@ pub enum ConfigCommands {
 
     /// Set a configuration value
     ///
-    /// By default, sets value in repository config (.jit/config.toml).
-    /// Use --global to write the user config (~/.config/jit/config.toml); no
-    /// configuration lookup currently reads it, so it changes no effective value.
+    /// Sets the value in the repository config (.jit/config.toml).
     ///
     /// Examples:
     ///   jit config set coordination.max_indefinite_leases_per_agent 3
@@ -2238,9 +2236,6 @@ pub enum ConfigCommands {
         key: String,
         /// Value to set
         value: String,
-        /// Set in user config instead of repository config
-        #[arg(long)]
-        global: bool,
     },
 
     /// Validate configuration files for errors

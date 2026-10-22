@@ -1,11 +1,9 @@
 //! Config accessor and mutation commands (`jit config get` / `jit config set`).
 //!
-//! `jit config set` (see [`CommandExecutor::set_config`]): target-file
-//! resolution (repo vs user-global), key parsing, per-type value dispatch, and
-//! parsing the edited document as configuration, so an edit that would not
-//! load never reaches the file. User-global config IO is delegated to the explicit
-//! [`crate::storage::user_config_store`] control plane; repository config edits
-//! publish through a repository-state mutation session.
+//! `jit config set` (see [`CommandExecutor::set_config`]): key parsing,
+//! per-type value dispatch, and parsing the edited document as configuration,
+//! so an edit that would not load never reaches the file. Edits publish through
+//! a repository-state mutation session.
 //!
 //! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
 //! accessor covering the WHOLE configuration surface (jit:043ae624), built by
@@ -20,16 +18,12 @@
 use super::*;
 use crate::config::EffectiveConfig;
 use crate::errors::InvalidArgumentError;
-use crate::storage::user_config_store::{
-    read_user_config_document, save_user_config_document, UserConfigRoot,
-};
 use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
 /// Returned by [`CommandExecutor::set_config`]. `file` is the config file that
-/// was written and `scope` is its origin token (`"user"` for a global write,
-/// `"repo"` otherwise), mirroring the tokens the `--json` payload reports.
+/// was written.
 #[derive(Debug, Serialize)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
@@ -38,8 +32,6 @@ pub struct ConfigSetOutcome {
     pub value: String,
     /// The config file that was written.
     pub file: PathBuf,
-    /// Config scope token: `"user"` for a global write, `"repo"` otherwise.
-    pub scope: &'static str,
 }
 
 /// Result of a `jit config get` lookup, carrying what the CLI needs to print.
@@ -202,38 +194,18 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Set a `section.field` key in the repo (or, with `global`, the user-global)
-    /// `config.toml`, returning what the CLI needs to print.
+    /// Set a `section.field` key in the repository `config.toml`, returning
+    /// what the CLI needs to print.
     ///
-    /// Resolves the target file and edits a formatting-preserving TOML document.
-    /// User-global writes use the capability-confined user-config store;
-    /// repository writes publish through the mutation session. The edited
-    /// document is parsed as configuration BEFORE the write, so an edit that
-    /// would not load is rejected and the file is left untouched. Numeric
-    /// (`*_secs`/`*_pct`/`max_*`) keys are parsed into TOML integers; any other
-    /// key is stored as a string.
-    pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome>
+    /// Edits a formatting-preserving TOML document and publishes it through the
+    /// mutation session. The edited document is parsed as configuration BEFORE
+    /// the write, so an edit that would not load is rejected and the file is
+    /// left untouched. Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed into
+    /// TOML integers; any other key is stored as a string.
+    pub fn set_config(&self, key: &str, value: &str) -> Result<ConfigSetOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        if global {
-            // The user-global config is outside repository materialization: read,
-            // edit, and atomically write it directly (no registry to re-derive).
-            let home =
-                dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
-            let user_config = UserConfigRoot::from_home(&home);
-            let config_path = user_config.config_path();
-            let mut doc = read_user_config_document(&user_config)?;
-            edit_config_document(&mut doc, key, value)?;
-            save_user_config_document(&user_config, &doc)?;
-            return Ok(ConfigSetOutcome {
-                key: key.to_string(),
-                value: value.to_string(),
-                file: config_path,
-                scope: "user",
-            });
-        }
-
         let layout = self.require_layout()?;
         let config_path = layout.resolve(&crate::repository_state::VirtualPath::CONFIG)?;
         self.set_repo_config(key, value)?;
@@ -241,7 +213,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             key: key.to_string(),
             value: value.to_string(),
             file: config_path,
-            scope: "repo",
         })
     }
 
@@ -571,7 +542,7 @@ schema = 1
 
         // A recognized level is accepted and persisted.
         executor
-            .set_config("validation.strictness", "strict", false)
+            .set_config("validation.strictness", "strict")
             .unwrap();
         assert_eq!(
             executor.get_config("validation.strictness").unwrap().value,
@@ -580,7 +551,7 @@ schema = 1
 
         // An unrecognized level is rejected with a message naming the bad value.
         let err = executor
-            .set_config("validation.strictness", "banana", false)
+            .set_config("validation.strictness", "banana")
             .unwrap_err();
         assert!(err.to_string().contains("banana"), "{err}");
 

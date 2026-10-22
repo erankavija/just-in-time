@@ -1376,7 +1376,7 @@ impl JitConfig {
     /// The lease enforcement mode write commands apply and `jit config` reports.
     ///
     /// Lease enforcement is repository policy, so only this repository config
-    /// decides it; user/system layers and the environment do not.
+    /// decides it; the environment does not.
     pub fn enforcement_mode(&self) -> EnforcementMode {
         resolve_enforcement_mode(self.worktree.as_ref())
     }
@@ -1384,7 +1384,7 @@ impl JitConfig {
     /// The lease limits `claim acquire` enforces and `jit config` reports.
     ///
     /// Repository policy like [`Self::enforcement_mode`]: only this repository
-    /// config decides them; user/system layers do not.
+    /// config decides them.
     pub fn coordination(&self) -> EffectiveCoordination {
         resolve_coordination(self.coordination.as_ref())
     }

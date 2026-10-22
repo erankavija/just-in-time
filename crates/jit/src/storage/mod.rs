@@ -40,7 +40,6 @@ pub mod ruleset_store;
 pub mod temp_cleanup;
 #[cfg(feature = "test-support")]
 mod test_support;
-pub mod user_config_store;
 pub mod warnings;
 pub mod worktree_identity;
 pub mod worktree_paths;
