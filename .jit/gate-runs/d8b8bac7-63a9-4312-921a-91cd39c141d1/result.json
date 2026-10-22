@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ce0cd77bed5e3f705121158efe1f170cca4951",
+  "completed_at": "2026-10-22T19:54:30.312947302Z",
+  "duration_ms": 67662,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All 42 affected calls now use the shared fixture, with no assertion changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "de880d9c-c9bf-475c-8d89-de0b2e55f620",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8b8bac7-63a9-4312-921a-91cd39c141d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T19:53:22.650265689Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 441091a27, 4cde38038 (merge), cf30e723f (gate record)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-06 (issue c780514e); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 2 (2026-10-22T19:31:51Z); code-review pending/unrun\nTruncation recovery: partitioned the initially truncated patch output into bounded per-path and per-parent reads; no relevant evidence omitted\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All 42 affected calls now use the shared fixture, with no assertion changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

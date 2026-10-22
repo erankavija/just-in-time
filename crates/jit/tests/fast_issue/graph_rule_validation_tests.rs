@@ -191,7 +191,7 @@ when = { type = "epic" }
 severity = "error"
 assert = { label-coverage = { child-link = "bogus" } }
 "#;
-    let storage = store_with_rules(bad_rules);
+    let storage = store_with_rules("");
 
     let mut epic = crate::fixture_issue(
         "epic".to_string(),
@@ -200,7 +200,11 @@ assert = { label-coverage = { child-link = "bogus" } }
     epic.labels = vec!["type:epic".to_string()];
     jit::test_harness::seed_memory_issue(&storage, &epic);
 
-    let executor = executor_for(storage);
+    let executor = executor_for(storage.clone());
+    // Initialization refuses a registry that yields a config error, so the
+    // malformed rule is declared over the initialized repository.
+    let rules = storage.read_repo_file(".jit/rules.toml").unwrap().unwrap();
+    storage.add_data_file("rules.toml", &format!("{rules}{bad_rules}"));
     let result = executor.validate_silent();
 
     assert!(result.is_err(), "config-error finding must fail validation");
