@@ -8,6 +8,7 @@
   ],
   "description": "Delete the user and system `config.toml` layers, which no longer feed any configuration key, together with the `config set --global` write path that targets them.\n\n## Background\n\nLease policy now resolves from the repository configuration only, through one resolver that `claim acquire` and the config commands share. That resolver was the only reader of the user (`~/.config/jit/config.toml`) and system (`/etc/jit/config.toml`) layers, so nothing reads those files any more. What remains is dead surface:\n\n- `config set --global` writes the user-global file through the user-config store (`crates/jit/src/storage/user_config_store.rs`, called from `commands/config.rs`).\n- CLI help and the configuration reference still describe user and system configuration files and a global scope.\n- Any remaining loader, path resolution or test fixture that names those files.\n\nThe agent identity file `~/.config/jit/agent.toml` is a separate mechanism that the agent-id resolver reads; it stays.\n\n## Success Criteria\n\n- [hard] REQ-01: `config set` has no global scope: the `--global` flag and its dispatch are removed, and the user-config store's write path is deleted unless something else uses it.\n- [hard] REQ-02: No code reads or resolves `~/.config/jit/config.toml` or `/etc/jit/config.toml`.\n- [hard] REQ-03: The configuration reference's file table lists only repository-level files and the environment, and CLI help and docs describe no user or system configuration layer.\n- [hard] REQ-04: A test proves that a `~/.config/jit/config.toml` present in the user's home has no effect on any configuration value or command.\n\n## Notes\n\n`~/.config/jit/agent.toml` is out of scope and keeps working. Removing a CLI flag changes the command schema: regenerate any projected CLI reference, and update MCP curated tools if a generated tool changes. Run the failure-corpus suite if a command's failure changes.\n",
   "documents": [],
+  "done_at": "2026-10-22T15:34:23.274725665Z",
   "first_ready_at": "2026-10-22T02:10:49.370855023Z",
   "gates_required": [
     "cargo-ci",
@@ -18,15 +19,33 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ce67b33a-74db-435e-9635-6d04d867ab9f",
+      "run_id": "f79be642-eef1-4a3e-8bf0-cc262c50fc8b",
       "status": "passed",
-      "updated_at": "2026-10-22T15:13:58.516319934Z",
+      "updated_at": "2026-10-22T15:26:38.323382131Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "adff2158-deb6-4733-a21c-847676687bb6",
-      "status": "failed",
-      "updated_at": "2026-10-22T15:18:36.823581504Z",
+      "run_id": "0645b0a6-2bff-4aa8-ad6f-994a099773d9",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:30:29.713879612Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "567db1f0-4af4-4e22-8c88-f71b0b333b72",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:34:06.882744516Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "deafb99b-552b-42cc-a832-b501516eca27",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:34:11.787587007Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "6f99068e-527d-49c9-8fa2-82c10538ea97",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:30:32.134063730Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,7 +62,7 @@
     "satisfies:842b0ac6/REQ-27"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove the user and system configuration layers",
-  "updated_at": "2026-10-22T15:18:36.823581504Z"
+  "updated_at": "2026-10-22T15:34:23.274725665Z"
 }
