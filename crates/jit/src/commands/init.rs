@@ -11,7 +11,7 @@ use crate::repository_state::{
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
     ProfileApplicationInput, RepositoryAction, VirtualPath,
 };
-use crate::storage::JsonFileStorage;
+use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -70,7 +70,7 @@ pub struct FreshInitResult {
     pub modified_paths: Vec<String>,
 }
 
-impl CommandExecutor<JsonFileStorage> {
+impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// Atomically complete neutral initialization and apply the selected profiles.
     ///
     /// An absent data directory is published by the init publisher's
@@ -577,7 +577,7 @@ mod tests {
     use super::*;
     use crate::commands::ProfileSelector;
     use crate::repository_state::{Contribution, MapEntryTarget};
-    use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
+    use crate::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -702,6 +702,35 @@ mod tests {
         }
         assert!(repo.path().join(".jit/issues").is_dir());
         assert_repo_valid(repo.path());
+    }
+
+    #[test]
+    fn test_fresh_init_over_memory_store_writes_the_files_the_json_backend_writes() {
+        let repo = TempDir::new().unwrap();
+        let json = JsonFileStorage::new(repo.path().join(".jit"));
+        executor_with_layout(&json, repo.path())
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+
+        let memory = crate::storage::InMemoryStorage::rooted_at(repo.path());
+        let layout = memory.repository_layout();
+        let memory_executor = CommandExecutor::new(memory.clone()).with_layout(layout);
+        memory_executor
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+
+        for path in [
+            ".jit/config.toml",
+            ".jit/index.json",
+            ".jit/gates.toml",
+            ".jit/invariants.toml",
+            ".jit/events.jsonl",
+            ".jit/rules.toml",
+        ] {
+            let expected = json.read_repo_file(path).unwrap();
+            assert!(expected.is_some(), "JSON backend wrote no {path}");
+            assert_eq!(memory.read_repo_file(path).unwrap(), expected, "{path}");
+        }
     }
 
     /// The `invariant` item kind, declared by the repository itself.

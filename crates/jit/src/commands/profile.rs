@@ -19,7 +19,7 @@ use crate::repository_state::{
     RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryStateError,
     RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
-use crate::storage::{JsonFileStorage, RepositoryMutationSession};
+use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
 use serde::Deserialize;
@@ -399,7 +399,7 @@ pub(super) fn validate_variable_inputs(
     Ok(())
 }
 
-impl CommandExecutor<JsonFileStorage> {
+impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// Read the package directory one profile command acts on, using the id
     /// declared by that package.
     pub fn resolve_profile_package(&self, selector: &ProfileSelector) -> Result<ProfilePackage> {
@@ -1893,6 +1893,7 @@ mod tests {
         ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
         RepositoryStateError, RootRelativePath, ScalarTarget, SetStringTarget,
     };
+    use crate::storage::JsonFileStorage;
     use crate::storage::{
         discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
     };
