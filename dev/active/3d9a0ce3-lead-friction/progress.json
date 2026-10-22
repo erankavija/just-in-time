@@ -248,7 +248,7 @@
           "title": "Build one profile selection per invocation",
           "classification": "implementation",
           "model": "opus",
-          "status": "review passed; awaiting explicit main-merge approval"
+          "status": "merge approved; validating latest main"
         }
       ]
     },
@@ -539,7 +539,7 @@
     },
     {
       "topic": "Automatic approval review rejected direct main merge",
-      "resolution": "Pending explicit user approval: proposed merge worktree-agent-abe963dd, tested candidate d9cc4e39a, gate/closure record commits. Rejection says shared-branch mutation lacks trusted user authorization. Parent 01a164c8-d7ba-7812-a630-db8dddcee05b informed; approval question presented. No bypass or main merge attempted."
+      "resolution": "User explicitly approved: \"I approve the merge\", coordinating thread 01a164c8-d7ba-7812-a630-db8dddcee05b, user message 01a1656c-cc39-72b2-a487-871d742b823a. Read directly on resume; parent authorized reconciliation, required checks, main merge and gate/closure records."
     }
   ],
   "surfaced_pitfalls": [
