@@ -12,7 +12,7 @@
           "key": "cargo-ci-lock-status",
           "title": "Preserve infrastructure status through the CI build lock",
           "classification": "implementation",
-          "status": "claimed; reuse merged adoption worktree"
+          "status": "implemented 784bf4f9c; focused red/green, shell selftest82 assertions and full CI4588+58 pass; pending merge/gates"
         },
         {
           "id": "d423752b-cedc-431b-be9e-d327f8b61387",
@@ -409,7 +409,7 @@
           "key": "fixture-issue-commands-a-adoption",
           "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "recovery in existing worktree; reviewing preserved fixture path substitutions; awaiting import cutover before full validation"
+          "status": "done"
         },
         {
           "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
@@ -481,7 +481,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "rework 1 recovery in existing worktree; preserved 4db73f1d7; awaiting import cutover before full validation"
+          "status": "recovery validated at cb0398396; integrated cargo-ci 4591 tests +58 doctests passed; pending main merge and recorded gates"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1296,5 +1296,22 @@
     "coordinator_thread": "01a164c8-d7ba-7812-a630-db8dddcee05b",
     "active_worktree_limit": 2,
     "pending_external_landing": null
+  },
+  "lead_reviews": {
+    "de880d9c": {
+      "verdict": "PASS",
+      "gates": [
+        "cargo-ci b5a4e893-2beb-4c5e-8e71-f736268ef67e",
+        "code-review d8b8bac7-63a9-4312-921a-91cd39c141d1"
+      ],
+      "criteria": {
+        "REQ-01": "42 substitutions across five owned command files use shared test_utils fixture",
+        "REQ-02": "Whole-file semantic comparison after path replacement proves assertions unchanged"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "zero matches",
+      "deferred_items": "no linked design documents",
+      "holistic": "same shared fixture construction; no scope or consumer mismatch"
+    }
   }
 }
