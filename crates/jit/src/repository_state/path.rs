@@ -351,6 +351,10 @@ mod identity {
 /// Constructors and derived queries over the identity, written without field
 /// access so the defining module above stays the only const-capable scope.
 impl VirtualPath {
+    /// The data root's records: issue records, the event log, gate-run
+    /// records, and the index listing the issues.
+    pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
+
     /// Construct a worktree-relative semantic identity.
     pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
         Self::from_parts(
@@ -533,12 +537,7 @@ impl RepositoryLayout {
     /// all when the data root lies outside the worktree. Configuration under
     /// the data root is not in the set, so its edits reach a digest.
     pub(crate) fn tracker_written_paths(&self) -> Vec<RootRelativePath> {
-        let records = [
-            VirtualPath::ISSUES,
-            VirtualPath::EVENTS,
-            VirtualPath::GATE_RUNS,
-            VirtualPath::INDEX,
-        ];
+        let records = VirtualPath::RECORDS;
         let data_entries = records
             .iter()
             .map(|record| record.relative().as_str())
