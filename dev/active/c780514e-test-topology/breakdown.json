@@ -1275,7 +1275,7 @@
   {
     "key": "cargo-ci-selftest-gate",
     "title": "cargo-ci self-test runs as a declared gate",
-    "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). `.jit/gates.toml` declares no script self-test gate. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/cargo-ci-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-04: `dev/TESTING.md` describes the self-test as a gate.\n",
+    "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). The gate that runs it was registered in `.jit/gates.toml` at planning. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `cargo-ci-selftest` runs `scripts/cargo-ci-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `cargo-ci-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-04: `dev/TESTING.md` describes the self-test as a gate.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1292,7 +1292,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "cargo-ci-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -1323,7 +1324,7 @@
   {
     "key": "profile-suite-selftest-gate",
     "title": "Suite-profiler self-test runs as a declared gate",
-    "description": "Move the suite profiler's self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345` (`test_profile_test_suite_script_passes_its_own_self_test`) runs `scripts/profile-test-suite.sh --self-test` inside the default suite. `.jit/gates.toml` declares no script self-test gate.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/profile-test-suite.sh --self-test`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: No test in the default suite runs the profiler's self-test.\n",
+    "description": "Move the suite profiler's self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345` (`test_profile_test_suite_script_passes_its_own_self_test`) runs `scripts/profile-test-suite.sh --self-test` inside the default suite. The gate that runs it was registered in `.jit/gates.toml` at planning.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `profile-suite-selftest` runs `scripts/profile-test-suite.sh --self-test`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `profile-suite-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: No test in the default suite runs the profiler's self-test.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1339,7 +1340,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "profile-suite-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -1367,7 +1369,7 @@
   {
     "key": "build-budget-selftest-gate",
     "title": "Build-budget checker self-test runs as a declared gate",
-    "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: `.jit/gates.toml` declares a gate that runs `scripts/rust-build-budget.sh --self-test`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-03: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-04: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
+    "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: The registered gate `build-budget-selftest` runs `scripts/rust-build-budget.sh --self-test`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-03: `build-budget-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-04: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1384,7 +1386,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "build-budget-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -4013,7 +4016,7 @@
   {
     "key": "docs-check-selftest-gate",
     "title": "Documentation checker self-test runs as a declared gate",
-    "description": "Run the `scripts/docs-check-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. The `docs-mechanical` gate runs the checkers over the tree, not their self-test.\n\nThe self-test prints `SKIP` and continues to a passing exit when the read bit is not enforced, as for root: `:197` skips the nested-traversal assertions and `:201` skips the unreadable-path assertions, so on such a host the checkers' environment-error exits go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/docs-check-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: The unreadable-path and nested-traversal assertions run on every host. Where the read bit is not enforced, the self-test either establishes an unreadable input another way or exits non-zero naming the precondition it could not establish. No branch prints a skip notice and continues to a passing exit.\n",
+    "description": "Make the `scripts/docs-check-selftest.sh` self-test pass as the registered gate `docs-check-selftest` over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. Until planning, no gate ran it. The gate `docs-check-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete. The `docs-mechanical` gate runs the checkers over the tree, not their self-test.\n\nThe self-test prints `SKIP` and continues to a passing exit when the read bit is not enforced, as for root: `:197` skips the nested-traversal assertions and `:201` skips the unreadable-path assertions, so on such a host the checkers' environment-error exits go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `docs-check-selftest` runs `scripts/docs-check-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `docs-check-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: The unreadable-path and nested-traversal assertions run on every host. Where the read bit is not enforced, the self-test either establishes an unreadable input another way or exits non-zero naming the precondition it could not establish. No branch prints a skip notice and continues to a passing exit.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4029,7 +4032,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "docs-check-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -4044,7 +4048,7 @@
       "terminal": {
         "consumer_family": "docs-check-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script, plus that script's own skip branch.",
+        "worker_sized_reason": "One registered gate over an existing self-test script, plus that script's own skip branch.",
         "footprint": {
           "touches": [
             ".jit/gates.toml",
@@ -4058,7 +4062,7 @@
   {
     "key": "shipped-policy-regions-selftest-gate",
     "title": "Shipped-policy region generator self-test runs as a declared gate",
-    "description": "Run the `scripts/generate-shipped-policy-regions-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/generate-shipped-policy-regions-selftest.sh` is a re-runnable self-test of `scripts/generate-shipped-policy-regions.sh`: idempotence on a current tree, restoration of a corrupted region with every byte outside its markers kept, and failure on malformed markers. It exits 2 when `git` or `jit` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/generate-shipped-policy-regions-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Make the `scripts/generate-shipped-policy-regions-selftest.sh` self-test pass as the registered gate `shipped-policy-regions-selftest` over the script it tests.\n\n## Background\n\n`scripts/generate-shipped-policy-regions-selftest.sh` is a re-runnable self-test of `scripts/generate-shipped-policy-regions.sh`: idempotence on a current tree, restoration of a corrupted region with every byte outside its markers kept, and failure on malformed markers. It exits 2 when `git` or `jit` is missing. Until planning, no gate ran it. The gate `shipped-policy-regions-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `shipped-policy-regions-selftest` runs `scripts/generate-shipped-policy-regions-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `shipped-policy-regions-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4074,7 +4078,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "shipped-policy-regions-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -4089,7 +4094,7 @@
       "terminal": {
         "consumer_family": "generate-shipped-policy-regions-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One registered gate over an existing self-test script.",
         "footprint": {
           "touches": [
             ".jit/gates.toml"
@@ -4102,7 +4107,7 @@
   {
     "key": "workflow-contract-selftest-gate",
     "title": "Workflow-contract harness self-test runs as a declared gate",
-    "description": "Run the `scripts/workflow-contract-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\nIts actionlint-wiring layer (`:119-135`) prints `SKIP` and passes when the entry point reports an environment error because actionlint is unavailable, so the actionlint defect seeds go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/workflow-contract-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: When actionlint is unavailable, the self-test exits non-zero naming the missing tool; no branch prints a skip notice and continues to a passing exit.\n",
+    "description": "Make the `scripts/workflow-contract-selftest.sh` self-test pass as the registered gate `workflow-contract-selftest` over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. Until planning, no gate ran it. The gate `workflow-contract-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\nIts actionlint-wiring layer (`:119-135`) prints `SKIP` and passes when the entry point reports an environment error because actionlint is unavailable, so the actionlint defect seeds go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `workflow-contract-selftest` runs `scripts/workflow-contract-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `workflow-contract-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: When actionlint is unavailable, the self-test exits non-zero naming the missing tool; no branch prints a skip notice and continues to a passing exit.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4118,7 +4123,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "workflow-contract-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -4133,7 +4139,7 @@
       "terminal": {
         "consumer_family": "workflow-contract-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script, plus that script's own skip branch.",
+        "worker_sized_reason": "One registered gate over an existing self-test script, plus that script's own skip branch.",
         "footprint": {
           "touches": [
             ".jit/gates.toml",
@@ -4147,7 +4153,7 @@
   {
     "key": "session-cost-benchmark-selftest-gate",
     "title": "Session-cost benchmark self-test runs as a declared gate",
-    "description": "Run the `scripts/benchmark-session-cost-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/benchmark-session-cost-selftest.sh` is a re-runnable self-test of `scripts/benchmark-session-cost.sh`, run against a fake `jit` and checked against the benchmark's output contract. It exits 2 when `cmp`, `find`, `git`, `grep`, `jq` or `sha256sum` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/benchmark-session-cost-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Make the `scripts/benchmark-session-cost-selftest.sh` self-test pass as the registered gate `session-cost-benchmark-selftest` over the script it tests.\n\n## Background\n\n`scripts/benchmark-session-cost-selftest.sh` is a re-runnable self-test of `scripts/benchmark-session-cost.sh`, run against a fake `jit` and checked against the benchmark's output contract. It exits 2 when `cmp`, `find`, `git`, `grep`, `jq` or `sha256sum` is missing. Until planning, no gate ran it. The gate `session-cost-benchmark-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `session-cost-benchmark-selftest` runs `scripts/benchmark-session-cost-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `session-cost-benchmark-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4163,7 +4169,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "session-cost-benchmark-selftest"
     ],
     "depends_on": [],
     "planning": {
@@ -4178,7 +4185,7 @@
       "terminal": {
         "consumer_family": "benchmark-session-cost-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One registered gate over an existing self-test script.",
         "footprint": {
           "touches": [
             ".jit/gates.toml"
@@ -4191,7 +4198,7 @@
   {
     "key": "standards-scan-test-gate",
     "title": "Standards-scan test suite runs as a declared gate",
-    "description": "Run the `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` is a re-runnable self-test of `.agents/skills/jit-project-lead/scripts/standards-scan.sh`, the content-standards scanner, over a self-contained `jit init` fixture seeded with issues and documents for each asserted finding. It exits 2 when `jit`, `jq` or `gawk` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Make the `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` self-test pass as the registered gate `standards-scan-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` is a re-runnable self-test of `.agents/skills/jit-project-lead/scripts/standards-scan.sh`, the content-standards scanner, over a self-contained `jit init` fixture seeded with issues and documents for each asserted finding. It exits 2 when `jit`, `jq` or `gawk` is missing. Until planning, no gate ran it. The gate `standards-scan-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `standards-scan-test` runs `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `standards-scan-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4207,7 +4214,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "standards-scan-test"
     ],
     "depends_on": [],
     "planning": {
@@ -4222,7 +4230,7 @@
       "terminal": {
         "consumer_family": "test-standards-scan.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One registered gate over an existing self-test script.",
         "footprint": {
           "touches": [
             ".jit/gates.toml"
@@ -4235,7 +4243,7 @@
   {
     "key": "standards-fix-test-gate",
     "title": "Standards-fix test suite runs as a declared gate",
-    "description": "Run the `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` is a re-runnable self-test of `.agents/skills/jit-project-lead/scripts/standards-fix.sh`, the mechanical content-standards fixer, which it runs between two scans of a seeded fixture. It exits 2 when `jit`, `jq` or `gawk` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Make the `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` self-test pass as the registered gate `standards-fix-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` is a re-runnable self-test of `.agents/skills/jit-project-lead/scripts/standards-fix.sh`, the mechanical content-standards fixer, which it runs between two scans of a seeded fixture. It exits 2 when `jit`, `jq` or `gawk` is missing. Until planning, no gate ran it. The gate `standards-fix-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `standards-fix-test` runs `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `standards-fix-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4251,7 +4259,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "standards-fix-test"
     ],
     "depends_on": [],
     "planning": {
@@ -4266,7 +4275,7 @@
       "terminal": {
         "consumer_family": "test-standards-fix.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One registered gate over an existing self-test script.",
         "footprint": {
           "touches": [
             ".jit/gates.toml"
@@ -4279,7 +4288,7 @@
   {
     "key": "manifest-tool-test-gate",
     "title": "Breakdown-manifest tool test suite runs as a declared gate",
-    "description": "Run the `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` is a re-runnable self-test of `.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py` over the fixtures in `.agents/skills/jit-planning-lead/evals/fixtures/` and the shared batch structural-conformance fixture. It needs `python3` and runs under `set -e`, so a missing interpreter exits non-zero. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Make the `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` self-test pass as the registered gate `manifest-tool-test` over the script it tests.\n\n## Background\n\n`.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` is a re-runnable self-test of `.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py` over the fixtures in `.agents/skills/jit-planning-lead/evals/fixtures/` and the shared batch structural-conformance fixture. It needs `python3` and runs under `set -e`, so a missing interpreter exits non-zero. Until planning, no gate ran it. The gate `manifest-tool-test` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `manifest-tool-test` runs `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `manifest-tool-test` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4295,7 +4304,8 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "manifest-tool-test"
     ],
     "depends_on": [],
     "planning": {
@@ -4310,7 +4320,7 @@
       "terminal": {
         "consumer_family": "test-manifest-tool.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One registered gate over an existing self-test script.",
         "footprint": {
           "touches": [
             ".jit/gates.toml"
