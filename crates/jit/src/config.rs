@@ -1338,7 +1338,7 @@ pub struct CoordinationConfig {
     pub max_indefinite_leases_per_repo: Option<u32>,
 }
 
-/// The coordination limits in force after layering.
+/// The coordination limits in force: repository values, else built-in defaults.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct EffectiveCoordination {
     pub max_indefinite_leases_per_agent: u32,
@@ -1627,9 +1627,7 @@ impl EffectiveConfig {
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
-    ///   REPO config only, with no system/user merge and no built-in
-    ///   defaults layered in. jit has no notion of a system/user override for
-    ///   a repo's type hierarchy, label namespaces, or item kinds — every
+    ///   REPO config only, with no built-in defaults filled in. Every
     ///   other reader of these fields loads the repo file directly (e.g.
     ///   [`ConfigManager::namespaces_from_config`](crate::config_manager::ConfigManager::namespaces_from_config)).
     ///   This is also why these sections reflect exactly what `config.toml`
