@@ -22,11 +22,9 @@ or customize individual settings.
 |------|---------|
 | `.jit/config.toml` | Repository config (schema + runtime) |
 | `.jit/templates.toml` | Graph templates and their [role/anchor bindings](#template-bindings-jittemplatestoml) |
-| `~/.config/jit/config.toml` | Written by `jit config set --global`; no configuration value is read from it |
 | `~/.config/jit/agent.toml` | Agent identity |
-| `/etc/jit/config.toml` | No configuration value is read from it |
 
-Every `config.toml` layer accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
+`.jit/config.toml` accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
 
 Priority (how the effective configuration is resolved for `jit config`): repository > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. The [`[coordination]`](#coordination-section) limits are repository-scoped like `enforce_leases`: they resolve from `.jit/config.toml` alone, then the built-in defaults, for `jit config` and `jit claim acquire` alike.
 
@@ -495,8 +493,7 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 The mode is read from the repository's own `.jit/config.toml` only: `off`
 with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
 section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
-commands all resolve it by this rule; user and system config and environment
-variables do not change it.
+commands all resolve it by this rule; environment variables do not change it.
 
 #### `write_policy`
 
@@ -693,17 +690,11 @@ jit config get bogus_section
 ### Set Value
 
 ```bash
-# Set in repository config
 jit config set worktree.enforce_leases warn
-
-# Write the user config file (currently has no effect on any value)
-jit config set <section.field> <value> --global
 ```
 
-A repository-scoped key such as `worktree.enforce_leases` takes effect only in
-the repository config. `--global` writes `~/.config/jit/config.toml`, which nothing
-reads, so it changes no effective value, including the lease limits. At either scope, `jit config set` refuses an edit after
-which the file would not load, and leaves the file unchanged.
+`jit config set` writes the repository config and refuses an edit after which
+the file would not load, leaving the file unchanged.
 
 ### Validate Config
 
