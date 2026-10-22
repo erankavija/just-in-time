@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T21:07:54.314194619Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,6 +8,7 @@
   ],
   "description": "Rule declarations accept unknown keys and two selector aliases. Three assertion kinds are untyped tables, so a misspelled key surfaces late as a configuration finding, or never.\n\n## Background\n\nIn `crates/jit/src/declarations/rules.rs`, `RawRulesFile` (`:879`), `RawRule` (`:886`) and `Selector` (`:223`) lack `deny_unknown_fields`; the `RawAssert` family (`:908-1116`) already has it. The selector accepts the aliases `has-doc-type` (`:237`) and `doc_type` (`:1110`), the only `serde(alias)` uses in configuration, agent and rule types. Both writers emit `has_doc_type` (`repository_state/rule_serialize.rs:210`, `commands/validate.rs:2953`), and so does `docs/reference/configuration.md:411`. `docs/how-to/validation-rules.md:87` documents the alias, and so does the rustdoc at `validation/graph.rs:1363`.\n\n`label-coverage`, `label-reference` and `dependency-shape` are untyped `toml::value::Table`s (`rules.rs:923-927`), interpreted late in `validation/graph.rs`: label-coverage keys at `:860-935`, and dependency-shape `target`/`mode`/`transitive` at `:1380-1403`, where `target` becomes a `Selector` only at evaluation. They are serialized back verbatim (`rule_serialize.rs:267-275`). The `kind` sugar is expanded by `expand_kind_sugar` (`rules.rs:1403`). Two tests assert tolerance of unknown table keys: `test_label_coverage_inline_rule_unchanged_with_extra_unknown_key` (`rules.rs:2869`) and `test_label_coverage_inline_rule_with_stray_kind_key_is_inert` (`:2894`). `RawGateRecency` shows the typed raw-struct pattern.\n\n## Success Criteria\n\n- [hard] REQ-01: `RawRulesFile`, `RawRule` and `Selector` reject unknown fields at load.\n- [hard] REQ-02: `label-coverage`, `label-reference` and `dependency-shape` assertions are checked at load through typed raw structs that reject unknown keys. `dependency-shape` `target` parses as a selector at load, and the `kind` sugar is a typed optional field.\n- [hard] REQ-03: The selector key is spelled only `has_doc_type`, and `has-doc-type` and `doc_type` are rejected.\n- [hard] REQ-04: Loading a rule declaration with an unknown key fails with an error naming the key.\n- [hard] REQ-05: The two tolerance tests assert rejection. `docs/how-to/validation-rules.md` and the `validation/graph.rs` rustdoc use `has_doc_type`.\n\n## Notes\n\nAfter the load-time check, the three assertion payloads keep their table representation. Full typing of the assertion model is a separate semantic-types refactor. This repository's `.jit/rules.toml` uses only declared keys.\n",
   "documents": [],
+  "done_at": "2026-10-22T01:31:29.231168388Z",
   "first_ready_at": "2026-10-21T15:36:13.540396236Z",
   "gates_required": [
     "cargo-ci",
@@ -15,7 +16,32 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "38f76f63-cf84-450d-a956-f5e118416095",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:24:50.202758723Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "efaacddc-8b74-474e-a3e3-be7741061c05",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:28:06.055489210Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "31611207-b21a-4db5-ac7e-44d98987ba0f",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:29:41.138597036Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "5a46b070-c11b-4220-b4aa-23cef33509ab",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:29:44.684945604Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
   "labels": [
     "type:task",
@@ -27,7 +53,7 @@
     "satisfies:842b0ac6/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Reject unknown keys in rule declarations",
-  "updated_at": "2026-10-21T21:08:00.094383303Z"
+  "updated_at": "2026-10-22T01:31:29.231168388Z"
 }

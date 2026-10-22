@@ -254,7 +254,7 @@
           "title": "Remove the auto and example-integration gate fields",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
@@ -317,7 +317,7 @@
           "title": "Reject unknown keys in rule declarations",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -341,7 +341,7 @@
           "title": "Reject unknown keys in config.toml",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "awaiting-merge"
         },
         {
           "id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
