@@ -302,8 +302,13 @@
     ],
     "depends_on": [
       "harness-shipped-item-kinds",
-      "shared-memory-executor",
-      "unit-test-shipped-item-kinds"
+      "unit-test-shipped-item-kinds",
+      "library-item-validate-memory-setup-adoption",
+      "fixture-issue-commands-a-adoption",
+      "fixture-issue-commands-b-adoption",
+      "fixture-issue-domain-query-adoption",
+      "library-issue-memory-setup-adoption",
+      "library-archive-file-setup-adoption"
     ],
     "planning": {
       "outcome": "The six harness-demonstration cases with no other owner have owning tests in the library modules they exercise.",
@@ -350,7 +355,8 @@
       "code-review"
     ],
     "depends_on": [
-      "harness-demo-case-moves"
+      "harness-demo-case-moves",
+      "fast-docs-templates-fixture-issue-adoption"
     ],
     "planning": {
       "outcome": "harness_demo.rs is gone, and contributor guidance cites owning tests instead.",
@@ -434,7 +440,9 @@
       "code-review"
     ],
     "depends_on": [
-      "finalization-owner-gaps"
+      "finalization-owner-gaps",
+      "fixture-issue-storage-state-adoption",
+      "library-storage-git-fixture-adoption"
     ],
     "planning": {
       "outcome": "The storage determinism section is gone, and storage tests cover only backend-added behaviour.",
@@ -1211,7 +1219,8 @@
       "code-review"
     ],
     "depends_on": [
-      "exit-code-binding-completeness"
+      "exit-code-binding-completeness",
+      "cli-issue-error-output-json-ids"
     ],
     "planning": {
       "outcome": "Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions.",
@@ -1307,7 +1316,8 @@
       "code-review"
     ],
     "depends_on": [
-      "label-query-cli-wiring-reduction"
+      "label-query-cli-wiring-reduction",
+      "cli-query-graph-in-process-setup-adoption"
     ],
     "planning": {
       "outcome": "The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion.",
@@ -1505,8 +1515,8 @@
       "code-review"
     ],
     "depends_on": [
-      "cli-process-fixture",
-      "command-list-output-types"
+      "command-list-output-types",
+      "cli-issue-show-spawn-migration"
     ],
     "planning": {
       "outcome": "A single schema-driven test checks count against collection length for each list-emitting command.",
@@ -3222,7 +3232,9 @@
       "cargo-ci",
       "code-review"
     ],
-    "depends_on": [],
+    "depends_on": [
+      "library-batch-memory-setup-adoption"
+    ],
     "planning": {
       "outcome": "Batch-create keeps at most one adapter wiring test, and graph tests own keyed cycle detection.",
       "contract_refs": [
@@ -3666,8 +3678,7 @@
       "code-review"
     ],
     "depends_on": [
-      "memory-declaration-seeding",
-      "harness-demo-case-moves"
+      "memory-declaration-seeding"
     ],
     "planning": {
       "outcome": "Item and validate unit tests build memory executors through the shared seeding, with no literal index.",
@@ -4105,6 +4116,8 @@
       "fast-issue-fixture-issue-adoption",
       "fast-docs-templates-fixture-issue-adoption",
       "fast-rules-fixture-issue-adoption",
+      "harness-shipped-item-kinds",
+      "unit-test-shipped-item-kinds",
       "fast-rules-shipped-item-kinds",
       "fast-rules-file-setup-adoption",
       "fast-docs-templates-file-setup-adoption",
@@ -5855,7 +5868,7 @@
   {
     "key": "fixture-issue-commands-a-adoption",
     "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
-    "description": "Move the archive, claim, dependency, document and gate command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `gate.rs`, `claim.rs`, `dependency.rs`, `archive.rs`, `document.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the archive, claim, dependency, document and gate command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `claim.rs`, `dependency.rs`, `gate.rs`, `archive.rs`, `document.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -5888,9 +5901,9 @@
         "worker_sized_reason": "One module family (archive, claim, dependency, document and gate command, 5 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
-            "crates/jit/src/commands/gate.rs",
             "crates/jit/src/commands/claim.rs",
             "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/commands/gate.rs",
             "crates/jit/src/commands/archive.rs",
             "crates/jit/src/commands/document.rs"
           ]
@@ -5901,7 +5914,7 @@
   {
     "key": "fixture-issue-commands-b-adoption",
     "title": "Gate-check, issue, item, executor and snapshot command unit tests use the shared issue fixture",
-    "description": "Move the gate-check, issue, item, executor and snapshot command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `snapshot.rs`, `issue.rs`, `item.rs`, `mod.rs`, `gate_check.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the gate-check, issue, item, executor and snapshot command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `item.rs`, `mod.rs`, `gate_check.rs`, `issue.rs`, `snapshot.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -5934,11 +5947,11 @@
         "worker_sized_reason": "One module family (gate-check, issue, item, executor and snapshot command, 5 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
-            "crates/jit/src/commands/snapshot.rs",
-            "crates/jit/src/commands/issue.rs",
             "crates/jit/src/commands/item.rs",
             "crates/jit/src/commands/mod.rs",
-            "crates/jit/src/commands/gate_check.rs"
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/snapshot.rs"
           ]
         }
       }
@@ -5947,7 +5960,7 @@
   {
     "key": "fixture-issue-commands-c-adoption",
     "title": "Template, validate and worktree command unit tests use the shared issue fixture",
-    "description": "Move the template, validate and worktree command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `template.rs`, `validate.rs`, `worktree.rs`, `template_expand.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the template, validate and worktree command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `template.rs`, `template_expand.rs`, `worktree.rs`, `validate.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -5981,9 +5994,9 @@
         "footprint": {
           "touches": [
             "crates/jit/src/commands/template.rs",
-            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/template_expand.rs",
             "crates/jit/src/commands/worktree.rs",
-            "crates/jit/src/commands/template_expand.rs"
+            "crates/jit/src/commands/validate.rs"
           ]
         }
       }
@@ -5992,7 +6005,7 @@
   {
     "key": "fixture-issue-domain-artifact-adoption",
     "title": "Domain artifact and projection unit tests use the shared issue fixture",
-    "description": "Move the domain artifact and projection unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `projection.rs`, `artifact_classifier.rs`, `store_divergence.rs`, `artifact_conformance.rs`, `artifact_directory.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the domain artifact and projection unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `artifact_conformance.rs`, `artifact_classifier.rs`, `store_divergence.rs`, `artifact_directory.rs`, `projection.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -6025,11 +6038,11 @@
         "worker_sized_reason": "One module family (domain artifact and projection, 5 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
-            "crates/jit/src/domain/projection.rs",
+            "crates/jit/src/domain/artifact_conformance.rs",
             "crates/jit/src/domain/artifact_classifier.rs",
             "crates/jit/src/domain/store_divergence.rs",
-            "crates/jit/src/domain/artifact_conformance.rs",
-            "crates/jit/src/domain/artifact_directory.rs"
+            "crates/jit/src/domain/artifact_directory.rs",
+            "crates/jit/src/domain/projection.rs"
           ]
         }
       }
@@ -6038,7 +6051,7 @@
   {
     "key": "fixture-issue-domain-query-adoption",
     "title": "Domain query, item and output unit tests use the shared issue fixture",
-    "description": "Move the domain query, item and output unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `visualization.rs`, `queries.rs`, `type_taxonomy.rs`, `item.rs`, `output.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the domain query, item and output unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `type_taxonomy.rs`, `item.rs`, `visualization.rs`, `output.rs`, `queries.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -6071,11 +6084,11 @@
         "worker_sized_reason": "One module family (domain query, item and output, 5 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
-            "crates/jit/src/visualization.rs",
-            "crates/jit/src/domain/queries.rs",
             "crates/jit/src/domain/type_taxonomy.rs",
             "crates/jit/src/domain/item.rs",
-            "crates/jit/src/output.rs"
+            "crates/jit/src/visualization.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/domain/queries.rs"
           ]
         }
       }
@@ -6084,7 +6097,7 @@
   {
     "key": "fixture-issue-graph-validation-adoption",
     "title": "Graph, validation and declaration unit tests use the shared issue fixture",
-    "description": "Move the graph, validation and declaration unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `mod.rs`, `hierarchy.rs`, `local.rs`, `desugar.rs`, `graph.rs`, `rules.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the graph, validation and declaration unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `rules.rs`, `desugar.rs`, `mod.rs`, `hierarchy.rs`, `graph.rs`, `local.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -6117,12 +6130,12 @@
         "worker_sized_reason": "One module family (graph, validation and declaration, 6 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
+            "crates/jit/src/declarations/rules.rs",
+            "crates/jit/src/validation/desugar.rs",
             "crates/jit/src/graph/mod.rs",
             "crates/jit/src/graph/hierarchy.rs",
-            "crates/jit/src/validation/local.rs",
-            "crates/jit/src/validation/desugar.rs",
             "crates/jit/src/validation/graph.rs",
-            "crates/jit/src/declarations/rules.rs"
+            "crates/jit/src/validation/local.rs"
           ]
         }
       }
@@ -6131,7 +6144,7 @@
   {
     "key": "fixture-issue-storage-state-adoption",
     "title": "Storage and repository-state unit tests use the shared issue fixture",
-    "description": "Move the storage and repository-state unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `default_rules.rs`, `json.rs`, `mutation.rs`, `archive.rs`, `reference.rs`, `repository_state_store_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "description": "Move the storage and repository-state unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `archive.rs`, `json.rs`, `default_rules.rs`, `reference.rs`, `repository_state_store_tests.rs`, `mutation.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -6164,12 +6177,12 @@
         "worker_sized_reason": "One module family (storage and repository-state, 6 files) with one concern: a call-path rewrite.",
         "footprint": {
           "touches": [
-            "crates/jit/src/repository_state/default_rules.rs",
-            "crates/jit/src/storage/json.rs",
-            "crates/jit/src/repository_state/mutation.rs",
             "crates/jit/src/repository_state/archive.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/repository_state/default_rules.rs",
             "crates/jit/src/storage/reference.rs",
-            "crates/jit/src/storage/repository_state_store_tests.rs"
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/repository_state/mutation.rs"
           ]
         }
       }
@@ -6245,8 +6258,6 @@
     ],
     "depends_on": [
       "memory-declaration-seeding",
-      "harness-demo-case-moves",
-      "batch-cycle-adapter-reproof-removal",
       "cli-process-fixture"
     ],
     "planning": {
@@ -6296,8 +6307,6 @@
     ],
     "depends_on": [
       "memory-declaration-seeding",
-      "harness-demo-case-moves",
-      "batch-cycle-adapter-reproof-removal",
       "cli-process-fixture"
     ],
     "planning": {
@@ -6347,8 +6356,6 @@
     ],
     "depends_on": [
       "memory-declaration-seeding",
-      "harness-demo-case-moves",
-      "batch-cycle-adapter-reproof-removal",
       "library-command-git-fixture-adoption"
     ],
     "planning": {
@@ -6776,7 +6783,8 @@
     "depends_on": [
       "exit-code-envelope-case-moves",
       "exit-code-issue-prefix-case-moves",
-      "cli-issue-error-output-json-ids"
+      "cli-issue-create-spawn-migration",
+      "cli-issue-update-spawn-migration"
     ],
     "planning": {
       "outcome": "The issue-creation, search, rollup and export tests assert only properties they add.",
@@ -6825,8 +6833,7 @@
     ],
     "depends_on": [
       "exit-code-envelope-case-moves",
-      "exit-code-issue-prefix-case-moves",
-      "cli-issue-error-output-spawn-migration"
+      "exit-code-issue-prefix-case-moves"
     ],
     "planning": {
       "outcome": "Issue show, status and top-level failure tests assert only properties they add.",
@@ -6874,8 +6881,7 @@
     ],
     "depends_on": [
       "exit-code-envelope-case-moves",
-      "exit-code-issue-prefix-case-moves",
-      "cli-issue-error-output-json-ids"
+      "exit-code-issue-prefix-case-moves"
     ],
     "planning": {
       "outcome": "Error-output tests assert only properties they add, with no projected exit-code re-assertion.",
@@ -6923,7 +6929,9 @@
     ],
     "depends_on": [
       "exit-code-claim-delete-case-moves",
-      "exit-code-gate-preset-case-move"
+      "exit-code-gate-preset-case-move",
+      "cli-repo-workflow-in-process-setup-adoption",
+      "cli-profile-json-ids"
     ],
     "planning": {
       "outcome": "Profile tests assert only properties they add, with no projected exit-code re-assertion.",
@@ -7018,7 +7026,8 @@
     ],
     "depends_on": [
       "exit-code-claim-delete-case-moves",
-      "exit-code-gate-preset-case-move"
+      "exit-code-gate-preset-case-move",
+      "cli-config-spawn-migration"
     ],
     "planning": {
       "outcome": "Configuration, serve and workflow tests assert only properties they add.",
