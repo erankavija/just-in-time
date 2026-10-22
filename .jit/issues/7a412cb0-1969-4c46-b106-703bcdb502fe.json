@@ -14,7 +14,26 @@
     "code-review",
     "profile-suite-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "22b7f944-82f4-4a37-ad9f-6089b56a9ca9",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:48:48.135484392Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "33056b32-5368-416b-9164-e6dc03fb2270",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:51:37.982184358Z",
+      "updated_by": "auto:executor"
+    },
+    "profile-suite-selftest": {
+      "run_id": "acf56f70-8e68-47f1-a6d1-7f5697f7fde7",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:48:48.931748947Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7a412cb0-1969-4c46-b106-703bcdb502fe",
   "labels": [
     "type:task",
@@ -31,5 +50,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Suite-profiler self-test runs as a declared gate",
-  "updated_at": "2026-10-22T20:30:38.756756366Z"
+  "updated_at": "2026-10-22T20:51:37.982184358Z"
 }
