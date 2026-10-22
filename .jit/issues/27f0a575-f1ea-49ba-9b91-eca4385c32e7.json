@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "5ca1589d-66ca-410c-95f8-f41d8c826b76",
-      "status": "failed",
-      "updated_at": "2026-10-22T02:28:52.860571848Z",
+      "run_id": "35aa7754-1b90-426f-a1aa-cb7468b551d6",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:36:25.074918838Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a06a11e7-c4c4-4eed-bfb0-3e6136a0f5e3",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:40:47.658092999Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue lifecycle methods behind an issues facade",
-  "updated_at": "2026-10-22T02:28:52.860571848Z"
+  "updated_at": "2026-10-22T06:40:47.658092999Z"
 }

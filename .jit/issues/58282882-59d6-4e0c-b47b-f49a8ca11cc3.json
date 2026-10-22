@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e8a1bceb-6a6e-4bd0-ad52-e0284091d91e",
+      "run_id": "d2673ecb-bc0d-426b-8949-1fefd0294879",
+      "status": "passed",
+      "updated_at": "2026-10-22T06:37:33.688662882Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8a6f59e9-5aae-4422-9c4c-b14958a158a4",
       "status": "failed",
-      "updated_at": "2026-10-22T02:30:53.020171728Z",
+      "updated_at": "2026-10-22T06:40:22.452040417Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +39,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove uncalled domain predicates and parsers",
-  "updated_at": "2026-10-22T02:30:53.020171728Z"
+  "updated_at": "2026-10-22T06:40:22.452040417Z"
 }

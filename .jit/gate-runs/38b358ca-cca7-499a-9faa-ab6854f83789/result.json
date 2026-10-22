@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "29c32c7149685e63c37c36ddb15760286ed5e097",
+  "completed_at": "2026-10-22T06:34:04.911334897Z",
+  "duration_ms": 106734,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/graph.rs",
+        "id": "F1",
+        "line": 460,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "cargo-ci has five unrelated doctest compilation failures caused by stale CommandExecutor::create_issue calls."
+      }
+    ],
+    "summary": "The attributable builtin-checker changes satisfy the issue criteria; one unrelated pre-existing CI doctest failure remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "39710b3b-2b92-4fc1-bbc2-4c230577e350",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "38b358ca-cca7-499a-9faa-ab6854f83789",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T06:32:18.177152161Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 80455ecc, f8065353, 51fcef315 (`jit:39710b3b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3d9a0ce3/requirement/REQ-02 (issue Markdown); @/invariant/gate-semantics, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 1 (five unrelated doctest compilation failures); code-review pending\nTruncation recovery: narrowed reads of gate-check execution, repository validation, CLI error mapping, tests, and individual commit patches\n\n1. [advisory][pre-existing] `cargo-ci` is red because five doctests still call the unavailable `CommandExecutor::create_issue` API (for example, [graph.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/graph.rs:460)); these paths are outside the attributable patches and do not affect the builtin-checker error classification.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable builtin-checker changes satisfy the issue criteria; one unrelated pre-existing CI doctest failure remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"cargo-ci has five unrelated doctest compilation failures caused by stale CommandExecutor::create_issue calls.\",\"file\":\"crates/jit/src/commands/graph.rs\",\"line\":460}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

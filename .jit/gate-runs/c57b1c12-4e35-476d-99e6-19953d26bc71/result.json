@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "be0d9ab5375b4c0b0a1196f69f0a7f4ec9c6ac3f",
+  "completed_at": "2026-10-22T06:45:03.681096248Z",
+  "duration_ms": 280613,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 3738,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "The CLI reference incorrectly states that worktree and coordination use a system/user/repo merged view."
+      }
+    ],
+    "summary": "The shared repository-only resolver, enforced acquisition path, reporting path, integration coverage, and configuration reference satisfy the issue criteria; one pre-existing CLI-reference inconsistency remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c57b1c12-4e35-476d-99e6-19953d26bc71",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T06:40:23.067394554Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93a6be35d, a1fd176cb, 26b32610a, 1bcf37544 (`jit:34361448`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-20; @/invariant/convention-convergence; @/issue/842b0ac6/requirement/REQ-26; @/gate/jit-validate\nGate evidence: cargo-ci passed; doc-review failed (exit 1); docs-mechanical pending; prior code-review passed\nTruncation recovery: Re-read the implementation commit by path and recovered its config patch with a zero-context diff.\n\n1. [advisory][pre-existing] `docs/reference/cli-commands.md:3738` still says `worktree` and `coordination` use a system/user/repo merged view, contradicting the repository-only resolver and the later tagged statement at line 3784. Blame attributes the stale statement to an earlier, untagged commit.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared repository-only resolver, enforced acquisition path, reporting path, integration coverage, and configuration reference satisfy the issue criteria; one pre-existing CLI-reference inconsistency remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The CLI reference incorrectly states that worktree and coordination use a system/user/repo merged view.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3738}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

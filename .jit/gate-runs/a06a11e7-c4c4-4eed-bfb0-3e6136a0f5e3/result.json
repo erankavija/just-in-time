@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "be0d9ab5375b4c0b0a1196f69f0a7f4ec9c6ac3f",
+  "completed_at": "2026-10-22T06:40:47.443149673Z",
+  "duration_ms": 254622,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped facade criteria are satisfied; no blocking or advisory findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "27f0a575-f1ea-49ba-9b91-eca4385c32e7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a06a11e7-c4c4-4eed-bfb0-3e6136a0f5e3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T06:36:32.820865088Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b81e5227f, b0a157cd7, d144d3d84, 992be2405, be0d9ab53 (`jit:27f0a575`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/active/df129d9e-rust-code-quality/{plan,inves­tigation}.md\nResolved items: @/issue/df129d9e/requirement/REQ-03; @/invariant/architecture-dependency-direction; @/invariant/convention-convergence; @/invariant/orthogonal-tests; @/invariant/essential-code-prose; @/gate/cargo-ci; @/invariant/bounded-rust-build-footprint\nGate evidence: cargo-ci passed, exit 0, 2026-10-22T06:34:57Z; code-review pending\nTruncation recovery: partitioned the initially truncated patch and policy reads by commit, file, and hunk; no relevant evidence remained omitted\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped facade criteria are satisfied; no blocking or advisory findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
