@@ -118,7 +118,7 @@
           "short_id": "9fa12e75",
           "title": "Render gate run status lines through one output renderer",
           "classification": "implementation",
-          "status": "in_progress (sonnet worker w-9fa12e75, base 6796fc3e7)"
+          "status": "done (merged 12d718456; code-review R1 failed: JSON never-run used human renderer; lead fix ce437049d; cargo-ci, code-review passed)"
         },
         {
           "key": "validation-report-renderer",
@@ -713,7 +713,8 @@
   "rework_counts": {
     "719a5501": 0,
     "650e6a56": 1,
-    "d8176fd3": 0
+    "d8176fd3": 0,
+    "9fa12e75": 1
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
