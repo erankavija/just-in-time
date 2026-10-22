@@ -12,11 +12,9 @@
 //! committed markdown reference.
 
 mod manager;
-mod planning;
 pub mod reference;
 
 pub use manager::PresetManager;
-pub use planning::preview_coverage_rule;
 pub use reference::render_reference_markdown;
 
 use crate::declarations::GateDefinition;
