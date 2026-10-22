@@ -7,6 +7,7 @@
   ],
   "description": "Retire the private git setup in the git-revision suite file in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:15-20` hand-rolls `git init` with a fixed author identity in its `Repo` fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: `git_revision_tests.rs` initialises git only through the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T15:47:00.132285826Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Git revision tests initialise git through the shared helper",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T15:47:00.132285826Z"
 }
