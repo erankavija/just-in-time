@@ -7,6 +7,7 @@
   ],
   "description": "Remove the item-kind copies from command and domain unit tests.\n\n## Background\n\n`CANONICAL_ITEM_KINDS` is hand-copied in the test modules of `crates/jit/src/commands/item.rs` (`:570`, with its `D-[0-9]+` pattern at `:581`) and `crates/jit/src/commands/validate.rs` (`:2975`, pattern at `:2986`). `crates/jit/src/domain/item.rs` tests hard-code the decision kind's `D-[0-9]+` pattern (`:1633`, `:2087`). Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Unit tests in `commands/item.rs`, `commands/validate.rs` and `domain/item.rs` that need shipped kinds take them from the shared derivation.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No unit test under `crates/jit/src` restates a shipped kind's declaration or its id pattern.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T16:07:09.080280692Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T16:07:09.080280692Z"
 }

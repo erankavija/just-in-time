@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "45e7ef15d5a7336d6a00df65386ca2e1d4d2ccae",
+  "completed_at": "2026-10-22T16:06:05.028142920Z",
+  "duration_ms": 216097,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared test support derives both typed and TOML item-kind declarations from the default package, and the focused mutation test proves contribution changes affect the derivation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0bf97911-8302-47bb-95c0-585d897ad63f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b98ba6bc-4bcc-4139-aea8-20212fb094a2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T16:02:28.930705665Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 762cc6d87, 99a610baa, 852e31d2a, 0bba22f71 (jit:0bf97911)\nPolicy sources: AGENTS.md\nResolved items: @/issue/0bf97911/requirement/REQ-01, REQ-02; @/issue/c780514e/requirement/REQ-07 (issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, single-source-prose, essential-code-prose, orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T16:02:07Z); prior code-review R1 failed, with both findings addressed or superseded by the recorded scope ruling\nTruncation recovery: narrowed merge patches to test_utils.rs and .config/nextest.toml after broad reads truncated; excluded historical .jit/progress records from behavioral review\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared test support derives both typed and TOML item-kind declarations from the default package, and the focused mutation test proves contribution changes affect the derivation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
