@@ -464,7 +464,8 @@
       "detail": "Holistic-review F1 (04a46d76) fails literal REQ-01 deletion of enforcement_drift. Approved DEC-drift-name and completed e1af39db require deleting the unused strict implementation and renaming the surviving tolerant production implementation to enforcement_drift.",
       "resolution": "Steward explicitly approved option 1 on 2026-10-22: reconcile contradictory naming prose with approved DEC-drift-name and completed e1af39db. Delete the original unused strict implementation, retain the sole production implementation under enforcement_drift, preserve all behavior and other REQ-01 clauses. Re-run holistic-review; no manual gate pass.",
       "prior_wording": "- [hard] REQ-01: The bracket breakdown module, `validate_integrity_silent` with its private helpers, and `drift::enforcement_drift` are deleted, and no test references them.",
-      "approved_wording": "- [hard] REQ-01: The bracket breakdown module and `validate_integrity_silent` with its private helpers are deleted, and no test references them. The original unused strict `drift::enforcement_drift` implementation and its obsolete tests are removed; the retained tolerant production implementation is the sole `enforcement_drift` function used by production and tests."
+      "approved_wording": "- [hard] REQ-01: The bracket breakdown module and `validate_integrity_silent` with its private helpers are deleted, and no test references them. The original unused strict `drift::enforcement_drift` implementation and its obsolete tests are removed; the retained tolerant production implementation is the sole `enforcement_drift` function used by production and tests.",
+      "outcome": "Resolved: amended criterion passed the independent holistic gate; no runtime change or manual gate pass."
     }
   ],
   "rework_counts": {
@@ -523,5 +524,17 @@
     "63c11d08 final cargo-ci passed: 4588 tests, 58 doctests, suite clock 18.434s; code-review passed with zero findings. All 40 implementation tasks are complete; epic validation and holistic review follow.",
     "Epic repo-validate passed (2557f21c). Holistic review 04a46d76 failed one finding: REQ-01 naming conflict with approved DEC-drift-name; escalated without overriding gate or modifying criterion."
   ],
-  "started_at": "2026-10-21T01:03:03.002143+00:00"
+  "started_at": "2026-10-21T01:03:03.002143+00:00",
+  "completed_at": "2026-10-22T19:43:08.889017+00:00",
+  "status": "complete",
+  "closure": {
+    "merge_commit": "109e944f6",
+    "gates": {
+      "repo-validate": "d63f7806-b535-4fa6-84a2-e11253f815c2",
+      "holistic-review": "050581f4-da58-45f9-b5e1-ff3d107a92bf"
+    },
+    "implementation_tasks": 40,
+    "bracket_nodes": 2,
+    "pitfall_reconciliation": "All 27 hard criteria audited. Duplicate domain paths and both stale comments resolved; source-reference projection regenerated. Drift-name criterion reconciled with steward approval and re-reviewed. Earlier load/fixture observations remain execution history; explicit non-goals remain outside the criteria."
+  }
 }
