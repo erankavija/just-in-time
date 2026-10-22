@@ -64,8 +64,12 @@ impl AgentConfig {
         let content =
             std::fs::read_to_string(config_path).context("Failed to read agent config file")?;
 
-        let config: AgentConfig =
-            toml::from_str(&content).map_err(|e| anyhow!("Failed to parse agent.toml: {e}"))?;
+        // The summary names the offending key even where only the top-level
+        // message is printed; the typed source keeps the parse-error class.
+        let config: AgentConfig = toml::from_str(&content).map_err(|e| {
+            let summary = format!("Failed to parse agent.toml: {}", e.message());
+            anyhow::Error::new(e).context(summary)
+        })?;
 
         // Validate agent ID format
         validate_agent_id(&config.agent.id)?;
@@ -242,9 +246,14 @@ description = "GitHub Copilot Workspace Session 1"
             ("default_ttl_secs = 900\n", "default_ttl_secs"),
         ] {
             std::fs::write(&path, format!("{VALID_TOML}{extra}")).unwrap();
+            let err = AgentConfig::load_from(&path).unwrap_err();
             // Rendered as the CLI prints a top-level error.
-            let err = AgentConfig::load_from(&path).unwrap_err().to_string();
-            assert!(err.contains(key), "error must name {key}: {err}");
+            let message = err.to_string();
+            assert!(message.contains(key), "error must name {key}: {message}");
+            assert_eq!(
+                crate::output::failure::classify(&err).error.code,
+                crate::output::ErrorCode::ParseError
+            );
         }
     }
 

@@ -136,7 +136,7 @@ Each invariant was resolved with `jit item show`.
 
 - `@/inv/orthogonal-tests`: violated by claims 2–10. REQ-09's half ("passes alone, in any order, in parallel") is enforced for env and cwd by `process_state_policy_tests.rs`. The receipt env lock and fixture-cache lock contention (§A) remain order- and load-sensitive.
 - `@/inv/shared-test-contracts`: violated by #11–#24. No `IssueStore` suite exists, and `memory_executor`, `fixture_issue`, and `TaxonomyRepo` each have parallel copies.
-- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 18 tool-missing skip paths pass silently (#26, §D.5). These are held-out tests in substance.
+- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 25 skip-and-pass paths pass silently: 18 in Rust tests when a tool is missing, 4 root-only lock tests, and 3 inside shell self-tests (#26, §D.5). These are held-out tests in substance.
 - `@/inv/bounded-rust-build-footprint`: passes at 10/12 targets and 1.61/2 GiB. The fixture cache's 747 MB in `target/` is unbudgeted. A new integration target for a shared fixture is not needed; the test-support surface already compiles once.
 - `@/inv/domain-agnostic`: the `CANONICAL_ITEM_KINDS` copies and `D-[0-9]+` literals are test-side copies of package vocabulary. REQ-07's derivation from `profiles/jit-default` must stay in test support and out of engine code.
 
@@ -221,7 +221,7 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
   - `crates/jit/src/test_mode.rs`.
   - Suite roots `crates/jit/tests/*/main.rs` hold local fixtures (`fixture_issue`, `TaxonomyRepo`, `memory_executor`).
 - **Build budget** (`scripts/rust-build-budget.sh:41-43`, `dev/benchmarks/rust-build-budgets/README.md`): targets 10/12; active test executables 14, 1,723,670,208/2,147,483,648 B; suite-duration limit 30 s. The latest `suite-build` line warmed 17 executables totalling 2,051,867,776 B in 73 ms.
-- **Script self-test gates.** None. `.jit/gates.toml` declares `cargo-ci` (`./scripts/cargo-ci.sh`), `cargo-ci-features`, `clippy`, `docs-mechanical`, `fmt`, `jit-validate`, `mcp-ci`, `npm-ci`, `repo-validate`, `secret-detection`, `tests`, `dependency-audit`, and the AI-review gates. All four script self-tests run inside the default Rust suite.
+- **Script self-test gates.** None. `.jit/gates.toml` declares `cargo-ci` (`./scripts/cargo-ci.sh`), `cargo-ci-features`, `clippy`, `docs-mechanical`, `fmt`, `jit-validate`, `mcp-ci`, `npm-ci`, `repo-validate`, `secret-detection`, `tests`, `dependency-audit`, and the AI-review gates. Four script self-tests run inside the default Rust suite, and four more run nowhere or only in CI (§D.7).
 
 ## D. Re-proof and fixture sweeps
 
@@ -309,16 +309,27 @@ The following carry a `count` that is not a list envelope:
 
 `list_envelope_tests.rs` covers every fallback command except `claim status`, `project render` and the three archive commands.
 
-### D.5 Tool-missing skips
+### D.5 Skip-and-pass paths
 
-| Site | Tool | Count |
+The sweep covered every Rust test (`eprintln!`/`println!` skip notices, early returns guarded by a host or tool probe) and every committed shell, Python and JavaScript test. Shell files were searched for `SKIP` and `skip`, Python for `unittest.skip*`/`pytest.mark.skip`, and JavaScript for `.skip`/`.todo`/`skipIf`. These pass without running their assertions:
+
+| Site | Condition | Count |
 | --- | --- | ---: |
-| `scratch_build/merged_tree_gate_verification_tests.rs:48-53` | git, cargo or jq (script exit 2) | 1 |
-| `scratch_build/rust_build_budget_checker_tests.rs:175`…`:521` | jq | 14 |
-| `scratch_build/dependency_feature_policy_tests.rs:168,185` | cargo | 2 |
-| `cli_item_validate/validate_cli_rule_tests.rs:930-935` | node | 1 |
+| `scratch_build/merged_tree_gate_verification_tests.rs:48-53` | git, cargo or jq missing (script exit 2) | 1 |
+| `scratch_build/rust_build_budget_checker_tests.rs:175`…`:521` | jq missing | 14 |
+| `scratch_build/dependency_feature_policy_tests.rs:168,185` | cargo missing | 2 |
+| `cli_item_validate/validate_cli_rule_tests.rs:930-935` | node missing | 1 |
+| `crates/jit/src/storage/lock.rs:652` (`skip_unless_write_is_denied`, called at `:676`, `:729`, `:773`, `:805`) | the process can write a read-only file, as root can | 4 |
+| `scripts/docs-check-selftest.sh:197,201` | the read bit is not enforced (root) | 2 |
+| `scripts/workflow-contract-selftest.sh:125` | actionlint unavailable (entry point exit 2) | 1 |
 
-`storage/lock.rs:652` (`skip_unless_write_is_denied`) skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool.
+Matches that are not a test passing on a skip:
+
+- `.agents/skills/jit-project-lead/scripts/standards-fix.sh:137-149,438`: `SKIPFILE` holds the fixer's own "skipped" records for findings it cannot fix. That is product output, which `test-standards-fix.sh` asserts.
+- `scripts/benchmark-rust-build.sh` (`BENCH_SKIP_SAMPLING`): a benchmark mode that assembles a report from existing samples. It is not a test.
+- `scripts/hooks/pre-commit:60` and `scripts/hooks/pre-push:29`: git hooks that skip lease validation without jq. They are local hooks, not tests.
+- `test-vectors/container-image/test_image_contract.py:219` (`skipUnless(RUNTIME_ENABLED)`): an opt-in runtime tier selected by `JIT_IMAGE_RUNTIME=1`, which `scripts/test-podman.sh` and `.github/workflows/docker.yml` set. It does not depend on a missing tool.
+- The `skip` wording in `cargo-ci-selftest.sh`, `test-standards-fix.sh` and `reclaim-worker-worktree.sh`: reported counts and records, not skipped assertions.
 
 ### D.6 In-process private setups outside the CLI targets
 
@@ -347,3 +358,36 @@ Memory-backed setups. These are functions that build an `InMemoryStorage` or a m
 - `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.
 
 Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.
+
+### D.7 Shell-script self-tests
+
+The sweep covered every committed shell file outside `dev/archive`: `*.sh`, `*.bash` and `*.bats` files under `scripts/`, `contrib/`, `.agents/`, `web/`, `mcp-server/`, `crates/`, `dev/` and `test-vectors/`, plus extensionless files with a shell shebang. It matched `test-*.sh`, `*-test.sh`, `*selftest*`, `--self-test` and `self_test`, then classified each match by what it tests. The tree has no bats files.
+
+Shell suites that test a repository script. No `.jit/gates.toml` gate runs any of them.
+
+| Self-test | Exercises | Tools it requires | Runs today |
+| --- | --- | --- | --- |
+| `scripts/cargo-ci-selftest.sh` | `scripts/cargo-ci.sh` gate behaviour over six fixture crates | git, cargo, jq (exit 2) | default suite (`merged_tree_gate_verification_tests.rs`) |
+| `scripts/profile-test-suite.sh --self-test` | the suite profiler | — | default suite (`build_profile_policy_tests.rs:332`) |
+| `scripts/rust-build-budget.sh` (14 Rust-driven cases) | the build-budget checker | jq | default suite (`rust_build_budget_checker_tests.rs`) |
+| `scripts/setup-recorded-failure-corpus.sh --self-test` | the corpus setup script | — | default suite (`failure_probe_fixture.rs:1060`) |
+| `scripts/docs-check-selftest.sh` | `scripts/docs-mechanical.sh` and the seven `scripts/docs-check-*.sh` checkers | jit, jq (exit 2) | nowhere |
+| `scripts/generate-shipped-policy-regions-selftest.sh` | `scripts/generate-shipped-policy-regions.sh` | git, jit (exit 2) | nowhere |
+| `scripts/workflow-contract-selftest.sh` | `scripts/workflow-contract.sh` with `test-vectors/workflow-contract/` | python3 (exit 2) | `.github/workflows/ci.yml:54` only |
+| `scripts/benchmark-session-cost-selftest.sh` | `scripts/benchmark-session-cost.sh` against a fake `jit` | cmp, find, git, grep, jq, sha256sum (exit 2) | nowhere |
+| `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` | `standards-scan.sh` over a seeded `jit init` fixture | jit, jq, gawk (exit 2) | nowhere (gate-run logs show ad hoc runs) |
+| `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` | `standards-fix.sh` between two scans | jit, jq, gawk (exit 2) | nowhere |
+| `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` | `scripts/breakdown_manifest.py` over `evals/fixtures/` | python3 (`set -e`) | nowhere |
+
+Matches that are not suites testing a repository script:
+
+| File | What it is | Why REQ-10 does not cover it |
+| --- | --- | --- |
+| `mcp-server/test-with-env.sh` | runs `npm test` with an isolated `JIT_DATA_DIR` | a runner for the MCP JavaScript suite, which the `mcp-ci` gate runs |
+| `scripts/test-ci-local.sh`, `scripts/test-ci-manual.sh` | replay GitHub Actions locally (`act` + podman, or the same commands by hand) | CI runners whose steps the `cargo-ci`, `npm-ci` and `mcp-ci` gates already run; they test no script |
+| `scripts/test-concurrent-mcp.sh`, `scripts/test-label-hierarchy-walkthrough.sh` | manual exercises of the `jit` binary (lock contention, a label-hierarchy walkthrough) | they test the product, not a script; the Rust suites own those properties |
+| `scripts/test-podman.sh` | builds the server image and smoke-tests it with Podman | a deployment smoke of the Dockerfile, not a script self-test |
+| `scripts/validate-setup.sh`, `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh` | file-presence and worktree-leak checks | operational checks, not tests of a script |
+| `*/evals/setup-test-repo.sh`, `dev/active/9c9ac88e/*.sh`, `crates/jit/tests/fixtures/**/check.sh`, `scripts/hooks/pre-*` | eval setup, benchmark harnesses, test fixture data, git hooks | none tests a script |
+
+Python tests of scripts (`scripts/release_version_contract_test.py`, `scripts/rust_version_policy_test.py`, `test-vectors/container-image/test_image_contract.py`, `dev/eval/steering/test_run_eval.py`, `dev/benchmarks/nextest-concurrency-934985ca/validate_selftest.py`) are not shell-script self-tests. The first three run in `.github/workflows/`.

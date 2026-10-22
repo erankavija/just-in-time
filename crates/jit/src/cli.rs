@@ -644,8 +644,9 @@ pub enum IssueCommands {
 
         /// Content format of the description body, selecting the parser used to
         /// extract sections during validation (markdown, html, or xml). When
-        /// omitted the repo default ([validation].content_format) applies, with a
-        /// Markdown fallback. html/xml require the matching cargo feature.
+        /// omitted the repo default ([validation].content_format) applies, falling
+        /// back to the built-in default content format. html/xml require the
+        /// matching cargo feature.
         #[arg(long, value_name = "FORMAT")]
         content_format: Option<String>,
 
@@ -2385,7 +2386,7 @@ pub enum ClaimCommands {
     /// Examples:
     ///   jit claim renew abc12345-6789-... --extension 600   # Extend by 10 minutes
     ///   jit claim renew abc12345-6789-... --extension 3600  # Extend by 1 hour
-    ///   jit claim renew abc12345-6789-...                   # Use default (10 minutes)
+    ///   jit claim renew abc12345-6789-...                   # Extend by the default TTL
     Renew {
         /// Lease ID to renew
         lease_id: String,

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3c83cf5e519846738c2c370ea0c1767b720b93d",
+  "completed_at": "2026-10-21T21:06:43.902039165Z",
+  "duration_ms": 55046,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's centralized runtime-default documentation is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "63a9ab6b-86f8-4a7d-bc05-a25ff866aee9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:05:48.855656261Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf (level 4) with no resolved children. I reviewed the six reachable `jit:459bb995` commits individually, including merge patches, and excluded uncommitted changes.\n\nThe impact cone correctly centralizes values in the generated [runtime defaults](docs/reference/runtime-defaults.md:3), updates the configuration and claim references to cite it, and keeps examples as explicit overrides. Current code and documentation agree on the affected defaults and `config show`/`config get` snapshot behavior.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's centralized runtime-default documentation is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

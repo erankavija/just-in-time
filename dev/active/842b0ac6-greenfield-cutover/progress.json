@@ -254,7 +254,7 @@
           "title": "Remove the auto and example-integration gate fields",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
@@ -263,7 +263,7 @@
           "title": "Remove the lifecycle-timestamp backfill",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "69af08af-ead8-4939-8d82-8f9017b82914",
@@ -308,7 +308,7 @@
           "title": "State each configuration default once",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-2-dispatched"
+          "status": "done"
         },
         {
           "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
@@ -317,7 +317,7 @@
           "title": "Reject unknown keys in rule declarations",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -341,7 +341,7 @@
           "title": "Reject unknown keys in config.toml",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "awaiting-merge"
         },
         {
           "id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
@@ -453,7 +453,9 @@
     "459bb995 replaced project.rs mode_token/style_token (audit had assigned them to 2195c98f); 2195c98f lead informed.",
     "d125490a: 31.6 s budget failure was host variance; worker measured +50 ms from the change (3 alternating runs, base 794bc6798 vs head).",
     "Slow test: cli_repo_workflow profile_cli_tests::test_profile_pack_packs_every_shipped_package_from_the_checkout takes ~8.8 s alone and hit the 20 s nextest timeout in 459bb995's full run (load rising 1.7->6.8). Candidate for c780514e alongside the profiled-fixture timeouts.",
-    "459bb995 R2 code-review: restatements phrased as 'falls back to Markdown' escaped the R1 'default' sweep (same class). Rework 2 is the last before escalation."
+    "459bb995 R2 code-review: restatements phrased as 'falls back to Markdown' escaped the R1 'default' sweep (same class). Rework 2 is the last before escalation.",
+    "Suite clock near budget on a quiet host: 29.0 s at load 2.1 after 459bb995 (7f3449a19). Cutover deletions alone have not lowered it; watch further merges.",
+    "mcp-ci runs against the installed dogfood binary: after a CLI-surface change (e.g. 2492ab29 removing migrate), reinstall via scripts/install-jit.sh (steward standing permission) before gating mcp-ci."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

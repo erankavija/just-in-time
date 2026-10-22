@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e608637c437a06f27aa6c93c932545e305cea7d2",
+  "completed_at": "2026-10-21T20:57:43.581748840Z",
+  "duration_ms": 198475,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged removal satisfies the issue criteria; retired event records remain tolerated through the shared parser and documentation, tests, and MCP curation are aligned.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "979627f6-e94d-4070-a526-c071a8d9c284",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:54:25.105905839Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e608637c4 (merge) and bd8d1b775; identical attributable 17-file removal footprint\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose, @/invariant/event-log (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/842b0ac6/requirement/REQ-08 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T20:52:34Z); mcp-ci pending; doc-review pending; docs-mechanical pending\nTruncation recovery: recovered initial combined patch truncation with individual source/test/doc diffs and bounded current-file reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged removal satisfies the issue criteria; retired event records remain tolerated through the shared parser and documentation, tests, and MCP curation are aligned.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

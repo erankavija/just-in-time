@@ -11,6 +11,7 @@ use std::path::Path;
 
 /// Root configuration structure loaded from `.jit/config.toml`.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct JitConfig {
     /// Schema version for migrations (optional).
     pub version: Option<VersionConfig>,
@@ -77,6 +78,7 @@ pub struct JitConfig {
 
 /// Schema version configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct VersionConfig {
     /// Schema version number.
     pub schema: u32,
@@ -95,6 +97,7 @@ impl VersionConfig {
 /// Resolve a present value with
 /// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
     /// The project's canonical name: the `@<project>` scope token in the
     /// multi-jit addressing scheme. `None` when the `[project]` table is
@@ -203,6 +206,7 @@ pub fn slugify_project_name(input: &str) -> String {
 
 /// Type hierarchy configuration from TOML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HierarchyConfigToml {
     /// Type name to hierarchy level mapping (lower = more strategic).
     pub types: HashMap<String, u8>,
@@ -245,12 +249,9 @@ where
 /// Validation behavior configuration.
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
-/// default rules derive from this repo's registry at load; serde ignores any
-/// stale enforcement keys still present in an old
-/// `config.toml` (no `deny_unknown_fields`), so such a file still parses. The
-/// operative keys here are `strictness` (the repo-wide enforcement modulator),
-/// `default_type`, and `content_format`.
+/// default rules derive from this repo's registry at load.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
     /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
     /// `"permissive"`. It modulates which rule violations block a write or
@@ -310,6 +311,7 @@ impl ValidationConfig {
 /// classification by declaring one, directly or by applying a profile package
 /// that contributes it.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct DocumentationConfig {
     /// Root directory for development documentation. Absent declares no root,
     /// so no boundary excludes an area from classification.
@@ -406,15 +408,10 @@ impl DocumentationConfig {
     }
 }
 
-/// Label namespace configuration from TOML.
-/// Replaces the namespace definitions in labels.json.
-///
-/// The per-namespace constraint fields (`values`, `pattern`, `required`) were
-/// removed when `.jit/rules.toml` became the operative validation ruleset (DR
-/// §8.4): a repo that wants those constraints authors the corresponding rules in
-/// `rules.toml`. The registry keeps only TAXONOMY (`description`/`unique`/
-/// `examples`); serde ignores any stale constraint keys in an old `config.toml`.
+/// Label namespace configuration from TOML: taxonomy only. Value constraints
+/// are authored as rules in `.jit/rules.toml` (DR §8.4).
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NamespaceConfig {
     /// Human-readable description.
     pub description: String,
@@ -511,6 +508,7 @@ pub struct NamespaceConfig {
 /// indexed from it; a `registry-first` kind is authored in a structured registry
 /// file. Resolve a present value with [`ItemKindConfig::source_of_truth`].
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ItemKindConfig {
     /// Section slug whose list items hold this kind's addressable items
     /// (e.g. `"success_criteria"`). Required in an explicit declaration.
@@ -752,6 +750,7 @@ impl Serialize for ItemKindSource {
 /// validation (e.g. an invariant's `enforced`/`advisory` discriminant) to a
 /// dedicated loader.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct TomlSourceDescriptor {
     /// Repository-local path to the `.toml` registry file (read through storage).
     pub toml: String,
@@ -1036,6 +1035,7 @@ impl schemars::JsonSchema for ProjectionKinds {
 /// assert_eq!(multi.kind.names(), ["rule", "gate"]);
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
 pub struct ProjectionConfig {
     /// The item kind(s) whose addressable rows this projection renders.
     pub kind: ProjectionKinds,
@@ -1245,6 +1245,7 @@ pub enum EnforcementModeError {
 
 /// Worktree and parallel work configuration.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorktreeConfig {
     /// Lease enforcement mode; resolved by [`JitConfig::enforcement_mode`].
     pub enforce_leases: Option<EnforcementMode>,
@@ -1325,8 +1326,7 @@ impl WorktreeConfig {
     }
 }
 
-/// Coordination settings for leases and multi-agent work. Unknown keys are
-/// rejected, so a key the coordinator does not apply fails to load.
+/// Coordination settings for leases and multi-agent work.
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinationConfig {
@@ -1423,12 +1423,12 @@ impl JitConfig {
         let content =
             std::fs::read_to_string(&config_path).context("Failed to read config.toml")?;
 
-        // An old `config.toml` may still carry removed enforcement keys
-        // (`require_type_label`, namespace `values`/`pattern`/`required`, etc.).
-        // serde ignores them (no `deny_unknown_fields`), so the file still parses;
-        // the keys simply have no effect — validation is rule-driven.
-        let mut config: JitConfig =
-            toml::from_str(&content).context("Failed to parse config.toml")?;
+        // The summary names the offending key even where only the top-level
+        // message is printed; the typed source keeps the parse-error class.
+        let mut config: JitConfig = toml::from_str(&content).map_err(|e| {
+            let summary = format!("Failed to parse config.toml: {}", e.message());
+            anyhow::Error::new(e).context(summary)
+        })?;
 
         // Load and validate `.jit/templates.toml` at config time: an absent file
         // is fine (empty registry), an invalid template fails config load with a
@@ -2221,28 +2221,41 @@ default_type = "task"
         assert!(chain.contains("strictness"), "{chain}");
     }
 
+    /// Every table of `config.toml` rejects an undeclared key, and both parse
+    /// paths name it in the error's top-level message.
     #[test]
-    fn test_removed_icon_preset_is_rejected_during_config_load() {
-        let temp_dir = TempDir::new().unwrap();
-        std::fs::write(
-            temp_dir.path().join("config.toml"),
-            r#"
-[type_hierarchy]
-types = { objective = 1 }
-
-[type_hierarchy.icons]
-preset = "navigation"
-"#,
-        )
-        .unwrap();
-
-        let error = JitConfig::load(temp_dir.path())
-            .expect_err("removed icon preset must not be silently ignored");
-        let message = format!("{error:#}");
-        assert!(
-            message.contains("preset"),
-            "error names the removed key: {message}"
-        );
+    fn test_load_rejects_unknown_key_by_name_in_every_table() {
+        let key = "undeclared_key";
+        for fragment in [
+            format!("{key} = 1\n"),
+            format!("[version]\n{key} = 1\n"),
+            format!("[project]\n{key} = 1\n"),
+            format!("[type_hierarchy]\n{key} = 1\n"),
+            format!("[type_hierarchy.icons]\n{key} = 1\n"),
+            format!("[validation]\n{key} = 1\n"),
+            format!("[documentation]\n{key} = 1\n"),
+            format!("[namespaces.ns]\n{key} = 1\n"),
+            format!("[item_kinds.kind]\n{key} = 1\n"),
+            format!("[item_kinds.kind]\nsource = {{ {key} = 1 }}\n"),
+            format!("[projection.view]\n{key} = 1\n"),
+            format!("[worktree]\n{key} = 1\n"),
+            format!("[coordination]\n{key} = 1\n"),
+        ] {
+            let temp_dir = TempDir::new().unwrap();
+            std::fs::write(temp_dir.path().join("config.toml"), &fragment).unwrap();
+            let loaded = JitConfig::load(temp_dir.path())
+                .expect_err("an unknown key must fail to load")
+                .to_string();
+            let declared = crate::declarations::parse_configuration(fragment.as_bytes())
+                .expect_err("an unknown key must fail to parse")
+                .to_string();
+            for message in [loaded, declared] {
+                assert!(
+                    message.contains(&format!("unknown field `{key}`")),
+                    "{fragment}: {message}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -2279,54 +2292,6 @@ types = { epic = 1, task = 2 }
 
         let result = JitConfig::load(temp_dir.path());
         assert!(result.is_err());
-    }
-
-    // ============================================================
-    // Deprecated-key scan (DR §8.4, decision D7) — warn, never hard-error
-    // ============================================================
-    // Stale-key tolerance: removed enforcement keys are ignored, not errors
-    // ============================================================
-
-    #[test]
-    fn test_load_config_with_removed_keys_still_parses() {
-        // An OLD config carrying the removed enforcement / namespace-constraint
-        // keys still loads (no `deny_unknown_fields`): serde ignores them, the
-        // surviving behavioral keys parse, and the registry taxonomy is intact.
-        // `.jit/rules.toml` is the operative validation ruleset, so the stale keys
-        // have no effect.
-        let temp_dir = TempDir::new().unwrap();
-        let config_toml = r#"
-[validation]
-default_type = "task"
-strictness = "loose"
-content_format = "markdown"
-require_type_label = true
-label_regex = '^[a-z]+:'
-reject_malformed_labels = true
-enforce_namespace_registry = true
-warn_orphaned_leaves = false
-warn_strategic_consistency = false
-
-[namespaces.type]
-description = "Issue type"
-unique = true
-examples = ["type:task"]
-values = ["task", "bug"]
-required = true
-"#;
-        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
-
-        let config = JitConfig::load(temp_dir.path()).expect("stale config must still load");
-        // It parsed; the surviving keys are intact.
-        let validation = config.validation.expect("validation section present");
-        assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
-        assert_eq!(validation.content_format, Some("markdown".to_string()));
-        // The namespace registry survives with only its taxonomy keys.
-        let namespaces = config.namespaces.expect("namespaces present");
-        let type_ns = &namespaces["type"];
-        assert_eq!(type_ns.description, "Issue type");
-        assert!(type_ns.unique);
     }
 
     #[test]
@@ -2968,24 +2933,6 @@ max_indefinite_leases_per_repo = 10
         let coord = config.coordination.unwrap();
         assert_eq!(coord.max_indefinite_leases_per_agent, Some(2));
         assert_eq!(coord.max_indefinite_leases_per_repo, Some(10));
-    }
-
-    /// The removed coordination timing keys are rejected as unknown keys.
-    #[test]
-    fn test_coordination_config_rejects_removed_timing_keys() {
-        for key in [
-            "default_ttl_secs",
-            "lease_renewal_threshold_pct",
-            "stale_threshold_secs",
-        ] {
-            let err = toml::from_str::<JitConfig>(&format!("[coordination]\n{key} = 60\n"))
-                .unwrap_err()
-                .to_string();
-            assert!(
-                err.contains("unknown field") && err.contains(key),
-                "{key} must be rejected as unknown: {err}"
-            );
-        }
     }
 
     #[test]

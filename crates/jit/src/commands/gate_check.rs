@@ -1681,28 +1681,24 @@ enforce_leases = "off"
 [[rules]]
 name = "coverage-preview"
 when = { type = "breakdown" }
-scope = "graph"
 severity = "error"
 assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", container-from-label = "brackets" } }
 
 [[rules]]
 name = "unrelated-local-failure"
 when = { type = "task" }
-scope = "local"
 severity = "error"
 assert = { require-label = { label = "required:*", min = 1 } }
 
 [[rules]]
 name = "unrelated-graph-failure"
 when = { type = "epic" }
-scope = "graph"
 severity = "error"
 assert = { label-coverage = { marker = "[hard]", child-link = "any" } }
 
 [[rules]]
 name = "unrelated-label-reference"
 when = { type = "task" }
-scope = "graph"
 severity = "error"
 assert = { label-reference = { from = "satisfies", to = "req" } }
 "#;

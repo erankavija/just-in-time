@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3c83cf5e519846738c2c370ea0c1767b720b93d",
+  "completed_at": "2026-10-21T21:05:48.279928422Z",
+  "duration_ms": 260406,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged changes meet all hard criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "17e1b5f5-4a3e-488f-9cde-59942718c584",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:01:27.873079404Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:459bb995 commits 4590bd483, 629f3194a, c9df5b860, 3bfbfc1af, 4568aea4f, 0757a30d6, 7f3449a19\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-03 (issue 842b0ac6); @/invariant/single-source-prose, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T20:59:42Z); doc-review pending; docs-mechanical pending\nTruncation recovery: split 4590bd483 and 3bfbfc1af patches by source/docs groups; separately read current config, rendering, projection, and test paths\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged changes meet all hard criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

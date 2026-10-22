@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3c83cf5e519846738c2c370ea0c1767b720b93d",
+  "completed_at": "2026-10-21T21:10:07.906452931Z",
+  "duration_ms": 248066,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied; no findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a989754-d48c-409a-a796-dee1671f800a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4d22e207-dcbb-4da4-9bee-c9d845d3edab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:05:59.839827555Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 549c80df7, f059dee4e (equivalent selector-refactor patches)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 and @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T20:48:41Z); mcp-ci passed (exit 0, 2026-10-21T21:05:57Z); prior F1 is addressed by the newer MCP pass\nTruncation recovery: re-read bounded, per-commit zero-context patches for core, callers, tests, documentation, workflow, and MCP surfaces\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied; no findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

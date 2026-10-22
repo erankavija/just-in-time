@@ -30,6 +30,9 @@ set -uo pipefail
 #   ignored-test a merge holding out a test with #[ignore]       -> excluded-tests fails
 #   ignored-doctest a merge holding out an ```ignore``` doctest  -> excluded-tests fails
 #
+# The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
+# over synthetic step output and load samples, one assertion per exit path.
+#
 # The signature and stale-expect scenarios also assert that `cargo build
 # --workspace` SUCCEEDS on the same tree: that is the recorded reason a
 # build-only merge guard was vacuous, kept here as a regression so the
@@ -602,9 +605,65 @@ test_ignored_doctest_is_rejected() {
     grep -qF "ignored_doctest_is_named" "$out"
 }
 
+# --- the exit-status classifier ----------------------------------------------
+# A failure is an infrastructure fault (75) only when every failing step is a
+# test TIMEOUT with no FAIL, or a suite-duration-only budget violation, and the
+# host was loaded; everything else is a verdict (1). Synthetic nextest and
+# budget output stand in for the steps, so no suite runs.
+readonly LOADED_LOAD1=9.00 QUIET_LOAD1=0.50 FIXTURE_CPUS=4
+readonly TIMEOUT_LINE='        TIMEOUT [  60.001s] jit commands::slow::test_slow'
+readonly FAIL_LINE='        FAIL [   0.120s] jit commands::x::test_broken'
+readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
+readonly FOOTPRINT_VIOLATION='  - integration-test targets: observed 99, limit 10.'
+
+classify() { # classify <load1> <test-output> <budget-output> <failed-step...>
+  local load="$1" dir="$scratch/classify"
+  shift
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  printf '%s\n' "$1" >"$dir/test.out"
+  printf '%s\n' "$2" >"$dir/budget.out"
+  shift 2
+  "$gate" --classify "$dir" "$load" "$FIXTURE_CPUS" "$@" >"$dir/diagnosis" 2>&1
+  classify_rc=$?
+}
+
+expect_classification() { # expect_classification <message> <exit> <load1> <test> <budget> <steps...>
+  local msg="$1" want="$2"
+  shift 2
+  classify "$@"
+  check "$msg: exits $want" test "$classify_rc" -eq "$want"
+  grep -q 'failed on repository content' "$scratch/classify/diagnosis" ||
+    check "$msg: the diagnosis records the observed load" \
+      grep -q "load1=${1:-unknown}" "$scratch/classify/diagnosis"
+  [ "$want" -ne 75 ] ||
+    check "$msg: the diagnosis records the classifying threshold" \
+      grep -qF "threshold 5.00 (1.25 x ${FIXTURE_CPUS} CPUs)" "$scratch/classify/diagnosis"
+}
+
+test_classifier_exit_paths() {
+  echo
+  echo "== classifier: only a loaded-host timeout or duration overrun exits 75 =="
+  expect_classification "loaded timeout without FAIL" 75 "$LOADED_LOAD1" "$TIMEOUT_LINE" "" test
+  expect_classification "loaded duration-only overrun" 75 "$LOADED_LOAD1" "" "$DURATION_VIOLATION" budget
+  expect_classification "loaded timeout plus duration overrun" 75 "$LOADED_LOAD1" "$TIMEOUT_LINE" "$DURATION_VIOLATION" test budget
+  expect_classification "quiet duration-only overrun" 1 "$QUIET_LOAD1" "" "$DURATION_VIOLATION" budget
+  expect_classification "quiet timeout" 1 "$QUIET_LOAD1" "$TIMEOUT_LINE" "" test
+  expect_classification "loaded timeout with a failing test" 1 "$LOADED_LOAD1" "$TIMEOUT_LINE"$'\n'"$FAIL_LINE" "" test
+  expect_classification "loaded fmt failure" 1 "$LOADED_LOAD1" "" "" fmt
+  expect_classification "loaded clippy failure" 1 "$LOADED_LOAD1" "" "" clippy
+  expect_classification "loaded doctest failure" 1 "$LOADED_LOAD1" "" "" doctest
+  expect_classification "loaded footprint budget failure" 1 "$LOADED_LOAD1" "" "$FOOTPRINT_VIOLATION" budget
+  expect_classification "loaded duration overrun beside a footprint failure" 1 "$LOADED_LOAD1" "" "$DURATION_VIOLATION"$'\n'"$FOOTPRINT_VIOLATION" budget
+  expect_classification "loaded timeout beside a clippy failure" 1 "$LOADED_LOAD1" "$TIMEOUT_LINE" "" test clippy
+  expect_classification "loaded test step failing without any TIMEOUT result" 1 "$LOADED_LOAD1" "error: could not compile" "" test
+  expect_classification "unknown load" 1 "" "$TIMEOUT_LINE" "" test
+}
+
 echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
+test_classifier_exit_paths
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

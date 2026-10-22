@@ -449,41 +449,6 @@ unique = false
     }
 
     #[test]
-    fn test_namespace_constraint_keys_are_ignored() {
-        // Stale per-namespace constraint keys (values/pattern/required) in an old
-        // config.toml are IGNORED: the domain registry carries only taxonomy
-        // (description/unique). Validation is rule-driven.
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-required = true
-values = ["workstream", "defect", "request"]
-
-[namespaces.workstream-group]
-description = "Workstream group"
-unique = false
-pattern = '^v\d+\.\d+$'
-"#;
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(&jit_dir);
-        let namespaces = config_mgr.get_namespaces().unwrap();
-
-        let type_ns = namespaces.namespaces.get("type").unwrap();
-        assert_eq!(type_ns.description, "Issue type");
-        assert!(type_ns.unique);
-
-        let ms_ns = namespaces.namespaces.get("workstream-group").unwrap();
-        assert_eq!(ms_ns.description, "Workstream group");
-        assert!(!ms_ns.unique);
-    }
-
-    #[test]
     fn test_namespace_unique_property() {
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");

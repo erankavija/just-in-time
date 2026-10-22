@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8de0ef84d48d2e3a2b7c9556dde93a64c482b101",
+  "completed_at": "2026-10-21T21:22:58.897071272Z",
+  "duration_ms": 81272,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/plan.md",
+        "id": "F1",
+        "line": 73,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/no-ignored-tests",
+          "@/charter/D-2"
+        ],
+        "severity": "high",
+        "summary": "The plan requires no self-test to pass by printing SKIP, but its workflow and docs gate leaves only change gates.toml while both underlying self-tests retain successful SKIP branches."
+      }
+    ],
+    "summary": "The script-self-test gate contract leaves successful SKIP branches unowned.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7c885165-89de-45a0-a867-e621c96867d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d58ad9c4-7122-4c4b-88cc-cc5b474c2ea7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:21:37.625016487Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5807 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16057-51dd-74b2-91e8-dd827d35cc27\n--------\nuser\n--- 5794 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[blocking, issue-impact]** The plan-fixed `script-self-test-gates` contract requires that no test passes by printing a skip notice, but the only planned workflow/docs self-test leaves touch `.jit/gates.toml` ([breakdown.json:4013](dev/active/c780514e-test-topology/breakdown.json:4013), [breakdown.json:4101](dev/active/c780514e-test-topology/breakdown.json:4101)). `workflow-contract-selftest.sh` exits successfully after `SKIP` when actionlint cannot run ([workflow-contract-selftest.sh:124](scripts/workflow-contract-selftest.sh:124)), and `docs-check-selftest.sh` does likewise for unreadable-path assertions ([docs-check-selftest.sh:197](scripts/docs-check-selftest.sh:197)). This leaves the plan’s stated contract unmet ([plan.md:73](dev/active/c780514e-test-topology/plan.md:73)) and permits a tool-unavailable test path to escape the gate. Extend the workflow leaf to make an actionlint environment error fail, and either make the docs assertions deterministic or explicitly revise the plan-fixed contract with a justified environmental exception; include the affected scripts in the leaves’ footprints and criteria.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The script-self-test gate contract leaves successful SKIP branches unowned.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan requires no self-test to pass by printing SKIP, but its workflow and docs gate leaves only change gates.toml while both underlying self-tests retain successful SKIP branches.\",\"file\":\"dev/active/c780514e-test-topology/plan.md\",\"line\":73,\"references\":[\"@/inv/no-ignored-tests\",\"@/charter/D-2\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

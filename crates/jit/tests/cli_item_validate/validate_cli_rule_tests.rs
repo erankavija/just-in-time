@@ -455,19 +455,18 @@ const COVERAGE_GRAPH_RULE: &str = r#"
 name = "epic-criteria-covered"
 when = { type = "epic" }
 severity = "error"
-scope = "graph"
 assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
 "#;
 
-/// A MALFORMED `label-reference` GRAPH rule: the required `to` key is missing, so
-/// the rule cannot be applied and must surface as a config-error finding.
+/// A MALFORMED `label-coverage` GRAPH rule: its `child-link` names no link
+/// direction, so the rule cannot be applied and must surface as a config-error
+/// finding.
 const MALFORMED_GRAPH_RULE: &str = r#"
 [[rules]]
 name = "broken-graph-rule"
 when = { type = "epic" }
 severity = "error"
-scope = "graph"
-assert = { label-reference = { from = "satisfies" } }
+assert = { label-coverage = { child-link = "bogus" } }
 "#;
 
 const DISABLED_GRAPH_RULE: &str = r#"
@@ -475,7 +474,6 @@ const DISABLED_GRAPH_RULE: &str = r#"
 name = "disabled-graph-rule"
 when = { type = "epic" }
 severity = "off"
-scope = "graph"
 assert = { label-coverage = { marker = "[hard]" } }
 "#;
 
@@ -484,7 +482,6 @@ const SELECTED_COVERAGE_GRAPH_RULE: &str = r#"
 name = "selected-epic-criteria-covered"
 when = { type = "epic" }
 severity = "error"
-scope = "graph"
 assert = { label-coverage = { child-link = "dependencies", marker = "[hard]" } }
 "#;
 
@@ -493,7 +490,6 @@ const SELECTED_BREAKDOWN_COVERAGE_RULE: &str = r#"
 name = "selected-breakdown-criteria-covered"
 when = { type = "breakdown" }
 severity = "error"
-scope = "graph"
 assert = { label-coverage = { child-link = "dependencies", marker = "[hard]", container-from-label = "brackets" } }
 "#;
 

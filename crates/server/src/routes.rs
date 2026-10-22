@@ -1537,9 +1537,9 @@ mod tests {
     async fn test_get_namespaces_exposes_taxonomy_only() {
         use jit::storage::JsonFileStorage;
 
-        // A file-backed storage with a config.toml carrying both the taxonomy
-        // keys and (stale, ignored) constraint keys, so the response contract
-        // (mirror of CLI config show --json) stays protected against drift.
+        // A file-backed storage with a config.toml carrying the taxonomy keys,
+        // so the response contract (mirror of CLI config show --json) stays
+        // protected against drift.
         let temp = tempfile::tempdir().unwrap();
         let jit_dir = temp.path().join(".jit");
         initialize_file_backed_test_repository(temp.path());
@@ -1549,13 +1549,10 @@ mod tests {
 [namespaces.type]
 description = "Issue type"
 unique = true
-required = true
-values = ["task", "bug"]
 
 [namespaces.milestone]
 description = "Release"
 unique = false
-pattern = '^v\d+\.\d+$'
 "#,
         )
         .unwrap();
@@ -1574,8 +1571,7 @@ pattern = '^v\d+\.\d+$'
         response.assert_status_ok();
         let data: NamespacesResponse = response.json();
 
-        // Only the taxonomy (description/unique) is surfaced; the stale
-        // constraint keys are ignored.
+        // Only the taxonomy (description/unique) is surfaced.
         let type_ns = data.namespaces.get("type").expect("type namespace");
         assert_eq!(type_ns.description, "Issue type");
         assert!(type_ns.unique);
