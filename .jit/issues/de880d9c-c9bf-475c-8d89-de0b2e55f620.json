@@ -8,6 +8,7 @@
   ],
   "description": "Move the archive, claim, dependency, document and gate command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `claim.rs`, `dependency.rs`, `gate.rs`, `archive.rs`, `document.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-22T19:57:15.371480023Z",
   "first_ready_at": "2026-10-22T15:28:24.328600794Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T19:54:52.832059019Z"
+  "updated_at": "2026-10-22T19:57:15.371480023Z"
 }
