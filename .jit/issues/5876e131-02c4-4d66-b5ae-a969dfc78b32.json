@@ -7,6 +7,7 @@
   ],
   "description": "Retire the item-kind tables in the shared harness and test taxonomy in favour of the package derivation.\n\n## Background\n\n`TestHarness::with_item_kinds` (`crates/jit/src/test_harness.rs`) hand-copies the shipped kinds as `CANONICAL_ITEM_KINDS`, with the `D-[0-9]+` pattern, and `SUITE_TABLES` in `crates/jit/src/test_taxonomy.rs` restates them again. Shared test support derives the shipped kinds from `profiles/jit-default/manifest.toml`. `dev/TESTING.md` documents `with_item_kinds` as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `TestHarness::with_item_kinds` and `test_taxonomy` take shipped kinds from the derivation, and neither holds an item-kind literal.\n- [hard] REQ-02: Harness tests that use item kinds assert what they asserted before.\n- [hard] REQ-03: `dev/TESTING.md` describes the derivation where it describes `with_item_kinds`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T16:07:08.984754918Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Harness and test taxonomy take shipped item kinds from the derivation",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T16:07:08.984754918Z"
 }
