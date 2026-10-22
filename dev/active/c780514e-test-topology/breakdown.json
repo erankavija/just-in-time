@@ -1429,12 +1429,14 @@
       "terminal": {
         "consumer_family": "inline list outputs",
         "test_boundary": "generated CLI schema",
-        "worker_sized_reason": "Six outputs adopt one existing generic type, plus one registration key fix.",
+        "worker_sized_reason": "Six outputs adopt the existing generic envelope; two canonical item types gain JsonSchema derives only, and graph rdeps gains its correct registration key.",
         "footprint": {
           "touches": [
             "crates/jit/src/main.rs",
             "crates/jit/src/schema.rs",
-            "crates/jit/src/output.rs"
+            "crates/jit/src/output.rs",
+            "crates/jit/src/gate_presets.rs",
+            "crates/jit/src/storage/claim_coordinator.rs"
           ]
         }
       }

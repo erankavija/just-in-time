@@ -148,7 +148,7 @@
           "key": "inline-list-output-types",
           "title": "Inline list bodies in main.rs become typed list envelopes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "9bb30f15-a995-4b63-924a-13c27e9fa61c",
@@ -1259,6 +1259,12 @@
       "issue": "0bf97911",
       "category": "gate consistency: foundation-only task failed code-review F1 'no consumers' while adoption is owned by dependent sibling tasks",
       "status": "resolved: steward (A) scope note appended to foundation-only tasks (f9894e1d6)"
+    },
+    {
+      "issue": "df505379",
+      "category": "minimal canonical schema derive footprint expansion",
+      "status": "approved by coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b",
+      "decision": "Add gate_presets.rs and storage/claim_coordinator.rs for JsonSchema derives/imports only on PresetInfo and Lease. No duplicate adapters or runtime/serde changes; criteria/gates unchanged. Assess/report before unsupported field, dependency, feature, or schema semantic expansion."
     }
   ],
   "rework_counts": {
