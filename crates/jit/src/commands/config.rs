@@ -473,7 +473,7 @@ mod tests {
             );
         }
 
-        // Defaulted merged-config leaf still resolves without any config.toml.
+        // A defaulted coordination leaf still resolves without any config.toml.
         let cap = executor
             .get_config("coordination.max_indefinite_leases_per_agent")
             .unwrap();
