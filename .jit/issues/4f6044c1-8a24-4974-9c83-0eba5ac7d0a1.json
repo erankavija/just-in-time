@@ -14,7 +14,26 @@
     "code-review",
     "docs-check-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a51c5862-ff95-4819-8331-3afb230870fd",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:37:35.635312281Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "95fe7b6b-8a7a-4fed-babe-8a113eca9d23",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:41:51.024320518Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-check-selftest": {
+      "run_id": "a9a526d0-a8a8-4df5-a1a2-caa7014fe2d8",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:37:56.280359553Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
   "labels": [
     "type:task",
@@ -31,5 +50,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Documentation checker self-test runs as a declared gate",
-  "updated_at": "2026-10-22T21:07:06.771846593Z"
+  "updated_at": "2026-10-22T21:41:51.024320518Z"
 }
