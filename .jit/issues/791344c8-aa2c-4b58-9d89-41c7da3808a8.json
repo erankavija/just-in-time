@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "510daa14-ed80-4633-9332-798d19c2150d",
+    "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
+    "c5c933f2-01da-4cb8-9711-4f1dd7b4e410"
+  ],
+  "description": "Remove the per-command checks of `count` against collection length from the `cli_repo_workflow` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_repo_workflow/artifact_conformance_cli_tests.rs (about :640)`, `cli_repo_workflow/profile_cli_tests.rs:1695 (assert_count_envelope)`, `cli_repo_workflow/worktree_cli_tests.rs:546,1036`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "791344c8-aa2c-4b58-9d89-41c7da3808a8",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:testing",
+    "component:cli",
+    "satisfies:c780514e/REQ-04",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "cli_repo_workflow tests stop re-asserting the list-envelope count",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

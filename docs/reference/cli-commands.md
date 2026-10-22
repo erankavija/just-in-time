@@ -3732,10 +3732,8 @@ jit config get worktree.enforce_leases
 jit config get coordination.max_indefinite_leases_per_agent
 ```
 
-**Two resolution strategies**, matching how the rest of jit already reads
-these sections — `config get` does not invent a third:
-Both read the repository `config.toml` only; user and system configuration
-supply no value.
+**Two resolution strategies**, both over the repository `config.toml` only and
+matching how the rest of jit already reads these sections:
 - `worktree`, `coordination`: the repository values, filled with built-in
   defaults.
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
@@ -3780,23 +3778,21 @@ jit config show [--json]
 
 ### `jit config set`
 
-Set a `section.field` key in the repository (or, with `--global`, the
-user-global) `config.toml`. The user-global file is currently read by no
-configuration lookup, so `--global` changes no effective value. A repository-level set that changes the namespace
+Set a `section.field` key in the repository `config.toml`. A set that changes the namespace
 registry also synchronizes the default `namespace-unique-*` rows in
 `rules.toml` (same write-through as re-init; custom rules and policy edits are
 untouched).
 
 ```bash
-jit config set <KEY> <VALUE> [--global] [--json]
+jit config set <KEY> <VALUE> [--json]
 
 jit config set coordination.max_indefinite_leases_per_agent 3
 ```
 
 ### `jit config validate`
 
-Validate the repo, user, and environment-variable configuration for syntax
-errors and invalid values (both surface when a config source fails to load).
+Validate the repository configuration and environment-variable overrides for
+syntax errors and invalid values.
 
 ```bash
 jit config validate [--json]

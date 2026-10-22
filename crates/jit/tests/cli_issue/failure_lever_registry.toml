@@ -371,9 +371,9 @@ confirmation = "invoked"
 path = "gate fail"
 argv = ["gate", "fail", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
-expected_failure = "GATE_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_code = "GATE_ERROR"
-expected_exit = 6
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]

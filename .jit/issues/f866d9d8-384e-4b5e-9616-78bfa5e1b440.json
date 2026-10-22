@@ -9,6 +9,7 @@
   ],
   "description": "Profile composition decides each target from the packages being applied alone: three-way publication, base fingerprints, record claims in composition, conflict remedies and the diverged conflict class are removed.\n\n## Background\n\nCharter decision D-8 rejects three-way publication and conflict remedies. Today composition compares a candidate package with the applied record and the repository:\n\n- The three-way decision lives in `crates/jit/src/profile/three_way.rs`.\n- Base fingerprints are at `crates/jit/src/repository_state/profile_apply.rs:1069-1365`.\n- Record-ownership composition is at `profile_apply.rs:2197-2256,2466-2760`, with `claimed_target_state` at 2760-2877 and `contribution_disposition` at 2401-2459. Its holding branch makes an upgrade refuse with one package named twice.\n- Remedies are `ProfileRemedy`/`ProfileResolution` (733-806) and `remedy_suggestions` (993), with the diverged class beside them.\n- Asset retention and departure are at 1990-2196.\n- Repair claims are built in `crates/jit/src/profile/apply_claims.rs`, and owner, retain and remove vocabulary sits in `crates/jit/src/profile/difference.rs`.\n\nThe conflict error-code description links a remedy contract (`crates/jit/src/output.rs:966-970`); the generated error-code reference (`docs/reference/error-codes.md`) is rendered from it. Error suggestions name deleted commands and records (`crates/jit/src/main.rs:1263,1280-1283`). The diff command's help names recorded claims (`crates/jit/src/cli.rs:3016-3041`). Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: The three-way decision module, base fingerprints and record-claim composition are gone, and composition reads no applied-profile record.\n- [hard] REQ-02: A profile conflict arises only between packages being applied that define one key differently; the repository's current value is never a conflict party.\n- [hard] REQ-03: No conflict carries a remedy, and the diverged class is gone from conflict output and its schema.\n- [hard] REQ-04: Error suggestions, help text and the conflict error-code description name no removed command, record or remedy, and the generated error-code reference is regenerated from that description.\n- [hard] REQ-05: Composition unit tests cover the surviving conflict rule, and tests of three-way and remedy behaviour are deleted.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:27:04.913531351Z",
   "first_ready_at": "2026-10-21T21:12:30.128463009Z",
   "gates_required": [
     "cargo-ci",
@@ -16,15 +17,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e338a7ca-3e4b-49ba-b824-956fd0be1b98",
+      "run_id": "d0678fc4-628e-4b80-85d1-0f8a5f05eeaa",
       "status": "passed",
-      "updated_at": "2026-10-22T01:58:35.864494773Z",
+      "updated_at": "2026-10-22T14:22:26.003618224Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "cd685897-2451-4463-9739-54c304b4f917",
-      "status": "failed",
-      "updated_at": "2026-10-22T02:03:52.692529383Z",
+      "run_id": "146b56b3-09bb-47ad-8bbb-565032b476f7",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:26:42.859803166Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove three-way profile publication",
-  "updated_at": "2026-10-22T02:03:52.692529383Z"
+  "updated_at": "2026-10-22T14:27:04.913531351Z"
 }

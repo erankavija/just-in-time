@@ -1,0 +1,35 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "2916a306-1b7a-4d23-8976-0a1a5d42006b",
+    "55cd1ae4-9957-4724-af8d-1219dfbe477b",
+    "966d0627-e3d4-40e6-b887-14cd1b6e8cd5",
+    "9a313a88-c229-4b59-8682-8e665aa957a6",
+    "e5166159-fecd-4bab-a3fd-c1c4c80aa0af"
+  ],
+  "description": "Delete the subprocess suites that re-prove command exit codes and parity now owned by the projection suite.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` re-prove bindings the exit-code projection suite owns, including the dependency-cycle exit code (`:69`). Their unique cases already have owners elsewhere. `crates/jit/tests/cli_issue/main.rs` declares both modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` no longer exist, and `cli_issue/main.rs` declares neither.\n- [hard] REQ-02: Every command-to-exit-code binding and human/machine parity case is proven by the projection suite.\n- [hard] REQ-03: No live document or source comment cites either file.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "89f517a5-73b0-4fb2-b212-262055f27970",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:testing",
+    "component:cli",
+    "satisfies:c780514e/REQ-01",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Exit-code re-proof suites are deleted",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

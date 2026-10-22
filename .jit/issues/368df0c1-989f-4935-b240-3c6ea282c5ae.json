@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-10-22T14:28:15.745833131Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Move the composition of the `query available` filters and its priority order into the domain, so the property has a pure owner before its subprocess re-proofs are cut.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns the pure query filters, tested there (21 unit tests) and in `crates/jit/tests/fast_issue/domain_queries_tests.rs` (10). `query available` composes its filters and priority order in the commands layer (`crates/jit/src/commands/query.rs:122-148`), and `crates/jit/src/commands/issue.rs:800` repeats the sort. The composed property has no domain owner and is proven only by subprocess tests in `crates/jit/tests/cli_query_graph/query_tests.rs`. Domain code is pure and I/O-free.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function in `domain/queries.rs` takes issues and the available-work filter and returns the available issues in priority order. `query available` and the claim path both call it, and neither sorts on its own.\n- [hard] REQ-02: Unit tests and a property-based test in `domain/queries.rs` own filter composition and ordering, including ties and each filter combination the command accepts.\n- [hard] REQ-03: `query available` output is unchanged.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:query-graph-ownership",
+    "component:core",
+    "component:testing",
+    "satisfies:c780514e/REQ-02",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/architecture-dependency-direction",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Available-work filtering and priority order become a pure domain query",
+  "updated_at": "2026-10-22T14:44:29.538526421Z"
+}

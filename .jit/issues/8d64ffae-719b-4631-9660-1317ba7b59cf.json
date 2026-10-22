@@ -1,0 +1,45 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "134ee921-9f52-4ec5-80f0-28791fd0e59d",
+    "1afbea78-e57b-4b89-8e18-237f9fa70d23",
+    "3f01cb72-5726-43bd-bb1f-136a640bc0aa",
+    "69341a9d-a518-4ed6-972e-070760d085ab",
+    "6a13eeac-f6e6-4da3-93b5-6432f06b3f6f",
+    "791344c8-aa2c-4b58-9d89-41c7da3808a8",
+    "7a69fc74-99ac-48bb-aa96-2ae31e5028e6",
+    "8939b7a7-e5e6-48a4-a650-22611d2c7be2",
+    "89f517a5-73b0-4fb2-b212-262055f27970",
+    "8f87e366-0470-42de-a24a-9262b637bd13",
+    "b51a5c2d-2aaa-4c82-9a70-12720d03a978",
+    "d3549d1d-1ebc-432d-9a2f-66223e1aaee0",
+    "e1410936-de60-4752-95e9-cf6790b80972",
+    "fc5ef0ef-da15-445b-ad19-439fb9b98060"
+  ],
+  "description": "Aggregate the work that delivers this outcome: command exit codes and the list-envelope count each have one owning test.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite, which fails for a projected row without a binding case. Other subprocess tests assert only what they add.\n- [hard] REQ-02: The list-envelope `count` property is proven by one test that covers each list-emitting command, and no per-command test re-asserts it.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "8d64ffae-719b-4631-9660-1317ba7b59cf",
+  "labels": [
+    "type:story",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:testing",
+    "component:cli",
+    "satisfies:c780514e/REQ-01",
+    "satisfies:c780514e/REQ-04",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Exit codes and list envelopes each have one owning test",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

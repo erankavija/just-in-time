@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "2b49f95b-c99f-4182-bb55-252efa30eea9"
+  ],
+  "description": "Retire the private git setup in library unit-test modules in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. Eight library test modules hand-roll `git init`: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs` and `commands/archive.rs`.\n\nThis entry covers `gate_execution.rs`, `json.rs`, `repository_state_store_tests.rs`, `repository_package.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/storage/repository_state_store_tests.rs`: `capture_git_fixture` (`:2587`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No library test module defines a git initialisation helper or spawns `git init` itself; each uses the shared function.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "64f04da6-c24f-49b8-891d-e8c4245cfe03",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Storage and gate-execution tests initialise git through the shared helper",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

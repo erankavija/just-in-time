@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-10-22T14:28:20.117519722Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Prove the drain entitlement at the shutdown-sequence layer with a short deadline, so no server test waits out the real five-second drain.\n\n## Background\n\n`crates/server/tests/server_integration/graceful_shutdown_tests.rs:538` (`test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero`) spawns `jit-server`, stalls a connection and waits the full `GRACEFUL_DRAIN_TIMEOUT` (5 s, `crates/server/src/shutdown.rs:33`) before asserting the force-close. It took 5.32 s and is the last test to finish in the suite run.\n\n`run_shutdown_sequence` (`shutdown.rs:152`) takes its drain deadline as a parameter and logs `drained_for_ms`. Its unit tests already pass a 300 ms deadline (`test_run_shutdown_sequence_force_closes_connections_that_outlive_the_deadline`, `:402`). A `test-support` build reads the serving process's deadline from `JIT_SERVER_DRAIN_DEADLINE_MS` (`configured_drain_deadline`). `test_the_drain_assertion_rejects_a_server_that_force_closes_early` (`:626`) uses that seam to show the drain assertion fails against a server that force-closes early.\n\n## Success Criteria\n\n- [hard] REQ-01: A unit test of `run_shutdown_sequence` with a short deadline owns the entitlement: a stalled connection keeps running for at least the deadline before it is force-closed.\n- [hard] REQ-02: The serving process enforces `GRACEFUL_DRAIN_TIMEOUT` when no test deadline is configured, proven without waiting for it.\n- [hard] REQ-03: The process-level test proves the wiring with a short configured deadline: a stalled connection is force-closed, the process exits zero, and the log records completion. The drain assertion is still shown to fail against a server that force-closes early.\n- [hard] REQ-04: No test in the server crate exceeds 5 s on a warm target at load ≤ 10.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "component:server",
+    "satisfies:c780514e/REQ-13",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Server shutdown force-close test stays under the per-test bound",
+  "updated_at": "2026-10-22T14:44:29.952643499Z"
+}

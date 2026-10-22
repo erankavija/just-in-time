@@ -261,7 +261,7 @@
           "short_id": "c780514e",
           "title": "Give each test property one owning test on shared fixtures and contracts",
           "wave": 4,
-          "status": "planning"
+          "status": "executing"
         },
         {
           "id": "0f8efc37-8054-420d-9409-dde888ea0040",
@@ -582,7 +582,9 @@
     "2026-10-22 ~00:30-04:30: sixth shared usage-limit stall, with all sessions idle; everyone was resumed at 04:31. Pattern: about 3-4 h of five-lead concurrency exhausts the quota, then a 3-4 h stall follows. Throughput is bounded by the quota, not by session count.",
     "2026-10-22 ~05:30: main went red after 842b0ac6's fbb661f2 (config set exit-code contract) and was fixed forward at 12f6a06aa within the 45-min cap (user args give INVALID_ARGUMENT; a corrupt file gives PARSE_ERROR). df129d9e's d8176fd3 (global --json) is done with all gates passed; wave 3 has started (27f0a575 in flight; handoff-6).",
     "2026-10-22 ~05:30-09:30: seventh shared usage-limit stall; work was resumed at 09:31. just-in-time-59 showed a 'waiting' state (possibly a permission prompt in its terminal that needs the user); it was asked to record any such block.",
-    "2026-10-22 ~10:30-17:00: the WEEKLY usage limit was hit (resets 17:00 Helsinki); work was resumed at 17:01. just-in-time-59 has shown 'waiting' since ~09:30 (7.5 h). It is probably blocked on a permission prompt in its own terminal, which needs the user. Its b697a3f7 planning WIP was checkpointed by the steward (0c4ec0ae6)."
+    "2026-10-22 ~10:30-17:00: the WEEKLY usage limit was hit (resets 17:00 Helsinki); work was resumed at 17:01. just-in-time-59 has shown 'waiting' since ~09:30 (7.5 h). It is probably blocked on a permission prompt in its own terminal, which needs the user. Its b697a3f7 planning WIP was checkpointed by the steward (0c4ec0ae6).",
+    "2026-10-22 ~17:45: c780514e plan-review passed on attempt 5; breakdown of 151 issues instantiated; B gates running. just-in-time-05 will execute it (same-session deviation, contained as for 842b0ac6), fixture-timeout fix and waves 1-2 first, preferring sonnet and haiku workers for weekly-quota pacing.",
+    "2026-10-22 ~18:00: c780514e planning complete (B 3d7d8ab2 done; both gates passed). Execution started under just-in-time-05; wave 1a is the fixture-lock timeout fix (a3dd995a) and rule-warning tests down a layer (9a07026e)."
   ],
   "started_at": "2026-07-03",
   "user_actions": [

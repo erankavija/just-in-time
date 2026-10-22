@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
+    "e7764cb1-1077-4b2d-b30e-ba63750d82f6"
+  ],
+  "description": "Stop the error-output and export tests in `crates/jit/tests/cli_issue` reading ids or values from human-readable output.\n\n## Background\n\nShared test support provides one CLI process fixture, which reads the ids of issues it creates from `--json` output. These files still parse human-readable output with `split_whitespace`, mostly to scrape created ids. This entry covers `error_json_tests.rs`, `snapshot_export_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files reads an id or other value from human-readable output; ids and values come from `--json` output.\n- [hard] REQ-02: Each edited test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "c211f14c-7cf9-4015-b1d4-78d8e8ad3bb2",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts",
+    "enforces:@/invariant/semantic-test-assertions"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "error-output and export tests read created ids from JSON output",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

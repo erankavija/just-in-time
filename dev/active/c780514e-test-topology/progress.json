@@ -1,0 +1,1235 @@
+{
+  "epic_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "epic_short_id": "c780514e",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "a3dd995a-26d2-4039-8a69-332eca663885",
+          "short_id": "a3dd995a",
+          "key": "profiled-fixture-build-lock",
+          "title": "Profiled-repository fixture lock waits are bounded",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
+          "short_id": "2b49f95b",
+          "key": "cli-process-fixture",
+          "title": "Shared fixture for spawning jit in CLI tests",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
+          "short_id": "871df4b0",
+          "key": "doctest-substep-bound",
+          "title": "Doctest substep fits within the per-test bound",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9a07026e-0666-4c3e-9868-5f083b293988",
+          "short_id": "9a07026e",
+          "key": "rule-warning-tests-down-a-layer",
+          "title": "Create-time rule warnings proven in-process without a profiled repository",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
+          "short_id": "a618b8cc",
+          "key": "server-shutdown-test-bound",
+          "title": "Server shutdown force-close test stays under the per-test bound",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d35c610b-f752-4fe3-89a9-7eca1b3d52b3",
+          "short_id": "d35c610b",
+          "key": "shared-fixture-issue",
+          "title": "Shared issue-construction fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "0973ed93-e516-41fd-8f55-9eef33ab2fa8",
+          "short_id": "0973ed93",
+          "key": "shared-taxonomy-repo",
+          "title": "Shared taxonomy repository type for CLI tests",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "0bf97911-8302-47bb-95c0-585d897ad63f",
+          "short_id": "0bf97911",
+          "key": "shipped-item-kinds-derivation",
+          "title": "Shared test support derives shipped item kinds from the default package",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
+          "short_id": "a84d275f",
+          "key": "store-generic-initialisation",
+          "title": "Product initialisation runs over any repository-state store",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
+          "short_id": "5b42e3ff",
+          "key": "build-budget-selftest-gate",
+          "title": "Build-budget checker self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
+          "short_id": "aa28fe5f",
+          "key": "cargo-ci-selftest-gate",
+          "title": "cargo-ci self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "559335cf-35ca-4046-ae3d-aab3f2f54498",
+          "short_id": "559335cf",
+          "key": "dependency-policy-tool-failure",
+          "title": "Dependency-feature policy tests fail when cargo is missing",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
+          "short_id": "4f6044c1",
+          "key": "docs-check-selftest-gate",
+          "title": "Documentation checker self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
+          "short_id": "4a82ed46",
+          "key": "file-backed-setup-constructors",
+          "title": "Shared constructors for file-backed in-process test repositories",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
+          "short_id": "5d7020b9",
+          "key": "finalization-owner-gaps",
+          "title": "Repository-state tests own each finalization case",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
+          "short_id": "df505379",
+          "key": "inline-list-output-types",
+          "title": "Inline list bodies in main.rs become typed list envelopes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9bb30f15-a995-4b63-924a-13c27e9fa61c",
+          "short_id": "9bb30f15",
+          "key": "lock-tests-deterministic-precondition",
+          "title": "Read-only lock tests establish their precondition on any host",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
+          "short_id": "2c453337",
+          "key": "manifest-tool-test-gate",
+          "title": "Breakdown-manifest tool test suite runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7a412cb0-1969-4c46-b106-703bcdb502fe",
+          "short_id": "7a412cb0",
+          "key": "profile-suite-selftest-gate",
+          "title": "Suite-profiler self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
+          "short_id": "368df0c1",
+          "key": "query-available-domain-order",
+          "title": "Available-work filtering and priority order become a pure domain query",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
+          "short_id": "fa9bf296",
+          "key": "session-cost-benchmark-selftest-gate",
+          "title": "Session-cost benchmark self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+          "short_id": "89406e14",
+          "key": "shipped-policy-regions-selftest-gate",
+          "title": "Shipped-policy region generator self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7495521e-8338-4ef8-82b9-cb4ddf182739",
+          "short_id": "7495521e",
+          "key": "standards-fix-test-gate",
+          "title": "Standards-fix test suite runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
+          "short_id": "0951556f",
+          "key": "standards-scan-test-gate",
+          "title": "Standards-scan test suite runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c11bcdaa-03d2-4b89-8143-26abd58d4632",
+          "short_id": "c11bcdaa",
+          "key": "workflow-contract-selftest-gate",
+          "title": "Workflow-contract harness self-test runs as a declared gate",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "c9442f7f-cf02-4150-a6c6-69483391d90b",
+          "short_id": "c9442f7f",
+          "key": "cli-apply-template-spawn-migration",
+          "title": "apply, preset and template tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e230e621-1d27-46e2-90bc-cefc2ad50730",
+          "short_id": "e230e621",
+          "key": "cli-config-spawn-migration",
+          "title": "configuration and CLI-surface tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
+          "short_id": "eaf543c7",
+          "key": "cli-gate-definition-spawn-migration",
+          "title": "gate definition tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
+          "short_id": "870e8e46",
+          "key": "cli-gate-evaluate-spawn-migration",
+          "title": "gate evaluation tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5353463c-6517-43ba-b104-b42cf951b4ce",
+          "short_id": "5353463c",
+          "key": "cli-gate-status-spawn-migration",
+          "title": "gate status and key tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8e69776c-443e-4842-b818-c6af28fc73c9",
+          "short_id": "8e69776c",
+          "key": "cli-init-discovery-spawn-migration",
+          "title": "init and discovery tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "fec9b43b-ed6c-4d40-aa6c-b9cf5688501f",
+          "short_id": "fec9b43b",
+          "key": "cli-issue-create-spawn-migration",
+          "title": "issue create and batch tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
+          "short_id": "b5faab2f",
+          "key": "cli-issue-error-output-spawn-migration",
+          "title": "error-output tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9c3b9da2-bb21-4d02-aead-6d970c71d821",
+          "short_id": "9c3b9da2",
+          "key": "cli-issue-failure-corpus-spawn-migration",
+          "title": "failure-envelope contract tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
+          "short_id": "e7764cb1",
+          "key": "cli-issue-output-mode-spawn-migration",
+          "title": "output-mode and export tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7bf48536-02ba-4fc5-99df-c242ef272368",
+          "short_id": "7bf48536",
+          "key": "cli-issue-show-spawn-migration",
+          "title": "issue show and status tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5f4daf6b-0f7f-4900-aa7f-689f9b6709c4",
+          "short_id": "5f4daf6b",
+          "key": "cli-issue-update-spawn-migration",
+          "title": "issue search and update tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "bac4423b-ee4a-4747-90e9-6808ae929ecf",
+          "short_id": "bac4423b",
+          "key": "cli-item-kind-spawn-migration",
+          "title": "item-kind tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "37218dff-534d-40e5-b70d-f7c9fa60bea3",
+          "short_id": "37218dff",
+          "key": "cli-profile-spawn-migration",
+          "title": "profile tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "33be0c83-6a02-411f-9565-d73ee99fedd1",
+          "short_id": "33be0c83",
+          "key": "cli-query-graph-fixture-issue-adoption",
+          "title": "cli_query_graph uses the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b93687b3-9393-4231-84f6-95ba9a607483",
+          "short_id": "b93687b3",
+          "key": "cli-registry-render-spawn-migration",
+          "title": "registry and render tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "07a1728d-4ade-4fad-9d21-d2aebbe3c8a8",
+          "short_id": "07a1728d",
+          "key": "cli-serve-artifact-spawn-migration",
+          "title": "serve and artifact tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "717f9c2f-b151-4803-b8bf-dc86df694fbc",
+          "short_id": "717f9c2f",
+          "key": "cli-validate-spawn-migration",
+          "title": "validate tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "173d98d5-8eb6-4f4d-adc4-63d5495fd3b7",
+          "short_id": "173d98d5",
+          "key": "cli-workflow-integration-spawn-migration",
+          "title": "workflow and integration tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d9598a97-61bc-4cf1-8b58-0792afc0c1f8",
+          "short_id": "d9598a97",
+          "key": "fast-docs-templates-fixture-issue-adoption",
+          "title": "fast_docs_templates uses the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2f95b4f6-9e73-4ad3-bed0-79e63b14101a",
+          "short_id": "2f95b4f6",
+          "key": "fast-issue-fixture-issue-adoption",
+          "title": "fast_issue uses the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b90b1660-6ea6-48b3-9866-df8709838ebb",
+          "short_id": "b90b1660",
+          "key": "fast-rules-fixture-issue-adoption",
+          "title": "fast_rules uses the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "de880d9c-c9bf-475c-8d89-de0b2e55f620",
+          "short_id": "de880d9c",
+          "key": "fixture-issue-commands-a-adoption",
+          "title": "Archive, claim, dependency, document and gate command unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
+          "short_id": "74b2a0d3",
+          "key": "fixture-issue-commands-b-adoption",
+          "title": "Gate-check, issue, item, executor and snapshot command unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9964af3f-46ff-455a-b9b6-ce55d778aff4",
+          "short_id": "9964af3f",
+          "key": "fixture-issue-commands-c-adoption",
+          "title": "Template, validate and worktree command unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "58dbb1a0-3eb1-4d34-8ebc-44eb080348b3",
+          "short_id": "58dbb1a0",
+          "key": "fixture-issue-domain-artifact-adoption",
+          "title": "Domain artifact and projection unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "19136324-fa38-46da-8492-59d6486b9134",
+          "short_id": "19136324",
+          "key": "fixture-issue-domain-query-adoption",
+          "title": "Domain query, item and output unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7995aa5c-7d47-43f0-91c4-5924c1ae67a8",
+          "short_id": "7995aa5c",
+          "key": "fixture-issue-graph-validation-adoption",
+          "title": "Graph, validation and declaration unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b612cde1-ee3f-48b3-a47d-90dffcb601d9",
+          "short_id": "b612cde1",
+          "key": "fixture-issue-storage-state-adoption",
+          "title": "Storage and repository-state unit tests use the shared issue fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5876e131-02c4-4d66-b5ae-a969dfc78b32",
+          "short_id": "5876e131",
+          "key": "harness-shipped-item-kinds",
+          "title": "Harness and test taxonomy take shipped item kinds from the derivation",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "07f4b1d4-7dde-47ae-929c-c0d892741b27",
+          "short_id": "07f4b1d4",
+          "key": "profiled-fixture-input-key",
+          "title": "Profiled-repository fixture keyed only on its inputs",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "22355a56-9730-4409-b9a8-5a2381c35cf7",
+          "short_id": "22355a56",
+          "key": "shared-memory-executor",
+          "title": "Memory executor initialised through product initialisation",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
+          "short_id": "529f621d",
+          "key": "auto-transition-domain-decision",
+          "title": "Auto-transition readiness is decided by a pure domain function",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "53f78490-ca3e-4bb4-aa18-503d2e04df97",
+          "short_id": "53f78490",
+          "key": "command-list-output-types",
+          "title": "Command-layer list results become typed list envelopes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f4deb00a-22ae-4505-9bc3-27ed5d816604",
+          "short_id": "f4deb00a",
+          "key": "fast-docs-templates-file-setup-adoption",
+          "title": "fast_docs_templates file-backed tests use the shared constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
+          "short_id": "8b6285a6",
+          "key": "fast-docs-templates-git-fixture-adoption",
+          "title": "Git revision tests initialise git through the shared helper",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7801f623-3865-4ee2-8891-16652e443faf",
+          "short_id": "7801f623",
+          "key": "fast-rules-file-setup-adoption",
+          "title": "fast_rules file-backed tests use the shared constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b511222f-b441-4f91-8533-9b8baeb4936c",
+          "short_id": "b511222f",
+          "key": "library-command-git-fixture-adoption",
+          "title": "Command unit tests initialise git through the shared helper",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "64f04da6-c24f-49b8-891d-e8c4245cfe03",
+          "short_id": "64f04da6",
+          "key": "library-storage-git-fixture-adoption",
+          "title": "Storage and gate-execution tests initialise git through the shared helper",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "1d52a376-a05f-4d7e-87b8-59649dd5900a",
+          "short_id": "1d52a376",
+          "key": "query-domain-owner-gaps",
+          "title": "Domain query tests own each property the query re-proofs assert",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2f717d93-f1ea-49cf-8769-4d244a4a3bec",
+          "short_id": "2f717d93",
+          "key": "server-git-fixture-adoption",
+          "title": "Server unit tests initialise git through the shared helper",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e21ca76d-3404-4881-b58d-d2952298f295",
+          "short_id": "e21ca76d",
+          "key": "unit-test-shipped-item-kinds",
+          "title": "Command unit tests take shipped item kinds from the default package",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "26cbc32e-975d-472c-8d5c-27689577b253",
+          "short_id": "26cbc32e",
+          "key": "cli-document-history-spawn-migration",
+          "title": "document and archive tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a057a4f5-b33f-4777-8df1-f458826afea5",
+          "short_id": "a057a4f5",
+          "key": "cli-gate-definition-json-ids",
+          "title": "gate definition and evaluation tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b0fa5e5d-b4d2-4f78-a4cc-d251b14f95d9",
+          "short_id": "b0fa5e5d",
+          "key": "cli-gate-status-json-ids",
+          "title": "gate status and key tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "14d95c74-971c-4f63-b250-c6afcbdd2cf8",
+          "short_id": "14d95c74",
+          "key": "cli-graph-spawn-migration",
+          "title": "graph and dependency tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c211f14c-7cf9-4015-b1d4-78d8e8ad3bb2",
+          "short_id": "c211f14c",
+          "key": "cli-issue-error-output-json-ids",
+          "title": "error-output and export tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6bd02fa4-c44e-49f4-a729-59eae4edf400",
+          "short_id": "6bd02fa4",
+          "key": "cli-issue-show-json-ids",
+          "title": "issue show and rollup tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2d3c886f-1d79-4490-ab78-c43b130ce6f0",
+          "short_id": "2d3c886f",
+          "key": "cli-issue-taxonomy-root-removal",
+          "title": "The cli_issue suite root drops its taxonomy repository copy",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c6cd250d-04d8-433e-8566-6a73dcfc4482",
+          "short_id": "c6cd250d",
+          "key": "cli-issue-update-json-ids",
+          "title": "issue mutation tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "28373fb7-61ce-4b93-84e3-d74d75b772ab",
+          "short_id": "28373fb7",
+          "key": "cli-label-query-spawn-migration",
+          "title": "label and query tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "37c169ad-dc85-4ebb-94bc-4c47fe0cdb86",
+          "short_id": "37c169ad",
+          "key": "cli-links-search-spawn-migration",
+          "title": "link, scope and search tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
+          "short_id": "7208e568",
+          "key": "cli-profile-json-ids",
+          "title": "profile tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6a5de806-d295-4fd4-9c4d-fe0551be21d7",
+          "short_id": "6a5de806",
+          "key": "cli-validate-json-ids",
+          "title": "validate tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "56eec47b-c803-4b20-9389-29b970c3c255",
+          "short_id": "56eec47b",
+          "key": "cli-workflow-json-ids",
+          "title": "workflow and integration tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9e411075-4c46-4ffd-ae7a-9743ad175080",
+          "short_id": "9e411075",
+          "key": "fast-rules-memory-executor-adoption",
+          "title": "fast_rules uses the shared memory executor",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5a93e443-6dfb-49e6-ba9f-89641e11f3f2",
+          "short_id": "5a93e443",
+          "key": "library-fixture-issue-deletion",
+          "title": "The library's own issue-construction fixture is deleted",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "53d582ab-f36d-4ed0-a8e2-7fa902717c9a",
+          "short_id": "53d582ab",
+          "key": "auto-transition-harness-owner",
+          "title": "Lifecycle harness tests stop re-proving the auto-transition cascade",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "20ab27e8-2582-4ba5-b923-c8dfb34095e3",
+          "short_id": "20ab27e8",
+          "key": "cli-item-validate-shipped-item-kinds",
+          "title": "Decision-kind CLI tests take shipped item kinds from the default package",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "aadae7cd-767c-439b-b818-d7b7d96f557e",
+          "short_id": "aadae7cd",
+          "key": "cli-repo-workflow-in-process-setup-adoption",
+          "title": "cli_repo_workflow in-process tests use the shared constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
+          "short_id": "f1c1acc8",
+          "key": "exit-code-binding-completeness",
+          "title": "Exit-code projection suite proves a binding behind each row",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e2eb8862-1622-4a58-9bbc-c77a57a87013",
+          "short_id": "e2eb8862",
+          "key": "finalization-reproof-deletion",
+          "title": "Storage tests stop re-proving mutation finalization",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2a6bc44c-459e-4837-baf9-0022778b0870",
+          "short_id": "2a6bc44c",
+          "key": "fixture-setup-hook-removal",
+          "title": "Fixture setup runs inside the suite with no runner hook",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "510daa14-ed80-4633-9332-798d19c2150d",
+          "short_id": "510daa14",
+          "key": "list-envelope-coverage-test",
+          "title": "One test proves the list-envelope count for each list-emitting command",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "ad1e6d0e-ec8a-4178-91a2-434ab80845c8",
+          "short_id": "ad1e6d0e",
+          "key": "memory-declaration-seeding",
+          "title": "Shared memory executor accepts declarations as data",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3f15b95c-0a30-4a55-9dc2-489a736fb5be",
+          "short_id": "3f15b95c",
+          "key": "query-cli-wiring-reduction",
+          "title": "Query CLI tests assert one wiring case per subcommand and flag",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "c5c933f2-01da-4cb8-9711-4f1dd7b4e410",
+          "short_id": "c5c933f2",
+          "key": "cli-claim-worktree-spawn-migration",
+          "title": "claim and worktree tests spawn jit through the shared process fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b305e55e-c4b4-429f-8a0d-b4d0f40e30fc",
+          "short_id": "b305e55e",
+          "key": "cli-graph-json-ids",
+          "title": "graph and dependency tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5001b556-bf9a-42a0-b82e-bcbfaafd622e",
+          "short_id": "5001b556",
+          "key": "cli-label-query-json-ids",
+          "title": "label and query tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8da3f7f5-3551-4111-a68a-4d4d4b093617",
+          "short_id": "8da3f7f5",
+          "key": "cli-query-graph-taxonomy-root-removal",
+          "title": "The cli_query_graph suite root drops its taxonomy repository copy",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2c9badcd-07b8-4489-9ca0-4ef70e5e6980",
+          "short_id": "2c9badcd",
+          "key": "issue-store-conformance-suite",
+          "title": "Shared IssueStore conformance suite runs against both backends",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d0b932fc-78b4-4b56-84a0-99f0c120ca4b",
+          "short_id": "d0b932fc",
+          "key": "auto-transition-wiring-reduction",
+          "title": "Workflow CLI tests keep one auto-transition wiring case",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "fac6c316-626c-4dba-8602-434a2ec86035",
+          "short_id": "fac6c316",
+          "key": "cli-cycle-reproof-removal",
+          "title": "Workflow CLI tests stop re-proving dependency cycle rejection",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e1410936-de60-4752-95e9-cf6790b80972",
+          "short_id": "e1410936",
+          "key": "cli-issue-list-envelope-reassertion-removal",
+          "title": "cli_issue tests stop re-asserting the list-envelope count",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
+          "short_id": "8d959c96",
+          "key": "cli-item-validate-in-process-setup-adoption",
+          "title": "cli_item_validate in-process tests use the shared constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d7c26016-7b28-497e-89ce-061e252cbf26",
+          "short_id": "d7c26016",
+          "key": "cli-query-graph-in-process-setup-adoption",
+          "title": "cli_query_graph in-process tests use the shared constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7a69fc74-99ac-48bb-aa96-2ae31e5028e6",
+          "short_id": "7a69fc74",
+          "key": "cli-query-graph-list-envelope-reassertion-removal",
+          "title": "cli_query_graph tests stop re-asserting the list-envelope count",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "55043636-88c3-4d6e-8cce-e3503b6ea489",
+          "short_id": "55043636",
+          "key": "env-reading-tests-guarded",
+          "title": "Tests read shared process environment only under the environment guard",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "55cd1ae4-9957-4724-af8d-1219dfbe477b",
+          "short_id": "55cd1ae4",
+          "key": "exit-code-envelope-case-moves",
+          "title": "Blocked-transition and startup envelope cases move beside their owners",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e5166159-fecd-4bab-a3fd-c1c4c80aa0af",
+          "short_id": "e5166159",
+          "key": "exit-code-gate-preset-case-move",
+          "title": "Gate preset registry case moves beside its owner",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9a313a88-c229-4b59-8682-8e665aa957a6",
+          "short_id": "9a313a88",
+          "key": "exit-code-issue-prefix-case-moves",
+          "title": "Issue-show prefix cases move beside their owner",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "134ee921-9f52-4ec5-80f0-28791fd0e59d",
+          "short_id": "134ee921",
+          "key": "exit-code-reassertion-cli-item-validate",
+          "title": "cli_item_validate tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "fc5ef0ef-da15-445b-ad19-439fb9b98060",
+          "short_id": "fc5ef0ef",
+          "key": "exit-code-reassertion-gate-evaluate",
+          "title": "Gate evaluation tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8f87e366-0470-42de-a24a-9262b637bd13",
+          "short_id": "8f87e366",
+          "key": "exit-code-reassertion-gate-status",
+          "title": "Gate status and definition tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2f63adec-7602-4d65-961a-3dd3b5daa54d",
+          "short_id": "2f63adec",
+          "key": "failure-corpus-in-suite",
+          "title": "Recorded-failure corpus built in the suite under an input key",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f0bee761-b2a9-4d61-ac5a-bb40730aec03",
+          "short_id": "f0bee761",
+          "key": "fast-docs-templates-memory-setup-adoption",
+          "title": "fast_docs_templates memory-backed tests use the shared seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3ca153c7-0ae8-4411-a11b-ee4c0940b422",
+          "short_id": "3ca153c7",
+          "key": "fast-issue-memory-setup-adoption",
+          "title": "fast_issue memory-backed tests use the shared seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2d342676-a0a5-4980-856e-310363f78564",
+          "short_id": "2d342676",
+          "key": "fast-rules-memory-setup-adoption",
+          "title": "fast_rules memory-backed tests use the shared seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b469f36d-8fb3-4e73-a199-765c289dfe88",
+          "short_id": "b469f36d",
+          "key": "library-archive-file-setup-adoption",
+          "title": "Archive command tests use the shared file-backed constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "155d8c3c-6777-4f60-b26a-1f4c4e10ef7d",
+          "short_id": "155d8c3c",
+          "key": "library-batch-memory-setup-adoption",
+          "title": "Batch-command tests use the shared memory seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3be2238f-0f30-4503-bbdc-2bc2877733fd",
+          "short_id": "3be2238f",
+          "key": "library-gate-memory-setup-adoption",
+          "title": "Gate command tests use the shared memory seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "955ee89e-1b00-4158-af63-1847f168f708",
+          "short_id": "955ee89e",
+          "key": "library-init-profile-file-setup-adoption",
+          "title": "Init and profile command tests use the shared file-backed constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d49d53db-98e5-4ce3-b3f9-e54ac64c3560",
+          "short_id": "d49d53db",
+          "key": "library-issue-memory-setup-adoption",
+          "title": "Issue, invariant and executor tests use the shared memory seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b7078f0d-4725-4fd8-926c-50436c39880c",
+          "short_id": "b7078f0d",
+          "key": "library-item-validate-memory-setup-adoption",
+          "title": "Item and validate unit tests use the shared memory seeding",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "44b40ce1-5e1e-48b4-b65e-d44fc192b3ca",
+          "short_id": "44b40ce1",
+          "key": "library-store-validation-file-setup-adoption",
+          "title": "Gate-run, repository-validation and CLI tests use the shared file-backed constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "340a846d-19c1-4afb-a5bd-7be6d1334e8a",
+          "short_id": "340a846d",
+          "key": "mcp-parity-tool-failure",
+          "title": "MCP parity test fails when node is missing",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "ca5eb7ee-4e67-4685-b63d-78d7dcb05b3a",
+          "short_id": "ca5eb7ee",
+          "key": "server-memory-setup-adoption",
+          "title": "Server tests use the shared memory seeding",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "b8c21611-e798-4674-a0a4-fa1a5688a16c",
+          "short_id": "b8c21611",
+          "key": "cli-worktree-json-ids",
+          "title": "cross-worktree tests read created ids from JSON output",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2cbe3ed8-eb3b-4544-be6f-d19a1fff3851",
+          "short_id": "2cbe3ed8",
+          "key": "batch-cycle-adapter-reproof-removal",
+          "title": "Batch-create stops re-proving keyed cycle detection",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "791344c8-aa2c-4b58-9d89-41c7da3808a8",
+          "short_id": "791344c8",
+          "key": "cli-repo-workflow-list-envelope-reassertion-removal",
+          "title": "cli_repo_workflow tests stop re-asserting the list-envelope count",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "966d0627-e3d4-40e6-b887-14cd1b6e8cd5",
+          "short_id": "966d0627",
+          "key": "exit-code-claim-delete-case-moves",
+          "title": "Claim and confirmed-delete cases move beside their owners",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2916a306-1b7a-4d23-8976-0a1a5d42006b",
+          "short_id": "2916a306",
+          "key": "exit-code-dependency-guard-case-moves",
+          "title": "Dependency and query argument-guard cases move beside their owners",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b51a5c2d-2aaa-4c82-9a70-12720d03a978",
+          "short_id": "b51a5c2d",
+          "key": "exit-code-reassertion-issue-create",
+          "title": "Issue-creation tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "1afbea78-e57b-4b89-8e18-237f9fa70d23",
+          "short_id": "1afbea78",
+          "key": "exit-code-reassertion-issue-errors",
+          "title": "Error-output tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "69341a9d-a518-4ed6-972e-070760d085ab",
+          "short_id": "69341a9d",
+          "key": "exit-code-reassertion-issue-show",
+          "title": "Issue show and failure-envelope tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "ce097844-5f62-4dce-bd75-2af8159f7920",
+          "short_id": "ce097844",
+          "key": "fast-rules-shipped-item-kinds",
+          "title": "Projection-render tests take shipped item kinds from the default package",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "50b800bb-2453-4454-8d61-cd80c8bd2b22",
+          "short_id": "50b800bb",
+          "key": "harness-demo-case-moves",
+          "title": "Unique harness demonstration cases move beside their owners",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b58ea1e2-c53b-4743-a548-2fe0e06b2965",
+          "short_id": "b58ea1e2",
+          "key": "label-query-harness-reduction",
+          "title": "Label and strategic executor tests keep one wiring case each",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "077937f5-ed4c-4a76-be4a-2819bd5f556b",
+          "short_id": "077937f5",
+          "key": "library-gate-claim-file-setup-adoption",
+          "title": "Gate, claim and hook tests use the shared file-backed constructors",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "94bbdbd6-31ab-4e65-873b-77e56ec6e47c",
+          "short_id": "94bbdbd6",
+          "key": "memory-backend-path-reads",
+          "title": "In-memory path reads serve the store's own commit-pinned state",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "4b5b8f4a-e71e-4271-b99a-0293a63907b2",
+          "short_id": "4b5b8f4a",
+          "key": "server-file-setup-adoption",
+          "title": "Server tests use the shared file-backed constructors",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "6f9f5d1e-f594-43c6-8817-33fd4813bd4a",
+          "short_id": "6f9f5d1e",
+          "key": "backend-specific-test-pruning",
+          "title": "Backend tests keep only backend-specific behaviour",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6a13eeac-f6e6-4da3-93b5-6432f06b3f6f",
+          "short_id": "6a13eeac",
+          "key": "exit-code-reassertion-checkout",
+          "title": "Claim, lock and discovery tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8939b7a7-e5e6-48a4-a650-22611d2c7be2",
+          "short_id": "8939b7a7",
+          "key": "exit-code-reassertion-profile",
+          "title": "Profile tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d3549d1d-1ebc-432d-9a2f-66223e1aaee0",
+          "short_id": "d3549d1d",
+          "key": "exit-code-reassertion-workflow",
+          "title": "Configuration and workflow tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "89f517a5-73b0-4fb2-b212-262055f27970",
+          "short_id": "89f517a5",
+          "key": "exit-code-reproof-deletion",
+          "title": "Exit-code re-proof suites are deleted",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2d537b7c-d772-49ce-93b6-24ae15f0a92e",
+          "short_id": "2d537b7c",
+          "key": "harness-demo-deletion",
+          "title": "The harness demonstration suite is deleted",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "168a9c16-f930-47ef-b139-984360e70c84",
+          "short_id": "168a9c16",
+          "key": "label-query-cli-wiring-reduction",
+          "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "3f01cb72-5726-43bd-bb1f-136a640bc0aa",
+          "short_id": "3f01cb72",
+          "key": "exit-code-reassertion-cli-query-graph",
+          "title": "cli_query_graph tests stop re-asserting projected exit codes",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "e2764021-758b-469f-86ce-9bedeb04a93d",
+          "short_id": "e2764021",
+          "key": "build-footprint-report",
+          "title": "Build-footprint figures before and after the epic are reported",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc",
+          "short_id": "7721a2a9",
+          "key": "suite-clock-report",
+          "title": "Suite clock before and after the epic is reported",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "stories": {
+    "exit-code-envelope-ownership": "8d64ffae-719b-4631-9660-1317ba7b59cf",
+    "query-graph-ownership": "28e6703c-2fa3-41c9-8fc0-ebdf79440a0b",
+    "storage-contracts": "eae17510-00c4-40fe-832c-b783b518112c",
+    "shared-test-fixtures": "c5aafdc0-998c-46a0-a286-7f853f0b814a",
+    "suite-cost": "45e3e442-e157-4d73-918c-2fc7df04accc"
+  },
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "traps": [],
+  "rules": "Steward: worktrees only; merges under `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock`; `cargo test --doc -p jit` on the branch before merge; CARGO_INCREMENTAL=0; builds via turnstile + shared lock; full gates via turnstile + exclusive lock; <=2 live worktrees and >=60 GB free to dispatch; --force only for load-only cargo-ci failures; prefer sonnet/haiku; breakdown is fixed (changes only via steward escalation + new planning pass); escalate project-level questions to steward just-in-time-24; never ask the user.",
+  "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
+  "started_at": "2026-10-22T14:43:25+00:00"
+}

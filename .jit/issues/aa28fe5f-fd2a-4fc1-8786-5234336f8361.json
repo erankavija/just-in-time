@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-10-22T14:28:17.935098801Z",
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f"
+  ],
+  "description": "Move the cargo-ci self-test out of the default suite into a declared gate over the script.\n\n## Background\n\n`crates/jit/tests/scratch_build/merged_tree_gate_verification_tests.rs` runs `scripts/cargo-ci-selftest.sh` (622 lines) inside the default suite. The script runs nested cargo builds of six fixture crates (`cargo build` at `:501`, gate runs at `:486`, scenarios at `:606-612`) and takes about 4 s. The test prints `SKIP:` and passes when the script exits 2 for missing git, cargo or jq (`:48-53`). The gate that runs it was registered in `.jit/gates.toml` at planning. `dev/TESTING.md` (`:195`, `:384`) describes where the self-test runs.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `cargo-ci-selftest` runs `scripts/cargo-ci-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `cargo-ci-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-03: `merged_tree_gate_verification_tests.rs` no longer exists, and the default suite runs no nested cargo build for this self-test.\n- [hard] REQ-04: `dev/TESTING.md` describes the self-test as a gate.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T14:27:42.375050721Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "cargo-ci-selftest"
+  ],
+  "gates_status": {},
+  "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:tooling",
+    "component:gates",
+    "satisfies:c780514e/REQ-10",
+    "per:@/charter/D-18",
+    "per:@/charter/D-2",
+    "enforces:@/invariant/no-ignored-tests",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "cargo-ci self-test runs as a declared gate",
+  "updated_at": "2026-10-22T14:44:25.497937094Z"
+}

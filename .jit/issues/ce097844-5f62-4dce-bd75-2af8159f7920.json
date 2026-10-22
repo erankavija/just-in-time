@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "0bf97911-8302-47bb-95c0-585d897ad63f",
+    "2d342676-a0a5-4980-856e-310363f78564"
+  ],
+  "description": "Remove the decision-kind copies from the projection-render harness tests.\n\n## Background\n\n`fast_rules/project_render_harness_tests.rs` (`:133`, `:189`, `:467`) restates the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No test in these files restates a shipped kind's declaration or its id pattern.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ce097844-5f62-4dce-bd75-2af8159f7920",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-07",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/single-source-prose",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Projection-render tests take shipped item kinds from the default package",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8425e1ef7423922847831f4b310388c135cec2d0",
+  "completed_at": "2026-10-22T14:26:42.623323928Z",
+  "duration_ms": 256133,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable profile-publication cutover satisfies the issue criteria; prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f866d9d8-384e-4b5e-9616-78bfa5e1b440",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "146b56b3-09bb-47ad-8bbb-565032b476f7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:22:26.490165818Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 753323290, 4f5db64b, 30fd493f, b80cd0da, 5f750231, 2fc1d531, d0cec81b\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/3d9a0ce3/requirement/REQ-04 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:20:57Z)\nTruncation recovery: reread 4f5db64b by individual path; profile_apply.rs in ranges 1–3394; commands/profile.rs in ranges 1–1124; narrowed current-tree searches\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable profile-publication cutover satisfies the issue criteria; prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

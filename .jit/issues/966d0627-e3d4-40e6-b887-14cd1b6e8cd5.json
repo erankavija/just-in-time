@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "56eec47b-c803-4b20-9389-29b970c3c255",
+    "c5c933f2-01da-4cb8-9711-4f1dd7b4e410",
+    "f1c1acc8-4440-409d-9a8b-e2fa070befc2"
+  ],
+  "description": "Move the claim and confirmed-delete cases that only the exit-code suite tests into the claim and issue-lifecycle suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:652`, `:702` and `:765`: claim and claim-next blocked by dependencies or a precheck gate, with `BLOCKED` details and remediation.\n- `:820`: claim-next skipping non-ready issues.\n- `:897` and `:920`: blocked-claim messages naming `--assign`, human and JSON.\n- `:954` and `:999`: an assign-only claim sets the assignee without a transition, and claiming a ready issue moves it to in-progress.\n- `:1590` and `:1616`: confirmed delete in text mode (\"Deleted issue:\") and JSON mode. These strings appear in no other test.\n\n## Success Criteria\n\n- [hard] REQ-01: Each claim case listed in the Background has an owning test in `cli_repo_workflow/claim_integration_tests.rs`, and each confirmed-delete case has one in `cli_repo_workflow/integration_test.rs`, with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "966d0627-e3d4-40e6-b887-14cd1b6e8cd5",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:exit-code-envelope-ownership",
+    "component:testing",
+    "component:cli",
+    "satisfies:c780514e/REQ-01",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Claim and confirmed-delete cases move beside their owners",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

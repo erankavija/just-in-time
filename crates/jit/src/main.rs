@@ -27,7 +27,8 @@ use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
 use jit::output::{
-    ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext, OutputMode,
+    plain_issue_rows, print_issue_list, ErrorCode, ExitCode, InitResponse, IssueColumn, JsonError,
+    JsonOutput, OutputContext, OutputMode,
 };
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -1419,14 +1420,12 @@ fn run_query_all<S: IssueStore>(
         .with_message(msg);
         println!("{}", output.to_json_string()?);
     } else {
-        let _ = output_ctx.print_info("All issues (filtered):");
-        for issue in &issues {
-            println!(
-                "  {} | {} | {:?} | {:?}",
-                issue.id, issue.title, issue.state, issue.priority
-            );
-        }
-        let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+        print_issue_list(
+            &output_ctx,
+            "All issues (filtered):",
+            plain_issue_rows(&issues),
+            &[IssueColumn::State, IssueColumn::Priority],
+        )?;
     }
     Ok(())
 }
@@ -2440,13 +2439,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         let output = JsonOutput::success(output_data).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
-                        let _ = output_ctx.print_info(format!("Found {} issue(s):", issues.len()));
-                        for issue in issues {
-                            println!(
-                                "{} | {} | {:?} | {:?}",
-                                issue.id, issue.title, issue.state, issue.priority
-                            );
-                        }
+                        print_issue_list(
+                            &output_ctx,
+                            &format!("Found {} issue(s):", issues.len()),
+                            plain_issue_rows(&issues),
+                            &[IssueColumn::State, IssueColumn::Priority],
+                        )?;
                     }
                 }
                 IssueCommands::Show {
@@ -4424,7 +4422,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = command_json_error(&e, ErrorCode::GateError);
+                            let json_error = gate_pass_json_error(&e, &id);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -4735,10 +4733,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info(format!("Reverse dependencies of {}:", id));
-                    for issue in issues {
-                        println!("  {} | {}", issue.id, issue.title);
-                    }
+                    print_issue_list(
+                        &output_ctx,
+                        &format!("Reverse dependencies of {}:", id),
+                        plain_issue_rows(&issues),
+                        &[],
+                    )?;
                 }
             }
             GraphCommands::Roots => {
@@ -4755,10 +4755,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let _ = output_ctx.print_info("Root issues (no dependencies):");
-                    for issue in issues {
-                        println!("  {} | {}", issue.id, issue.title);
-                    }
+                    print_issue_list(
+                        &output_ctx,
+                        "Root issues (no dependencies):",
+                        plain_issue_rows(&issues),
+                        &[],
+                    )?;
                 }
             }
             GraphCommands::Tree { root } => {
@@ -5520,12 +5522,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ =
-                                output_ctx.print_info("Available issues (unassigned, unblocked):");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                            print_issue_list(
+                                &output_ctx,
+                                "Available issues (unassigned, unblocked):",
+                                plain_issue_rows(&issues),
+                                &[IssueColumn::Priority],
+                            )?;
                         }
                     }
                     jit::cli::QueryCommands::Blocked {
@@ -5599,14 +5601,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_info("Blocked issues:");
-                            for (issue, reasons) in &blocked {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
-                                for reason in reasons {
-                                    println!("    - {}", reason);
-                                }
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", blocked.len()));
+                            print_issue_list(
+                                &output_ctx,
+                                "Blocked issues:",
+                                blocked.iter().map(|(issue, reasons)| {
+                                    (issue, reasons.iter().map(ToString::to_string).collect())
+                                }),
+                                &[IssueColumn::Priority],
+                            )?;
                         }
                     }
                     jit::cli::QueryCommands::Strategic {
@@ -5640,11 +5642,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_info("Strategic issues:");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.priority);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                            print_issue_list(
+                                &output_ctx,
+                                "Strategic issues:",
+                                plain_issue_rows(&issues),
+                                &[IssueColumn::Priority],
+                            )?;
                         }
                     }
                     jit::cli::QueryCommands::Closed {
@@ -5678,11 +5681,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let _ = output_ctx.print_info("Closed issues (Done or Rejected):");
-                            for issue in &issues {
-                                println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
-                            }
-                            let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                            print_issue_list(
+                                &output_ctx,
+                                "Closed issues (Done or Rejected):",
+                                plain_issue_rows(&issues),
+                                &[IssueColumn::State],
+                            )?;
                         }
                     }
                     jit::cli::QueryCommands::Count { by, label } => {
@@ -5839,11 +5843,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             }
-            jit::cli::ConfigCommands::Set { key, value, global } => {
+            jit::cli::ConfigCommands::Set { key, value } => {
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
-                let outcome = executor.set_config(&key, &value, global)?;
+                let outcome = executor.set_config(&key, &value)?;
 
                 if json {
                     println!(
@@ -5851,8 +5855,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         JsonOutput::success(json!({
                             "key": outcome.key,
                             "value": outcome.value,
-                            "file": outcome.file.display().to_string(),
-                            "scope": outcome.scope
+                            "file": outcome.file.display().to_string()
                         }))
                         .to_json_string()?
                     );
@@ -5882,17 +5885,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if repo_config_path.exists() {
                     if let Err(e) = JitConfig::load(&jit_dir) {
                         result.errors.push(format!("repo config: {}", e));
-                    }
-                }
-
-                // Check user config.
-                if let Some(home) = dirs::home_dir() {
-                    let user_config_path = home.join(".config/jit/config.toml");
-                    if user_config_path.exists() {
-                        let user_dir = home.join(".config/jit");
-                        if let Err(e) = JitConfig::load(&user_dir) {
-                            result.errors.push(format!("user config: {}", e));
-                        }
                     }
                 }
 

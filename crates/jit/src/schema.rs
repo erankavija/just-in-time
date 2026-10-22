@@ -997,7 +997,7 @@ impl CommandSchema {
             row(
                 "config validate",
                 4,
-                "The repo, user, or environment-variable configuration failed to \
+                "The repo or environment-variable configuration failed to \
                  load or carried an invalid value.",
                 false,
             ),

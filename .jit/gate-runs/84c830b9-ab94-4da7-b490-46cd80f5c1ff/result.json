@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8425e1ef7423922847831f4b310388c135cec2d0",
+  "completed_at": "2026-10-22T14:26:54.145058792Z",
+  "duration_ms": 284317,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Linked plan and manifest pass validation, render freshness, and native dry-run; prior sizing and gate-attachment findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7c885165-89de-45a0-a867-e621c96867d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84c830b9-ab94-4da7-b490-46cd80f5c1ff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:22:09.827529722Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Linked plan and manifest pass validation, render freshness, and native dry-run; prior sizing and gate-attachment findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

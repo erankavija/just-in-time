@@ -1518,17 +1518,10 @@ fn test_claim_release_help_cross_references_assignment_commands() {
 
 #[test]
 fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
-    // Each state once diverged: `config show` honoured the env var and user
-    // layer while write commands read only the repository config.
-    let states = [
-        ("", "strict", None),
-        (
-            "[worktree]\n",
-            "off",
-            Some("[worktree]\nenforce_leases = \"off\"\n"),
-        ),
-    ];
-    for (worktree_section, env_mode, user_config) in states {
+    // Each state once diverged: `config show` honoured the env var while write
+    // commands read only the repository config.
+    let states = [("", "strict"), ("[worktree]\n", "off")];
+    for (worktree_section, env_mode) in states {
         let repo = setup_repo();
         let issue_id = create_issue(repo.path(), "Lease enforcement probe");
         let config_path = repo.path().join(".jit/config.toml");
@@ -1536,10 +1529,6 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
         config.push_str(&format!("\n{worktree_section}"));
         fs::write(&config_path, config).unwrap();
         let home = repo.path().join("isolated-home");
-        fs::create_dir_all(home.join(".config/jit")).unwrap();
-        if let Some(user_config) = user_config {
-            fs::write(home.join(".config/jit/config.toml"), user_config).unwrap();
-        }
         let jit = |args: &[&str]| {
             Command::new(assert_cmd::cargo::cargo_bin!("jit"))
                 .current_dir(repo.path())
@@ -1575,8 +1564,8 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
 
 #[test]
 fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
-    // Each state once diverged: `config show` layered the user config over the
-    // repository's while `claim acquire` read the repository config alone.
+    // Each state once diverged: `config show` and `claim acquire` resolved the
+    // limits independently.
     let section = |agent: Option<u32>, repo: Option<u32>| {
         let line = |key: &str, value: Option<u32>| {
             value.map_or(String::new(), |v| format!("{key} = {v}\n"))
@@ -1587,29 +1576,19 @@ fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
             line("max_indefinite_leases_per_repo", repo)
         )
     };
-    // (repo section, user section, whether the per-agent or per-repo limit is probed)
+    // (repo section, whether the per-agent or per-repo limit is probed)
     let states = [
-        (String::new(), None, "per_agent"),
-        (section(Some(1), None), None, "per_agent"),
-        (String::new(), Some(section(Some(1), None)), "per_agent"),
-        (
-            section(None, Some(2)),
-            Some(section(None, Some(5))),
-            "per_repo",
-        ),
-        (String::new(), Some(section(None, Some(1))), "per_repo"),
+        (String::new(), "per_agent"),
+        (section(Some(1), None), "per_agent"),
+        (section(None, Some(2)), "per_repo"),
     ];
-    for (repo_section, user_section, probe) in states {
+    for (repo_section, probe) in states {
         let repo = setup_repo();
         let config_path = repo.path().join(".jit/config.toml");
         let mut config = fs::read_to_string(&config_path).unwrap();
         config.push_str(&format!("\n{repo_section}"));
         fs::write(&config_path, config).unwrap();
         let home = repo.path().join("isolated-home");
-        fs::create_dir_all(home.join(".config/jit")).unwrap();
-        if let Some(user_section) = &user_section {
-            fs::write(home.join(".config/jit/config.toml"), user_section).unwrap();
-        }
         let jit = |args: &[&str]| {
             Command::new(assert_cmd::cargo::cargo_bin!("jit"))
                 .current_dir(repo.path())
@@ -1650,7 +1629,7 @@ fn test_config_show_reports_the_lease_limits_claim_acquire_enforces() {
         }
         assert_eq!(
             granted, reported,
-            "repo {repo_section:?}, user {user_section:?}: config show reported {probe} \
+            "repo {repo_section:?}: config show reported {probe} \
              limit {reported} but claim acquire granted {granted}"
         );
     }

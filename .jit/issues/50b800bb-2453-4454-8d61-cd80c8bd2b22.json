@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T14:27:42.375050721Z",
+  "dependencies": [
+    "19136324-fa38-46da-8492-59d6486b9134",
+    "5876e131-02c4-4d66-b5ae-a969dfc78b32",
+    "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
+    "b469f36d-8fb3-4e73-a199-765c289dfe88",
+    "b7078f0d-4725-4fd8-926c-50436c39880c",
+    "d49d53db-98e5-4ce3-b3f9-e54ac64c3560",
+    "de880d9c-c9bf-475c-8d89-de0b2e55f620",
+    "e21ca76d-3404-4881-b58d-d2952298f295"
+  ],
+  "description": "Copy the harness demonstration cases that no other test owns into the library test modules of the code they exercise, so the demonstration suite can be deleted without losing coverage.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/harness_demo.rs` (527 lines, 14 tests) is a self-described demonstration of `TestHarness` (`crate::test_harness`, compiled into the library under test support). It re-proves queries, blocking, cycle rejection and gates. Six of its cases have no other owner:\n\n- `:291` item list and resolve, through `list_items` and `show_item` (`crates/jit/src/commands/item.rs`).\n- `:314` item-kind compatibility with label coverage, through `resolve_link_label` (`commands/item.rs`).\n- `:377` container progress and children, through `issue_progress` and `issue_children` (`crates/jit/src/commands/issue.rs`).\n- `:442` the issue status response projection, through `issue_status_response` (`commands/issue.rs`).\n- `:462` an empty container rollup, through `StateRollup::from_issues` (`crates/jit/src/output.rs`).\n- `:475` archive candidates being complete and non-mutating, through `archive_candidates` (`crates/jit/src/commands/archive.rs`).\n\nShared test support derives shipped item kinds from the default profile package.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six cases has an owning test, with the same assertions, in the test module of the file the Background names for it: `commands/item.rs` for `:291` and `:314`, `commands/issue.rs` for `:377` and `:442`, `output.rs` for `:462` and `commands/archive.rs` for `:475`.\n- [hard] REQ-02: A moved case that needs shipped item kinds takes them from the shared derivation.\n- [hard] REQ-03: A behaviour an existing test in those modules already owns is not duplicated.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "50b800bb-2453-4454-8d61-cd80c8bd2b22",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:query-graph-ownership",
+    "component:testing",
+    "satisfies:c780514e/REQ-02",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Unique harness demonstration cases move beside their owners",
+  "updated_at": "2026-10-22T14:27:42.375050721Z"
+}

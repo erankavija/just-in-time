@@ -169,7 +169,7 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | exit-code-envelope-ownership | Exit codes and list envelopes each have one owning test | story | command exit codes and the list-envelope count each have one owning test | — | REQ-01, REQ-04 | — | — | exit-code-reproof-deletion, cli-issue-list-envelope-reassertion-removal, cli-query-graph-list-envelope-reassertion-removal, cli-repo-workflow-list-envelope-reassertion-removal, exit-code-reassertion-gate-evaluate, exit-code-reassertion-gate-status, exit-code-reassertion-issue-create, exit-code-reassertion-issue-show, exit-code-reassertion-issue-errors, exit-code-reassertion-cli-query-graph, exit-code-reassertion-cli-item-validate, exit-code-reassertion-profile, exit-code-reassertion-checkout, exit-code-reassertion-workflow |
 | query-graph-ownership | Query, transition and cycle semantics are proven at the domain and graph layers | story | query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring | — | REQ-02 | — | — | query-cli-wiring-reduction, auto-transition-wiring-reduction, auto-transition-harness-owner, batch-cycle-adapter-reproof-removal, cli-cycle-reproof-removal, harness-demo-deletion, label-query-cli-wiring-reduction, label-query-harness-reduction |
 | storage-contracts | Storage behaviour is proven once per contract | story | finalization is proven in repository state and every IssueStore backend runs one conformance suite | — | REQ-03, REQ-08 | — | — | backend-specific-test-pruning |
-| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-gate-definition-json-ids, cli-gate-status-json-ids, cli-issue-show-json-ids, cli-issue-update-json-ids, cli-issue-failure-corpus-spawn-migration, cli-issue-error-output-json-ids, cli-graph-json-ids, cli-label-query-json-ids, cli-worktree-json-ids, cli-apply-template-spawn-migration, cli-profile-json-ids, cli-config-spawn-migration, cli-workflow-json-ids, library-command-git-fixture-adoption, library-storage-git-fixture-adoption, fast-docs-templates-git-fixture-adoption, library-fixture-issue-deletion, fast-issue-fixture-issue-adoption, fast-docs-templates-fixture-issue-adoption, fast-rules-fixture-issue-adoption, harness-shipped-item-kinds, unit-test-shipped-item-kinds, fast-rules-shipped-item-kinds, fast-rules-file-setup-adoption, fast-docs-templates-file-setup-adoption, fast-issue-memory-setup-adoption, fast-docs-templates-memory-setup-adoption, env-reading-tests-guarded, library-item-validate-memory-setup-adoption, library-archive-file-setup-adoption, library-gate-claim-file-setup-adoption, library-init-profile-file-setup-adoption, library-store-validation-file-setup-adoption, server-file-setup-adoption, cli-item-validate-in-process-setup-adoption, cli-query-graph-in-process-setup-adoption, cli-repo-workflow-in-process-setup-adoption, cli-issue-taxonomy-root-removal, cli-query-graph-taxonomy-root-removal |
+| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-apply-template-spawn-migration, cli-config-spawn-migration, cli-gate-definition-json-ids, cli-gate-status-json-ids, cli-graph-json-ids, cli-issue-error-output-json-ids, cli-issue-failure-corpus-spawn-migration, cli-issue-show-json-ids, cli-issue-taxonomy-root-removal, cli-issue-update-json-ids, cli-item-validate-in-process-setup-adoption, cli-label-query-json-ids, cli-profile-json-ids, cli-query-graph-in-process-setup-adoption, cli-query-graph-taxonomy-root-removal, cli-registry-render-spawn-migration, cli-repo-workflow-in-process-setup-adoption, cli-validate-json-ids, cli-workflow-json-ids, cli-worktree-json-ids, env-reading-tests-guarded, fast-docs-templates-file-setup-adoption, fast-docs-templates-fixture-issue-adoption, fast-docs-templates-git-fixture-adoption, fast-docs-templates-memory-setup-adoption, fast-issue-fixture-issue-adoption, fast-issue-memory-setup-adoption, fast-rules-file-setup-adoption, fast-rules-fixture-issue-adoption, fast-rules-shipped-item-kinds, harness-shipped-item-kinds, library-archive-file-setup-adoption, library-batch-memory-setup-adoption, library-fixture-issue-deletion, library-gate-claim-file-setup-adoption, library-init-profile-file-setup-adoption, library-issue-memory-setup-adoption, library-item-validate-memory-setup-adoption, library-storage-git-fixture-adoption, library-store-validation-file-setup-adoption, server-file-setup-adoption, unit-test-shipped-item-kinds |
 | suite-cost | The default suite runs within its time and footprint budgets | story | the default suite runs no nested cargo build or tool-skipping test, fixtures are keyed on inputs, and footprint and clock are reported | — | REQ-10, REQ-11, REQ-12, REQ-13, D-01 | — | — | suite-clock-report |
 | cli-gate-evaluate-spawn-migration | gate evaluation tests spawn jit through the shared process fixture | task | The gate evaluation tests spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 6 | — | cli-process-fixture |
 | cli-gate-status-spawn-migration | gate status and key tests spawn jit through the shared process fixture | task | The gate status and key tests spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 6 | — | cli-process-fixture |
@@ -535,45 +535,48 @@ flowchart LR
     N65 --> N86
     N66 --> N86
     N12 --> N87
+    N118 --> N88
+    N120 --> N88
     N93 --> N88
     N94 --> N88
-    N98 --> N88
-    N99 --> N88
-    N100 --> N88
-    N103 --> N88
     N111 --> N88
+    N103 --> N88
+    N100 --> N88
+    N98 --> N88
+    N149 --> N88
+    N99 --> N88
+    N82 --> N88
     N112 --> N88
-    N116 --> N88
-    N118 --> N88
     N119 --> N88
-    N120 --> N88
+    N83 --> N88
+    N150 --> N88
+    N106 --> N88
+    N84 --> N88
+    N107 --> N88
     N123 --> N88
-    N139 --> N88
-    N140 --> N88
-    N49 --> N88
-    N131 --> N88
-    N36 --> N88
-    N37 --> N88
-    N38 --> N88
-    N44 --> N88
-    N45 --> N88
-    N47 --> N88
-    N51 --> N88
-    N52 --> N88
-    N54 --> N88
-    N56 --> N88
+    N116 --> N88
     N1 --> N88
-    N79 --> N88
+    N52 --> N88
+    N37 --> N88
+    N49 --> N88
+    N56 --> N88
+    N36 --> N88
+    N54 --> N88
+    N51 --> N88
+    N38 --> N88
+    N47 --> N88
+    N44 --> N88
     N135 --> N88
+    N132 --> N88
+    N131 --> N88
     N136 --> N88
     N137 --> N88
+    N134 --> N88
+    N79 --> N88
+    N140 --> N88
     N138 --> N88
     N81 --> N88
-    N82 --> N88
-    N83 --> N88
-    N84 --> N88
-    N149 --> N88
-    N150 --> N88
+    N45 --> N88
     N24 --> N89
     N0 --> N90
     N0 --> N91
