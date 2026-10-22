@@ -12,7 +12,7 @@
           "key": "profiled-fixture-build-lock",
           "title": "Profiled-repository fixture lock waits are bounded",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged; gates pending"
         },
         {
           "id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
@@ -36,7 +36,7 @@
           "key": "rule-warning-tests-down-a-layer",
           "title": "Create-time rule warnings proven in-process without a profiled repository",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged; gates pending"
         },
         {
           "id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
@@ -76,7 +76,7 @@
           "key": "store-generic-initialisation",
           "title": "Product initialisation runs over any repository-state store",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched (sonnet)"
         },
         {
           "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
@@ -1227,7 +1227,13 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "from": "a3dd995a worker",
+      "finding": "profiled-fixture consumers without a nextest setup-script entry still build directly (now bounded at 12 s with a named error); durable fix is per-input keys and setup-script removal",
+      "disposition": "covered by planned profiled-fixture-input-key and fixture-setup-hook-removal"
+    }
+  ],
   "traps": [],
   "rules": "Steward: worktrees only; merges under `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock`; `cargo test --doc -p jit` on the branch before merge; CARGO_INCREMENTAL=0; builds via turnstile + shared lock; full gates via turnstile + exclusive lock; <=2 live worktrees and >=60 GB free to dispatch; --force only for load-only cargo-ci failures; prefer sonnet/haiku; breakdown is fixed (changes only via steward escalation + new planning pass); escalate project-level questions to steward just-in-time-24; never ask the user.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
