@@ -172,7 +172,7 @@
           "key": "profile-suite-selftest-gate",
           "title": "Suite-profiler self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "source6e9369142 integrated2b54bf3ee; fullCI4590+25 pass; awaiting main gates"
+          "status": "done"
         },
         {
           "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
@@ -1484,6 +1484,35 @@
         "serialization": "flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock",
         "timing": "Bash builtin; /usr/bin/time absent failed before cargo and was replaced"
       }
+    },
+    "7a412cb0": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "22b7f944-82f4-4a37-ad9f-6089b56a9ca9",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "33056b32-5368-416b-9164-e6dc03fb2270",
+          "status": "passed"
+        },
+        {
+          "key": "profile-suite-selftest",
+          "run_id": "acf56f70-8e68-47f1-a6d1-7f5697f7fde7",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": ".jit/gates.toml profile-suite-selftest runs script --self-test, mode auto without auto key; script input owns embedded fixtures",
+        "REQ-02": "standalone main gate passed; generic gate runner maps nonzero statuses to non-passing outcomes including2; no selftest skip path",
+        "REQ-03": "build_profile_policy_tests wrapper and its unused process import deleted; full tracked removed-name sweep empty"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "removed obsolete module prose and two script caller comments; rendered gate description from source",
+      "deferred_items": "no linked design documents",
+      "holistic": "script execution unchanged; only test invocation ownership moved to configured gate; no budget or lock change"
     }
   }
 }
