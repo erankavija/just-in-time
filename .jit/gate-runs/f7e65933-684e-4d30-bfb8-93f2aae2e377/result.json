@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "780de345fc2107ce6d4310817bee5da22c76f307",
+  "completed_at": "2026-10-22T14:42:38.501731097Z",
+  "duration_ms": 236608,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The created breakdown exactly matches the authoritative manifest and approved external graph geometry; the prior blocker is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f7e65933-684e-4d30-bfb8-93f2aae2e377",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:38:41.892832359Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "The prior blocker is resolved: `94bbdbd6` now depends on `ec190bd5` as required by [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/c780514e-test-topology/plan.md:698).\n\nAll required checks pass:\n\n- 151 manifest entries exactly match 151 stored issues and 298 intra-manifest edges.\n- All titles, descriptions, types, priorities, labels, gates, and dependencies match.\n- All 37 incoming external edges, 25 source-to-breakdown edges, the container-to-sink edge, and the outgoing re-home edge match.\n- No `planning` metadata was persisted or batch-exported.\n- Manifest validation, renderer check, native batch dry-run, and `jit validate` pass.\n- Content standards and blank-workspace root checks pass.\n- Contract modes, producer reachability, footprints, uncertainties, and overlaps are consistent with the approved plan.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| All 146 finest-tier issues | Yes | Yes | Yes | Yes | Yes | Yes | Yes | PASS |\n\nReview procedure followed the `jit-breakdown` skill.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The created breakdown exactly matches the authoritative manifest and approved external graph geometry; the prior blocker is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

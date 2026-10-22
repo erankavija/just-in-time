@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Give each test property one owning test on shared fixtures and contracts (c780514e) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-22T14:42:58.751229140Z",
   "first_ready_at": "2026-10-22T14:27:23.247911042Z",
   "gates_required": [
     "coverage-preview",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "run_id": "6c487f70-e92f-4437-b761-87c2cfc0cb64",
-      "status": "failed",
-      "updated_at": "2026-10-22T14:38:22.365581320Z",
+      "run_id": "f7e65933-684e-4d30-bfb8-93f2aae2e377",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:42:38.716295930Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -40,7 +41,7 @@
     "brackets:c780514e"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T14:38:22.365581320Z"
+  "updated_at": "2026-10-22T14:42:58.751229140Z"
 }
