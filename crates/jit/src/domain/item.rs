@@ -392,31 +392,6 @@ pub enum KindScope {
 impl KindScope {
     /// The token a kind declares its issue scope with.
     pub const ISSUE_TOKEN: &'static str = "issue";
-    /// The token a kind declares its project scope with.
-    pub const PROJECT_TOKEN: &'static str = "project";
-
-    /// Parse a kind's optional `scope` config string.
-    ///
-    /// `None` defaults to [`KindScope::Issue`] (the prior, issue-scoped behavior).
-    /// An unrecognized value is rejected with the kind name supplied by the caller
-    /// via [`KindScope::parse_for`]; this `parse` variant uses a placeholder name
-    /// in its error.
-    pub fn parse(scope: Option<&str>) -> Result<Self, ItemError> {
-        Self::parse_for("<kind>", scope)
-    }
-
-    /// Parse a kind's optional `scope` config string, naming `kind` in any error.
-    pub fn parse_for(kind: &str, scope: Option<&str>) -> Result<Self, ItemError> {
-        match scope {
-            None => Ok(KindScope::Issue),
-            Some(Self::ISSUE_TOKEN) => Ok(KindScope::Issue),
-            Some(Self::PROJECT_TOKEN) => Ok(KindScope::Project),
-            Some(other) => Err(ItemError::InvalidScope {
-                kind: kind.to_string(),
-                scope: other.to_string(),
-            }),
-        }
-    }
 
     /// Whether this kind is project-scoped (`@`).
     pub fn is_project(&self) -> bool {
@@ -467,14 +442,6 @@ pub enum ItemError {
         issue: String,
         /// The underlying parser error.
         source: crate::document::ContentParserError,
-    },
-    /// A kind declares an unrecognized `scope` (not `issue` or `project`).
-    #[error("item kind '{kind}' has an invalid scope '{scope}'; expected 'issue' or 'project'")]
-    InvalidScope {
-        /// The offending kind name.
-        kind: String,
-        /// The unrecognized scope string.
-        scope: String,
     },
     /// A `scope = "project"` kind declares no `source` for the substrate its
     /// `source-of-truth` reads from, so it cannot be indexed at project scope: a
