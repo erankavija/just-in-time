@@ -7,8 +7,8 @@ slow-timeout = { period = "15s", terminate-after = 4 }
 
 [[profile.default.scripts]]
 filter = '''
-(binary(cli_item_validate) & (test(/^invariant_registry_story_tests::/) | test(/^item_cli_tests::/) | test(/^project_render_cli_tests::/) | test(/^type_hierarchy_fix_tests::/) | test(/^validate_cli_rule_tests::/))) |
-(binary(jit) & test(/^(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair)$/))
+binary(cli_item_validate) |
+(binary(jit) & test(/^(commands::(init|profile|validate)|test_utils)::tests::/))
 '''
 setup = 'default-repository-fixture'
 
@@ -18,8 +18,8 @@ slow-timeout = { period = "15s", terminate-after = 4 }
 
 [[profile.default.scripts]]
 filter = '''
-(binary(cli_item_validate) & test(/^derived_state_repair_tests::/)) |
-(binary(jit) & test(/^(commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged|commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes|commands::validate::tests::test_validate_silent_accepts_a_drifted_profile_owned_target|commands::validate::tests::test_validate_silent_does_not_read_applied_profile_records|commands::validate::tests::test_validate_fix_leaves_a_drifted_profile_owned_target_unrepaired|commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states)$/))
+binary(cli_item_validate) |
+(binary(jit) & test(/^(commands::(init|profile|validate)|test_utils)::tests::/))
 '''
 setup = 'dogfood-repository-fixture'
 
