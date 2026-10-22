@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c2c71eba3da26f2719e75c443f585484eba437b1",
+  "completed_at": "2026-10-22T01:58:29.788932844Z",
+  "duration_ms": 264159,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied in the attributable current-tree changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e8af73b4-cc8b-4309-b1fb-de43e8baa12d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T01:54:05.629915770Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0cda458e, 88cfdca1, 282827ce, 278a5693, 12f6a06a, c8dabb00, c2c71eba (all `jit:fbb661f2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-04 and REQ-03 (parent issue); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T01:52:42Z); prior structured code-review verdict passed\nTruncation recovery: per-commit, per-path diffs; focused current-source and test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied in the attributable current-tree changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

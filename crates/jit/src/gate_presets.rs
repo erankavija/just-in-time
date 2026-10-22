@@ -60,8 +60,6 @@ impl GateTemplate {
             inputs: None,
             priority: 100,
             reserved: HashMap::new(),
-            auto: self.mode == GateMode::Auto,
-            example_integration: None,
         }
     }
 }

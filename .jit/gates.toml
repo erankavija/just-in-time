@@ -6,7 +6,6 @@ description = "AI-powered adversarial review of a breakdown against the design d
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -28,7 +27,6 @@ description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -72,7 +70,6 @@ description = "Compiles and tests the optional html/xml content-parser features:
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -113,7 +110,6 @@ description = "Zero clippy warnings allowed"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -147,7 +143,6 @@ description = "Issue-scoped, read-only AI code review using `jit:<short-id>` com
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -169,7 +164,6 @@ description = "Evaluate the configured coverage-preview rule with the gated brea
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "rule_validation"
@@ -185,7 +179,6 @@ description = "cargo-audit checks Cargo.lock and treats vulnerabilities plus all
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -205,7 +198,6 @@ description = "An issue-scoped documentation-impact review. It uses the reposito
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -227,7 +219,6 @@ description = "Deterministic mechanical checks over the adopter-facing documenta
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -274,7 +265,6 @@ description = "Code must be formatted with cargo fmt"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -304,7 +294,6 @@ description = "Container-scoped independent holistic coherence review by a revie
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -326,7 +315,6 @@ description = "Per-issue validation must pass (jit validate <ISSUE_ID> exits 0; 
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -346,7 +334,6 @@ description = "MCP server workspace checks: the mcp-server unit and integration 
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -384,7 +371,6 @@ description = "Web workspace checks: vitest suite, ESLint, and production build 
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -419,7 +405,6 @@ description = "AI-powered plan/design review before fan-out, against the plannin
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -441,7 +426,6 @@ description = "Whole-repository validation must pass (`jit validate` with NO iss
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -461,7 +445,6 @@ description = "gitleaks scans the working-tree version of every tracked file (sc
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"
@@ -485,7 +468,6 @@ description = "Manual threat-model review covers path containment, symlink and j
 stage = "precheck"
 mode = "manual"
 priority = 100
-auto = false
 
 [gates.reserved]
 
@@ -497,7 +479,6 @@ description = "Write tests first"
 stage = "precheck"
 mode = "manual"
 priority = 100
-auto = false
 
 [gates.reserved]
 
@@ -509,7 +490,6 @@ description = "Full test suite must pass"
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "exec"

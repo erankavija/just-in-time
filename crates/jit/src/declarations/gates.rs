@@ -149,8 +149,9 @@ pub enum GateChecker {
 /// Warning emitted by the review placeholder checker.
 pub const REVIEW_PLACEHOLDER_WARNING: &str = "WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate.";
 
-/// One authored quality-gate definition.
+/// One authored quality-gate definition. An unknown key fails the load.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GateDefinition {
     /// Schema version for future evolution.
     #[serde(default = "default_gate_version")]
@@ -185,11 +186,6 @@ pub struct GateDefinition {
     /// Reserved declaration extensions.
     #[serde(default)]
     pub reserved: HashMap<String, serde_json::Value>,
-    /// Deprecated authored field preserved during round trips.
-    #[serde(default)]
-    pub auto: bool,
-    /// Deprecated authored field preserved during round trips.
-    pub example_integration: Option<String>,
 }
 
 impl GateDefinition {
@@ -274,7 +270,7 @@ pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<Vec<u8>, GateD
 pub enum GateDeclarationError {
     #[error("gate registry is not UTF-8: {0}")]
     Utf8(#[from] std::str::Utf8Error),
-    #[error("gate registry TOML is invalid: {0}")]
+    #[error("gate registry TOML is invalid: {}", .0.message())]
     Toml(#[from] toml::de::Error),
     #[error("gate registry cannot be serialized: {0}")]
     Serialize(#[from] toml::ser::Error),
@@ -307,6 +303,33 @@ mode = "manual"
             parse_gate_registry(bytes),
             Err(GateDeclarationError::DuplicateKey(key)) if key == "review"
         ));
+    }
+
+    /// REQ-01: a key outside the declaration schema, including the removed
+    /// `auto` and `example_integration`, fails the load naming the key.
+    #[test]
+    fn test_gate_registry_parser_rejects_unknown_key_by_name() {
+        for key in ["auto", "example_integration", "undeclared_key"] {
+            let error = parse_gate_registry(
+                format!(
+                    "[[gates]]\n\
+                     key = \"review\"\n\
+                     title = \"Review\"\n\
+                     description = \"Review\"\n\
+                     stage = \"postcheck\"\n\
+                     mode = \"manual\"\n\
+                     {key} = true\n"
+                )
+                .as_bytes(),
+            )
+            .expect_err("an unknown key must fail to parse");
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("unknown field `{key}`")),
+                "{key}: {error}"
+            );
+        }
     }
 
     /// One gate declaration whose `[gates.inputs]` body is under test.
@@ -388,8 +411,6 @@ mode = "manual"
             inputs: None,
             priority: 100,
             reserved: HashMap::new(),
-            auto: false,
-            example_integration: None,
         };
         let registry = GateRegistry {
             gates: HashMap::from([

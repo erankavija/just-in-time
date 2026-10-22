@@ -6,7 +6,6 @@
     "0e3b69fc-1af7-4cc8-9089-96f2debd6324",
     "2492ab29-2047-4bae-9cdc-d17749f1e515",
     "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
-    "34361448-f21b-4efb-8437-2ee38ba584c6",
     "4251137e-6a16-402c-ad97-91889cea4978",
     "45b442f3-fe6d-4626-af72-905c6f25d388",
     "4c216a28-9362-4e0d-9ccd-e5cd43f9093b",
@@ -27,6 +26,7 @@
     "d759d606-cf7b-4548-9fbe-bcf48793856e",
     "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
     "e1af39db-860f-4715-9e68-b9d126a81c12",
+    "ea5f4536-6dc7-4c22-8de7-b68b6c30252d",
     "ec190bd5-af89-4776-969f-81f48412592a",
     "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c"
   ],
@@ -49,5 +49,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Import domain type items through the domain facade",
-  "updated_at": "2026-10-21T05:49:14.534480756Z"
+  "updated_at": "2026-10-22T02:11:01.410979139Z"
 }

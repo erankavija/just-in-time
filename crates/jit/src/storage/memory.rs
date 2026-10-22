@@ -847,8 +847,7 @@ impl IssueStore for InMemoryStorage {
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
         match Self::data_entry_bytes(&self.repository_state(), &VirtualPath::GATES) {
-            Some(bytes) => parse_gate_registry(&bytes)
-                .context("Failed to deserialize gate registry from repository image"),
+            Some(bytes) => Ok(parse_gate_registry(&bytes)?),
             None => Ok(GateRegistry::default()),
         }
     }

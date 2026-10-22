@@ -72,7 +72,6 @@ description = "Evaluate the configured coverage-preview rule with the gated brea
 stage = "postcheck"
 mode = "auto"
 priority = 100
-auto = true
 
 [gates.checker]
 type = "rule_validation"

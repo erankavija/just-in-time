@@ -82,7 +82,6 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
 | cli-process-fixture | Shared fixture for spawning jit in CLI tests | task | One shared test-support fixture spawns jit over a temporary repository it owns, with inherited JIT_* variables removed. | — | REQ-05, REQ-09, D-02 | creates 1, touches 3 | — | — |
-| cli-gate-migration | cli_gate tests spawn jit through the shared process fixture | task | The cli_gate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
 | cli-issue-command-migration | cli_issue command tests spawn jit through the shared process fixture | task | The cli_issue command test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, REQ-06, D-02 | touches 18 | — | cli-process-fixture, shared-taxonomy-repo |
 | cli-issue-envelope-migration | cli_issue envelope tests spawn jit through the shared process fixture | task | The cli_issue envelope and failure test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 15 | — | cli-process-fixture |
 | cli-item-validate-migration | cli_item_validate tests spawn jit through the shared process fixture | task | The cli_item_validate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
@@ -115,6 +114,7 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | suite-clock-report | Suite clock before and after the epic is reported | task | The benchmark note records the suite clock before and after, and a per-test profile with no test over 5 s. | suite-measurement-protocol | REQ-13, D-01 | touches 1 | — | build-footprint-report |
 | exit-code-envelope-case-moves | Blocked-transition and startup envelope cases move beside their owners | task | Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness |
 | exit-code-claim-delete-case-moves | Claim and confirmed-delete cases move beside their owners | task | Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness, cli-repo-checkout-migration, cli-repo-workflow-migration |
+| cli-gate-migration | cli_gate tests spawn jit through the shared process fixture | task | The cli_gate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
 | exit-code-reassertion-cli-gate | cli_gate tests stop re-asserting projected exit codes | task | The cli_gate suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 9 | — | exit-code-binding-completeness, cli-gate-migration |
 | exit-code-reassertion-cli-issue | cli_issue tests stop re-asserting projected exit codes | task | The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 13 | — | exit-code-envelope-case-moves, exit-code-issue-prefix-case-moves |
 | exit-code-reassertion-cli-query-graph | cli_query_graph tests stop re-asserting projected exit codes | task | The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 5 | — | label-query-cli-wiring-reduction |
@@ -189,39 +189,39 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 ```mermaid
 flowchart LR
     N0["cli-process-fixture: Shared fixture for spawning jit in CLI tests"]
-    N1["cli-gate-migration: cli_gate tests spawn jit through the shared process fixture"]
-    N2["cli-issue-command-migration: cli_issue command tests spawn jit through the shared process fixture"]
-    N3["cli-issue-envelope-migration: cli_issue envelope tests spawn jit through the shared process fixture"]
-    N4["cli-item-validate-migration: cli_item_validate tests spawn jit through the shared process fixture"]
-    N5["cli-query-graph-migration: cli_query_graph tests spawn jit through the shared process fixture"]
-    N6["cli-repo-checkout-migration: Git-backed workflow tests spawn jit through the shared process fixture"]
-    N7["cli-repo-profile-migration: Profile workflow tests spawn jit through the shared process fixture"]
-    N8["cli-repo-workflow-migration: Remaining workflow tests spawn jit through the shared process fixture"]
-    N9["env-reading-tests-guarded: Tests read shared process environment only under the environment guard"]
-    N10["exit-code-binding-completeness: Exit-code projection suite proves a binding behind each row"]
-    N11["exit-code-reproof-deletion: Exit-code re-proof suites are deleted"]
-    N12["query-available-domain-order: Available-work filtering and priority order become a pure domain query"]
-    N13["auto-transition-domain-decision: Auto-transition readiness is decided by a pure domain function"]
-    N14["harness-demo-case-moves: Unique harness demonstration cases move beside their owners"]
-    N15["harness-demo-deletion: The harness demonstration suite is deleted"]
-    N16["finalization-owner-gaps: Repository-state tests own each finalization case"]
-    N17["finalization-reproof-deletion: Storage tests stop re-proving mutation finalization"]
-    N18["issue-store-conformance-suite: Shared IssueStore conformance suite runs against both backends"]
-    N19["memory-backend-path-reads: In-memory path reads serve the store's own commit-pinned state"]
-    N20["backend-specific-test-pruning: Backend tests keep only backend-specific behaviour"]
-    N21["profiled-fixture-input-key: Profiled-repository fixture keyed only on its inputs"]
-    N22["fixture-setup-hook-removal: Fixture setup runs inside the suite with no runner hook"]
-    N23["failure-corpus-in-suite: Recorded-failure corpus built in the suite under an input key"]
-    N24["rule-warning-tests-down-a-layer: Create-time rule warnings proven in-process without a profiled repository"]
-    N25["doctest-substep-bound: Doctest substep fits within the per-test bound"]
-    N26["cargo-ci-selftest-gate: cargo-ci self-test runs as a declared gate"]
-    N27["profile-suite-selftest-gate: Suite-profiler self-test runs as a declared gate"]
-    N28["build-budget-selftest-gate: Build-budget checker self-test runs as a declared gate"]
-    N29["dependency-policy-tool-failure: Dependency-feature policy tests fail when cargo is missing"]
-    N30["build-footprint-report: Build-footprint figures before and after the epic are reported"]
-    N31["suite-clock-report: Suite clock before and after the epic is reported"]
-    N32["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
-    N33["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
+    N1["cli-issue-command-migration: cli_issue command tests spawn jit through the shared process fixture"]
+    N2["cli-issue-envelope-migration: cli_issue envelope tests spawn jit through the shared process fixture"]
+    N3["cli-item-validate-migration: cli_item_validate tests spawn jit through the shared process fixture"]
+    N4["cli-query-graph-migration: cli_query_graph tests spawn jit through the shared process fixture"]
+    N5["cli-repo-checkout-migration: Git-backed workflow tests spawn jit through the shared process fixture"]
+    N6["cli-repo-profile-migration: Profile workflow tests spawn jit through the shared process fixture"]
+    N7["cli-repo-workflow-migration: Remaining workflow tests spawn jit through the shared process fixture"]
+    N8["env-reading-tests-guarded: Tests read shared process environment only under the environment guard"]
+    N9["exit-code-binding-completeness: Exit-code projection suite proves a binding behind each row"]
+    N10["exit-code-reproof-deletion: Exit-code re-proof suites are deleted"]
+    N11["query-available-domain-order: Available-work filtering and priority order become a pure domain query"]
+    N12["auto-transition-domain-decision: Auto-transition readiness is decided by a pure domain function"]
+    N13["harness-demo-case-moves: Unique harness demonstration cases move beside their owners"]
+    N14["harness-demo-deletion: The harness demonstration suite is deleted"]
+    N15["finalization-owner-gaps: Repository-state tests own each finalization case"]
+    N16["finalization-reproof-deletion: Storage tests stop re-proving mutation finalization"]
+    N17["issue-store-conformance-suite: Shared IssueStore conformance suite runs against both backends"]
+    N18["memory-backend-path-reads: In-memory path reads serve the store's own commit-pinned state"]
+    N19["backend-specific-test-pruning: Backend tests keep only backend-specific behaviour"]
+    N20["profiled-fixture-input-key: Profiled-repository fixture keyed only on its inputs"]
+    N21["fixture-setup-hook-removal: Fixture setup runs inside the suite with no runner hook"]
+    N22["failure-corpus-in-suite: Recorded-failure corpus built in the suite under an input key"]
+    N23["rule-warning-tests-down-a-layer: Create-time rule warnings proven in-process without a profiled repository"]
+    N24["doctest-substep-bound: Doctest substep fits within the per-test bound"]
+    N25["cargo-ci-selftest-gate: cargo-ci self-test runs as a declared gate"]
+    N26["profile-suite-selftest-gate: Suite-profiler self-test runs as a declared gate"]
+    N27["build-budget-selftest-gate: Build-budget checker self-test runs as a declared gate"]
+    N28["dependency-policy-tool-failure: Dependency-feature policy tests fail when cargo is missing"]
+    N29["build-footprint-report: Build-footprint figures before and after the epic are reported"]
+    N30["suite-clock-report: Suite clock before and after the epic is reported"]
+    N31["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
+    N32["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
+    N33["cli-gate-migration: cli_gate tests spawn jit through the shared process fixture"]
     N34["exit-code-reassertion-cli-gate: cli_gate tests stop re-asserting projected exit codes"]
     N35["exit-code-reassertion-cli-issue: cli_issue tests stop re-asserting projected exit codes"]
     N36["exit-code-reassertion-cli-query-graph: cli_query_graph tests stop re-asserting projected exit codes"]
@@ -293,72 +293,72 @@ flowchart LR
     N102["shared-test-fixtures: Tests run on shared fixtures and guards"]
     N103["suite-cost: The default suite runs within its time and footprint budgets"]
     N0 --> N1
+    N44 --> N1
     N0 --> N2
-    N44 --> N2
     N0 --> N3
     N0 --> N4
+    N44 --> N4
+    N50 --> N4
     N0 --> N5
-    N44 --> N5
-    N50 --> N5
     N0 --> N6
     N0 --> N7
-    N0 --> N8
-    N22 --> N9
-    N3 --> N10
-    N32 --> N11
-    N33 --> N11
-    N69 --> N11
-    N70 --> N11
-    N71 --> N11
-    N12 --> N13
-    N55 --> N14
-    N52 --> N14
-    N56 --> N14
-    N14 --> N15
+    N21 --> N8
+    N2 --> N9
+    N31 --> N10
+    N32 --> N10
+    N69 --> N10
+    N70 --> N10
+    N71 --> N10
+    N11 --> N12
+    N55 --> N13
+    N52 --> N13
+    N56 --> N13
+    N13 --> N14
+    N15 --> N16
     N16 --> N17
     N17 --> N18
     N18 --> N19
-    N19 --> N20
+    N20 --> N21
     N21 --> N22
-    N22 --> N23
-    N3 --> N23
-    N99 --> N30
-    N100 --> N30
-    N101 --> N30
-    N102 --> N30
-    N23 --> N30
-    N25 --> N30
-    N26 --> N30
-    N27 --> N30
-    N28 --> N30
+    N2 --> N22
+    N99 --> N29
+    N100 --> N29
+    N101 --> N29
+    N102 --> N29
+    N22 --> N29
+    N24 --> N29
+    N25 --> N29
+    N26 --> N29
+    N27 --> N29
+    N28 --> N29
+    N42 --> N29
+    N83 --> N29
+    N84 --> N29
+    N85 --> N29
+    N86 --> N29
+    N87 --> N29
+    N88 --> N29
+    N89 --> N29
+    N90 --> N29
     N29 --> N30
-    N42 --> N30
-    N83 --> N30
-    N84 --> N30
-    N85 --> N30
-    N86 --> N30
-    N87 --> N30
-    N88 --> N30
-    N89 --> N30
-    N90 --> N30
-    N30 --> N31
-    N10 --> N32
-    N10 --> N33
-    N6 --> N33
-    N8 --> N33
-    N10 --> N34
-    N1 --> N34
-    N32 --> N35
+    N9 --> N31
+    N9 --> N32
+    N5 --> N32
+    N7 --> N32
+    N0 --> N33
+    N9 --> N34
+    N33 --> N34
+    N31 --> N35
     N69 --> N35
     N77 --> N36
-    N10 --> N37
-    N4 --> N37
-    N33 --> N38
+    N9 --> N37
+    N3 --> N37
+    N32 --> N38
     N71 --> N38
     N39 --> N40
     N0 --> N41
     N40 --> N41
-    N4 --> N42
+    N3 --> N42
     N45 --> N46
     N45 --> N47
     N45 --> N48
@@ -369,49 +369,49 @@ flowchart LR
     N54 --> N55
     N54 --> N56
     N54 --> N57
-    N4 --> N57
+    N3 --> N57
     N54 --> N58
     N67 --> N58
     N0 --> N59
     N0 --> N60
     N0 --> N61
     N62 --> N63
-    N24 --> N63
+    N23 --> N63
     N62 --> N64
     N52 --> N65
     N65 --> N66
     N65 --> N67
     N53 --> N67
     N65 --> N68
-    N10 --> N69
-    N2 --> N69
-    N10 --> N70
-    N5 --> N70
-    N10 --> N71
-    N7 --> N71
+    N9 --> N69
+    N1 --> N69
+    N9 --> N70
+    N4 --> N70
+    N9 --> N71
+    N6 --> N71
     N41 --> N72
-    N2 --> N72
+    N1 --> N72
     N41 --> N73
-    N5 --> N73
+    N4 --> N73
     N41 --> N74
-    N8 --> N74
     N7 --> N74
     N6 --> N74
-    N12 --> N75
+    N5 --> N74
+    N11 --> N75
     N75 --> N76
-    N5 --> N76
+    N4 --> N76
     N75 --> N77
     N70 --> N77
     N75 --> N78
     N67 --> N78
-    N13 --> N79
-    N8 --> N79
-    N13 --> N80
-    N8 --> N82
+    N12 --> N79
+    N7 --> N79
+    N12 --> N80
+    N7 --> N82
     N65 --> N91
-    N14 --> N91
+    N13 --> N91
     N65 --> N92
-    N14 --> N92
+    N13 --> N92
     N81 --> N92
     N59 --> N92
     N62 --> N93
@@ -425,10 +425,10 @@ flowchart LR
     N57 --> N96
     N62 --> N97
     N65 --> N97
-    N5 --> N97
+    N4 --> N97
     N62 --> N98
-    N7 --> N98
-    N11 --> N99
+    N6 --> N98
+    N10 --> N99
     N72 --> N99
     N73 --> N99
     N74 --> N99
@@ -442,15 +442,15 @@ flowchart LR
     N80 --> N100
     N81 --> N100
     N82 --> N100
-    N15 --> N100
+    N14 --> N100
     N77 --> N100
     N78 --> N100
-    N20 --> N101
+    N19 --> N101
+    N33 --> N102
     N1 --> N102
     N2 --> N102
-    N3 --> N102
-    N6 --> N102
-    N8 --> N102
+    N5 --> N102
+    N7 --> N102
     N61 --> N102
     N46 --> N102
     N47 --> N102
@@ -461,14 +461,14 @@ flowchart LR
     N64 --> N102
     N66 --> N102
     N68 --> N102
-    N9 --> N102
+    N8 --> N102
     N91 --> N102
     N93 --> N102
     N95 --> N102
     N96 --> N102
     N97 --> N102
     N98 --> N102
-    N31 --> N103
+    N30 --> N103
 ```
 <!-- jit:breakdown-overview:end -->
 
