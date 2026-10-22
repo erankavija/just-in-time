@@ -132,7 +132,7 @@
           "key": "file-backed-setup-constructors",
           "title": "Shared constructors for file-backed in-process test repositories",
           "classification": "implementation",
-          "status": "rework 2 queued: code-review R2 F1 traversal test reads a fixed temp path (test_utils.rs:1214); cargo-ci needs post-revert rerun"
+          "status": "rework 2 dispatched in reused adoption checkout; owned-path isolation fix and focused red/green underway"
         },
         {
           "id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
@@ -481,7 +481,7 @@
           "key": "shared-memory-executor",
           "title": "Memory executor initialised through product initialisation",
           "classification": "implementation",
-          "status": "recovery validated at cb0398396; integrated cargo-ci 4591 tests +58 doctests passed; pending main merge and recorded gates"
+          "status": "done"
         },
         {
           "id": "529f621d-fdff-4c0c-b349-58bfbe2b93ad",
@@ -1312,6 +1312,36 @@
       "stale_narrative": "zero matches",
       "deferred_items": "no linked design documents",
       "holistic": "same shared fixture construction; no scope or consumer mismatch"
+    },
+    "22355a56": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "076cb8c4-29cd-46a5-8cf7-e23576620551",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "7cb49f35-c5d2-4fd1-8bb5-aff1e5037849",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "test_helpers.rs:175 initializes fault-free declaration copy through product initializer; no literal config/index scaffold",
+        "REQ-02": "test_harness.rs:41 uses shared executor; malformed/missing-state scenarios declare preconditions after init; 4591 tests and58docs pass"
+      },
+      "prior_findings": [
+        {
+          "round": "R1",
+          "finding": "Index-plus-rules bypass omits config in partial stores",
+          "status": "closed",
+          "cite": "crates/jit/src/commands/test_helpers.rs:180; regression:281"
+        }
+      ],
+      "stale_narrative": "zero matches",
+      "deferred_items": "no linked design documents",
+      "holistic": "shared initialization and canonical record paths; all five prior integration failures pass"
     }
   }
 }
