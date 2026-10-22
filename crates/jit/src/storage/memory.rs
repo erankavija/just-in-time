@@ -31,7 +31,6 @@ use std::sync::{Arc, Mutex};
 /// record read through [`IssueStore`] and one published by a session share one
 /// source of truth and round-trip through the identical canonical serializers.
 #[derive(Clone)]
-#[allow(dead_code)] // Public API used only in tests, not in binary
 pub struct InMemoryStorage {
     /// Unique root path for parallel test isolation
     root_path: std::path::PathBuf,
@@ -65,7 +64,6 @@ pub(crate) struct MemoryRepositoryState {
 
 impl InMemoryStorage {
     /// Create a new in-memory storage instance.
-    #[allow(dead_code)] // Public API used only in tests, not in binary
     pub fn new() -> Self {
         // Generate unique root path for parallel test isolation
         let unique_id = uuid::Uuid::new_v4();
