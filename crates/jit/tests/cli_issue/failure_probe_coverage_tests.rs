@@ -62,15 +62,16 @@ struct Registration<'a> {
     kind: RegistrationKind<'a>,
 }
 
-/// Derive executable machine-readable arms from the schema generated directly
-/// from Clap's command tree. Intentionally do not inspect `Command::hidden`:
-/// hidden arms remain executable and therefore remain in the coverage contract.
-fn reflected_json_arm_paths() -> BTreeSet<String> {
+/// Derive executable arms, each of which accepts the global `--json`, from the
+/// schema generated directly from Clap's command tree. Intentionally do not
+/// inspect `Command::hidden`: hidden arms remain executable and therefore remain
+/// in the coverage contract.
+fn reflected_executable_arm_paths() -> BTreeSet<String> {
     let schema = jit::schema::CommandSchema::generate();
-    reflected_json_arm_paths_from(&schema.commands)
+    reflected_executable_arm_paths_from(&schema.commands)
 }
 
-fn reflected_json_arm_paths_from(
+fn reflected_executable_arm_paths_from(
     commands: &HashMap<String, jit::schema::Command>,
 ) -> BTreeSet<String> {
     fn collect(
@@ -85,19 +86,20 @@ fn reflected_json_arm_paths_from(
                 format!("{prefix} {name}")
             };
 
-            // Flags in the generated schema belong directly to this command;
-            // inherited/global flags live separately in `global_options`.
-            // Record an executable parent such as bare `query` before walking
-            // its independently executable descendants.
-            if command.flags.iter().any(|flag| flag.name == "json") {
+            let children = command
+                .subcommands
+                .as_ref()
+                .filter(|children| !children.is_empty());
+
+            // A leaf is executable. Flags and args in the generated schema
+            // belong directly to their command (globals live in
+            // `global_options`), so a parent declaring its own, such as bare
+            // `query`, also runs without a subcommand.
+            if children.is_none() || !command.flags.is_empty() || !command.args.is_empty() {
                 paths.insert(path.clone());
             }
 
-            if let Some(children) = command
-                .subcommands
-                .as_ref()
-                .filter(|children| !children.is_empty())
-            {
+            if let Some(children) = children {
                 collect(&path, children, paths);
             }
         });
@@ -118,7 +120,7 @@ fn coverage_errors(declared: &BTreeSet<String>, registrations: &[Registration<'_
         .map(|path| format!("missing probe or exemption for declared arm `{path}`"));
     let stale = registered
         .difference(declared)
-        .map(|path| format!("stale registry arm `{path}` no longer declares --json"));
+        .map(|path| format!("stale registry arm `{path}` is no longer an executable arm"));
     let empty_exemptions = registrations
         .iter()
         .filter(|registration| {
@@ -256,7 +258,7 @@ fn write_census_report(report: &FailureProbeCensus) -> io::Result<PathBuf> {
 
 #[test]
 fn test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes() {
-    let declared = reflected_json_arm_paths();
+    let declared = reflected_executable_arm_paths();
     let registry = failure_lever_registry();
     let corpus = recorded_failure_corpus().expect("load the verified raw failure corpus");
     let registrations = registry_registrations(&registry);
@@ -342,7 +344,7 @@ fn test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes() {
         .collect::<BTreeSet<_>>();
     assert_eq!(
         report_paths, declared,
-        "successful census rows must equal the reflected --json arm set"
+        "successful census rows must equal the reflected executable arm set"
     );
     assert_eq!(
         report.arms.len(),
@@ -387,9 +389,9 @@ fn test_coverage_errors_reports_missing_declared_arm() {
 }
 
 #[test]
-fn test_reflected_json_arm_paths_preserves_executable_parent_and_child_arms() {
+fn test_reflected_executable_arm_paths_from_keeps_leaves_and_parents_with_own_flags() {
     fn command(
-        has_json: bool,
+        has_flag: bool,
         subcommands: Option<HashMap<String, jit::schema::Command>>,
     ) -> jit::schema::Command {
         jit::schema::Command {
@@ -398,9 +400,9 @@ fn test_reflected_json_arm_paths_preserves_executable_parent_and_child_arms() {
             aliases: Vec::new(),
             subcommands,
             args: Vec::new(),
-            flags: has_json
+            flags: has_flag
                 .then(|| jit::schema::Flag {
-                    name: "json".to_owned(),
+                    name: "full".to_owned(),
                     flag_type: "boolean".to_owned(),
                     required: false,
                     description: String::new(),
@@ -412,13 +414,24 @@ fn test_reflected_json_arm_paths_preserves_executable_parent_and_child_arms() {
         }
     }
 
-    let child = command(true, None);
-    let parent = command(true, Some(HashMap::from([("child".to_owned(), child)])));
-    let commands = HashMap::from([("parent".to_owned(), parent)]);
+    let parent = |child_name: &str| {
+        Some(HashMap::from([(
+            child_name.to_owned(),
+            command(false, None),
+        )]))
+    };
+    let commands = HashMap::from([
+        ("bare".to_owned(), command(true, parent("child"))),
+        ("group".to_owned(), command(false, parent("leaf"))),
+    ]);
 
     assert_eq!(
-        reflected_json_arm_paths_from(&commands),
-        BTreeSet::from(["parent".to_owned(), "parent child".to_owned()])
+        reflected_executable_arm_paths_from(&commands),
+        BTreeSet::from([
+            "bare".to_owned(),
+            "bare child".to_owned(),
+            "group leaf".to_owned(),
+        ])
     );
 }
 
@@ -438,7 +451,7 @@ fn test_coverage_errors_reports_stale_registered_arm() {
 
     assert_eq!(
         coverage_errors(&declared, &registrations),
-        vec!["stale registry arm `issue removed` no longer declares --json".to_owned()]
+        vec!["stale registry arm `issue removed` is no longer an executable arm".to_owned()]
     );
 }
 

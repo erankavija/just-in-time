@@ -754,8 +754,8 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     // Pack and add move a package between repositories, so each takes the
     // package location it works from and the archive it works through.
     for (command, flags) in [
-        ("pack", ["dry-run", "json", "output", "source"]),
-        ("add", ["archive", "destination", "dry-run", "json"]),
+        ("pack", ["dry-run", "output", "source"]),
+        ("add", ["archive", "destination", "dry-run"]),
     ] {
         assert_eq!(
             commands[command]["flags"]

@@ -20,6 +20,7 @@ jit worktree <COMMAND> [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `-q, --quiet` | Suppress non-essential output |
+| `--json` | Emit machine-readable JSON |
 | `-h, --help` | Print help information |
 
 ---

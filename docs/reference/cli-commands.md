@@ -488,7 +488,7 @@ jit gate add abc123 tests,clippy,fmt  ❌
 This follows industry standard (cargo, kubectl, git).
 
 ### `--json`
-Output data in JSON format for machine consumption.
+Output data in JSON format for machine consumption. The flag is global: it is accepted after any command segment, so `jit query --json available` and `jit query available --json` are equivalent.
 
 ### `--quiet` / `-q`
 Suppress non-essential output (success messages, headers, warnings). Preserves data output and errors.

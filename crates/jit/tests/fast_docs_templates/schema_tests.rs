@@ -68,22 +68,42 @@ fn test_schema_create_issue_args() {
 
 #[test]
 fn test_schema_has_json_flags() {
+    fn json_flag_paths(
+        prefix: &str,
+        commands: &std::collections::HashMap<String, jit::schema::Command>,
+    ) -> Vec<String> {
+        commands
+            .iter()
+            .flat_map(|(name, command)| {
+                let path = format!("{prefix}{name}");
+                let own = command
+                    .flags
+                    .iter()
+                    .any(|f| f.name == "json")
+                    .then(|| path.clone());
+                let nested = command
+                    .subcommands
+                    .as_ref()
+                    .map(|children| json_flag_paths(&format!("{path} "), children))
+                    .unwrap_or_default();
+                own.into_iter().chain(nested)
+            })
+            .collect()
+    }
+
     let schema = CommandSchema::generate();
 
-    // Check that commands with --json flag have it in flags
-    let query_all = schema
-        .commands
-        .get("query")
-        .unwrap()
-        .subcommands
-        .as_ref()
-        .unwrap()
-        .get("all")
-        .unwrap();
-    assert!(query_all.flags.iter().any(|f| f.name == "json"));
-
-    let status = schema.commands.get("status").unwrap();
-    assert!(status.flags.iter().any(|f| f.name == "json"));
+    // `--json` is one global option, inherited by every command rather than
+    // declared on any of them.
+    assert_eq!(
+        schema
+            .global_options
+            .iter()
+            .filter(|f| f.name == "json")
+            .count(),
+        1
+    );
+    assert_eq!(json_flag_paths("", &schema.commands), Vec::<String>::new());
 }
 
 #[test]
