@@ -100,7 +100,7 @@
           "key": "build-budget-selftest-gate",
           "title": "Build-budget checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress; port14 Rust-driven checker cases into script self-test; reused adoption checkout"
+          "status": "implemented shell311ceb4f2 and wrapper deletion50a6755e3; aggregate-size case preserved; final CI queued"
         },
         {
           "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -180,7 +180,7 @@
           "key": "query-available-domain-order",
           "title": "Available-work filtering and priority order become a pure domain query",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; pure available filter/order owner shared by query and claim; reused memory checkout"
         },
         {
           "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
@@ -1299,7 +1299,7 @@
     "active_worktree_limit": 2,
     "pending_external_landing": null,
     "worktrees": {
-      "agent-22355a56": "worktree-agent-559335cf",
+      "agent-22355a56": "worktree-agent-368df0c1",
       "agent-de880d9c": "worktree-agent-5b42e3ff"
     }
   },
