@@ -37,13 +37,20 @@ must set `label_namespace`.
 - `rule_validation` names one configured graph rule with `rule` and evaluates it
 with the gated issue as its sole firing subject. The complete repository may be
 used for graph and identifier-resolution context, but unrelated issues cannot
-contribute findings. A missing, disabled, or non-matching rule is an error.
+contribute findings. A missing, disabled, or non-matching rule is a fault.
 - `review_placeholder` passes so a workflow can be installed before an external
 reviewer is selected, but records an advisory structured finding and prints
 `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns
 while any gate uses it. Replace it with an `exec` checker (for example, `jit gate
 update <key> --checker-command <command>`) before treating the gate as review
 evidence.
+
+An in-process checker that cannot judge the repository records an `error` run:
+configuration or declarations that do not load, a broken repository structure, or
+a missing or invalid checker setting (`label_namespace`, the target label, `rule`).
+A finding about repository content records `failed`. `jit gate evaluate` reports an
+`error` run with exit code 10 and JSON verdict `error`, and the next evaluation
+retries it.
 
 Native checker types are selected in the gate registry; `jit gate define` does not
 have a checker-type option. These five independent definitions show the canonical

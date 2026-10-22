@@ -188,7 +188,7 @@ pub fn execute_gate_checker_with_context(
 
 /// Exit status (`EX_TEMPFAIL`) by which an exec checker reports an
 /// infrastructure fault instead of a verdict on the repository.
-const CHECKER_TEMPFAIL_EXIT: i32 = 75;
+pub(crate) const CHECKER_TEMPFAIL_EXIT: i32 = 75;
 
 /// Result of command execution
 struct CommandExecutionResult {
