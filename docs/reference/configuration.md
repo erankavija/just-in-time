@@ -519,11 +519,9 @@ motivates it: a command that writes only the shared control plane or
 machine-local runtime state still counts as state-mutating and is still
 refused. Over-refusing that class is the chosen behaviour.
 
-The stance is read from the repository's own `.jit/config.toml` only, never
-from user- or system-level config, and `jit config get` and `jit config show`
-do not report it: it is a repository-scoped policy, not something a user- or system-level
-config should be able to relax on the repository's behalf. The one surface that
-outranks it is the per-invocation
+The stance is a repository-scoped policy read from `.jit/config.toml`, and
+`jit config get` and `jit config show` do not report it. The one override is
+the per-invocation
 [`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) below.
 
 This repository declares the allowing stance (see `.jit/config.toml`),

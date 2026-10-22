@@ -291,8 +291,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The effective-configuration snapshot behind both `jit config get` and
     /// `jit config show`.
     ///
-    /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in the
-    /// config layer.
+    /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
+    /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
         EffectiveConfig::load(self.storage.root())?.full_snapshot()
     }

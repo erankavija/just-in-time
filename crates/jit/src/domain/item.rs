@@ -1501,7 +1501,7 @@ pub fn resolve_kind_alias<'a>(kinds: &'a [ItemKind], name: &str) -> Option<&'a s
 ///
 /// This is the SAME triple [`ItemKind::as_triple`] exposes (the engine's
 /// `criterion_ids` / `label-coverage` machinery consumes exactly these three
-/// keys), captured here as owned values so a config layer can rewrite a rule's
+/// keys), captured here as owned values so rule-declaration loading can rewrite a rule's
 /// assert table without holding a borrow. `marker` is `None` when the kind
 /// declares no marker.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1517,7 +1517,7 @@ pub struct KindTriple {
 /// Expand a named kind from the config registry into its `(section, marker,
 /// id-pattern)` [`KindTriple`].
 ///
-/// This is the ONE kind→triple resolver shared by every config layer that offers
+/// This is the ONE kind→triple resolver shared by every declaration loader that offers
 /// `kind =` sugar: it resolves the kind through [`ItemKind::from_config`] (so
 /// declared values and id-pattern validation are applied identically to indexing)
 /// and returns the same triple [`ItemKind::as_triple`] exposes. The engine then
