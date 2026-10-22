@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a4759a3ec7a76615c68faaf5462691675d89a45c",
+  "completed_at": "2026-10-22T14:43:27.209285564Z",
+  "duration_ms": 322696,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are met; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bba89543-127d-4c86-9a2c-2850d13387ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:38:04.513100327Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8773e7305; a4759a3ec (merge, same five-file first-parent delta)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; issue Markdown\nResolved items: @/issue/287eef78/requirement/REQ-01, @/issue/287eef78/requirement/REQ-02, @/issue/287eef78/requirement/REQ-03, @/issue/842b0ac6/requirement/REQ-20, @/charter/D-18, @/invariant/orthogonal-tests, @/invariant/essential-code-prose\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T14:36:35.610736714+00:00)\nTruncation recovery: re-read root-scoped policy, individual patches by path, and bounded current callers/tests; excluded the merge second-parent diff as unrelated parent history.\n\n1. No findings. The typed error now covers fail and automated-evaluation paths, the JSON classifier yields `INVALID_ARGUMENT`, and the focused CLI test verifies exit 2.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are met; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
