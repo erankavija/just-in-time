@@ -295,10 +295,7 @@ EOF
   chmod +x "$fake_bin/cargo" "$fake_bin/git"
   printf '0\n' >"$work/cargo-runs"
 
-  # The inner run drives the fake cargo above, so it compiles and executes
-  # nothing and needs no host-wide build lock. Suppressing the acquisition is
-  # what lets the self-test run from inside a cargo-ci gate, which holds that
-  # lock for its whole duration (jit:6d10e5d4).
+  # Fake Cargo performs no build, so the inner run needs no host-wide lock.
   PROFILE_TEST_SUITE_OUTPUT="$output" PROFILE_TEST_SUITE_FAKE_CARGO_RUNS="$work/cargo-runs" \
     PROFILE_TEST_SUITE_LOCKED=1 PATH="$fake_bin:$PATH" "$script_path"
   validate_artifact "$output"
@@ -323,11 +320,8 @@ PYEOF
 #
 # Only the measured profiling run compiles or executes anything, so only it
 # takes the lock. `--validate` parses a JSON artifact and `--self-test` drives
-# this script against a fake cargo; neither competes for CPU or cache. Taking
-# the lock for those modes deadlocks any caller already holding it — the test
-# that runs `--self-test` from inside a cargo-ci run would wait on the lock
-# that run holds for its whole duration, until nextest's hard per-test timeout
-# kills it (jit:6d10e5d4).
+# this script against a fake cargo. Neither needs the build lock, and acquiring
+# it would deadlock callers that already hold it.
 if [[ $# -eq 0 && -z "${PROFILE_TEST_SUITE_LOCKED:-}" ]]; then
   build_lock="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
   if command -v flock >/dev/null 2>&1; then
