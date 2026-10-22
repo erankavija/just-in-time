@@ -509,10 +509,6 @@ pub fn execute_claim_status<S: IssueStore>(
 
 /// Lists all active leases across all agents and worktrees.
 ///
-/// # Arguments
-///
-/// * `_storage` - Issue storage (unused but kept for consistency)
-///
 /// # Returns
 ///
 /// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
