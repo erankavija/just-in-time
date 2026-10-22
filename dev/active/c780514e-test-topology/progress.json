@@ -7,6 +7,14 @@
       "wave_number": 1,
       "issues": [
         {
+          "id": "d423752b-cedc-431b-be9e-d327f8b61387",
+          "short_id": "d423752b",
+          "key": "profiled-fixture-cold-build",
+          "title": "No test waits on a cold profiled-repository fixture build",
+          "classification": "implementation",
+          "status": "pending (next priority)"
+        },
+        {
           "id": "a3dd995a-26d2-4039-8a69-332eca663885",
           "short_id": "a3dd995a",
           "key": "profiled-fixture-build-lock",
@@ -44,7 +52,7 @@
           "key": "server-shutdown-test-bound",
           "title": "Server shutdown force-close test stays under the per-test bound",
           "classification": "implementation",
-          "status": "merged; gating"
+          "status": "done"
         },
         {
           "id": "d35c610b-f752-4fe3-89a9-7eca1b3d52b3",
@@ -1224,7 +1232,14 @@
     "shared-test-fixtures": "c5aafdc0-998c-46a0-a286-7f853f0b814a",
     "suite-cost": "45e3e442-e157-4d73-918c-2fc7df04accc"
   },
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "d423752b",
+      "title": "No test waits on a cold profiled-repository fixture build",
+      "reason": "steward evidence: a3dd995a's bounded lock wait still fails on cold keys after a crate change (run 6978f6b9); steward-approved follow-up",
+      "wired": "suite-cost story and profiled-fixture-input-key depend on it"
+    }
+  ],
   "escalations": [
     {
       "issue": "0bf97911",

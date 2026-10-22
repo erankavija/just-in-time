@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5f3e8140d0bcba6ac4ae1a71ad707ea7215874f8",
+  "completed_at": "2026-10-22T15:40:45.570913009Z",
+  "duration_ms": 244030,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are covered by the attributable shutdown and process-level tests; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6709b2bb-bf67-4a17-a4f8-8264350a3ee0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:36:41.540867265Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3b7b8d5ec and merge ef97020c (first-parent delta duplicates 3b7b8d5ec)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-13 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T15:36:15Z); code-review pending\nTruncation recovery: re-read each attributable path patch, merge first-parent delta, live shutdown wiring, tests, and policies in bounded calls\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are covered by the attributable shutdown and process-level tests; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-22T15:40:49.042225799Z",
+  "dependencies": [],
+  "description": "No test waits on a cold profiled-repository fixture build, so the fixture's consumers stay within the suite's per-test bound on the first run after a crate change.\n\n## Background\n\nThe profiled-repository fixture in `crates/jit/src/test_utils.rs` caches one built repository per key and serialises builds of a key under a cross-process lock. The wait for that lock is bounded at 12 s, and a timeout fails with an error naming the lock, the key and the holder. On the first full suite run after any crate change the key changes. Building the cold key under host contention then takes longer than the bound, so a consumer fails before the build finishes. Observed on one run: `test_profiled_repository_fixture_clones_are_isolated_and_profiled` failed with \"profiled-repository fixture key … still being built; lock … held by pid … (fixture-build:…) / Lock timeout … after 12s\", the in-memory variant reached the 20 s runner timeout, and the suite clock was 31.6 s.\n\n## Success Criteria\n\n- [hard] REQ-01: Every consumer of the profiled-repository fixture in the default suite either finds its key already built before the consumer's own timeout starts, or waits for a build that does not count against that consumer's per-test timeout; no consumer fails or times out because another process is building its key.\n- [hard] REQ-02: On a cold fixture cache, with the target freshly rebuilt, the default suite's fixture consumers each finish within 5 s at host load ≤ 10.\n- [hard] REQ-03: A test observes the cold-cache case: with no built entry for a key and several concurrent consumers, every consumer succeeds within the per-test bound and the key is built exactly once.\n- [hard] REQ-04: The fixture still builds each key at most once per run, and the bounded lock wait and its named timeout error remain for a builder that stalls.\n\n## Notes\n\nBuilding each needed fixture once ahead of the tests (a test-runner setup step) or excluding the build from consumers' timeouts are both acceptable; the change is scoped to the fixture and its runner configuration.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-22T15:40:49.042225799Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d423752b-cedc-431b-be9e-d327f8b61387",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "satisfies:c780514e/REQ-13",
+    "satisfies:c780514e/REQ-11",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "No test waits on a cold profiled-repository fixture build",
+  "updated_at": "2026-10-22T15:40:49.042225799Z"
+}

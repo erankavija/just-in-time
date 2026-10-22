@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ac6602f3-ff29-4eee-ad0f-615c26c83a7c",
-      "status": "passed",
-      "updated_at": "2026-10-22T15:23:48.149135644Z",
+      "run_id": "6978f6b9-512e-47db-b18a-38a530559fb3",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:39:42.624105724Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared fixture for spawning jit in CLI tests",
-  "updated_at": "2026-10-22T15:37:08.304861048Z"
+  "updated_at": "2026-10-22T15:39:42.624105724Z"
 }
