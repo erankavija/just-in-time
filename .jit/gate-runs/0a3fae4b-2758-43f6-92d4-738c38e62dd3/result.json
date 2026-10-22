@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/rust-build-budget.sh --self-test",
+  "commit": "427c49f2bcb60c2fe82127857e231f3ac0d710b3",
+  "completed_at": "2026-10-22T21:03:05.734159062Z",
+  "duration_ms": 503,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "build-budget-selftest",
+  "inputs_digest": "d839194f29edd4389217896a1a0315a64c590e1f06066a9c2dde1cef1f84123d",
+  "issue_id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0a3fae4b-2758-43f6-92d4-738c38e62dd3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:03:05.231060035Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "PASS: exact-boundaries\nPASS: targets-over-limit\nPASS: bytes-over-limit\nPASS: profile-drift\nPASS: remote-resolver\nPASS: duplicate-tls\nPASS: duration-absent\nPASS: duration-invalid-29.999\nPASS: duration-invalid--1\nPASS: duration-invalid-empty\nPASS: duration-below\nPASS: duration-at-threshold\nPASS: duration-above-and-diagnostic\nPASS: missing-jq\nrust-build-budget: self-test passed\n"
+}

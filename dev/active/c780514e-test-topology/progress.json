@@ -100,7 +100,7 @@
           "key": "build-budget-selftest-gate",
           "title": "Build-budget checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "implemented shell311ceb4f2 and wrapper deletion50a6755e3; aggregate-size case preserved; final CI queued"
+          "status": "done"
         },
         {
           "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -124,7 +124,7 @@
           "key": "docs-check-selftest-gate",
           "title": "Documentation checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "implemented22db1218c;67 self-test assertions pass; finalCI pending"
         },
         {
           "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
@@ -140,7 +140,7 @@
           "key": "finalization-owner-gaps",
           "title": "Repository-state tests own each finalization case",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; Luna xhigh selected for bounded single-file unit ownership completion, stronger lead audit and unchanged independent gates; reused memory checkout"
         },
         {
           "id": "df505379-385f-4fe7-b7bd-4af3bb3b88aa",
@@ -180,7 +180,7 @@
           "key": "query-available-domain-order",
           "title": "Available-work filtering and priority order become a pure domain query",
           "classification": "implementation",
-          "status": "in_progress; pure available filter/order owner shared by query and claim; reused memory checkout"
+          "status": "done"
         },
         {
           "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
@@ -1283,6 +1283,10 @@
       "from": "22355a56 and rework-tu1 workers",
       "finding": "test_utils::tests::test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target fails intermittently in worktree lib runs ('compile the isolated setup artifact: error: Current directory is invalid'); it spawns a nested cargo build",
       "disposition": "owned by fixture-setup-hook-removal (removes the receipt path) and REQ-10 (no nested cargo build); watch for it in gate runs"
+    },
+    {
+      "finding": "Main query gate fe708443 failed 34.565s suite budget while same-source worker passed17.799s; main launcher omitted required CARGO_INCREMENTAL=0. Input-key reuse63c1d94d correctly retained failure despite changed external environment.",
+      "disposition": "Resolved operational mismatch by explicit export0 in ephemeral land/regate scripts. Raw nextest diagnostic13.237s at normal priority is not comparable gate proof; authoritative normal-nice gate911fbb9e passed14.542s suite,4580tests+25docs. No source or budget change; timing causation not proven. Always set0 explicitly and investigate before forced checker execution."
     }
   ],
   "traps": [
@@ -1536,6 +1540,61 @@
       "stale_narrative": "all active missing-Cargo skip references removed including adjacent budget-fixture comment; historical evidence preserved",
       "deferred_items": "no linked design documents",
       "holistic": "no global env mutation, no fallback Cargo, policy assertions unchanged; red/green evidence recorded in ddd25c64e commit body"
+    },
+    "5b42e3ff": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "16bbf6d1-3d5e-4f33-ae08-c09264d88b3b",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "8d1f0916-8731-4d36-8fbf-315cfec8914a",
+          "status": "passed"
+        },
+        {
+          "key": "build-budget-selftest",
+          "run_id": "0a3fae4b-2758-43f6-92d4-738c38e62dd3",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "scripts/rust-build-budget.sh self_test covers all fourteen prior properties via thirteen fixture cases plus missing-jq probe; durable mapping in311ceb4f2; aggregate bytes case uses two individually-under-budget executables",
+        "REQ-02": "build-budget-selftest runs script --self-test with mode auto, no auto key; inputs include script with all embedded fixtures",
+        "REQ-03": "main self-test gate passed; required-tool preflight exits2 and missing-jq fixture checks2; generic runner owns nonzero outcome contract",
+        "REQ-04": "535-line Rust wrapper and scratch_build module declaration removed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "tracked alias sweep finds historical investigations, benchmark logs and changelog only; current TESTING and rendered gate description updated",
+      "deferred_items": "no linked design documents",
+      "holistic": "same budget values and normal checker preserved; fixtures now owned by checker; inherited BUSY_HOST_OVERRIDE cleared for child fixtures; no Cargo in self-test"
+    },
+    "368df0c1": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "911fbb9e-f593-4912-97cf-09212ed34d25",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "cfa9a7e4-6f07-49ad-bd46-eb0081f7d767",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "domain::queries::query_available composes existing pure readiness/label/priority filters and stable priority ordering; query command and claim path delegate without local sorts",
+        "REQ-02": "domain unit matrix covers absent/all priorities and empty/exact/wildcard/AND/repeated/nonmatching labels; ties unit and randomized composition/order property preserve input order",
+        "REQ-03": "command validates patterns and reads one issue snapshot; existing claim and CLI boundary tests retained and full CI passed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "active Rust/Markdown sweep found no pending or future claims for query_available or AvailableFilter; raw historical benchmark inventory matches are measurement data",
+      "deferred_items": "no linked design documents",
+      "holistic": "Pure domain composition reuses canonical query functions; claim expression context still derives from all issues; no new I/O or layer dependency"
     }
-  }
+  },
+  "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates."
 }

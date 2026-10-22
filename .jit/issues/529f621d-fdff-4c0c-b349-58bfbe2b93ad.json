@@ -7,6 +7,7 @@
   ],
   "description": "Give the dependency auto-transition a pure domain owner, so the command cascade only applies a decision the domain makes.\n\n## Background\n\nThe readiness predicates are tested in `crates/jit/src/domain/types.rs:2546-2703`, and `domain/types.rs` already decides the readiness change for one stored issue. The cascade to dependents is command-layer orchestration (`crates/jit/src/commands/issue.rs:816-859`, `crates/jit/src/commands/mod.rs:2791`). It is re-proven by four CLI tests in `crates/jit/tests/cli_repo_workflow/workflow_tests.rs` (`:529`, `:577`, `:646`, `:698`) and by harness tests (`commands/bulk_update.rs:2001`, `tests/fast_issue/lifecycle_timestamps_tests.rs:89`).\n\n## Success Criteria\n\n- [hard] REQ-01: One pure domain function takes a transitioned issue and the state of its dependents and returns the dependents that become ready. The command cascade applies that result and decides nothing itself.\n- [hard] REQ-02: Unit tests and a property-based test of that function own the auto-transition rules, including dependents with other unmet dependencies, rejected dependencies and dependents outside backlog, and each rule the four `workflow_tests.rs` cases and the lifecycle harness cascade assertions check.\n- [hard] REQ-03: Command behaviour and emitted events are unchanged.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T21:35:58.088216904Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Auto-transition readiness is decided by a pure domain function",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-22T21:35:58.088216904Z"
 }
