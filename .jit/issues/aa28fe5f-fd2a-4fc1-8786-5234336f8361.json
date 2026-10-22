@@ -14,7 +14,26 @@
     "code-review",
     "cargo-ci-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9cf51e90-2866-4430-9dcb-013ce70bc1e6",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:27:55.785988903Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-selftest": {
+      "run_id": "f4f29148-5bba-4c2d-b238-220970ae5bcb",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:28:01.327839482Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ccbebffe-47dd-4240-b356-ef2c12af7226",
+      "status": "passed",
+      "updated_at": "2026-10-22T20:29:37.614609494Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
   "labels": [
     "type:task",
@@ -32,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cargo-ci self-test runs as a declared gate",
-  "updated_at": "2026-10-22T20:23:17.256944295Z"
+  "updated_at": "2026-10-22T20:29:37.614609494Z"
 }
