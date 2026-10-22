@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7f922856-611f-4a9a-9852-b077012c5de6",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:03:42.589350283Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9fa12e75-2632-4e68-8d67-b80caf78770d",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Render gate run status lines through one output renderer",
-  "updated_at": "2026-10-22T14:30:34.773126261Z"
+  "updated_at": "2026-10-22T15:03:42.589350283Z"
 }

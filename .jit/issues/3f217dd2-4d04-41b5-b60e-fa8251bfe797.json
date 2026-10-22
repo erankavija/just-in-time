@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-22T15:01:49.070998999Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "The profile lifecycle event records what an apply did: the package id, its version and the variable values applied, with a status vocabulary that no longer refers to records, reconfigure or upgrade.\n\n## Background\n\nCharter decision D-8: \"The profile operation's event records what was applied.\" The lifecycle vocabulary (`crates/jit/src/domain/types.rs:1143-1166`) carries reconfigure and upgrade operations and statuses, and its installed status is defined as \"no prior record existed\". The event payload (`ProfileLifecycleProfile`, `types.rs:1181`) holds id, status and variables but no version. Line numbers are at the investigation baseline.\n\nStruct literals of the event are built in `crates/jit/src/domain/event_log.rs:101`, `crates/jit/src/repository_state/mutation.rs:2522` and `crates/jit/src/storage/repository_state_store_tests.rs:2360`, and the event is assembled in `crates/jit/src/repository_state/initialize.rs` (`profile_lifecycle_profile`). The event catalog (`crates/jit/src/domain/event_catalog.rs:264`) describes the payload as \"without resolved values\"; the generated events reference (`docs/reference/events.md`) is rendered from that catalog.\n\n## Success Criteria\n\n- [hard] REQ-01: The lifecycle operation and status vocabularies hold no reconfigure or upgrade member, and no status is defined by a record's presence.\n- [hard] REQ-02: The profile lifecycle event records the package id, its version and the variable values applied.\n- [hard] REQ-03: The event catalog describes that payload, and the generated events reference is regenerated from it.\n- [hard] REQ-04: Unit tests over event construction own the payload properties.\n",
   "documents": [],
+  "first_ready_at": "2026-10-22T15:01:36.123237065Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Record what was applied in the profile lifecycle event",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-10-22T15:01:49.070998999Z"
 }

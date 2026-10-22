@@ -584,7 +584,8 @@
     "2026-10-22 ~05:30-09:30: seventh shared usage-limit stall; work was resumed at 09:31. just-in-time-59 showed a 'waiting' state (possibly a permission prompt in its terminal that needs the user); it was asked to record any such block.",
     "2026-10-22 ~10:30-17:00: the WEEKLY usage limit was hit (resets 17:00 Helsinki); work was resumed at 17:01. just-in-time-59 has shown 'waiting' since ~09:30 (7.5 h). It is probably blocked on a permission prompt in its own terminal, which needs the user. Its b697a3f7 planning WIP was checkpointed by the steward (0c4ec0ae6).",
     "2026-10-22 ~17:45: c780514e plan-review passed on attempt 5; breakdown of 151 issues instantiated; B gates running. just-in-time-05 will execute it (same-session deviation, contained as for 842b0ac6), fixture-timeout fix and waves 1-2 first, preferring sonnet and haiku workers for weekly-quota pacing.",
-    "2026-10-22 ~18:00: c780514e planning complete (B 3d7d8ab2 done; both gates passed). Execution started under just-in-time-05; wave 1a is the fixture-lock timeout fix (a3dd995a) and rule-warning tests down a layer (9a07026e)."
+    "2026-10-22 ~18:00: c780514e planning complete (B 3d7d8ab2 done; both gates passed). Execution started under just-in-time-05; wave 1a is the fixture-lock timeout fix (a3dd995a) and rule-warning tests down a layer (9a07026e).",
+    "2026-10-22 ~18:15: c780514e's a3dd995a and 9a07026e fixed the recurring fixture timeouts (bounded 12 s lock wait with a named error; cli_warnings now in-process at ~0.03 s). The force-rerun exemption for that signature is withdrawn. Suite clock is 23.6-23.7 s at load 10-17."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
@@ -596,7 +597,7 @@
     {
       "date": "2026-10-21",
       "priority": "urgent",
-      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier. Additional data: fast_rules cli_warnings_integration_tests take ~6.3 s each alone and hit the 20 s per-test timeout under any concurrency. This is the recurring 'load' timeout pattern and a test-topology candidate (c780514e). UPDATE 23:40: d125490a hit 31.6 s on a quiet host; it is being measured to see whether the change itself causes the overrun."
+      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier. Additional data: fast_rules cli_warnings_integration_tests take ~6.3 s each alone and hit the 20 s per-test timeout under any concurrency. This is the recurring 'load' timeout pattern and a test-topology candidate (c780514e). UPDATE 23:40: d125490a hit 31.6 s on a quiet host; it is being measured to see whether the change itself causes the overrun. UPDATE 18:15: after c780514e's first fixes the suite clock is 23.6-23.7 s at load 10-17 (the flaky timeouts are gone). More trimming is coming from c780514e."
     },
     {
       "date": "2026-10-21",

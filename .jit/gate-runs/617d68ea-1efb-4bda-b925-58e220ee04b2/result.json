@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "0e35ae0ed05f147e9ae7e8e7d28bc6f7f008c885",
+  "completed_at": "2026-10-22T15:06:12.103744731Z",
+  "duration_ms": 113935,
+  "evaluation_stability": "stable",
+  "exit_code": 2,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "0cef60894502551c3406d4cc20cc203d95c20def77d7b71110da2af7fb857293",
+  "issue_id": "0973ed93-e516-41fd-8f55-9eef33ab2fa8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "617d68ea-1efb-4bda-b925-58e220ee04b2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T15:04:18.168696836Z",
+  "status": "failed",
+  "stderr": "ERROR: cargo-ci: timed out after 1800s waiting for /run/user/1000/cargo-ci.lock\nCOMMAND            PID MODE   PATH\n       A holder with PPID 1 and no live cargo/rustc is a leaked daemon,\n       not a running build; stop it (e.g. sccache --stop-server) and retry.\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 46487 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 46487 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 37519 ms, warmed 17 executables (1973248728 bytes) in 72 ms.\n  ✓ fmt: ok (1552 ms)\n  ✓ clippy: ok (28049 ms)\n  ✓ suite-build: built in 37519 ms, warmed 17 executables (1973248728 bytes) in 72 ms (37594 ms)\n  ✓ test: 4567 passed, 0 failed, 0 skipped (42429 ms)\n  ✓ doctest: 58 passed, 0 failed, 0 ignored (4040 ms)\n  ✓ suite-clock: 46487 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (82 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=8.63 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}
