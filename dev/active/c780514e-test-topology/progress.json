@@ -116,7 +116,7 @@
           "key": "dependency-policy-tool-failure",
           "title": "Dependency-feature policy tests fail when cargo is missing",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; require suite Cargo and remove two false-pass skip paths; reused memory checkout"
         },
         {
           "id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
@@ -172,7 +172,7 @@
           "key": "profile-suite-selftest-gate",
           "title": "Suite-profiler self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress; reuse adoption checkout; remove default-suite profiler wrapper"
+          "status": "source6e9369142 integrated2b54bf3ee; fullCI4590+25 pass; awaiting main gates"
         },
         {
           "id": "368df0c1-989f-4935-b240-3c6ea282c5ae",
@@ -1299,7 +1299,7 @@
     "active_worktree_limit": 2,
     "pending_external_landing": null,
     "worktrees": {
-      "agent-22355a56": "worktree-agent-871df4b0",
+      "agent-22355a56": "worktree-agent-559335cf",
       "agent-de880d9c": "worktree-agent-7a412cb0"
     }
   },
