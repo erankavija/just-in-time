@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2f837120-4e6d-4523-ab82-eee31d2ea44a",
+      "status": "failed",
+      "updated_at": "2026-10-22T19:08:05.835319627Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "63c11d08-054e-471a-9b0c-491c30b8d8a1",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the remaining domain re-export paths",
-  "updated_at": "2026-10-22T19:03:14.166690306Z"
+  "updated_at": "2026-10-22T19:08:05.835319627Z"
 }
