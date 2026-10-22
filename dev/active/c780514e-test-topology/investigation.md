@@ -351,7 +351,7 @@ A function is listed when its body does one of these:
 
 A row's identity is its file and function name (`Type::method` inside an `impl`). The line is context at the sweep commit. Each listed function is classified as one of:
 
-- **setup**: builds a repository, store, executor or declaration directory from scratch, opens an executor over a store it is given, or hand-rolls `git init`. The owner entry names it under "Helpers to retire".
+- **setup**: builds a repository, store, executor or declaration directory from scratch, opens an executor over a store it is given, or hand-rolls `git init`. The owner entry, named in the Owner column, lists it under "Helpers to retire".
 - **scenario**: arranges paths, writes scenario declarations or records into a repository it is given, or reads results.
 - **subject**: the backend, session, layout, image or wrapper under test.
 
@@ -361,33 +361,33 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 
 | File | Function | Line | Class | Owner |
 | --- | --- | ---: | --- | --- |
-| `commands/archive.rs` | `executor` | 893 | setup | `library-file-setup-adoption` |
-| `commands/archive.rs` | `executable_document_repo` | 994 | setup | `library-file-setup-adoption` |
-| `commands/archive.rs` | `configured_repo` | 1764 | setup | `library-file-setup-adoption` |
-| `commands/archive.rs` | `development_root_repo` | 1995 | setup | `library-file-setup-adoption` |
-| `commands/archive.rs` | `directory_link_repo` | 2399 | setup | `library-file-setup-adoption` |
-| `commands/archive.rs` | `executable_container_repo` | 2494 | setup | `library-file-setup-adoption` |
-| `commands/batch_create.rs` | `executor` | 672 | setup | `library-command-memory-setup-adoption` |
-| `commands/batch_create.rs` | `coverage_executor` | 926 | setup | `library-command-memory-setup-adoption` |
-| `commands/bulk_update.rs` | `blocked_dependent_fixture` | 1973 | setup | `library-command-memory-setup-adoption` |
-| `commands/claim.rs` | `create_test_issue` | 1045 | setup | `library-file-setup-adoption` |
+| `commands/archive.rs` | `executor` | 893 | setup | `library-archive-file-setup-adoption` |
+| `commands/archive.rs` | `executable_document_repo` | 994 | setup | `library-archive-file-setup-adoption` |
+| `commands/archive.rs` | `configured_repo` | 1764 | setup | `library-archive-file-setup-adoption` |
+| `commands/archive.rs` | `development_root_repo` | 1995 | setup | `library-archive-file-setup-adoption` |
+| `commands/archive.rs` | `directory_link_repo` | 2399 | setup | `library-archive-file-setup-adoption` |
+| `commands/archive.rs` | `executable_container_repo` | 2494 | setup | `library-archive-file-setup-adoption` |
+| `commands/batch_create.rs` | `executor` | 672 | setup | `library-batch-memory-setup-adoption` |
+| `commands/batch_create.rs` | `coverage_executor` | 926 | setup | `library-batch-memory-setup-adoption` |
+| `commands/bulk_update.rs` | `blocked_dependent_fixture` | 1973 | setup | `library-batch-memory-setup-adoption` |
+| `commands/claim.rs` | `create_test_issue` | 1045 | setup | `library-gate-claim-file-setup-adoption` |
 | `commands/dependency.rs` | `mark_index_deleted` | 1213 | scenario | — |
-| `commands/events.rs` | `seeded_override_executor` | 52 | setup | `library-command-memory-setup-adoption` |
-| `commands/gate.rs` | `setup` | 1445 | setup | `library-command-memory-setup-adoption` |
-| `commands/gate_check.rs` | `setup` | 1665 | setup | `library-command-memory-setup-adoption` |
+| `commands/events.rs` | `seeded_override_executor` | 52 | setup | `library-batch-memory-setup-adoption` |
+| `commands/gate.rs` | `setup` | 1445 | setup | `library-gate-memory-setup-adoption` |
+| `commands/gate_check.rs` | `setup` | 1665 | setup | `library-gate-memory-setup-adoption` |
 | `commands/gate_check.rs` | `seed_rule_validation_rules` | 1704 | scenario | — |
-| `commands/gate_check.rs` | `setup_file_repository` | 2077 | setup | `library-file-setup-adoption` |
-| `commands/gate_check.rs` | `ReuseFixture::new` | 2149 | setup | `library-file-setup-adoption` |
+| `commands/gate_check.rs` | `setup_file_repository` | 2077 | setup | `library-gate-claim-file-setup-adoption` |
+| `commands/gate_check.rs` | `ReuseFixture::new` | 2149 | setup | `library-gate-claim-file-setup-adoption` |
 | `commands/gate_check.rs` | `ReuseFixture::rewrite_checker_command` | 2269 | scenario | — |
 | `commands/gate_check.rs` | `write_corrupt_gate_run` | 2573 | scenario | — |
-| `commands/gate_cli_tests.rs` | `setup` | 11 | setup | `library-command-memory-setup-adoption` |
-| `commands/hooks.rs` | `diverged_strict_repo` | 254 | setup | `library-file-setup-adoption` |
-| `commands/init.rs` | `executor_with_layout` | 665 | setup | `library-file-setup-adoption` |
-| `commands/init.rs` | `assert_repo_valid` | 675 | setup | `library-file-setup-adoption` |
+| `commands/gate_cli_tests.rs` | `setup` | 11 | setup | `library-gate-memory-setup-adoption` |
+| `commands/hooks.rs` | `diverged_strict_repo` | 254 | setup | `library-gate-claim-file-setup-adoption` |
+| `commands/init.rs` | `executor_with_layout` | 665 | setup | `library-init-profile-file-setup-adoption` |
+| `commands/init.rs` | `assert_repo_valid` | 675 | setup | `library-init-profile-file-setup-adoption` |
 | `commands/init.rs` | `declare_before_init` | 748 | subject | — |
-| `commands/invariant.rs` | `exec` | 76 | setup | `library-command-memory-setup-adoption` |
-| `commands/issue.rs` | `setup` | 917 | setup | `library-command-memory-setup-adoption` |
-| `commands/issue.rs` | `setup_over` | 921 | setup | `library-command-memory-setup-adoption` |
+| `commands/invariant.rs` | `exec` | 76 | setup | `library-issue-memory-setup-adoption` |
+| `commands/issue.rs` | `setup` | 917 | setup | `library-issue-memory-setup-adoption` |
+| `commands/issue.rs` | `setup_over` | 921 | setup | `library-issue-memory-setup-adoption` |
 | `commands/item.rs` | `executor_with` | 614 | setup | `library-item-validate-memory-setup-adoption` |
 | `commands/item.rs` | `project_exec_with_name` | 629 | setup | `library-item-validate-memory-setup-adoption` |
 | `commands/item.rs` | `project_exec` | 728 | setup | `library-item-validate-memory-setup-adoption` |
@@ -398,10 +398,10 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `commands/item.rs` | `registry_exec_with_gates` | 1344 | setup | `library-item-validate-memory-setup-adoption` |
 | `commands/item.rs` | `registry_exec_with_rules_and_gates` | 1428 | setup | `library-item-validate-memory-setup-adoption` |
 | `commands/item.rs` | `config_exec` | 1536 | setup | `library-item-validate-memory-setup-adoption` |
-| `commands/mod.rs` | `precheck_evidence_fixture` | 3572 | setup | `library-command-memory-setup-adoption` |
-| `commands/profile.rs` | `fixture` | 2262 | setup | `library-file-setup-adoption` |
+| `commands/mod.rs` | `precheck_evidence_fixture` | 3572 | setup | `library-issue-memory-setup-adoption` |
+| `commands/profile.rs` | `fixture` | 2262 | setup | `library-init-profile-file-setup-adoption` |
 | `commands/profile.rs` | `record_for` | 2408 | scenario | — |
-| `commands/profile.rs` | `bare_repository_beside_shipped_packages` | 3016 | setup | `library-file-setup-adoption` |
+| `commands/profile.rs` | `bare_repository_beside_shipped_packages` | 3016 | setup | `library-init-profile-file-setup-adoption` |
 | `commands/profile.rs` | `published_configuration` | 3044 | scenario | — |
 | `commands/validate.rs` | `dangling_exec` | 3004 | setup | `library-item-validate-memory-setup-adoption` |
 | `commands/validate.rs` | `dangling_exec_with_namespaces` | 3023 | setup | `library-item-validate-memory-setup-adoption` |
@@ -411,7 +411,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `document/reference.rs` | `layout` | 264 | subject | — |
 | `domain/item.rs` | `invariant_cfg` | 1656 | scenario | — |
 | `gate_execution.rs` | `worktree_with_data_root` | 977 | subject | — |
-| `main.rs` | `repository_declaring` | 7645 | setup | `library-file-setup-adoption` |
+| `main.rs` | `repository_declaring` | 7645 | setup | `library-store-validation-file-setup-adoption` |
 | `main.rs` | `checkout_paths` | 7656 | scenario | — |
 | `profile/drift_report.rs` | `subject` | 181 | subject | — |
 | `profile/package_capture.rs` | `Fixture::new` | 557 | subject | — |
@@ -432,7 +432,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `storage/claim_coordinator_proptests.rs` | `setup_coordinator` | 14 | subject | — |
 | `storage/discovery.rs` | `index_in` | 112 | subject | — |
 | `storage/external_publish.rs` | `external_target` | 330 | subject | — |
-| `storage/gate_runs.rs` | `setup_storage` | 17 | setup | `library-file-setup-adoption` |
+| `storage/gate_runs.rs` | `setup_storage` | 17 | setup | `library-store-validation-file-setup-adoption` |
 | `storage/gate_runs.rs` | `record_gate_run` | 25 | scenario | — |
 | `storage/json.rs` | `configure_test_layout` | 1565 | subject | — |
 | `storage/json.rs` | `retained_storage` | 1614 | subject | — |
@@ -443,17 +443,17 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `storage/repository_state_store_tests.rs` | `publish_issue` | 263 | subject | — |
 | `storage/repository_state_store_tests.rs` | `sessions_over` | 1188 | subject | — |
 | `storage/repository_state_store_tests.rs` | `capture_listing_errors` | 1278 | subject | — |
-| `storage/repository_state_store_tests.rs` | `capture_git_fixture` | 2587 | setup | `library-git-fixture-adoption` |
+| `storage/repository_state_store_tests.rs` | `capture_git_fixture` | 2587 | setup | `library-storage-git-fixture-adoption` |
 | `storage/repository_state_store_tests.rs` | `WriteSetFixture::new` | 2801 | subject | — |
 | `storage/repository_state_store_tests.rs` | `FileSessionBackend::seeded` | 3273 | subject | — |
 | `validation/repository.rs` | `fixture` | 866 | scenario | — |
-| `validation/repository.rs` | `executor` | 892 | setup | `library-file-setup-adoption` |
+| `validation/repository.rs` | `executor` | 892 | setup | `library-store-validation-file-setup-adoption` |
 
 **`crates/jit/tests/cli_gate`**
 
 | File | Function | Line | Class | Owner |
 | --- | --- | ---: | --- | --- |
-| `bracket_coverage_gate_run_test.rs` | `setup_bracket_repo` | 138 | setup | `cli-gate-migration` |
+| `bracket_coverage_gate_run_test.rs` | `setup_bracket_repo` | 138 | setup | `cli-gate-evaluate-spawn-migration` |
 | `bracket_coverage_gate_run_test.rs` | `assert_gate_run` | 191 | scenario | — |
 | `gate_cli_integration_test.rs` | `enable_warn_leases` | 75 | scenario | — |
 | `gate_evaluate_all_test.rs` | `define_review_placeholder_gate` | 90 | scenario | — |
@@ -471,28 +471,28 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `failure_probe_fixture.rs` | `FailureFixture::apply` | 605 | scenario | — |
 | `issue_update_atomicity_tests.rs` | `repository_text` | 16 | scenario | — |
 | `issue_update_description_ops_tests.rs` | `assert_last_event_is_description_update` | 86 | scenario | — |
-| `serve_failure_envelope_tests.rs` | `setup` | 13 | setup | `cli-issue-envelope-migration` |
+| `serve_failure_envelope_tests.rs` | `setup` | 13 | setup | `cli-issue-error-output-spawn-migration` |
 
 **`crates/jit/tests/cli_item_validate`**
 
 | File | Function | Line | Class | Owner |
 | --- | --- | ---: | --- | --- |
-| `decision_kind_tests.rs` | `setup_test_repo` | 48 | setup | `cli-item-validate-migration` |
+| `decision_kind_tests.rs` | `setup_test_repo` | 48 | setup | `cli-item-kind-spawn-migration` |
 | `decision_kind_tests.rs` | `default_executor_with` | 163 | setup | `cli-item-validate-in-process-setup-adoption` |
-| `decision_risk_story_tests.rs` | `setup_test_repo` | 58 | setup | `cli-item-validate-migration` |
+| `decision_risk_story_tests.rs` | `setup_test_repo` | 58 | setup | `cli-item-kind-spawn-migration` |
 | `decision_risk_story_tests.rs` | `default_executor_with` | 119 | setup | `cli-item-validate-in-process-setup-adoption` |
 | `derived_state_repair_tests.rs` | `file_snapshot` | 43 | scenario | — |
 | `invariant_check_cli_tests.rs` | `write_rules` | 33 | scenario | — |
 | `invariant_check_cli_tests.rs` | `write_invariants` | 37 | scenario | — |
-| `invariant_registry_story_tests.rs` | `setup_jit_root_with_invariants_toml` | 33 | setup | `cli-item-validate-migration` |
-| `invariant_registry_story_tests.rs` | `setup_cli_repo` | 68 | setup | `cli-item-validate-migration` |
+| `invariant_registry_story_tests.rs` | `setup_jit_root_with_invariants_toml` | 33 | setup | `cli-item-kind-spawn-migration` |
+| `invariant_registry_story_tests.rs` | `setup_cli_repo` | 68 | setup | `cli-item-kind-spawn-migration` |
 | `item_cli_tests.rs` | `configure_project_scope_kind` | 315 | scenario | — |
 | `item_cli_tests.rs` | `register_link_namespaces` | 687 | scenario | — |
 | `markdown_kind_source_path_tests.rs` | `configure_policy_kind` | 53 | scenario | — |
 | `project_render_cli_tests.rs` | `append_projection` | 35 | scenario | — |
-| `risk_kind_tests.rs` | `setup_test_repo` | 50 | setup | `cli-item-validate-migration` |
+| `risk_kind_tests.rs` | `setup_test_repo` | 50 | setup | `cli-item-kind-spawn-migration` |
 | `risk_kind_tests.rs` | `default_executor_with` | 129 | setup | `cli-item-validate-in-process-setup-adoption` |
-| `validate_cli_rule_tests.rs` | `setup_repo_with_rules` | 27 | setup | `cli-item-validate-migration` |
+| `validate_cli_rule_tests.rs` | `setup_repo_with_rules` | 27 | setup | `cli-validate-spawn-migration` |
 | `validate_cli_rule_tests.rs` | `configure_review_placeholder` | 609 | scenario | — |
 
 **`crates/jit/tests/cli_query_graph`**
@@ -503,25 +503,25 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `scope_validation_tests.rs` | `executor_with_rules_and_templates` | 161 | setup | `cli-query-graph-in-process-setup-adoption` |
 | `scope_validation_tests.rs` | `executor` | 1118 | setup | `cli-query-graph-in-process-setup-adoption` |
 | `scope_validation_tests.rs` | `setup_spine` | 1298 | scenario | — |
-| `search_tests.rs` | `create_test_repo` | 8 | setup | `cli-query-graph-migration` |
+| `search_tests.rs` | `create_test_repo` | 8 | setup | `cli-links-search-spawn-migration` |
 
 **`crates/jit/tests/cli_repo_workflow`**
 
 | File | Function | Line | Class | Owner |
 | --- | --- | ---: | --- | --- |
-| `apply_cli_tests.rs` | `setup_repo` | 88 | setup | `cli-repo-profile-migration` |
+| `apply_cli_tests.rs` | `setup_repo` | 88 | setup | `cli-apply-template-spawn-migration` |
 | `archive_preview_cli_tests.rs` | `set_documentation_policy` | 121 | scenario | — |
-| `archive_preview_cli_tests.rs` | `initialize_with_policy` | 135 | setup | `cli-repo-checkout-migration` |
+| `archive_preview_cli_tests.rs` | `initialize_with_policy` | 135 | setup | `cli-document-history-spawn-migration` |
 | `archive_preview_cli_tests.rs` | `document_contents` | 1558 | scenario | — |
 | `artifact_conformance_cli_tests.rs` | `declare_issue_scoped_areas` | 157 | scenario | — |
 | `claim_integration_tests.rs` | `acquire_selected_linked_lease` | 113 | scenario | — |
 | `cross_substrate_generality_tests.rs` | `write_jit_file` | 82 | scenario | — |
 | `divergence_recovery_journey_tests.rs` | `store_of` | 70 | scenario | — |
 | `divergence_recovery_journey_tests.rs` | `stage_documented_store_paths` | 254 | scenario | — |
-| `doc_show_tests.rs` | `initialized_repo` | 176 | setup | `cli-repo-checkout-migration` |
-| `format_compat_cli_tests.rs` | `setup_too_new_repo` | 19 | setup | `cli-repo-workflow-migration` |
+| `doc_show_tests.rs` | `initialized_repo` | 176 | setup | `cli-document-history-spawn-migration` |
+| `format_compat_cli_tests.rs` | `setup_too_new_repo` | 19 | setup | `cli-config-spawn-migration` |
 | `init_tests.rs` | `packaged_documentation_policy` | 687 | scenario | — |
-| `linked_checkout_write_policy_tests.rs` | `linked_checkout_fixture` | 147 | setup | `cli-repo-checkout-migration` |
+| `linked_checkout_write_policy_tests.rs` | `linked_checkout_fixture` | 147 | setup | `cli-claim-worktree-spawn-migration` |
 | `linked_checkout_write_policy_tests.rs` | `declare_stance` | 212 | scenario | — |
 | `linked_checkout_write_policy_tests.rs` | `durable_events` | 222 | scenario | — |
 | `linked_checkout_write_policy_tests.rs` | `store_bytes` | 425 | scenario | — |
@@ -532,8 +532,8 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | `profile_publication_tests.rs` | `executor_with_interruptions` | 107 | subject | — |
 | `profile_publication_tests.rs` | `ordinary_executor` | 117 | setup | `cli-repo-workflow-in-process-setup-adoption` |
 | `serve_cli_tests.rs` | `write_stale_pid` | 176 | scenario | — |
-| `steering_scenarios.rs` | `setup_scenario_repo` | 150 | setup | `cli-repo-workflow-migration` |
-| `template_binding_cli_tests.rs` | `setup_repo` | 136 | setup | `cli-repo-profile-migration` |
+| `steering_scenarios.rs` | `setup_scenario_repo` | 150 | setup | `cli-workflow-integration-spawn-migration` |
+| `template_binding_cli_tests.rs` | `setup_repo` | 136 | setup | `cli-apply-template-spawn-migration` |
 | `worktree_identity_tests.rs` | `identity_paths` | 14 | scenario | — |
 
 **`crates/jit/tests/fast_docs_templates`**
