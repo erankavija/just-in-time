@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9aee1d692db4921b8444eb65bd423ce283460630",
+  "completed_at": "2026-10-22T21:41:50.809005484Z",
+  "duration_ms": 234232,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied by the attributed gate declaration and permission-precondition self-test changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4f6044c1-8a24-4974-9c83-0eba5ac7d0a1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "95fe7b6b-8a7a-4fed-babe-8a113eca9d23",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:37:56.576392645Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9fd97abf, 452db99e, f4381c85, 22db1218, 9aee1d69 (jit:4f6044c1)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests (.jit/invariants.toml); @/gate/docs-check-selftest (.jit/gates.toml); @/issue/c780514e/requirement/REQ-10 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T21:37:18Z); docs-check-selftest passed (exit 0, 2026-10-22T21:37:35Z)\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied by the attributed gate declaration and permission-precondition self-test changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

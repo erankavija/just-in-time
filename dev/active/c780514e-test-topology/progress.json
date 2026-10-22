@@ -124,7 +124,7 @@
           "key": "docs-check-selftest-gate",
           "title": "Documentation checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "implemented22db1218c;67 self-test assertions pass; finalCI pending"
+          "status": "done"
         },
         {
           "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
@@ -156,7 +156,7 @@
           "key": "lock-tests-deterministic-precondition",
           "title": "Read-only lock tests establish their precondition on any host",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; Luna xhigh for bounded single-file skip-to-precondition assertion change, unchanged assertions and independent gates; reused adoption checkout"
         },
         {
           "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
@@ -1594,6 +1594,35 @@
       "stale_narrative": "active Rust/Markdown sweep found no pending or future claims for query_available or AvailableFilter; raw historical benchmark inventory matches are measurement data",
       "deferred_items": "no linked design documents",
       "holistic": "Pure domain composition reuses canonical query functions; claim expression context still derives from all issues; no new I/O or layer dependency"
+    },
+    "4f6044c1": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "a51c5862-ff95-4819-8331-3afb230870fd",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "95fe7b6b-8a7a-4fed-babe-8a113eca9d23",
+          "status": "passed"
+        },
+        {
+          "key": "docs-check-selftest",
+          "run_id": "a9a526d0-a8a8-4df5-a1a2-caa7014fe2d8",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "docs-check-selftest retains executable command/mode auto and includes tree-wide checker inputs with same exclusions as docs-mechanical",
+        "REQ-02": "configured gate passed; existing command rejects nonzero including2 and SKIP; tool preflight retained",
+        "REQ-03": "both permission bypass branches restore owned fixture modes and exit2 naming unreadable-input precondition; normal host executes all four assertions"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "script skip comments and planning-only gate narrative replaced; active script/docs/config sweep finds no obsolete permission-skip claims; projection rendered from registry",
+      "deferred_items": "no linked design documents",
+      "holistic": "Only permission-precondition failure behavior and gate input coverage change; full checker assertions retained"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates."
