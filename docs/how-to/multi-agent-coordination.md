@@ -258,7 +258,7 @@ finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 
 Claim timing has no configuration keys.
 
-### Agent Config (`~/.config/jit/agent.toml`)
+### Agent Identity (`~/.config/jit/agent.toml`)
 
 ```toml
 [agent]
