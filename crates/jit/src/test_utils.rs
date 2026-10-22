@@ -6,8 +6,12 @@
 
 use crate::commands::CommandExecutor;
 use crate::commands::ProfileSelector;
+use crate::config::ItemKindConfig;
 use crate::domain::DocumentReference;
-use crate::profile::{capture_package_tree, CapturedPackageTree, ProfilePackage};
+use crate::profile::{
+    capture_package_tree, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
+};
+use crate::repository_state::{Contribution, MapEntryTarget};
 use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
@@ -57,6 +61,29 @@ pub fn document_reference_typed(
     DocumentReference {
         doc_type: Some(doc_type.into()),
         ..document_reference(path)
+    }
+}
+
+/// A drafted issue carrying a fresh random id.
+pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
+    let mut issue = crate::domain::Issue::draft(title, description);
+    issue.id = uuid::Uuid::new_v4().to_string();
+    issue
+}
+
+#[cfg(test)]
+mod fixture_issue_tests {
+    use super::fixture_issue;
+
+    #[test]
+    fn test_fixture_issue_carries_title_description_and_distinct_ids() {
+        let first = fixture_issue("Title".into(), "Body".into());
+        let second = fixture_issue("Title".into(), "Body".into());
+        assert_eq!(
+            (first.title.as_str(), first.description.as_str()),
+            ("Title", "Body")
+        );
+        assert_ne!(first.id, second.id);
     }
 }
 
@@ -1150,6 +1177,108 @@ fn set_captured_mode(path: &Path, mode: FileMode) -> Result<()> {
 #[cfg(not(unix))]
 fn set_captured_mode(_path: &Path, _mode: FileMode) -> Result<()> {
     Ok(())
+}
+/// The shipped default package's manifest id.
+const SHIPPED_PACKAGE_ID: &str = "jit-default";
+
+/// The item-kind declarations `manifest` contributes, keyed by kind name.
+///
+/// Read from the package model's `item-kinds` map-entry contributions, so a
+/// kind, alias, mode or id pattern exists here only where the manifest says so.
+///
+/// Panics when a contribution's value is not an item-kind declaration.
+pub fn item_kinds_contributed_by(
+    manifest: &ProfilePackageModel,
+) -> BTreeMap<String, ItemKindConfig> {
+    manifest
+        .contributions
+        .iter()
+        .filter_map(|contribution| match contribution {
+            Contribution::MapEntry {
+                target: MapEntryTarget::ItemKinds,
+                identity,
+                value,
+            } => Some((identity, value)),
+            _ => None,
+        })
+        .map(|(identity, value)| {
+            let kind = serde_json::from_value(value.clone())
+                .unwrap_or_else(|error| panic!("item kind '{identity}' does not parse: {error}"));
+            (identity.clone(), kind)
+        })
+        .collect()
+}
+
+/// The shipped item kinds in typed form, read from the default package's
+/// manifest in this checkout.
+///
+/// Panics when the manifest cannot be read or does not parse as a package.
+pub fn shipped_item_kinds() -> BTreeMap<String, ItemKindConfig> {
+    let path = repository_checkout()
+        .join(PROFILE_PACKAGE_SOURCES)
+        .join(SHIPPED_PACKAGE_ID)
+        .join("manifest.toml");
+    let bytes = fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let manifest = ProfilePackage::parse_manifest(&bytes)
+        .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    item_kinds_contributed_by(&manifest)
+}
+
+/// The shipped item kinds as the `[item_kinds.<kind>]` tables of a repository
+/// `config.toml`, serialized from [`shipped_item_kinds`].
+pub fn shipped_item_kinds_toml() -> String {
+    #[derive(Serialize)]
+    struct ConfigKinds {
+        item_kinds: BTreeMap<String, ItemKindConfig>,
+    }
+    toml::to_string(&ConfigKinds {
+        item_kinds: shipped_item_kinds(),
+    })
+    .expect("a declared item kind serializes to TOML")
+}
+
+#[cfg(test)]
+mod shipped_item_kinds_tests {
+    use super::*;
+
+    fn default_manifest_bytes() -> Vec<u8> {
+        let path = repository_checkout()
+            .join(PROFILE_PACKAGE_SOURCES)
+            .join(SHIPPED_PACKAGE_ID)
+            .join("manifest.toml");
+        fs::read(path).unwrap()
+    }
+
+    #[test]
+    fn test_item_kinds_contributed_by_manifest_edit_changes_derivation() {
+        let original = String::from_utf8(default_manifest_bytes()).unwrap();
+        let before = item_kinds_contributed_by(
+            &ProfilePackage::parse_manifest(original.as_bytes()).unwrap(),
+        );
+        let (kind, declaration) = before.iter().next().expect("the package ships kinds");
+        let pattern = declaration.id_pattern.clone().unwrap();
+        let edited = original.replacen(
+            &format!("id-pattern = \"{pattern}\""),
+            "id-pattern = \"EDITED-[0-9]+\"",
+            1,
+        );
+        assert_ne!(edited, original, "the edit must land in the manifest");
+
+        let after =
+            item_kinds_contributed_by(&ProfilePackage::parse_manifest(edited.as_bytes()).unwrap());
+
+        assert_ne!(before, after);
+        assert_eq!(after[kind].id_pattern.as_deref(), Some("EDITED-[0-9]+"));
+    }
+
+    #[test]
+    fn test_shipped_item_kinds_toml_round_trips_to_typed_form() {
+        let config: crate::config::JitConfig = toml::from_str(&shipped_item_kinds_toml()).unwrap();
+
+        let declared: BTreeMap<_, _> = config.item_kinds.unwrap().into_iter().collect();
+        assert!(!declared.is_empty());
+        assert_eq!(declared, shipped_item_kinds());
+    }
 }
 
 /// The manifest id of every profile package this repository publishes, sorted.

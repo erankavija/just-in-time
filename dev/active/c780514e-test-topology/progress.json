@@ -12,7 +12,7 @@
           "key": "profiled-fixture-build-lock",
           "title": "Profiled-repository fixture lock waits are bounded",
           "classification": "implementation",
-          "status": "merged; gates pending"
+          "status": "done"
         },
         {
           "id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
@@ -20,7 +20,7 @@
           "key": "cli-process-fixture",
           "title": "Shared fixture for spawning jit in CLI tests",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged; cargo-ci passed; code-review FAILED R1 (F1 dev/TESTING.md:215 claims all CLI suites use JitCli); docs rework queued"
         },
         {
           "id": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
@@ -36,7 +36,7 @@
           "key": "rule-warning-tests-down-a-layer",
           "title": "Create-time rule warnings proven in-process without a profiled repository",
           "classification": "implementation",
-          "status": "merged; gates pending"
+          "status": "done"
         },
         {
           "id": "a618b8cc-8183-487a-905f-4fb8dfdf193e",
@@ -44,7 +44,7 @@
           "key": "server-shutdown-test-bound",
           "title": "Server shutdown force-close test stays under the per-test bound",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched (sonnet)"
         },
         {
           "id": "d35c610b-f752-4fe3-89a9-7eca1b3d52b3",
@@ -52,7 +52,7 @@
           "key": "shared-fixture-issue",
           "title": "Shared issue-construction fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "0973ed93-e516-41fd-8f55-9eef33ab2fa8",
@@ -60,7 +60,7 @@
           "key": "shared-taxonomy-repo",
           "title": "Shared taxonomy repository type for CLI tests",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "0bf97911-8302-47bb-95c0-585d897ad63f",
@@ -68,7 +68,7 @@
           "key": "shipped-item-kinds-derivation",
           "title": "Shared test support derives shipped item kinds from the default package",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched (sonnet)"
         },
         {
           "id": "a84d275f-1671-4360-b5d1-bf3ff0eed036",
@@ -76,7 +76,7 @@
           "key": "store-generic-initialisation",
           "title": "Product initialisation runs over any repository-state store",
           "classification": "implementation",
-          "status": "dispatched (sonnet)"
+          "status": "done"
         },
         {
           "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
@@ -1226,7 +1226,9 @@
   },
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "2b49f95b": 1
+  },
   "surfaced_pitfalls": [
     {
       "from": "a3dd995a worker",

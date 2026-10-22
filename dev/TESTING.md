@@ -212,31 +212,26 @@ Shared in-process helpers live in the `jit` library's `test-support` surface (fo
 `crates/jit/src/test_harness.rs`), so they never surface as their own test targets. Add a new integration case to the file that
 matches its subsystem, or add a module file plus a `mod` line in the suite's `main.rs`.
 
-The CLI suites spawn the compiled binary through `env!("CARGO_BIN_EXE_jit")` against a
-`TempDir` seeded by `jit init`, then assert on exit status, stdout, and JSON payloads. They
-are the only layer that can catch argument-parsing regressions, output-format drift, and
-exit-code changes.
+The CLI suites spawn the compiled binary through `jit::test_cli::JitCli`, the one shared
+subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
+`jit init`, or `with_repository(TempDir)` for one built by shared test support) and removes it
+on drop. `command(args)` yields a `std::process::Command` for the target's `jit` with the
+repository as working directory, test mode on and every inherited `JIT_*` variable removed;
+`command_with_env` sets a variable for that process alone, so tests keep `assert_cmd`'s
+assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
+`create_issue` returns the created id from `--json`, and `init_git` (backed by
+`init_git_repository`, which in-process tests also call) initialises git with a fixed author
+identity and no dependence on global git configuration. Tests name no binary path,
+`CARGO_BIN_EXE_jit` or `cargo_bin!`, and scrape no human-readable output for ids.
 
 ```rust
 #[test]
 fn test_create_and_query() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
+    cli.create_issue(["--title", "Task", "--priority", "high"]).unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "--priority", "high"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let output = Command::new(jit)
-        .args(["query", "ready", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    cli.command(["query", "ready", "--json"]).assert().success();
+    let json = cli.run_json(["query", "ready"]).unwrap();
     assert!(json["issues"].is_array());
 }
 ```

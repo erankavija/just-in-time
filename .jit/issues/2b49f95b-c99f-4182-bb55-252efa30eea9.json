@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:15.313898108Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ac6602f3-ff29-4eee-ad0f-615c26c83a7c",
+      "status": "passed",
+      "updated_at": "2026-10-22T15:23:48.149135644Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8af43b7d-3982-4fcc-90ba-cf7f2f5b7333",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:28:32.821182633Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2b49f95b-c99f-4182-bb55-252efa30eea9",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared fixture for spawning jit in CLI tests",
-  "updated_at": "2026-10-22T15:03:43.766477938Z"
+  "updated_at": "2026-10-22T15:28:32.821182633Z"
 }
