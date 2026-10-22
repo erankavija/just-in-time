@@ -6,10 +6,10 @@ use crate::profile::{
     read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
     ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfilePackEntry, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult,
-    ProfileShowEntry, ProfileShowResult, ProfileTargetAction, ProfileTargetChange,
-    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
-    SelectionObservation, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult, ProfileShowEntry,
+    ProfileShowResult, ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment,
+    ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph, SelectionObservation,
+    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
