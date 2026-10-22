@@ -368,7 +368,7 @@
           "title": "Remove the user and system configuration layers",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-dispatched"
+          "status": "rework-2-dispatched"
         }
       ]
     },
@@ -462,7 +462,7 @@
     "34361448": 2,
     "fe761000": 1,
     "58282882": 1,
-    "ea5f4536": 1
+    "ea5f4536": 2
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",

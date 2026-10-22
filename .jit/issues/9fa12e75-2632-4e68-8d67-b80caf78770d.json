@@ -15,9 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "7f922856-611f-4a9a-9852-b077012c5de6",
+      "run_id": "bae06362-0f4c-413e-8d21-e005f366e497",
       "status": "passed",
-      "updated_at": "2026-10-22T15:03:42.589350283Z",
+      "updated_at": "2026-10-22T15:16:39.475371966Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "de56eda9-ca21-4d09-b7e2-e3f7484649d8",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:05:30.549474950Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Render gate run status lines through one output renderer",
-  "updated_at": "2026-10-22T15:03:42.589350283Z"
+  "updated_at": "2026-10-22T15:16:39.475371966Z"
 }

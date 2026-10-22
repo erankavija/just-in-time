@@ -18,15 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "d27da6d1-aa6d-4194-b0d7-a9ab6b139925",
+      "run_id": "ce67b33a-74db-435e-9635-6d04d867ab9f",
       "status": "passed",
-      "updated_at": "2026-10-22T14:47:39.934754156Z",
+      "updated_at": "2026-10-22T15:13:58.516319934Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "303ba85e-f7e7-4acd-8e73-73a2a08f4a9f",
+      "run_id": "adff2158-deb6-4733-a21c-847676687bb6",
       "status": "failed",
-      "updated_at": "2026-10-22T14:53:18.002112980Z",
+      "updated_at": "2026-10-22T15:18:36.823581504Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove the user and system configuration layers",
-  "updated_at": "2026-10-22T14:53:18.002112980Z"
+  "updated_at": "2026-10-22T15:18:36.823581504Z"
 }
