@@ -31,25 +31,6 @@ pub use default_rules::{
     default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
     type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
 };
-// Rule-membership-diff seam: `default_rule_membership_diff` and
-// `DefaultRuleMembershipDiff` are `pub` only for this function's own doctest (no
-// production or integration-test consumer outside `repository_state`), so their
-// exposure as crate public API is gated behind `test-support`. The `pub(crate)`
-// twin keeps every internal caller's resolution
-// (`crate::repository_state::DefaultRuleMembershipDiff`, etc.) identical in
-// both feature states.
-#[cfg(feature = "test-support")]
-pub use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
-// Measured (cargo build -p jit, feature off): neither name is referenced by
-// that path anywhere in the crate — `default_rule_membership_diff` has no
-// production caller at all (only this module's own unit tests and its
-// doctest call it), and `DefaultRuleMembershipDiff` is otherwise reached only
-// via `default_rule_membership_diff_from_identities`'s separate, unconditional
-// `pub(crate)` path. Both are genuinely unused here, so the allow is scoped to
-// exactly this pair, not a blanket over unrelated items.
-#[cfg(not(feature = "test-support"))]
-#[allow(unused_imports)]
-pub(crate) use default_rules::{default_rule_membership_diff, DefaultRuleMembershipDiff};
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
@@ -71,37 +52,20 @@ pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
-pub use materialize::{assemble_config, render_capture_closure, render_data_root_ignore};
-pub use package_tree::{
-    finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
-    TreeFileDisposition, TreeFileOutcome,
+pub use materialize::{
+    assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
+    ValidationCaptureClosure,
 };
-// Capture-closure seam: `validate_capture_closure` and `ValidationCaptureClosure`
-// are `pub` only for the `fast_rules` integration-test crate (no production
-// consumer outside `repository_state`/`commands::validate`), so their exposure
-// as crate public API is gated behind `test-support`. The `pub(crate)` twin
-// keeps every internal caller's resolution
-// (`crate::repository_state::validate_capture_closure`, etc.) identical in both
-// feature states.
-#[cfg(not(feature = "test-support"))]
-pub(crate) use materialize::validate_capture_closure;
-#[cfg(feature = "test-support")]
-pub use materialize::{validate_capture_closure, ValidationCaptureClosure};
-// Measured (cargo build -p jit, feature off): `validate_capture_closure` has a
-// real internal caller (`commands/validate.rs` resolves it through this same
-// `crate::repository_state::` path in both feature states) so it needs no
-// allow. `ValidationCaptureClosure` itself has no by-name crate-internal
-// caller — it's only reached as `validate_capture_closure`'s inferred return
-// type — so its feature-off twin alone is allowed unused.
-#[cfg(not(feature = "test-support"))]
-#[allow(unused_imports)]
-pub(crate) use materialize::ValidationCaptureClosure;
 pub(crate) use mutation::captured_gate_run_result_paths;
 pub(crate) use mutation::MutationContextFactory;
 pub use mutation::{
     finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
     serialize_event, serialize_gate_run, serialize_issue, IdAuthority, MutationClock,
     MutationContext, MutationContextAnnotation, MutationError, MutationIntent, SystemMutationClock,
+};
+pub use package_tree::{
+    finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
+    TreeFileDisposition, TreeFileOutcome,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled
@@ -206,23 +170,7 @@ pub use projection::{
 };
 pub(crate) use projection_render::{render_projection_body, ProjectionInputs};
 pub use rule_serialize::{render_rule_block, rules_file_header};
-// Rule-serialization seam: `serialize_ruleset`, `SchemaFile`, and
-// `SerializedRuleSet` are `pub` only for integration-test crates (no
-// production consumer outside `repository_state`), so their exposure as
-// crate public API is gated behind `test-support`. The `pub(crate)` twin
-// keeps every internal caller's resolution
-// (`crate::repository_state::SerializedRuleSet`, etc.) identical in both
-// feature states.
-#[cfg(feature = "test-support")]
 pub use rule_serialize::{serialize_ruleset, SchemaFile, SerializedRuleSet};
-#[cfg(not(feature = "test-support"))]
-pub(crate) use rule_serialize::{serialize_ruleset, SerializedRuleSet};
-// `SchemaFile` itself has no by-name crate-internal caller (it's only
-// reached as the element type of `SerializedRuleSet::schema_files`), so its
-// feature-off twin alone is allowed unused.
-#[cfg(not(feature = "test-support"))]
-#[allow(unused_imports)]
-pub(crate) use rule_serialize::SchemaFile;
 pub use rules_document::{parse_rule_identities, splice_default_membership, RulesDocumentError};
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 

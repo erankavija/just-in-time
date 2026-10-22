@@ -333,104 +333,29 @@ pub struct DefaultRuleMembershipDiff {
     pub to_drop: Vec<String>,
 }
 
-impl DefaultRuleMembershipDiff {
-    /// Whether applying this diff would change anything.
-    // Measured: no production caller anywhere in the crate. Its only
-    // consumers are this module's own `cfg(test)` unit tests, so it is
-    // unreached in a plain, non-test-support build.
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.to_add.is_empty() && self.to_drop.is_empty()
-    }
-}
-
-/// Compute the [`DefaultRuleMembershipDiff`] between `loaded` (the rules as
-/// currently authored in `rules.toml`) and `namespaces` (the current registry).
+/// Compute the [`DefaultRuleMembershipDiff`] between the `(name, origin)`
+/// identities of the rules authored in `rules.toml` and `namespaces` (the
+/// current registry).
+///
+/// The membership decision needs only each rule's identity, keeping the edit
+/// independent of full [`RuleSet`] validation: a custom rule whose assertion
+/// fails to load must not strand `rules.toml` out of sync after `config.toml`
+/// was already saved (jit:d74a9ed1 review F1).
 ///
 /// Mirrors [`reconcile_default_rules_with_config`]'s opt-out and matching
-/// rules exactly:
+/// rules:
 ///
-/// - `loaded` carrying NO `origin = "default"` rule at all has deliberately
-///   opted out of the defaults; the diff is empty (nothing to add or drop).
-/// - Otherwise, a rule [`default_ruleset`] would emit for `namespaces` that has
-///   no counterpart already in `loaded` is in `to_add`.
-/// - An `origin = "default"` row in `loaded` that [`default_ruleset`] no longer
-///   emits for `namespaces` is in `to_drop`.
+/// - No `origin = "default"` rule at all means the file opted out of the
+///   defaults; the diff is empty.
+/// - A rule [`default_ruleset`] emits for `namespaces` with no counterpart is
+///   in `to_add`.
+/// - An `origin = "default"` row that [`default_ruleset`] no longer emits is in
+///   `to_drop`.
+/// - A rule sharing a derived name but a different `origin` is never dropped
+///   and suppresses the append of the derived default, so the write never
+///   produces a duplicate-name file.
 ///
-/// A rule sharing a derived NAME but a different `origin` (a custom rule
-/// shadowing the default name) is never counted as "existing"
-/// here, never targeted for drop, and SUPPRESSES the append of the derived
-/// default row — the shadowing rule keeps the name, so the sync never writes a
-/// duplicate-name file that the production rules loader would reject. This matches how
-/// [`reconcile_default_rules_with_config`] only ever touches `origin =
-/// "default"` rows and skips a derived default whose name is already present.
-///
-/// Pure: no I/O, deterministic, total.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::repository_state::{default_ruleset, default_rule_membership_diff};
-/// use std::collections::HashMap;
-///
-/// let mut ns = HashMap::new();
-/// ns.insert("type".to_string(), LabelNamespace::new("Type", true));
-/// let scaffolded_registry = LabelNamespaces {
-///     schema_version: 2,
-///     namespaces: ns,
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// };
-/// let loaded = default_ruleset(&scaffolded_registry);
-///
-/// // `team` becomes unique later (e.g. a hand edit of config.toml).
-/// let mut now = HashMap::new();
-/// now.insert("type".to_string(), LabelNamespace::new("Type", true));
-/// now.insert("team".to_string(), LabelNamespace::new("Team", true));
-/// let current_registry = LabelNamespaces {
-///     schema_version: 2,
-///     namespaces: now,
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// };
-///
-/// let diff = default_rule_membership_diff(&loaded, &current_registry);
-/// assert_eq!(diff.to_add.len(), 1);
-/// assert_eq!(diff.to_add[0].name, "namespace-unique-team");
-/// assert!(diff.to_drop.is_empty());
-/// ```
-// This fn must stay `pub` at its own definition (the `test-support` arm
-// re-exports it as fully `pub` from `repository_state`). Measured: it has no
-// production caller anywhere in the crate — its only consumers are this
-// module's own `cfg(test)` unit tests and the doctest above — so it is
-// unreached in a plain, non-test-support build.
-#[allow(dead_code)]
-pub fn default_rule_membership_diff(
-    loaded: &RuleSet,
-    namespaces: &LabelNamespaces,
-) -> DefaultRuleMembershipDiff {
-    let identities: Vec<(String, Option<String>)> = loaded
-        .rules
-        .iter()
-        .map(|r| (r.name.clone(), r.origin.clone()))
-        .collect();
-    default_rule_membership_diff_from_identities(&identities, namespaces)
-}
-
-/// [`default_rule_membership_diff`] over bare `(name, origin)` identities.
-///
-/// This is the variant repository-state materialization uses: the membership
-/// decision needs only each rule's identity, keeping the edit independent of
-/// full [`RuleSet`] validation — a custom rule whose assertion fails to load
-/// (bad schema reference, malformed assert table) must not
-/// strand `rules.toml` out of sync after `config.toml` was already saved
-/// (jit:d74a9ed1 review F1).
-///
-/// Pure: no I/O, deterministic — `to_add` and `to_drop` are sorted by rule
-/// name.
+/// Pure: no I/O, deterministic; `to_add` and `to_drop` are sorted by rule name.
 pub(crate) fn default_rule_membership_diff_from_identities(
     existing_rules: &[(String, Option<String>)],
     namespaces: &LabelNamespaces,
@@ -677,6 +602,15 @@ mod tests {
             label_associations: None,
             strategic_types: None,
         }
+    }
+
+    fn diff_of(loaded: &RuleSet, namespaces: &LabelNamespaces) -> DefaultRuleMembershipDiff {
+        let identities: Vec<_> = loaded
+            .rules
+            .iter()
+            .map(|r| (r.name.clone(), r.origin.clone()))
+            .collect();
+        default_rule_membership_diff_from_identities(&identities, namespaces)
     }
 
     fn issue_with(labels: &[&str]) -> Issue {
@@ -1164,7 +1098,7 @@ mod tests {
         assert_eq!(names.len(), count, "default rule names must be unique");
     }
 
-    // -- default_rule_membership_diff (jit:d74a9ed1) -------------------------
+    // -- default_rule_membership_diff_from_identities (jit:d74a9ed1) -------------------------
 
     #[test]
     fn test_reconcile_custom_rule_shadowing_default_name_is_not_duplicated() {
@@ -1199,12 +1133,12 @@ mod tests {
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", true)),
         ]);
-        let diff = default_rule_membership_diff(&loaded, &now);
+        let diff = diff_of(&loaded, &now);
         assert_eq!(diff.to_add.len(), 1);
         assert_eq!(diff.to_add[0].name, "namespace-unique-team");
         assert_eq!(diff.to_add[0].origin.as_deref(), Some("default"));
         assert!(diff.to_drop.is_empty());
-        assert!(!diff.is_empty());
+        assert_ne!(diff, DefaultRuleMembershipDiff::default());
     }
 
     #[test]
@@ -1216,7 +1150,7 @@ mod tests {
             ("team", LabelNamespace::new("Team", true)),
         ]));
         let now = registry(vec![("type", LabelNamespace::new("Type", true))]);
-        let diff = default_rule_membership_diff(&loaded, &now);
+        let diff = diff_of(&loaded, &now);
         assert!(diff.to_add.is_empty());
         assert_eq!(diff.to_drop, vec!["namespace-unique-team".to_string()]);
     }
@@ -1233,7 +1167,7 @@ mod tests {
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", false)),
         ]);
-        let diff = default_rule_membership_diff(&loaded, &now);
+        let diff = diff_of(&loaded, &now);
         assert!(diff.to_add.is_empty());
         assert_eq!(diff.to_drop, vec!["namespace-unique-team".to_string()]);
     }
@@ -1245,9 +1179,9 @@ mod tests {
             ("team", LabelNamespace::new("Team", true)),
         ]);
         let loaded = default_ruleset(&reg);
-        let diff = default_rule_membership_diff(&loaded, &reg);
+        let diff = diff_of(&loaded, &reg);
         assert!(
-            diff.is_empty(),
+            diff == DefaultRuleMembershipDiff::default(),
             "unchanged registry yields no delta: {diff:?}"
         );
     }
@@ -1266,9 +1200,9 @@ mod tests {
         let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
         // `loaded` carries NO default-origin rule at all here, so the opt-out
         // path applies and the diff is empty regardless of the name collision.
-        let diff = default_rule_membership_diff(&loaded, &reg);
+        let diff = diff_of(&loaded, &reg);
         assert!(
-            diff.is_empty(),
+            diff == DefaultRuleMembershipDiff::default(),
             "an opted-out file yields no delta: {diff:?}"
         );
 
@@ -1279,7 +1213,7 @@ mod tests {
         loaded_with_default
             .rules
             .push(custom_json_rule("namespace-unique-team"));
-        let diff = default_rule_membership_diff(&loaded_with_default, &reg);
+        let diff = diff_of(&loaded_with_default, &reg);
         assert!(
             !diff
                 .to_add
@@ -1300,7 +1234,7 @@ mod tests {
             rules: vec![custom_json_rule("only-custom-rule")],
         };
         let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
-        let diff = default_rule_membership_diff(&loaded, &reg);
-        assert!(diff.is_empty());
+        let diff = diff_of(&loaded, &reg);
+        assert_eq!(diff, DefaultRuleMembershipDiff::default());
     }
 }

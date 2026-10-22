@@ -322,27 +322,6 @@ impl InitializationScaffold {
         Ok(resolve_gitattributes(entry, line)?.0)
     }
 
-    /// The neutral scaffold files as repository-relative `(path, bytes)` pairs.
-    ///
-    /// The command overlays these onto the captured base so the profile derivation
-    /// sees the proposed neutral repository. Excludes the audit log and any profile
-    /// contribution.
-    pub fn neutral_files(&self) -> Vec<(String, Vec<u8>)> {
-        let mut files = vec![
-            (".jit/config.toml".to_string(), self.config.clone()),
-            (".jit/index.json".to_string(), self.index.clone()),
-            (".jit/gates.toml".to_string(), self.gates.clone()),
-            (".jit/invariants.toml".to_string(), self.invariants.clone()),
-            (".jit/rules.toml".to_string(), self.rules.clone()),
-        ];
-        files.extend(
-            self.schemas
-                .iter()
-                .map(|(name, bytes)| (format!(".jit/schemas/{name}"), bytes.clone())),
-        );
-        files
-    }
-
     /// Whether the scaffold carries a profile contribution.
     pub fn profile(&self) -> Option<&ProfileApplicationInput> {
         self.profile.as_ref()
