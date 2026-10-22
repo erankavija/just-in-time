@@ -6,12 +6,26 @@
   "dependencies": [],
   "description": "Make the cargo-ci load classifier judge the host's load before this run starts, so the steward's quiet-host rule and the classifier agree.\n\n## Background\n\n494f1d4b made `scripts/cargo-ci.sh` exit 75 for environment-sensitive failures (test TIMEOUTs without FAIL, a suite-duration overrun) on a loaded host. It samples the 1-minute load average just before and after the suite clock and calls the host loaded at 1.25 × nproc. That sample follows the run's own fmt, clippy and build fan-out, so it measures the run itself, and 30 on 24 CPUs is almost never reached: runs at load1 12.7 and 17.1 that timed out on known fixture contention were recorded as content verdicts. The milestone steward calls a host quiet at roughly load below 4 on 24 cores and approved this task.\n\n## Success Criteria\n\n- [hard] REQ-01: The classifier judges the 1-minute load average sampled before the run's first step against 0.17 × nproc, and the printed classification line names that baseline sample, the threshold and the resulting classification.\n- [hard] REQ-02: The script's self-test covers a baseline on each side of the threshold.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:10:02.398899717Z",
   "first_ready_at": "2026-10-22T01:58:45.768280485Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "37b1004f-061f-4bbc-939c-feecf5f44d16",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:06:29.182571687Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "687c6810-0c04-43c0-9191-b5c89388540a",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:09:55.067979956Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "856f0520-7af9-4c2d-9297-5abbd9eae365",
   "labels": [
     "epic:lead-friction",
@@ -21,7 +35,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Classify cargo-ci load from a pre-run baseline",
-  "updated_at": "2026-10-22T02:28:56.174905356Z"
+  "updated_at": "2026-10-22T14:10:02.398899717Z"
 }

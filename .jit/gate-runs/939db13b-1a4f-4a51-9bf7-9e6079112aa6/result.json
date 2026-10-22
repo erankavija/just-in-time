@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7cf359a844702ed16f51911a546a2fb663169eb0",
+  "completed_at": "2026-10-22T14:09:53.844560160Z",
+  "duration_ms": 68692,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met in the attributable current-tree footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "69af08af-ead8-4939-8d82-8f9017b82914",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "939db13b-1a4f-4a51-9bf7-9e6079112aa6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:08:45.151923849Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7f3384530, 0e4632421 (jit:69af08af)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-24 and REQ-02 (.jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code none; 2026-10-22T14:08:44Z)\nTruncation recovery: narrowed reads of default_rules tests, item declarations/sources, callers, and merge-parent diffs\n\n1. No findings. The current tree meets all three hard criteria; removed symbols are absent and affected exports are unconditional.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met in the attributable current-tree footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -226,8 +226,6 @@ pub struct ComposedContribution {
 /// Origin of one differing definition in a semantic contribution conflict.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum ContributionConflictOwner {
-    /// The repository itself authored one of the conflicting definitions.
-    Repository,
     /// A package being applied authored one of the definitions.
     Package(ProfilePackageId),
 }
@@ -235,7 +233,6 @@ pub enum ContributionConflictOwner {
 impl std::fmt::Display for ContributionConflictOwner {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Repository => formatter.write_str("the repository"),
             Self::Package(package_id) => write!(formatter, "package {package_id}"),
         }
     }
@@ -255,8 +252,8 @@ pub enum ContributionOutcome {
     Contested {
         /// Shared semantic identity with incompatible definitions.
         identity: ContributionIdentity,
-        /// Every repository or package owner of a conflicting definition,
-        /// sorted independently of selector occurrence.
+        /// Every package defining a conflicting definition, sorted
+        /// independently of selector occurrence.
         owners: Vec<ContributionConflictOwner>,
     },
 }
@@ -1261,8 +1258,8 @@ fn owned_composed_contributions(
         .collect()
 }
 
-/// Render definitions that have already passed one semantic ownership
-/// composition. This renderer deliberately contains no occupant convention.
+/// Render definitions that have already passed one semantic composition.
+/// This renderer deliberately contains no occupant convention.
 fn render_composed_contributions(
     base: &RepositoryImage,
     contributions: &[ComposedContribution],

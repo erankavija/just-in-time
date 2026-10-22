@@ -9,6 +9,7 @@
   ],
   "description": "Make `claim acquire` and `config show` read the coordination lease limits through one resolver, so the limits an operator sees are the limits writes enforce.\n\n## Background\n\nThe two `[coordination]` limits, `max_indefinite_leases_per_agent` and `max_indefinite_leases_per_repo`, are resolved in two places that disagree:\n\n- `config show` and `config get` read `MergedCoordinationConfig` (`crates/jit/src/config.rs:1988-2026`), which falls back from the repository layer to the user and system layers, and render it at `config.rs:1956-1957` and `main.rs:6756-6803`.\n- `claim acquire` builds a loader over the repository `.jit/config.toml` only (`crates/jit/src/commands/claim.rs:107-111`) and enforces `CoordinationConfig::max_indefinite_leases_per_*` (`config.rs:1345-1351`, used at `claim.rs:143-144`). A malformed repository config is swallowed there and the built-in defaults apply.\n\nA limit set in the user or system layer is therefore reported but never enforced. Lease enforcement mode had the same divergence; it now resolves through one resolver that both paths call, and lease policy comes from the repository alone. These limits follow the same rule.\n\n## Success Criteria\n\n- [hard] REQ-01: One resolver computes the effective lease limits, and both `claim acquire` and the config commands call it; no second resolution path for these limits remains.\n- [hard] REQ-02: The user and system configuration layers do not affect the lease limits; only the repository configuration and the built-in defaults do.\n- [hard] REQ-03: A regression test covers each configuration state (no `[coordination]` section, each limit set in the repository, a limit set only in the user or system layer) and asserts that the reported limits equal the enforced limits.\n- [hard] REQ-04: The configuration reference states one resolution rule for the lease limits, with no carve-out for execution paths that bypass the merged configuration.\n\n## Notes\n\nFollow the resolver shape that lease enforcement mode now uses rather than introducing a second pattern (`@/inv/convention-convergence`). A malformed repository configuration fails the claim the same way it fails the config commands instead of silently falling back to defaults.\n",
   "documents": [],
+  "done_at": "2026-10-22T14:26:02.980062707Z",
   "first_ready_at": "2026-10-21T05:49:10.044364505Z",
   "gates_required": [
     "cargo-ci",
@@ -18,21 +19,27 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e874a634-0057-4bee-a18c-d795edfe2f9b",
+      "run_id": "c3b41665-adef-47b7-bf8f-ca2d82b82164",
       "status": "passed",
-      "updated_at": "2026-10-22T06:40:22.765266506Z",
+      "updated_at": "2026-10-22T14:17:56.094053415Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "c57b1c12-4e35-476d-99e6-19953d26bc71",
+      "run_id": "325872b9-8ede-4765-9f39-770147929574",
       "status": "passed",
-      "updated_at": "2026-10-22T06:45:03.895707323Z",
+      "updated_at": "2026-10-22T14:23:03.633552606Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "run_id": "e4bbf5f4-89ba-4c14-90b1-cd2bc23312c2",
-      "status": "failed",
-      "updated_at": "2026-10-22T06:47:14.770738137Z",
+      "run_id": "c6c3654a-a73c-4cbb-a43d-b566960b3400",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:25:41.787037588Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "a97ca836-5db6-490a-8f40-ce867edcdaf5",
+      "status": "passed",
+      "updated_at": "2026-10-22T14:25:45.539077478Z",
       "updated_by": "auto:executor"
     }
   },
@@ -48,7 +55,7 @@
     "satisfies:842b0ac6/REQ-26"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Resolve the coordination lease limits through one resolver",
-  "updated_at": "2026-10-22T06:47:14.770738137Z"
+  "updated_at": "2026-10-22T14:26:02.980062707Z"
 }

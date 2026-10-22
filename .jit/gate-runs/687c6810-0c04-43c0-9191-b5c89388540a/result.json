@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7cf359a844702ed16f51911a546a2fb663169eb0",
+  "completed_at": "2026-10-22T14:09:54.845897480Z",
+  "duration_ms": 102842,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The pre-step baseline, 0.17 × nproc threshold, diagnostic output, and both threshold-boundary self-tests meet the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "856f0520-7af9-4c2d-9297-5abbd9eae365",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "687c6810-0c04-43c0-9191-b5c89388540a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:08:12.003468182Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ed0e84b40 and 9ebabcad4 (identical two-file first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/856f0520/requirement/REQ-01 and REQ-02 (issue Markdown); @/issue/3d9a0ce3/requirement/REQ-02 (issue Markdown); @/gate/cargo-ci (.jit/gates.toml); @/invariant/orthogonal-tests and essential-code-prose (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed, exit 0, 2026-10-22T14:06:06Z\nTruncation recovery: recovered with per-commit diffs and bounded current script/self-test reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The pre-step baseline, 0.17 × nproc threshold, diagnostic output, and both threshold-boundary self-tests meet the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

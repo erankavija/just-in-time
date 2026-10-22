@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8425e1ef7423922847831f4b310388c135cec2d0",
+  "completed_at": "2026-10-22T14:25:41.567911419Z",
+  "duration_ms": 157611,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The repository-only coordination-limit resolver and its documented config and CLI behavior are accurate and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6c3654a-a73c-4cbb-a43d-b566960b3400",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T14:23:03.956541147Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf, so I inspected only the six reachable commits tagged `jit:34361448` individually (including merges); no fallback was needed. The prior CLI-reference finding is resolved. Current code uses the same repository-only resolver for reporting and claim enforcement, and the configuration/command references state that user and system configuration provide no lease-limit values.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The repository-only coordination-limit resolver and its documented config and CLI behavior are accurate and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

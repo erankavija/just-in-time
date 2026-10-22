@@ -29,7 +29,7 @@
     "satisfies:842b0ac6/REQ-27"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the user and system configuration layers",
-  "updated_at": "2026-10-22T02:11:01.137808556Z"
+  "updated_at": "2026-10-22T14:26:03.088279584Z"
 }

@@ -58,13 +58,6 @@ impl State {
         matches!(self, State::Done | State::Rejected)
     }
 
-    /// Check if this state is closed (Done or Rejected)
-    ///
-    /// This is an alias for is_terminal() for query semantics.
-    pub fn is_closed(self) -> bool {
-        self.is_terminal()
-    }
-
     /// The canonical snake_case string for this state.
     ///
     /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
@@ -3407,11 +3400,5 @@ impl LabelNamespaces {
     /// Get a namespace by name
     pub fn get(&self, name: &str) -> Option<&LabelNamespace> {
         self.namespaces.get(name)
-    }
-
-    /// Check if a namespace exists
-    #[allow(dead_code)] // May be used in future
-    pub fn contains(&self, name: &str) -> bool {
-        self.namespaces.contains_key(name)
     }
 }
