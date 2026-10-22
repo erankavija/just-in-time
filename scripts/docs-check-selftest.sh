@@ -171,8 +171,7 @@ echo "== footprint error handling (env errors, never a false-green pass) =="
 assert_rc 2 $? "links: nonexistent footprint path is an env error"
 "$citations" "$scratch/no_such_path_zzz" >/dev/null 2>&1
 assert_rc 2 $? "citations: nonexistent footprint path is an env error"
-# Unreadable footprint file → exit 2. Skipped where the read bit is not enforced
-# (e.g. running as root, which bypasses permission checks).
+# Both permission-error assertions require the host to enforce the read bit.
 noread="$scratch/unreadable.md"
 printf '# x\n' >"$noread"
 chmod 000 "$noread"
@@ -194,11 +193,16 @@ if [ ! -r "$noread" ]; then
     "$citations" "$nest" >/dev/null 2>&1
     assert_rc 2 $? "citations: unreadable nested directory is an env error"
   else
-    echo "SKIP: read bit not enforced on nested dir — nested-traversal assertions skipped"
+    chmod 755 "$nest/sub" 2>/dev/null || true
+    chmod 644 "$noread" 2>/dev/null || true
+    echo "selftest: cannot establish unreadable nested directory: host does not enforce the read bit" >&2
+    exit 2
   fi
   chmod 755 "$nest/sub" 2>/dev/null || true
 else
-  echo "SKIP: read bit not enforced here (likely root) — unreadable-path assertions skipped"
+  chmod 644 "$noread" 2>/dev/null || true
+  echo "selftest: cannot establish unreadable footprint file: host does not enforce the read bit" >&2
+  exit 2
 fi
 chmod 644 "$noread" 2>/dev/null || true
 echo

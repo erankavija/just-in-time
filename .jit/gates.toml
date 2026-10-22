@@ -610,7 +610,7 @@ roots = [
 version = 1
 key = "docs-check-selftest"
 title = "Documentation checker self-test"
-description = "Runs scripts/docs-check-selftest.sh, which seeds each documentation checker's defect class and asserts the checker fails, then asserts it passes once the seed is reverted. Any non-zero exit fails the gate, including exit 2 for a missing jit or jq, and so does a run that prints a SKIP: line. Registered at planning for c780514e; the script still skips its unreadable-path assertions where the read bit is not enforced, so on such a host the gate starts out failing until its owning task removes that skip branch."
+description = "Runs scripts/docs-check-selftest.sh against documentation checkers and their repository fixtures. Any non-zero exit or SKIP notice fails; permission preconditions must be enforced."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -624,16 +624,21 @@ pass_context = false
 [gates.checker.env]
 
 [gates.inputs]
-roots = [
-  "scripts/docs-check-canonical.sh",
-  "scripts/docs-check-citations.sh",
-  "scripts/docs-check-links.sh",
-  "scripts/docs-check-package-content.sh",
-  "scripts/docs-check-policy-phrases.sh",
-  "scripts/docs-check-projections.sh",
-  "scripts/docs-check-selftest.sh",
-  "scripts/docs-check-shipped-policy.sh",
-  "scripts/docs-mechanical.sh",
+roots = ["."]
+exclude = [
+  ".agents/cache-pool",
+  ".agents/worktrees",
+  ".claude",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
+  "mcp-server/node_modules",
+  "target",
+  "web/dist",
+  "web/node_modules",
+  "web/test-output.log",
 ]
 
 [gates.reserved]
