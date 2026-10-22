@@ -27,7 +27,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "HierarchyConfig has one fallible constructor from declarations",
-  "updated_at": "2026-10-21T05:32:20.319197193Z"
+  "updated_at": "2026-10-22T19:43:25.824316138Z"
 }

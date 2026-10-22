@@ -27,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Validated issue identity type with an alias staging bridge",
-  "updated_at": "2026-10-21T05:32:16.507846677Z"
+  "updated_at": "2026-10-22T19:43:19.936822108Z"
 }

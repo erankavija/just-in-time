@@ -7,6 +7,14 @@
       "wave_number": 1,
       "issues": [
         {
+          "id": "5c6c108a-b14f-4d9b-9781-29b9e0193cb5",
+          "short_id": "5c6c108a",
+          "key": "cargo-ci-lock-status",
+          "title": "Preserve infrastructure status through the CI build lock",
+          "classification": "implementation",
+          "status": "claimed; reuse merged adoption worktree"
+        },
+        {
           "id": "d423752b-cedc-431b-be9e-d327f8b61387",
           "short_id": "d423752b",
           "key": "profiled-fixture-cold-build",
@@ -1238,6 +1246,12 @@
       "title": "No test waits on a cold profiled-repository fixture build",
       "reason": "steward evidence: a3dd995a's bounded lock wait still fails on cold keys after a crate change (run 6978f6b9); steward-approved follow-up",
       "wired": "suite-cost story and profiled-fixture-input-key depend on it"
+    },
+    {
+      "id": "5c6c108a-b14f-4d9b-9781-29b9e0193cb5",
+      "title": "Preserve infrastructure status through the CI build lock",
+      "reason": "Coordinator-approved scope addition: de880d9c run 448d0665 misclassified child infrastructure75 as flock timeout; scripts/cargo-ci.sh uses same status for both.",
+      "wired": "cargo-ci-selftest task aa28fe5f depends on this bug; bug follows completed breakdown"
     }
   ],
   "escalations": [
@@ -1281,6 +1295,6 @@
     "backup": "/tmp/jit-c780514e-recovery-20261022T220855",
     "coordinator_thread": "01a164c8-d7ba-7812-a630-db8dddcee05b",
     "active_worktree_limit": 2,
-    "pending_external_landing": "63c11d08"
+    "pending_external_landing": null
   }
 }

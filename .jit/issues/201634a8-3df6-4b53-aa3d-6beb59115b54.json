@@ -11,39 +11,21 @@
       "doc_type": "investigation",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/842b0ac6-greenfield-cutover/investigation.md"
+      "path": "dev/archive/842b0ac6-greenfield-cutover/active/investigation.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "7cd8d3c150fcd606b6ee6bbda71b5172d57dac5341eb1ff83b10b6c370ad49c1",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/842b0ac6-greenfield-cutover/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "0fd5f0901858e4f2cf9f9cb6f9ef0265253ea2e8f1a79a191d64d3590c5406f6",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/842b0ac6-greenfield-cutover/investigation.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/842b0ac6-greenfield-cutover/plan.md"
+      "path": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md"
     },
     {
       "commit": null,
       "doc_type": "manifest",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/842b0ac6-greenfield-cutover/breakdown.json"
+      "path": "dev/archive/842b0ac6-greenfield-cutover/active/breakdown.json"
     }
   ],
   "done_at": "2026-10-21T00:53:51.452262214Z",
@@ -76,5 +58,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-21T00:53:51.452262214Z"
+  "updated_at": "2026-10-22T19:48:17.801700205Z"
 }
