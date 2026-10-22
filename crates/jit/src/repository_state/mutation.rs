@@ -1429,7 +1429,7 @@ mod tests {
     }
 
     fn seeded_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue("Title".into(), "Body".into());
+        let mut issue = crate::domain::fixture_issue("Title".into(), "Body".into());
         issue.id = id.to_string();
         issue.assignee = assignee;
         issue.created_at = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
@@ -1440,7 +1440,7 @@ mod tests {
     }
 
     fn map_order_draft(reverse: bool) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue("Canonical".into(), "Body".into());
+        let mut issue = crate::domain::fixture_issue("Canonical".into(), "Body".into());
         issue.id = "11111111-1111-4111-8111-111111111111".into();
         let context_entries = [("alpha", "one"), ("zeta", "two")];
         let gate_entries = [
@@ -2232,7 +2232,7 @@ mod tests {
         })
         .unwrap();
         let draft = {
-            let mut issue = crate::domain::types::fixture_issue("New".into(), "Body".into());
+            let mut issue = crate::domain::fixture_issue("New".into(), "Body".into());
             issue.state = State::Ready;
             issue
         };
@@ -2334,7 +2334,7 @@ mod tests {
 
     #[test]
     fn test_create_issue_rejects_future_index_without_a_plan() {
-        let draft = crate::domain::types::fixture_issue("New".into(), "Body".into());
+        let draft = crate::domain::fixture_issue("New".into(), "Body".into());
         let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
         let index_bytes = serde_json::to_vec(&serde_json::json!({
             "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION + 1,

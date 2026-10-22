@@ -84,8 +84,8 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///    [`crate::commands::CommandExecutor::query_by_label`],
 ///    `snapshot::SnapshotScope::parse`, plus the unrelated-namespace assignee
 ///    parsers (`commands::claim::assert_valid_actor`,
-///    `domain::types::Assignee::from_str` /
-///    `domain::types::Assignee`'s `PartialEq<str>` — label values never reach
+///    `domain::Assignee::from_str` /
+///    `domain::Assignee`'s `PartialEq<str>` — label values never reach
 ///    these; they parse `{type}:{identifier}` assignees, a different input
 ///    domain per @/inv/assignee-format).
 /// 2. **Slash-decode qualified-id sites** — route through the structural
@@ -1871,7 +1871,7 @@ mod tests {
     }
 
     fn issue(title: &str, labels: &[&str]) -> Issue {
-        let mut i = crate::domain::types::fixture_issue(title.to_string(), String::new());
+        let mut i = crate::domain::fixture_issue(title.to_string(), String::new());
         i.labels = labels.iter().map(|s| s.to_string()).collect();
         i
     }
@@ -1885,7 +1885,7 @@ mod tests {
     fn typed_issue(title: &str, level: u8, extra_labels: &[&str]) -> Issue {
         let mut labels = vec![format!("type:{}", test_type(level))];
         labels.extend(extra_labels.iter().map(|label| (*label).to_string()));
-        let mut issue = crate::domain::types::fixture_issue(title.to_string(), String::new());
+        let mut issue = crate::domain::fixture_issue(title.to_string(), String::new());
         issue.labels = labels;
         issue
     }
@@ -2152,7 +2152,7 @@ source-of-truth = "markdown-first"
         let mut container = initiative_with_criteria(&["REQ-01"]);
         // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
         // credits the container's criterion.
-        let mut impl_node = crate::domain::types::fixture_issue(
+        let mut impl_node = crate::domain::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );

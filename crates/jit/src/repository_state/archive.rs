@@ -597,7 +597,7 @@ mod tests {
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
     };
-    use crate::domain::types::fixture_issue;
+    use crate::domain::fixture_issue;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
         RepositoryLayout, RepositoryRootEvidence,

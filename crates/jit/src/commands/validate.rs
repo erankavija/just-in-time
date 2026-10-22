@@ -2524,17 +2524,14 @@ depends_on = ["planning"]
                 .unwrap();
         let template = registry.get("custom-plan").unwrap();
 
-        let mut container =
-            crate::domain::types::fixture_issue("container".to_string(), String::new());
+        let mut container = crate::domain::fixture_issue("container".to_string(), String::new());
         container.id = "container-12345678".to_string();
 
-        let mut planning =
-            crate::domain::types::fixture_issue("planning".to_string(), String::new());
+        let mut planning = crate::domain::fixture_issue("planning".to_string(), String::new());
         planning.id = "planning-12345678".to_string();
         planning.labels = vec!["type:planning".to_string()];
 
-        let mut breakdown =
-            crate::domain::types::fixture_issue("breakdown".to_string(), String::new());
+        let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
         breakdown.id = "breakdown-12345678".to_string();
         breakdown.labels = vec![
             "type:breakdown".to_string(),
@@ -2977,7 +2974,7 @@ source-of-truth = \"registry-first\"
     }
 
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::types::fixture_issue(title.to_string(), body.to_string());
+        let mut issue = crate::domain::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }
@@ -3326,7 +3323,7 @@ description = \"Full Rust CI pipeline must pass.\"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let issue = crate::domain::types::fixture_issue("Doc".to_string(), String::new());
+        let issue = crate::domain::fixture_issue("Doc".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3375,8 +3372,8 @@ description = \"Full Rust CI pipeline must pass.\"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let target = crate::domain::types::fixture_issue("Target".to_string(), String::new());
-        let other = crate::domain::types::fixture_issue("Other".to_string(), String::new());
+        let target = crate::domain::fixture_issue("Target".to_string(), String::new());
+        let other = crate::domain::fixture_issue("Other".to_string(), String::new());
         let (target_id, other_id) = (target.id.clone(), other.id.clone());
         seed_issue(executor.storage(), target);
         seed_issue(executor.storage(), other);
@@ -3452,7 +3449,7 @@ description = \"Full Rust CI pipeline must pass.\"
 
         let executor = setup();
         let mut issues = ["Target", "Other"]
-            .map(|title| crate::domain::types::fixture_issue(title.to_string(), String::new()));
+            .map(|title| crate::domain::fixture_issue(title.to_string(), String::new()));
         issues[0].state = crate::domain::State::Ready;
         let target_id = issues[0].id.clone();
         issues

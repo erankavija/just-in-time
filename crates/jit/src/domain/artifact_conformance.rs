@@ -279,7 +279,7 @@ fn owners_by_referenced_path(issues: &[Issue]) -> BTreeMap<String, Vec<&Issue>> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::types::fixture_issue;
+    use crate::domain::fixture_issue;
     use crate::test_utils::document_reference;
     use proptest::prelude::*;
     use std::collections::HashMap;
