@@ -100,7 +100,7 @@
           "key": "build-budget-selftest-gate",
           "title": "Build-budget checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; port14 Rust-driven checker cases into script self-test; reused adoption checkout"
         },
         {
           "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -1300,7 +1300,7 @@
     "pending_external_landing": null,
     "worktrees": {
       "agent-22355a56": "worktree-agent-559335cf",
-      "agent-de880d9c": "worktree-agent-7a412cb0"
+      "agent-de880d9c": "worktree-agent-5b42e3ff"
     }
   },
   "lead_reviews": {
