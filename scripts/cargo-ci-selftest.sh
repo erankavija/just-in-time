@@ -203,6 +203,53 @@ EOF
     test ! -e "$unexpected"
 }
 
+# The real wrapper must distinguish lock acquisition from every child status.
+test_build_lock_status_propagation() {
+  local fixture="$scratch/build-lock" rc status lock_fd
+  mkdir -p "$fixture/bin"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--version" ]; then
+  echo "cargo 1.90.0 (selftest fixture)"
+  exit 0
+fi
+printf 'ran\n' >"$SELFTEST_CHILD_RAN"
+if flock -n "$CARGO_CI_BUILD_LOCK" true; then
+  echo "child ran without the build lock" >&2
+  exit 98
+fi
+exit "$SELFTEST_CHILD_STATUS"
+EOF
+  chmod +x "$fixture/bin/cargo"
+  for status in 0 1 2 75 255; do
+    env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK \
+      PATH="$fixture/bin:$PATH" CARGO_CI_NO_SCCACHE=1 \
+      CARGO_CI_BUILD_LOCK="$fixture/build.lock" CARGO_CI_LOCK_TIMEOUT=0.01 \
+      SELFTEST_CHILD_RAN="$fixture/ran" SELFTEST_CHILD_STATUS="$status" \
+      "$gate" --cargo selftest >"$fixture/out" 2>&1
+    rc=$?
+    check "build lock: child status $status survives while the lock is held" test "$rc" -eq "$status"
+    check "build lock: child status $status is not diagnosed as acquisition timeout" \
+      test "$(grep -c 'timed out' "$fixture/out")" -eq 0
+  done
+  check "build lock: child exit releases the lock" flock -n "$fixture/build.lock" true
+
+  rm -f "$fixture/ran"
+  exec {lock_fd}>"$fixture/build.lock"
+  flock "$lock_fd"
+  env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK \
+    PATH="$fixture/bin:$PATH" CARGO_CI_NO_SCCACHE=1 \
+    CARGO_CI_BUILD_LOCK="$fixture/build.lock" CARGO_CI_LOCK_TIMEOUT=0.01 \
+    SELFTEST_CHILD_RAN="$fixture/ran" SELFTEST_CHILD_STATUS=0 \
+    "$gate" --cargo selftest >"$fixture/out" 2>&1
+  rc=$?
+  exec {lock_fd}>&-
+  check "build lock: acquisition timeout is an environment error" test "$rc" -eq 2
+  check "build lock: timeout names the duration and lock" \
+    grep -qF "timed out after 0.01s waiting for $fixture/build.lock" "$fixture/out"
+  check "build lock: timeout never starts the child" test ! -e "$fixture/ran"
+}
+
 # --- fixture construction ----------------------------------------------------
 
 # Base commit of a throwaway crate: dependency-free, two independent modules.
@@ -668,6 +715,7 @@ echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
 test_classifier_exit_paths
+test_build_lock_status_propagation
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

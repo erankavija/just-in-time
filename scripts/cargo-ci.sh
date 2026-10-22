@@ -110,31 +110,12 @@ if [ "${1:-}" = "--classify" ]; then
   exit "$rc"
 fi
 
-# Host-wide build serialization. Only one cargo-ci run executes the heavy
-# build/test steps at a time across the whole host. Concurrent gate runs (e.g.
-# several agent sessions each calling `jit gate evaluate ... cargo-ci`) otherwise
-# oversubscribe the CPU — every `cargo build` fans out to all cores, so K runs
-# demand K×nproc — and multiply peak RAM into swap, making the host and any
-# interactive shell laggy. We re-run the script under a blocking
-# flock so concurrent runs queue rather than fail; the lock is held for the
-# whole run and released when the process exits. CARGO_CI_LOCKED guards against
-# infinite re-exec; CARGO_CI_NO_LOCK=1 disables (e.g. an isolated CI container
-# that already owns the machine); CARGO_CI_BUILD_LOCK overrides the lock path;
-# CARGO_CI_LOCK_TIMEOUT bounds the wait.
-#
-# `flock -o` is load-bearing: it closes the lock descriptor in the child before
-# exec. Without it every descendant inherits the descriptor, and a descendant
-# that daemonises keeps holding the lock after this run exits — `sccache`
-# double-forks to PPID 1 and does exactly that — so the next caller blocks
-# forever against a run that finished long ago. The lock releases when the
-# waiting `flock` parent exits, which is the intended "held for the whole run"
-# lifetime.
-#
-# The wait is bounded and announced. An unbounded silent block is
-# indistinguishable from a hung or dead process, which is how a wedged lock
-# stayed undiagnosed for minutes at a time; `-E 75` separates "could not acquire
-# the lock" from the wrapped command's own exit status so the timeout can name
-# what it was waiting for.
+# Serialize builds across the host with a bounded wait. The parent holds the
+# descriptor and closes it in the child, so daemon descendants cannot retain
+# the lock. Acquisition and child execution have separate statuses: no child
+# exit code can be mistaken for a lock timeout.
+# CARGO_CI_LOCKED prevents re-entry; CARGO_CI_NO_LOCK disables serialization.
+# CARGO_CI_BUILD_LOCK and CARGO_CI_LOCK_TIMEOUT override the path and wait.
 report_build_lock_holders() {
   local lock="$1"
   if command -v lslocks >/dev/null 2>&1; then
@@ -153,8 +134,8 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
       report_build_lock_holders "$BUILD_LOCK" >&2
     fi
     lock_status=0
-    env CARGO_CI_LOCKED=1 flock -o -w "$LOCK_TIMEOUT" -E 75 "$BUILD_LOCK" "$0" "$@" ||
-      lock_status=$?
+    exec {build_lock_fd}>"$BUILD_LOCK"
+    flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
     if [ "$lock_status" -eq 75 ]; then
       echo "ERROR: cargo-ci: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
       report_build_lock_holders "$BUILD_LOCK" >&2
@@ -162,7 +143,10 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
       echo "       not a running build; stop it (e.g. sccache --stop-server) and retry." >&2
       exit 2
     fi
-    exit "$lock_status"
+    [ "$lock_status" -eq 0 ] || exit "$lock_status"
+    child_status=0
+    env CARGO_CI_LOCKED=1 "$0" "$@" {build_lock_fd}>&- || child_status=$?
+    exit "$child_status"
   fi
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
