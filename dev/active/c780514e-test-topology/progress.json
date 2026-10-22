@@ -124,7 +124,7 @@
           "key": "docs-check-selftest-gate",
           "title": "Documentation checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; permission preconditions fail closed; gate input closure audited; reused adoption checkout"
         },
         {
           "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
