@@ -8,13 +8,33 @@
   ],
   "description": "Move the build-budget checker's tests into the script's own self-test, run as a declared gate that fails when a tool is missing.\n\n## Background\n\n`crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` drives `scripts/rust-build-budget.sh` (from `:145`) in 14 tests over fixture inputs: target and executable budget boundaries, thirteen integration targets, executables over 2 GiB, profile drift, a reintroduced remote resolver, a duplicate TLS backend, and suite-duration flag handling and thresholds, including the failure message naming the measured span. Each test prints `SKIP: jq not on PATH` and passes when jq is missing (`:175` to `:521`).\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/rust-build-budget.sh` has a self-test mode that covers each case the 14 tests covered and exits non-zero when jq or another tool it needs is missing.\n- [hard] REQ-02: The registered gate `build-budget-selftest` runs `scripts/rust-build-budget.sh --self-test`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-03: `build-budget-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n- [hard] REQ-04: `rust_build_budget_checker_tests.rs` no longer exists, and `scratch_build/main.rs` does not declare it.\n",
   "documents": [],
+  "done_at": "2026-10-22T21:07:06.343615427Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "build-budget-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "build-budget-selftest": {
+      "run_id": "0a3fae4b-2758-43f6-92d4-738c38e62dd3",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:03:05.742162076Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci": {
+      "run_id": "16bbf6d1-3d5e-4f33-ae08-c09264d88b3b",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:03:05.070142490Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d1f0916-8731-4d36-8fbf-315cfec8914a",
+      "status": "passed",
+      "updated_at": "2026-10-22T21:06:41.466835536Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
   "labels": [
     "type:task",
@@ -30,7 +50,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Build-budget checker self-test runs as a declared gate",
-  "updated_at": "2026-10-22T20:52:45.585544918Z"
+  "updated_at": "2026-10-22T21:07:06.343615427Z"
 }

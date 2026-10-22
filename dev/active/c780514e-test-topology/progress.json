@@ -100,7 +100,7 @@
           "key": "build-budget-selftest-gate",
           "title": "Build-budget checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "implemented shell311ceb4f2 and wrapper deletion50a6755e3; aggregate-size case preserved; final CI queued"
+          "status": "done"
         },
         {
           "id": "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -124,7 +124,7 @@
           "key": "docs-check-selftest-gate",
           "title": "Documentation checker self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; permission preconditions fail closed; gate input closure audited; reused adoption checkout"
         },
         {
           "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
@@ -1536,6 +1536,36 @@
       "stale_narrative": "all active missing-Cargo skip references removed including adjacent budget-fixture comment; historical evidence preserved",
       "deferred_items": "no linked design documents",
       "holistic": "no global env mutation, no fallback Cargo, policy assertions unchanged; red/green evidence recorded in ddd25c64e commit body"
+    },
+    "5b42e3ff": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "16bbf6d1-3d5e-4f33-ae08-c09264d88b3b",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "8d1f0916-8731-4d36-8fbf-315cfec8914a",
+          "status": "passed"
+        },
+        {
+          "key": "build-budget-selftest",
+          "run_id": "0a3fae4b-2758-43f6-92d4-738c38e62dd3",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "scripts/rust-build-budget.sh self_test covers all fourteen prior properties via thirteen fixture cases plus missing-jq probe; durable mapping in311ceb4f2; aggregate bytes case uses two individually-under-budget executables",
+        "REQ-02": "build-budget-selftest runs script --self-test with mode auto, no auto key; inputs include script with all embedded fixtures",
+        "REQ-03": "main self-test gate passed; required-tool preflight exits2 and missing-jq fixture checks2; generic runner owns nonzero outcome contract",
+        "REQ-04": "535-line Rust wrapper and scratch_build module declaration removed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "tracked alias sweep finds historical investigations, benchmark logs and changelog only; current TESTING and rendered gate description updated",
+      "deferred_items": "no linked design documents",
+      "holistic": "same budget values and normal checker preserved; fixtures now owned by checker; inherited BUSY_HOST_OVERRIDE cleared for child fixtures; no Cargo in self-test"
     }
   }
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "427c49f2bcb60c2fe82127857e231f3ac0d710b3",
+  "completed_at": "2026-10-22T21:06:41.253682353Z",
+  "duration_ms": 215210,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met by the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5b42e3ff-6d8f-47e4-90e6-aafdb42f3d77",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8d1f0916-8731-4d36-8fbf-315cfec8914a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:03:06.043184092Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bcde2562a, 68d260fab, 69c808273, 311ceb4f2, 50a6755e3, 427c49f2b (`jit:5b42e3ff`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-10 (issue description); @/gate/build-budget-selftest (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-22T21:01:59Z); build-budget-selftest passed (exit 0, 2026-10-22T21:03:05Z); code-review pending\nTruncation recovery: reread merge patch by affected path; reread deleted 535-line Rust fixture test in bounded ranges; inspected current script, gate declaration, projection, and affected documentation in bounded ranges\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met by the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
