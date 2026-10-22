@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-22T15:45:00.050340814Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fa527a77-2cc2-4f9a-806e-c195a4aa0d8e",
+      "status": "failed",
+      "updated_at": "2026-10-22T15:49:01.057946828Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4a82ed46-98da-46dc-ad0c-f2ae8adecc33",
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Shared constructors for file-backed in-process test repositories",
-  "updated_at": "2026-10-22T15:45:00.050340814Z"
+  "updated_at": "2026-10-22T15:49:01.057946828Z"
 }
