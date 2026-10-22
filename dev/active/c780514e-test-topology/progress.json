@@ -156,7 +156,7 @@
           "key": "lock-tests-deterministic-precondition",
           "title": "Read-only lock tests establish their precondition on any host",
           "classification": "implementation",
-          "status": "implemented4239fc42f;15 focused lock tests pass; waiting finalization source before fullCI"
+          "status": "done"
         },
         {
           "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
@@ -1287,6 +1287,10 @@
     {
       "finding": "Main query gate fe708443 failed 34.565s suite budget while same-source worker passed17.799s; main launcher omitted required CARGO_INCREMENTAL=0. Input-key reuse63c1d94d correctly retained failure despite changed external environment.",
       "disposition": "Resolved operational mismatch by explicit export0 in ephemeral land/regate scripts. Raw nextest diagnostic13.237s at normal priority is not comparable gate proof; authoritative normal-nice gate911fbb9e passed14.542s suite,4580tests+25docs. No source or budget change; timing causation not proven. Always set0 explicitly and investigate before forced checker execution."
+    },
+    {
+      "finding": "9bb30f15 review advisory F1: unsupported REQ-10 coverage label on lock precondition task",
+      "disposition": "Coordinator approval pending for label and corresponding manifest/plan credit correction; retain task and invariant link. Reconcile before epic coverage gate."
     }
   ],
   "traps": [
@@ -1646,6 +1650,37 @@
       "stale_narrative": "No pending finalization claims found in active Rust/Markdown sweep; backend reproof intentionally remains for its later task",
       "deferred_items": "no linked design documents",
       "holistic": "Only mutation.rs test code changed; no backend I/O or production behavior; combined gate/event identity allocation is covered"
+    },
+    "9bb30f15": {
+      "verdict": "PASS",
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "f5c2b6ec-0deb-4850-8ae1-229271758c3e",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "2caebc75-6ffd-4511-875b-b77e1905778a",
+          "status": "passed"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "skip_unless_write_is_denied and all four host-based early returns removed",
+        "REQ-02": "Each existing chmod scenario invokes assert_write_is_denied; inability to deny writing fails with the path and missing precondition",
+        "REQ-03": "All prior lock/warning/path/reacquisition assertions preserved;15 focused lock tests pass; privileged/root execution was not performed"
+      },
+      "prior_findings": "none",
+      "stale_narrative": "Worker source/docs sweep found no stale permission-skip claims; investigation and issue background are historical evidence. Obsolete helper comment removed.",
+      "deferred_items": "no linked design documents",
+      "holistic": "Only test guard behavior changed; regular-file shared/exclusive semantics and owned fixture cleanup preserved",
+      "advisory_findings": [
+        {
+          "id": "F1",
+          "finding": "Pre-existing satisfies:c780514e/REQ-10 credit does not describe the host-permission precondition task",
+          "disposition": "Sent to coordinator for minimal label/manifest/plan credit correction; criteria/gates unchanged"
+        }
+      ]
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
