@@ -108,7 +108,7 @@
           "key": "cargo-ci-selftest-gate",
           "title": "cargo-ci self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress; reuse adoption checkout; remove default-suite wrapper and update declared gate/docs"
         },
         {
           "id": "559335cf-35ca-4046-ae3d-aab3f2f54498",
@@ -1298,7 +1298,7 @@
     "pending_external_landing": null,
     "worktrees": {
       "agent-22355a56": "worktree-agent-871df4b0",
-      "agent-de880d9c": "worktree-agent-4a82ed46"
+      "agent-de880d9c": "worktree-agent-aa28fe5f"
     }
   },
   "lead_reviews": {
