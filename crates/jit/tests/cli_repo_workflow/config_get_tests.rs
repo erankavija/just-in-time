@@ -301,7 +301,6 @@ fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
     let out = config_get(temp.path(), &["worktree.enforce_leases", "--json"]);
     assert!(!out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let stderr = String::from_utf8_lossy(&out.stderr);
     let envelope: serde_json::Value =
         serde_json::from_str(&stdout).expect("stdout contains exactly one JSON document");
     let code = ErrorCode::from_str(
@@ -315,7 +314,6 @@ fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
     assert!(envelope["error"]["message"]
         .as_str()
         .is_some_and(|message| message.contains("Failed to parse config.toml")));
-    assert!(stderr.contains("Failed to parse config.toml"));
 }
 
 // ---------------------------------------------------------------------------

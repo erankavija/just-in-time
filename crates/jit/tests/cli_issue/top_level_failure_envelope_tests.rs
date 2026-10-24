@@ -36,7 +36,7 @@ fn parse_single_error(output: &Output) -> (serde_json::Value, ErrorCode) {
 }
 
 #[test]
-fn test_propagated_config_parse_failure_emits_registered_envelope_and_human_diagnostic() {
+fn test_propagated_config_parse_failure_emits_registered_envelope_and_empty_stderr() {
     let repository = setup_repository();
     fs::write(
         repository.path().join(".jit/config.toml"),
@@ -55,9 +55,38 @@ fn test_propagated_config_parse_failure_emits_registered_envelope_and_human_diag
     assert_eq!(output.status.code(), Some(code.exit_code().code()));
     assert!(envelope["error"]["message"].is_string());
     assert!(
-        String::from_utf8_lossy(&output.stderr).starts_with("Error: "),
-        "human diagnostic remains on stderr: {:?}",
+        output.stderr.is_empty(),
+        "JSON failure has no stderr diagnostic: {:?}",
         String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_propagated_config_parse_failure_without_json_writes_one_stderr_diagnostic() {
+    let repository = setup_repository();
+    fs::write(
+        repository.path().join(".jit/config.toml"),
+        "this is not valid TOML [[[",
+    )
+    .expect("corrupt repository config");
+
+    let output = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["label", "namespaces"])
+        .output()
+        .expect("run propagated human-mode failure fixture");
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty(), "human failure leaked to stdout");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        stderr.lines().count(),
+        1,
+        "expected one diagnostic: {stderr}"
+    );
+    assert!(
+        stderr.starts_with("Error: "),
+        "unexpected diagnostic: {stderr}"
     );
 }
 

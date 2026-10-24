@@ -1481,13 +1481,13 @@ fn test_exit_code_dep_add_ambiguous_prefix_both_positions() {
 //
 // With --json, startup failures that abort before a command handler runs
 // (repository not found, repository format too new) emit a structured error
-// object on stdout while keeping their exit codes (3 and 10).
+// object on stdout and keep their exit codes (3 and 10).
 // ============================================================================
 
 #[test]
 fn test_exit_code_startup_repo_not_found_json_envelope() {
     // Uninitialized directory: `--json` must produce a structured envelope on
-    // stdout AND keep exit code 3, with the human line still on stderr.
+    // stdout and keep exit code 3.
     let temp_dir = TempDir::new().unwrap();
 
     let output = Command::new(jit_binary())
@@ -1504,8 +1504,6 @@ fn test_exit_code_startup_repo_not_found_json_envelope() {
         .as_str()
         .unwrap()
         .contains("not found"));
-    // Human line stays on stderr.
-    assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
 }
 
 #[test]
@@ -1549,8 +1547,6 @@ fn test_exit_code_startup_format_too_new_json_envelope() {
         .as_str()
         .unwrap()
         .contains("newer than this jit"));
-    // Human line stays on stderr.
-    assert!(String::from_utf8_lossy(&output.stderr).contains("newer than this jit"));
 }
 
 // ============================================================================
