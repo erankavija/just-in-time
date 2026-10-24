@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -19,7 +19,7 @@
           "short_id": "7aafec83",
           "title": "Shared git repository and counting stand-in test fixtures",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -51,7 +51,7 @@
           "short_id": "81664a6a",
           "title": "Storage-owned git module with a one-process probe",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "external_blockers": []
         },
         {
@@ -59,7 +59,7 @@
           "short_id": "aec50003",
           "title": "Pinned-read tests count processes with the shared stand-in",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "external_blockers": []
         },
         {
@@ -75,7 +75,7 @@
           "short_id": "cb01a945",
           "title": "Pinned-document test builds its commit through the git fixture",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "external_blockers": []
         }
       ]
@@ -522,6 +522,29 @@
       "model": "sonnet",
       "tier": "medium",
       "reason": "Bounded command refactor with a CLI test; no shared contract."
+    },
+    {
+      "issue": "81664a6a",
+      "vendor": "anthropic",
+      "model": "opus",
+      "tier": "high",
+      "reason": "Sets the git-module contract that about 30 later tasks extend."
+    },
+    {
+      "issue": "aec50003",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "tier": "low",
+      "reason": "Mechanical test-helper swap with exact criteria."
+    },
+    {
+      "issue": "cb01a945",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "tier": "low",
+      "reason": "One test moves from libgit2 onto the fixture."
     }
   ],
   "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits."
