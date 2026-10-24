@@ -134,7 +134,9 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "in_progress (sonnet worker w-d4373d07, base 5b36c0d51)"
+          "status": "in_progress (merged 8cf19175a; cargo-ci passed; code-review R1 failed F1 stale rustdoc serve.rs:556; rework 1 at opus)",
+          "model_tier": "opus (rework 1)",
+          "tier_reason": "escalated one tier after a failed review attempt"
         },
         {
           "key": "archive-execution-renderer",
@@ -714,7 +716,8 @@
     "719a5501": 0,
     "650e6a56": 1,
     "d8176fd3": 0,
-    "9fa12e75": 1
+    "9fa12e75": 1,
+    "d4373d07": 1
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
@@ -728,5 +731,15 @@
       "2195c98f error-code-vocabulary (steward edge, pending)"
     ]
   },
-  "started_at": "2026-10-21T05:00:00Z"
+  "started_at": "2026-10-21T05:00:00Z",
+  "line_target": {
+    "modules": "main.rs + dispatch/ + output",
+    "baseline_rev": "dc2ea8706",
+    "baseline": 9804,
+    "threshold_below": 8700,
+    "decision": "plan D-26",
+    "epic_merge_deltas": {
+      "through_9cc3056a": -115
+    }
+  }
 }

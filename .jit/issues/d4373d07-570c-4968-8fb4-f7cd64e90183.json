@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "44ed92dc-8dac-4823-a62a-729157891a7e",
+      "status": "passed",
+      "updated_at": "2026-10-24T18:15:56.270693605Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c620e55f-305d-4f7b-9814-af65344409a2",
+      "status": "failed",
+      "updated_at": "2026-10-24T18:20:30.411408141Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d4373d07-570c-4968-8fb4-f7cd64e90183",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Foreground serve as a commands-layer operation",
-  "updated_at": "2026-10-24T18:14:15.656283693Z"
+  "updated_at": "2026-10-24T18:20:30.411408141Z"
 }
