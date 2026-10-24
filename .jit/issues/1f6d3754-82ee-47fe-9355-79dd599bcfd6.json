@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "49311051-c15b-4158-b072-18d3735e45e8",
+      "run_id": "c6876430-e6c7-42a9-b5d2-aba85ace58ee",
       "status": "passed",
-      "updated_at": "2026-10-24T23:33:10.324500046Z",
+      "updated_at": "2026-10-24T23:45:53.439549868Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Artifact-plan errors use the derive-based error convention",
-  "updated_at": "2026-10-24T23:33:10.324500046Z"
+  "updated_at": "2026-10-24T23:45:53.439549868Z"
 }
