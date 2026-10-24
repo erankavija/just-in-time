@@ -494,7 +494,8 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "7aafec83": 1
+    "7aafec83": 1,
+    "81664a6a": 1
   },
   "surfaced_pitfalls": [],
   "reconciled_after_breakdown": [

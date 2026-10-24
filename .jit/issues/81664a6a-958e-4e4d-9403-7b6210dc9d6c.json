@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "65e43f0a-b47f-4578-8e64-a05a38e6981f",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:18:30.053706813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ff37c97e-6ac4-441e-b776-bf193650ca8f",
+      "status": "failed",
+      "updated_at": "2026-10-24T19:20:01.385537227Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "81664a6a-958e-4e4d-9403-7b6210dc9d6c",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Storage-owned git module with a one-process probe",
-  "updated_at": "2026-10-24T19:06:20.577658461Z"
+  "updated_at": "2026-10-24T19:20:01.385537227Z"
 }
