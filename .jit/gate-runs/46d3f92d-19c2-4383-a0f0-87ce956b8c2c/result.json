@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:14:23.648840470Z",
+  "duration_ms": 1703,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "manifest-tool-test",
+  "inputs_digest": "4baf28eebd44945af95c2b5d0f1cca8109baec8ee0d26c50902bf17feb39d05d",
+  "issue_id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "46d3f92d-19c2-4383-a0f0-87ce956b8c2c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:21.945380824Z",
+  "status": "passed",
+  "stderr": "error: plan breakdown overview is stale\n",
+  "stdout": "valid\nerror: source coverage missing: REQ-99\nerror: required sources are outside the known-source universe: REQ-99\nerror: manifest root must be a bare JSON array\nerror: depends_on graph contains a cycle\nerror: unknown source refs: REQ-02\nwarning: entry[0]: weak-worker-sized-reason: does not explain why the work fits one focused cycle\nwarning: entry[1]: weak-worker-sized-reason: does not explain why the work fits one focused cycle\nwarning: entry[0]: broad-quantifier: uses a broad quantifier\nwarning: entry[0]: independent-verbs: states multiple independent verbs\nwarning: entry[0]: multiple-consumer-families: names more than one consumer family\nwarning: entry[0]: acceptance-clusters: contains three or more acceptance clusters\nwarning: entry[0]: implementation-release: combines implementation with release work\nwarning: entry[0]: weak-worker-sized-reason: does not explain why the work fits one focused cycle\nadvisory: entry 'migrate-consumers' footprint uncertainty: The migration footprint is not bounded.\nwarning: entry[0]: independent-verbs: states multiple independent verbs\nvalid\nvalid\nvalid\n"
+}
