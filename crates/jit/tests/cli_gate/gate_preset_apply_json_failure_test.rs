@@ -7,10 +7,10 @@ use jit::test_cli::JitCli;
 /// The project-defined preset every case below applies.
 const PRESET: &str = "review";
 
-/// A repository declaring one gate and capturing it into the project's own
-/// preset [`PRESET`], which is the only place a preset comes from.
-fn preset_repository() -> JitCli {
-    let temp = JitCli::initialised().expect("initialised repository");
+/// Declare one gate in `temp` and capture it into the project's own preset
+/// [`PRESET`], which is the only place a preset comes from. Returns the
+/// issue the preset was captured from.
+fn define_team_review_preset(temp: &JitCli) -> String {
     temp.command([
         "gate",
         "define",
@@ -22,14 +22,14 @@ fn preset_repository() -> JitCli {
     ])
     .assert()
     .success();
-    let reference = create_issue(&temp, "Preset source");
+    let reference = create_issue(temp, "Preset source");
     temp.command(["gate", "add", &reference, "team-review"])
         .assert()
         .success();
     temp.command(["gate", "preset", "create", &reference, PRESET])
         .assert()
         .success();
-    temp
+    reference
 }
 
 fn create_issue(temp: &JitCli, title: &str) -> String {
@@ -38,7 +38,8 @@ fn create_issue(temp: &JitCli, title: &str) -> String {
 
 #[test]
 fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
-    let temp = preset_repository();
+    let temp = JitCli::initialised().unwrap();
+    define_team_review_preset(&temp);
     let valid_issue = create_issue(&temp, "Preset target");
     let missing_issue = "00000000-0000-0000-0000-000000000000";
 
@@ -94,7 +95,8 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
 
 #[test]
 fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
-    let temp = preset_repository();
+    let temp = JitCli::initialised().unwrap();
+    define_team_review_preset(&temp);
 
     let output = temp
         .command([
@@ -117,7 +119,8 @@ fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
 
 #[test]
 fn test_gate_preset_apply_json_all_success_retains_success_payload() {
-    let temp = preset_repository();
+    let temp = JitCli::initialised().unwrap();
+    define_team_review_preset(&temp);
     let issue = create_issue(&temp, "Preset target");
 
     let output = temp
