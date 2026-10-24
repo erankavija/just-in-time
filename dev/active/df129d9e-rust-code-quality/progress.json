@@ -134,7 +134,7 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "in_progress (merged 8cf19175a; cargo-ci passed; code-review R1 failed F1 stale rustdoc serve.rs:556; rework 1 at opus)",
+          "status": "done (merged 8cf19175a + rework 8c6d518bc; REQ-02 exit clause amended by user 9f201b611; code-review R1 failed on stale rustdoc, R2 passed; cargo-ci passed)",
           "model_tier": "opus (rework 1)",
           "tier_reason": "escalated one tier after a failed review attempt"
         },
@@ -739,7 +739,8 @@
     "threshold_below": 8700,
     "decision": "plan D-26",
     "epic_merge_deltas": {
-      "through_9cc3056a": -115
+      "through_9cc3056a": -115,
+      "d4373d07": -24
     }
   }
 }
