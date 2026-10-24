@@ -19574,3 +19574,9 @@
 {"id":"67b40250-7f99-4481-aad4-53ba4f6ebf91","issue_id":"2e7e1348-869e-47dc-af07-29c21b40fdc0","timestamp":"2026-10-24T18:35:18.742528673Z","type":"issue_completed"}
 {"assignee":"agent:df129d9e-lead","id":"9fe9d667-ab20-419d-b793-07f9f9a921a1","issue_id":"a807e699-a7ed-474e-b6af-2ed4086a9dad","timestamp":"2026-10-24T18:35:32.470404965Z","type":"issue_claimed"}
 {"from":"ready","id":"9f96d153-768c-4325-bec9-3ddc2d0127f4","issue_id":"a807e699-a7ed-474e-b6af-2ed4086a9dad","timestamp":"2026-10-24T18:35:32.575048751Z","to":"in_progress","type":"issue_state_changed"}
+{"id":"7207c8fb-ce94-4d28-ac65-d74eaabfc16c","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","priority":"high","timestamp":"2026-10-24T18:36:32.241578953Z","title":"Configurable worktree root independent of the data root","type":"issue_created"}
+{"from":"ready","id":"8f1c2b7d-1640-45eb-a34e-5d07bcc6bd7c","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-10-24T18:36:36.435321266Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"7be980a0-c96c-481e-aeff-dc1db075f07f","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-10-24T18:36:36.435321266Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"07a465f2-f670-4638-ac2b-c4e027958194","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-10-24T18:36:52.822184067Z","type":"issue_updated","updated_by":"dependency-remove"}
+{"from":"backlog","id":"37ca9cb1-31d8-440b-b650-5da9d62a6627","issue_id":"5046408a-9706-4ca0-9302-54d20e2088aa","timestamp":"2026-10-24T18:36:52.822184067Z","to":"ready","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"4b6f7498-558a-4279-af78-1af7ba88980f","issue_id":"f4d9502a-c585-4436-8819-bcd3d5c59171","timestamp":"2026-10-24T18:36:53.176916795Z","type":"issue_updated","updated_by":"dependency-add"}
