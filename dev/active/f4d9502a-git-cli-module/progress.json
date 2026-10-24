@@ -59,7 +59,7 @@
           "short_id": "aec50003",
           "title": "Pinned-read tests count processes with the shared stand-in",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": []
         },
         {
