@@ -1,6 +1,8 @@
 //! The storage-owned module through which jit starts git (`@/charter/D-21`).
 //! Every process runs as `<program> -C <directory> …`, never in the process
-//! working directory.
+//! working directory. Layout detection in `worktree_paths.rs` is a tracked
+//! exception that starts its own processes until it adopts [`Git::probe`]
+//! (jit:07663984).
 
 use std::io;
 use std::path::{Path, PathBuf};
