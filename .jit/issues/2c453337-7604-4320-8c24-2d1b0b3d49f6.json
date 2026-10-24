@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:25.390073480Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -29,7 +29,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Breakdown-manifest tool test suite runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:28.731548979Z"
+  "updated_at": "2026-10-24T23:13:38.170339808Z"
 }
