@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d21ed426be431dc52eb4b52327104c15e00742da",
+  "completed_at": "2026-10-24T18:49:09.004668214Z",
+  "duration_ms": 178958,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The runtime image installs git without recommended packages, and the static contract detects its absence in the prior Dockerfile.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "810e32d4-2922-4837-a100-58ab13ef0161",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aef52f6a-ee98-41ce-b2d6-98b1b5ab6f78",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T18:46:10.045807076Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7e3cf87cf (implementation), f95058e01 and d21ed426b (merge commits)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-10 and @/charter/D-21 — dev/vision/9db27a3a-charter.md; @/issue/f4d9502a/requirement/REQ-10 — .jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json; @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose — .jit/invariants.toml\nGate evidence: code-review pending, with no recorded run or exit code\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The runtime image installs git without recommended packages, and the static contract detects its absence in the prior Dockerfile.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
