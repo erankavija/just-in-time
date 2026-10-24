@@ -50,10 +50,11 @@ incomplete criterion coverage, stale generated output, or unresolved sizing
 warnings. Missing hierarchy config, invented sources, non-aggregating non-finest
 entries, and malformed/duplicate contract headings also fail. Every issue
 description is the final standalone body. Every finest-tier
-entry must pass the one-worker assignment simulation: one outcome, bounded
-consumer family, observable test boundary, focused implementation/review cycle,
-no inner decomposition, and no mixed deliverable categories. `landing_group`
-never changes that judgment. Per-code warning overrides and terminal footprints
+entry must pass the one-worker assignment simulation: one coherent change,
+observable test boundary, one focused implementation/review cycle, and not a
+mere chain link. Adding a form, moving its callers, and deleting the old form
+within one module is one entry. A manifest over the validator's issue budget
+fails. `landing_group` never changes that judgment. Per-code warning overrides and terminal footprints
 stay visible for review. Contract modes and producer reachability must be exact.
 
 ## 3. Create once

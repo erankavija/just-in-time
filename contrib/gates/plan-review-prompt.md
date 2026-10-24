@@ -27,17 +27,20 @@ history, or append-only correction sections are blocking accumulation.
 
 Check every edge and simulate assigning every finest-tier entry to one worker:
 
-| Key | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed foundation/migration/deletion/docs/release work | Result |
-|---|---|---|---|---|---|---|---|---|
+| Key | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |
+|---|---|---|---|---|---|---|
 
-Fail a row only when the mis-sizing is material: the worker could not deliver
-the leaf in one focused cycle, or the scope genuinely mixes deliverable
-classes. A borderline row is an advisory note. `landing_group` is integration
-metadata only. Broad quantifiers, independent verbs, several component
-families, three acceptance clusters, and implementation plus release require a
-split or a concrete per-code override that remains visible here. Reject global
-incantations, missing hierarchy/source universes, invented refs, tier-laundered
-leaves, and malformed or duplicate contract headings.
+Fail a row only when the mis-sizing is material. Oversize: the worker could not
+deliver the leaf in one focused cycle, or it combines implementation with
+release. Undersize: the leaf only links a producer-to-remover chain or a bridge
+pair that one task within the module would deliver. Adding a form, moving its
+callers, and deleting the old form within one module is one coherent change, not
+mixed work. A borderline row is an advisory note. A manifest over the validator's
+issue budget is blocking. `landing_group` is integration metadata only. Each
+sizing warning requires a merge, a split, or a concrete per-code override that
+remains visible here. Reject global incantations, missing hierarchy/source
+universes, invented refs, tier-laundered leaves, and malformed or duplicate
+contract headings.
 
 Plan-fixed contracts must have no producer. Every implementation-produced
 contract must have exactly one producer transitively reachable by each consumer.
