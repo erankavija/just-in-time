@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9de4fe221e96c0ec67851acbb07e8e31eaa8ecda",
+  "completed_at": "2026-10-24T19:06:09.437908276Z",
+  "duration_ms": 97208,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard fixture criteria are met; the prior absolute-path finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7aafec83-b056-4047-9569-77c9373ba2d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "63ddb89c-db57-4c02-873e-4d3e584f1acf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T19:04:32.229232203Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `52011f8`, `783baeec`, `2c957502`, `2670df4`, `36ed8e5`, `3472eae`, `9de4fe2` (`jit:7aafec83`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-21` (`dev/vision/9db27a3a-charter.md`); `@/invariant/shared-test-contracts`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose` (`.jit/invariants.toml`); `@/issue/7aafec83/requirement/REQ-01`, `REQ-02`, `REQ-03`, `@/issue/f4d9502a/requirement/REQ-07` (issue descriptions)\nGate evidence: `cargo-ci` passed (exit 0, 2026-10-24T19:03:04Z); prior `code-review` failed on F1, which current `git.rs:174-193` and `git_tests.rs:160-185` address\nTruncation recovery: re-read bounded per-commit fixture patches, current fixture/test ranges, and exact tagged-commit statistics; generated cache artifacts were outside the impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard fixture criteria are met; the prior absolute-path finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

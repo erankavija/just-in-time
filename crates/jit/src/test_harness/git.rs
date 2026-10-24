@@ -64,6 +64,9 @@ impl GitRepository {
 /// A stand-in for the git executable that records each invocation, then runs
 /// the real git found on `PATH` when the stand-in was created.
 ///
+/// The real git is the first executable `git` under an absolute `PATH` entry
+/// that is not itself a stand-in, canonicalized; relative entries are skipped.
+///
 /// The stand-in is a file named `git` alone in its directory, so a test can
 /// pass [`program`](Self::program) as an explicit program or put the
 /// directory first on a child's `PATH` through
@@ -73,22 +76,31 @@ impl GitRepository {
 #[cfg(unix)]
 pub struct GitStandIn {
     dir: tempfile::TempDir,
+    real_git: PathBuf,
 }
+
+/// The stand-in script's first lines, which identify a stand-in on `PATH`.
+#[cfg(unix)]
+const STAND_IN_HEADER: &str = "#!/bin/sh\n# jit test-harness git stand-in\n";
 
 #[cfg(unix)]
 impl GitStandIn {
     /// Create the stand-in, resolving the real git on the current `PATH`.
     pub fn new() -> Self {
+        Self::resolving_on(&std::env::var_os("PATH").unwrap_or_default())
+    }
+
+    fn resolving_on(search_path: &std::ffi::OsStr) -> Self {
         use std::os::unix::fs::PermissionsExt;
 
-        let real_git = Self::resolve_real_git();
-        let dir = tempfile::TempDir::new().unwrap();
-        let stand_in = Self { dir };
+        let stand_in = Self {
+            dir: tempfile::TempDir::new().unwrap(),
+            real_git: resolve_real_git(search_path),
+        };
         std::fs::create_dir(stand_in.bin_dir()).unwrap();
         std::fs::create_dir(stand_in.records_dir()).unwrap();
         let script = format!(
-            r#"#!/bin/sh
-records={records}
+            r#"{STAND_IN_HEADER}records={records}
 staged="$records/.$$"
 if [ "$#" -gt 0 ]; then printf '%s\0' "$@"; fi > "$staged" || exit 125
 count() {{ echo "$#"; }}
@@ -101,7 +113,7 @@ rm -f "$staged"
 exec {git} "$@"
 "#,
             records = shell_quote(&stand_in.records_dir()),
-            git = shell_quote(&real_git),
+            git = shell_quote(&stand_in.real_git),
         );
         let program = stand_in.program();
         std::fs::write(&program, script).unwrap();
@@ -112,6 +124,11 @@ exec {git} "$@"
     /// The stand-in executable, named `git`.
     pub fn program(&self) -> PathBuf {
         self.bin_dir().join("git")
+    }
+
+    /// The absolute path of the real git the stand-in runs.
+    pub fn real_git(&self) -> &Path {
+        &self.real_git
     }
 
     /// The directory holding only the stand-in.
@@ -151,19 +168,29 @@ exec {git} "$@"
     fn records_dir(&self) -> PathBuf {
         self.dir.path().join("invocations")
     }
+}
 
-    fn resolve_real_git() -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+fn resolve_real_git(search_path: &std::ffi::OsStr) -> PathBuf {
+    use std::io::Read;
+    use std::os::unix::fs::PermissionsExt;
 
-        let path = std::env::var_os("PATH").unwrap_or_default();
-        std::env::split_paths(&path)
-            .map(|dir| dir.join("git"))
-            .find(|candidate| {
-                std::fs::metadata(candidate)
-                    .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-            })
-            .expect("a git executable on PATH")
-    }
+    let is_stand_in = |path: &Path| {
+        let mut header = vec![0; STAND_IN_HEADER.len()];
+        std::fs::File::open(path)
+            .and_then(|mut file| file.read_exact(&mut header))
+            .is_ok_and(|()| header == STAND_IN_HEADER.as_bytes())
+    };
+    std::env::split_paths(search_path)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join("git"))
+        .filter(|candidate| {
+            std::fs::metadata(candidate)
+                .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+        })
+        .filter_map(|candidate| std::fs::canonicalize(candidate).ok())
+        .find(|candidate| !is_stand_in(candidate))
+        .expect("a git executable under an absolute PATH entry")
 }
 
 #[cfg(unix)]

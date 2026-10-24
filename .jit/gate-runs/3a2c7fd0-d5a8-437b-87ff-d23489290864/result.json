@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3a14c2e06c86d60afcbc985e76ad432e4f7c46d7",
+  "completed_at": "2026-10-24T19:12:31.360518338Z",
+  "duration_ms": 159547,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable test migration satisfies its scoped criterion with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cb01a945-4421-41c7-8909-32fb4b8fc585",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3a2c7fd0-d5a8-437b-87ff-d23489290864",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T19:09:51.813357514Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3a14c2e06, f7786e737 (both `jit:cb01a945`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-01 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-24T19:08:32.115814292+00:00\nTruncation recovery: inspected the merge’s first-parent patch separately and bounded current test/fixture slices\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable test migration satisfies its scoped criterion with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
