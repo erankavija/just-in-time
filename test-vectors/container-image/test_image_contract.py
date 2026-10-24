@@ -122,6 +122,15 @@ class StaticImageContractTests(unittest.TestCase):
         self.assertNotRegex(runtime.lower(), r"\b(?:chown|chmod)\b")
         self.assertNotIn("jit init", runtime)
 
+    def test_runtime_apt_install_provides_git_without_recommends(self) -> None:
+        joined = re.sub(r"\\\s*\n", " ", self.runtime_stage())
+        install = re.search(r"apt-get\s+install\b([^&\n]*)", joined)
+        self.assertIsNotNone(install, "runtime stage must install packages with apt-get")
+        tokens = install.group(1).split()
+        packages = [token for token in tokens if not token.startswith("-")]
+        self.assertIn("--no-install-recommends", tokens)
+        self.assertIn("git", packages)
+
     def test_healthcheck_uses_server_health_route(self) -> None:
         self.assertRegex(
             self.text,
