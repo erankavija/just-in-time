@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -165,7 +165,7 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "in_progress (merged 46a747fc2; cargo-ci and code-review failed on stale stderr assertion in cli_gate test_issue_show_errors_on_corrupt_gate_run; codex luna re-dispatch 2, same tier)",
+          "status": "done (merged 46a747fc2 + fix 1d998db27; first merge broke cli_gate test, gates failed; codex attempts 3-4 fixed; full cargo-ci on branch then cargo-ci, code-review passed)",
           "vendor": "codex",
           "model_tier": "gpt-6-luna xhigh",
           "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
@@ -752,7 +752,11 @@
       "through_9cc3056a": -115,
       "d4373d07": -24,
       "2e7e1348": -4,
-      "a807e699": -158
-    }
+      "a807e699": -158,
+      "5d0a9a90": 8
+    },
+    "epic_total": -293,
+    "head_lines": 9031,
+    "head_rev": "1d998db27"
   }
 }
