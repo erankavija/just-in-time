@@ -1,4 +1,6 @@
 use jit::storage::{GitRevisionError, GitRevisionResolver};
+#[cfg(unix)]
+use jit::test_harness::git::GitStandIn;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -163,33 +165,6 @@ fn test_git_revision_resolver_reports_unavailable_git() {
 }
 
 #[cfg(unix)]
-fn counted_git(repo: &Repo) -> (std::path::PathBuf, std::path::PathBuf) {
-    use std::os::unix::fs::PermissionsExt;
-
-    let log = repo.root.join("git-processes.log");
-    let wrapper = repo.root.join("git-wrapper.sh");
-    let log_literal = log.to_string_lossy().replace('\'', "'\\''");
-    fs::write(
-        &wrapper,
-        format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log_literal}'\nexec git \"$@\"\n"),
-    )
-    .unwrap();
-    let mut permissions = fs::metadata(&wrapper).unwrap().permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&wrapper, permissions).unwrap();
-    (wrapper, log)
-}
-
-#[cfg(unix)]
-fn process_log(log: &Path) -> Vec<String> {
-    fs::read_to_string(log)
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_owned)
-        .collect()
-}
-
-#[cfg(unix)]
 #[test]
 fn test_inspect_pinned_targets_classifies_every_target_class() {
     use jit::repository_state::RepositoryTargetKind;
@@ -233,8 +208,8 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
     .map(|(revision, path)| (revision.to_string(), path.to_string()))
     .collect::<std::collections::BTreeSet<_>>();
 
-    let (wrapper, _) = counted_git(&repo);
-    let batched = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let stand_in = GitStandIn::new();
+    let batched = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
     let mut cache = BTreeMap::new();
     let actual = batched.inspect_pinned_targets(&requests, &mut cache);
 
@@ -327,9 +302,9 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
             .unavailable_reason(),
         Some("not found in commit tree")
     );
-    assert!(process_log(&repo.root.join("git-processes.log"))
-        .iter()
-        .any(|line| line == "rev-parse --verify not-a-revision^{commit}"));
+    assert!(stand_in.invocations().iter().any(
+        |invocation| invocation.args() == ["rev-parse", "--verify", "not-a-revision^{commit}"]
+    ));
     assert_eq!(cache.len(), 12);
 }
 
@@ -347,8 +322,8 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
     let requests = (0..40)
         .map(|index| ("HEAD".to_string(), format!("docs/file-{index}.md")))
         .collect::<std::collections::BTreeSet<_>>();
-    let (wrapper, log) = counted_git(&repo);
-    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let stand_in = GitStandIn::new();
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
     let mut cache = BTreeMap::new();
     resolver.inspect_pinned_targets(
         &[("HEAD".to_string(), "docs/file-0.md".to_string())]
@@ -356,23 +331,44 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
             .collect(),
         &mut cache,
     );
-    assert_eq!(process_log(&log).len(), 3);
+    assert_eq!(stand_in.invocations().len(), 3);
     resolver.inspect_pinned_targets(&requests, &mut cache);
 
-    let processes = process_log(&log);
+    let processes = stand_in.invocations();
     assert_eq!(processes.len(), 6);
-    assert!(processes.iter().any(|line| line.starts_with("rev-parse ")));
+    assert!(processes.iter().any(|invocation| invocation
+        .args()
+        .first()
+        .is_some_and(|argument| argument == "rev-parse")));
     let listing = processes
         .iter()
         .skip(3)
-        .filter(|line| line.contains("ls-tree"))
+        .filter(|invocation| {
+            invocation
+                .args()
+                .iter()
+                .any(|argument| argument == "ls-tree")
+        })
         .collect::<Vec<_>>();
     assert_eq!(listing.len(), 1);
-    assert!(listing[0].starts_with(&format!(
-        "--literal-pathspecs ls-tree -t -z --full-tree {revision} -- "
-    )));
-    assert!((1..40).all(|index| listing[0].contains(&format!("docs/file-{index}.md"))));
-    assert!(processes.iter().any(|line| line == "cat-file --batch"));
+    assert!(listing[0]
+        .args()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .starts_with(&[
+            "--literal-pathspecs",
+            "ls-tree",
+            "-t",
+            "-z",
+            "--full-tree",
+            revision.as_str(),
+            "--",
+        ]));
+    assert!((1..40).all(|index| listing[0].args().contains(&format!("docs/file-{index}.md"))));
+    assert!(processes
+        .iter()
+        .any(|invocation| invocation.args() == ["cat-file", "--batch"]));
 }
 
 #[cfg(unix)]
@@ -388,23 +384,32 @@ fn test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree() {
         .into_iter()
         .map(|(revision, path)| (revision.to_string(), path.to_string()))
         .collect::<std::collections::BTreeSet<_>>();
-    let (wrapper, log) = counted_git(&repo);
-    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let stand_in = GitStandIn::new();
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
 
     let results = resolver.inspect_pinned_targets(&requests, &mut BTreeMap::new());
 
     assert!(results.values().all(Result::is_ok));
-    let listings = process_log(&log)
+    let listings = stand_in
+        .invocations()
         .into_iter()
-        .filter(|line| line.contains("ls-tree"))
+        .filter(|invocation| {
+            invocation
+                .args()
+                .iter()
+                .any(|argument| argument == "ls-tree")
+        })
         .collect::<Vec<_>>();
     assert_eq!(listings.len(), 1);
     assert!(
-        !listings[0].split(' ').any(|argument| argument == "-r"),
-        "pinned classification listed the commit tree recursively: {}",
-        listings[0]
+        !listings[0].args().iter().any(|argument| argument == "-r"),
+        "pinned classification listed the commit tree recursively: {:?}",
+        listings[0].args()
     );
-    assert!(!listings[0].contains("other"));
+    assert!(!listings[0]
+        .args()
+        .iter()
+        .any(|argument| argument.contains("other")));
 }
 
 #[cfg(unix)]
@@ -422,31 +427,37 @@ fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_proces
     ]
     .into_iter()
     .collect::<std::collections::BTreeSet<_>>();
-    let (wrapper, log) = counted_git(&repo);
-    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let stand_in = GitStandIn::new();
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, stand_in.program());
     let mut cache = BTreeMap::new();
     let results = resolver.inspect_pinned_targets(&requests, &mut cache);
 
     assert!(results.values().all(Result::is_ok));
-    let processes = process_log(&log);
+    let processes = stand_in.invocations();
     assert_eq!(
         processes
             .iter()
-            .filter(|line| line.starts_with("rev-parse "))
+            .filter(|invocation| invocation
+                .args()
+                .first()
+                .is_some_and(|argument| argument == "rev-parse"))
             .count(),
         1
     );
     assert_eq!(
         processes
             .iter()
-            .filter(|line| line.contains(" ls-tree "))
+            .filter(|invocation| invocation
+                .args()
+                .iter()
+                .any(|argument| argument == "ls-tree"))
             .count(),
         2
     );
     assert_eq!(
         processes
             .iter()
-            .filter(|line| *line == "cat-file --batch")
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
             .count(),
         1
     );
