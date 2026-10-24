@@ -13,80 +13,38 @@
 //! that emits no block degrades gracefully (no findings field, no error).
 
 use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
 
-fn jit() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+fn define_auto_gate(temp: &JitCli, key: &str, checker_command: &str) {
+    temp.command([
+        "gate",
+        "define",
+        key,
+        "--title",
+        key,
+        "--description",
+        "Test gate for structured findings",
+        "--mode",
+        "auto",
+        "--checker-command",
+        checker_command,
+        "--timeout",
+        "10",
+    ])
+    .assert()
+    .success();
 }
 
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit()
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
-fn define_auto_gate(temp: &TempDir, key: &str, checker_command: &str) {
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            key,
-            "--description",
-            "Test gate for structured findings",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .assert()
-        .success();
-}
-
-fn create_issue(temp: &TempDir, gate_keys: &[&str]) -> String {
-    let mut args: Vec<String> = vec![
-        "issue".into(),
-        "create".into(),
-        "--title".into(),
-        "Test issue".into(),
-    ];
-    for k in gate_keys {
-        args.push("--gate".into());
-        args.push((*k).into());
-    }
-    let out = jit()
-        .current_dir(temp.path())
-        .args(&args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let s = String::from_utf8_lossy(&out);
-    s.lines()
-        .find(|l| l.contains("Created issue:"))
+fn create_issue(temp: &JitCli, gate_keys: &[&str]) -> String {
+    let gates = gate_keys.iter().flat_map(|key| ["--gate", *key]);
+    temp.create_issue(["--title", "Test issue"].into_iter().chain(gates))
         .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
 }
 
-fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
+fn run_gate(temp: &JitCli, issue_id: &str, gate_key: &str) {
     // Records a fresh run by executing the checker, regardless of verdict.
-    jit()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", issue_id, gate_key, "--force"])
+    temp.command(["gate", "evaluate", issue_id, gate_key, "--force"])
         .assert();
 }
 
@@ -106,14 +64,13 @@ fn findings_checker() -> &'static str {
 
 #[test]
 fn test_findings_surface_in_latest_run_json() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
     run_gate(&temp, &id, "code-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "code-review", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "code-review", "--json"])
         .assert()
         .success()
         .get_output()
@@ -141,7 +98,7 @@ fn test_findings_surface_in_latest_run_json() {
 
 #[test]
 fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     let checker = concat!(
         "printf '%s\\n' ",
         "'<<<JIT-FINDINGS-JSON' ",
@@ -152,9 +109,8 @@ fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
     let id = create_issue(&temp, &["doc-review"]);
     run_gate(&temp, &id, "doc-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "doc-review", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "doc-review", "--json"])
         .assert()
         .success()
         .get_output()
@@ -172,14 +128,13 @@ fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
 
 #[test]
 fn test_findings_surface_in_history_json() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
     run_gate(&temp, &id, "code-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "--all", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "--all", "--json"])
         .assert()
         .success()
         .get_output()
@@ -198,7 +153,7 @@ fn test_findings_surface_in_history_json() {
 
 #[test]
 fn test_findings_survive_lean_projection_in_status_all() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     // A PASSING checker whose stdout is dropped by the lean projection, but
     // whose structured findings must be retained.
     let checker = concat!(
@@ -211,9 +166,8 @@ fn test_findings_survive_lean_projection_in_status_all() {
     let id = create_issue(&temp, &["code-review"]);
     run_gate(&temp, &id, "code-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status-all", &id, "--json"])
+    let out = temp
+        .command(["gate", "status-all", &id, "--json"])
         .assert()
         .get_output()
         .stdout
@@ -236,14 +190,13 @@ fn test_findings_survive_lean_projection_in_status_all() {
 
 #[test]
 fn test_findings_text_view() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
     run_gate(&temp, &id, "code-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "code-review", "--findings"])
+    let out = temp
+        .command(["gate", "status", &id, "code-review", "--findings"])
         .assert()
         .success()
         .get_output()
@@ -265,14 +218,13 @@ fn test_findings_text_view() {
 
 #[test]
 fn test_findings_text_view_json() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
     run_gate(&temp, &id, "code-review");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "code-review", "--findings", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "code-review", "--findings", "--json"])
         .assert()
         .success()
         .get_output()
@@ -290,14 +242,13 @@ fn test_findings_text_view_json() {
 
 #[test]
 fn test_non_conforming_checker_has_no_findings() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo just plain output; exit 0");
     let id = create_issue(&temp, &["tests"]);
     run_gate(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -314,15 +265,14 @@ fn test_non_conforming_checker_has_no_findings() {
 
 #[test]
 fn test_findings_view_degrades_for_plaintext_checker() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo just plain output; exit 0");
     let id = create_issue(&temp, &["tests"]);
     run_gate(&temp, &id, "tests");
 
     // Text form: single header line noting the absence, no error.
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--findings"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--findings"])
         .assert()
         .success()
         .get_output()
@@ -335,9 +285,8 @@ fn test_findings_view_degrades_for_plaintext_checker() {
     );
 
     // JSON form: has_findings=false, empty findings array.
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "status", &id, "tests", "--findings", "--json"])
+    let out = temp
+        .command(["gate", "status", &id, "tests", "--findings", "--json"])
         .assert()
         .success()
         .get_output()
@@ -354,14 +303,13 @@ fn test_findings_view_degrades_for_plaintext_checker() {
 
 #[test]
 fn test_findings_in_gate_failed_error_envelope() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
     let id = create_issue(&temp, &["code-review"]);
 
     // `gate evaluate` (no --force) runs the checker; it exits 1 -> GATE_FAILED.
-    let output = jit()
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &id, "code-review", "--json"])
+    let output = temp
+        .command(["gate", "evaluate", &id, "code-review", "--json"])
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(4));
@@ -379,23 +327,21 @@ fn test_findings_in_gate_failed_error_envelope() {
 
 #[test]
 fn test_findings_and_history_conflict_json_error() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo x; exit 0");
     let id = create_issue(&temp, &["tests"]);
     run_gate(&temp, &id, "tests");
 
-    jit()
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "status",
-            &id,
-            "tests",
-            "--findings",
-            "--all",
-            "--json",
-        ])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("mutually exclusive"));
+    temp.command([
+        "gate",
+        "status",
+        &id,
+        "tests",
+        "--findings",
+        "--all",
+        "--json",
+    ])
+    .assert()
+    .failure()
+    .stdout(predicate::str::contains("mutually exclusive"));
 }

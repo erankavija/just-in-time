@@ -7,122 +7,63 @@
 //!   4. Supplying NEITHER errors with an actionable message.
 
 use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-    temp
-}
-
 /// Define a manual gate and create an issue that requires it.
-/// Returns (TempDir, short_issue_id).
-fn setup_manual_gate_issue(gate_key: &str) -> (TempDir, String) {
-    let temp = setup_repo();
+/// Returns (JitCli, short_issue_id).
+fn setup_manual_gate_issue(gate_key: &str) -> (JitCli, String) {
+    let temp = JitCli::initialised().unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            gate_key,
-            "--title",
-            "Test Gate",
-            "--description",
-            "Test gate for REQ-03",
-            "--mode",
-            "manual",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "define",
+        gate_key,
+        "--title",
+        "Test Gate",
+        "--description",
+        "Test gate for REQ-03",
+        "--mode",
+        "manual",
+    ])
+    .assert()
+    .success();
 
-    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Test issue",
-            "--gate",
-            gate_key,
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let out_str = String::from_utf8_lossy(&out);
-    let issue_id = out_str
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
+    let issue_id = temp
+        .create_issue(["--title", "Test issue", "--gate", gate_key])
+        .unwrap();
     (temp, issue_id)
 }
 
 /// Define an auto gate (exit 0) and create an issue with it.
-fn setup_auto_gate_issue(gate_key: &str) -> (TempDir, String) {
-    let temp = setup_repo();
+fn setup_auto_gate_issue(gate_key: &str) -> (JitCli, String) {
+    let temp = JitCli::initialised().unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            gate_key,
-            "--title",
-            "Auto Gate",
-            "--description",
-            "Auto gate for REQ-03",
-            "--mode",
-            "auto",
-            "--checker-command",
-            "exit 0",
-            "--timeout",
-            "10",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "define",
+        gate_key,
+        "--title",
+        "Auto Gate",
+        "--description",
+        "Auto gate for REQ-03",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "exit 0",
+        "--timeout",
+        "10",
+    ])
+    .assert()
+    .success();
 
-    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Test issue",
-            "--gate",
-            gate_key,
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-
-    let out_str = String::from_utf8_lossy(&out);
-    let issue_id = out_str
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
+    let issue_id = temp
+        .create_issue(["--title", "Test issue", "--gate", gate_key])
+        .unwrap();
     (temp, issue_id)
 }
 
@@ -133,19 +74,17 @@ fn setup_auto_gate_issue(gate_key: &str) -> (TempDir, String) {
 #[test]
 fn test_gate_evaluate_positional_key_still_works() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "evaluate",
-            &issue_id,
-            "code-review",
-            "--by",
-            "human:reviewer",
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Passed gate 'code-review'"));
+    temp.command([
+        "gate",
+        "evaluate",
+        &issue_id,
+        "code-review",
+        "--by",
+        "human:reviewer",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Passed gate 'code-review'"));
 }
 
 // ---------------------------------------------------------------------------
@@ -155,29 +94,26 @@ fn test_gate_evaluate_positional_key_still_works() {
 #[test]
 fn test_gate_evaluate_flag_key_accepted() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "evaluate",
-            &issue_id,
-            "--gate",
-            "code-review",
-            "--by",
-            "human:reviewer",
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Passed gate 'code-review'"));
+    temp.command([
+        "gate",
+        "evaluate",
+        &issue_id,
+        "--gate",
+        "code-review",
+        "--by",
+        "human:reviewer",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Passed gate 'code-review'"));
 }
 
 #[test]
 fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
     // Positional form
     let (temp_pos, id_pos) = setup_manual_gate_issue("code-review");
-    let out_pos = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_pos.path())
-        .args([
+    let out_pos = temp_pos
+        .command([
             "gate",
             "evaluate",
             &id_pos,
@@ -194,9 +130,8 @@ fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
 
     // Flag form
     let (temp_flag, id_flag) = setup_manual_gate_issue("code-review");
-    let out_flag = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_flag.path())
-        .args([
+    let out_flag = temp_flag
+        .command([
             "gate",
             "evaluate",
             &id_flag,
@@ -228,19 +163,17 @@ fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
 #[test]
 fn test_gate_evaluate_both_positional_and_flag_errors() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "evaluate",
-            &issue_id,
-            "code-review",
-            "--gate",
-            "code-review",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--gate").and(predicate::str::contains("positional")));
+    temp.command([
+        "gate",
+        "evaluate",
+        &issue_id,
+        "code-review",
+        "--gate",
+        "code-review",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("--gate").and(predicate::str::contains("positional")));
 }
 
 // ---------------------------------------------------------------------------
@@ -250,9 +183,7 @@ fn test_gate_evaluate_both_positional_and_flag_errors() {
 #[test]
 fn test_gate_evaluate_neither_positional_nor_flag_errors() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id])
+    temp.command(["gate", "evaluate", &issue_id])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").or(predicate::str::contains("gate key")));
@@ -267,15 +198,11 @@ fn test_gate_status_positional_key_still_works() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
 
     // Run gate first so status has something to show
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "tests"])
+    temp.command(["gate", "evaluate", &issue_id, "tests"])
         .assert()
         .success();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id, "tests"])
+    temp.command(["gate", "status", &issue_id, "tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
@@ -289,15 +216,11 @@ fn test_gate_status_positional_key_still_works() {
 fn test_gate_status_flag_key_accepted() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "evaluate", &issue_id, "tests"])
+    temp.command(["gate", "evaluate", &issue_id, "tests"])
         .assert()
         .success();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id, "--gate", "tests"])
+    temp.command(["gate", "status", &issue_id, "--gate", "tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
@@ -307,14 +230,12 @@ fn test_gate_status_flag_key_accepted() {
 fn test_gate_status_flag_and_positional_produce_identical_outcome() {
     // Positional form
     let (temp_pos, id_pos) = setup_auto_gate_issue("tests");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_pos.path())
-        .args(["gate", "evaluate", &id_pos, "tests"])
+    temp_pos
+        .command(["gate", "evaluate", &id_pos, "tests"])
         .assert()
         .success();
-    let out_pos = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_pos.path())
-        .args(["gate", "status", &id_pos, "tests", "--json"])
+    let out_pos = temp_pos
+        .command(["gate", "status", &id_pos, "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -323,14 +244,12 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
 
     // Flag form
     let (temp_flag, id_flag) = setup_auto_gate_issue("tests");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_flag.path())
-        .args(["gate", "evaluate", &id_flag, "tests"])
+    temp_flag
+        .command(["gate", "evaluate", &id_flag, "tests"])
         .assert()
         .success();
-    let out_flag = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp_flag.path())
-        .args(["gate", "status", &id_flag, "--gate", "tests", "--json"])
+    let out_flag = temp_flag
+        .command(["gate", "status", &id_flag, "--gate", "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -351,9 +270,7 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
 #[test]
 fn test_gate_status_both_positional_and_flag_errors() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id, "tests", "--gate", "tests"])
+    temp.command(["gate", "status", &issue_id, "tests", "--gate", "tests"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").and(predicate::str::contains("positional")));
@@ -366,9 +283,7 @@ fn test_gate_status_both_positional_and_flag_errors() {
 #[test]
 fn test_gate_status_neither_positional_nor_flag_errors() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id])
+    temp.command(["gate", "status", &issue_id])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").or(predicate::str::contains("gate key")));
@@ -382,9 +297,8 @@ fn test_gate_status_neither_positional_nor_flag_errors() {
 #[test]
 fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
-    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
+    let out = temp
+        .command([
             "gate",
             "evaluate",
             &issue_id,
@@ -406,9 +320,8 @@ fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
 #[test]
 fn test_gate_status_neither_with_json_emits_machine_readable_error() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
-    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["gate", "status", &issue_id, "--json"])
+    let out = temp
+        .command(["gate", "status", &issue_id, "--json"])
         .assert()
         .failure()
         .get_output()
@@ -433,9 +346,8 @@ fn test_gate_evaluate_commands_report_passed_gate_with_one_suffixless_line() {
             .into_iter()
             .map(|a| a.replace("{id}", &issue_id))
             .collect();
-        let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(temp.path())
-            .args(&args)
+        let out = temp
+            .command(&args)
             .args(["--by", "human:reviewer"])
             .assert()
             .success()
