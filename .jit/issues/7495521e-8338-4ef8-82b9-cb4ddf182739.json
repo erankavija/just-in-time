@@ -14,7 +14,26 @@
     "code-review",
     "standards-fix-test"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b794875c-bc1e-454e-ba2d-66cec35c0552",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:45.162345696Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dffbc2cb-c6eb-4bef-b44c-89e59e7b8d7c",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:15:50.894563213Z",
+      "updated_by": "auto:executor"
+    },
+    "standards-fix-test": {
+      "run_id": "678dd17d-8ee3-4e04-86f7-5b307ae09e54",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:25.945645402Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7495521e-8338-4ef8-82b9-cb4ddf182739",
   "labels": [
     "type:task",
@@ -31,5 +50,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Standards-fix test suite runs as a declared gate",
-  "updated_at": "2026-10-24T23:13:38.670485173Z"
+  "updated_at": "2026-10-24T23:15:50.894563213Z"
 }

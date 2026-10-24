@@ -14,7 +14,20 @@
     "code-review",
     "session-cost-benchmark-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fe68cec0-fc8f-41dd-98ed-d1b7320cf47e",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.323218687Z",
+      "updated_by": "auto:executor"
+    },
+    "session-cost-benchmark-selftest": {
+      "run_id": "37a3452d-759a-49f2-aaec-8c896f82ed83",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:17.586461196Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Session-cost benchmark self-test runs as a declared gate",
-  "updated_at": "2026-10-22T22:07:03.461186421Z"
+  "updated_at": "2026-10-24T23:14:44.323218687Z"
 }

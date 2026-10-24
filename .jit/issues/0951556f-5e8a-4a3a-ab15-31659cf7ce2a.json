@@ -14,7 +14,26 @@
     "code-review",
     "standards-scan-test"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "90227604-dc58-43ad-8b36-0c41e273f8c1",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:45.364544889Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "21cce070-9b3d-4bde-a4d1-cd38af9c7889",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:16:05.717972727Z",
+      "updated_by": "auto:executor"
+    },
+    "standards-scan-test": {
+      "run_id": "e7ced7ee-227f-4c23-aad7-1afd5713cb0c",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:26.898887644Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
   "labels": [
     "type:task",
@@ -31,5 +50,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Standards-scan test suite runs as a declared gate",
-  "updated_at": "2026-10-24T23:13:38.923640828Z"
+  "updated_at": "2026-10-24T23:16:05.717972727Z"
 }

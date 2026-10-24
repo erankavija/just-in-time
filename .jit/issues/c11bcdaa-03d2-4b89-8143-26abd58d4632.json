@@ -14,7 +14,20 @@
     "code-review",
     "workflow-contract-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d66101b1-36d8-4d2c-8c34-cbf45a874edb",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.564876388Z",
+      "updated_by": "auto:executor"
+    },
+    "workflow-contract-selftest": {
+      "run_id": "47b2dbf6-c54d-49ef-bb58-d01faf534116",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:19.949582575Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c11bcdaa-03d2-4b89-8143-26abd58d4632",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Workflow-contract harness self-test runs as a declared gate",
-  "updated_at": "2026-10-24T23:13:39.160738253Z"
+  "updated_at": "2026-10-24T23:14:44.564876388Z"
 }

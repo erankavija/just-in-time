@@ -14,7 +14,20 @@
     "code-review",
     "manifest-tool-test"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a87d47f7-0e38-4574-914f-855942a70a2d",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.965355162Z",
+      "updated_by": "auto:executor"
+    },
+    "manifest-tool-test": {
+      "run_id": "46d3f92d-19c2-4383-a0f0-87ce956b8c2c",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:23.657031706Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2c453337-7604-4320-8c24-2d1b0b3d49f6",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Breakdown-manifest tool test suite runs as a declared gate",
-  "updated_at": "2026-10-24T23:13:38.170339808Z"
+  "updated_at": "2026-10-24T23:14:44.965355162Z"
 }
