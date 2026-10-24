@@ -166,10 +166,6 @@ fn test_query_label_json_invalid_pattern() {
     assert!(json["error"]["suggestions"][0]
         .as_str()
         .is_some_and(|suggestion| suggestion.contains("namespace:value")));
-    assert!(
-        String::from_utf8_lossy(&output.stderr).starts_with("Error: "),
-        "propagated failure retains its human diagnostic"
-    );
 }
 
 #[test]

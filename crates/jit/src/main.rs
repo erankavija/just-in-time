@@ -1490,8 +1490,12 @@ fn main() {
     let outcome = std::panic::catch_unwind(|| match run() {
         (_, Ok(())) => ExitCode::Success,
         (mode, Err(e)) => {
-            eprintln!("Error: {}", e);
-            emit_top_level_json_error(&e, mode).unwrap_or_else(|| classify(&e).exit_code())
+            if mode.json {
+                emit_top_level_json_error(&e)
+            } else {
+                eprintln!("Error: {}", e);
+                classify(&e).exit_code()
+            }
         }
     });
 
@@ -1513,18 +1517,9 @@ fn main() {
     }
 }
 
-/// Under `--json`, emit one structured envelope for every failure propagated to
-/// the top-level boundary.
-///
-/// Handler-owned JSON failures print and terminate before reaching this
-/// function, preserving their tailored code, details, and suggestions without a
-/// second document. Propagated failures arrive here with stdout untouched. The
-/// returned status is derived from the exact rendered code.
-fn emit_top_level_json_error(error: &anyhow::Error, mode: OutputMode) -> Option<ExitCode> {
-    if !mode.json {
-        return None;
-    }
-
+/// Emit one structured envelope for a failure propagated to the top level.
+/// Handler-owned JSON failures terminate before reaching this boundary.
+fn emit_top_level_json_error(error: &anyhow::Error) -> ExitCode {
     let json_error = if error
         .downcast_ref::<jit::errors::InvalidLabelPatternError>()
         .is_some()
@@ -1551,10 +1546,17 @@ fn emit_top_level_json_error(error: &anyhow::Error, mode: OutputMode) -> Option<
     };
     let exit_code = json_error.exit_code();
 
-    if let Ok(rendered) = json_error.to_json_string() {
-        println!("{}", rendered);
-    }
-    Some(exit_code)
+    let rendered = json_error.to_json_string().unwrap_or_else(|_| {
+        serde_json::json!({
+            "error": {
+                "code": json_error.error.code.as_str(),
+                "message": json_error.error.message,
+            }
+        })
+        .to_string()
+    });
+    println!("{}", rendered);
+    exit_code
 }
 
 /// Parse the command line and dispatch it, handing back the parsed output mode
