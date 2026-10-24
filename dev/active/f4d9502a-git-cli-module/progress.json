@@ -1,0 +1,502 @@
+{
+  "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
+  "epic_short_id": "f4d9502a",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "3d93442b-2764-4ada-b924-405220a9e6f4",
+          "short_id": "3d93442b",
+          "title": "Hook installation targets the selected repository's common directory",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "7aafec83-b056-4047-9569-77c9373ba2d3",
+          "short_id": "7aafec83",
+          "title": "Shared git repository and counting stand-in test fixtures",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "810e32d4-2922-4837-a100-58ab13ef0161",
+          "short_id": "810e32d4",
+          "title": "Server image ships the git executable",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "d7cce445-436d-43d7-9ac9-7c21251b19fa",
+          "short_id": "d7cce445",
+          "title": "Issue reads stop consulting git HEAD",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "0102769f",
+            "e1a6c8c2"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "81664a6a-958e-4e4d-9403-7b6210dc9d6c",
+          "short_id": "81664a6a",
+          "title": "Storage-owned git module with a one-process probe",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "aec50003-38ae-49aa-9af8-1c9b9db31651",
+          "short_id": "aec50003",
+          "title": "Pinned-read tests count processes with the shared stand-in",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "b4ca051c-e241-45a5-b0ae-6f9016ada867",
+          "short_id": "b4ca051c",
+          "title": "Issue visibility pages describe two read sources",
+          "classification": "documentation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "cb01a945-4421-41c7-8909-32fb4b8fc585",
+          "short_id": "cb01a945",
+          "title": "Pinned-document test builds its commit through the git fixture",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "07663984-071b-4aa1-963a-e6ec2791f8d8",
+          "short_id": "07663984",
+          "title": "Layout detection uses the module's one-process probe",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "09974ad1-7c28-4aba-8a7a-62b0020383f3",
+          "short_id": "09974ad1",
+          "title": "Base comparison operation in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "24d3b460-ff46-4f57-bd79-a7cec02eb905",
+          "short_id": "24d3b460",
+          "title": "User name query in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
+          "short_id": "3a3b86cf",
+          "title": "Dirty-path query in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "437907da-4243-4ee2-828e-e13ba3efb5af",
+          "short_id": "437907da",
+          "title": "One worktree listing in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
+          "short_id": "46a89061",
+          "title": "Pinned revision reads move into the git module behind a bridge",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
+          "short_id": "4ba18af4",
+          "title": "One head lookup in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
+          "short_id": "bb5040a8",
+          "title": "Origin URL query in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
+          "short_id": "cc9f213e",
+          "title": "Path history query in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "7297f922-d3fd-4118-b533-c9d0b7638bc1",
+          "short_id": "7297f922",
+          "title": "CLI test bounds the git processes of issue reads",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "732f7afb-f1ee-4242-aa18-82b3b70ea96f",
+          "short_id": "732f7afb",
+          "title": "Init records the worktree branch through the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "9de4c09c-207b-4ea1-9482-3846383cd3c7",
+          "short_id": "9de4c09c",
+          "title": "Worktree info reads its branch through the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "c16c834c-f134-4af8-ab20-40c6a120e836",
+          "short_id": "c16c834c",
+          "title": "Storage pinned inspection runs on a module checkout",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "c5062e21-331d-4ab8-8468-3535d16d634f",
+          "short_id": "c5062e21",
+          "title": "Server detects its layout once from the selected data root",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "e3c38fea-fb76-4c32-85ac-f45ba7f1036c",
+          "short_id": "e3c38fea",
+          "title": "Worktree list reads worktrees through the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "c3e3e2ff"
+          ]
+        },
+        {
+          "id": "ec9e812c-dea5-4c6c-be38-4cd5349d6225",
+          "short_id": "ec9e812c",
+          "title": "Pinned-read behaviour suite moves into the git module suite",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "f649c144-cbc4-4e0e-9a26-c364590a57a3",
+          "short_id": "f649c144",
+          "title": "Lease validation lists worktrees once per run",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "614a6f97"
+          ]
+        },
+        {
+          "id": "f6eaba42-e756-4b94-b66e-ea1f46838bde",
+          "short_id": "f6eaba42",
+          "title": "Claims take their branch and git requirement from the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "614a6f97"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "d48e28bf-e001-4f50-9f01-44c97cc8658c",
+          "short_id": "d48e28bf",
+          "title": "Object reader and presence check in the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd",
+          "short_id": "d5cae9e3",
+          "title": "CLI tests for commands with no git executable",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
+          "short_id": "d68150e2",
+          "title": "Storage and executor stop re-detecting the layout",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "ea4b7363-acd6-4c0d-913f-beca27afcd4b",
+          "short_id": "ea4b7363",
+          "title": "Release actor reads git user.name through the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "3f8da8c4-4fb4-4191-bec4-d496155b6266",
+          "short_id": "3f8da8c4",
+          "title": "Gate runs take commit and branch evidence from the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "417be079",
+            "79aa3aa7"
+          ]
+        },
+        {
+          "id": "47d62472-731b-48a9-b27c-136cf86804ee",
+          "short_id": "47d62472",
+          "title": "Branch drift validation compares in the selected worktree",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "83c8632f-5495-4fef-a774-730ebeae95be",
+          "short_id": "83c8632f",
+          "title": "Document history comes from the module's path history",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "855d027d"
+          ]
+        },
+        {
+          "id": "92afc5d8-ddeb-405b-a708-b4b97f19d024",
+          "short_id": "92afc5d8",
+          "title": "Init reads git classification from the invocation's layout",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
+          "short_id": "9ecde705",
+          "title": "Link checks test asset presence through one git process",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "855d027d"
+          ]
+        },
+        {
+          "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
+          "short_id": "a273667c",
+          "title": "Path reads at a commit go through the git module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "22189592"
+          ]
+        },
+        {
+          "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
+          "short_id": "c140921c",
+          "title": "Snapshot source and repository facts come from the module",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "855d027d"
+          ]
+        },
+        {
+          "id": "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
+          "short_id": "d9ba0029",
+          "title": "Archive planning reads pinned evidence through one git process",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "5e1ba005",
+            "f8f80eea"
+          ]
+        },
+        {
+          "id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
+          "short_id": "dcf88b6f",
+          "title": "Pinned target inspection reads blobs through the object reader",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "fb5e8e8d-1b2a-4774-a45a-ca597d144ab3",
+          "short_id": "fb5e8e8d",
+          "title": "Main-history guard runs against the selected worktree",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "417be079"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "1acfa592-ce5a-4b73-ad86-a82881f1208f",
+          "short_id": "1acfa592",
+          "title": "Document show reads through storage at the version it names",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "855d027d"
+          ]
+        },
+        {
+          "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "short_id": "5046408a",
+          "title": "Configurable worktree root independent of the data root",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": [
+            "a807e699"
+          ]
+        },
+        {
+          "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
+          "short_id": "7cd27db8",
+          "title": "Snapshot export reads committed files through one git process",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
+          "short_id": "e6ec58f3",
+          "title": "Remove the revision resolver bridge",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "933ff852-7cc9-4902-a424-626b882df531",
+          "short_id": "933ff852",
+          "title": "Document diff reads both versions through one git process",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "cd603c8e-c2a8-43b8-afd5-7419d8d667f3",
+          "short_id": "cd603c8e",
+          "title": "Document command reference states the show and history semantics",
+          "classification": "documentation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "6fdb2d53-bc92-424e-bc74-455f21f2cc26",
+          "short_id": "6fdb2d53",
+          "title": "Remove the libgit2 binding from the workspace",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "23b48cf0-02af-4286-a788-bcda0ec32abf",
+          "short_id": "23b48cf0",
+          "title": "Git requirement pages name the git executable",
+          "classification": "documentation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "34851181-7812-4cef-9347-9b80c7fd288f",
+          "short_id": "34851181",
+          "title": "Trim the layout and git module surface to production callers",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
+          "short_id": "78cb05ed",
+          "title": "Build-policy check rejects native git and OpenSSL linkage",
+          "classification": "implementation",
+          "status": "pending",
+          "external_blockers": []
+        },
+        {
+          "id": "caceed7d-749c-44f4-8bad-647183cdaf29",
+          "short_id": "caceed7d",
+          "title": "Contributor documents stop presenting libgit2 as the git integration",
+          "classification": "documentation",
+          "status": "pending",
+          "external_blockers": []
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "reconciled_after_breakdown": [
+    "5046408a"
+  ],
+  "started_at": "2026-10-24T21:43:21+03:00"
+}
