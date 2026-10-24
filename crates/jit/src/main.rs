@@ -34,22 +34,8 @@ use jit::output::{
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
-
-fn normalize_absolute_path(path: &Path) -> PathBuf {
-    path.components()
-        .fold(PathBuf::new(), |mut normalized, component| {
-            match component {
-                Component::CurDir => {}
-                Component::ParentDir => {
-                    normalized.pop();
-                }
-                other => normalized.push(other.as_os_str()),
-            }
-            normalized
-        })
-}
 
 /// Build the `--json` error envelope for a rejected `jit dep add` batch
 /// (jit:c8518f2a). Every rejected edge is named under `details.rejected`
@@ -181,21 +167,6 @@ fn dep_add_batch_json_error(
     }
     json_error.error.details = Some(details);
     json_error
-}
-
-/// Whether session open failed on the leftover redo record: it did not parse,
-/// or applying it failed.
-fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
-    use jit::storage::RepositoryStateStoreError;
-    error.chain().any(|cause| {
-        matches!(
-            cause.downcast_ref::<RepositoryStateStoreError>(),
-            Some(
-                RepositoryStateStoreError::UnreadableRedoRecord { .. }
-                    | RepositoryStateStoreError::RedoApply(_)
-            )
-        )
-    })
 }
 
 /// Report a `jit recover` failure as `recovery_failed` and exit.
@@ -936,88 +907,6 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
     }
 }
 
-#[cfg(test)]
-mod gate_findings_text_tests {
-    use super::render_gate_findings_text;
-    use chrono::Utc;
-    use jit::declarations::GateStage;
-    use jit::domain::gate_findings::{GateFinding, GateFindings};
-    use jit::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION};
-
-    fn run_with(references: Vec<String>) -> GateRunResult {
-        GateRunResult {
-            schema_version: GATE_RUN_SCHEMA_VERSION,
-            run_id: "run-1".to_string(),
-            gate_key: "review".to_string(),
-            stage: GateStage::Postcheck,
-            issue_id: "issue-1".to_string(),
-            commit: None,
-            branch: None,
-            status: GateRunStatus::Failed,
-            started_at: Utc::now(),
-            completed_at: None,
-            duration_ms: None,
-            exit_code: Some(1),
-            stdout: String::new(),
-            stderr: String::new(),
-            command: "review".to_string(),
-            by: None,
-            message: None,
-            findings: Some(GateFindings {
-                verdict: "fail".to_string(),
-                summary: "one defect".to_string(),
-                findings: vec![GateFinding {
-                    id: "F1".to_string(),
-                    severity: "high".to_string(),
-                    disposition: Some("blocking".to_string()),
-                    origin: Some("issue-impact".to_string()),
-                    summary: "unsafe write".to_string(),
-                    file: Some("src/storage.rs".to_string()),
-                    line: Some(12),
-                    references,
-                }],
-            }),
-            inputs_digest: None,
-            origin: jit::domain::GateVerdictOrigin::Executed,
-            evaluation_stability: jit::domain::GateEvaluationStability::Stable,
-        }
-    }
-
-    #[test]
-    fn test_render_gate_findings_text_exposes_references_exactly() {
-        let rendered = render_gate_findings_text(&run_with(vec![
-            "@/inv/atomic-writes".to_string(),
-            "checker:opaque value".to_string(),
-        ]));
-
-        assert!(rendered.contains(r#"references: ["@/inv/atomic-writes","checker:opaque value"]"#));
-    }
-
-    #[test]
-    fn test_render_gate_findings_text_json_encoding_distinguishes_collisions() {
-        let comma_value = render_gate_findings_text(&run_with(vec!["a, b".to_string()]));
-        let two_values =
-            render_gate_findings_text(&run_with(vec!["a".to_string(), "b".to_string()]));
-        let empty_value = render_gate_findings_text(&run_with(vec![String::new()]));
-
-        assert!(comma_value.contains(r#"references: ["a, b"]"#));
-        assert!(two_values.contains(r#"references: ["a","b"]"#));
-        assert!(empty_value.contains(r#"references: [""]"#));
-        assert_ne!(comma_value, two_values);
-        assert_ne!(
-            empty_value,
-            render_gate_findings_text(&run_with(Vec::new()))
-        );
-    }
-
-    #[test]
-    fn test_render_gate_findings_text_omits_empty_references() {
-        let rendered = render_gate_findings_text(&run_with(Vec::new()));
-
-        assert!(!rendered.contains("references:"));
-    }
-}
-
 fn print_gate_run_details(result: &GateRunResult) {
     let status_str = match result.status {
         jit::domain::GateRunStatus::Passed => "passed",
@@ -1601,8 +1490,12 @@ fn main() {
     let outcome = std::panic::catch_unwind(|| match run() {
         (_, Ok(())) => ExitCode::Success,
         (mode, Err(e)) => {
-            eprintln!("Error: {}", e);
-            emit_top_level_json_error(&e, mode).unwrap_or_else(|| classify(&e).exit_code())
+            if mode.json {
+                emit_top_level_json_error(&e)
+            } else {
+                eprintln!("Error: {}", e);
+                classify(&e).exit_code()
+            }
         }
     });
 
@@ -1624,18 +1517,9 @@ fn main() {
     }
 }
 
-/// Under `--json`, emit one structured envelope for every failure propagated to
-/// the top-level boundary.
-///
-/// Handler-owned JSON failures print and terminate before reaching this
-/// function, preserving their tailored code, details, and suggestions without a
-/// second document. Propagated failures arrive here with stdout untouched. The
-/// returned status is derived from the exact rendered code.
-fn emit_top_level_json_error(error: &anyhow::Error, mode: OutputMode) -> Option<ExitCode> {
-    if !mode.json {
-        return None;
-    }
-
+/// Emit one structured envelope for a failure propagated to the top level.
+/// Handler-owned JSON failures terminate before reaching this boundary.
+fn emit_top_level_json_error(error: &anyhow::Error) -> ExitCode {
     let json_error = if error
         .downcast_ref::<jit::errors::InvalidLabelPatternError>()
         .is_some()
@@ -1662,65 +1546,17 @@ fn emit_top_level_json_error(error: &anyhow::Error, mode: OutputMode) -> Option<
     };
     let exit_code = json_error.exit_code();
 
-    if let Ok(rendered) = json_error.to_json_string() {
-        println!("{}", rendered);
-    }
-    Some(exit_code)
-}
-
-/// Decide whether this invocation may write inside the checkout it selected, and
-/// what that permission owes the audit trail.
-///
-/// This is the whole linked-checkout write policy, evaluated once. It governs
-/// exactly the invocations that open a repository mutation session and run inside
-/// a linked non-primary checkout according to the selected-root worktree
-/// authority; every other invocation is outside the policy and answers `None`
-/// without reading a declaration. The governed ones take one of three outcomes:
-///
-/// - the effective stance refuses, and the invocation is refused;
-/// - the repository's own declaration permits it, and nothing is owed;
-/// - an explicit per-invocation override turned the declared refusal into an
-///   allowance, which is the one shape warranting an audit record — the returned
-///   annotation's fields name the stance that *would have refused*.
-///
-/// Precedence between the two stances is never re-decided here: it comes from
-/// [`LinkedCheckoutWriteStance::resolve`](jit::domain::LinkedCheckoutWriteStance::resolve).
-///
-/// # Errors
-///
-/// Returns [`LinkedCheckoutWriteRefusedError`](jit::errors::LinkedCheckoutWriteRefusedError)
-/// when the effective stance refuses the invocation, or an error when the
-/// repository's declared stance cannot be read.
-fn linked_checkout_write_decision(
-    opens_mutation_session: bool,
-    worktree_paths: &jit::storage::worktree_paths::WorktreePaths,
-    jit_dir: &std::path::Path,
-    invocation_override: Option<jit::domain::LinkedCheckoutWriteStance>,
-) -> Result<Option<jit::repository_state::MutationContextAnnotation>> {
-    use jit::domain::LinkedCheckoutWriteStance;
-
-    if !opens_mutation_session || !worktree_paths.is_worktree() {
-        return Ok(None);
-    }
-    let declared = jit::config_manager::ConfigManager::new(jit_dir).get_write_policy()?;
-    let effective = LinkedCheckoutWriteStance::resolve(declared, invocation_override);
-    match effective {
-        LinkedCheckoutWriteStance::Refuse => {
-            Err(jit::errors::LinkedCheckoutWriteRefusedError::new(
-                worktree_paths.worktree_root.clone(),
-                effective,
-            )
-            .into())
-        }
-        LinkedCheckoutWriteStance::Allow => Ok((declared == LinkedCheckoutWriteStance::Refuse)
-            .then(|| {
-                jit::repository_state::MutationContextAnnotation::LinkedCheckoutWriteOverridden {
-                    checkout: worktree_paths.worktree_root.clone(),
-                    declared_stance: declared,
-                    invocation_override: effective,
-                }
-            })),
-    }
+    let rendered = json_error.to_json_string().unwrap_or_else(|_| {
+        serde_json::json!({
+            "error": {
+                "code": json_error.error.code.as_str(),
+                "message": json_error.error.message,
+            }
+        })
+        .to_string()
+    });
+    println!("{}", rendered);
+    exit_code
 }
 
 /// Parse the command line and dispatch it, handing back the parsed output mode
@@ -1783,228 +1619,120 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
     }
 
     let current_dir = env::current_dir()?;
-    let requires_recovery_dispatch = command.requires_recovery_dispatch();
     // The per-invocation write stance is read before any repository work, so an
     // unusable token fails the invocation rather than being silently dropped by a
     // command that never consults it.
     let invocation_write_override =
         jit::config_manager::ConfigManager::invocation_write_override()?;
-
-    // Determine the jit data directory.
-    //
-    // `JIT_DATA_DIR` always wins (highest precedence, checked first). Absent an
-    // override, `jit init` always targets the current directory — like `git
-    // init`, it never searches upward, so initializing inside an existing
-    // repository creates a nested `.jit/` rather than reinitializing an
-    // ancestor. Every other command discovers the repository root by walking
-    // up from the current directory the way git discovers `.git`: stopping at
-    // the first ancestor containing `.jit/`, and never crossing a `.git`
-    // boundary or the filesystem root. When no `.jit/` is found within that
-    // boundary, fall back to `<cwd>/.jit` so the "repository not found" error
-    // from `storage.validate()` below names a sensible path and still
-    // suggests `jit init`.
-    let is_init = matches!(&command, Commands::Init { .. });
-    let (jit_dir, non_git_worktree_root) = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
-        let target = normalize_absolute_path(&current_dir.join(custom_dir));
-        let discovered = jit::storage::discovery::discover_jit_dir(&current_dir);
-        let worktree_root = discovered
-            .filter(|candidate| candidate == &target)
-            .and_then(|candidate| candidate.parent().map(|parent| parent.to_path_buf()))
-            .unwrap_or_else(|| current_dir.clone());
-        (target, worktree_root)
-    } else if is_init {
-        (current_dir.join(".jit"), current_dir.clone())
-    } else if requires_recovery_dispatch {
-        match jit::storage::discovery::discover_recovery_jit_dir(&current_dir) {
-            Some(discovered) => {
-                let worktree_root = discovered
-                    .parent()
-                    .map(|parent| parent.to_path_buf())
-                    .unwrap_or_else(|| current_dir.clone());
-                (discovered, worktree_root)
-            }
-            None => (current_dir.join(".jit"), current_dir.clone()),
-        }
-    } else {
-        match jit::storage::discovery::discover_jit_dir(&current_dir) {
-            Some(discovered) => {
-                let worktree_root = discovered
-                    .parent()
-                    .map(|parent| parent.to_path_buf())
-                    .unwrap_or_else(|| current_dir.clone());
-                (discovered, worktree_root)
-            }
-            None => (current_dir.join(".jit"), current_dir.clone()),
-        }
-    };
-
-    // Construct the canonical repository layout before any recovery or service
-    // reads: the Git-optional
-    // worktree root (falling back to the current directory outside Git) plus the
-    // selected data root. Session-opening commands mutate through exactly this
-    // layout; the worktree root always comes from this boundary, never inferred
-    // from the storage parent (`@/charter/D-4`, plan layout authority). Discovery
-    // is mandatory: startup reports discovery/wiring failures before dispatch.
-    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect_for_data_root(
-        &jit_dir,
-        &non_git_worktree_root,
-    )
-    .context("failed to discover repository worktree layout")?;
-
-    // The linked-checkout write policy is decided here, on the two facts already
-    // in hand — whether this invocation opens a repository mutation session, and
-    // whether the selected root is a linked non-primary checkout — and strictly
-    // before the storage handle exists. A refusal therefore precedes every
-    // repository write, lock, lease, and event append: it is not a state change,
-    // so it appends nothing and leaves no residue for recovery to converge.
-    // A permitted override answers the fact every mutation context below carries,
-    // installed after the executor is built so it spans the rest of dispatch
-    // (jit:f52567ed, jit:0c8d38be).
-    let linked_checkout_write_annotation = linked_checkout_write_decision(
-        requires_recovery_dispatch,
-        &worktree_paths,
-        &jit_dir,
-        invocation_write_override,
+    let jit::commands::OpenedRepository {
+        retained_session: mut retained_mutation_session,
+        mut executor,
+        data_root: jit_dir,
+        worktree_paths,
+        layout: executor_layout,
+        recovered_records: redo_records_applied,
+        // Spans the rest of dispatch, so every production mutation context
+        // carries a permitted linked-checkout override (jit:f52567ed).
+        write_override_annotation: _linked_checkout_write_override,
+    } = jit::commands::open_repository(jit::commands::RepositoryInvocation {
+        current_dir: current_dir.clone(),
+        data_dir_override: env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
+        is_init: matches!(&command, Commands::Init { .. }),
+        opens_mutation_session: command.requires_recovery_dispatch(),
+        coordinates_claims_first: command.coordinates_claims_first(),
+        is_validation_exempt: matches!(
+            &command,
+            Commands::Init { .. } | Commands::Profile(ProfileCommands::Show { .. })
+        ),
+        is_recover: matches!(&command, Commands::Recover),
+        write_override: invocation_write_override,
+    })
+    .map_err(
+        |error| match error.downcast::<jit::commands::RecoveryFailedError>() {
+            Ok(failure) => exit_recovery_failed(&failure.0, json),
+            Err(error) => error,
+        },
     )?;
+    let storage = executor.storage().clone();
 
-    let storage = JsonFileStorage::new(&jit_dir);
-    storage.configure_worktree_paths(&worktree_paths);
-    let executor_layout =
-        jit::storage::discover_repository_layout(&worktree_paths.worktree_root, &jit_dir)
-            .context("failed to construct repository layout")?;
-    // Session opening is the one recovery boundary. Ordinary mutation dispatch
-    // asks storage to open and retain its own exact session, so no caller can
-    // inject a foreign session. Commands that coordinate claims are the deliberate
-    // exception: their operation session opens only after coordination.
-    let coordinates_claims_first = command.coordinates_claims_first();
-    let mut retained_mutation_session = None;
-    let redo_records_applied = if requires_recovery_dispatch {
-        if coordinates_claims_first {
-            // Claim-aware mutation enters coordination first, then opens its own
-            // mutation session. This unretained startup open repairs
-            // residue before validation without inverting coordinator -> repository.
-            let session = jit::storage::RepositoryStateStore::open_mutation_session(
-                &storage,
-                executor_layout.clone(),
-            )?;
-            let recovered = session.recovery_report().recovered_count();
-            drop(session);
-            recovered
+    if let Commands::Init {
+        profile,
+        values_file,
+        set,
+    } = &command
+    {
+        let output_ctx = OutputContext::new(quiet, json);
+        let selectors = parse_profile_selectors(profile, json)?;
+        let assignments = parse_profile_variable_assignments(set, json)?;
+        profile_result(executor.validate_profile_selection(&selectors), json)?;
+
+        // Every init and re-init — plain, profiled, or over an existing root —
+        // publishes through one mutation session: `run_initialization` fills
+        // only the missing neutral scaffold state (authored config/gates/rules
+        // preserved), seeds `[project]` and `rules.toml` when absent, computes
+        // the worktree `.gitattributes` merge-driver claim, and routes
+        // config/rules/schemas through one redo record. Unifying the
+        // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
+        // profiled init, closing the prior re-init gap.
+        let init_result = profile_result(
+            executor.initialize_fresh_repository_from_sources(
+                &current_dir,
+                Some(&selectors),
+                &ProfileVariableOptions {
+                    values_file: values_file.clone(),
+                    assignments,
+                },
+            ),
+            json,
+        )?;
+        // Machine-local worktree identity (gitignored, not repository state)
+        // is created after the scaffold is published.
+        let (worktree_identity, init_warnings) =
+            executor.initialize_worktree_identity(&worktree_paths)?;
+        for warning in &init_warnings {
+            output_ctx.print_warning(warning)?;
+        }
+
+        // The worktree `.gitattributes` merge-driver claim is part of the init
+        // plan itself (every init and re-init); its typed
+        // outcome is reported here directly and drives the `--json`
+        // created/modified path lists.
+        let gitattributes_outcome = init_result.gitattributes;
+
+        // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
+        // plan when absent; the applied plan is the sole preimage
+        // authority for whether this run created it.
+        let scaffolded = init_result
+            .created_paths
+            .iter()
+            .any(|path| path == ".jit/rules.toml");
+        if scaffolded {
+            let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
+        }
+        let profile_result = init_result.profile;
+
+        let message = if let Some(ref identity) = worktree_identity {
+            format!(
+                "Initialized jit repository (worktree: {})",
+                identity.worktree_id
+            )
         } else {
-            let guard = storage
-                .open_and_retain_mutation_session(executor_layout.clone())
-                .map_err(|error| match &command {
-                    // Applying the leftover record is `jit recover`'s own work,
-                    // so its failure is a recovery failure, not a startup one.
-                    Commands::Recover if is_leftover_record_failure(&error) => {
-                        exit_recovery_failed(&error, json)
-                    }
-                    _ => error,
-                })?;
-            let recovered = guard.recovery_report().recovered_count();
-            retained_mutation_session = Some(guard);
-            recovered
-        }
-    } else {
-        0
-    };
-    let mut executor = CommandExecutor::new(storage.clone())
-        .with_layout(executor_layout.clone())
-        .with_worktree_paths(worktree_paths.clone());
+            "Initialized jit repository".to_string()
+        };
+        let _ = output_ctx.print_success(&message);
 
-    // The decision taken above covers every mutation this invocation makes: when
-    // an explicit override is the only reason it may write inside a linked
-    // checkout, every production mutation context carries that fact, and the
-    // finalizer publishes the audit record in the same plan as the mutation. The
-    // guard lives for the rest of dispatch and restores the previous annotation on
-    // the way out.
-    let _linked_checkout_write_override =
-        linked_checkout_write_annotation.map(jit::commands::DispatchMutationAnnotation::install);
-
-    match &command {
-        Commands::Init {
-            profile,
-            values_file,
-            set,
-        } => {
-            let output_ctx = OutputContext::new(quiet, json);
-            let selectors = parse_profile_selectors(profile, json)?;
-            let assignments = parse_profile_variable_assignments(set, json)?;
-            profile_result(executor.validate_profile_selection(&selectors), json)?;
-
-            // Every init and re-init — plain, profiled, or over an existing root —
-            // publishes through one mutation session: `run_initialization` fills
-            // only the missing neutral scaffold state (authored config/gates/rules
-            // preserved), seeds `[project]` and `rules.toml` when absent, computes
-            // the worktree `.gitattributes` merge-driver claim, and routes
-            // config/rules/schemas through one redo record. Unifying the
-            // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
-            // profiled init, closing the prior re-init gap.
-            let init_result = profile_result(
-                executor.initialize_fresh_repository_from_sources(
-                    &current_dir,
-                    Some(&selectors),
-                    &ProfileVariableOptions {
-                        values_file: values_file.clone(),
-                        assignments,
-                    },
-                ),
-                json,
-            )?;
-            // Machine-local worktree identity (gitignored, not repository state)
-            // is created after the scaffold is published.
-            let (worktree_identity, init_warnings) =
-                executor.initialize_worktree_identity(&worktree_paths)?;
-            for warning in &init_warnings {
-                output_ctx.print_warning(warning)?;
-            }
-
-            // The worktree `.gitattributes` merge-driver claim is part of the init
-            // plan itself (every init and re-init); its typed
-            // outcome is reported here directly and drives the `--json`
-            // created/modified path lists.
-            let gitattributes_outcome = init_result.gitattributes;
-
-            // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
-            // plan when absent; the applied plan is the sole preimage
-            // authority for whether this run created it.
-            let scaffolded = init_result
-                .created_paths
-                .iter()
-                .any(|path| path == ".jit/rules.toml");
-            if scaffolded {
-                let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
-            }
-            let profile_result = init_result.profile;
-
-            let message = if let Some(ref identity) = worktree_identity {
-                format!(
-                    "Initialized jit repository (worktree: {})",
-                    identity.worktree_id
-                )
-            } else {
-                "Initialized jit repository".to_string()
+        if json {
+            let payload = InitResponse {
+                repository_root: current_dir.display().to_string(),
+                data_dir: jit_dir.display().to_string(),
+                repository_id: worktree_identity.map(|identity| identity.worktree_id),
+                gitattributes_status: gitattributes_outcome,
+                created_paths: init_result.created_paths,
+                modified_paths: init_result.modified_paths,
+                profile: profile_result,
             };
-            let _ = output_ctx.print_success(&message);
-
-            if json {
-                let payload = InitResponse {
-                    repository_root: current_dir.display().to_string(),
-                    data_dir: jit_dir.display().to_string(),
-                    repository_id: worktree_identity.map(|identity| identity.worktree_id),
-                    gitattributes_status: gitattributes_outcome,
-                    created_paths: init_result.created_paths,
-                    modified_paths: init_result.modified_paths,
-                    profile: profile_result,
-                };
-                let output = JsonOutput::success(payload).with_message(message);
-                println!("{}", output.to_json_string()?);
-            }
-        }
-        Commands::Profile(ProfileCommands::Show { .. }) => {}
-        _ => {
-            // Validate repository exists for all commands except init
-            storage.validate()?;
+            let output = JsonOutput::success(payload).with_message(message);
+            println!("{}", output.to_json_string()?);
         }
     }
 
@@ -5417,22 +5145,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
-                        println!(
-                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
-                                result.publications.len(),
-                                result.reference_changes.len(),
-                                result.deleted_sources.len()
-                            );
-                        for warning in result.warnings {
-                            println!(
-                                "warning: {}{}",
-                                warning.code.as_str(),
-                                warning
-                                    .path
-                                    .map(|path| format!(" ({path})"))
-                                    .unwrap_or_default()
-                            );
-                        }
+                        print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
                     let plan = executor.preview_archive_document(&path)?;
@@ -5449,22 +5162,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
-                        println!(
-                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
-                                result.publications.len(),
-                                result.reference_changes.len(),
-                                result.deleted_sources.len()
-                            );
-                        for warning in result.warnings {
-                            println!(
-                                "warning: {}{}",
-                                warning.code.as_str(),
-                                warning
-                                    .path
-                                    .map(|path| format!(" ({path})"))
-                                    .unwrap_or_default()
-                            );
-                        }
+                        print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
                     let plan = executor.preview_archive_container(&id)?;
@@ -5994,7 +5692,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::HooksCommands::Install => {
                 use jit::commands::hooks::install_hooks;
 
-                match install_hooks(None) {
+                let installed = if worktree_paths.is_git_repository() {
+                    install_hooks(&worktree_paths.common_dir)
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Not in a git repository (no .git directory found)"
+                    ))
+                };
+                match installed {
                     Ok(result) => {
                         if json {
                             let output = jit::output::JsonOutput::success(serde_json::json!({
@@ -6861,88 +6566,60 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     guard.release()?;
                 }
 
-                // Foreground mode: run inline so we can print the URL before blocking.
+                // Foreground mode: the banner prints from the bound-port callback.
                 if fg {
                     use jit::commands::serve::{
-                        find_available_port, find_server_binary, find_web_dir, is_process_alive,
-                        read_pid_file, spawn_with_listener,
+                        foreground_exit_code, run_foreground, ForegroundOptions, ForegroundOutcome,
                     };
 
-                    // Honour existing running server.
-                    if let Some(pf) = read_pid_file(&jit_dir)? {
-                        if is_process_alive(pf.pid) {
-                            let url = format!("http://localhost:{}", pf.port);
+                    let opts = ForegroundOptions {
+                        data_dir: jit_dir.clone(),
+                        preferred_port: port,
+                        web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
+                        server_binary: None,
+                    };
+                    match run_foreground(opts, |launch| {
+                        if !json {
+                            let url = format!("http://localhost:{}", launch.port);
+                            println!("Starting server on {url} (foreground, Ctrl+C to stop)");
+                            println!("  API: {url}/api");
+                            match &launch.web_dir {
+                                Some(web) => println!("  Web: {url}/ (from {})", web.display()),
+                                None => println!("  Web: {url}/ (embedded assets)"),
+                            }
+                        }
+                    })? {
+                        ForegroundOutcome::AlreadyRunning { pid, port: p } => {
+                            let url = format!("http://localhost:{p}");
                             if json {
                                 println!(
                                     "{}",
                                     serde_json::to_string_pretty(&json!({
                                         "status": "running",
-                                        "pid": pf.pid,
-                                        "port": pf.port,
+                                        "pid": pid,
+                                        "port": p,
                                         "url": url
                                     }))?
                                 );
                             } else {
-                                println!("Server is already running on {url} (PID {})", pf.pid);
+                                println!("Server is already running on {url} (PID {pid})");
                             }
-                            return Ok(());
                         }
-                    }
-
-                    let listener = find_available_port(port)?;
-                    let p = listener
-                        .local_addr()
-                        .context("Failed to read bound port")?
-                        .port();
-                    let url = format!("http://localhost:{p}");
-                    let server_bin = find_server_binary()?;
-                    let data_dir_str = jit_dir
-                        .to_str()
-                        .ok_or_else(|| anyhow::anyhow!("data_dir is not valid UTF-8"))?;
-
-                    let resolved_web_dir = web_dir
-                        .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
-                        .or_else(find_web_dir);
-
-                    if !json {
-                        println!("Starting server on {url} (foreground, Ctrl+C to stop)");
-                        println!("  API: {url}/api");
-                        if let Some(web) = resolved_web_dir.as_deref().filter(|d| d.is_dir()) {
-                            println!("  Web: {url}/ (from {})", web.display());
-                        } else {
-                            println!("  Web: {url}/ (embedded assets)");
+                        ForegroundOutcome::Exited { port: p, status } => {
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "exited",
+                                        "port": p,
+                                        "exit_code": status.code()
+                                    }))?
+                                );
+                            }
+                            if !status.success() {
+                                std::process::exit(foreground_exit_code(status.code()));
+                            }
                         }
-                    }
-
-                    let mut cmd = std::process::Command::new(&server_bin);
-                    cmd.arg("--data-dir")
-                        .arg(data_dir_str)
-                        .arg("--bind")
-                        .arg(format!("0.0.0.0:{p}"));
-                    if let Some(web) = &resolved_web_dir {
-                        if web.is_dir() {
-                            cmd.arg("--web-dir").arg(web);
-                        }
-                    }
-                    // Hand the bound socket to the child (inherited fd on
-                    // Unix); it adopts this exact socket instead of re-binding.
-                    let mut child = spawn_with_listener(&mut cmd, listener)
-                        .context("Failed to run jit-server")?;
-                    let status = child.wait().context("Failed to wait on jit-server")?;
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&json!({
-                                "status": "exited",
-                                "port": p,
-                                "exit_code": status.code()
-                            }))?
-                        );
-                    }
-                    if !status.success() {
-                        std::process::exit(jit::commands::serve::foreground_exit_code(
-                            status.code(),
-                        ));
                     }
                 } else {
                     // Daemonize via start_server.
@@ -7624,165 +7301,83 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 }
 
 #[cfg(test)]
-mod linked_checkout_write_decision_tests {
-    //! The dispatch-time linked-checkout write policy: which invocations it
-    //! refuses, which it permits, and which of the permitted ones owe an audit
-    //! record.
+mod gate_findings_text_tests {
+    use super::render_gate_findings_text;
+    use chrono::Utc;
+    use jit::declarations::GateStage;
+    use jit::domain::gate_findings::{GateFinding, GateFindings};
+    use jit::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION};
 
-    use super::linked_checkout_write_decision;
-    use jit::domain::LinkedCheckoutWriteStance;
-    use jit::errors::LinkedCheckoutWriteRefusedError;
-    use jit::repository_state::MutationContextAnnotation;
-    use jit::storage::worktree_paths::WorktreePaths;
-    use std::path::PathBuf;
-
-    /// A repository whose `[worktree]` section declares `stance`, or which
-    /// declares no stance at all when `stance` is `None`.
-    fn repository_declaring(stance: Option<LinkedCheckoutWriteStance>) -> tempfile::TempDir {
-        let temp = tempfile::TempDir::new().expect("create a temporary repository");
-        let declaration = stance
-            .map(|stance| format!("[worktree]\nwrite_policy = \"{}\"\n", stance.as_token()))
-            .unwrap_or_default();
-        std::fs::write(temp.path().join("config.toml"), declaration)
-            .expect("write the repository configuration");
-        temp
-    }
-
-    /// Paths describing either a linked non-primary checkout or the primary one.
-    fn checkout_paths(linked: bool) -> WorktreePaths {
-        let worktree_root = if linked {
-            PathBuf::from("/repo/.worktrees/feature")
-        } else {
-            PathBuf::from("/repo")
-        };
-        WorktreePaths {
-            git_repository: true,
-            common_dir: PathBuf::from("/repo/.git"),
-            local_jit: worktree_root.join(".jit"),
-            worktree_root,
-            shared_jit: PathBuf::from("/repo/.git/jit"),
+    fn run_with(references: Vec<String>) -> GateRunResult {
+        GateRunResult {
+            schema_version: GATE_RUN_SCHEMA_VERSION,
+            run_id: "run-1".to_string(),
+            gate_key: "review".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Failed,
+            started_at: Utc::now(),
+            completed_at: None,
+            duration_ms: None,
+            exit_code: Some(1),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "review".to_string(),
+            by: None,
+            message: None,
+            findings: Some(GateFindings {
+                verdict: "fail".to_string(),
+                summary: "one defect".to_string(),
+                findings: vec![GateFinding {
+                    id: "F1".to_string(),
+                    severity: "high".to_string(),
+                    disposition: Some("blocking".to_string()),
+                    origin: Some("issue-impact".to_string()),
+                    summary: "unsafe write".to_string(),
+                    file: Some("src/storage.rs".to_string()),
+                    line: Some(12),
+                    references,
+                }],
+            }),
+            inputs_digest: None,
+            origin: jit::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: jit::domain::GateEvaluationStability::Stable,
         }
     }
 
     #[test]
-    fn test_linked_checkout_write_decision_refuses_every_governed_invocation_the_stance_refuses() {
-        let refusing = repository_declaring(Some(LinkedCheckoutWriteStance::Refuse));
-        let undeclared = repository_declaring(None);
-        let allowing = repository_declaring(Some(LinkedCheckoutWriteStance::Allow));
-        let linked = checkout_paths(true);
+    fn test_render_gate_findings_text_exposes_references_exactly() {
+        let rendered = render_gate_findings_text(&run_with(vec![
+            "@/inv/atomic-writes".to_string(),
+            "checker:opaque value".to_string(),
+        ]));
 
-        let cases: [(&str, &std::path::Path, Option<LinkedCheckoutWriteStance>); 3] = [
-            ("a declared refusal refuses", refusing.path(), None),
-            (
-                "an undeclared stance refuses, because refusing is what a repository that never \
-                 considered the question gets",
-                undeclared.path(),
-                None,
-            ),
-            (
-                "an invocation whose own stance refuses outranks a declaration that would have \
-                 permitted it",
-                allowing.path(),
-                Some(LinkedCheckoutWriteStance::Refuse),
-            ),
-        ];
-
-        for (reason, jit_dir, invocation_override) in cases {
-            let error = linked_checkout_write_decision(true, &linked, jit_dir, invocation_override)
-                .expect_err(reason);
-            let refusal = error
-                .downcast_ref::<LinkedCheckoutWriteRefusedError>()
-                .unwrap_or_else(|| panic!("the refusal is typed, not a message: {error:#}"));
-            assert_eq!(
-                refusal.checkout(),
-                linked.worktree_root,
-                "the refusal names the checkout the worktree authority selected"
-            );
-            assert_eq!(
-                refusal.stance(),
-                LinkedCheckoutWriteStance::Refuse,
-                "the refusal names the stance that refused it"
-            );
-        }
+        assert!(rendered.contains(r#"references: ["@/inv/atomic-writes","checker:opaque value"]"#));
     }
 
     #[test]
-    fn test_linked_checkout_write_decision_installs_a_record_only_when_an_override_outranks_a_refusal(
-    ) {
-        let refusing = repository_declaring(Some(LinkedCheckoutWriteStance::Refuse));
-        let annotation = linked_checkout_write_decision(
-            true,
-            &checkout_paths(true),
-            refusing.path(),
-            Some(LinkedCheckoutWriteStance::Allow),
-        )
-        .expect("an override outranking a refusal permits the invocation")
-        .expect("an override outranking a refusal warrants an audit record");
+    fn test_render_gate_findings_text_json_encoding_distinguishes_collisions() {
+        let comma_value = render_gate_findings_text(&run_with(vec!["a, b".to_string()]));
+        let two_values =
+            render_gate_findings_text(&run_with(vec!["a".to_string(), "b".to_string()]));
+        let empty_value = render_gate_findings_text(&run_with(vec![String::new()]));
 
-        let MutationContextAnnotation::LinkedCheckoutWriteOverridden {
-            checkout,
-            declared_stance,
-            invocation_override,
-        } = annotation
-        else {
-            unreachable!("the linked-checkout override is the fact this dispatch installs")
-        };
-        assert_eq!(
-            checkout,
-            checkout_paths(true).worktree_root,
-            "the record names the checkout the worktree authority selected"
-        );
-        assert_eq!(
-            (declared_stance, invocation_override),
-            (
-                LinkedCheckoutWriteStance::Refuse,
-                LinkedCheckoutWriteStance::Allow
-            ),
-            "the record pairs the declaration that would have refused with the stance that permitted"
+        assert!(comma_value.contains(r#"references: ["a, b"]"#));
+        assert!(two_values.contains(r#"references: ["a","b"]"#));
+        assert!(empty_value.contains(r#"references: [""]"#));
+        assert_ne!(comma_value, two_values);
+        assert_ne!(
+            empty_value,
+            render_gate_findings_text(&run_with(Vec::new()))
         );
     }
 
     #[test]
-    fn test_linked_checkout_write_decision_permits_without_a_record_where_no_refusal_was_outranked()
-    {
-        let refusing = repository_declaring(Some(LinkedCheckoutWriteStance::Refuse));
-        let allowing = repository_declaring(Some(LinkedCheckoutWriteStance::Allow));
+    fn test_render_gate_findings_text_omits_empty_references() {
+        let rendered = render_gate_findings_text(&run_with(Vec::new()));
 
-        let cases: [(&str, bool, &WorktreePaths, &std::path::Path); 3] = [
-            (
-                "an invocation that opens no mutation session is outside the policy, so it is \
-                 neither refused nor audited",
-                false,
-                &checkout_paths(true),
-                refusing.path(),
-            ),
-            (
-                "the primary checkout is never governed by the linked-checkout stance",
-                true,
-                &checkout_paths(false),
-                refusing.path(),
-            ),
-            (
-                "a repository declaring the allowing stance permits by its own declaration, so \
-                 an override there outranks nothing",
-                true,
-                &checkout_paths(true),
-                allowing.path(),
-            ),
-        ];
-
-        for (reason, opens_mutation_session, worktree_paths, jit_dir) in cases {
-            assert!(
-                linked_checkout_write_decision(
-                    opens_mutation_session,
-                    worktree_paths,
-                    jit_dir,
-                    Some(LinkedCheckoutWriteStance::Allow)
-                )
-                .expect("the invocation is permitted")
-                .is_none(),
-                "{reason}"
-            );
-        }
+        assert!(!rendered.contains("references:"));
     }
 }

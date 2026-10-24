@@ -30,6 +30,10 @@ worker-sized. Never implement the planned work.
    defaults but must record them.
 3. Create or reconcile `C`. Its description must have atomic, observable marked
    criteria such as `[hard] REQ-NN`. Verify input claims against the live system.
+   Scope `C` before planning it. When its criteria span several areas, give each
+   area an entry of the configured intermediate tier under `C`, and group that
+   area's terminals beneath it. Drop criteria that neither change observable
+   behaviour nor remove a real duplicate.
 4. Run `jit apply plan <C>` once. Record planning node `P`, breakdown node `B`,
    their configured gates, and P's plan path. Commit JIT state.
 
@@ -76,34 +80,39 @@ acceptance criteria, DAG prose, or review history into it.
 
 ### Terminal invariant
 
-Iteratively split oversized finest-tier work into horizontal siblings until each
-terminal issue has exactly one primary outcome, one bounded consumer family, one
-observable test boundary, and work one agent can implement and review in one
-focused cycle without another decomposition. A terminal must not combine
-independently testable foundation, migration, deletion, documentation, or release
-deliverables. It must disclose non-empty footprint `creates`/`touches`, or concrete
-uncertainty. A shared `landing_group` is integration metadata, never permission to
-merge work. No finer configured type is required to split an oversized task.
+A terminal is the largest coherent change one agent can implement and review in
+one focused cycle. Adding a form, moving its callers, and deleting the old form
+within one module is one terminal, together with its tests and docs. Merge
+terminals that exist only as links in such a chain, including bridge producer and
+remover pairs. Split a terminal only when one agent cannot deliver it in one
+cycle, or when it combines implementation with release. Each terminal discloses a
+non-empty footprint `creates`/`touches`, or a concrete uncertainty. A shared
+`landing_group` is integration metadata only. The manifest stays within the
+validator's issue budget; when the criteria cannot fit, propose criteria to defer
+instead of exceeding it.
 
 Mark every plan contract `plan-fixed` or `implementation-produced`. The latter
 has exactly one `produces_contracts` owner transitively reachable from every
 consumer; a plan-fixed contract has none.
 
 Every non-finest manifest entry must depend transitively on a strictly finer
-entry; relabeling executable work never suppresses terminal checks. Sizing
+entry; relabeling executable work never suppresses terminal checks. The validator
+fails a manifest over its issue budget (`--max-issues`, default 50). Its oversize
 heuristics warn on broad quantifiers, independent verbs, multiple consumer
-families, three or more acceptance clusters, mixed deliverable classes, and
-implementation plus release. Split the task or add a reason under that warning's
-stable `warning_overrides` code. Overrides remain visible and require reviewer
-approval; `worker_sized_reason` is not an escape hatch.
+families, three or more acceptance clusters, and implementation plus release. Its
+undersize heuristic warns on a terminal that is only a chain link. Resolve a
+warning by merging, splitting, or a reason under its stable `warning_overrides`
+code; an override may cite a recorded owner decision. Overrides remain visible
+and require reviewer approval; `worker_sized_reason` is not an escape hatch.
 
 ## 4. Review and approve P
 
 Dispatch [reviewer-prompt.md](references/reviewer-prompt.md). It checks both
 artifacts, current code, readability, deterministic validation, and simulates one
-assignment per leaf. Fix every finding by replacing the defective contract/task,
-removing superseded prose, regenerating the plan, and rerunning all four commands.
-Append-only correction sections fail.
+assignment per leaf. Fix every finding by replacing or merging the defective
+contract/task, removing superseded prose, regenerating the plan, and rerunning all
+four commands. Append-only correction sections fail. Report each round's issue
+count and its change from the previous round.
 
 Audit upstream dependencies moved from `C` to `P`. Keep planning-required edges.
 For implementation-consumed edges, remove them from `P` and record the external

@@ -36,12 +36,11 @@
     "story:suite-cost",
     "component:testing",
     "component:storage",
-    "satisfies:c780514e/REQ-10",
     "per:@/charter/D-18",
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Read-only lock tests establish their precondition on any host",
-  "updated_at": "2026-10-22T22:06:42.446167280Z"
+  "updated_at": "2026-10-22T22:07:34.529826777Z"
 }

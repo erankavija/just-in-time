@@ -29,7 +29,7 @@ LABEL org.opencontainers.image.source="https://github.com/erankavija/just-in-tim
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates ripgrep wget \
+  && apt-get install -y --no-install-recommends ca-certificates git ripgrep wget \
   && printf '%s\n' '--hidden' > /etc/jit-ripgreprc \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=server-builder /build/target/release/jit-server /usr/local/bin/jit-server

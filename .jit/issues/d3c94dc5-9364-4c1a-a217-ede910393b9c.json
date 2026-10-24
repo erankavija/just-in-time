@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "693a2fdd-18cc-477d-97a6-e4a8f52fcd3f"
+  ],
+  "description": "Extend in-session lease checking to the two user-requested writes that check no lease today, bulk update and the CLI dependency edits, and state in the adopter docs which writes the lease rule covers.\n\n## Background\n\n- Bulk update builds its requests with `enforce_lease: false` (`CapturedFieldUpdate::bulk`, `crates/jit/src/commands/mod.rs:951-971`), so `jit issue update --filter` changes issues no matter who holds their leases. Single-issue update and rejection with a reason already check (`crates/jit/src/commands/issue.rs:555,719`).\n- `jit dep add` and `jit dep rm` use the batch variants (`crates/jit/src/main.rs:2975,3041` call `add_dependencies_with_policy` and `remove_dependencies`, which publish `CapturedDependencyMutation::Batch`/`RemoveBatch`, `crates/jit/src/commands/dependency.rs:19,31`), and only the single variants enforce a lease (`dependency.rs:281,370`). `DepCommands::coordinates_claims_first` (`crates/jit/src/cli.rs:2938`) classifies both verbs repository-first for that reason; `CLAIM_FIRST_LEAF_COMMANDS` (`cli.rs:3236`) and the inventory test (`cli.rs:3331`) pin the classification.\n- The in-session check is `captured_lease_warnings` (`mod.rs:778`) with a `claims_mutation_guard` (`mod.rs:757`) taken before the session; strict refusals are `LeaseRequiredError`.\n- System-derived writes (readiness corrections of dependents, validate repairs, archive, recovery) are not user requests for the issues they touch.\n- `docs/reference/configuration.md:474` and `:488` and `docs/reference/claim.md:11-14` say lease enforcement covers \"structural issue operations\" and \"selected write commands\" without saying which.\n\n## Success Criteria\n\n- [hard] REQ-01: Bulk update checks the lease of each matched issue it changes inside its publishing session; in strict mode an unleased issue is reported in `errors` and the others still apply, and in warn mode the warning is reported for that issue.\n- [hard] REQ-02: `dep add` and `dep rm` check the lease of the issue whose dependencies change inside their publishing session, and both are classified claims-first in the classification and its inventory test.\n- [hard] REQ-03: Harness tests show strict mode refusing a bulk update and a `dep add` on an unleased issue with `LeaseRequiredError` (both succeed today), and no lease check for readiness corrections of dependents.\n- [hard] REQ-04: The configuration and claim references state the lease-checked writes as a rule (every user-requested write to an existing issue checks the lease of the issues it targets, including bulk update, `dep add`/`dep rm`, assign, unassign, template application and the gate commands; system-derived writes do not) rather than a hand-kept command list, and no other page restates it (`@/charter/D-13`).\n\n## Notes\n\n- Behaviour change: with `enforce_leases` set to `warn` or `strict`, bulk update and `dep add`/`dep rm` now warn or refuse for unleased issues, and the two dependency verbs lock claims before the repository.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d3c94dc5-9364-4c1a-a217-ede910393b9c",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "per:@/charter/D-20",
+    "component:core",
+    "component:docs",
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:b697a3f7/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Bulk and dependency edits check leases in their publishing session",
+  "updated_at": "2026-10-24T21:22:37.717854234Z"
+}

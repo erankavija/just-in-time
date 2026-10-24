@@ -48,6 +48,42 @@ pub enum ServeOutcome {
     AlreadyRunning { pid: u32, port: u16 },
 }
 
+/// Inputs to [`run_foreground`].
+#[derive(Debug)]
+pub struct ForegroundOptions {
+    /// Absolute path to the `.jit` data directory.
+    pub data_dir: PathBuf,
+    /// Preferred starting port (auto-selects if unavailable).
+    pub preferred_port: u16,
+    /// Explicit web UI directory; `None` auto-detects with [`find_web_dir`].
+    pub web_dir: Option<PathBuf>,
+    /// Override the server binary path (testing only; normally resolved by
+    /// [`find_server_binary`] automatically).
+    pub server_binary: Option<PathBuf>,
+}
+
+/// What a foreground server is about to serve, handed to the caller once the
+/// port is bound and the binary and web dir are resolved, before the child is
+/// spawned.
+#[derive(Debug)]
+pub struct ForegroundLaunch {
+    pub port: u16,
+    /// The web UI directory the child serves, or `None` for embedded assets.
+    pub web_dir: Option<PathBuf>,
+}
+
+/// Outcome of `jit serve --fg`.
+#[derive(Debug, PartialEq)]
+pub enum ForegroundOutcome {
+    /// A live server was already running; nothing was spawned.
+    AlreadyRunning { pid: u32, port: u16 },
+    /// The foreground server ran and exited.
+    Exited {
+        port: u16,
+        status: std::process::ExitStatus,
+    },
+}
+
 /// Outcome of `jit serve --stop`.
 #[derive(Debug, PartialEq)]
 pub enum StopOutcome {
@@ -518,10 +554,7 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// outcome reports the child's own state rather than its state at one chosen
 /// moment.
 ///
-/// Foreground mode is handled by the caller, not this function. Use
-/// [`find_available_port`] to bind the socket and [`spawn_with_listener`] to
-/// hand it to the child — the same inheritance path this function uses — so
-/// the port is never re-bound across the process boundary.
+/// Foreground mode is [`run_foreground`].
 ///
 /// # Errors
 /// Returns an error when the port cannot be bound, the server binary cannot be
@@ -649,6 +682,63 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
         port,
         log_file,
     })
+}
+
+/// Runs the server in the foreground until it exits.
+///
+/// `on_bound` runs once the port is bound and the binary and web dir are
+/// resolved; the child is then spawned and awaited. A live server recorded in
+/// the PID file short-circuits to [`ForegroundOutcome::AlreadyRunning`].
+///
+/// # Errors
+/// Returns an error if the PID file is unreadable, no port or server binary is
+/// available, the child cannot be spawned, or waiting on it fails.
+pub fn run_foreground(
+    opts: ForegroundOptions,
+    on_bound: impl FnOnce(&ForegroundLaunch),
+) -> Result<ForegroundOutcome> {
+    if let Some(pf) = read_pid_file(&opts.data_dir)? {
+        if is_process_alive(pf.pid) {
+            return Ok(ForegroundOutcome::AlreadyRunning {
+                pid: pf.pid,
+                port: pf.port,
+            });
+        }
+    }
+
+    let listener = find_available_port(opts.preferred_port)?;
+    let port = listener
+        .local_addr()
+        .context("Failed to read bound port")?
+        .port();
+    let server_bin = match opts.server_binary {
+        Some(p) => p,
+        None => find_server_binary()?,
+    };
+    let data_dir = opts
+        .data_dir
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("data_dir is not valid UTF-8"))?;
+    let web_dir = opts.web_dir.or_else(find_web_dir).filter(|d| d.is_dir());
+
+    on_bound(&ForegroundLaunch {
+        port,
+        web_dir: web_dir.clone(),
+    });
+
+    let mut cmd = std::process::Command::new(&server_bin);
+    cmd.arg("--data-dir")
+        .arg(data_dir)
+        .arg("--bind")
+        .arg(format!("0.0.0.0:{port}"));
+    if let Some(web) = &web_dir {
+        cmd.arg("--web-dir").arg(web);
+    }
+    // Hand the bound socket to the child (inherited fd on Unix); it adopts
+    // this exact socket instead of re-binding.
+    let mut child = spawn_with_listener(&mut cmd, listener).context("Failed to run jit-server")?;
+    let status = child.wait().context("Failed to wait on jit-server")?;
+    Ok(ForegroundOutcome::Exited { port, status })
 }
 
 /// Stops the running server for the given data directory.
@@ -1190,6 +1280,35 @@ mod tests {
     }
 
     // ── startup failure: the child exits ──────────────────────────────────────
+
+    #[test]
+    #[cfg(unix)]
+    fn test_run_foreground_reports_child_exit_status() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path().join(".jit");
+        std::fs::create_dir(&data_dir).unwrap();
+        let stub = executable_script(tmp.path().join("stub-server"), "#!/bin/sh\nexit 7\n");
+        let mut launched = None;
+
+        let outcome = run_foreground(
+            ForegroundOptions {
+                data_dir,
+                preferred_port: 0,
+                web_dir: None,
+                server_binary: Some(stub),
+            },
+            |launch| launched = Some(launch.port),
+        )
+        .unwrap();
+
+        match outcome {
+            ForegroundOutcome::Exited { port, status } => {
+                assert_eq!(status.code(), Some(7));
+                assert_eq!(Some(port), launched);
+            }
+            other => panic!("expected the child to run and exit, got {other:?}"),
+        }
+    }
 
     #[test]
     #[cfg(unix)]

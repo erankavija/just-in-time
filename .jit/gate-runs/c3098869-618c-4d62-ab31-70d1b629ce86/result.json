@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "46a747fc2b6cedf0b447e572d13e79ebec95dfea",
+  "completed_at": "2026-10-24T19:25:03.038279532Z",
+  "duration_ms": 234930,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_gate/gate_cli_integration_test.rs",
+        "id": "F1",
+        "line": 192,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "The corrupt gate-run JSON test still reads stderr, which is now intentionally empty; cargo-ci fails this test."
+      }
+    ],
+    "summary": "The JSON-stream change leaves one existing CLI integration test asserting the retired stderr behavior, causing cargo-ci to fail.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d0a9a90-7038-40f0-b5c1-aeea365d0dd0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c3098869-618c-4d62-ab31-70d1b629ce86",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T19:21:08.107584848Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10031 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16f5c-15a9-7f61-8a37-258441caeb88\n--------\nuser\n--- 10018 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f886d7c47, 1e2f0037a, 46a747fc2 (jit:5d0a9a90)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-09 and REQ-12 (.jit issue content); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci and jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 1, 2026-10-24T19:21:04Z; code-review pending\nTruncation recovery: path-scoped patches for each tagged commit and both merge parents; narrow current-file and failing-test reads; separate item and gate queries\n\n1. [blocking][issue-impact] `crates/jit/tests/cli_gate/gate_cli_integration_test.rs:192` still reads stderr after intentionally invoking `issue show --json`. The new renderer correctly leaves stderr empty, so its retained assertion fails; the recorded cargo-ci run confirms this is the sole failing test. Update it to validate the stdout error envelope (including its contextual message) and empty stderr. This leaves the required suite failing and violates the contributed REQ-09 contract.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The JSON-stream change leaves one existing CLI integration test asserting the retired stderr behavior, causing cargo-ci to fail.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The corrupt gate-run JSON test still reads stderr, which is now intentionally empty; cargo-ci fails this test.\",\"file\":\"crates/jit/tests/cli_gate/gate_cli_integration_test.rs\",\"line\":192,\"references\":[\"@/issue/df129d9e/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

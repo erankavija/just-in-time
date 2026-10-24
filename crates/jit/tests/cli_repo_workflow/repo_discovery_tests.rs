@@ -40,6 +40,15 @@ fn jit_status(dir: &Path) -> Output {
         .expect("jit status failed to spawn")
 }
 
+fn status_error_message(output: &Output) -> String {
+    let envelope: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("status failure is one JSON document");
+    envelope["error"]["message"]
+        .as_str()
+        .expect("status failure carries an error message")
+        .to_owned()
+}
+
 // ---------------------------------------------------------------------------
 // REQ-01: discovery from a nested subdirectory and from inside `.jit/` itself.
 // ---------------------------------------------------------------------------
@@ -218,11 +227,11 @@ fn test_status_does_not_cross_git_boundary_into_unrelated_ancestor_repo() {
         !out.status.success(),
         "status must not succeed by escaping into the unrelated outer .jit/"
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let message = status_error_message(&out);
     assert!(
-        stderr.contains("JIT repository not found"),
+        message.contains("JIT repository not found"),
         "expected not-found error, got: {}",
-        stderr
+        message
     );
 }
 
@@ -240,16 +249,16 @@ fn test_status_reports_not_found_with_init_suggestion_when_no_repo_in_boundary()
 
     let out = jit_status(&sub_dir);
     assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let message = status_error_message(&out);
     assert!(
-        stderr.contains("JIT repository not found"),
+        message.contains("JIT repository not found"),
         "expected not-found error, got: {}",
-        stderr
+        message
     );
     assert!(
-        stderr.contains("jit init"),
+        message.contains("jit init"),
         "expected init suggestion, got: {}",
-        stderr
+        message
     );
 }
 
@@ -261,16 +270,16 @@ fn test_status_reports_not_found_with_init_suggestion_when_no_repo_anywhere() {
 
     let out = jit_status(&sub_dir);
     assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let message = status_error_message(&out);
     assert!(
-        stderr.contains("JIT repository not found"),
+        message.contains("JIT repository not found"),
         "expected not-found error, got: {}",
-        stderr
+        message
     );
     assert!(
-        stderr.contains("jit init"),
+        message.contains("jit init"),
         "expected init suggestion, got: {}",
-        stderr
+        message
     );
 }
 
@@ -325,6 +334,39 @@ fn test_jit_data_dir_override_takes_precedence_over_ancestor_discovery() {
     );
 }
 
+#[test]
+fn test_hooks_install_targets_repository_selected_by_data_dir_override() {
+    let git_init = |dir: &Path| {
+        let out = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(dir)
+            .output()
+            .expect("git init failed to spawn");
+        assert!(out.status.success(), "git init failed: {:?}", out);
+    };
+    let process_repo = TempDir::new().unwrap();
+    git_init(process_repo.path());
+    assert!(jit_init(process_repo.path()).status.success());
+    let selected_repo = TempDir::new().unwrap();
+    git_init(selected_repo.path());
+    assert!(jit_init(selected_repo.path()).status.success());
+
+    let out = Command::new(jit_binary())
+        .current_dir(process_repo.path())
+        .env("JIT_DATA_DIR", selected_repo.path().join(".jit"))
+        .args(["hooks", "install", "--json"])
+        .output()
+        .expect("hooks install failed to spawn");
+    assert!(
+        out.status.success(),
+        "hooks install failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert!(selected_repo.path().join(".git/hooks/pre-commit").exists());
+    assert!(!process_repo.path().join(".git/hooks/pre-commit").exists());
+}
+
 // ---------------------------------------------------------------------------
 // Regression: a bare `.jit` (no index.json) in a shared ancestor — e.g. stray
 // litter under a persistent CI temp root — must not be bound. Before discovery
@@ -356,10 +398,10 @@ fn test_bare_ancestor_jit_is_skipped_not_bound() {
         "bare ancestor .jit must yield NotFound (3), not GenericError (1); stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let message = status_error_message(&out);
     assert!(
-        stderr.contains("JIT repository not found") && stderr.contains("jit init"),
+        message.contains("JIT repository not found") && message.contains("jit init"),
         "expected not-found + init suggestion, got: {}",
-        stderr
+        message
     );
 }

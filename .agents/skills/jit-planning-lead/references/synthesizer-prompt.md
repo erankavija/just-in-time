@@ -25,12 +25,15 @@ Keep a complete known-source universe and distinguish mandatory coverage from
 optional design/finding references. Every non-finest entry must aggregate a
 strictly finer in-manifest descendant; never use a higher tier to hide leaf work.
 
-Refine every finest-tier entry horizontally until a one-worker simulation passes:
-one outcome, bounded consumer family, observable test boundary, one focused
-implementation/review cycle, no internal decomposition, and no mixed foundation,
-migration, deletion, documentation, or release deliverables. Never use lack of a
-finer type or one final landing as justification. `landing_group` records shared
-integration only.
+Make each finest-tier entry the largest coherent change one worker can implement
+and review in one focused cycle. Adding a form, moving its callers, and deleting
+the old form within one module is one entry, with its tests and docs. Merge
+entries that are only chain links or bridge producer/remover pairs. Split only
+when one worker cannot deliver the entry in one cycle, or when it combines
+implementation with release. Group a multi-area container's entries under the
+configured intermediate tier. Stay within the validator's issue budget; when the
+criteria cannot fit, list criteria to defer under Needs decision.
+`landing_group` records shared integration only.
 
 Every terminal declares a `footprint`: non-empty `creates` and/or `touches`, or a
 concrete `uncertainty` reason. New files belong in `creates`; greenfield work has

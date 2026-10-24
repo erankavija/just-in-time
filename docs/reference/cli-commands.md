@@ -503,7 +503,7 @@ Suppress non-essential output (success messages, headers, warnings). Preserves d
 - Issue lists and query results
 - Issue IDs (from `issue create`)
 - Essential data output
-- Errors (always shown to stderr)
+- Errors (shown to stderr in human mode; under `--json`, failures are emitted as JSON envelopes to stdout)
 
 ### `--version`
 Print the CLI package version and build profile:
@@ -3668,7 +3668,7 @@ served from.
 
 ### `jit hooks install`
 
-Copy the hook templates into `.git/hooks/` and make them executable.
+Copy the hook templates into the `hooks/` directory of the selected repository's common git directory and make them executable.
 
 ```bash
 jit hooks install [--json]

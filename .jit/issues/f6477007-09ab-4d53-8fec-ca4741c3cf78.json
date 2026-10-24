@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "12ecb90c-eb0c-4c4d-8717-f217217eb5c9"
+  ],
+  "description": "Give the crate one process-liveness probe and one PID guard, so every liveness check and signal site converts PIDs the same `@/inv/pid-safety` way, a live process owned by another user reads as alive, and non-unix platforms follow one policy (REQ-20 process liveness).\n\n## Background\n\n- Two liveness primitives disagree: `is_process_alive` (`crates/jit/src/commands/serve.rs:154-175`, non-unix `false`) and `process_exists` (`crates/jit/src/storage/lock_cleanup.rs:15-44`, non-unix `true`). Both read `kill(pid, 0).is_ok()`, so a live process owned by another user, for which `kill` fails with `EPERM`, reads as dead. `cleanup_stale_locks` (`lock_cleanup.rs:67`, check at `:112`) therefore removes a lock a live foreign process holds.\n- Each primitive carries its own copy of the PID guard (checked `u32` to `i32` conversion, positive value): `serve.rs:162-167` and `lock_cleanup.rs:27-30`.\n- Liveness callers, all in `serve.rs`: `start_server` (`:571`), `run_foreground` (`:701`), `stop_server` (`:751`) and `server_status` (`:794`); serve tests `:1494`, `:1527`, `:1614`. `main.rs` reaches liveness only through these functions. Duplicated primitive tests: `serve.rs:904-921` and `lock_cleanup.rs:150-176`.\n- `stop_server` (`serve.rs:749-786`) converts the PID with its own `i32::try_from` (`:767-768`) before sending `SIGTERM` (`:773-774`).\n- `kill_process_group` (`crates/jit/src/gate_execution.rs:321-337`, unix) negates a checked `i32` and sends `SIGKILL` to the group (`:330-332`), refusing PIDs at or below 1, because `kill(-1)` signals every process the user owns and `kill(0)` the caller's own group; the non-unix variant (`:341-343`) only kills the child.\n\n## Success Criteria\n\n- [hard] REQ-01: A crate module `crates/jit/src/process.rs` owns the PID guard and the liveness probe; `is_process_alive` and `process_exists` no longer exist, and every liveness caller listed above uses the probe.\n- [hard] REQ-02: The probe reports a process alive when the probe succeeds or fails with `EPERM`, dead only on `ESRCH` or a guard refusal, and alive on non-unix platforms. A regression test shows the probe outcome `EPERM` maps to alive (on today's code `kill(pid, 0).is_ok()` maps it to dead), independent of the user the suite runs as.\n- [hard] REQ-03: The new module's own tests own the current-process, invalid-PID, `u32::MAX` and PID-0 cases; the copies in `serve.rs` and `lock_cleanup.rs` are gone.\n- [hard] REQ-04: `stop_server` and `kill_process_group` convert PIDs only through the guard in `process.rs`; neither calls `i32::try_from` on a PID itself.\n- [hard] REQ-05: The guard offers a process-group conversion that refuses PID 0 and PID 1 as well as non-positive and overflowing values, and `kill_process_group` falls back to killing the child when it refuses, as today.\n- [hard] REQ-06: Unit tests in `process.rs` own the group-target refusals (0, 1, `u32::MAX`) and the accepted case; `stop_server` with a PID the guard refuses reports an error and sends no signal.\n\n## Notes\n\n- Behaviour changes: `cleanup_stale_locks` keeps a lock whose holder is a live process owned by another user; `jit serve` start, status and stop treat another user's live PID as running; on non-unix platforms the server liveness check reports alive (it reported dead), so a stale PID file there no longer starts a duplicate server.\n- The signal sites signal or refuse the same PIDs as today.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-24T21:22:37.717854234Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:one-form-convergence",
+    "component:storage",
+    "component:server",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-20"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Process liveness and signalling go through one PID guard",
+  "updated_at": "2026-10-24T21:29:30.311951910Z"
+}

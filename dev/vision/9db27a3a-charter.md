@@ -41,6 +41,7 @@ one that adds it (D-18).
 - D-19: Reads never scale with project history; the storage layout addresses per-key data directly
 - D-20: One computation per capability; previews, scoped views, and checkers are views over it
 - D-21: Reach git only through the git CLI, from one storage-owned module
+- D-22: Reads never wait on writers; a lock-free capture is admitted only when no commit crossed it
 
 ## Decision Details
 
@@ -313,7 +314,8 @@ one that adds it (D-18).
   synced redo record under the data root's gitignored `tmp/`, holding each
   directory it makes that no other operation's path lies beneath, the complete
   new bytes and mode of each written file, each deleted path, and the event
-  append as an offset and its bytes. Paths are relative to the data root or the
+  append as an offset and its bytes. Every record appends an event, so the
+  event log's length counts the repository's commits. Paths are relative to the data root or the
   worktree, so projections, profile assets, and archived documents publish
   through the same record. Applying the record makes each directory, replaces
   each file by temp-file and rename, removes each deleted path, writes the
@@ -385,8 +387,8 @@ one that adds it (D-18).
 
 - **Chosen:** Each capability is computed one way. Validation computes one
   report over the captured repository and filters it for an issue, a scope, an
-  explanation, or a gate checker. A preview runs the same mutation session as
-  its operation, read-only. A rule, derivation, or parser exists once and every
+  explanation, or a gate checker. A preview runs the same capture and
+  derivation as its operation, read-only. A rule, derivation, or parser exists once and every
   caller goes through it.
 - **Rejected:** Scoped or preview variants that reimplement part of the full
   computation for speed or convenience. They drift: preview and apply disagree,
@@ -408,3 +410,22 @@ one that adds it (D-18).
   needed fact through the tool adopters already have is the smaller, uniformly
   testable mechanism (D-18).
 - **Date:** 2026-10-20
+
+### D-22: Reads never wait on writers
+
+- **Chosen:** Reads never wait on writers. A read captures without locks and is
+  admitted only when no redo record was present and the event log did not grow
+  across its capture; it retries a bounded number of times and then reads under
+  the repository lock, which also completes a leftover record. Every redo record
+  appends at least one event, so the log's length is the repository's commit
+  counter.
+- **Rejected:** A shared/exclusive repository lock, which still blocks readers
+  on writers and lets a stream of readers starve writers; and re-reading the
+  read set to validate a capture, which is unsound when a freed inode is reused
+  for bytes that return to a prior value.
+- **Reasoning:** Many agents read one repository while others write it. A read
+  that serializes behind every writer and every other reader makes the slowest
+  mutation everyone's latency. The admission check reuses the record and the
+  event log that D-17 already maintains, so concurrency adds one check rather
+  than a lock mode (D-18).
+- **Date:** 2026-10-24

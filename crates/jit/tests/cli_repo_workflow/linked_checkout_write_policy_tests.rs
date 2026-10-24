@@ -483,22 +483,32 @@ fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_
 fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_to_permit() {
     let (_temp, _primary, linked) = linked_checkout_fixture();
 
-    let assert = create_issue_in(&linked, "Permitted mutation", None).failure();
-    let stderr = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
+    let error = refusal_envelope(create_issue_in(&linked, "Permitted mutation", None).failure());
+    let message = error["message"]
+        .as_str()
+        .expect("refusal carries an error message");
+    let suggestions = error["suggestions"]
+        .as_array()
+        .expect("refusal carries permit guidance")
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let diagnostic = format!("{message}\n{}\n{suggestions}", error["details"]["stance"]);
 
     assert!(
-        stderr.contains(&linked.display().to_string()),
-        "the refusal must name the linked checkout it refused in; stderr: {stderr}"
+        diagnostic.contains(&linked.display().to_string()),
+        "the refusal must name the linked checkout it refused in; error: {error}"
     );
     assert!(
-        stderr.contains("refuse"),
-        "the refusal must name the stance that refused it; stderr: {stderr}"
+        diagnostic.contains("refuse"),
+        "the refusal must name the stance that refused it; error: {error}"
     );
     for permit_surface in ["write_policy", "allow", WRITE_STANCE_ENV] {
         assert!(
-            stderr.contains(permit_surface),
+            diagnostic.contains(permit_surface),
             "the refusal must name the surfaces that permit the operation, including \
-             {permit_surface}; stderr: {stderr}"
+             {permit_surface}; error: {error}"
         );
     }
 }

@@ -84,6 +84,20 @@ pub enum RepositoryStateStoreError {
     Other(#[from] anyhow::Error),
 }
 
+/// Whether session open failed on the leftover redo record: it did not parse,
+/// or applying it failed.
+pub(crate) fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<RepositoryStateStoreError>(),
+            Some(
+                RepositoryStateStoreError::UnreadableRedoRecord { .. }
+                    | RepositoryStateStoreError::RedoApply(_)
+            )
+        )
+    })
+}
+
 /// Whether this failure is a lock wait that expired rather than an outcome the
 /// session decided.
 ///

@@ -65,6 +65,9 @@ assert_rejects "without depending on producer" "$tool" validate "$fixtures/manif
 assert_rejects "must have exactly one producer" "$tool" validate "$fixtures/manifest-contract-invalid-producers.json" --config "$config" --known-source REQ-11 --plan "$fixtures/plan-contract-modes.md"
 assert_rejects "cannot produce plan-fixed contract" "$tool" validate "$fixtures/manifest-contract-invalid-producers.json" --config "$config" --known-source REQ-11 --plan "$fixtures/plan-contract-modes.md"
 assert_rejects "non-empty footprint" "$tool" validate "$fixtures/manifest-missing-footprint.json" --config "$config" --known-source REQ-12
+# Sizing cuts both ways: an in-module chain link and an over-budget manifest both fail.
+assert_rejects "chain-link" "$tool" validate "$fixtures/manifest-chain-link.json" --config "$config" --known-source REQ-13 --deny-warnings
+assert_rejects "over the budget of 0" "$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --plan "$fixtures/plan-stale.md" --max-issues 0
 ! "$tool" render "$fixtures/manifest-valid.json" "$tmp_plan" --check
 "$tool" render "$fixtures/manifest-valid.json" "$tmp_plan" --write
 "$tool" render "$fixtures/manifest-valid.json" "$tmp_plan" --check

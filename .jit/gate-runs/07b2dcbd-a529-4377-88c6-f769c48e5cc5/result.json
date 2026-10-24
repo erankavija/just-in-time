@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b834fcbae48f3be07fdabd038a85ed92139f8ef0",
+  "completed_at": "2026-10-24T19:01:56.373222836Z",
+  "duration_ms": 208047,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Repository bootstrap is centralized in the library and the prior recovery-mapping finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a807e699-a7ed-474e-b6af-2ed4086a9dad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "07b2dcbd-a529-4377-88c6-f769c48e5cc5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T18:58:28.325384805Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ad8d6a80b, 5d9e1def3, 853d1cfc8, 57158c991, 893168b19, b834fcbae (`jit:a807e699`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-09, REQ-15, REQ-19 (issue markdown); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T18:56:55Z); prior code-review F1 verified addressed\nTruncation recovery: recovered bounded bootstrap/main patches and linked-doc ranges; verified merge patches match their feature patches by stable patch ID\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Repository bootstrap is centralized in the library and the prior recovery-mapping finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

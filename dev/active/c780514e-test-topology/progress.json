@@ -1265,6 +1265,12 @@
       "category": "minimal canonical schema derive footprint expansion",
       "status": "approved by coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b",
       "decision": "Add gate_presets.rs and storage/claim_coordinator.rs for JsonSchema derives/imports only on PresetInfo and Lease. No duplicate adapters or runtime/serde changes; criteria/gates unchanged. Assess/report before unsupported field, dependency, feature, or schema semantic expansion."
+    },
+    {
+      "issue": "9bb30f15",
+      "category": "unsupported pre-existing REQ-10 contribution credit",
+      "status": "coordinator approved narrow metadata correction",
+      "decision": "Remove coverage label and corresponding manifest/plan source credit only; retain invariant link, criteria, gates, implementation. Validate actual REQ-10 coverage."
     }
   ],
   "rework_counts": {
@@ -1296,7 +1302,7 @@
     },
     {
       "finding": "9bb30f15 review advisory F1: unsupported REQ-10 coverage label on lock precondition task",
-      "disposition": "Coordinator approval pending for label and corresponding manifest/plan credit correction; retain task and invariant link. Reconcile before epic coverage gate."
+      "disposition": "Resolved by coordinator-approved metadata correction; real REQ-10 contributors retained. Coverage graph validation recorded after correction."
     }
   ],
   "traps": [
@@ -1684,9 +1690,28 @@
         {
           "id": "F1",
           "finding": "Pre-existing satisfies:c780514e/REQ-10 credit does not describe the host-permission precondition task",
-          "disposition": "Sent to coordinator for minimal label/manifest/plan credit correction; criteria/gates unchanged"
+          "disposition": "Coordinator-approved correction: remove unsupported coverage credit from issue, manifest and plan; retain invariant link, criteria, gates and implementation."
         }
-      ]
+      ],
+      "coverage_correction_validation": {
+        "repository": "jit validate passed; zero errors/warnings/divergences/rule findings including configured coverage-preview on done breakdown",
+        "remaining_REQ_10_contributors": [
+          "0951556f",
+          "2c453337",
+          "2f63adec",
+          "340a846d",
+          "45e3e442",
+          "4f6044c1",
+          "559335cf",
+          "5b42e3ff",
+          "7495521e",
+          "7a412cb0",
+          "89406e14",
+          "aa28fe5f",
+          "c11bcdaa",
+          "fa9bf296"
+        ]
+      }
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
@@ -1702,5 +1727,29 @@
       "build_processes_at_check": [],
       "scope": "Coordinator-approved incremental subdirectories only; profile owner confirmed idle; turnstile and exclusive build lock held"
     }
-  ]
+  ],
+  "execution_status": "paused_by_user",
+  "handoff": "dev/active/c780514e-test-topology/handoff.md",
+  "pause_checkpoint": {
+    "reason": "User requested handoff via coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b",
+    "main_before_handoff": "66941bb60",
+    "workers_paused": true,
+    "active_processes": "none from this epic; verify on resume",
+    "df505379": {
+      "branch": "worktree-agent-df505379",
+      "head": "ce23d3b19546d7b2bbac431d7eff91fd9bb54007",
+      "worktree": ".agents/worktrees/agent-22355a56",
+      "dirty": false,
+      "implementation": "not started; no checks run",
+      "lease": "released at pause; issue remains in_progress"
+    },
+    "fa9bf296": {
+      "branch": "worktree-agent-fa9bf296",
+      "head": "163e3a371",
+      "worktree": ".agents/worktrees/agent-de880d9c",
+      "dirty": false,
+      "implementation": "WIP gate input roots only; projection/selftest/gates pending",
+      "lease": "released at pause; issue remains in_progress"
+    }
+  }
 }

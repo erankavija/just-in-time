@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8cf19175a680ecfcc90c223f126d39e20d82765c",
+  "completed_at": "2026-10-24T18:20:30.195126660Z",
+  "duration_ms": 254109,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/serve.rs",
+        "id": "F1",
+        "line": 556,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose",
+          "@/invariant/architecture-dependency-direction"
+        ],
+        "severity": "medium",
+        "summary": "Foreground lifecycle rustdoc still directs callers to manually assemble startup and misstates callback timing."
+      }
+    ],
+    "summary": "Foreground lifecycle behavior is implemented, but its public rustdoc contradicts the new command-layer API.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d4373d07-570c-4968-8fb4-f7cd64e90183",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c620e55f-305d-4f7b-9814-af65344409a2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T18:16:16.085129085Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2976 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16f20-b7e8-7981-bf71-04a183a3f74f\n--------\nuser\n--- 2963 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5b36c0d51, 58a0af656, 9f201b611, 8cf19175a (jit:d4373d07, reachable from HEAD)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/df129d9e/requirement/REQ-09, REQ-15, REQ-19 (issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T18:14:30.980672653Z)\nTruncation recovery: narrowed plan/investigation reads to REQ-19 and D-11/D-23; narrowed foreground test inspection to command_exit_code_projection_tests.rs:620-742\n\n1. [blocking][issue-impact] `crates/jit/src/commands/serve.rs:556` still instructs callers to manually assemble foreground startup with `find_available_port` and `spawn_with_listener`, bypassing the new `run_foreground` operation. Its new rustdoc also says the callback occurs after child configuration, but it runs before command construction and spawn at lines 726–742. This leaves contradictory public lifecycle guidance. References: @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Foreground lifecycle behavior is implemented, but its public rustdoc contradicts the new command-layer API.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Foreground lifecycle rustdoc still directs callers to manually assemble startup and misstates callback timing.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":556,\"references\":[\"@/invariant/essential-code-prose\",\"@/invariant/architecture-dependency-direction\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

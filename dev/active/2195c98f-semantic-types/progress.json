@@ -1,0 +1,640 @@
+{
+  "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+  "epic_short_id": "2195c98f",
+  "current_wave": 1,
+  "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "0abaeba0-4ef2-49af-8700-aae07a5cd8c2",
+          "short_id": "0abaeba0",
+          "title": "This checkout's claims log names issues by full id",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "18bcafb8-88ca-4d1c-9776-2f14e2138b8b",
+          "short_id": "18bcafb8",
+          "title": "Production event matchers read events through a body view",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
+          "short_id": "1f6d3754",
+          "title": "Artifact-plan errors use the derive-based error convention",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3e353abd-9b73-4da2-a8e7-ea07512f3e3e",
+          "short_id": "3e353abd",
+          "title": "Validated issue identity type with an alias staging bridge",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3f026bb1-9db7-4c5c-9a74-c6c96d619006",
+          "short_id": "3f026bb1",
+          "title": "One macro declares a closed wire vocabulary",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "62a0085a-a0e4-4877-8dbf-2bd8f4a6e1c3",
+          "short_id": "62a0085a",
+          "title": "HierarchyConfig has one fallible constructor from declarations",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6e8b9f31-64ae-4a05-b4e8-dbe39d35638b",
+          "short_id": "6e8b9f31",
+          "title": "System actors are named Assignee constants",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
+          "short_id": "acb38457",
+          "title": "Graph node traits expose dependency ids as string views",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
+          "short_id": "b3fcd297",
+          "title": "Schema paths come from a VirtualPath constructor",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b48d7b2a-74f5-4534-b3eb-944946b08260",
+          "short_id": "b48d7b2a",
+          "title": "Rule patterns compile at declaration load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
+          "short_id": "cccfd407",
+          "title": "One VirtualPath predicate recognises reserved application targets",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
+          "short_id": "f8523c62",
+          "title": "Query assignee filters parse to an Assignee",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "0af95f14-ce17-497b-9420-be71325ec0a5",
+          "short_id": "0af95f14",
+          "title": "Library unit tests take canonical issue ids from one fixture",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "179dcef9-71f8-41d0-a871-696c989d0ee4",
+          "short_id": "179dcef9",
+          "title": "Repository action owners are one enum",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
+          "short_id": "18dc6e3e",
+          "title": "Repository-state code names well-known files through VirtualPath constants",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
+          "short_id": "256c8eb1",
+          "title": "Error codes come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
+          "short_id": "2ac50581",
+          "title": "Lifecycle state tokens come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
+          "short_id": "3625b18b",
+          "title": "Unit tests match events through the body view",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
+          "short_id": "3ae2293a",
+          "title": "Gate stage and mode tokens come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
+          "short_id": "5c232305",
+          "title": "ProfileId is defined in the domain layer",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
+          "short_id": "6add7ca6",
+          "title": "Projection mode and style reach output typed",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
+          "short_id": "72dfc0d7",
+          "title": "Built-in gate findings use closed severity and disposition enums",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
+          "short_id": "7383f4ea",
+          "title": "Template transform kind is typed at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
+          "short_id": "80fe846e",
+          "title": "Artifact-plan codes declare their wire spelling once",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "96bb0941-07f3-4f55-bd69-93ad587c5540",
+          "short_id": "96bb0941",
+          "title": "Validation strictness is typed at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
+          "short_id": "a50e9be9",
+          "title": "Resolved agent identity is an Assignee",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
+          "short_id": "b4fe7887",
+          "title": "Item-kind scope has one enum",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
+          "short_id": "b8506ce7",
+          "title": "Store divergence tokens come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
+          "short_id": "bc1955a8",
+          "title": "Item kinds hold their id pattern as IdPattern",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
+          "short_id": "bf87bbdb",
+          "title": "Graph queries return nodes rather than id strings",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
+          "short_id": "c400730c",
+          "title": "Id prefixes parse once into an IssueIdPrefix",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
+          "short_id": "e3d06f82",
+          "title": "Integration tests match events through the body view",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
+          "short_id": "f8f80eea",
+          "title": "Hierarchy callers propagate the constructor's error",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "faa19def-4484-4706-becf-dab559f0f3d4",
+          "short_id": "faa19def",
+          "title": "Gate-run actors are Assignee values",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "13190465-174b-4fd2-be58-308b7a3d7e2e",
+          "short_id": "13190465",
+          "title": "The fast_issue suite carries typed canonical issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "182350ce-35f1-46aa-8106-1a5a7dca3542",
+          "short_id": "182350ce",
+          "title": "Priority tokens come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
+          "short_id": "19d9bd7d",
+          "title": "CLI suites that use the library carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "428646c5-14ce-4127-ab7e-2b0ed56b0195",
+          "short_id": "428646c5",
+          "title": "Profile dependency resolution compares ProfileId values",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
+          "short_id": "42bcaa6e",
+          "title": "Content format is typed at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
+          "short_id": "5fac48b8",
+          "title": "Issue drafts carry their pre-derived identifier",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6826f966-461c-4668-ae5a-92d10f75c5cf",
+          "short_id": "6826f966",
+          "title": "Rule severity and scope tokens come from one declaration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
+          "short_id": "8cfbf19d",
+          "title": "Lease and worktree ids are dedicated types",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+          "short_id": "91081bd3",
+          "title": "The CLI resolves each issue-id argument once at entry",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
+          "short_id": "945f65f3",
+          "title": "Commands name well-known files through VirtualPath constants",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
+          "short_id": "a57c5057",
+          "title": "The server resolves each issue-id path parameter once",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
+          "short_id": "b45a2865",
+          "title": "The fast_rules suite carries typed canonical issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "b73b3e5a-87d4-455a-961d-20c88a3a7039",
+          "short_id": "b73b3e5a",
+          "title": "The fast_docs_templates suite carries typed canonical issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d72bf093-a36d-4cc7-8255-36c46bc9bb93",
+          "short_id": "d72bf093",
+          "title": "Event becomes an envelope around a tagged body",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "1622756a-d805-40b4-a5af-37dadcc6a683",
+          "short_id": "1622756a",
+          "title": "Human output renders vocabulary tokens, not Debug names",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
+          "short_id": "30923ea1",
+          "title": "Priority orders by rank through Ord",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
+          "short_id": "5d5c5514",
+          "title": "Validation projections hold typed state and priority",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
+          "short_id": "98404e0c",
+          "title": "Lease records name their issue by IssueId",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
+          "short_id": "a4b94a17",
+          "title": "Type-hierarchy and label-uniqueness rule options are typed",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
+          "short_id": "c1c86312",
+          "title": "Composite arguments carry their issue as a typed id",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1",
+          "short_id": "c797b59b",
+          "title": "The shared integration harness carries typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e1a6c8c2-bace-4c0c-8d01-1842dfac7f80",
+          "short_id": "e1a6c8c2",
+          "title": "Storage and configuration code name well-known files through VirtualPath constants",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
+          "short_id": "e98ae5a4",
+          "title": "Event tags declare their wire spelling once",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "f265e748-e350-4ba6-949f-575acf122bd9",
+          "short_id": "f265e748",
+          "title": "Event issue accessor returns an optional IssueId",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "5491edd0-b77e-4d2d-9cd2-83a0e4cd56cb",
+          "short_id": "5491edd0",
+          "title": "Worktree and server files under .jit have VirtualPath constants",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "75951558-accb-4ee9-be38-e97fee0326ee",
+          "short_id": "75951558",
+          "title": "Issue lifecycle commands carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "804a8605-267b-4934-a9ef-08422fc3686d",
+          "short_id": "804a8605",
+          "title": "Dependency, graph and template commands carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8e82fa49-1859-4e29-8972-f2da05e90b0a",
+          "short_id": "8e82fa49",
+          "title": "Gate commands carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "af9c277d-a906-460d-9d96-6ae3ae0bf124",
+          "short_id": "af9c277d",
+          "title": "Label-reference assertions are typed at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
+          "short_id": "cd8adfc1",
+          "title": "Executor core carries typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "d50d6976-f978-4900-a218-6bb9d1b3fa52",
+          "short_id": "d50d6976",
+          "title": "Document-family commands carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "1c5da41d-e1b3-475c-818d-324f57dd716b",
+          "short_id": "1c5da41d",
+          "title": "Validation carries typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "5613ef50-362b-43ef-a268-12afc91f5b52",
+          "short_id": "5613ef50",
+          "title": "Dependency-shape assertions are typed at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
+          "short_id": "641bd14e",
+          "title": "Repository-state mutations carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "8acca4f4-af5d-4dd8-b135-5f4a87eb1311",
+          "short_id": "8acca4f4",
+          "title": "Errors and output carry typed issue ids",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "7e8f1525-9efc-4c41-97e9-829eb7dc9a25",
+          "short_id": "7e8f1525",
+          "title": "Label-coverage assertions are typed and compiled at load",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
+          "short_id": "89e7a273",
+          "title": "Storage trait and backends take issue ids as IssueId",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
+          "short_id": "3ee3a4d1",
+          "title": "Domain types carry issue ids as IssueId",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "7abcc22d-c931-4da8-94b0-c9c894333540",
+          "short_id": "7abcc22d",
+          "title": "IssueId becomes the validated newtype",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "0102769f-e3d8-4cbf-8da5-674aebd71c01",
+          "short_id": "0102769f",
+          "title": "Issue record paths come from a VirtualPath constructor",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
+          "short_id": "488eb3c1",
+          "title": "Gate keys are a validated GateKey in the registry and gate runs",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "ce2bdbb0-ef3b-4074-a0ba-71070cc555f3",
+          "short_id": "ce2bdbb0",
+          "title": "Server issue responses carry the domain short id",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "id": "417be079-1de3-43e3-816a-03f4a70e2f63",
+          "short_id": "417be079",
+          "title": "Issue gate fields are keyed by GateKey",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
+          "short_id": "79aa3aa7",
+          "title": "Gate runs are identified by a validated GateRunId",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "855d027d-2575-4c9d-8c6a-049f406fe397",
+          "short_id": "855d027d",
+          "title": "Commands take issue record paths from the VirtualPath constructor",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "be18da9e-bfe2-4813-a69e-72ee1904c344",
+          "short_id": "be18da9e",
+          "title": "Web UI renders the server-provided short id",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "external_blockers": {
+    "c780514e test-topology (paused)": [
+      "0af95f14",
+      "13190465",
+      "19d9bd7d",
+      "5fac48b8",
+      "b45a2865",
+      "b73b3e5a"
+    ]
+  },
+  "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
+  "dispatch_log": [],
+  "surfaced_pitfalls": [],
+  "started_at": "2026-10-24T23:06:41.581082+00:00"
+}
