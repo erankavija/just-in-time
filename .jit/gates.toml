@@ -647,7 +647,7 @@ exclude = [
 version = 1
 key = "shipped-policy-regions-selftest"
 title = "Shipped-policy region generator self-test"
-description = "Runs scripts/generate-shipped-policy-regions-selftest.sh: the generator changes nothing on a current tree, restores a corrupted region while keeping every byte outside its markers, and fails on malformed markers. Any non-zero exit fails the gate, including exit 2 for a missing git or jit. Registered at planning for c780514e."
+description = "Runs scripts/generate-shipped-policy-regions-selftest.sh: the generator changes nothing on a current tree, restores a corrupted region while keeping every byte outside its markers, and fails on malformed markers. Any non-zero exit fails the gate, including exit 2 for a missing git or jit."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -660,13 +660,13 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the self-test, the generator, and the files whose regions it renders
-# and the configuration it renders them from.
+# Inputs: the self-test, the generator, the files whose regions it renders, and
+# the shipped package it renders them from.
 [gates.inputs]
 roots = [
-  ".jit/config.toml",
   "docs/reference/configuration.md",
   "docs/reference/example-config.toml",
+  "profiles/jit-default",
   "scripts/generate-shipped-policy-regions-selftest.sh",
   "scripts/generate-shipped-policy-regions.sh",
 ]
