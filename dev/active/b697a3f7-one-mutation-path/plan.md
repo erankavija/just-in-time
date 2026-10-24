@@ -22,8 +22,8 @@ Every preview and read runs the capture and derivation of the operation it descr
 | REQ-11 | `gate-preset-catalog` adds the public catalog, moves apply, template apply, list and show onto it, and deletes the storage preset I/O. | Configuration C6 |
 | REQ-12 | `gate-evidence-capture` (DEC-07) | Configuration C7–C9 |
 | REQ-13 | `image-identity-token` (`image-identity`) | Configuration C10–C12, §5 REQ-13 A |
-| REQ-14 | `redo-parent-handles-once` | Storage C1, C2 |
-| REQ-15 | `redo-sync-coalescing` first proves replay from any subset of persisted operations under `redo-crash-model`, then coalesces syncs only if that proof passes, and otherwise documents why per-operation syncs stay (DEC-18). | Storage C3, §4 |
+| REQ-14 | `redo-apply-parents-once` | Storage C1, C2 |
+| REQ-15 | `redo-apply-parents-once` first proves replay from any subset of persisted operations under `redo-crash-model`, then coalesces syncs only if that proof passes, and otherwise documents why per-operation syncs stay (DEC-18). | Storage C3, §4 |
 | REQ-16 | `capability-fs-module` moves the primitives into their own module, repoints every importer and gives the module its own error type, which ends the import cycle. Then `leaf-open-once` (with DEC-19's profile reads and the exact-store read) and `record-commit-through-capabilities`. | Storage C4–C7 |
 | REQ-17 | `atomic-publication-core` (`atomic-publication`) adds the core with the redo put as first caller and moves the export writers. `control-files-publication` adds the path entry for control files outside the repository roots, moves the lease records, claims sequence, worktree identity and PID file onto it, and owns the assertion that no other stage-and-rename remains (DEC-07, DEC-21). | Storage C8–C10, §5 D3–D4 |
 | REQ-18 | `domain-typed-errors` gives the classifier its layout-violation type and one missing-evidence helper and types every domain error. `root-relative-path-in-domain` moves `RootRelativePath` into the domain, repoints every importer and owns the domain-purity assertion (DEC-13). | Archive C7–C10; storage REQ-18 row |
@@ -113,7 +113,7 @@ One non-blocking, no-follow leaf open with an fstat recheck serves every storage
 
 ### `redo-subset-proof` [implementation-produced] — Subset-replay verdict
 
-The verdict on whether replaying a record after any subset of its operations persisted converges, on both backends, under `redo-crash-model`. If it converges, the verdict is a passing property test. If not, it is a deterministic test asserting that the recorded failing subset diverges. Either way, no failing or ignored test lands. Producer: `redo-sync-coalescing`, whose coalescing step the verdict decides.
+The verdict on whether replaying a record after any subset of its operations persisted converges, on both backends, under `redo-crash-model`. If it converges, the verdict is a passing property test. If not, it is a deterministic test asserting that the recorded failing subset diverges. Either way, no failing or ignored test lands. Producer: `redo-apply-parents-once`, whose coalescing step the verdict decides.
 
 ### `atomic-publication` [implementation-produced] — One file publication
 
@@ -149,7 +149,7 @@ A storage module that reads the repository's configuration, template and invaria
 | read-session | Lock-free read session with commit admission and one read driver | task | A capture-only session trait, a lock-free admitted session per backend, and with_read_session with its locked fallback. | event-append-invariant | REQ-21, DEC-09 | touches 9 | — | event-per-commit |
 | lock-free-read-consumers | Validate, link checks and profile previews read through the read driver | task | Validation reads, link checks and profile previews read through with_read_session, and the storage format reference states the read discipline. | read-session-driver | REQ-21, DEC-24 | touches 5 | — | read-session |
 | read-concurrency-benchmark | Benchmark: concurrent readers beside a continuous writer | task | A benchmark records that eight readers beside a continuous writer reach 4x one reader's rate and keep 80% of writes. | — | REQ-21, DEC-25 | creates 5, touches 1 | — | lock-free-read-consumers |
-| cost-evidence | Cost evidence: the epic's four cost reductions against the base binary | task | One harness measures the four REQ-22 cost claims against base 369d35a42 and the tip record passes each ratio threshold. | — | REQ-22, DEC-25 | creates 7 | — | archive-candidates-one-session, declarations-on-mutation-base, redo-sync-coalescing |
+| cost-evidence | Cost evidence: the epic's four cost reductions against the base binary | task | One harness measures the four REQ-22 cost claims against base 369d35a42 and the tip record passes each ratio threshold. | — | REQ-22, DEC-25 | creates 7 | — | archive-candidates-one-session, declarations-on-mutation-base, redo-apply-parents-once |
 | read-concurrency | Reads run beside writers, every commit appends an event, and the cost reductions are evidenced | story | Reads capture lock-free behind one admission check, every commit appends an event, and cost reductions are measured. | — | REQ-21, REQ-22, REQ-23 | — | — | cost-evidence, read-concurrency-benchmark |
 | configuration-assembly | One pure assembler builds every JitConfig from source bytes | task | One public pure function assembles JitConfig from source bytes; every assembly site calls it and the mirror fields are gone. | — | REQ-09, DEC-15 | touches 12 | — | — |
 | configuration-store | Storage reads configuration files and the registry file loaders are gone | task | A storage loader reads the declaration files through the assembler; callers and tests use it and the registry loaders are gone. | configuration-assembler | REQ-20, DEC-15 | creates 1, touches 13 | — | configuration-assembly |
@@ -163,9 +163,8 @@ A storage module that reads the repository's configuration, template and invaria
 | capability-fs-module | No-follow primitives live in one storage module with their own error type | task | The no-follow capability primitives live in storage/capability_fs.rs, return their own error type, and redo apply no longer imports from the session module. | — | REQ-16 | creates 1, touches 12 | — | root-relative-path-in-domain |
 | leaf-open-once | The no-follow leaf open exists once and serves storage, profile and exact-store reads | task | One non-blocking no-follow leaf open serves the storage repository file readers, the profile package reader and the JSON backend's exact-store read. | capability-fs | REQ-16, REQ-20, DEC-19 | touches 7 | — | capability-fs-module |
 | record-commit-through-capabilities | Redo record commit goes through capability handles | task | Record commit writes through the data-root handle, and redo_record.rs only defines the record format. | capability-fs | REQ-16 | touches 11 | — | capability-fs-module |
-| redo-parent-handles-once | Redo apply opens each distinct parent once | task | Redo apply opens each distinct parent directory once per record through a per-record handle map. | capability-fs | REQ-14 | touches 2 | — | record-commit-through-capabilities |
-| redo-sync-coalescing | Redo apply syncs each distinct parent once per record, decided by a crash-subset proof | task | A subset-replay proof decides whether redo apply syncs each parent once per record; otherwise rustdoc states why not. | redo-crash-model | REQ-15, DEC-18 | touches 6 | — | redo-parent-handles-once |
-| atomic-publication-core | One atomic file publication with a durability argument serves the redo put and external exports | task | One publish core with a durability argument and unique stage names serves the redo put and the external export writers. | capability-fs | REQ-17 | touches 4 | — | redo-sync-coalescing |
+| redo-apply-parents-once | Redo apply opens and syncs each parent once per record | task | Redo apply opens each parent once per record, and a subset-replay proof decides whether it also syncs each once. | capability-fs, redo-crash-model | DEC-18, REQ-14, REQ-15 | touches 6 | — | record-commit-through-capabilities |
+| atomic-publication-core | One atomic file publication with a durability argument serves the redo put and external exports | task | One publish core with a durability argument and unique stage names serves the redo put and the external export writers. | capability-fs | REQ-17 | touches 4 | — | redo-apply-parents-once |
 | control-files-publication | Lease records, worktree identity and the server PID file publish through the one function | task | Lease records, the claims sequence counter, worktree identity and the server PID file publish through the one function, and the PID file is synced. | atomic-publication | REQ-17, DEC-07, DEC-21 | touches 6, uncertain | — | atomic-publication-core, process-liveness-primitive |
 | storage-primitives | Storage primitives exist once and redo apply touches each parent once | story | Images are shared by token, redo apply opens and syncs parents once per record, and no-follow and publication primitives exist once. | — | REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-20 | — | — | control-files-publication, image-identity-token, leaf-open-once |
 | archive-reference-resolution-once | Archive discovery resolves each reference once | task | Archive planning resolves each artifact reference once per plan and walks reachability once per distinct root. | — | REQ-08 | touches 1 | — | — |
@@ -212,25 +211,24 @@ flowchart LR
     N24["capability-fs-module: No-follow primitives live in one storage module with their own error type"]
     N25["leaf-open-once: The no-follow leaf open exists once and serves storage, profile and exact-store reads"]
     N26["record-commit-through-capabilities: Redo record commit goes through capability handles"]
-    N27["redo-parent-handles-once: Redo apply opens each distinct parent once"]
-    N28["redo-sync-coalescing: Redo apply syncs each distinct parent once per record, decided by a crash-subset proof"]
-    N29["atomic-publication-core: One atomic file publication with a durability argument serves the redo put and external exports"]
-    N30["control-files-publication: Lease records, worktree identity and the server PID file publish through the one function"]
-    N31["storage-primitives: Storage primitives exist once and redo apply touches each parent once"]
-    N32["archive-reference-resolution-once: Archive discovery resolves each reference once"]
-    N33["archive-preview-through-execute-planner: Archive preview runs the execute planner read-only"]
-    N34["archive-candidates-one-session: Archive candidates plan in one read-only session"]
-    N35["container-destination-once: Container marker and destination evidence are declared once"]
-    N36["snapshot-from-one-image: Snapshot export copies stored bytes from one image"]
-    N37["archive-destination-no-legacy-fallback: Archive destinations drop the short-id fallback"]
-    N38["archive-and-snapshot: Archive planning and snapshot export read through the execute session"]
-    N39["domain-typed-errors: Domain code reports typed errors and imports nothing from repository_state"]
-    N40["root-relative-path-in-domain: RootRelativePath lives in the domain with its own parse error"]
-    N41["one-safe-path-validator: Relative path inputs validate through RootRelativePath::parse"]
-    N42["issue-scope-type: Link checks and snapshot export select issues through one IssueScope"]
-    N43["process-liveness-primitive: Process liveness and signalling go through one PID guard"]
-    N44["type-extraction-exact-values: Type labels have one exact extraction"]
-    N45["one-form-convergence: Layering and duplicated primitives converge on one form"]
+    N27["redo-apply-parents-once: Redo apply opens and syncs each parent once per record"]
+    N28["atomic-publication-core: One atomic file publication with a durability argument serves the redo put and external exports"]
+    N29["control-files-publication: Lease records, worktree identity and the server PID file publish through the one function"]
+    N30["storage-primitives: Storage primitives exist once and redo apply touches each parent once"]
+    N31["archive-reference-resolution-once: Archive discovery resolves each reference once"]
+    N32["archive-preview-through-execute-planner: Archive preview runs the execute planner read-only"]
+    N33["archive-candidates-one-session: Archive candidates plan in one read-only session"]
+    N34["container-destination-once: Container marker and destination evidence are declared once"]
+    N35["snapshot-from-one-image: Snapshot export copies stored bytes from one image"]
+    N36["archive-destination-no-legacy-fallback: Archive destinations drop the short-id fallback"]
+    N37["archive-and-snapshot: Archive planning and snapshot export read through the execute session"]
+    N38["domain-typed-errors: Domain code reports typed errors and imports nothing from repository_state"]
+    N39["root-relative-path-in-domain: RootRelativePath lives in the domain with its own parse error"]
+    N40["one-safe-path-validator: Relative path inputs validate through RootRelativePath::parse"]
+    N41["issue-scope-type: Link checks and snapshot export select issues through one IssueScope"]
+    N42["process-liveness-primitive: Process liveness and signalling go through one PID guard"]
+    N43["type-extraction-exact-values: Type labels have one exact extraction"]
+    N44["one-form-convergence: Layering and duplicated primitives converge on one form"]
     N2 --> N1
     N0 --> N2
     N5 --> N3
@@ -245,15 +243,15 @@ flowchart LR
     N9 --> N10
     N10 --> N11
     N11 --> N12
-    N34 --> N13
+    N33 --> N13
     N19 --> N13
-    N28 --> N13
+    N27 --> N13
     N13 --> N14
     N12 --> N14
     N15 --> N16
     N16 --> N17
-    N36 --> N17
-    N34 --> N18
+    N35 --> N17
+    N33 --> N18
     N6 --> N18
     N17 --> N18
     N21 --> N19
@@ -263,33 +261,32 @@ flowchart LR
     N3 --> N21
     N19 --> N22
     N18 --> N22
-    N40 --> N24
+    N39 --> N24
     N24 --> N25
     N24 --> N26
     N26 --> N27
     N27 --> N28
     N28 --> N29
+    N42 --> N29
     N29 --> N30
-    N43 --> N30
-    N30 --> N31
-    N23 --> N31
-    N25 --> N31
+    N23 --> N30
+    N25 --> N30
+    N31 --> N32
+    N10 --> N32
     N32 --> N33
-    N10 --> N33
-    N33 --> N34
-    N33 --> N35
-    N10 --> N36
+    N32 --> N34
+    N10 --> N35
+    N34 --> N36
+    N33 --> N37
+    N36 --> N37
     N35 --> N37
-    N34 --> N38
-    N37 --> N38
-    N36 --> N38
-    N39 --> N40
-    N33 --> N41
-    N17 --> N42
-    N42 --> N45
-    N41 --> N45
-    N43 --> N45
-    N44 --> N45
+    N38 --> N39
+    N32 --> N40
+    N17 --> N41
+    N41 --> N44
+    N40 --> N44
+    N42 --> N44
+    N43 --> N44
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -315,7 +312,7 @@ flowchart LR
 | DEC-15 Configuration assembly | Chosen: one strict assembler. A malformed `[item_kinds]` is a structural load failure, and an image with an absent `config.toml` assembles the empty config (stated in `configuration-assembler`). Configuration file I/O lives in storage (`configuration-store` and its four sibling leaves), which supersedes 459bb995's note. The assembler builds on 459bb995's defaults and accessors. Rejected: keeping two pipelines, or keeping I/O in `config.rs`. |
 | DEC-16 Type extraction | Chosen: exact label values. `extract_type` is deleted, and `type:Epic` stops passing the taxonomy check (stated in `type-extraction-exact-values`). No adopter doc claims case-insensitive types. Rejected: lowercasing everywhere. |
 | DEC-17 Status summary | Chosen: no change. `backlog` already shipped in f7340f63f, and the relocation is dropped (DEC-26). |
-| DEC-18 REQ-15 proof | Chosen: `redo-sync-coalescing` lands the subset-replay proof before any sync moves, and coalesces only if the proof passes; otherwise it documents the crash case in rustdoc. Rejected: coalescing on the existing interruption tests, which cannot observe a lost directory entry. |
+| DEC-18 REQ-15 proof | Chosen: `redo-apply-parents-once` lands the subset-replay proof before any sync moves, and coalesces only if the proof passes; otherwise it documents the crash case in rustdoc. Rejected: coalescing on the existing interruption tests, which cannot observe a lost directory entry. |
 | DEC-19 Profile opener | Chosen: profile imports the storage leaf open. No layer rule forbids profile from importing storage, so no bytes handoff is needed (`leaf-open-once`). Rejected: a cited exception. |
 | DEC-20 Process liveness | Chosen: one guarded primitive in a crate-level process module, whose PID guard the signaling sites use (`process-liveness-primitive`). EPERM counts as alive, and the non-unix policy is "alive". Rejected: a tri-state result with a policy per caller. |
 | DEC-21 Recover's claims-index write | Chosen: f8a6b298 53d19851 deletes `write_index_atomic`, including recover's unlocked `claims.index.tmp` write. `control-files-publication` then routes the lease writes that replace it through `atomic-publication`. Rejected: fixing a function that is about to be deleted. |
