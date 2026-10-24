@@ -154,3 +154,32 @@ fn test_git_stand_in_records_concurrent_invocations_once_each() {
     expected.sort();
     assert_eq!(recorded, expected);
 }
+
+#[cfg(unix)]
+#[test]
+fn test_git_stand_in_resolves_an_absolute_real_git_past_relative_entries_and_stand_ins() {
+    let earlier = GitStandIn::new();
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    let search_path = std::env::join_paths(
+        [
+            PathBuf::new(),
+            PathBuf::from("."),
+            PathBuf::from("bin"),
+            earlier.bin_dir(),
+        ]
+        .into_iter()
+        .chain(std::env::split_paths(&inherited)),
+    )
+    .unwrap();
+
+    let stand_in = GitStandIn::resolving_on(&search_path);
+
+    assert!(stand_in.real_git().is_absolute());
+    assert_eq!(stand_in.real_git(), earlier.real_git());
+    assert_ne!(stand_in.real_git(), earlier.program());
+    let output = Command::new(stand_in.program())
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
