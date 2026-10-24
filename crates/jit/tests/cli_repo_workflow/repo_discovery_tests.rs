@@ -325,6 +325,39 @@ fn test_jit_data_dir_override_takes_precedence_over_ancestor_discovery() {
     );
 }
 
+#[test]
+fn test_hooks_install_targets_repository_selected_by_data_dir_override() {
+    let git_init = |dir: &Path| {
+        let out = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(dir)
+            .output()
+            .expect("git init failed to spawn");
+        assert!(out.status.success(), "git init failed: {:?}", out);
+    };
+    let process_repo = TempDir::new().unwrap();
+    git_init(process_repo.path());
+    assert!(jit_init(process_repo.path()).status.success());
+    let selected_repo = TempDir::new().unwrap();
+    git_init(selected_repo.path());
+    assert!(jit_init(selected_repo.path()).status.success());
+
+    let out = Command::new(jit_binary())
+        .current_dir(process_repo.path())
+        .env("JIT_DATA_DIR", selected_repo.path().join(".jit"))
+        .args(["hooks", "install", "--json"])
+        .output()
+        .expect("hooks install failed to spawn");
+    assert!(
+        out.status.success(),
+        "hooks install failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert!(selected_repo.path().join(".git/hooks/pre-commit").exists());
+    assert!(!process_repo.path().join(".git/hooks/pre-commit").exists());
+}
+
 // ---------------------------------------------------------------------------
 // Regression: a bare `.jit` (no index.json) in a shared ancestor — e.g. stray
 // litter under a persistent CI temp root — must not be bound. Before discovery
