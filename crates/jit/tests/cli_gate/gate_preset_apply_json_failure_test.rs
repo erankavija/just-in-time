@@ -2,71 +2,48 @@
 
 use assert_cmd::prelude::*;
 use jit::output::ErrorCode;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit(temp: &TempDir) -> Command {
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command.current_dir(temp.path());
-    command
-}
+use jit::test_cli::JitCli;
 
 /// The project-defined preset every case below applies.
 const PRESET: &str = "review";
 
 /// A repository declaring one gate and capturing it into the project's own
 /// preset [`PRESET`], which is the only place a preset comes from.
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().expect("temporary repository");
-    jit(&temp).arg("init").assert().success();
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "team-review",
-            "--title",
-            "Team review",
-            "--description",
-            "A reviewer signs off",
-        ])
-        .assert()
-        .success();
+fn preset_repository() -> JitCli {
+    let temp = JitCli::initialised().expect("initialised repository");
+    temp.command([
+        "gate",
+        "define",
+        "team-review",
+        "--title",
+        "Team review",
+        "--description",
+        "A reviewer signs off",
+    ])
+    .assert()
+    .success();
     let reference = create_issue(&temp, "Preset source");
-    jit(&temp)
-        .args(["gate", "add", &reference, "team-review"])
+    temp.command(["gate", "add", &reference, "team-review"])
         .assert()
         .success();
-    jit(&temp)
-        .args(["gate", "preset", "create", &reference, PRESET])
+    temp.command(["gate", "preset", "create", &reference, PRESET])
         .assert()
         .success();
     temp
 }
 
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let output = jit(temp)
-        .args(["issue", "create", "--title", title, "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let response: serde_json::Value =
-        serde_json::from_slice(&output).expect("issue creation must emit JSON");
-    response["id"]
-        .as_str()
-        .expect("issue creation response must contain an id")
-        .to_string()
+fn create_issue(temp: &JitCli, title: &str) -> String {
+    temp.create_issue(["--title", title]).unwrap()
 }
 
 #[test]
 fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
-    let temp = setup_repo();
+    let temp = preset_repository();
     let valid_issue = create_issue(&temp, "Preset target");
     let missing_issue = "00000000-0000-0000-0000-000000000000";
 
-    let output = jit(&temp)
-        .args([
+    let output = temp
+        .command([
             "gate",
             "preset",
             "apply",
@@ -117,10 +94,10 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
 
 #[test]
 fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
-    let temp = setup_repo();
+    let temp = preset_repository();
 
-    let output = jit(&temp)
-        .args([
+    let output = temp
+        .command([
             "gate",
             "preset",
             "apply",
@@ -140,11 +117,11 @@ fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
 
 #[test]
 fn test_gate_preset_apply_json_all_success_retains_success_payload() {
-    let temp = setup_repo();
+    let temp = preset_repository();
     let issue = create_issue(&temp, "Preset target");
 
-    let output = jit(&temp)
-        .args(["gate", "preset", "apply", PRESET, &issue, "--json"])
+    let output = temp
+        .command(["gate", "preset", "apply", PRESET, &issue, "--json"])
         .assert()
         .success()
         .get_output()
