@@ -188,6 +188,36 @@ pub fn render_archive_candidates(
     rendered
 }
 
+/// Render the human summary of an executed archive: the completion counts,
+/// then one `warning: {code} ({path})` line per warning.
+pub fn render_archive_execution(
+    result: &crate::domain::artifact_execution::ArchiveExecutionResult,
+) -> String {
+    use std::fmt::Write;
+
+    let mut rendered = String::new();
+    let _ = writeln!(
+        rendered,
+        "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
+        result.publications.len(),
+        result.reference_changes.len(),
+        result.deleted_sources.len()
+    );
+    for warning in &result.warnings {
+        let _ = writeln!(
+            rendered,
+            "warning: {}{}",
+            warning.code.as_str(),
+            warning
+                .path
+                .as_ref()
+                .map(|path| format!(" ({path})"))
+                .unwrap_or_default()
+        );
+    }
+    rendered
+}
+
 /// A column printed after `{id} | {title}` in a human issue-list row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IssueColumn {
@@ -2947,6 +2977,46 @@ mod tests {
         }
         assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
         assert_eq!(passed, "Passed gate 'tests' for issue abc123");
+    }
+
+    #[test]
+    fn test_render_archive_execution_lists_counts_and_warnings_or_none() {
+        use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+        use crate::domain::artifact_plan::{ContentIdentity, PlanTarget, PlanWarning, WarningCode};
+        let result = |warnings| ArchiveExecutionResult {
+            schema_version: 1,
+            target: PlanTarget::Document {
+                path: "docs/a.md".into(),
+            },
+            destination_root: "archive".into(),
+            publications: vec![ArchivePublication {
+                source: Some("docs/a.md".into()),
+                destination: "archive/a.md".into(),
+                content_identity: ContentIdentity::from_bytes(b"a"),
+                adopted: false,
+            }],
+            reference_changes: Vec::new(),
+            planned_deletions: Vec::new(),
+            deleted_sources: vec!["docs/a.md".into()],
+            warnings,
+            event_appended: true,
+            reconciling: false,
+        };
+        let summary = "Archive execution complete: 1 publication(s), 0 reference change(s), 1 source deletion(s)";
+
+        assert_eq!(
+            render_archive_execution(&result(Vec::new())),
+            format!("{summary}\n")
+        );
+
+        let warned = render_archive_execution(&result(vec![
+            PlanWarning::new(WarningCode::DeletionFailed, Some("docs/a.md")),
+            PlanWarning::new(WarningCode::NoOwner, None::<String>),
+        ]));
+        assert_eq!(
+            warned,
+            format!("{summary}\nwarning: deletion-failed (docs/a.md)\nwarning: no-owner\n")
+        );
     }
 
     #[test]
