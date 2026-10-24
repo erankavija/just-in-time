@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "a33ab76a-75d3-46e1-95de-7efdc5923e06",
+      "run_id": "13a55957-8f74-4110-a582-a4847d459d00",
       "status": "passed",
-      "updated_at": "2026-10-24T23:42:32.126127258Z",
+      "updated_at": "2026-10-24T23:50:19.490839354Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One macro declares a closed wire vocabulary",
-  "updated_at": "2026-10-24T23:43:53.920942874Z"
+  "updated_at": "2026-10-24T23:50:19.490839354Z"
 }
