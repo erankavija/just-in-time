@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b834fcbae48f3be07fdabd038a85ed92139f8ef0",
+  "completed_at": "2026-10-24T18:59:56.679855117Z",
+  "duration_ms": 181401,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_harness/git.rs",
+        "id": "F1",
+        "line": 160,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7aafec83/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "GitStandIn resolves PATH candidates without making the selected real-git executable absolute, allowing recursion after PATH is prepended with the stand-in."
+      }
+    ],
+    "summary": "The counting stand-in does not guarantee an absolute real-git path, leaving REQ-02 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7aafec83-b056-4047-9569-77c9373ba2d3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8c058408-1a08-4e28-b31c-8dd29e7a0808",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T18:56:55.277930627Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3707 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16f45-eaa9-7f42-8612-eaaa807e3374\n--------\nuser\n--- 3694 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `52011f8`, `783baeec`, `2c957502` (`jit:7aafec83`); merge patches duplicate the same three-file feature footprint  \nPolicy sources: `AGENTS.md`  \nResolved items: `@/charter/D-21` (`dev/vision/9db27a3a-charter.md`); `@/invariant/shared-test-contracts`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose` (`.jit/invariants.toml`); `@/issue/7aafec83/requirement/REQ-02` (issue description)  \nGate evidence: `cargo-ci` passed (exit 0, 2026-10-24T18:55:29Z); `code-review` pending  \nTruncation recovery: reread bounded current fixture/test files and per-parent merge diffs; confirmed identical feature blobs through `HEAD`  \n\n1. **F1 — blocking, issue-impact (high):** [`crates/jit/src/test_harness/git.rs:160`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/test_harness/git.rs:160) joins each `PATH` component with `git` but never makes the selected executable absolute. A relative entry such as `.` produces `git`, which the generated script later resolves against the child’s modified `PATH`; with the stand-in prepended, it can recurse into itself instead of executing real git. Absolutize/canonicalize the selected executable and add a relative-`PATH` test. This leaves hard REQ-02 unmet. (`@/issue/7aafec83/requirement/REQ-02`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The counting stand-in does not guarantee an absolute real-git path, leaving REQ-02 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"GitStandIn resolves PATH candidates without making the selected real-git executable absolute, allowing recursion after PATH is prepended with the stand-in.\",\"file\":\"crates/jit/src/test_harness/git.rs\",\"line\":160,\"references\":[\"@/issue/7aafec83/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

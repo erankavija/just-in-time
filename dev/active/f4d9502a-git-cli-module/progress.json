@@ -493,7 +493,9 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "7aafec83": 1
+  },
   "surfaced_pitfalls": [],
   "reconciled_after_breakdown": [
     "5046408a"
