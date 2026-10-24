@@ -9,6 +9,7 @@
   ],
   "description": "Derive `Display` and `Error` for the artifact-plan error types, matching the crate's error convention.\n\n## Background\n\n`PlanError` hand-writes `Display` and `Error` (`crates/jit/src/domain/artifact_plan.rs:1113-1187`), and so does its sibling `InventoryError` (`domain/artifact_inventory.rs:136`). The crate's convention is `thiserror` derives (about 100 in the crate); `artifact_discovery.rs:207` and `repository_state/archive.rs:547` already wrap `PlanError` with `#[from]`.\n\n## Success Criteria\n\n- [hard] REQ-01: `PlanError` and `InventoryError` derive `thiserror::Error`, and their hand-written `Display` and `Error` impls are gone.\n- [hard] REQ-02: Each error message is unchanged, as the existing tests observe.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:51:43.199283392Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Artifact-plan errors use the derive-based error convention",
-  "updated_at": "2026-10-24T23:45:53.439549868Z"
+  "updated_at": "2026-10-24T23:51:43.199283392Z"
 }

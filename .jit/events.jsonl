@@ -19901,3 +19901,5 @@
 {"assignee":"agent:jit-execution-lead","id":"362e30ae-f3b0-452b-b096-2b877221fa19","issue_id":"5f4daf6b-0f7f-4900-aa7f-689f9b6709c4","timestamp":"2026-10-24T23:43:56.283116017Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"ffbb73e1-8416-4bab-b0ad-6bc4ba052c29","issue_id":"1f6d3754-82ee-47fe-9355-79dd599bcfd6","timestamp":"2026-10-24T23:33:10.324500046Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"ebcfc3f7-6b5b-46f3-9337-580627bc317d","issue_id":"1f6d3754-82ee-47fe-9355-79dd599bcfd6","timestamp":"2026-10-24T23:45:53.439549868Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"808c69a5-583d-4285-83cd-c87196e65fec","issue_id":"1f6d3754-82ee-47fe-9355-79dd599bcfd6","timestamp":"2026-10-24T23:51:43.199283392Z","to":"done","type":"issue_state_changed"}
+{"id":"eef9ef59-c9cd-4dd5-9027-4a7c8ca16755","issue_id":"1f6d3754-82ee-47fe-9355-79dd599bcfd6","timestamp":"2026-10-24T23:51:43.199283392Z","type":"issue_completed"}
