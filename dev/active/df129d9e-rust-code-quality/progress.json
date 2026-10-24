@@ -134,7 +134,7 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (sonnet worker w-d4373d07, base 5b36c0d51)"
         },
         {
           "key": "archive-execution-renderer",
