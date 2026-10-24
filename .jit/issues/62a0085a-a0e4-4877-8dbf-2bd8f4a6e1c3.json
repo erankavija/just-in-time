@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "715d1d2b-9c1f-4dc1-8630-68b64a89248a",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:48:28.623588203Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b26f30b7-dd93-4315-a07e-1dbec33fbef0",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:41:57.675949313Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "62a0085a-a0e4-4877-8dbf-2bd8f4a6e1c3",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "HierarchyConfig has one fallible constructor from declarations",
-  "updated_at": "2026-10-24T23:17:58.761485224Z"
+  "updated_at": "2026-10-24T23:48:28.623588203Z"
 }

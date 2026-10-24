@@ -34,6 +34,7 @@
 //! - Validate dependencies (dependencies are unrestricted by type)
 //! - Check organizational membership (future: via `epic:*`, `milestone:*` labels)
 
+use crate::domain::LabelNamespaces;
 use crate::labels::is_type_label;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -109,6 +110,14 @@ impl HierarchyConfig {
             types: HashMap::new(),
             label_associations: HashMap::new(),
         }
+    }
+
+    /// Builds a hierarchy from the repository's type and membership declarations.
+    pub fn from_declarations(declarations: &LabelNamespaces) -> Result<Self, ConfigError> {
+        Self::new(
+            declarations.declared_type_hierarchy(),
+            declarations.label_associations.clone().unwrap_or_default(),
+        )
     }
 
     /// Creates a new hierarchy configuration from a map of type names to levels.
@@ -466,6 +475,19 @@ mod tests {
 
         let result = HierarchyConfig::new(types, label_associations);
         assert_eq!(result, Err(ConfigError::InvalidLevel(0)));
+    }
+
+    #[test]
+    fn test_from_declarations_invalid_hierarchy_returns_config_error() {
+        let declarations = LabelNamespaces {
+            type_hierarchy: Some(HashMap::from([(test_type(4), 0)])),
+            ..LabelNamespaces::empty(1)
+        };
+
+        assert_eq!(
+            HierarchyConfig::from_declarations(&declarations),
+            Err(ConfigError::InvalidLevel(0))
+        );
     }
 
     #[test]
