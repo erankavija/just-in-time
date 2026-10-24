@@ -144,7 +144,9 @@
           "short_id": "2e7e1348",
           "title": "One output renderer for archive execution summaries",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (haiku worker w-2e7e1348)",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: byte-identical renderer extraction following three established renderer tasks"
         },
         {
           "key": "repository-bootstrap-constructor",
