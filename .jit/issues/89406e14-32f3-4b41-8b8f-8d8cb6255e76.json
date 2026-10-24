@@ -21,6 +21,12 @@
       "updated_at": "2026-10-24T23:14:44.766765529Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "11dc2e29-0f19-4158-867e-8789e71d216b",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:18:02.153763813Z",
+      "updated_by": "auto:executor"
+    },
     "shipped-policy-regions-selftest": {
       "run_id": "93df51f9-7e20-425f-b937-4707c919bab9",
       "status": "passed",
@@ -44,5 +50,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Shipped-policy region generator self-test runs as a declared gate",
-  "updated_at": "2026-10-24T23:14:44.766765529Z"
+  "updated_at": "2026-10-24T23:18:02.153763813Z"
 }
