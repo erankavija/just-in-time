@@ -168,9 +168,9 @@ fn test_gate_status_no_prior_runs_shows_not_run_message() {
 
 #[test]
 fn test_issue_show_errors_on_corrupt_gate_run() {
-    // A truncated/garbage result.json must make `issue show --json` fail loudly
-    // with the offending path, not silently omit the run and fabricate
-    // last_run_at: null / exit_code: null.
+    // A corrupt result.json must make `issue show --json` fail loudly instead
+    // of silently omitting the run. The deserialize cause and offending path
+    // are in the error's source chain.
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
     // Plant a corrupt gate-run record on disk.
@@ -189,16 +189,19 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
         .assert()
         .failure()
         .get_output()
-        .stderr
+        .stdout
         .clone();
 
-    // The command must fail loudly with the gate-run load context (the
-    // deserialize cause + offending path live in the error's source chain).
-    // It must NOT silently succeed with an omitted run.
-    let stderr = String::from_utf8_lossy(&output);
+    // The command must fail loudly with the gate-run load context instead of
+    // silently succeeding with an omitted run.
+    let envelope: serde_json::Value = serde_json::from_slice(&output)
+        .unwrap_or_else(|error| panic!("expected a JSON failure envelope: {error}; {output:?}"));
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("failure envelope carries an error message");
     assert!(
-        stderr.contains("Failed to load gate runs for issue"),
-        "expected a contextual gate-run load error, got: {stderr}"
+        message.contains("Failed to load gate runs for issue"),
+        "expected a contextual gate-run load error, got: {envelope}"
     );
 }
 
