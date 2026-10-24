@@ -8,12 +8,26 @@
   ],
   "description": "Move the one integration test that builds a repository through libgit2 onto the shared git repository fixture.\n\n## Background\n\n- `test_add_pinned_document_uses_pinned_document_and_asset_bytes` (`crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:253`) builds its commit through libgit2 (`git2::Repository::init` at `:259`, `git2::Signature` at `:272`), reaching the crate's normal `git2` dependency.\n- `jit::test_harness` offers a git repository fixture that initializes, writes and commits through the git CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: The test builds its commit with the repository fixture, names no `git2` item, and asserts what it asserts today.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-10-24T19:12:52.616800553Z",
   "first_ready_at": "2026-10-24T19:06:20.242345550Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d795e7ee-02d4-4f8e-802c-1ed13ed16ef0",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:09:46.096706729Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3a2c7fd0-d5a8-437b-87ff-d23489290864",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:12:31.619814511Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cb01a945-4421-41c7-8909-32fb4b8fc585",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Pinned-document test builds its commit through the git fixture",
-  "updated_at": "2026-10-24T19:06:21.180492501Z"
+  "updated_at": "2026-10-24T19:12:52.616800553Z"
 }

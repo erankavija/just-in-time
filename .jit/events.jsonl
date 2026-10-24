@@ -19627,3 +19627,8 @@
 {"assignee":"agent:f4d9502a-lead","id":"3d1307e6-ff48-4e94-a8ab-0838330bde1f","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:06:20.984661437Z","type":"issue_claimed"}
 {"from":"ready","id":"8ac0b6cb-34f8-4083-898e-75e76c7e754a","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:06:21.180492501Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:f4d9502a-lead","id":"f3cbe881-21d1-460b-a7fc-c1b2c31c778f","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:06:21.180492501Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"70f37cc1-3204-4f48-a904-3a76b702c936","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:09:46.096706729Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"28c9db21-45f8-46b5-93e9-cba9f5e3a0bf","issue_id":"6633bf7d-4eba-4675-aa39-80a04032dc5f","priority":"high","timestamp":"2026-10-24T19:12:00.026325968Z","title":"Planning sizing bounds manifests and merges coherent changes","type":"issue_created"}
+{"gate_key":"code-review","id":"9a54cd0c-59b4-458e-bcee-7f44b5aa3599","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:31.619814511Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"231c5308-2d39-4437-ae37-b73bfaab4573","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:52.616800553Z","to":"done","type":"issue_state_changed"}
+{"id":"efbfed22-b286-494a-a9ba-cb1fd0ed5a80","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:52.616800553Z","type":"issue_completed"}

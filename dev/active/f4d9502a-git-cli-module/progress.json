@@ -75,7 +75,7 @@
           "short_id": "cb01a945",
           "title": "Pinned-document test builds its commit through the git fixture",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": []
         }
       ]
