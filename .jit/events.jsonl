@@ -19632,3 +19632,4 @@
 {"gate_key":"code-review","id":"9a54cd0c-59b4-458e-bcee-7f44b5aa3599","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:31.619814511Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"231c5308-2d39-4437-ae37-b73bfaab4573","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:52.616800553Z","to":"done","type":"issue_state_changed"}
 {"id":"efbfed22-b286-494a-a9ba-cb1fd0ed5a80","issue_id":"cb01a945-4421-41c7-8909-32fb4b8fc585","timestamp":"2026-10-24T19:12:52.616800553Z","type":"issue_completed"}
+{"fields":["description"],"id":"b0dbf9dd-dac2-4fff-8bc5-1c553bbaebe4","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-10-24T19:12:56.516262199Z","type":"issue_updated","updated_by":"issue-update"}
