@@ -101,20 +101,14 @@ type = "rule_validation"
 rule = "coverage-preview"
 "#;
 
-/// A repository initialised over the bracket config, the `plan` template, the
-/// coverage rule, and a `coverage-preview` auto gate using the portable native checker.
-fn bracket_repository() -> JitCli {
-    let dir = declaration_dir(&[
-        (".jit/config.toml", BRACKET_CONFIG_TOML),
-        (".jit/templates.toml", BRACKET_TEMPLATE_TOML),
-        (".jit/rules.toml", COVERAGE_RULES_TOML),
-        (".jit/gates.toml", COVERAGE_GATE_TOML),
-    ])
-    .unwrap();
-    let cli = JitCli::with_repository(dir);
-    cli.run(["init"]).unwrap();
-    cli
-}
+/// Declarations of the bracket config, the `plan` template, the coverage rule,
+/// and a `coverage-preview` auto gate using the portable native checker.
+const BRACKET_DECLARATIONS: &[(&str, &str)] = &[
+    (".jit/config.toml", BRACKET_CONFIG_TOML),
+    (".jit/templates.toml", BRACKET_TEMPLATE_TOML),
+    (".jit/rules.toml", COVERAGE_RULES_TOML),
+    (".jit/gates.toml", COVERAGE_GATE_TOML),
+];
 
 /// Build a bracket `C → child → B` by hand (the shape of a drafted bracket)
 /// with the coverage-preview gate attached to `B`. When `covered`, the child credits the criterion with `satisfies:<C-short-id>/<req_id>`. Returns
@@ -185,7 +179,8 @@ fn assert_gate_run(cli: &JitCli, breakdown_id: &str, expected_status: &str) {
 
 #[test]
 fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
-    let cli = bracket_repository();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     // Child credits the container's REQ-01 → coverage complete.
     let (_c, b) = build_bracket(&cli, "Auth epic", "REQ-01", true);
 
@@ -211,7 +206,8 @@ fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
 
 #[test]
 fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
-    let cli = bracket_repository();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     // Child carries NO satisfies label → REQ-77 left uncovered.
     let (_c, b) = build_bracket(&cli, "Pay epic", "REQ-77", false);
 
@@ -250,7 +246,8 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
 
 #[test]
 fn test_selected_rule_ignores_historical_rejected_bracket_target() {
-    let cli = bracket_repository();
+    let cli = JitCli::with_repository(declaration_dir(BRACKET_DECLARATIONS).unwrap());
+    cli.run(["init"]).unwrap();
     let (_selected_container, selected_breakdown) =
         build_bracket(&cli, "Current epic", "REQ-01", true);
     let (historical_container, _historical_breakdown) =
