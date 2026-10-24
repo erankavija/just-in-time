@@ -7,6 +7,7 @@
   ],
   "description": "Move the validated profile identity and its lowercase-kebab predicate into the domain layer.\n\n## Background\n\n`ProfileId` (`crates/jit/src/profile/manifest.rs:23-49`) validates through `is_lowercase_kebab` (`manifest.rs:397`) in `TryFrom` and deserialization, and lives in `profile/`. `domain/types.rs:1183` names `crate::profile::ProfileId`, a dependency from the domain outward. `RegionId` (`manifest.rs:74`) uses the same predicate. `ProfileId` is referenced in 13 files under `crates/jit/src`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileId` and the lowercase-kebab predicate are defined in `domain::identity`, and `ProfileId` is constructed only through validation.\n- [hard] REQ-02: Each reference imports `crate::domain::identity::ProfileId`, and the domain imports nothing from `profile` for it.\n- [hard] REQ-03: `RegionId` validates through the domain predicate, and no second copy of the predicate exists.\n",
   "documents": [],
+  "first_ready_at": "2026-10-24T23:27:44.226086350Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "ProfileId is defined in the domain layer",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-24T23:27:44.226086350Z"
 }
