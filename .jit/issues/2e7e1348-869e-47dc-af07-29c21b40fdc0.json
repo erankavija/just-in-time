@@ -8,12 +8,26 @@
   ],
   "description": "The archive execution summary, duplicated byte for byte in two archive arms, moves into one renderer beside the existing archive renderers.\n\n## Background\n\n`ArchiveCommands::Document` and `ArchiveCommands::Container` in `crates/jit/src/main.rs` (or the archive handler module once moved) each print the same block after executing an archive: an `Archive execution complete: …` line followed by `warning:` lines. The preview and candidates views already go through `output::render_archive_plan` and `render_archive_candidates`, so the execution view is the only archive view rendered inline.\n\n## Success Criteria\n\n- [hard] REQ-01: The output module exposes one archive execution renderer, beside `render_archive_plan`, that prints the completion line and warnings.\n- [hard] REQ-02: `archive document` and `archive container` print their execution summary only through it, and their human output is unchanged.\n- [hard] REQ-03: One unit test owns the renderer's output, and the archive CLI suites pass without assertion changes.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-10-24T18:35:18.742528673Z",
   "first_ready_at": "2026-10-22T01:49:45.816030902Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "155ebd9d-b5c2-474b-9e37-b669bd497d5c",
+      "status": "passed",
+      "updated_at": "2026-10-24T18:32:10.457151230Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5615bcf6-1d85-4fc8-ac9d-b6de2096a77c",
+      "status": "passed",
+      "updated_at": "2026-10-24T18:35:07.985228456Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2e7e1348-869e-47dc-af07-29c21b40fdc0",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:df129d9e/REQ-21"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "One output renderer for archive execution summaries",
-  "updated_at": "2026-10-24T18:27:24.446746903Z"
+  "updated_at": "2026-10-24T18:35:18.742528673Z"
 }

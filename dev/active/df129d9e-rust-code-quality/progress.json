@@ -144,7 +144,7 @@
           "short_id": "2e7e1348",
           "title": "One output renderer for archive execution summaries",
           "classification": "implementation",
-          "status": "in_progress (haiku worker w-2e7e1348)",
+          "status": "done (merged 10fde232e; cargo-ci, code-review passed)",
           "model_tier": "haiku",
           "tier_reason": "mechanical: byte-identical renderer extraction following three established renderer tasks"
         },
@@ -742,7 +742,8 @@
     "decision": "plan D-26",
     "epic_merge_deltas": {
       "through_9cc3056a": -115,
-      "d4373d07": -24
+      "d4373d07": -24,
+      "2e7e1348": -4
     }
   }
 }
