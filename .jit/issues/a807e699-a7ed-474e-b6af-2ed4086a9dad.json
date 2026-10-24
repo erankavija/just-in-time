@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fed49a47-d940-40d5-a77f-02f2189d527a",
+      "status": "passed",
+      "updated_at": "2026-10-24T18:45:46.823784657Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2513138b-c4ba-4f9d-938a-dc4130179953",
+      "status": "failed",
+      "updated_at": "2026-10-24T18:49:15.830733360Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a807e699-a7ed-474e-b6af-2ed4086a9dad",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Library repository bootstrap for the CLI",
-  "updated_at": "2026-10-24T18:35:32.575048751Z"
+  "updated_at": "2026-10-24T18:49:15.830733360Z"
 }

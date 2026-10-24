@@ -154,9 +154,10 @@
           "short_id": "a807e699",
           "title": "Library repository bootstrap for the CLI",
           "classification": "implementation",
-          "status": "in_progress (opus worker w-a807e699)",
+          "status": "in_progress (merged 853d1cfc8; cargo-ci passed; code-review R1 failed F1: recover leftover-record mapping left in main.rs; rework 1 to original opus worker)",
           "model_tier": "opus",
-          "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy"
+          "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy",
+          "vendor": "claude"
         },
         {
           "key": "json-silent-stderr",
@@ -721,7 +722,8 @@
     "650e6a56": 1,
     "d8176fd3": 0,
     "9fa12e75": 1,
-    "d4373d07": 1
+    "d4373d07": 1,
+    "a807e699": 1
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
