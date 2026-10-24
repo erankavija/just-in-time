@@ -677,14 +677,14 @@ roots = [
 version = 1
 key = "workflow-contract-selftest"
 title = "Workflow-contract harness self-test"
-description = "Runs scripts/workflow-contract-selftest.sh, which shows the workflow-contract harness rejects each defect in its case vectors and that the actionlint wiring rejects an actionlint-only defect. Any non-zero exit fails the gate, including exit 2 for a missing python3, and so does a run that prints a SKIP: line. Registered at planning for c780514e; the script still skips its actionlint layer when actionlint is unavailable, so on such a host the gate starts out failing until its owning task removes that skip branch."
+description = "Runs scripts/workflow-contract-selftest.sh, which shows the workflow-contract harness rejects each defect in its case vectors and that the actionlint wiring rejects an actionlint-only defect. Any non-zero exit fails the gate, including exit 2 for a missing python3 and the failure reported when actionlint is unavailable."
 stage = "postcheck"
 mode = "auto"
 priority = 100
 
 [gates.checker]
 type = "exec"
-command = "out=$(./scripts/workflow-contract-selftest.sh 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ \"$rc\" -eq 0 ] && ! printf '%s\\n' \"$out\" | grep -q '^SKIP:'"
+command = "./scripts/workflow-contract-selftest.sh"
 timeout_seconds = 300
 pass_context = false
 
