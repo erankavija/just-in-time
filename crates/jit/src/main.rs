@@ -5417,22 +5417,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
-                        println!(
-                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
-                                result.publications.len(),
-                                result.reference_changes.len(),
-                                result.deleted_sources.len()
-                            );
-                        for warning in result.warnings {
-                            println!(
-                                "warning: {}{}",
-                                warning.code.as_str(),
-                                warning
-                                    .path
-                                    .map(|path| format!(" ({path})"))
-                                    .unwrap_or_default()
-                            );
-                        }
+                        print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
                     let plan = executor.preview_archive_document(&path)?;
@@ -5449,22 +5434,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
-                        println!(
-                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
-                                result.publications.len(),
-                                result.reference_changes.len(),
-                                result.deleted_sources.len()
-                            );
-                        for warning in result.warnings {
-                            println!(
-                                "warning: {}{}",
-                                warning.code.as_str(),
-                                warning
-                                    .path
-                                    .map(|path| format!(" ({path})"))
-                                    .unwrap_or_default()
-                            );
-                        }
+                        print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
                     let plan = executor.preview_archive_container(&id)?;
