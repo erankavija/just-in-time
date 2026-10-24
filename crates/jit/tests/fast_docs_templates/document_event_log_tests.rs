@@ -254,34 +254,15 @@ fn test_add_document_reference_new_path_appends() {
 fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     use jit::commands::CommandExecutor;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
+    use jit::test_harness::git::GitRepository;
     use sha2::{Digest, Sha256};
 
     let temp = tempfile::tempdir().unwrap();
-    let repo = git2::Repository::init(temp.path()).unwrap();
-    std::fs::create_dir_all(temp.path().join("docs")).unwrap();
-    std::fs::write(temp.path().join("docs/guide.md"), "![pinned](./logo.png)\n").unwrap();
-    std::fs::write(temp.path().join("docs/logo.png"), b"pinned asset").unwrap();
-    let mut index = repo.index().unwrap();
-    index
-        .add_path(std::path::Path::new("docs/guide.md"))
-        .unwrap();
-    index
-        .add_path(std::path::Path::new("docs/logo.png"))
-        .unwrap();
-    let tree_id = index.write_tree().unwrap();
-    let tree = repo.find_tree(tree_id).unwrap();
-    let signature = git2::Signature::now("JIT test", "jit@example.invalid").unwrap();
-    let revision = repo
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "pinned document",
-            &tree,
-            &[],
-        )
-        .unwrap()
-        .to_string();
+    let repository = GitRepository::init(temp.path());
+    let revision = repository
+        .write("docs/guide.md", "![pinned](./logo.png)\n")
+        .write("docs/logo.png", b"pinned asset")
+        .commit("pinned document");
 
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
