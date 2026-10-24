@@ -320,6 +320,19 @@ flowchart LR
 | Lazy-detection test sweep | A grep of in-process tests that build a git repository with a storage handle or executor and no paths finds three groups. The primary-checkout tier tests in `storage/json.rs` move with `layout-fallback-removal`. The server routes `test_executor` moves with `document-history-through-module`, which diff follows. The archive fixture moves with `archive-pinned-reads-batched`. Every entry whose consumer reads the executor's checkout depends on `layout-fallback-removal`. |
 | Shared-file contention | `storage/git.rs` and `git_module_tests.rs` receive one operation per mechanism entry, in distinct functions; `commands/document.rs`, `commands/worktree.rs`, `commands/claim.rs` and `storage/json.rs` are edited by several entries in distinct functions. Same-function edits are ordered by edges: show and history before diff, claims before the release actor, and the module-operation entries before their consumers. The remaining footprint advisories are distinct functions, and workers rebase. |
 
+## Post-breakdown reconciliation
+
+### 5046408a — Configurable worktree root independent of the data root
+
+5046408a was created on user request after the breakdown, so the manifest has no entry for it. It lets the data root live in its own git repository: a worktree-root setting in the data root's `config.toml` (relative to the data root) and a `JIT_WORKTREE_ROOT` override. Leases stay in the git common directory of the repository holding the data root.
+
+| Aspect | Reconciliation |
+|---|---|
+| Overlap | It changes how the invocation's layout is resolved, which `layout-probe-adoption`, `server-layout-from-data-root` and `layout-fallback-removal` rebuild, and it needs gate evidence from the selected worktree, which `gate-evidence-through-module` delivers. Its CLI side sits in the bootstrap that a807e699 (df129d9e) moves. |
+| Dependencies | 5046408a → `gate-evidence-through-module` (3f8da8c4), which implies the whole layout chain, and → a807e699, so it edits the moved bootstrap once. `git-surface-trim` (34851181) → 5046408a, so the trim judges the final surface; the trim's former direct edge onto 3f8da8c4 is now implied and was reduced. The direct epic edge was dropped; the epic reaches it through `git-operations`. |
+| Requirement credit | None. It adds a capability beyond the epic's REQ-01..13 and must keep them: one layout probe per invocation (REQ-04), with the configured root taken without a second probe; every git call against the selected worktree (REQ-03). |
+| DEC-23 Split roots | Chosen: land after the `layout-once` carrier is final. The configured root replaces only the worktree root; the git-common-directory facts (leases, linked-checkout detection, primary data root) still come from the one probe of the data root. This is the one entry allowed to change `WorktreePaths`' fields, since every struct-literal-touching entry precedes it. Rejected: landing it first, which would invalidate the line citations and the unchanged-fields contract of the layout entries. |
+
 ## Investigation sources
 
 - [Investigation](investigation.md): the consumer sweeps, spawn measurements, primitive verification and option analyses for the CLI surface, layout, branch lookups and no-git behaviour, and for libgit2 removal and `HEAD`-tree reads.
