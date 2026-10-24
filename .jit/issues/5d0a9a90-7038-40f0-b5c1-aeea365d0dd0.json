@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3cabb615-e8f9-41b1-acf9-de00d9375aac",
+      "status": "failed",
+      "updated_at": "2026-10-24T19:21:04.195686359Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c3098869-618c-4d62-ab31-70d1b629ce86",
+      "status": "failed",
+      "updated_at": "2026-10-24T19:25:03.255080561Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d0a9a90-7038-40f0-b5c1-aeea365d0dd0",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Keep stderr empty for --json failures",
-  "updated_at": "2026-10-24T19:02:47.685209198Z"
+  "updated_at": "2026-10-24T19:25:03.255080561Z"
 }

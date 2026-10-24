@@ -165,7 +165,7 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "in_progress (codex gpt-6-luna xhigh)",
+          "status": "in_progress (merged 46a747fc2; cargo-ci and code-review failed on stale stderr assertion in cli_gate test_issue_show_errors_on_corrupt_gate_run; codex luna re-dispatch 2, same tier)",
           "vendor": "codex",
           "model_tier": "gpt-6-luna xhigh",
           "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
@@ -726,7 +726,8 @@
     "d8176fd3": 0,
     "9fa12e75": 1,
     "d4373d07": 1,
-    "a807e699": 1
+    "a807e699": 1,
+    "5d0a9a90": 2
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
