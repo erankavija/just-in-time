@@ -7,6 +7,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Converge previews and coupled derivations on the mutation session (b697a3f7) into well-ordered implementation issues.",
   "documents": [],
+  "first_ready_at": "2026-10-24T21:22:04.574095338Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
@@ -36,7 +37,7 @@
     "brackets:b697a3f7"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "breakdown: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-10-21T20:36:56.502609569Z"
+  "updated_at": "2026-10-24T21:22:04.574095338Z"
 }
