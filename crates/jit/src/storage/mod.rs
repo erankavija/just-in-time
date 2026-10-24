@@ -81,8 +81,9 @@ pub use redo_record::{
 pub use reference::{render_reference_markdown, GateRunField};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use repository_state_store::{
-    discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,
-    RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
+    discover_repository_layout, is_leftover_record_failure, RecoveryDispatchReport,
+    RepositoryApplyOutcome, RepositoryMutationSession, RepositoryStateStore,
+    RepositoryStateStoreError,
 };
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
