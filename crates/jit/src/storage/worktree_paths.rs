@@ -61,7 +61,8 @@ impl WorktreePaths {
         non_git_root: &Path,
         selected_data_root: Option<&Path>,
     ) -> Result<Self> {
-        // Check if in git repo
+        // Tracked exception to `@/charter/D-21`: detection starts its own git
+        // processes until it moves onto `storage::git::Git::probe` (jit:07663984).
         let is_repo = Command::new("git")
             .arg("-C")
             .arg(current)
