@@ -658,7 +658,7 @@ impl CommandSchema {
                 Some(schema_to_value::<GraphDepsTreeResponse>()),
                 "GraphDepsTreeResponse",
             ),
-            "graph_downstream" => (
+            "graph_rdeps" => (
                 Some(schema_to_value::<GraphDownstreamResponse>()),
                 "GraphDownstreamResponse",
             ),
@@ -710,6 +710,22 @@ impl CommandSchema {
                 "NamespacesResponse",
             ),
             "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
+            "gate_preset_list" => (
+                Some(schema_to_value::<GatePresetListResponse>()),
+                "GatePresetListResponse",
+            ),
+            "events_tail" | "events_query" => (
+                Some(schema_to_value::<EventListResponse>()),
+                "EventListResponse",
+            ),
+            "label_values" => (
+                Some(schema_to_value::<LabelValuesResponse>()),
+                "LabelValuesResponse",
+            ),
+            "claim_status" | "claim_list" => (
+                Some(schema_to_value::<LeaseListResponse>()),
+                "LeaseListResponse",
+            ),
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),
                 "WorktreeListResponse",

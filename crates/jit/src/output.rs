@@ -1538,6 +1538,10 @@ collection_keys! {
     ArtifactsKey = "artifacts";
     NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
+    PresetsKey = "presets";
+    EventsKey = "events";
+    ValuesKey = "values";
+    LeasesKey = "leases";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
@@ -2943,6 +2947,32 @@ pub struct SearchQuery {
     pub query: String,
 }
 
+/// Response for `gate preset list` command
+pub type GatePresetListResponse = ListEnvelope<PresetsKey, crate::gate_presets::PresetInfo>;
+
+/// Response for `events tail` and `events query`
+pub type EventListResponse = ListEnvelope<EventsKey, crate::domain::Event>;
+
+/// Response for `label values` command
+pub type LabelValuesResponse = ListEnvelope<ValuesKey, String, LabelValuesScope>;
+
+/// The namespace a [`LabelValuesResponse`] lists values of.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LabelValuesScope {
+    pub namespace: String,
+}
+
+/// Response for `claim status` and `claim list`: the leases beside the
+/// storage warnings raised while reading them.
+pub type LeaseListResponse =
+    ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease, LeaseListWarnings>;
+
+/// The storage warnings a [`LeaseListResponse`] carries.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LeaseListWarnings {
+    pub warnings: Vec<crate::storage::StorageWarning>,
+}
+
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
     ListEnvelope<WorktreesKey, crate::commands::worktree::WorktreeListEntry>;
@@ -4140,5 +4170,76 @@ mod tests {
         let v = serde_json::to_value(&def).unwrap();
         assert_eq!(v["stage"], "postcheck");
         assert_eq!(v["mode"], "auto");
+    }
+
+    /// `count` and the collection key are the shared envelope contract; each
+    /// distinct response shape keeps its extras beside them.
+    fn assert_envelope_value(value: &serde_json::Value, key: &str, len: usize) {
+        assert_eq!(value["count"], len);
+        assert_eq!(value[key].as_array().map(Vec::len), Some(len));
+    }
+
+    #[test]
+    fn test_gate_preset_list_response_serializes_presets_beside_count() {
+        let info = crate::gate_presets::PresetInfo {
+            name: "rust-tdd".into(),
+            description: "TDD gates".into(),
+            gate_count: 3,
+        };
+        let value = serde_json::to_value(GatePresetListResponse::new(vec![info])).unwrap();
+        assert_envelope_value(&value, "presets", 1);
+        assert_eq!(value["presets"][0]["gate_count"], 3);
+    }
+
+    #[test]
+    fn test_event_list_response_serializes_events_beside_count() {
+        let event = crate::domain::Event::IssueCreated {
+            id: "e".into(),
+            issue_id: "i".into(),
+            timestamp: chrono::Utc::now(),
+            title: "title".into(),
+            priority: crate::domain::Priority::Normal,
+        };
+        let value =
+            serde_json::to_value(EventListResponse::new(vec![event.clone(), event])).unwrap();
+        assert_envelope_value(&value, "events", 2);
+        assert!(value["events"][0]["type"].is_string());
+    }
+
+    #[test]
+    fn test_label_values_response_serializes_namespace_beside_values() {
+        let response = LabelValuesResponse::with_extras(
+            vec!["v1".into(), "v2".into()],
+            LabelValuesScope {
+                namespace: "epic".into(),
+            },
+        );
+        let value = serde_json::to_value(response).unwrap();
+        assert_envelope_value(&value, "values", 2);
+        assert_eq!(value["namespace"], "epic");
+    }
+
+    #[test]
+    fn test_lease_list_response_serializes_null_options_and_empty_warnings() {
+        let now = chrono::Utc::now();
+        let lease = crate::storage::claim_coordinator::Lease {
+            lease_id: "l".into(),
+            issue_id: "i".into(),
+            agent_id: "agent:a".into(),
+            worktree_id: "w".into(),
+            branch: None,
+            ttl_secs: 0,
+            acquired_at: now,
+            expires_at: None,
+            last_beat: now,
+            stale: false,
+        };
+        let response =
+            LeaseListResponse::with_extras(vec![lease], LeaseListWarnings { warnings: vec![] });
+        let value = serde_json::to_value(response).unwrap();
+        assert_envelope_value(&value, "leases", 1);
+        assert_eq!(value["warnings"], json!([]));
+        assert!(value["leases"][0]["expires_at"].is_null());
+        assert!(value["leases"][0]["branch"].is_null());
     }
 }

@@ -22,6 +22,7 @@ pub use reference::render_reference_markdown;
 use crate::declarations::GateDefinition;
 use crate::declarations::{GateChecker, GateMode, GateStage};
 use anyhow::{anyhow, Context, Result};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -185,7 +186,7 @@ pub(crate) fn load_presets_from_custom_files(
 }
 
 /// Preset metadata for listing
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PresetInfo {
     /// Preset name
     pub name: String,
