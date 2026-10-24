@@ -9,6 +9,7 @@
   ],
   "description": "Under `--json` a propagated failure renders once, as the stdout envelope, instead of also printing an `Error:` line to stderr.\n\n## Background\n\n`main()` in `crates/jit/src/main.rs` handles `run()`'s error with `eprintln!(\"Error: {}\", e)` unconditionally and then calls `emit_top_level_json_error`, so every propagated failure under `--json` prints both a stderr diagnostic and the stdout envelope (reproduced with `jit apply plan <id> --json`). Handler-owned failures already leave stderr empty. `test_propagated_config_parse_failure_emits_registered_envelope_and_human_diagnostic` in `crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs` asserts the duplicate stderr line, and `docs/reference/cli-commands.md` says errors are \"always shown to stderr\". With `--json` declared once as a global flag, the parsed output mode reaches `main()` beside `run()`'s result, so `main()` can choose one rendering.\n\n## Success Criteria\n\n- [hard] REQ-01: Once clap has accepted the arguments, a failing invocation with `--json` writes exactly one failure envelope to stdout and nothing to stderr, for propagated and handler-owned failures alike.\n- [hard] REQ-02: A failing invocation without `--json` writes one `Error:` diagnostic to stderr and nothing to stdout.\n- [hard] REQ-03: The propagated-failure test in `top_level_failure_envelope_tests.rs` states the new contract (empty stderr under `--json`), and a human-mode test owns the single-diagnostic property.\n- [hard] REQ-04: The \"always shown to stderr\" statement in `docs/reference/cli-commands.md` describes the new behaviour.\n- [hard] REQ-05: `main()` chooses the rendering from the parsed output mode; no raw-argv scan decides it.\n\n## Notes\n\nClap parse failures stay outside the envelope and keep writing to stderr. Success-path warnings, such as those `issue create` prints, stay on stderr as documented; this change concerns failure rendering only. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-10-24T19:40:34.522820629Z",
   "first_ready_at": "2026-10-22T01:49:45.978082464Z",
   "gates_required": [
     "cargo-ci",
@@ -16,15 +17,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "3cabb615-e8f9-41b1-acf9-de00d9375aac",
-      "status": "failed",
-      "updated_at": "2026-10-24T19:21:04.195686359Z",
+      "run_id": "b1c1d71b-7b90-4925-929d-492321ef1b81",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:36:53.877322460Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "c3098869-618c-4d62-ab31-70d1b629ce86",
-      "status": "failed",
-      "updated_at": "2026-10-24T19:25:03.255080561Z",
+      "run_id": "fa6fd120-20b2-447a-952a-9d2340fa6a35",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:40:23.936518082Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "satisfies:df129d9e/REQ-12"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Keep stderr empty for --json failures",
-  "updated_at": "2026-10-24T19:25:03.255080561Z"
+  "updated_at": "2026-10-24T19:40:34.522820629Z"
 }
