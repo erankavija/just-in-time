@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:55:22.002084003Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -26,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Hierarchy callers propagate the constructor's error",
-  "updated_at": "2026-10-24T23:53:02.682006182Z"
+  "updated_at": "2026-10-24T23:55:22.220236081Z"
 }

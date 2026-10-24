@@ -7,6 +7,7 @@
   ],
   "description": "Declare the store-divergence vocabularies through the vocabulary macro.\n\n## Background\n\n`DivergentRecord` and `DivergenceClass` (`crates/jit/src/domain/store_divergence.rs:32,59`) hand-write their spellings beside serde.\n\n## Success Criteria\n\n- [hard] REQ-01: `DivergentRecord` and `DivergenceClass` are declared through the macro, and their hand-written spellings are gone.\n- [hard] REQ-02: Divergence reports are byte-identical.\n",
   "documents": [],
+  "first_ready_at": "2026-10-24T23:55:25.992970459Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Store divergence tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-24T23:55:25.992970459Z"
 }
