@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::errors;
+use crate::storage::git::{Git, GitCheckout};
 
 /// Paths for worktree-aware storage.
 ///
@@ -143,6 +144,13 @@ impl WorktreePaths {
     /// Return whether the selected data root belongs to a Git checkout.
     pub fn is_git_repository(&self) -> bool {
         self.git_repository
+    }
+
+    /// Return this checkout's git operations, run by the default executable,
+    /// or `None` outside a git checkout.
+    pub fn git(&self) -> Option<GitCheckout> {
+        self.git_repository
+            .then(|| GitCheckout::new(Git::default(), self.worktree_root.clone()))
     }
 
     /// Project this repository authority onto one worktree reported by Git.
@@ -316,6 +324,27 @@ mod tests {
         assert!(secondary_paths
             .is_primary_worktree_path(Path::new("/repo"))
             .unwrap());
+    }
+
+    #[test]
+    fn test_git_pairs_default_executable_with_worktree_root_only_for_git_checkout() {
+        let checkout = WorktreePaths {
+            git_repository: true,
+            common_dir: PathBuf::from("/repo/.git"),
+            worktree_root: PathBuf::from("/repo"),
+            local_jit: PathBuf::from("/repo/.jit"),
+            shared_jit: PathBuf::from("/repo/.git/jit"),
+        };
+        let outside = WorktreePaths {
+            git_repository: false,
+            ..checkout.clone()
+        };
+
+        assert_eq!(
+            checkout.git(),
+            Some(GitCheckout::new(Git::default(), PathBuf::from("/repo")))
+        );
+        assert_eq!(outside.git(), None);
     }
 
     #[test]

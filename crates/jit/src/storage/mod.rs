@@ -21,6 +21,7 @@ pub mod errors;
 pub(crate) mod external_publish;
 pub mod gate_runs;
 pub mod gate_store;
+pub mod git;
 pub mod git_revision;
 pub mod guard_order;
 pub(crate) mod init_publish;
