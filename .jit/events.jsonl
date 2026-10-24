@@ -19549,3 +19549,5 @@
 {"fields":["documents"],"id":"5f61371f-eade-45c9-90c5-34f99e3c8765","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-10-22T22:10:37.600802487Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"ready","id":"49464eeb-0fad-4901-bdf5-ae425eba221a","issue_id":"0dc73711-07fb-49c3-8eda-996516b19bd1","timestamp":"2026-10-24T18:06:12.018949006Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:planning-lead-b697a3f7","id":"2fc3c2df-9c4e-409f-97f0-b5e8d61558d8","issue_id":"0dc73711-07fb-49c3-8eda-996516b19bd1","timestamp":"2026-10-24T18:06:12.018949006Z","type":"issue_claimed"}
+{"from":"in_progress","id":"cf02933d-485f-4927-9446-0c0a8b9c7ed7","issue_id":"9cc3056a-7147-4a9a-89bf-f0e6fd53806b","timestamp":"2026-10-24T18:07:41.540707320Z","to":"done","type":"issue_state_changed"}
+{"id":"a7dee598-1d59-4101-b4d8-75f2cff1b04f","issue_id":"9cc3056a-7147-4a9a-89bf-f0e6fd53806b","timestamp":"2026-10-24T18:07:41.540707320Z","type":"issue_completed"}

@@ -126,7 +126,7 @@
           "short_id": "9cc3056a",
           "title": "One output renderer for validation findings",
           "classification": "implementation",
-          "status": "in_progress (sonnet worker w-9cc3056a, base c983c7d3c)"
+          "status": "done (merged 145091232; cargo-ci, code-review passed; closed after interrupted-session recovery ee3fcbc84)"
         },
         {
           "key": "serve-foreground-command",
