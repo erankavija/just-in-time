@@ -8,6 +8,7 @@
   ],
   "description": "Moves the CLI's repository-opening prelude into one library function that returns a ready executor and its retained mutation session, so `main.rs` makes no storage or discovery call of its own.\n\n## Background\n\n`run()` in `crates/jit/src/main.rs` opens the repository inline before dispatch:\n\n- discovers the data root (`JIT_DATA_DIR`, `jit init`, `discover_recovery_jit_dir` for recovery-dispatched commands, `discover_jit_dir` otherwise, with a `<cwd>/.jit` fallback);\n- detects `WorktreePaths::detect_for_data_root` and takes the linked-checkout write decision;\n- constructs `JsonFileStorage::new`, calls `configure_worktree_paths` and `discover_repository_layout`;\n- opens the mutation session: an unretained `RepositoryStateStore::open_mutation_session` for claim-coordinating commands, `open_and_retain_mutation_session` otherwise, mapping a leftover-record failure under `jit recover` to a recovery failure;\n- builds `CommandExecutor::new(..).with_layout(..).with_worktree_paths(..)`;\n- calls `storage.validate()` for every command except `init` and `profile list`/`show`.\n\nThe server repeats part of this in `crates/server/src/main.rs`. Every step is library work, and its order is behaviour (the write-policy refusal precedes any lock or write; recovery precedes validation).\n\n## Success Criteria\n\n- [hard] REQ-01: A public library function takes the invocation facts the prelude reads (working directory, data-dir override, whether the command is init, recovery-dispatched, claim-coordinating or validation-exempt, and the write override) and returns the executor, the retained-session guard and the recovered-record count, performing the steps above in today's order.\n- [hard] REQ-02: `main.rs` opens the repository only through that function and makes no `JsonFileStorage`, `RepositoryStateStore`, discovery, worktree-path or `validate` call.\n- [hard] REQ-03: A test of the function (for example `test_open_repository_validates_except_for_exempt_commands`) shows the validation exemption and the retained session, and the existing startup, recovery, linked-checkout and init suites pass unweakened.\n\n## Notes\n\n- 0f8efc37 later adopts this function for the server; the server is unchanged here.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "done_at": "2026-10-24T19:02:11.766356192Z",
   "first_ready_at": "2026-10-22T01:49:46.223796958Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "fed49a47-d940-40d5-a77f-02f2189d527a",
+      "run_id": "6ca403f8-a69f-4df2-96e5-867fc8d8324e",
       "status": "passed",
-      "updated_at": "2026-10-24T18:45:46.823784657Z",
+      "updated_at": "2026-10-24T18:58:28.020772060Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "2513138b-c4ba-4f9d-938a-dc4130179953",
-      "status": "failed",
-      "updated_at": "2026-10-24T18:49:15.830733360Z",
+      "run_id": "07b2dcbd-a529-4377-88c6-f769c48e5cc5",
+      "status": "passed",
+      "updated_at": "2026-10-24T19:01:56.594136807Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +38,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Library repository bootstrap for the CLI",
-  "updated_at": "2026-10-24T18:49:15.830733360Z"
+  "updated_at": "2026-10-24T19:02:11.766356192Z"
 }

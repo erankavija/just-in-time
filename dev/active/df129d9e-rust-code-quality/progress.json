@@ -154,7 +154,7 @@
           "short_id": "a807e699",
           "title": "Library repository bootstrap for the CLI",
           "classification": "implementation",
-          "status": "in_progress (merged 853d1cfc8; cargo-ci passed; code-review R1 failed F1: recover leftover-record mapping left in main.rs; rework 1 to original opus worker)",
+          "status": "done (merged 853d1cfc8 + rework b834fcbae; code-review R1 failed on recover mapping left in main.rs, R2 passed; cargo-ci passed)",
           "model_tier": "opus",
           "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy",
           "vendor": "claude"
@@ -165,7 +165,10 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (codex gpt-6-luna xhigh)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-luna xhigh",
+          "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
         }
       ]
     },
@@ -747,7 +750,8 @@
     "epic_merge_deltas": {
       "through_9cc3056a": -115,
       "d4373d07": -24,
-      "2e7e1348": -4
+      "2e7e1348": -4,
+      "a807e699": -158
     }
   }
 }
