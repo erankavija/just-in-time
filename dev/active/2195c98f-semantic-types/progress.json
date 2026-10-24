@@ -33,7 +33,7 @@
           "short_id": "3e353abd",
           "title": "Validated issue identity type with an alias staging bridge",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3f026bb1-9db7-4c5c-9a74-c6c96d619006",
@@ -150,7 +150,7 @@
           "short_id": "5c232305",
           "title": "ProfileId is defined in the domain layer",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
@@ -227,7 +227,7 @@
           "short_id": "c400730c",
           "title": "Id prefixes parse once into an IssueIdPrefix",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
@@ -683,6 +683,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Single constructor and site sweep with exact criteria."
+    },
+    {
+      "issue": "c400730c",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting IssueIdPrefix and call-site bridge over 29 files."
+    },
+    {
+      "issue": "5c232305",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Multi-file type move across 14 files with a layer constraint."
     }
   ],
   "surfaced_pitfalls": [],
