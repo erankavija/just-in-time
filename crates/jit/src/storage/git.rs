@@ -143,7 +143,9 @@ mod tests {
             .run(dir.path(), &["version"])
             .unwrap_err();
 
-        assert!(matches!(&error, GitError::Unavailable { program: named, .. } if named == &program));
+        assert!(
+            matches!(&error, GitError::Unavailable { program: named, .. } if named == &program)
+        );
         assert!(error.to_string().contains(program.to_str().unwrap()));
     }
 }

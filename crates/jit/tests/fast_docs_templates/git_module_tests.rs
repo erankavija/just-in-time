@@ -25,7 +25,10 @@ fn test_probe_primary_checkout_yields_common_dir_and_top_level() {
 
     let probed = probe(repository.root()).unwrap();
 
-    assert_eq!(probed.common_dir, canonical(&repository.root().join(".git")));
+    assert_eq!(
+        probed.common_dir,
+        canonical(&repository.root().join(".git"))
+    );
     assert_eq!(probed.worktree_root, canonical(repository.root()));
 }
 
@@ -38,7 +41,10 @@ fn test_probe_subdirectory_resolves_relative_common_dir_against_probed_directory
 
     let probed = probe(&nested).unwrap();
 
-    assert_eq!(probed.common_dir, canonical(&repository.root().join(".git")));
+    assert_eq!(
+        probed.common_dir,
+        canonical(&repository.root().join(".git"))
+    );
     assert_eq!(probed.worktree_root, canonical(repository.root()));
 }
 
@@ -51,7 +57,10 @@ fn test_probe_linked_checkout_yields_shared_common_dir_and_linked_top_level() {
 
     let probed = probe(&linked).unwrap();
 
-    assert_eq!(probed.common_dir, canonical(&repository.root().join(".git")));
+    assert_eq!(
+        probed.common_dir,
+        canonical(&repository.root().join(".git"))
+    );
     assert_eq!(probed.worktree_root, canonical(&linked));
 }
 
@@ -62,7 +71,10 @@ fn test_probe_repository_without_commits_yields_checkout() {
 
     let probed = probe(repository.root()).unwrap();
 
-    assert_eq!(probed.common_dir, canonical(&repository.root().join(".git")));
+    assert_eq!(
+        probed.common_dir,
+        canonical(&repository.root().join(".git"))
+    );
     assert_eq!(probed.worktree_root, canonical(repository.root()));
 }
 
