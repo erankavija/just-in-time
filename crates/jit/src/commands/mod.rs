@@ -4,6 +4,7 @@
 //! dependency manipulation, gate operations, and event logging.
 //!
 //! This module is organized into submodules by functional area:
+//! - `bootstrap`: Repository opening for one CLI invocation
 //! - `issue`: Issue CRUD operations and lifecycle management
 //! - `dependency`: Dependency graph operations  
 //! - `breakdown`: Bracket-aware breakdown operations
@@ -28,6 +29,7 @@
 
 mod archive;
 pub mod batch_create;
+mod bootstrap;
 pub mod bulk_update;
 pub mod claim;
 mod config;
@@ -69,6 +71,7 @@ pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
 };
+pub use bootstrap::{open_repository, OpenedRepository, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
