@@ -25,7 +25,7 @@
     "satisfies:b697a3f7/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Sessions share the captured image and recognise it by token",
-  "updated_at": "2026-10-24T21:22:50.037697777Z"
+  "updated_at": "2026-10-24T21:29:30.384790162Z"
 }

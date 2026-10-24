@@ -24,7 +24,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Type labels have one exact extraction",
-  "updated_at": "2026-10-24T21:22:51.376130750Z"
+  "updated_at": "2026-10-24T21:29:30.238083891Z"
 }

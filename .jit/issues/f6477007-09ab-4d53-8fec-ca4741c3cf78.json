@@ -26,7 +26,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Process liveness and signalling go through one PID guard",
-  "updated_at": "2026-10-24T21:22:51.039114952Z"
+  "updated_at": "2026-10-24T21:29:30.311951910Z"
 }
