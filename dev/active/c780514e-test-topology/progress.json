@@ -1303,6 +1303,11 @@
     {
       "finding": "9bb30f15 review advisory F1: unsupported REQ-10 coverage label on lock precondition task",
       "disposition": "Resolved by coordinator-approved metadata correction; real REQ-10 contributors retained. Coverage graph validation recorded after correction."
+    },
+    {
+      "session": 2,
+      "finding": "Lead dispatched wave-2 cli_gate batch (870e8e46, 5353463c, eaf543c7) while wave-1 df505379 was still in progress, against wave discipline and the session-1 handoff instruction.",
+      "disposition": "Containment: the batch is not merged or gated until df505379 closes and wave 1 is complete. No further wave-2 dispatch before then."
     }
   ],
   "traps": [
