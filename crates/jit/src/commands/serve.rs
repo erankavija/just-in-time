@@ -63,7 +63,8 @@ pub struct ForegroundOptions {
 }
 
 /// What a foreground server is about to serve, handed to the caller once the
-/// port is bound and before the operation blocks.
+/// port is bound and the binary and web dir are resolved, before the child is
+/// spawned.
 #[derive(Debug)]
 pub struct ForegroundLaunch {
     pub port: u16,
@@ -553,10 +554,7 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// outcome reports the child's own state rather than its state at one chosen
 /// moment.
 ///
-/// Foreground mode is handled by the caller, not this function. Use
-/// [`find_available_port`] to bind the socket and [`spawn_with_listener`] to
-/// hand it to the child — the same inheritance path this function uses — so
-/// the port is never re-bound across the process boundary.
+/// Foreground mode is [`run_foreground`].
 ///
 /// # Errors
 /// Returns an error when the port cannot be bound, the server binary cannot be
@@ -688,9 +686,9 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
 
 /// Runs the server in the foreground until it exits.
 ///
-/// `on_bound` runs once the port is bound and the child is configured, before
-/// the operation blocks on the child. A live server recorded in the PID file
-/// short-circuits to [`ForegroundOutcome::AlreadyRunning`].
+/// `on_bound` runs once the port is bound and the binary and web dir are
+/// resolved; the child is then spawned and awaited. A live server recorded in
+/// the PID file short-circuits to [`ForegroundOutcome::AlreadyRunning`].
 ///
 /// # Errors
 /// Returns an error if the PID file is unreadable, no port or server binary is
