@@ -1642,16 +1642,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             &command,
             Commands::Init { .. } | Commands::Profile(ProfileCommands::Show { .. })
         ),
+        is_recover: matches!(&command, Commands::Recover),
         write_override: invocation_write_override,
     })
-    .map_err(|error| match &command {
-        // Applying the leftover record is `jit recover`'s own work, so its
-        // failure is a recovery failure, not a startup one.
-        Commands::Recover if jit::storage::is_leftover_record_failure(&error) => {
-            exit_recovery_failed(&error, json)
-        }
-        _ => error,
-    })?;
+    .map_err(
+        |error| match error.downcast::<jit::commands::RecoveryFailedError>() {
+            Ok(failure) => exit_recovery_failed(&failure.0, json),
+            Err(error) => error,
+        },
+    )?;
     let storage = executor.storage().clone();
 
     if let Commands::Init {
