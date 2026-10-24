@@ -5690,7 +5690,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::HooksCommands::Install => {
                 use jit::commands::hooks::install_hooks;
 
-                match install_hooks(None) {
+                let installed = if worktree_paths.is_git_repository() {
+                    install_hooks(&worktree_paths.common_dir)
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Not in a git repository (no .git directory found)"
+                    ))
+                };
+                match installed {
                     Ok(result) => {
                         if json {
                             let output = jit::output::JsonOutput::success(serde_json::json!({
