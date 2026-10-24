@@ -8,13 +8,33 @@
   ],
   "description": "Make the `scripts/benchmark-session-cost-selftest.sh` self-test pass as the registered gate `session-cost-benchmark-selftest` over the script it tests.\n\n## Background\n\n`scripts/benchmark-session-cost-selftest.sh` is a re-runnable self-test of `scripts/benchmark-session-cost.sh`, run against a fake `jit` and checked against the benchmark's output contract. It exits 2 when `cmp`, `find`, `git`, `grep`, `jq` or `sha256sum` is missing. Until planning, no gate ran it. The gate `session-cost-benchmark-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `session-cost-benchmark-selftest` runs `scripts/benchmark-session-cost-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `session-cost-benchmark-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:17:53.567392904Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "session-cost-benchmark-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fe68cec0-fc8f-41dd-98ed-d1b7320cf47e",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.323218687Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "35c5141b-1a1b-4b27-872b-4d08a34d11ba",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:17:12.414210680Z",
+      "updated_by": "auto:executor"
+    },
+    "session-cost-benchmark-selftest": {
+      "run_id": "37a3452d-759a-49f2-aaec-8c896f82ed83",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:17.586461196Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fa9bf296-4375-4c86-9bf0-80a128cd74c8",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Session-cost benchmark self-test runs as a declared gate",
-  "updated_at": "2026-10-22T22:07:03.461186421Z"
+  "updated_at": "2026-10-24T23:17:53.567392904Z"
 }

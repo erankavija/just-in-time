@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/generate-shipped-policy-regions-selftest.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:14:21.791285679Z",
+  "duration_ms": 1703,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "shipped-policy-regions-selftest",
+  "inputs_digest": "81674bd4e8f5b8ecbea9940af6a0d2fe5f9cad6b8c436847a00cbc55fce1f3d2",
+  "issue_id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "93df51f9-7e20-425f-b937-4707c919bab9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:20.087645321Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== fixture: a clone of this repository carrying the working-tree scripts and targets ==\n\n== idempotence and containment ==\nPASS: generator: succeeds against a current repository (exit 0)\nPASS: generator: a run against a current tree rewrites no tracked byte (exit 0)\nPASS: generator: leaves the working tree it runs in otherwise unchanged (exit 0)\nPASS: generator: a second run immediately after the first succeeds (exit 0)\nPASS: generator: the second run leaves the configuration reference byte-identical\nPASS: generator: the second run leaves the example configuration byte-identical\n\n== region restoration and byte preservation outside the markers ==\nPASS: generator: succeeds against corrupted regions (exit 0)\nPASS: generator: replaces a stale body in the configuration reference\nPASS: generator: replaces a stale body in the example configuration\nPASS: generator: preserves authored bytes after the region in the configuration reference\nPASS: generator: preserves authored bytes after the region in the example configuration\nPASS: generator: restores both targets to their committed bytes (exit 0)\n\n== a target without usable markers fails the splice ==\nPASS: generator: a target missing its begin marker fails the splice (exit 1)\nPASS: generator: writes nothing into a target it cannot splice\n\n== a publication the rename cannot complete fails rather than refuses ==\nPASS: generator: a publication the rename cannot complete is a failure, not a refusal (exit 1)\nPASS: generator: leaves the target as it found it when the publication fails\nPASS: generator: leaves no staged file behind when the publication fails (exit 0)\n\nOK: generate-shipped-policy-regions selftest passed\n"
+}

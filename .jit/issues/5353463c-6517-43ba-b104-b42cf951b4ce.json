@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-24T23:16:21.704000744Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -26,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "gate status and key tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:46:59.682989913Z"
+  "updated_at": "2026-10-24T23:16:21.704000744Z"
 }
