@@ -11,7 +11,7 @@
           "short_id": "3d93442b",
           "title": "Hook installation targets the selected repository's common directory",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": []
         },
         {
