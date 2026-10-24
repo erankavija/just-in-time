@@ -6861,88 +6861,60 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     guard.release()?;
                 }
 
-                // Foreground mode: run inline so we can print the URL before blocking.
+                // Foreground mode: the banner prints from the bound-port callback.
                 if fg {
                     use jit::commands::serve::{
-                        find_available_port, find_server_binary, find_web_dir, is_process_alive,
-                        read_pid_file, spawn_with_listener,
+                        foreground_exit_code, run_foreground, ForegroundOptions, ForegroundOutcome,
                     };
 
-                    // Honour existing running server.
-                    if let Some(pf) = read_pid_file(&jit_dir)? {
-                        if is_process_alive(pf.pid) {
-                            let url = format!("http://localhost:{}", pf.port);
+                    let opts = ForegroundOptions {
+                        data_dir: jit_dir.clone(),
+                        preferred_port: port,
+                        web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
+                        server_binary: None,
+                    };
+                    match run_foreground(opts, |launch| {
+                        if !json {
+                            let url = format!("http://localhost:{}", launch.port);
+                            println!("Starting server on {url} (foreground, Ctrl+C to stop)");
+                            println!("  API: {url}/api");
+                            match &launch.web_dir {
+                                Some(web) => println!("  Web: {url}/ (from {})", web.display()),
+                                None => println!("  Web: {url}/ (embedded assets)"),
+                            }
+                        }
+                    })? {
+                        ForegroundOutcome::AlreadyRunning { pid, port: p } => {
+                            let url = format!("http://localhost:{p}");
                             if json {
                                 println!(
                                     "{}",
                                     serde_json::to_string_pretty(&json!({
                                         "status": "running",
-                                        "pid": pf.pid,
-                                        "port": pf.port,
+                                        "pid": pid,
+                                        "port": p,
                                         "url": url
                                     }))?
                                 );
                             } else {
-                                println!("Server is already running on {url} (PID {})", pf.pid);
+                                println!("Server is already running on {url} (PID {pid})");
                             }
-                            return Ok(());
                         }
-                    }
-
-                    let listener = find_available_port(port)?;
-                    let p = listener
-                        .local_addr()
-                        .context("Failed to read bound port")?
-                        .port();
-                    let url = format!("http://localhost:{p}");
-                    let server_bin = find_server_binary()?;
-                    let data_dir_str = jit_dir
-                        .to_str()
-                        .ok_or_else(|| anyhow::anyhow!("data_dir is not valid UTF-8"))?;
-
-                    let resolved_web_dir = web_dir
-                        .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
-                        .or_else(find_web_dir);
-
-                    if !json {
-                        println!("Starting server on {url} (foreground, Ctrl+C to stop)");
-                        println!("  API: {url}/api");
-                        if let Some(web) = resolved_web_dir.as_deref().filter(|d| d.is_dir()) {
-                            println!("  Web: {url}/ (from {})", web.display());
-                        } else {
-                            println!("  Web: {url}/ (embedded assets)");
+                        ForegroundOutcome::Exited { port: p, status } => {
+                            if json {
+                                println!(
+                                    "{}",
+                                    serde_json::to_string_pretty(&json!({
+                                        "status": "exited",
+                                        "port": p,
+                                        "exit_code": status.code()
+                                    }))?
+                                );
+                            }
+                            if !status.success() {
+                                std::process::exit(foreground_exit_code(status.code()));
+                            }
                         }
-                    }
-
-                    let mut cmd = std::process::Command::new(&server_bin);
-                    cmd.arg("--data-dir")
-                        .arg(data_dir_str)
-                        .arg("--bind")
-                        .arg(format!("0.0.0.0:{p}"));
-                    if let Some(web) = &resolved_web_dir {
-                        if web.is_dir() {
-                            cmd.arg("--web-dir").arg(web);
-                        }
-                    }
-                    // Hand the bound socket to the child (inherited fd on
-                    // Unix); it adopts this exact socket instead of re-binding.
-                    let mut child = spawn_with_listener(&mut cmd, listener)
-                        .context("Failed to run jit-server")?;
-                    let status = child.wait().context("Failed to wait on jit-server")?;
-                    if json {
-                        println!(
-                            "{}",
-                            serde_json::to_string_pretty(&json!({
-                                "status": "exited",
-                                "port": p,
-                                "exit_code": status.code()
-                            }))?
-                        );
-                    }
-                    if !status.success() {
-                        std::process::exit(jit::commands::serve::foreground_exit_code(
-                            status.code(),
-                        ));
                     }
                 } else {
                     // Daemonize via start_server.
