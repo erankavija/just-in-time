@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "06a5e83d-a51a-42a9-81b6-362fc30918db",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:22:25.895227061Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8db608ca-7c2d-4daa-aef4-8da41e553d90",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:23:33.611189757Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3e353abd-9b73-4da2-a8e7-ea07512f3e3e",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validated issue identity type with an alias staging bridge",
-  "updated_at": "2026-10-24T23:17:57.695371264Z"
+  "updated_at": "2026-10-24T23:23:33.611189757Z"
 }
