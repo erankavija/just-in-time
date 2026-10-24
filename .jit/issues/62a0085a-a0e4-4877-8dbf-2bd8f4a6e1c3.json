@@ -9,6 +9,7 @@
   ],
   "description": "Build the type hierarchy from repository declarations through one fallible constructor with one error policy.\n\n## Background\n\nThree production sites build a `HierarchyConfig` from `LabelNamespaces` with three policies: `config_manager.rs:305-309` wraps the error in an invalid-argument error, `commands/validate.rs:1039` propagates the raw `ConfigError`, and `repository_state/default_rules.rs:518-526` silently falls back to `HierarchyConfig::empty()`. A level-0 type is therefore accepted by one command family and rejected by another.\n\n## Success Criteria\n\n- [hard] REQ-01: `HierarchyConfig::from_declarations(&LabelNamespaces)` in `domain/type_taxonomy.rs` returns `Result<HierarchyConfig, ConfigError>` and is the one production constructor from declarations.\n- [hard] REQ-02: The three production sites build through it and keep their current error policies, so no caller changes.\n- [hard] REQ-03: Taxonomy unit tests show that an invalid hierarchy yields the constructor's `ConfigError`.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:52:55.608659796Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
@@ -41,7 +42,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "HierarchyConfig has one fallible constructor from declarations",
-  "updated_at": "2026-10-24T23:48:28.623588203Z"
+  "updated_at": "2026-10-24T23:52:55.608659796Z"
 }
