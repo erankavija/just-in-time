@@ -158,8 +158,9 @@ it finds, so covering a new defect class means adding a directory, not editing
 the harness.
 
 The self-test also seeds a schema defect that only `actionlint` detects into a
-scratch copy of `.github/`, which keeps the linter provably in the path rather
-than declared and skipped.
+scratch copy of `.github/`, which keeps the linter provably in the path. When
+the entry point cannot obtain `actionlint`, the self-test fails and names it.
+This repository runs the self-test as the `workflow-contract-selftest` gate.
 
 ## Action pins
 
