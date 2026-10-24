@@ -4172,15 +4172,14 @@ mod tests {
         assert_eq!(v["mode"], "auto");
     }
 
-    /// `count` and the collection key are the shared envelope contract; each
-    /// distinct response shape keeps its extras beside them.
+    /// `count` is owned by `ListEnvelope`; each distinct response shape owns
+    /// only its collection key and the extras beside it.
     fn assert_envelope_value(value: &serde_json::Value, key: &str, len: usize) {
-        assert_eq!(value["count"], len);
         assert_eq!(value[key].as_array().map(Vec::len), Some(len));
     }
 
     #[test]
-    fn test_gate_preset_list_response_serializes_presets_beside_count() {
+    fn test_gate_preset_list_response_serializes_presets_under_collection_key() {
         let info = crate::gate_presets::PresetInfo {
             name: "rust-tdd".into(),
             description: "TDD gates".into(),
@@ -4192,7 +4191,7 @@ mod tests {
     }
 
     #[test]
-    fn test_event_list_response_serializes_events_beside_count() {
+    fn test_event_list_response_serializes_events_under_collection_key() {
         let event = crate::domain::Event::IssueCreated {
             id: "e".into(),
             issue_id: "i".into(),
