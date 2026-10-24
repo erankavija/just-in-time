@@ -8,6 +8,7 @@ use crate::domain::LinkedCheckoutWriteStance;
 use crate::errors::LinkedCheckoutWriteRefusedError;
 use crate::repository_state::{MutationContextAnnotation, RepositoryLayout};
 use crate::storage::discovery::{discover_jit_dir, discover_recovery_jit_dir};
+use crate::storage::repository_state_store::is_leftover_record_failure;
 use crate::storage::{
     discover_repository_layout, JsonFileStorage, RepositoryStateStore,
     RetainedMutationSessionGuard, WorktreePaths,
@@ -31,8 +32,17 @@ pub struct RepositoryInvocation {
     pub coordinates_claims_first: bool,
     /// The command runs over a store that may not be initialized.
     pub is_validation_exempt: bool,
+    /// The command is `jit recover`, whose own work is applying the leftover
+    /// redo record.
+    pub is_recover: bool,
     pub write_override: Option<LinkedCheckoutWriteStance>,
 }
+
+/// `jit recover` failed applying the leftover redo record while opening its
+/// session; the source is the session-open failure.
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct RecoveryFailedError(pub anyhow::Error);
 
 /// A repository opened for dispatch.
 ///
@@ -61,8 +71,9 @@ pub struct OpenedRepository {
 /// # Errors
 ///
 /// Returns [`LinkedCheckoutWriteRefusedError`] when the effective stance
-/// refuses the invocation; otherwise the layout-discovery, session-open
-/// (see [`crate::storage::is_leftover_record_failure`]) or validation failure.
+/// refuses the invocation, and [`RecoveryFailedError`] when `jit recover`
+/// cannot read or apply the leftover redo record; otherwise the
+/// layout-discovery, session-open or validation failure.
 pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedRepository> {
     let (data_root, non_git_worktree_root) = select_data_root(&invocation);
 
@@ -98,7 +109,15 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
             (None, session.recovery_report().recovered_count())
         }
         (true, false) => {
-            let guard = storage.open_and_retain_mutation_session(layout.clone())?;
+            let guard = storage
+                .open_and_retain_mutation_session(layout.clone())
+                .map_err(|error| {
+                    if invocation.is_recover && is_leftover_record_failure(&error) {
+                        RecoveryFailedError(error).into()
+                    } else {
+                        error
+                    }
+                })?;
             let recovered = guard.recovery_report().recovered_count();
             (Some(guard), recovered)
         }
@@ -238,6 +257,7 @@ mod tests {
             opens_mutation_session: false,
             coordinates_claims_first: false,
             is_validation_exempt: false,
+            is_recover: false,
             write_override: None,
         }
     }
@@ -284,6 +304,45 @@ mod tests {
         assert!(
             claiming.retained_session.is_none(),
             "a claim-coordinating command opens its session after coordination"
+        );
+    }
+
+    #[test]
+    fn test_open_repository_reports_an_unreadable_leftover_record_as_recovery_failure_only_for_recover(
+    ) {
+        let (repo, _storage) = setup_test_repo().expect("create an initialized repository");
+        let scratch = repo
+            .path()
+            .join(".jit")
+            .join(crate::storage::RECORD_SCRATCH_DIR);
+        std::fs::create_dir_all(&scratch).expect("create the record scratch directory");
+        std::fs::write(scratch.join(crate::storage::RECORD_FILE_NAME), b"no header")
+            .expect("write an unreadable leftover record");
+        let mutating = RepositoryInvocation {
+            opens_mutation_session: true,
+            ..invocation(repo.path())
+        };
+
+        let other = open_repository(mutating.clone())
+            .err()
+            .expect("an unreadable leftover record fails the session open");
+        assert!(
+            is_leftover_record_failure(&other)
+                && other.downcast_ref::<RecoveryFailedError>().is_none(),
+            "another command reports the session-open failure itself: {other:#}"
+        );
+        let recover = open_repository(RepositoryInvocation {
+            is_recover: true,
+            ..mutating
+        })
+        .err()
+        .expect("an unreadable leftover record fails jit recover");
+        let failure = recover
+            .downcast_ref::<RecoveryFailedError>()
+            .unwrap_or_else(|| panic!("jit recover reports a recovery failure: {recover:#}"));
+        assert!(
+            is_leftover_record_failure(&failure.0),
+            "the recovery failure carries the session-open failure"
         );
     }
 }

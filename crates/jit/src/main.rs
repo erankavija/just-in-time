@@ -1642,16 +1642,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             &command,
             Commands::Init { .. } | Commands::Profile(ProfileCommands::Show { .. })
         ),
+        is_recover: matches!(&command, Commands::Recover),
         write_override: invocation_write_override,
     })
-    .map_err(|error| match &command {
-        // Applying the leftover record is `jit recover`'s own work, so its
-        // failure is a recovery failure, not a startup one.
-        Commands::Recover if jit::storage::is_leftover_record_failure(&error) => {
-            exit_recovery_failed(&error, json)
-        }
-        _ => error,
-    })?;
+    .map_err(
+        |error| match error.downcast::<jit::commands::RecoveryFailedError>() {
+            Ok(failure) => exit_recovery_failed(&failure.0, json),
+            Err(error) => error,
+        },
+    )?;
     let storage = executor.storage().clone();
 
     if let Commands::Init {
@@ -5691,7 +5690,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::HooksCommands::Install => {
                 use jit::commands::hooks::install_hooks;
 
-                match install_hooks(None) {
+                let installed = if worktree_paths.is_git_repository() {
+                    install_hooks(&worktree_paths.common_dir)
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Not in a git repository (no .git directory found)"
+                    ))
+                };
+                match installed {
                     Ok(result) => {
                         if json {
                             let output = jit::output::JsonOutput::success(serde_json::json!({

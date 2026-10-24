@@ -11,7 +11,7 @@
           "short_id": "3d93442b",
           "title": "Hook installation targets the selected repository's common directory",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -19,7 +19,7 @@
           "short_id": "7aafec83",
           "title": "Shared git repository and counting stand-in test fixtures",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "external_blockers": []
         },
         {
@@ -27,7 +27,7 @@
           "short_id": "810e32d4",
           "title": "Server image ships the git executable",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "external_blockers": []
         },
         {
@@ -493,10 +493,36 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "7aafec83": 1
+  },
   "surfaced_pitfalls": [],
   "reconciled_after_breakdown": [
     "5046408a"
   ],
-  "started_at": "2026-10-24T21:43:21+03:00"
+  "started_at": "2026-10-24T21:43:21+03:00",
+  "dispatches": [
+    {
+      "issue": "7aafec83",
+      "vendor": "anthropic",
+      "model": "opus",
+      "tier": "high",
+      "reason": "Sets the shared git-test-fixtures contract later tasks build on."
+    },
+    {
+      "issue": "810e32d4",
+      "vendor": "anthropic",
+      "model": "haiku",
+      "tier": "low",
+      "reason": "One Dockerfile package plus one static contract test."
+    },
+    {
+      "issue": "3d93442b",
+      "vendor": "anthropic",
+      "model": "sonnet",
+      "tier": "medium",
+      "reason": "Bounded command refactor with a CLI test; no shared contract."
+    }
+  ],
+  "dispatch_policy": "Alternate implementation dispatches between Claude sub-agents and Codex workers (user instruction relayed by just-in-time-05); tier within each family by difficulty. Codex workers cannot commit; the lead reviews and commits."
 }

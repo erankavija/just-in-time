@@ -86,7 +86,7 @@ pub enum RepositoryStateStoreError {
 
 /// Whether session open failed on the leftover redo record: it did not parse,
 /// or applying it failed.
-pub fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
+pub(crate) fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
     error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<RepositoryStateStoreError>(),

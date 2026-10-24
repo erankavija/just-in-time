@@ -3668,7 +3668,7 @@ served from.
 
 ### `jit hooks install`
 
-Copy the hook templates into `.git/hooks/` and make them executable.
+Copy the hook templates into the `hooks/` directory of the selected repository's common git directory and make them executable.
 
 ```bash
 jit hooks install [--json]
