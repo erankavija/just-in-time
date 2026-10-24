@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-b697a3f7",
+  "claimed_at": "2026-10-24T18:06:12.018949006Z",
   "context": {},
   "created_at": "2026-10-21T20:36:56.502609569Z",
   "dependencies": [],
@@ -76,7 +77,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "planning: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-10-21T21:16:22.046778452Z"
+  "updated_at": "2026-10-24T18:06:12.018949006Z"
 }
