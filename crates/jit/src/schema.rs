@@ -1329,10 +1329,7 @@ mod tests {
 
         // Guard against drift in either direction: the schema enum must equal
         // the authoritative `State::ALL` enumeration exactly.
-        let expected: Vec<String> = State::ALL
-            .iter()
-            .map(|s| s.as_str().to_string())
-            .collect();
+        let expected: Vec<String> = State::ALL.iter().map(|s| s.as_str().to_string()).collect();
         assert_eq!(
             enum_vals, expected,
             "schema State enum must match State::ALL exactly (single source of truth)"

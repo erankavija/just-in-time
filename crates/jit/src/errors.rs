@@ -931,13 +931,7 @@ impl fmt::Display for TransitionBlocker {
                 issue_id,
                 title,
                 state,
-            } => write!(
-                f,
-                "{} {} [{}]",
-                short_id(issue_id),
-                title,
-                state.as_str()
-            ),
+            } => write!(f, "{} {} [{}]", short_id(issue_id), title, state.as_str()),
             Self::MissingDependency { issue_id } => {
                 write!(f, "{} (missing issue) [missing]", short_id(issue_id))
             }
