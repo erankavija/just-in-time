@@ -306,10 +306,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
         || error
-            .downcast_ref::<crate::declarations::GateStageParseError>()
-            .is_some()
-        || error
-            .downcast_ref::<crate::declarations::GateModeParseError>()
+            .downcast_ref::<crate::domain::vocabulary::UnknownToken>()
             .is_some()
         || error
             .downcast_ref::<crate::document::DocumentScopeParseError>()

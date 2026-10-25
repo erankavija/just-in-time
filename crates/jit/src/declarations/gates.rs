@@ -1,104 +1,34 @@
 //! Neutral authored quality-gate declarations and pure TOML preservation.
 
 use crate::domain::repository_inputs::RepositoryInputs;
+use crate::domain::vocabulary::wire_vocabulary;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr;
 
-/// Error returned for an unknown gate stage.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateStageParseError {
-    /// The input was not a canonical stage token.
-    #[error("Invalid gate stage: '{0}' (expected 'precheck' or 'postcheck')")]
-    UnknownStage(String),
-}
-
-/// Gate execution stage.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateStage {
-    /// Runs before work starts.
-    Precheck,
-    /// Runs after work completes.
-    Postcheck,
-}
-
-impl GateStage {
-    /// Canonical serialized token.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Precheck => "precheck",
-            Self::Postcheck => "postcheck",
-        }
+wire_vocabulary! {
+    /// Gate execution stage.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+    )]
+    pub enum GateStage {
+        /// Runs before work starts.
+        Precheck = "precheck",
+        /// Runs after work completes.
+        Postcheck = "postcheck",
     }
 }
 
-impl FromStr for GateStage {
-    type Err = GateStageParseError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "precheck" => Ok(Self::Precheck),
-            "postcheck" => Ok(Self::Postcheck),
-            _ => Err(GateStageParseError::UnknownStage(value.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateStage {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// Error returned for an unknown gate mode.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateModeParseError {
-    /// The input was not a canonical mode token.
-    #[error("Invalid gate mode: '{0}' (expected 'manual' or 'auto')")]
-    UnknownMode(String),
-}
-
-/// Gate execution mode.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateMode {
-    /// Requires an explicit pass/fail.
-    Manual,
-    /// Has an automated checker.
-    Auto,
-}
-
-impl GateMode {
-    /// Canonical serialized token.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Manual => "manual",
-            Self::Auto => "auto",
-        }
-    }
-}
-
-impl FromStr for GateMode {
-    type Err = GateModeParseError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "manual" => Ok(Self::Manual),
-            "auto" => Ok(Self::Auto),
-            _ => Err(GateModeParseError::UnknownMode(value.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateMode {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
+wire_vocabulary! {
+    /// Gate execution mode.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+    )]
+    pub enum GateMode {
+        /// Requires an explicit pass/fail.
+        Manual = "manual",
+        /// Has an automated checker.
+        Auto = "auto",
     }
 }
 
@@ -428,5 +358,28 @@ mode = "manual"
                     .position(|window| window == b"key = \"zeta\"")
         );
         assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
+    }
+
+    /// The repository's authored registry re-serializes to a fixed point, and
+    /// the stage and mode tokens it carries are the vocabulary's own.
+    #[test]
+    fn test_gate_registry_serialization_of_repository_gates_is_stable() {
+        let authored = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../.jit/gates.toml"
+        ))
+        .expect("the repository gates.toml is readable");
+        let registry = parse_gate_registry(&authored).expect("the repository gates parse");
+        let bytes = serialize_gate_registry(&registry).unwrap();
+        let text = String::from_utf8(bytes.clone()).unwrap();
+
+        assert_eq!(
+            serialize_gate_registry(&parse_gate_registry(&bytes).unwrap()).unwrap(),
+            bytes
+        );
+        registry.gates.values().for_each(|gate| {
+            assert!(text.contains(&format!("stage = \"{}\"", gate.stage)));
+            assert!(text.contains(&format!("mode = \"{}\"", gate.mode)));
+        });
     }
 }
