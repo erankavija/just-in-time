@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -136,7 +136,7 @@
           "short_id": "3625b18b",
           "title": "Unit tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
@@ -234,7 +234,7 @@
           "short_id": "e3d06f82",
           "title": "Integration tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
@@ -1018,6 +1018,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Graph query return types across eight files with property tests."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Mechanical unit-test migration onto the body view."
+    },
+    {
+      "issue": "e3d06f82",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical integration-test migration onto the body view."
     }
   ],
   "surfaced_pitfalls": [
