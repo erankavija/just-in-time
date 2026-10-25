@@ -1671,12 +1671,11 @@ mod tests {
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         // Create config with enforcement off for test backward compatibility
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config_toml = r#"
 [worktree]
 enforce_leases = "off"
 "#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
+        storage.add_data_file("config.toml", config_toml);
 
         crate::commands::test_helpers::memory_executor(storage)
     }
@@ -3019,7 +3018,12 @@ link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
 "#;
-        std::fs::write(executor.storage.root().join("config.toml"), config).unwrap();
+        let config_path = executor
+            .repository_layout()
+            .unwrap()
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::write(config_path, config).unwrap();
         seed_repo_file(&executor.storage, ".jit/config.toml", config);
         seed_rule_validation_rules(&executor);
 

@@ -83,7 +83,10 @@ fn test_repeated_container_owner_detection_respects_configured_areas_and_vendor_
 #[test]
 fn test_repository_archive_paths_do_not_repeat_policy_roots_inside_container_directories() {
     let repository_root = repository_root();
-    let config = JitConfig::load(&repository_root.join(".jit")).unwrap();
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        &repository_root.join(".jit"),
+    ))
+    .unwrap();
     let documentation = config.documentation.unwrap();
     let development_root = documentation.development_root();
     let issue_scoped_areas = documentation.issue_scoped_areas();

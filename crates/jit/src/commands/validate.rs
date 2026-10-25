@@ -1448,7 +1448,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .load()
                 .ok()
                 .and_then(|config| {
-                    crate::storage::ruleset_store::load_ruleset(layout.data_root(), &config).ok()
+                    crate::storage::ruleset_store::load_ruleset(&layout, &config).ok()
                 })
                 .map(|set| set.rules.into_iter().map(|r| r.name).collect())
         } else {
@@ -2795,11 +2795,8 @@ depends_on = ["planning"]
              [type_hierarchy.types]\ntask = 4\n\
              [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n";
         storage.add_data_file("config.toml", config);
-        // The type-repair path reads the declared hierarchy through a
-        // `ConfigManager` rooted at the store, so the fixture declares it there
-        // as well as in the memory image.
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        // The shared memory-executor setup mirrors this declaration through the
+        // selected layout for the filesystem loader.
         let mut executor = memory_executor(storage.clone());
         let id = executor
             .issues()
@@ -2965,8 +2962,6 @@ source-of-truth = \"registry-first\"
     /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_data_file("config.toml", CANONICAL_ITEM_KINDS);
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
@@ -2984,9 +2979,8 @@ source-of-truth = \"registry-first\"
     /// isolating the dangling-item-link pass as the validation failure.
     fn dangling_exec_with_namespaces(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
         // Invariant registry through the storage boundary (descriptor path); the
-        // `config.toml` is parsed from the real `.jit` root by `cached_config`.
+        // `config.toml` is mirrored to the selected data root for `cached_config`.
         storage.add_data_file("invariants.toml", REGISTRY_TOML);
         let config = format!(
             "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
@@ -2994,7 +2988,6 @@ source-of-truth = \"registry-first\"
              [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
              {CANONICAL_ITEM_KINDS}"
         );
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
         storage.add_data_file("config.toml", &config);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -3051,12 +3044,18 @@ source-of-truth = \"registry-first\"
     const ONE_RULE: &str = "\
 [[rules]]
 name = \"label-format\"
+assert = { require-section = { heading = \"Success Criteria\" } }
 ";
 
     const ONE_GATE: &str = "\
 [[gates]]
+version = 1
 key = \"cargo-ci\"
+title = \"Cargo CI\"
 description = \"Full Rust CI pipeline must pass.\"
+stage = \"postcheck\"
+mode = \"manual\"
+priority = 100
 ";
 
     /// Like [`dangling_exec`] but ALSO declares `rule` and `gate` item kinds and
@@ -3064,16 +3063,15 @@ description = \"Full Rust CI pipeline must pass.\"
     /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
     fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        storage.add_data_file("config.toml", &config);
         storage.add_data_file("invariants.toml", REGISTRY_TOML);
         storage.add_data_file("rules.toml", ONE_RULE);
         storage.add_data_file("gates.toml", ONE_GATE);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        CommandExecutor::new(storage)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     #[test]

@@ -13,6 +13,8 @@ use crate::profile::{
 };
 use crate::repository_state::{Contribution, MapEntryTarget};
 use crate::repository_state::{FileMode, VirtualPath};
+#[cfg(any(test, feature = "test-support"))]
+use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence};
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -29,6 +31,29 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
+
+/// Give a temporary data root a valid repository layout for loader tests.
+#[cfg(any(test, feature = "test-support"))]
+pub fn repository_layout_for_data_root(data_root: &Path) -> RepositoryLayout {
+    let absolute_data_root = std::fs::canonicalize(data_root).unwrap_or_else(|_error| {
+        let parent = data_root.parent().unwrap_or(data_root);
+        let parent = std::fs::canonicalize(parent)
+            .expect("temporary test worktree root has an absolute path");
+        parent.join(
+            data_root
+                .file_name()
+                .expect("temporary data root has a final component"),
+        )
+    });
+    let worktree_root = absolute_data_root
+        .parent()
+        .expect("temporary data root has a parent");
+    RepositoryLayout::new(
+        RepositoryRootEvidence::new(worktree_root, "test-worktree", true),
+        RepositoryRootEvidence::new(&absolute_data_root, "test-data", true),
+    )
+    .expect("temporary test roots form a valid repository layout")
+}
 
 /// A reference to `path` at HEAD with no label, type, format, or assets.
 pub fn document_reference(path: impl Into<String>) -> DocumentReference {
@@ -2268,7 +2293,7 @@ mod tests {
     #[test]
     fn test_setup_test_repo_with_taxonomy_declares_and_exposes_exact_vocabulary() {
         let (_temp, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::config::JitConfig::load(storage.root()).unwrap();
+        let config = crate::config::JitConfig::load(&storage.repository_layout().unwrap()).unwrap();
         let hierarchy = config
             .type_hierarchy
             .expect("taxonomy fixture must declare a type hierarchy");

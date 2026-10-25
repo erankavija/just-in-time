@@ -33,7 +33,7 @@ use crate::domain::id_pattern::IdPattern;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
-use crate::repository_state::VirtualPath;
+use crate::repository_state::{RepositoryLayoutError, VirtualPath};
 
 /// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
 pub const DEFAULT_CRITERION_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
@@ -41,6 +41,10 @@ pub const DEFAULT_CRITERION_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
 pub enum RuleConfigError {
+    /// The repository layout could not resolve a rules or schema path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+
     /// The rules file could not be read from disk.
     #[error("failed to read rules file '{path}': {source}")]
     Io {

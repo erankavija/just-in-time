@@ -16,12 +16,9 @@
 //! An explicit `JIT_DATA_DIR` override always takes precedence over discovery;
 //! that check lives in the caller (`main.rs`), not here.
 
+use crate::repository_state::VirtualPath;
 use crate::storage::redo_record::{RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use std::path::{Path, PathBuf};
-
-/// Marker file that distinguishes an initialized `.jit` repository from a bare
-/// or partial `.jit` directory. Kept in sync with `json::INDEX_FILE`.
-const INDEX_FILE: &str = "index.json";
 
 /// Walk upward from `start`, using `exists` to probe each candidate path, to
 /// find the nearest ancestor directory containing an initialized `.jit`
@@ -43,7 +40,7 @@ const INDEX_FILE: &str = "index.json";
 pub fn discover_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     for ancestor in start.ancestors() {
         let candidate = ancestor.join(".jit");
-        if exists(&candidate.join(INDEX_FILE)) {
+        if exists(&candidate.join(VirtualPath::INDEX.relative().as_path())) {
             return Some(candidate);
         }
         if exists(&ancestor.join(".git")) {
@@ -82,7 +79,7 @@ pub fn discover_recovery_jit_dir(start: &Path) -> Option<PathBuf> {
 pub fn discover_recovery_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     for ancestor in start.ancestors() {
         let jit = ancestor.join(".jit");
-        let initialized = exists(&jit.join(INDEX_FILE));
+        let initialized = exists(&jit.join(VirtualPath::INDEX.relative().as_path()));
         let pending_record = exists(&jit.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME));
         if initialized || pending_record {
             return Some(jit);
@@ -110,7 +107,9 @@ mod tests {
     /// Path to the `index.json` marker inside a `.jit` at `dir`, the presence
     /// of which is what makes a directory count as an initialized repository.
     fn index_in(dir: &str) -> PathBuf {
-        PathBuf::from(dir).join(".jit").join("index.json")
+        PathBuf::from(dir)
+            .join(".jit")
+            .join(VirtualPath::INDEX.relative().as_path())
     }
 
     #[test]
@@ -204,7 +203,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let jit = temp.path().join(".jit");
         fs::create_dir(&jit).unwrap();
-        fs::write(jit.join("index.json"), "{}").unwrap();
+        fs::write(jit.join(VirtualPath::INDEX.relative().as_path()), "{}").unwrap();
         let nested = temp.path().join("a/b");
         fs::create_dir_all(&nested).unwrap();
 

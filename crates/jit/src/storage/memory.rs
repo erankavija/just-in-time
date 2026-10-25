@@ -33,7 +33,7 @@ use std::sync::{Arc, Mutex};
 /// source of truth and round-trip through the identical canonical serializers.
 #[derive(Clone)]
 pub struct InMemoryStorage {
-    /// Unique root path for parallel test isolation
+    /// Unique root path for parallel test isolation.
     root_path: std::path::PathBuf,
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.
@@ -356,11 +356,14 @@ impl InMemoryStorage {
             return None;
         }
         let mut components = vpath.relative().as_str().split('/');
-        let (Some("gate-runs"), Some(run_id), None) =
+        let (Some(directory), Some(run_id), None) =
             (components.next(), components.next(), components.next())
         else {
             return None;
         };
+        if directory != VirtualPath::GATE_RUNS.relative().as_str() {
+            return None;
+        }
         gate_run_result_relative_path(run_id)
             .is_ok_and(|_| Self::gate_run_directory_vpath(run_id).is_ok_and(|path| &path == vpath))
             .then_some(run_id)
@@ -456,7 +459,7 @@ impl InMemoryStorage {
 
     /// Deserialize every captured issue record in the aggregate image.
     fn load_issues(state: &MemoryRepositoryState) -> Result<Vec<Issue>> {
-        Self::data_files_in(state, "issues", ".json")
+        Self::data_files_in(state, VirtualPath::ISSUES.relative().as_str(), ".json")
             .map(|(_, bytes)| {
                 serde_json::from_slice::<Issue>(&bytes)
                     .context("Failed to deserialize issue from repository image")
@@ -858,7 +861,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn root(&self) -> &std::path::Path {
-        // Return unique root path for parallel test isolation
+        // Return unique root path for parallel test isolation.
         &self.root_path
     }
 
@@ -1140,7 +1143,10 @@ mod tests {
 
         // Seeding any repository-owned file marks the data root as existing and
         // publishes the Data("") directory entry.
-        storage.add_data_file("config.toml", "[project]\nname = \"x\"\n");
+        storage.add_data_file(
+            VirtualPath::CONFIG.relative().as_str(),
+            "[project]\nname = \"x\"\n",
+        );
         assert!(
             storage.repository_state().data_root_exists,
             "a seeded store is existing-root"
@@ -1380,11 +1386,11 @@ mod record_tests {
 
     #[test]
     fn test_commit_record_installs_the_record_before_any_entry_changes() {
-        let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
+        let storage = seeded(&[VirtualPath::INDEX, worktree("stale.md")], false);
         let before = semantic_state(&storage).0;
         let record = RedoRecord::new(
             Vec::new(),
-            vec![put(data("index.json"), b"published")],
+            vec![put(VirtualPath::INDEX, b"published")],
             vec![worktree("stale.md")],
             Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
@@ -1412,7 +1418,7 @@ mod record_tests {
         let storage = seeded(&[], false);
         let leftover = RedoRecord::new(
             Vec::new(),
-            vec![put(data("index.json"), b"leftover")],
+            vec![put(VirtualPath::INDEX, b"leftover")],
             Vec::new(),
             None,
         )
@@ -1420,7 +1426,7 @@ mod record_tests {
         storage.commit_record(&leftover).unwrap();
 
         let outcome = storage.commit_record(
-            &RedoRecord::new(Vec::new(), Vec::new(), vec![data("index.json")], None).unwrap(),
+            &RedoRecord::new(Vec::new(), Vec::new(), vec![VirtualPath::INDEX], None).unwrap(),
         );
 
         assert!(
@@ -1432,11 +1438,11 @@ mod record_tests {
 
     #[test]
     fn test_memory_redo_applier_apply_publishes_every_operation_the_record_names() {
-        let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
+        let storage = seeded(&[VirtualPath::INDEX, worktree("stale.md")], false);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
         let record = RedoRecord::new(
             Vec::new(),
-            vec![put(data("index.json"), b"published")],
+            vec![put(VirtualPath::INDEX, b"published")],
             vec![worktree("stale.md")],
             Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
@@ -1448,7 +1454,7 @@ mod record_tests {
         uninterrupted().apply(&storage, &record).unwrap();
 
         assert_eq!(
-            file_bytes(&storage, &data("index.json")).as_deref(),
+            file_bytes(&storage, &VirtualPath::INDEX).as_deref(),
             Some(b"published".as_slice())
         );
         assert!(
@@ -1469,7 +1475,7 @@ mod record_tests {
         let storage = seeded(&[], false);
         let record = RedoRecord::new(
             Vec::new(),
-            vec![put(data("index.json"), b"published")],
+            vec![put(VirtualPath::INDEX, b"published")],
             Vec::new(),
             None,
         )
@@ -1573,7 +1579,7 @@ mod record_tests {
         let record = RedoRecord::new(
             vec![data("templates")],
             vec![
-                put(data("index.json"), b"published"),
+                put(VirtualPath::INDEX, b"published"),
                 put(worktree("notes.md"), b"published"),
             ],
             vec![worktree("stale.md")],
@@ -1610,13 +1616,13 @@ mod record_tests {
         let (recorded, applier) = recording_applier();
         let published = RedoRecord::new(
             Vec::new(),
-            vec![put(data("index.json"), b"published")],
+            vec![put(VirtualPath::INDEX, b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
         let removed =
-            RedoRecord::new(Vec::new(), Vec::new(), vec![data("index.json")], None).unwrap();
+            RedoRecord::new(Vec::new(), Vec::new(), vec![VirtualPath::INDEX], None).unwrap();
 
         applier.apply(&storage, &published).unwrap();
         let after_first = recorded.points();
@@ -1646,7 +1652,7 @@ mod record_tests {
             Vec::new(),
             vec![
                 put(worktree("notes.md"), b"published"),
-                put(data("index.json"), b"published"),
+                put(VirtualPath::INDEX, b"published"),
             ],
             Vec::new(),
             None,
@@ -1668,7 +1674,10 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_put_under_a_non_directory_ancestor() {
         let storage = seeded(&[], false);
-        storage.add_data_file("issues", "an ordinary file where a directory is needed");
+        storage.add_data_file(
+            VirtualPath::ISSUES.relative().as_str(),
+            "an ordinary file where a directory is needed",
+        );
         let record = RedoRecord::new(
             Vec::new(),
             vec![put(data("issues/a.json"), b"published")],
@@ -1685,7 +1694,7 @@ mod record_tests {
                 outcome,
                 Err(RedoApplyError::Roots(RepositoryStateStoreError::UnsafeTarget(
                     ref component
-                ))) if component == "issues"
+                ))) if component == VirtualPath::ISSUES.relative().as_str()
             ),
             "the put resolved through an ancestor that is not a directory"
         );
@@ -1716,7 +1725,7 @@ mod record_tests {
         storage.add_data_file("issues/existing.json", "residual");
         let record = RedoRecord::new(
             Vec::new(),
-            vec![put(data("issues"), b"occupier")],
+            vec![put(VirtualPath::ISSUES, b"occupier")],
             Vec::new(),
             None,
         )
@@ -1732,7 +1741,7 @@ mod record_tests {
         );
         assert!(
             matches!(
-                storage.repository_state().entries.get(&data("issues")),
+                storage.repository_state().entries.get(&VirtualPath::ISSUES),
                 Some(RepositoryEntry::Directory { .. })
             ),
             "the refused put overwrote the directory at its target"
@@ -1762,8 +1771,8 @@ mod record_tests {
         let record = RedoRecord::new(
             Vec::new(),
             vec![
-                put(data("index.json"), b"published"),
-                put(data("issues"), b"occupier"),
+                put(VirtualPath::INDEX, b"published"),
+                put(VirtualPath::ISSUES, b"occupier"),
             ],
             Vec::new(),
             None,
@@ -1779,7 +1788,7 @@ mod record_tests {
             "the later put replaced a directory the file backend refuses to rename over: {outcome:?}"
         );
         assert_eq!(
-            file_bytes(&storage, &data("index.json")).as_deref(),
+            file_bytes(&storage, &VirtualPath::INDEX).as_deref(),
             Some(b"published".as_slice()),
             "the refusal undid a put that had already landed"
         );

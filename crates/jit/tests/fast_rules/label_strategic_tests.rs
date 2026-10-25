@@ -2,14 +2,14 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::storage::{InMemoryStorage, IssueStore};
+use jit::storage::InMemoryStorage;
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 
 /// An executor over a repository that declares the type hierarchy these tests
 /// classify against, together with the declaration it was configured from:
 /// every type name below is read from that value rather than repeated.
-/// `query_strategic` reads the declaration through a `ConfigManager` rooted at
-/// the store, so the fixture writes it there as well as into the memory image.
+/// `query_strategic` reads the declaration through a `ConfigManager` bound to
+/// the selected layout, so the fixture writes it there and into the memory image.
 fn strategic_executor() -> (CommandExecutor<InMemoryStorage>, TestTaxonomy) {
     let taxonomy = test_taxonomy();
     let storage = InMemoryStorage::new();
@@ -17,8 +17,12 @@ fn strategic_executor() -> (CommandExecutor<InMemoryStorage>, TestTaxonomy) {
         "[worktree]\nenforce_leases = \"off\"\n\n{}",
         taxonomy.config_fragment()
     );
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), &config).unwrap();
+    let config_path = storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(config_path, &config).unwrap();
     storage.add_data_file("config.toml", &config);
     (crate::memory_executor(storage), taxonomy)
 }

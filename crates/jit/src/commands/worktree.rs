@@ -350,8 +350,15 @@ pub fn execute_worktree_store_divergence(paths: &WorktreePaths) -> Result<StoreD
         });
     };
 
-    let local = read_exact_store(&paths.local_jit)?;
-    let reference = read_exact_store(&reference_root)?;
+    let local_layout =
+        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    let primary_worktree = paths
+        .primary_worktree_root()?
+        .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
+    let reference_layout =
+        crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
+    let local = read_exact_store(&local_layout)?;
+    let reference = read_exact_store(&reference_layout)?;
 
     Ok(StoreDivergenceReport {
         checkout_store,

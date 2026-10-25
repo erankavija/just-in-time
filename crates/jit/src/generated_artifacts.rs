@@ -24,11 +24,43 @@
 use crate::profile::template_region;
 
 use crate::profile::template_region::TEMPLATE_REGION_PACKAGE_ID;
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use std::path::PathBuf;
 
 /// A render of one committed artifact's current bytes, given the bytes the
 /// checkout holds. A whole-file render ignores them; a region render splices
 /// into them, preserving every authored byte outside its delimiters.
 pub type RenderFn = fn(&[u8]) -> Result<Vec<u8>, String>;
+
+/// Identity of a generated repository artifact.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ArtifactTarget {
+    /// A repository-relative spelling whose path is not a well-known JIT path.
+    RepositoryRelative(&'static str),
+    /// A well-known path resolved through the repository layout.
+    Virtual(VirtualPath),
+}
+
+impl ArtifactTarget {
+    /// Repository-relative spelling used in diagnostics and metadata.
+    pub fn repository_relative(&self) -> String {
+        match self {
+            Self::RepositoryRelative(path) => (*path).to_string(),
+            Self::Virtual(path) => path.repository_relative(),
+        }
+    }
+
+    /// Resolve this target against the selected repository roots.
+    pub fn resolve(&self, layout: &RepositoryLayout) -> Result<PathBuf, RepositoryLayoutError> {
+        match self {
+            Self::RepositoryRelative(path) => {
+                let path = layout.classify_repository_relative(path)?;
+                layout.resolve(&path)
+            }
+            Self::Virtual(path) => layout.resolve(path),
+        }
+    }
+}
 
 /// Where an artifact's render lives.
 pub enum ArtifactRender {
@@ -37,7 +69,7 @@ pub enum ArtifactRender {
     /// result; the artifact's drift assertion calls the same function.
     InCrate {
         /// Repository-relative path of the committed file.
-        target: &'static str,
+        target: ArtifactTarget,
         /// The render both the entry point and the drift assertion read.
         render: RenderFn,
     },
@@ -67,10 +99,14 @@ pub struct GeneratedArtifact {
 
 impl GeneratedArtifact {
     /// The committed files this artifact writes.
-    pub fn targets(&self) -> Vec<&'static str> {
+    pub fn targets(&self) -> Vec<ArtifactTarget> {
         match &self.render {
-            ArtifactRender::InCrate { target, .. } => vec![target],
-            ArtifactRender::InEntryPoint { targets } => targets.to_vec(),
+            ArtifactRender::InCrate { target, .. } => vec![target.clone()],
+            ArtifactRender::InEntryPoint { targets } => targets
+                .iter()
+                .copied()
+                .map(ArtifactTarget::RepositoryRelative)
+                .collect(),
         }
     }
 }
@@ -85,7 +121,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::output::test_support::ERROR_CODE_REFERENCE_GENERATOR,
         holds: "the error-code vocabulary declared in `jit::output::ErrorCode`",
         render: ArtifactRender::InCrate {
-            target: crate::output::test_support::ERROR_CODE_REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::output::test_support::ERROR_CODE_REFERENCE_PATH,
+            ),
             render: render_error_code_reference,
         },
     },
@@ -94,7 +132,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::domain::event_catalog::test_support::REFERENCE_GENERATOR,
         holds: "the event catalog declared in `jit::domain::event_catalog::event_catalog`",
         render: ArtifactRender::InCrate {
-            target: crate::domain::event_catalog::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::domain::event_catalog::test_support::REFERENCE_PATH,
+            ),
             render: render_events_reference,
         },
     },
@@ -103,7 +143,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::schema::test_support::EXIT_CODE_REFERENCE_GENERATOR,
         holds: "the exit-code taxonomy declared in `jit::schema`",
         render: ArtifactRender::InCrate {
-            target: crate::schema::test_support::EXIT_CODE_REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::schema::test_support::EXIT_CODE_REFERENCE_PATH,
+            ),
             render: render_exit_code_reference,
         },
     },
@@ -112,7 +154,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::gate_presets::reference::test_support::REFERENCE_GENERATOR,
         holds: "the preset contract and portable checker syntax in `jit::gate_presets`",
         render: ArtifactRender::InCrate {
-            target: crate::gate_presets::reference::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::gate_presets::reference::test_support::REFERENCE_PATH,
+            ),
             render: render_gate_presets_reference,
         },
     },
@@ -121,7 +165,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::runtime_defaults::test_support::REFERENCE_GENERATOR,
         holds: "the defaults declared in `jit::runtime_defaults`",
         render: ArtifactRender::InCrate {
-            target: crate::runtime_defaults::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::runtime_defaults::test_support::REFERENCE_PATH,
+            ),
             render: render_runtime_defaults_reference,
         },
     },
@@ -141,7 +187,9 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: crate::storage::reference::test_support::REFERENCE_GENERATOR,
         holds: "the record layout declared in `jit::storage::reference`",
         render: ArtifactRender::InCrate {
-            target: crate::storage::reference::test_support::REFERENCE_PATH,
+            target: ArtifactTarget::RepositoryRelative(
+                crate::storage::reference::test_support::REFERENCE_PATH,
+            ),
             render: render_storage_records_reference,
         },
     },
@@ -150,7 +198,7 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
         generator: template_region::TEMPLATE_REGION_GENERATOR,
         holds: "the packaged template declarations",
         render: ArtifactRender::InCrate {
-            target: template_region::TEMPLATE_REGISTRY_PATH,
+            target: ArtifactTarget::Virtual(template_region::TEMPLATE_REGISTRY_PATH),
             render: render_template_region,
         },
     },
@@ -214,7 +262,7 @@ fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
         .ok_or_else(|| {
             format!(
                 "the render changed {} outside the delimiters",
-                template_region::TEMPLATE_REGISTRY_PATH
+                template_region::TEMPLATE_REGISTRY_PATH.repository_relative()
             )
         })
 }
@@ -226,7 +274,15 @@ mod tests {
 
     /// The checkout these sources were compiled from.
     fn repository_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap()
+    }
+
+    fn repository_layout() -> RepositoryLayout {
+        let root = repository_root();
+        crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap()
     }
 
     /// Every declared entry point is a runnable script in the checkout, so a
@@ -269,12 +325,14 @@ mod tests {
     /// checkout it regenerates rather than a stale inventory.
     #[test]
     fn test_generated_artifacts_declare_targets_that_exist() {
+        let layout = repository_layout();
         for artifact in GENERATED_ARTIFACTS {
             for target in artifact.targets() {
                 assert!(
-                    repository_root().join(target).is_file(),
-                    "{}: {target} is not in the checkout",
-                    artifact.name
+                    target.resolve(&layout).unwrap().is_file(),
+                    "{}: {} is not in the checkout",
+                    artifact.name,
+                    target.repository_relative(),
                 );
             }
         }
