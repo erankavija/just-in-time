@@ -252,7 +252,7 @@ mod tests {
     use super::*;
     use crate::declarations::rules::{
         Assertion, DependencyShapeConfig, LabelReferenceConfig, LabelReferenceScope, Rule,
-        RuleScope, SchemaSource, Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
+        RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
     };
     use crate::domain::id_pattern::IdPattern;
     use crate::validation::engine::SchemaEngine;
@@ -626,10 +626,13 @@ mod tests {
         }))
         .is_none());
         assert!(desugar(&Assertion::CheckerCommand("./c.sh".to_string())).is_none());
-        assert!(desugar(&Assertion::LabelCoverage {
-            config: toml::value::Table::new()
-        })
-        .is_none());
+        let coverage = RuleSet::parse(
+            "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+            None,
+            [],
+        )
+        .unwrap();
+        assert!(desugar(&coverage.rules[0].assert).is_none());
         assert!(desugar(&Assertion::LabelReference {
             config: LabelReferenceConfig {
                 from: "satisfies".to_string(),
