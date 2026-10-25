@@ -462,12 +462,7 @@ pub(crate) fn validation_declarations_from_image(
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| -> Result<_, DeclarationParseError> {
-                    let name = request
-                        .reference
-                        .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
-                        .and_then(|suffix| suffix.strip_prefix('/'))
-                        .unwrap_or(&request.reference);
-                    let path = VirtualPath::schema(name)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;

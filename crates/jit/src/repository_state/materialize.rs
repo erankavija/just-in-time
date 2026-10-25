@@ -165,15 +165,8 @@ pub fn render_capture_closure(
         }
     }
     if let Some(content) = rules_content {
-        // A rule schema reference is relative to the data root (`schemas/...`),
-        // so it is a `Data(...)` path directly rather than a repo-relative one.
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            let name = request
-                .reference
-                .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
-                .and_then(|suffix| suffix.strip_prefix('/'))
-                .unwrap_or(&request.reference);
-            paths.push(VirtualPath::schema(name)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     paths.sort();
@@ -287,12 +280,7 @@ pub fn validate_capture_closure(
 
     if let Some(content) = rules_content {
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            let name = request
-                .reference
-                .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
-                .and_then(|suffix| suffix.strip_prefix('/'))
-                .unwrap_or(&request.reference);
-            paths.push(VirtualPath::schema(name)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     // Every schema the CURRENT configuration derives, whether or not the authored
@@ -587,29 +575,37 @@ pub(crate) fn compose_default_ruleset(
         .collect();
     let mut default_refs = std::collections::BTreeSet::new();
     let mut foreign_refs = std::collections::BTreeSet::new();
-    for req in
-        crate::declarations::rules::RuleSet::schema_requests(&current_rules).unwrap_or_default()
+    for req in crate::declarations::rules::RuleSet::schema_requests(&current_rules)
+        .map_err(ProducerError::from)?
     {
+        let schema_path = VirtualPath::schema_reference(&req.reference)?;
         if origins.get(req.rule.as_str()).copied().flatten()
             == Some(crate::declarations::rules::DEFAULT_ORIGIN)
         {
-            default_refs.insert(req.reference);
+            default_refs.insert(schema_path);
         } else {
-            foreign_refs.insert(req.reference);
+            foreign_refs.insert(schema_path);
         }
     }
     for (vpath, occupant) in image.entries() {
         let RepositoryEntry::File { .. } = occupant else {
             continue;
         };
-        let Some(name) = schema_file_name(vpath) else {
+        let Some(schema_path) = schema_file_path(vpath) else {
             continue;
         };
-        let reference = VirtualPath::schema(name)?.relative().as_str().to_owned();
+        let Some(name) = schema_path
+            .relative()
+            .as_path()
+            .file_name()
+            .and_then(|name| name.to_str())
+        else {
+            continue;
+        };
         // Proven generated (referenced ONLY by default rules), not shared with any
         // custom rule, and no longer an expected target.
-        if default_refs.contains(&reference)
-            && !foreign_refs.contains(&reference)
+        if default_refs.contains(&schema_path)
+            && !foreign_refs.contains(&schema_path)
             && !expected_names.contains(name)
         {
             actions.push(RepositoryAction::DeleteFile {
@@ -644,17 +640,16 @@ fn entry<'a>(
         .map_err(|error| ProducerError::from(error).into())
 }
 
-/// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
-/// path. Used to locate obsolete generated schema targets for repair.
-fn schema_file_name(path: &VirtualPath) -> Option<&str> {
+/// Parse a schema entry's relative spelling through the shared reference parser.
+fn schema_file_path(path: &VirtualPath) -> Option<VirtualPath> {
     if path.root_class() != crate::repository_state::RepositoryRootClass::Data {
         return None;
     }
     match path.relative() {
-        crate::repository_state::RootRelativePath::Descendant(rel) => rel
-            .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())?
-            .strip_prefix('/')
-            .filter(|name| !name.contains('/')),
+        crate::repository_state::RootRelativePath::Descendant(rel) => {
+            let schema_path = VirtualPath::schema_reference(rel.as_ref()).ok()?;
+            schema_path.eq(path).then_some(schema_path)
+        }
         crate::repository_state::RootRelativePath::Root => None,
     }
 }

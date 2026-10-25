@@ -383,6 +383,22 @@ impl VirtualPath {
         )
     }
 
+    /// Parse a rule schema reference into its validated data-root path.
+    pub fn schema_reference(reference: &str) -> Result<Self, RepositoryLayoutError> {
+        let reference_path = RootRelativePath::parse(reference)?;
+        let Some(name) = reference_path
+            .as_str()
+            .strip_prefix(Self::SCHEMAS.relative().as_str())
+            .and_then(|suffix| suffix.strip_prefix('/'))
+        else {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        };
+        if !name.ends_with(".json") {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        }
+        Self::schema(name)
+    }
+
     /// Construct a virtual identity from an explicit selected-root class.
     ///
     /// Every fallible constructor funnels through the same canonicality and
@@ -965,6 +981,26 @@ mod tests {
 
         for invalid in ["", "..", "a/b", "a\\b", "/absolute.json"] {
             assert!(VirtualPath::schema(invalid).is_err(), "{invalid:?}");
+        }
+    }
+
+    #[test]
+    fn test_schema_reference_constructor_validates_rule_reference() {
+        let path = VirtualPath::schema_reference("schemas/body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in [
+            "body.json",
+            "schemas/nested/body.json",
+            "schemas//body.json",
+            "schemas/../body.json",
+            "/schemas/body.json",
+        ] {
+            assert!(
+                VirtualPath::schema_reference(invalid).is_err(),
+                "{invalid:?}"
+            );
         }
     }
 
