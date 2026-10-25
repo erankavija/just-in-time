@@ -314,7 +314,7 @@
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
           "short_id": "91081bd3",
-          "title": "The CLI resolves each issue-id argument once at entry and executor families take resolved ids",
+          "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
           "status": "dispatched"
         },
@@ -1145,6 +1145,13 @@
       "model": "opus",
       "effort": "-",
       "reason": "Rework R2 (final): dep rm targets and validate ids resolved at the boundary; same tier, alternation slot is Claude after 5491edd0 (codex)."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Widened scope after invoker-approved absorption: multi-file retype of five executor families plus composite arguments with exact criteria; alternation slot is Codex after the Claude R2."
     }
   ],
   "surfaced_pitfalls": [
