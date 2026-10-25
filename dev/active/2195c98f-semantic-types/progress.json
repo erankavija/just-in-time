@@ -213,7 +213,7 @@
           "short_id": "bc1955a8",
           "title": "Item kinds hold their id pattern as IdPattern",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
@@ -288,7 +288,7 @@
           "short_id": "42bcaa6e",
           "title": "Content format is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -391,7 +391,7 @@
           "short_id": "a4b94a17",
           "title": "Type-hierarchy and label-uniqueness rule options are typed",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
@@ -466,7 +466,7 @@
           "short_id": "af9c277d",
           "title": "Label-reference assertions are typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
@@ -954,6 +954,20 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Two rule-option enums decoded at load."
+    },
+    {
+      "issue": "42bcaa6e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded content format, same pattern as strictness."
+    },
+    {
+      "issue": "af9c277d",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "First compiled-graph-assertion lowering; sets the pattern two later tasks follow."
     }
   ],
   "surfaced_pitfalls": [
