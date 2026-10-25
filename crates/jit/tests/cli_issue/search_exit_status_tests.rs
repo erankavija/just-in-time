@@ -1,27 +1,13 @@
 //! Search JSON failures exit with the status assigned to their reported code.
 
 use jit::output::ErrorCode;
+use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::str::FromStr;
 use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().expect("temporary repository should be created");
-    let status = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .arg("init")
-        .status()
-        .expect("jit init should run");
-    assert!(status.success(), "jit init should succeed");
-    temp
-}
 
 fn assert_json_error_status_matches_code(output: Output, expected_code: ErrorCode) {
     assert!(!output.status.success(), "search invocation should fail");
@@ -40,12 +26,13 @@ fn assert_json_error_status_matches_code(output: Output, expected_code: ErrorCod
 
 #[test]
 fn test_search_json_missing_ripgrep_exits_with_reported_code_status() {
-    let repo = setup_test_repo();
+    let repo = JitCli::initialised().unwrap();
     let empty_path = TempDir::new().expect("empty PATH directory should be created");
-    let output = Command::new(jit_binary())
-        .current_dir(repo.path())
-        .env("PATH", empty_path.path())
-        .args(["search", "needle", "--json"])
+    let output = repo
+        .command_with_env(
+            ["search", "needle", "--json"],
+            [("PATH", empty_path.path().as_os_str())],
+        )
         .output()
         .expect("search should run");
 
@@ -54,17 +41,18 @@ fn test_search_json_missing_ripgrep_exits_with_reported_code_status() {
 
 #[test]
 fn test_search_json_backend_failure_exits_with_reported_code_status() {
-    let repo = setup_test_repo();
+    let repo = JitCli::initialised().unwrap();
     let tools = TempDir::new().expect("fake tool directory should be created");
     let ripgrep = tools.path().join("rg");
     fs::write(&ripgrep, "#!/bin/sh\nexit 2\n").expect("fake ripgrep should be written");
     fs::set_permissions(&ripgrep, fs::Permissions::from_mode(0o755))
         .expect("fake ripgrep should be executable");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repo.path())
-        .env("PATH", tools.path())
-        .args(["search", "needle", "--json"])
+    let output = repo
+        .command_with_env(
+            ["search", "needle", "--json"],
+            [("PATH", tools.path().as_os_str())],
+        )
         .output()
         .expect("search should run");
 
