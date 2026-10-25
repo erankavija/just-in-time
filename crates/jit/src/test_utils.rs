@@ -83,23 +83,6 @@ pub fn stamped_event(
     event
 }
 
-/// A normal-priority issue-created event for `issue_id`, stamped with `id` and
-/// `timestamp`.
-pub fn issue_created_event(
-    id: &str,
-    issue_id: &str,
-    title: &str,
-    timestamp: chrono::DateTime<chrono::Utc>,
-) -> crate::domain::Event {
-    let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
-    issue.id = issue_id.to_string();
-    stamped_event(
-        crate::domain::Event::draft_issue_created(&issue),
-        id,
-        timestamp,
-    )
-}
-
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;
@@ -1076,10 +1059,12 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     let mut written = fs::metadata(&path)?.len();
     let mut ordinal = 0_u64;
     while written <= bytes {
-        let line = serde_json::to_string(&issue_created_event(
-            &format!("01J0000000000000000000{ordinal:04}"),
-            &format!("00000000-0000-4000-8000-{ordinal:012}"),
-            &format!("Accumulated history {ordinal}"),
+        let mut issue =
+            crate::domain::Issue::draft(format!("Accumulated history {ordinal}"), String::new());
+        issue.id = format!("00000000-0000-4000-8000-{ordinal:012}");
+        let line = serde_json::to_string(&stamped_event(
+            crate::domain::Event::draft_issue_created(&issue),
+            format!("01J0000000000000000000{ordinal:04}"),
             chrono::Utc::now(),
         ))?;
         writeln!(log, "{line}")?;

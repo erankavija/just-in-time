@@ -47,6 +47,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::EventBody;
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
 
@@ -77,11 +78,11 @@ mod tests {
             .expect("the event query succeeds");
 
         assert_eq!(events, vec![expected]);
-        let Event::LinkedCheckoutWriteOverridden {
+        let EventBody::LinkedCheckoutWriteOverridden {
             declared_stance,
             invocation_override,
             ..
-        } = &events[0]
+        } = events[0].body()
         else {
             panic!("the event query reports the override record");
         };

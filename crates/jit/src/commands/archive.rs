@@ -2546,7 +2546,7 @@ mod tests {
             .read_events()
             .unwrap()
             .iter()
-            .filter(|event| matches!(event, Event::IssueStateChanged { issue_id, to: State::Archived, .. } if issue_id == id))
+            .filter(|event| matches!(event.body(), EventBody::IssueStateChanged { issue_id, to: State::Archived, .. } if issue_id == id))
             .count()
     }
 
