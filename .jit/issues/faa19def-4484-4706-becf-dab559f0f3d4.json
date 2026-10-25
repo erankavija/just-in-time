@@ -8,6 +8,7 @@
   ],
   "description": "Store the actor of a gate run as an `Assignee`, so it is parsed once at decode.\n\n## Background\n\n`GateRunResult.by` is `Option<String>` (`crates/jit/src/domain/types.rs:982`), re-parsed into an `Assignee` by `gate_state_from_run` (`commands/gate_check.rs:229-236`). Production writers emit only the automated executor (`gate_execution.rs:175,1513`, `commands/gate_check.rs:56,1225`); the output view copies it (`output.rs:2502,2560`). Every recorded gate-run `by` in this repository is `auto:executor`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateRunResult.by` is `Option<Assignee>`, and the re-parse in `gate_state_from_run` is gone.\n- [hard] REQ-02: Gate-run writers use the automated-executor constant.\n- [hard] REQ-03: Recorded gate runs in this repository load and re-serialize byte-identically.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:13:21.954145724Z",
   "first_ready_at": "2026-10-25T01:43:29.860781475Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Gate-run actors are Assignee values",
-  "updated_at": "2026-10-25T05:13:18.543944057Z"
+  "updated_at": "2026-10-25T05:13:21.954145724Z"
 }

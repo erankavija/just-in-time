@@ -9,6 +9,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: system actors, gate-run actors, query filters and lease records carry Assignee and dedicated id types.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: System actors are named `Assignee` constants, and gate-run actors and query assignee filters are `Assignee` values.\n- [hard] REQ-02: Lease records hold an `Assignee` agent, an `IssueId` issue, a `LeaseId` and a `WorktreeId`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T05:13:22.143847987Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Actors and leases carry typed identities",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:13:22.143847987Z"
 }
