@@ -33,6 +33,7 @@
 //! which necessarily change from the in-code placeholder to the on-disk file
 //! reference. The round-trip test compares field-wise, excluding those two.
 
+use super::VirtualPath;
 use crate::declarations::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
 use std::collections::HashSet;
 
@@ -252,13 +253,15 @@ fn render_assertion(
         ),
         Assertion::JsonSchema(source) => {
             let file_name = format!("{}.json", unique_schema_stem(schema_identity, used_stems));
+            let schema_path = VirtualPath::schema(&file_name)
+                .expect("sanitized schema names are safe file-name components");
             schema_files.push(SchemaFile {
                 name: file_name.clone(),
                 content: pretty_schema(&source.schema),
             });
             format!(
                 "{{ json-schema = {} }}",
-                toml_basic_string(&format!("schemas/{file_name}"))
+                toml_basic_string(schema_path.relative().as_str())
             )
         }
         Assertion::CheckerCommand(cmd) => {

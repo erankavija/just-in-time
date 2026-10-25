@@ -368,6 +368,21 @@ impl VirtualPath {
         Self::from_parts(RepositoryRootClass::Data, RootRelativePath::parse(path)?)
     }
 
+    /// Construct a schema file path from one validated file-name component.
+    pub fn schema(name: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
+        let name = name.as_ref();
+        let parsed = RootRelativePath::parse(name)?;
+        if parsed.depth() != 1 {
+            return Err(RepositoryLayoutError::LexicalEscape(
+                name.to_string_lossy().into_owned(),
+            ));
+        }
+        Self::from_parts(
+            RepositoryRootClass::Data,
+            Self::SCHEMAS.relative().clone().join(parsed.as_str()),
+        )
+    }
+
     /// Construct a virtual identity from an explicit selected-root class.
     ///
     /// Every fallible constructor funnels through the same canonicality and
@@ -939,6 +954,17 @@ mod tests {
                 "relative": spelling,
             });
             assert!(deserialize_path(&layout, encoded).is_err(), "{spelling:?}");
+        }
+    }
+
+    #[test]
+    fn test_schema_path_constructor_validates_one_file_name_component() {
+        let path = VirtualPath::schema("body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in ["", "..", "a/b", "a\\b", "/absolute.json"] {
+            assert!(VirtualPath::schema(invalid).is_err(), "{invalid:?}");
         }
     }
 

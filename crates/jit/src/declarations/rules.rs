@@ -31,6 +31,7 @@ use thiserror::Error;
 use crate::config::JitConfig;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
+use crate::repository_state::VirtualPath;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
@@ -1495,12 +1496,17 @@ fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConf
     {
         return Err(reject("reference must not contain a '..' path component"));
     }
-    if !reference.starts_with("schemas/") {
+    let Some(name) = reference
+        .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
+        .and_then(|suffix| suffix.strip_prefix('/'))
+    else {
         return Err(reject("reference must start with 'schemas/'"));
-    }
+    };
     if !reference.ends_with(".json") {
         return Err(reject("reference must end with '.json'"));
     }
+    VirtualPath::schema(name)
+        .map_err(|_| reject("reference must name one file under 'schemas/'"))?;
     Ok(())
 }
 
@@ -2543,6 +2549,16 @@ assert = { json-schema = "/etc/passwd.json" }
     #[test]
     fn test_schema_reference_parent_traversal_is_rejected() {
         let toml = schema_rule_toml("schemas/../escape.json");
+        let err = parse(&toml).unwrap_err();
+        assert!(matches!(
+            err,
+            RuleConfigError::InvalidSchemaReference { .. }
+        ));
+    }
+
+    #[test]
+    fn test_schema_reference_nested_file_name_is_rejected() {
+        let toml = schema_rule_toml("schemas/nested/x.json");
         let err = parse(&toml).unwrap_err();
         assert!(matches!(
             err,

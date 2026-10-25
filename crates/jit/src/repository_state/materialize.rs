@@ -166,7 +166,12 @@ pub fn render_capture_closure(
         // A rule schema reference is relative to the data root (`schemas/...`),
         // so it is a `Data(...)` path directly rather than a repo-relative one.
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            let name = request
+                .reference
+                .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
+                .and_then(|suffix| suffix.strip_prefix('/'))
+                .unwrap_or(&request.reference);
+            paths.push(VirtualPath::schema(name)?);
         }
     }
     paths.sort();
@@ -280,14 +285,19 @@ pub fn validate_capture_closure(
 
     if let Some(content) = rules_content {
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            let name = request
+                .reference
+                .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())
+                .and_then(|suffix| suffix.strip_prefix('/'))
+                .unwrap_or(&request.reference);
+            paths.push(VirtualPath::schema(name)?);
         }
     }
     // Every schema the CURRENT configuration derives, whether or not the authored
     // file references it yet: a newly-declared table adds a default rule whose
     // projection must be publishable in the same pass that adds its row.
     for schema in &serialized_default_ruleset(config).schema_files {
-        paths.push(VirtualPath::data(format!("schemas/{}", schema.name))?);
+        paths.push(VirtualPath::schema(&schema.name)?);
     }
     paths.sort();
     paths.dedup();
@@ -535,7 +545,7 @@ pub(crate) fn compose_default_ruleset(
         .map(|f| f.name.as_str())
         .collect();
     for schema in &serialized.schema_files {
-        let vpath = image_path(image, &format!(".jit/schemas/{}", schema.name))?;
+        let vpath = VirtualPath::schema(&schema.name)?;
         if !image.capture_spec().contains_path(&vpath) {
             continue;
         }
@@ -589,7 +599,7 @@ pub(crate) fn compose_default_ruleset(
         let Some(name) = schema_file_name(vpath) else {
             continue;
         };
-        let reference = format!("schemas/{name}");
+        let reference = VirtualPath::schema(name)?.relative().as_str().to_owned();
         // Proven generated (referenced ONLY by default rules), not shared with any
         // custom rule, and no longer an expected target.
         if default_refs.contains(&reference)
@@ -636,7 +646,8 @@ fn schema_file_name(path: &VirtualPath) -> Option<&str> {
     }
     match path.relative() {
         crate::repository_state::RootRelativePath::Descendant(rel) => rel
-            .strip_prefix("schemas/")
+            .strip_prefix(VirtualPath::SCHEMAS.relative().as_str())?
+            .strip_prefix('/')
             .filter(|name| !name.contains('/')),
         crate::repository_state::RootRelativePath::Root => None,
     }

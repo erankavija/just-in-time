@@ -980,7 +980,7 @@ pub(super) fn compose_profile_targets_with_context(
         .into_iter()
         .map(|schema| {
             Ok((
-                VirtualPath::data(format!("schemas/{}", schema.name))?,
+                VirtualPath::schema(&schema.name)?,
                 Some(schema.content.into_bytes()),
             ))
         })

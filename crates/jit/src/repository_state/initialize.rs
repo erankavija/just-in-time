@@ -358,7 +358,7 @@ impl InitializationScaffold {
         ];
         for (name, bytes) in &self.schemas {
             files.push(DesiredFile {
-                path: VirtualPath::data(format!("schemas/{name}"))?,
+                path: VirtualPath::schema(name)?,
                 bytes: bytes.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::Always,
@@ -560,7 +560,7 @@ pub(super) fn derive_initialization(
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
         .iter()
-        .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
+        .map(|(name, _)| VirtualPath::schema(name))
         .collect::<Result<_, _>>()?;
     let desired = dedup_last_wins(scaffold.desired_files()?);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
