@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-b3fcd297",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "65468044a009002acda417f0517b6144f4277fac",
+  "completed_at": "2026-10-25T02:01:43.540735339Z",
+  "duration_ms": 264531,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met and the prior template-loader finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a05854e1-eb40-4871-a571-99d4581ee712",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T01:57:19.008898122Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fa4386c73, bb80227d4, 8f1ae9f20, 98a0c36c3 (`jit:b3fcd297`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/b3fcd297/requirement/REQ-01 and REQ-02 (issue description, markdown-first); @/issue/2195c98f/requirement/REQ-07 (issue description, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/semantic-types (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T01:55:49.245431111+00:00); prior code-review failed (exit 1) but its template-loader finding is resolved in 8f1ae9f20\nTruncation recovery: re-read tagged implementation patches by path, scanned current production schema-path construction, and excluded 98a0c36c3’s historical gate records from behavior review\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met and the prior template-loader finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

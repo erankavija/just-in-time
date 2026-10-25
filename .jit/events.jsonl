@@ -20034,3 +20034,5 @@
 {"id":"a923af3b-0da4-4258-b265-bc20a5bf0870","issue_id":"6e8b9f31-64ae-4a05-b4e8-dbe39d35638b","timestamp":"2026-10-25T01:43:29.585970447Z","type":"issue_completed"}
 {"from":"backlog","id":"f84a02f5-a486-407e-a158-35a35e8b80bd","issue_id":"a50e9be9-77a8-4cc8-87be-e3f22a3b70ba","timestamp":"2026-10-25T01:43:29.758102752Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"bbc0c7c3-4968-4062-b118-1a5826c36e7a","issue_id":"faa19def-4484-4706-becf-dab559f0f3d4","timestamp":"2026-10-25T01:43:29.860781475Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"1d68189c-c696-4ac7-8e0a-06a96c0d102b","issue_id":"b3fcd297-5db5-46fb-93ed-df846f3df9c2","timestamp":"2026-10-25T01:57:15.040937798Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"226499b0-927b-4a37-8d2e-fbca5c91cdd6","issue_id":"b3fcd297-5db5-46fb-93ed-df846f3df9c2","timestamp":"2026-10-25T02:01:43.782840039Z","type":"gate_passed","updated_by":"auto:executor"}
