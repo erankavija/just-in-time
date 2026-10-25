@@ -159,10 +159,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let container_id = &IssueIdPrefix::parse(container_id)?;
+        let container_id = &IssueIdPrefix::from_str(container_id)?;
         let anchor_bindings = &anchor_bindings
             .iter()
-            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::parse(id)?)))
+            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::from_str(id)?)))
             .collect::<Result<BTreeMap<_, _>>>()?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
@@ -753,7 +753,7 @@ fn derive_template_apply(
             let full = super::resolve_issue_from_capture(issues, bound).with_context(|| {
                 format!(
                     "template '{}' anchor '{}' is bound to '{}', which does not resolve to an existing issue",
-                    template.name, anchor.name, bound.requested()
+                    template.name, anchor.name, bound.as_str()
                 )
             })?;
             Ok((anchor.name.clone(), full))

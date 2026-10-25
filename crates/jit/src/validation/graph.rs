@@ -56,6 +56,7 @@ use crate::domain::type_taxonomy::{
 use crate::domain::{ContentFormat, Issue};
 use crate::graph::DependencyGraph;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use crate::declarations::rules::{
     Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
@@ -1265,11 +1266,11 @@ enum ContainerMatch<'a> {
 }
 
 /// Resolve a `container-from-label` value against the in-memory `issues` slice
-/// by [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix). Two issues sharing a
+/// by [`IssueIdPrefix`](crate::domain::identity::IssueIdPrefix). Two issues sharing a
 /// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
 /// a collision, never silently resolve the first match.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
-    let Ok(prefix) = crate::domain::issue_id::IssueIdPrefix::parse(value) else {
+    let Ok(prefix) = crate::domain::identity::IssueIdPrefix::from_str(value) else {
         return ContainerMatch::None;
     };
     let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
