@@ -397,11 +397,19 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         package: &ProfilePackage,
         variable_inputs: &VariableInputs,
     ) -> Result<ProfileApplicationInput> {
-        super::profile::reject_reserved_application_targets(
-            package.hashes().targets.keys().map(String::as_str),
-        )?;
-        let metadata = package.model();
         let layout = self.require_layout()?;
+        let targets = package
+            .hashes()
+            .targets
+            .keys()
+            .map(|target| {
+                layout
+                    .classify_repository_relative(target)
+                    .map_err(Into::into)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        super::profile::reject_reserved_application_targets(targets.iter())?;
+        let metadata = package.model();
         let resolved = resolve_package(
             package,
             &variable_inputs.for_declarations(&package.model().variables),
