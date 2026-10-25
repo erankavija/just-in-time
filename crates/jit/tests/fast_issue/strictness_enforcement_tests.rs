@@ -43,7 +43,8 @@ fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMem
     let storage = InMemoryStorage::new();
     let defaults = jit::repository_state::serialize_ruleset(
         &jit::repository_state::default_ruleset(&jit::domain::LabelNamespaces::empty(2)),
-    );
+    )
+    .unwrap();
     let validation = match strictness {
         Some(level) => format!("[validation]\nstrictness = \"{level}\"\n"),
         None => String::new(),

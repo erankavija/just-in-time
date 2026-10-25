@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:45:22.281417628Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate-run actors are Assignee values",
-  "updated_at": "2026-10-25T01:43:29.860781475Z"
+  "updated_at": "2026-10-25T01:45:22.892238915Z"
 }

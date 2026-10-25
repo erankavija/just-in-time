@@ -639,6 +639,23 @@ mod tests {
     use crate::domain::{Priority, State};
     use crate::output::DependencyTreeNode;
 
+    #[test]
+    fn test_resolve_hierarchy_tree_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .resolve_hierarchy_tree(None)
+            .expect_err("invalid hierarchy must fail graph resolution");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
     fn make_node(id: &str, state: State) -> DependencyTreeNode {
         DependencyTreeNode {
             id: id.to_string(),

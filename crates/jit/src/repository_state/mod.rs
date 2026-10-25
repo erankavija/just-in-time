@@ -29,8 +29,8 @@ pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
-    type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
+    default_ruleset, reconcile_default_rules_with_config, type_hierarchy_known_schema,
+    TYPE_HIERARCHY_SCHEMA_FILE,
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
@@ -463,7 +463,7 @@ pub(crate) fn validation_declarations_from_image(
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;
@@ -976,8 +976,8 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config).schema_files {
-            let vpath = VirtualPath::data(format!("schemas/{}", schema.name))?;
+        for schema in materialize::serialized_default_ruleset(&config)?.schema_files {
+            let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);
             }

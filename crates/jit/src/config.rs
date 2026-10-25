@@ -3,6 +3,7 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -1040,33 +1041,25 @@ impl ProjectionConfig {
     }
 }
 
-/// How a registry is projected into its documentation target.
-///
-/// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
-/// serde rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionMode {
-    /// Write the rendered block to a separate whole file.
-    #[serde(rename = "separate-file")]
-    SeparateFile,
-    /// Replace only a delimited region within an existing file, byte-preserving
-    /// everything outside the delimiters.
-    #[serde(rename = "region")]
-    Region,
+wire_vocabulary! {
+    /// How a registry is projected into its documentation target.
+    ///
+    /// Deserialized from the kebab-case tokens `separate-file` and `region`;
+    /// an unrecognized value is a descriptive parse error rather than a silent
+    /// default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionMode {
+        /// Write the rendered block to a separate whole file.
+        SeparateFile = "separate-file",
+        /// Replace only a delimited region within an existing file, byte-preserving
+        /// everything outside the delimiters.
+        Region = "region",
+    }
 }
 
 impl ProjectionMode {
     /// Mode applied when a projection omits `mode`.
     pub const DEFAULT: Self = Self::SeparateFile;
-
-    /// The config token naming this mode, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionMode::SeparateFile => "separate-file",
-            ProjectionMode::Region => "region",
-        }
-    }
 }
 
 impl Default for ProjectionMode {
@@ -1075,61 +1068,38 @@ impl Default for ProjectionMode {
     }
 }
 
-impl std::fmt::Display for ProjectionMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
+wire_vocabulary! {
+    /// How a projected registry is rendered into the markdown block.
+    ///
+    /// Deserialized from the tokens `full` and `id-anchor`; an unrecognized
+    /// value is a descriptive parse error rather than a silent default. The
+    /// default (no `style` field) is [`ProjectionStyle::DEFAULT`].
+    ///
+    /// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet
+    ///   list of `- **{self-id}** — {text}` rows from any addressable item kind.
+    /// - [`ProjectionStyle::Full`] renders the built-in rich registry views,
+    ///   with typed metadata absent from a generic addressable row.
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionStyle {
+        /// Render the built-in rich registry view for the projection's kind(s): the
+        /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
+        /// registries' `## Rules` / `## Gates` sections with metadata.
+        Full = "full",
+        /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
+        /// rows from the kind's addressable items, for embedding beneath a
+        /// hand-authored heading. Kind-agnostic: any item kind renders this way.
+        IdAnchor = "id-anchor",
     }
-}
-
-/// How a projected registry is rendered into the markdown block.
-///
-/// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
-/// rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `style` field) is [`ProjectionStyle::DEFAULT`].
-///
-/// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet list of
-///   `- **{self-id}** — {text}` rows from a kind's addressable items — the
-///   kind-agnostic style any item kind can use with no dedicated code.
-/// - [`ProjectionStyle::Full`] renders the built-in rich registry views (the
-///   invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-///   registries' `## Rules` / `## Gates` sections with severity/enforce metadata),
-///   which carry typed fields absent from a generic addressable row.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionStyle {
-    /// Render the built-in rich registry view for the projection's kind(s): the
-    /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-    /// registries' `## Rules` / `## Gates` sections with metadata.
-    #[serde(rename = "full")]
-    Full,
-    /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
-    /// rows from the kind's addressable items, for embedding beneath a
-    /// hand-authored heading. Kind-agnostic: any item kind renders this way.
-    #[serde(rename = "id-anchor")]
-    IdAnchor,
 }
 
 impl ProjectionStyle {
     /// Style applied when a projection omits `style`.
     pub const DEFAULT: Self = Self::Full;
-
-    /// The config token naming this style, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionStyle::Full => "full",
-            ProjectionStyle::IdAnchor => "id-anchor",
-        }
-    }
 }
 
 impl Default for ProjectionStyle {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for ProjectionStyle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
     }
 }
 
