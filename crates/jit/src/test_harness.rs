@@ -87,12 +87,13 @@ source-of-truth = \"registry-first\"
         // reader, while mutation paths capture the aggregate in-memory image.
         // Keep both fixture views coherent until the read-side storage facade is
         // consolidated.
-        std::fs::create_dir_all(self.storage.root()).unwrap();
-        std::fs::write(
-            self.storage.root().join("config.toml"),
-            CANONICAL_ITEM_KINDS,
-        )
-        .unwrap();
+        let config_path = self
+            .storage
+            .repository_layout()
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        std::fs::write(config_path, CANONICAL_ITEM_KINDS).unwrap();
         self.storage
             .add_data_file("config.toml", CANONICAL_ITEM_KINDS);
         self

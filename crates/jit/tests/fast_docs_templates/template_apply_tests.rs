@@ -96,8 +96,13 @@ const DOCUMENT_AREA: &str = "workspace/notes";
 fn declare_document_area(h: &TestHarness) {
     let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
     h.storage.add_data_file("config.toml", &config);
-    std::fs::create_dir_all(h.storage.root()).unwrap();
-    std::fs::write(h.storage.root().join("config.toml"), &config).unwrap();
+    let config_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(config_path, &config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -951,7 +956,15 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
+    std::fs::write(
+        temp.path().join(
+            jit::repository_state::VirtualPath::CONFIG
+                .relative()
+                .as_path(),
+        ),
+        "",
+    )
+    .unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
             .unwrap();

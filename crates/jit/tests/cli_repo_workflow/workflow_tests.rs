@@ -51,7 +51,7 @@ fn test_workflow_simple_task_completion() {
     // 2. Verify it's in ready state (auto-transitioned)
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("State: Ready"));
+    assert!(stdout.contains("State: ready"));
 
     // 3. Claim the task
     let output = run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
@@ -69,7 +69,7 @@ fn test_workflow_simple_task_completion() {
         "Should contain assignee, got: {}",
         stdout
     );
-    assert!(stdout.contains("State: InProgress"));
+    assert!(stdout.contains("State: in_progress"));
 
     // 5. Complete the task
     let output = run_jit(&temp, &["issue", "update", &id, "--state", "done"]);
@@ -78,7 +78,42 @@ fn test_workflow_simple_task_completion() {
     // 6. Verify completion
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("State: Done"));
+    assert!(stdout.contains("State: done"));
+}
+
+/// Human `issue show` prints the same state and priority tokens as `--json`.
+#[test]
+fn test_issue_show_human_and_json_render_same_vocabulary_tokens() {
+    let temp = setup_test_repo();
+    let output = run_jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "-t",
+            "Token parity",
+            "--priority",
+            "high",
+        ],
+    );
+    let id = extract_id(&String::from_utf8_lossy(&output.stdout));
+    assert!(run_jit(&temp, &["issue", "claim", &id, "agent:worker-1"])
+        .status
+        .success());
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&run_jit(&temp, &["issue", "show", &id, "--json"]).stdout).unwrap();
+    let human =
+        String::from_utf8_lossy(&run_jit(&temp, &["issue", "show", &id]).stdout).into_owned();
+
+    let state = json["state"].as_str().unwrap();
+    let priority = json["priority"].as_str().unwrap();
+    assert_eq!(state, "in_progress");
+    assert!(human.contains(&format!("State: {state}")), "got: {human}");
+    assert!(
+        human.contains(&format!("Priority: {priority}")),
+        "got: {human}"
+    );
 }
 
 // ============================================================================
@@ -261,7 +296,7 @@ fn test_workflow_gates() {
     run_jit(&temp, &["issue", "update", &id, "--state", "done"]);
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Gated"));
+    assert!(stdout.contains("gated"));
 
     // Evaluate tests gate
     run_jit(&temp, &["gate", "evaluate", &id, "tests"]);
@@ -269,7 +304,7 @@ fn test_workflow_gates() {
     // Still in Gated (review not passed)
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Gated"));
+    assert!(stdout.contains("gated"));
 
     // Evaluate review gate
     run_jit(
@@ -280,7 +315,7 @@ fn test_workflow_gates() {
     // Now should auto-transition to Done
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Done"));
+    assert!(stdout.contains("done"));
 }
 
 // ============================================================================
@@ -552,7 +587,7 @@ fn test_auto_transition_when_dependency_rejected() {
     let output = run_jit(&temp, &["issue", "show", &task_b]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Backlog"),
+        stdout.contains("State: backlog"),
         "Task B should be blocked"
     );
 
@@ -564,7 +599,7 @@ fn test_auto_transition_when_dependency_rejected() {
     let output = run_jit(&temp, &["issue", "show", &task_b]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Ready"),
+        stdout.contains("State: ready"),
         "Task B should auto-transition to Ready when dependency is rejected"
     );
 }
@@ -609,7 +644,7 @@ fn test_auto_transition_when_multiple_dependencies_complete() {
     let output = run_jit(&temp, &["issue", "show", &task_c]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Backlog"),
+        stdout.contains("State: backlog"),
         "Task C should be blocked"
     );
 
@@ -621,7 +656,7 @@ fn test_auto_transition_when_multiple_dependencies_complete() {
     let output = run_jit(&temp, &["issue", "show", &task_c]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Backlog"),
+        stdout.contains("State: backlog"),
         "Task C should still be blocked by B"
     );
 
@@ -633,7 +668,7 @@ fn test_auto_transition_when_multiple_dependencies_complete() {
     let output = run_jit(&temp, &["issue", "show", &task_c]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Ready"),
+        stdout.contains("State: ready"),
         "Task C should auto-transition to Ready when both dependencies are done"
     );
 }
@@ -685,7 +720,7 @@ fn test_auto_transition_with_mixed_terminal_states() {
     let output = run_jit(&temp, &["issue", "show", &task_c]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Ready"),
+        stdout.contains("State: ready"),
         "Task C should auto-transition to Ready when dependencies are in terminal states (Done/Rejected)"
     );
 }
@@ -720,7 +755,7 @@ fn test_auto_transition_when_dependency_done() {
     // Verify B is in Backlog
     let output = run_jit(&temp, &["issue", "show", &task_b]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("State: Backlog"));
+    assert!(stdout.contains("State: backlog"));
 
     // Complete task A (terminal state, should unblock B)
     let output = run_jit(&temp, &["issue", "update", &task_a, "--state", "done"]);
@@ -730,7 +765,7 @@ fn test_auto_transition_when_dependency_done() {
     let output = run_jit(&temp, &["issue", "show", &task_b]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("State: Ready"),
+        stdout.contains("State: ready"),
         "Task B should auto-transition to Ready when dependency is done"
     );
 }

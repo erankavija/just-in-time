@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1622756a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "49f546b17ed834eefcd59f63c6b30ae12217a968",
+  "completed_at": "2026-10-25T08:33:48.914898663Z",
+  "duration_ms": 149138,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged changes render affected closed vocabularies through canonical wire-token Display implementations, with parity coverage and passing cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1622756a-d805-40b4-a5af-37dadcc6a683",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c98a4781-529f-4133-a4d2-5c664a8ce0f6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T08:31:19.776691430Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9bac2522a, 49f546b17 (uncommitted `.jit/` changes excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-10 and REQ-17 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, essential-code-prose, orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T08:29:47Z); code-review pending\nTruncation recovery: narrowed renderer/Debug scan, wire-vocabulary macro, output projection, and changed-path reads after combined output truncated\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged changes render affected closed vocabularies through canonical wire-token Display implementations, with parity coverage and passing cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

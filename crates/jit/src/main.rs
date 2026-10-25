@@ -32,6 +32,7 @@ use jit::output::{
     JsonOutput, OutputContext, OutputMode,
 };
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
+use jit::repository_state::VirtualPath;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::PathBuf;
@@ -1331,8 +1332,8 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
     println!("ID: {}", response.id);
     println!("Title: {}", response.title);
     println!("Description: {}", response.description);
-    println!("State: {:?}", response.state);
-    println!("Priority: {:?}", response.priority);
+    println!("State: {}", response.state);
+    println!("Priority: {}", response.priority);
     println!("Assignee: {:?}", response.assignee);
 
     if response.dependencies.is_empty() {
@@ -1349,12 +1350,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
             response.dependencies.len()
         );
         for dep in &response.dependencies {
-            println!(
-                "  {} - {} [{}]",
-                dep.short_id(),
-                dep.title,
-                format!("{:?}", dep.state).to_lowercase()
-            );
+            println!("  {} - {} [{}]", dep.short_id(), dep.title, dep.state);
         }
     }
 
@@ -1365,7 +1361,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         for gate in &response.gates {
             let last_run = gate.last_run_at.as_deref().unwrap_or("never run");
             println!(
-                "  - {} [{:?}] (last run: {})",
+                "  - {} [{}] (last run: {})",
                 gate.key, gate.status, last_run
             );
         }
@@ -1705,10 +1701,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
         // plan when absent; the applied plan is the sole preimage
         // authority for whether this run created it.
+        let rules_path = VirtualPath::RULES.repository_relative();
         let scaffolded = init_result
             .created_paths
             .iter()
-            .any(|path| path == ".jit/rules.toml");
+            .any(|path| path == &rules_path);
         if scaffolded {
             let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
         }
@@ -2292,7 +2289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 let summary_response =
                                     jit::output::IssueShowSummaryResponse::from(&issue);
                                 let msg = format!(
-                                    "Issue {}: {} [{:?}]",
+                                    "Issue {}: {} [{}]",
                                     summary_response.short_id,
                                     summary_response.title,
                                     summary_response.state
@@ -2314,7 +2311,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             );
 
                             let show_msg = format!(
-                                "Issue {}: {} [{:?}]",
+                                "Issue {}: {} [{}]",
                                 &response.id[..8],
                                 response.title,
                                 response.state
@@ -2569,7 +2566,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 if json {
                                     let issue = storage.load_issue(&full_id)?;
                                     let msg = format!(
-                                        "Updated issue {} to {:?}",
+                                        "Updated issue {} to {}",
                                         issue.short_id(),
                                         issue.state
                                     );
@@ -3361,7 +3358,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let _ = output_ctx.print_info("Gates:");
                             for gate in gates {
                                 println!(
-                                    "  {} - {} ({:?}, {:?})",
+                                    "  {} - {} ({}, {})",
                                     gate.key, gate.title, gate.stage, gate.mode
                                 );
                             }
@@ -3389,8 +3386,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!("Gate: {}", gate.key);
                         println!("  Title: {}", gate.title);
                         println!("  Description: {}", gate.description);
-                        println!("  Stage: {:?}", gate.stage);
-                        println!("  Mode: {:?}", gate.mode);
+                        println!("  Stage: {}", gate.stage);
+                        println!("  Mode: {}", gate.mode);
                         if let Some(checker) = gate.checker {
                             match checker {
                                 jit::declarations::GateChecker::Exec {
@@ -3747,7 +3744,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Ok(Some(result)) => {
                             if json {
                                 use jit::output::{GateRunSummary, JsonOutput};
-                                let msg = format!("Gate '{}': {:?}", gate_key, result.status);
+                                let msg = format!("Gate '{}': {}", gate_key, result.status);
                                 let summary = GateRunSummary::full(&result);
                                 let output = JsonOutput::success(summary).with_message(msg);
                                 println!("{}", output.to_json_string()?);
@@ -5284,7 +5281,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Dependency,
                                                         detail: format!(
-                                                            "{} ({}:{:?})",
+                                                            "{} ({}:{})",
                                                             id, title, state
                                                         ),
                                                     }
@@ -5292,7 +5289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                 BlockingReason::Gate { key, status } => {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Gate,
-                                                        detail: format!("{} ({:?})", key, status),
+                                                        detail: format!("{} ({})", key, status),
                                                     }
                                                 }
                                             })
@@ -5464,7 +5461,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::LabelCommands::Namespaces => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 if json {
                     use jit::output::{JsonOutput, NamespacesResponse};
@@ -5604,9 +5601,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 // Check repo config — invalid enforcement and write-policy tokens are
                 // caught at TOML parse time, so a successful load implies valid values.
-                let repo_config_path = jit_dir.join("config.toml");
+                let repo_config_path = executor
+                    .storage()
+                    .repository_layout()?
+                    .resolve(&VirtualPath::CONFIG)?;
                 if repo_config_path.exists() {
-                    if let Err(e) = JitConfig::load(&jit_dir) {
+                    if let Err(e) = JitConfig::load(&executor.storage().repository_layout()?) {
                         result.errors.push(format!("repo config: {}", e));
                     }
                 }
@@ -5662,7 +5662,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::ConfigCommands::ShowHierarchy => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 let hierarchy = namespaces.declared_type_hierarchy();
 

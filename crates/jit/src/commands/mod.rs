@@ -2193,7 +2193,17 @@ pub struct CommandExecutor<S: IssueStore> {
 impl<S: IssueStore> CommandExecutor<S> {
     /// Create a new command executor with the given storage
     pub fn new(storage: S) -> Self {
-        let config_manager = ConfigManager::new(storage.root());
+        let data_root = storage.root();
+        let config_layout = crate::storage::discover_repository_layout(
+            data_root
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new(".")),
+            data_root,
+        )
+        .ok();
+        let config_manager = config_layout
+            .map(ConfigManager::new)
+            .unwrap_or_else(ConfigManager::unbound);
         Self {
             storage,
             config_manager,
@@ -2214,6 +2224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// data root; tests supply a fixture layout over a temporary worktree.
     pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {
         self.storage.configure_repository_layout(&layout);
+        self.config_manager.bind_layout(layout.clone());
         self.layout = Some(layout);
         self
     }
@@ -2506,7 +2517,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?;
-                crate::storage::ruleset_store::load_ruleset(self.storage.root(), &config)
+                crate::storage::ruleset_store::load_ruleset(
+                    self.repository_layout()
+                        .map_err(|error| RuleConfigError::Configuration {
+                            message: error.to_string(),
+                        })?,
+                    &config,
+                )
             })
             .as_ref()
     }
@@ -4187,9 +4204,11 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-
-        let rules_path = storage.root().join("rules.toml");
+        let layout = storage.repository_layout();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
         std::fs::write(
             &rules_path,
             r#"
@@ -4200,7 +4219,7 @@ assert = { require-section = { heading = "Goals" } }
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         // First access parses and caches the file.
         let first = executor.rules().expect("valid rules");
@@ -4240,9 +4259,11 @@ assert = { require-doc-type = { doc-type = "design" } }
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-
-        let config_path = storage.root().join("config.toml");
+        let layout = storage.repository_layout();
+        let config_path = layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         std::fs::write(
             &config_path,
             r#"
@@ -4253,7 +4274,7 @@ unique = false
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         // First access parses config.toml and caches the namespace registry.
         let first = executor.cached_namespaces().expect("valid namespaces");
@@ -4290,10 +4311,10 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
+        let layout = storage.repository_layout();
         // No rules.toml written.
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
         let rules = executor.rules().expect("missing file is not an error");
         assert!(rules.rules.is_empty());
     }
@@ -4303,12 +4324,16 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
+        let layout = storage.repository_layout();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
 
         // A rule whose assert table has no kind is a genuine config error and
         // must NOT be downgraded to an empty (no-rules) set.
         std::fs::write(
-            storage.root().join("rules.toml"),
+            rules_path,
             r#"
 [[rules]]
 name = "broken"
@@ -4317,7 +4342,7 @@ assert = {}
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
         assert!(
             executor.rules().is_err(),
             "malformed rules.toml must surface an error, not an empty set"

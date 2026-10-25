@@ -501,7 +501,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // State change
         if let Some(new_state) = operations.state {
             if issue.state != new_state {
-                changes.push(format!("state: {:?} → {:?}", issue.state, new_state));
+                changes.push(format!("state: {} → {}", issue.state, new_state));
             }
         }
 
@@ -553,10 +553,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Priority change
         if let Some(new_priority) = operations.priority {
             if issue.priority != new_priority {
-                changes.push(format!(
-                    "priority: {:?} → {:?}",
-                    issue.priority, new_priority
-                ));
+                changes.push(format!("priority: {} → {}", issue.priority, new_priority));
             }
         }
 
@@ -755,8 +752,8 @@ mod tests {
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
-        assert!(changes[0].contains("Ready"));
-        assert!(changes[0].contains("Done"));
+        assert!(changes[0].contains("ready"));
+        assert!(changes[0].contains("done"));
     }
 
     #[test]

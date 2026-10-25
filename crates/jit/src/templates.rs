@@ -32,16 +32,21 @@
 //! template file plus the type hierarchy alone.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::domain::vocabulary::wire_vocabulary;
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 
 /// Errors that can occur while loading and validating `.jit/templates.toml`.
 #[derive(Debug, Error)]
 pub enum TemplateConfigError {
+    /// The repository layout could not resolve the templates path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+
     /// The templates file could not be read from disk.
     #[error("failed to read templates file '{path}': {source}")]
     Io {
@@ -412,10 +417,10 @@ impl TemplateRegistry {
     /// `type`s are checked; pass an empty slice to skip the type check (when no
     /// hierarchy is configured).
     pub fn load<S: AsRef<str>>(
-        jit_root: &Path,
+        layout: &RepositoryLayout,
         hierarchy_types: &[S],
     ) -> Result<Self, TemplateConfigError> {
-        let path = jit_root.join("templates.toml");
+        let path = layout.resolve(&VirtualPath::TEMPLATES)?;
         if !path.exists() {
             return Ok(Self::empty());
         }
@@ -806,15 +811,24 @@ applies_to  = ["epic"]
     #[test]
     fn test_load_missing_file_is_empty_registry() {
         let dir = TempDir::new().unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let reg = TemplateRegistry::load(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+            &HIERARCHY,
+        )
+        .unwrap();
         assert!(reg.templates.is_empty());
     }
 
     #[test]
     fn test_load_valid_file_from_disk() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), plan_template_toml()).unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            plan_template_toml(),
+        )
+        .unwrap();
+        let reg = TemplateRegistry::load(&layout, &HIERARCHY).unwrap();
         assert_eq!(reg.templates.len(), 1);
         assert_eq!(reg.templates[0].name, "plan");
     }
@@ -822,8 +836,13 @@ applies_to  = ["epic"]
     #[test]
     fn test_malformed_toml_errors() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), "[[template").unwrap();
-        let err = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap_err();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            "[[template",
+        )
+        .unwrap();
+        let err = TemplateRegistry::load(&layout, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::Toml(_)));
     }
 
@@ -1106,7 +1125,11 @@ depends_on = ["a"]
             .and_then(|p| p.parent())
             .expect("crate is nested two levels under the repo root");
         let jit_dir = repo_root.join(".jit");
-        let reg = TemplateRegistry::load(&jit_dir, &HIERARCHY).unwrap();
+        let reg = TemplateRegistry::load(
+            &crate::test_utils::repository_layout_for_data_root(&jit_dir),
+            &HIERARCHY,
+        )
+        .unwrap();
         let plan = reg
             .get("plan")
             .expect("repo .jit/templates.toml declares a `plan` template");
