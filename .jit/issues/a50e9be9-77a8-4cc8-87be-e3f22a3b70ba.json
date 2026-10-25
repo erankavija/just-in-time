@@ -8,6 +8,7 @@
   ],
   "description": "Carry the resolved agent identity as an `Assignee` from resolution through the claim coordinator into lease records.\n\n## Background\n\n`resolve_agent_id` returns `Result<String>` (`crates/jit/src/agent_config.rs:88`) after validating through `Assignee` and discarding the result (`:162`). `ClaimCoordinator::new(paths, locker, worktree_id: String, agent_id: String)` (`storage/claim_coordinator.rs:364`) is called at `commands/claim.rs:245,534,580,634,702` and `commands/mod.rs:732`. `ClaimCoordinator` stores the agent as a `String` (`:268`), as does `Lease.agent_id` (`:37`). Each agent id in this checkout's claims log parses as an `Assignee`.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_agent_id` returns `Assignee`.\n- [hard] REQ-02: `ClaimCoordinator`, `Lease` and `ClaimOp` hold the agent as `Assignee`, and system callers pass the named actor constants.\n- [hard] REQ-03: A claims-log entry whose agent is not a valid assignee fails to decode with an error naming the field.\n- [hard] REQ-04: Claims-log lines are byte-identical before and after.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:46:52.629246741Z",
   "first_ready_at": "2026-10-25T01:43:29.758102752Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolved agent identity is an Assignee",
-  "updated_at": "2026-10-25T02:43:51.198029250Z"
+  "updated_at": "2026-10-25T02:46:52.629246741Z"
 }
