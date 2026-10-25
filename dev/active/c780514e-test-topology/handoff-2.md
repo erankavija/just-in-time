@@ -25,7 +25,12 @@
 
 - **Slot A, `.agents/worktrees/agent-22355a56`, branch `worktree-agent-w2-cli-issue`.**
   - Committed and unmerged: b5faab2f `bcbf44664`, e7764cb1 `66af637ba`, 7bf48536 `1a60e7e20`. These passed lead review and 339/339 cli_issue tests; their cargo-ci and code-review gates have not run.
-  - A Codex gpt-6-luna follow-up for fec9b43b, 9c3b9da2 and 5f4daf6b may still be running or may have left uncommitted edits in this worktree. Brief: `/tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/287df093-c878-4892-a6f1-7223cf12cdad/scratchpad/brief-b-cli-issue2.md`. Report: `.../scratchpad/codex-cli-issue2.txt`.
+  - The Codex gpt-6-luna follow-up for fec9b43b, 9c3b9da2 and 5f4daf6b **finished after this handoff was drafted**. Its edits are **uncommitted** in this worktree and not yet lead-reviewed:
+    - fec9b43b: 6 files, 44 tests.
+    - 5f4daf6b: 6 files, 50 tests. It also deleted the suite-root `TaxonomyRepo` copy from cli_issue `main.rs`, since 5f4daf6b moved the last caller. Commit that `main.rs` change with 5f4daf6b.
+    - 9c3b9da2: nothing changed. Beyond the serve test, its failure-probe tests (`test_recorded_failure_arms_emit_the_canonical_error_envelope`, `test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes`) need a committed HEAD and a linked worktree. That is the same fixture gap as open question 1.
+    - In the sandbox, 338/339 cli_issue tests pass; the one failure is the serve-port bind, a sandbox artefact. Re-run outside the sandbox.
+    - Brief: `/tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/287df093-c878-4892-a6f1-7223cf12cdad/scratchpad/brief-b-cli-issue2.md`. Report: `.../scratchpad/codex-cli-issue2.txt`.
 - **Slot B, `.agents/worktrees/agent-de880d9c`, branch `worktree-agent-w2-crw1`.** Committed and unmerged; lead review passed; cli_repo_workflow 406/406:
   - e230e621 `f147f4d11`
   - 8e69776c `13c038953` (partial)
@@ -62,7 +67,7 @@
   - Commit per issue by file footprint (see the "This entry covers" line in each issue).
 - [ ] Commit main's pending epic tracker changes, then land in this order with `scratchpad/land.sh` (run it from a clean main; it refuses non-tracker dirt, including `progress.json`):
   1. 5353463c on main (branch argument `main`), then `review.sh 5353463c`. This is its rework 2 of 2; a further FAIL escalates.
-  2. Slot B: `land.sh worktree-agent-w2-crw1 "<msg>" e230e621 c9442f7f 37218dff 8e69776c`, then reviews for the first three.
+  2. Slot B: `land.sh worktree-agent-w2-crw1 "<msg>" e230e621 c9442f7f 37218dff 8e69776c`, then reviews for the first three. If 2195c98f's e1a6c8c2 has landed (config writes now resolve `VirtualPath::CONFIG` via `RepositoryLayout`), first merge main into the branch: e230e621 (`f147f4d11`) edits `cli_repo_workflow/project_config_tests.rs`, which e1a6c8c2 also changes. e1a6c8c2 also touches `test_utils.rs` (new `repository_layout_for_data_root` block), `test_harness.rs`, `fast_docs_templates/`, `fast_rules/` and `cli_item_validate/invariant_registry_story_tests.rs`; check these before dispatching 07f4b1d4, b93687b3 and 717f9c2f.
   3. Slot A: the three reviewed issues plus any accepted follow-up issues.
 - [ ] Close passing issues with `scratchpad/close.sh "<msg>" <ids>`, then update `progress.json` (`prog.py status/review`).
 - [ ] Remaining ready wave-2 work, dispatched to the two worktrees, alternating Claude and Codex (next dispatch: Claude):

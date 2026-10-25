@@ -319,9 +319,10 @@ fn capture_gate_preset_image(
             .collect::<Result<Vec<_>>>()?;
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
-            let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
+            let rules_text =
+                super::image_virtual_bytes(image, &crate::repository_state::VirtualPath::RULES)?
+                    .map(String::from_utf8)
+                    .transpose()?;
             render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
         } else {
             Vec::new()
@@ -1046,9 +1047,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let spec = CaptureSpec::new(registries()?, budget)?;
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
-                    let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                        .map(String::from_utf8)
-                        .transpose()?;
+                    let rules_text = super::image_virtual_bytes(
+                        image,
+                        &crate::repository_state::VirtualPath::RULES,
+                    )?
+                    .map(String::from_utf8)
+                    .transpose()?;
                     Ok(spec.discover_paths(render_capture_closure(
                         image.layout(),
                         &config,
@@ -1299,7 +1303,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             let warnings = super::captured_lease_warnings(
                 mode,
                 std::slice::from_ref(&target),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let preset = parse_captured_gate_presets(&image)?

@@ -2,6 +2,7 @@
 //!
 //! Provides CLI interface for worktree information and operations.
 
+use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
@@ -16,7 +17,7 @@ use std::process::Command;
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct WorktreeInfo {
     /// Stable worktree identifier
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Current git branch
     pub branch: String,
     /// Absolute path to worktree root
@@ -31,7 +32,7 @@ pub struct WorktreeInfo {
 #[derive(Debug, Serialize, PartialEq, JsonSchema)]
 pub struct WorktreeListEntry {
     /// Stable worktree identifier
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Current git branch
     pub branch: String,
     /// Absolute path to worktree root
@@ -141,13 +142,13 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
 /// Number of active claims (leases) for the worktree
 fn count_claims_for_worktree(
     index: &ClaimsIndex,
-    worktree_id: &str,
+    worktree_id: &WorktreeId,
     now: chrono::DateTime<chrono::Utc>,
 ) -> usize {
     index
         .leases
         .iter()
-        .filter(|lease| lease.worktree_id == worktree_id && !lease.is_expired(now))
+        .filter(|lease| &lease.worktree_id == worktree_id && !lease.is_expired(now))
         .count()
 }
 
@@ -279,7 +280,12 @@ fn execute_worktree_list_at(
                 identity.worktree_id
             } else {
                 // No .jit directory yet - use branch-based temporary ID
-                format!("wt:{}", git_entry.branch)
+                WorktreeId::try_from(format!("wt:{}", git_entry.branch)).with_context(|| {
+                    format!(
+                        "Invalid worktree id fallback from branch '{}'",
+                        git_entry.branch
+                    )
+                })?
             };
 
             // Count active claims for this worktree
@@ -495,14 +501,14 @@ mod tests {
 
         // Just verify the types are correct by constructing manually
         let info = WorktreeInfo {
-            worktree_id: "wt:12345678".to_string(),
+            worktree_id: "wt:12345678".parse().unwrap(),
             branch: "main".to_string(),
             root_path: "/path/to/worktree".to_string(),
             is_main_worktree: true,
             common_dir: "/path/to/.git".to_string(),
         };
 
-        assert_eq!(info.worktree_id, "wt:12345678");
+        assert_eq!(info.worktree_id.as_str(), "wt:12345678");
         assert_eq!(info.branch, "main");
         assert!(info.is_main_worktree);
 
@@ -534,14 +540,14 @@ mod tests {
     fn test_worktree_list_entry_structure() {
         // Verify the structure is correct
         let entry = WorktreeListEntry {
-            worktree_id: "wt:12345678".to_string(),
+            worktree_id: "wt:12345678".parse().unwrap(),
             branch: "main".to_string(),
             path: "/home/user/project".to_string(),
             is_main: true,
             active_claims: 3,
         };
 
-        assert_eq!(entry.worktree_id, "wt:12345678");
+        assert_eq!(entry.worktree_id.as_str(), "wt:12345678");
         assert_eq!(entry.branch, "main");
         assert_eq!(entry.active_claims, 3);
         assert!(entry.is_main);
@@ -560,10 +566,10 @@ mod tests {
             sequence_gaps: Vec::new(),
             leases: vec![
                 Lease {
-                    lease_id: "lease-1".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
                     issue_id: "issue-1".to_string(),
                     agent_id: "agent:1".parse().unwrap(),
-                    worktree_id: "wt:abc123".to_string(),
+                    worktree_id: "wt:abc123".parse().unwrap(),
                     branch: Some("main".to_string()),
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -572,10 +578,10 @@ mod tests {
                     stale: false,
                 },
                 Lease {
-                    lease_id: "lease-2".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
                     issue_id: "issue-2".to_string(),
                     agent_id: "agent:1".parse().unwrap(),
-                    worktree_id: "wt:abc123".to_string(),
+                    worktree_id: "wt:abc123".parse().unwrap(),
                     branch: Some("main".to_string()),
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -584,10 +590,10 @@ mod tests {
                     stale: false,
                 },
                 Lease {
-                    lease_id: "lease-3".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
                     issue_id: "issue-3".to_string(),
                     agent_id: "agent:2".parse().unwrap(),
-                    worktree_id: "wt:def456".to_string(),
+                    worktree_id: "wt:def456".parse().unwrap(),
                     branch: Some("feature/test".to_string()),
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -599,9 +605,9 @@ mod tests {
         };
 
         let now = Utc::now();
-        let count_abc = count_claims_for_worktree(&index, "wt:abc123", now);
-        let count_def = count_claims_for_worktree(&index, "wt:def456", now);
-        let count_xyz = count_claims_for_worktree(&index, "wt:xyz789", now);
+        let count_abc = count_claims_for_worktree(&index, &"wt:abc123".parse().unwrap(), now);
+        let count_def = count_claims_for_worktree(&index, &"wt:def456".parse().unwrap(), now);
+        let count_xyz = count_claims_for_worktree(&index, &"wt:xyz789".parse().unwrap(), now);
 
         assert_eq!(count_abc, 2);
         assert_eq!(count_def, 1);
@@ -615,11 +621,13 @@ mod tests {
 
         let now = Utc::now();
         let make_lease =
-            |id: &str, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
-                lease_id: id.to_string(),
+            |id: crate::domain::identity::LeaseId,
+             ttl_secs: u64,
+             expires_at: Option<chrono::DateTime<Utc>>| Lease {
+                lease_id: id.clone(),
                 issue_id: format!("issue-{id}"),
                 agent_id: "agent:1".parse().unwrap(),
-                worktree_id: "wt:abc123".to_string(),
+                worktree_id: "wt:abc123".parse().unwrap(),
                 branch: Some("main".to_string()),
                 ttl_secs,
                 acquired_at: now,
@@ -635,17 +643,32 @@ mod tests {
             sequence_gaps: Vec::new(),
             leases: vec![
                 // Live: finite TTL, expiry in the future
-                make_lease("live", 600, Some(now + Duration::seconds(300))),
+                make_lease(
+                    "00000000-0000-4000-8000-000000000001".parse().unwrap(),
+                    600,
+                    Some(now + Duration::seconds(300)),
+                ),
                 // Expired: finite TTL, expiry in the past -> must not be counted
-                make_lease("expired", 600, Some(now - Duration::seconds(1))),
+                make_lease(
+                    "00000000-0000-4000-8000-000000000002".parse().unwrap(),
+                    600,
+                    Some(now - Duration::seconds(1)),
+                ),
                 // Indefinite: ttl_secs == 0, no expiry -> always live
-                make_lease("indefinite", 0, None),
+                make_lease(
+                    "00000000-0000-4000-8000-000000000003".parse().unwrap(),
+                    0,
+                    None,
+                ),
             ],
         };
 
         // Only the live and indefinite leases count; the expired one is excluded,
         // matching `claim list` which evicts expired leases before reporting.
-        assert_eq!(count_claims_for_worktree(&index, "wt:abc123", now), 2);
+        assert_eq!(
+            count_claims_for_worktree(&index, &"wt:abc123".parse().unwrap(), now),
+            2
+        );
     }
 
     /// REQ-02: expiry is driven through an injected [`Clock`] rather than a real
@@ -698,7 +721,7 @@ mod tests {
             .unwrap()
             .trim()
             .to_string();
-        let worktree_id = format!("wt:{branch}");
+        let worktree_id = WorktreeId::try_from(format!("wt:{branch}")).unwrap();
 
         let paths = WorktreePaths {
             git_repository: true,
@@ -722,8 +745,13 @@ mod tests {
         coordinator.init().unwrap();
 
         // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
-        coordinator.acquire_claim("issue-short", 1).unwrap();
-        coordinator.acquire_claim("issue-long", 600).unwrap();
+        use crate::storage::claim_coordinator::test_issue_id;
+        coordinator
+            .acquire_claim(&test_issue_id("issue-short"), 1)
+            .unwrap();
+        coordinator
+            .acquire_claim(&test_issue_id("issue-long"), 600)
+            .unwrap();
 
         let active_total = |clock: &FixedClock| -> usize {
             let (entries, _warnings) = execute_worktree_list_at(&paths, clock).unwrap();

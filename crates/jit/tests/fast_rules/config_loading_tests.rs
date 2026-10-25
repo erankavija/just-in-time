@@ -34,7 +34,10 @@ default_type = "task"
     );
 
     let validation = config.validation.unwrap();
-    assert_eq!(validation.strictness, Some("loose".to_string()));
+    assert_eq!(
+        validation.strictness,
+        Some(jit::validation::Strictness::Loose)
+    );
     assert_eq!(validation.default_type, Some("task".to_string()));
 }
 

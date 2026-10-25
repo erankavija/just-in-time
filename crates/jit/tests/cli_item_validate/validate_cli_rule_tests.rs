@@ -454,7 +454,7 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
 // ---------------------------------------------------------------------------
 // Rework (jit:b8ba1b10): whole-repo --json must surface graph-rule findings;
 // id + legacy flags must be rejected; per-issue + --explain must report
-// malformed graph rules instead of silently passing.
+// unresolved container pointers instead of silently passing.
 // ---------------------------------------------------------------------------
 
 /// A `label-coverage` GRAPH rule at error severity. An epic declaring a `[hard]`
@@ -467,15 +467,13 @@ severity = "error"
 assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
 "#;
 
-/// A MALFORMED `label-coverage` GRAPH rule: its `child-link` names no link
-/// direction, so the rule cannot be applied and must surface as a config-error
-/// finding.
-const MALFORMED_GRAPH_RULE: &str = r#"
+/// A valid coverage rule whose missing container pointer fails evaluation.
+const UNRESOLVED_CONTAINER_RULE: &str = r#"
 [[rules]]
 name = "broken-graph-rule"
 when = { type = "epic" }
 severity = "error"
-assert = { label-coverage = { child-link = "bogus" } }
+assert = { label-coverage = { container-from-label = "brackets" } }
 "#;
 
 const DISABLED_GRAPH_RULE: &str = r#"
@@ -716,11 +714,9 @@ fn test_validate_id_with_leases_is_rejected() {
 }
 
 #[test]
-fn test_validate_id_reports_malformed_graph_rule_not_passed() {
-    // Finding #3: a malformed graph rule whose selector applies to the issue must
-    // be REPORTED for a per-issue `jit validate <id>` (a config-error finding),
-    // never silently dropped.
-    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
+fn test_validate_id_reports_unresolved_container_pointer() {
+    // Per-issue validation must report an unresolved container pointer.
+    let temp = setup_repo_with_rules(UNRESOLVED_CONTAINER_RULE);
     let id = create_epic(&temp, false);
 
     let assert = bin()
@@ -734,15 +730,15 @@ fn test_validate_id_reports_malformed_graph_rule_not_passed() {
     assert!(
         findings.iter().any(|f| f["rule"] == "broken-graph-rule"
             && f["message"].as_str().unwrap_or("").contains("config error")),
-        "malformed graph rule must be reported per-issue: {findings:?}"
+        "unresolved container pointer must be reported per-issue: {findings:?}"
     );
 }
 
 #[test]
-fn test_validate_explain_marks_malformed_graph_rule_as_failed() {
-    // Finding #3 (--explain): a graph rule with a config error for the issue must
+fn test_validate_explain_marks_unresolved_container_pointer_as_failed() {
+    // Finding #3 (--explain): a graph rule with a missing container pointer must
     // be shown as FAILED, never PASS.
-    let temp = setup_repo_with_rules(MALFORMED_GRAPH_RULE);
+    let temp = setup_repo_with_rules(UNRESOLVED_CONTAINER_RULE);
     let id = create_epic(&temp, false);
 
     // Human form: the rule appears and is marked FAIL.
@@ -766,7 +762,7 @@ fn test_validate_explain_marks_malformed_graph_rule_as_failed() {
     let outcome = outcomes
         .iter()
         .find(|o| o["rule"] == "broken-graph-rule")
-        .expect("malformed graph rule must appear as an outcome");
+        .expect("unresolved container pointer must appear as an outcome");
     assert_eq!(
         outcome["passed"], false,
         "a config-errored graph rule must be reported as failed, not passed: {outcome}"

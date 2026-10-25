@@ -981,7 +981,11 @@ fn test_claim_force_evict_requires_reason() {
     // Force-evict without reason should fail (clap validation)
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["claim", "force-evict", "01FAKE0000000000000000000"])
+        .args([
+            "claim",
+            "force-evict",
+            "00000000-0000-4000-8000-000000000001",
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--reason"));
@@ -1079,7 +1083,7 @@ fn test_claim_heartbeat_not_found_error() {
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_AGENT_ID", "agent:test")
-        .args(["claim", "heartbeat", "01FAKE0000000000000000000"])
+        .args(["claim", "heartbeat", "00000000-0000-4000-8000-000000000001"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found"));

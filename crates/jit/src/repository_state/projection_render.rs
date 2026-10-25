@@ -28,7 +28,7 @@
 
 use super::projection::{render_id_anchor_rows, render_invariants_markdown, ProjectionError};
 use super::rules_gates_projection::render_rules_and_gates_markdown;
-use super::ProducerError;
+use super::{ProducerError, VirtualPath};
 use crate::config::{JitConfig, ProjectionConfig, ProjectionStyle, SourceOfTruth};
 use crate::declarations::rules::RuleSet;
 use crate::declarations::GateRegistry;
@@ -99,7 +99,7 @@ fn resolve_rows(
     config: &JitConfig,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<Vec<AddressableItem>, ProducerError> {
-    let parser = content_parser_for(None, repo_content_format(config)?)?;
+    let parser = content_parser_for(None, repo_content_format(config))?;
     let mut rows = Vec::new();
     for kind in kinds {
         if !kind.kind_scope().is_project() {
@@ -152,10 +152,6 @@ fn resolve_rows(
 /// invariant, rule, and gate registries from (repository.rs loads `config.invariants`
 /// from `.jit/invariants.toml`, and the rule/gate stores live beside it). These are
 /// jit's infrastructure, NOT a user domain vocabulary.
-const INVARIANT_STORE: &str = ".jit/invariants.toml";
-const RULE_STORE: &str = ".jit/rules.toml";
-const GATE_STORE: &str = ".jit/gates.toml";
-
 /// Render the `full` body for the built-in registry-first kinds.
 ///
 /// Dispatches on what CONFIGURATION declares, not on kind NAMES: a projected
@@ -223,11 +219,14 @@ fn render_full_body(
         }
     }
 
-    if sources == BTreeSet::from([INVARIANT_STORE]) {
+    let invariant_store = VirtualPath::INVARIANTS.repository_relative();
+    let rule_store = VirtualPath::RULES.repository_relative();
+    let gate_store = VirtualPath::GATES.repository_relative();
+    if sources == BTreeSet::from([invariant_store.as_str()]) {
         let registry = &inputs.config.invariants;
         let body = render_invariants_markdown(registry, ProjectionStyle::Full);
         Ok((body, registry.invariants.len()))
-    } else if sources == BTreeSet::from([RULE_STORE, GATE_STORE]) {
+    } else if sources == BTreeSet::from([rule_store.as_str(), gate_store.as_str()]) {
         let body =
             render_rules_and_gates_markdown(inputs.rules, inputs.gates, ProjectionStyle::Full);
         Ok((body, inputs.rules.rules.len() + inputs.gates.gates.len()))
@@ -242,19 +241,6 @@ fn render_full_body(
 /// The repo-level content format (`[validation].content_format`, defaulting to
 /// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
 /// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerError> {
-    match config.validation.as_ref() {
-        Some(validation) => match validation.content_format.as_deref() {
-            None => Ok(ContentFormat::DEFAULT),
-            Some(value)
-                if value.eq_ignore_ascii_case("markdown") || value.eq_ignore_ascii_case("md") =>
-            {
-                Ok(ContentFormat::Markdown)
-            }
-            Some(value) if value.eq_ignore_ascii_case("html") => Ok(ContentFormat::Html),
-            Some(value) if value.eq_ignore_ascii_case("xml") => Ok(ContentFormat::Xml),
-            Some(value) => Err(ProducerError::InvalidContentFormat(value.to_string())),
-        },
-        None => Ok(ContentFormat::DEFAULT),
-    }
+fn repo_content_format(config: &JitConfig) -> ContentFormat {
+    config.content_format()
 }
