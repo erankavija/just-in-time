@@ -3,7 +3,7 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::JitConfig;
-use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::{IssueIdPrefix, LeaseId};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -86,7 +86,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     ttl_secs: u64,
     agent_id: Option<&str>,
     reason: Option<&str>,
-) -> Result<(String, Vec<StorageWarning>)> {
+) -> Result<(LeaseId, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
     // Resolve short ID to full ID
@@ -224,7 +224,7 @@ where
 /// heartbeat cannot be recorded (e.g. the lease does not exist).
 pub fn execute_claim_heartbeat(
     paths: &WorktreePaths,
-    lease_id: &str,
+    lease_id: &LeaseId,
 ) -> Result<Vec<StorageWarning>> {
     use crate::agent_config::resolve_agent_id;
 
@@ -255,7 +255,7 @@ pub fn execute_claim_heartbeat(
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ReleasedLeaseInfo {
     /// The lease ID that was released (resolved from the issue, not supplied by the user).
-    pub lease_id: String,
+    pub lease_id: LeaseId,
     /// The full issue ID whose lease was released.
     pub issue_id: String,
     /// The prior owner of the released lease.
@@ -418,7 +418,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 /// lease cannot be renewed (e.g. it does not exist).
 pub fn execute_claim_renew(
     paths: &WorktreePaths,
-    lease_id: &str,
+    lease_id: &LeaseId,
     extension_secs: u64,
 ) -> Result<(Lease, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
@@ -559,7 +559,7 @@ pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<Stor
 /// lease cannot be evicted.
 pub fn execute_claim_force_evict(
     paths: &WorktreePaths,
-    lease_id: &str,
+    lease_id: &LeaseId,
     reason: &str,
 ) -> Result<Vec<StorageWarning>> {
     // Get current branch for identity
@@ -779,7 +779,7 @@ mod tests {
         issue_id: &str,
         ttl_secs: u64,
         agent_id: &str,
-    ) -> Result<String> {
+    ) -> Result<LeaseId> {
         // Resolve short ID to full ID
         let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
@@ -811,7 +811,11 @@ mod tests {
     }
 
     /// Execute claim release with manually constructed paths (for testing)
-    fn execute_claim_release_test(temp: &TempDir, lease_id: &str, agent_id: &str) -> Result<()> {
+    fn execute_claim_release_test(
+        temp: &TempDir,
+        lease_id: &LeaseId,
+        agent_id: &str,
+    ) -> Result<()> {
         let paths = create_test_paths(temp);
 
         // Create coordinator
@@ -819,7 +823,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.parse()?);
+            ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), agent_id.parse()?);
 
         // Release lease
         coordinator.release_lease(lease_id)?;
@@ -844,7 +848,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.parse()?);
+            ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), actor.parse()?);
         coordinator.init()?;
 
         let leases = coordinator.get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)?;
@@ -1020,7 +1024,7 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             agent_id.unwrap_or("agent:test").parse().unwrap(),
         );
 
@@ -1099,8 +1103,8 @@ mod tests {
 
         assert!(result.is_ok());
         let lease_id = result.unwrap();
-        assert!(!lease_id.is_empty());
-        assert!(lease_id.len() >= 32);
+        assert!(!lease_id.as_str().is_empty());
+        assert!(lease_id.as_str().len() >= 32);
         Ok(())
     }
 
@@ -1187,7 +1191,7 @@ mod tests {
     /// Helper to execute claim renew in tests
     fn execute_claim_renew_test(
         temp: &TempDir,
-        lease_id: &str,
+        lease_id: &LeaseId,
         extension_secs: u64,
         agent_id: &str,
     ) -> Result<Lease> {
@@ -1222,7 +1226,7 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             "agent:test".parse().unwrap(),
         );
         let original = coordinator
@@ -1253,7 +1257,12 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_renew_test(&temp, "fake-lease-id", 600, "agent:test");
+        let result = execute_claim_renew_test(
+            &temp,
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            600,
+            "agent:test",
+        );
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1306,10 +1315,14 @@ mod tests {
 
     // Tests for claim release command
     #[test]
-    fn test_claim_release_fails_with_invalid_lease_id() -> Result<()> {
+    fn test_claim_release_fails_for_nonexistent_lease() -> Result<()> {
         let (temp, _storage) = setup_test_repo()?;
 
-        let result = execute_claim_release_test(&temp, "invalid-lease-id", "agent:test");
+        let result = execute_claim_release_test(
+            &temp,
+            &"00000000-0000-4000-8000-000000000008".parse().unwrap(),
+            "agent:test",
+        );
 
         assert!(result.is_err());
         Ok(())
@@ -1496,7 +1509,7 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             crate::domain::Assignee::SYSTEM_LIST,
         );
         coordinator.init()?;
@@ -1536,7 +1549,11 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_force_evict_test(&temp, "fake-lease-id", "Test reason");
+        let result = execute_claim_force_evict_test(
+            &temp,
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            "Test reason",
+        );
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1571,7 +1588,11 @@ mod tests {
     }
 
     /// Helper to execute force evict in tests
-    fn execute_claim_force_evict_test(temp: &TempDir, lease_id: &str, reason: &str) -> Result<()> {
+    fn execute_claim_force_evict_test(
+        temp: &TempDir,
+        lease_id: &LeaseId,
+        reason: &str,
+    ) -> Result<()> {
         let paths = create_test_paths(temp);
 
         let locker = FileLocker::new(Duration::from_secs(
@@ -1580,7 +1601,7 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             crate::domain::Assignee::SYSTEM_ADMIN,
         );
         coordinator.init()?;
@@ -1626,7 +1647,7 @@ mod tests {
         issue_id: &str,
         ttl_secs: u64,
         agent_id: &str,
-    ) -> Result<String> {
+    ) -> Result<LeaseId> {
         let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let paths = create_test_paths(temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
@@ -1706,7 +1727,7 @@ mod tests {
             600,
             "agent:worker",
         )?;
-        assert!(!lease_id.is_empty());
+        assert!(!lease_id.as_str().is_empty());
 
         // Issue is assigned with a stamped claimed_at, and exactly one claim event
         // was appended in the same publication (@/inv/event-log).

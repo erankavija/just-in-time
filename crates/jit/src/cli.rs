@@ -2374,12 +2374,12 @@ pub enum ClaimCommands {
     /// working on an issue beyond the original TTL.
     ///
     /// Examples:
-    ///   jit claim renew abc12345-6789-... --extension 600   # Extend by 10 minutes
-    ///   jit claim renew abc12345-6789-... --extension 3600  # Extend by 1 hour
-    ///   jit claim renew abc12345-6789-...                   # Extend by the default TTL
+    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 600   # Extend by 10 minutes
+    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 3600  # Extend by 1 hour
+    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41                   # Extend by the default TTL
     Renew {
         /// Lease ID to renew
-        lease_id: String,
+        lease_id: crate::domain::identity::LeaseId,
 
         /// How many seconds to extend the lease by
         #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
@@ -2393,11 +2393,11 @@ pub enum ClaimCommands {
     /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
     ///
     /// Examples:
-    ///   jit claim heartbeat abc12345-6789-...       # Send heartbeat
-    ///   jit claim heartbeat abc12345-6789-... --json
+    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41       # Send heartbeat
+    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41 --json
     Heartbeat {
         /// Lease ID to heartbeat
-        lease_id: String,
+        lease_id: crate::domain::identity::LeaseId,
     },
 
     /// Show active lease status
@@ -2441,11 +2441,11 @@ pub enum ClaimCommands {
     /// The eviction is logged with the provided reason for audit trail.
     ///
     /// Examples:
-    ///   jit claim force-evict abc12345-6789-... --reason "Stale after crash"
-    ///   jit claim force-evict abc12345-6789-... --reason "Admin override" --json
+    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Stale after crash"
+    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Admin override" --json
     ForceEvict {
         /// Lease ID to evict
-        lease_id: String,
+        lease_id: crate::domain::identity::LeaseId,
 
         /// Reason for eviction (required for audit trail)
         #[arg(long)]
@@ -3129,6 +3129,38 @@ mod recovery_dispatch_tests {
     use clap::{CommandFactory, Parser};
     use std::collections::BTreeSet;
 
+    #[test]
+    fn test_claim_lease_arguments_parse_to_lease_ids_before_dispatch() {
+        let canonical = "b53beeba-32f2-4671-a407-2d94e4d13d41";
+        for command in ["renew", "heartbeat", "force-evict"] {
+            let suffix = if command == "force-evict" {
+                vec!["--reason", "test"]
+            } else {
+                vec![]
+            };
+            let args = |id| {
+                ["jit", "claim", command, id]
+                    .into_iter()
+                    .chain(suffix.iter().copied())
+            };
+            let cli = Cli::try_parse_from(args(canonical)).unwrap();
+            let Some(Commands::Claim(command)) = cli.command else {
+                panic!("expected claim command")
+            };
+            let lease_id = match command {
+                ClaimCommands::Renew { lease_id, .. }
+                | ClaimCommands::Heartbeat { lease_id }
+                | ClaimCommands::ForceEvict { lease_id, .. } => lease_id,
+                _ => panic!("expected lease argument"),
+            };
+            assert_eq!(lease_id.as_str(), canonical);
+            assert_eq!(
+                Cli::try_parse_from(args("lease-id")).err().unwrap().kind(),
+                clap::error::ErrorKind::ValueValidation
+            );
+        }
+    }
+
     const CLI_LEAF_COMMANDS: &[&str] = &[
         "apply",
         "archive candidates",
@@ -3350,10 +3382,23 @@ mod recovery_dispatch_tests {
             ),
             ("claim acquire", &["jit", "claim", "acquire", "deadbeef"]),
             ("claim release", &["jit", "claim", "release", "deadbeef"]),
-            ("claim renew", &["jit", "claim", "renew", "lease-id"]),
+            (
+                "claim renew",
+                &[
+                    "jit",
+                    "claim",
+                    "renew",
+                    "00000000-0000-4000-8000-000000000001",
+                ],
+            ),
             (
                 "claim heartbeat",
-                &["jit", "claim", "heartbeat", "lease-id"],
+                &[
+                    "jit",
+                    "claim",
+                    "heartbeat",
+                    "00000000-0000-4000-8000-000000000001",
+                ],
             ),
             (
                 "claim force-evict",
@@ -3361,7 +3406,7 @@ mod recovery_dispatch_tests {
                     "jit",
                     "claim",
                     "force-evict",
-                    "lease-id",
+                    "00000000-0000-4000-8000-000000000001",
                     "--reason",
                     "stale",
                 ],

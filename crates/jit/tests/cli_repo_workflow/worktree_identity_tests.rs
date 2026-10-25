@@ -22,8 +22,8 @@ fn test_generate_worktree_id_is_deterministic() {
         .unwrap()
         .with_timezone(&chrono::Utc);
 
-    let id1 = generate_worktree_id(&path, timestamp);
-    let id2 = generate_worktree_id(&path, timestamp);
+    let id1 = generate_worktree_id(&path, timestamp).unwrap();
+    let id2 = generate_worktree_id(&path, timestamp).unwrap();
 
     assert_eq!(id1, id2, "Same inputs should produce same ID");
 }
@@ -33,16 +33,16 @@ fn test_generate_worktree_id_format() {
     let path = PathBuf::from("/test/path");
     let timestamp = chrono::Utc::now();
 
-    let id = generate_worktree_id(&path, timestamp);
+    let id = generate_worktree_id(&path, timestamp).unwrap();
 
     // Should start with "wt:"
-    assert!(id.starts_with("wt:"), "ID should start with 'wt:'");
+    assert!(id.as_str().starts_with("wt:"), "ID should start with 'wt:'");
 
     // Should be exactly "wt:" + 8 hex chars
-    assert_eq!(id.len(), 11, "ID should be 11 chars (wt: + 8 hex)");
+    assert_eq!(id.as_str().len(), 11, "ID should be 11 chars (wt: + 8 hex)");
 
     // After "wt:", should be valid hex
-    let hex_part = &id[3..];
+    let hex_part = &id.as_str()[3..];
     assert!(
         hex_part.chars().all(|c| c.is_ascii_hexdigit()),
         "ID suffix should be hex: {}",
@@ -54,8 +54,8 @@ fn test_generate_worktree_id_format() {
 fn test_generate_worktree_id_different_paths_different_ids() {
     let timestamp = chrono::Utc::now();
 
-    let id1 = generate_worktree_id(&PathBuf::from("/path/one"), timestamp);
-    let id2 = generate_worktree_id(&PathBuf::from("/path/two"), timestamp);
+    let id1 = generate_worktree_id(&PathBuf::from("/path/one"), timestamp).unwrap();
+    let id2 = generate_worktree_id(&PathBuf::from("/path/two"), timestamp).unwrap();
 
     assert_ne!(id1, id2, "Different paths should produce different IDs");
 }
@@ -71,8 +71,8 @@ fn test_generate_worktree_id_different_timestamps_different_ids() {
         .unwrap()
         .with_timezone(&chrono::Utc);
 
-    let id1 = generate_worktree_id(&path, time1);
-    let id2 = generate_worktree_id(&path, time2);
+    let id1 = generate_worktree_id(&path, time1).unwrap();
+    let id2 = generate_worktree_id(&path, time2).unwrap();
 
     assert_ne!(
         id1, id2,
@@ -84,7 +84,7 @@ fn test_generate_worktree_id_different_timestamps_different_ids() {
 fn test_worktree_identity_serialization() {
     let identity = WorktreeIdentity {
         schema_version: 1,
-        worktree_id: "wt:abc123ef".to_string(),
+        worktree_id: "wt:abc123ef".parse().unwrap(),
         branch: "main".to_string(),
         root: "/path/to/worktree".to_string(),
         created_at: chrono::Utc::now(),
@@ -108,7 +108,7 @@ fn test_load_or_create_creates_new_identity() {
     let branch = "test-branch".to_string();
     let identity = load_or_create_worktree_identity(&identity_paths(&temp_dir), &branch).unwrap();
 
-    assert!(identity.worktree_id.starts_with("wt:"));
+    assert!(identity.worktree_id.as_str().starts_with("wt:"));
     assert_eq!(identity.branch, branch);
     assert_eq!(identity.root, temp_dir.path().to_string_lossy().to_string());
     assert_eq!(identity.schema_version, 1);
@@ -214,7 +214,7 @@ fn test_init_removes_copied_worktree_json_with_wrong_path() {
     // Create a worktree.json with WRONG root path (simulates copied file)
     let wrong_identity = WorktreeIdentity {
         schema_version: 1,
-        worktree_id: "wt:wrongid1".to_string(),
+        worktree_id: "wt:wrongid1".parse().unwrap(),
         branch: "main".to_string(),
         root: "/some/other/worktree".to_string(), // Wrong path!
         created_at: chrono::Utc::now(),
@@ -250,7 +250,7 @@ fn test_init_preserves_correct_worktree_json() {
     // Create a worktree.json with CORRECT root path
     let correct_identity = WorktreeIdentity {
         schema_version: 1,
-        worktree_id: "wt:correct1".to_string(),
+        worktree_id: "wt:correct1".parse().unwrap(),
         branch: "main".to_string(),
         root: temp_dir.path().to_string_lossy().to_string(), // Correct path
         created_at: chrono::Utc::now(),
@@ -275,7 +275,7 @@ fn test_init_preserves_correct_worktree_json() {
     assert!(wt_file.exists());
     let content = fs::read_to_string(&wt_file).unwrap();
     let identity: WorktreeIdentity = serde_json::from_str(&content).unwrap();
-    assert_eq!(identity.worktree_id, "wt:correct1");
+    assert_eq!(identity.worktree_id.as_str(), "wt:correct1");
     assert_eq!(identity.root, temp_dir.path().to_string_lossy().to_string());
 }
 
@@ -296,7 +296,7 @@ fn test_init_is_idempotent() {
     let jit_dir = temp_dir.path().join(".jit");
     let identity = WorktreeIdentity {
         schema_version: 1,
-        worktree_id: "wt:stable01".to_string(),
+        worktree_id: "wt:stable01".parse().unwrap(),
         branch: "main".to_string(),
         root: temp_dir.path().to_string_lossy().to_string(),
         created_at: chrono::Utc::now(),
@@ -317,5 +317,5 @@ fn test_init_is_idempotent() {
     // Verify ID is unchanged
     let content = fs::read_to_string(&wt_file).unwrap();
     let final_identity: WorktreeIdentity = serde_json::from_str(&content).unwrap();
-    assert_eq!(final_identity.worktree_id, "wt:stable01");
+    assert_eq!(final_identity.worktree_id.as_str(), "wt:stable01");
 }

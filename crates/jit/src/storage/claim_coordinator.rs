@@ -26,6 +26,7 @@ use uuid::Uuid;
 
 use super::lock::FileLocker;
 use super::worktree_paths::WorktreePaths;
+use crate::domain::identity::{LeaseId, WorktreeId};
 use crate::domain::Assignee;
 use crate::errors;
 
@@ -33,7 +34,7 @@ use crate::errors;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct Lease {
     /// Unique lease identifier (UUID)
-    pub lease_id: String,
+    pub lease_id: LeaseId,
     /// Issue being claimed
     pub issue_id: String,
     /// Agent holding the lease
@@ -41,7 +42,7 @@ pub struct Lease {
     #[schemars(with = "String")]
     pub agent_id: Assignee,
     /// Worktree where lease was acquired
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Git branch (informational)
     pub branch: Option<String>,
     /// Time-to-live in seconds (0 = indefinite)
@@ -106,29 +107,29 @@ pub enum ClaimOp {
     },
     /// Renew an existing lease
     Renew {
-        lease_id: String,
+        lease_id: LeaseId,
         new_expires_at: Option<DateTime<Utc>>,
         new_last_beat: DateTime<Utc>,
     },
     /// Heartbeat for indefinite leases (updates last_beat only)
     Heartbeat {
-        lease_id: String,
+        lease_id: LeaseId,
         new_last_beat: DateTime<Utc>,
     },
     /// Release a lease explicitly
     Release {
-        lease_id: String,
+        lease_id: LeaseId,
         released_at: DateTime<Utc>,
     },
     /// Automatically evict expired lease
     AutoEvict {
-        lease_id: String,
+        lease_id: LeaseId,
         evicted_at: DateTime<Utc>,
         reason: String,
     },
     /// Force evict a lease (admin operation)
     ForceEvict {
-        lease_id: String,
+        lease_id: LeaseId,
         evicted_at: DateTime<Utc>,
         reason: String,
     },
@@ -236,13 +237,13 @@ impl ClaimsIndex {
     }
 
     /// Remove a lease from the index
-    pub fn remove_lease(&mut self, lease_id: &str) {
-        self.leases.retain(|l| l.lease_id != lease_id);
+    pub fn remove_lease(&mut self, lease_id: &LeaseId) {
+        self.leases.retain(|l| &l.lease_id != lease_id);
     }
 
     /// Find a lease by lease_id
-    pub fn find_lease_by_id(&self, lease_id: &str) -> Option<&Lease> {
-        self.leases.iter().find(|l| l.lease_id == lease_id)
+    pub fn find_lease_by_id(&self, lease_id: &LeaseId) -> Option<&Lease> {
+        self.leases.iter().find(|l| &l.lease_id == lease_id)
     }
 }
 
@@ -250,7 +251,7 @@ impl ClaimsIndex {
 pub struct ClaimCoordinator {
     paths: WorktreePaths,
     locker: FileLocker,
-    worktree_id: String,
+    worktree_id: WorktreeId,
     agent_id: Assignee,
     /// Whether to fsync the audit log and index on every write. Defaults to
     /// `true` for crash durability in production. Tests that exercise pure
@@ -347,7 +348,7 @@ impl ClaimCoordinator {
     pub fn new(
         paths: WorktreePaths,
         locker: FileLocker,
-        worktree_id: String,
+        worktree_id: WorktreeId,
         agent_id: Assignee,
     ) -> Self {
         Self {
@@ -459,7 +460,7 @@ impl ClaimCoordinator {
         // 4. Create new lease
         let now = self.clock.now();
         let lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
+            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
             issue_id: issue_id.to_string(),
             agent_id: self.agent_id.clone(),
             worktree_id: self.worktree_id.clone(),
@@ -592,7 +593,7 @@ impl ClaimCoordinator {
         // 5. Create new lease
         let now = self.clock.now();
         let lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
+            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
             issue_id: issue_id.to_string(),
             agent_id: self.agent_id.clone(),
             worktree_id: self.worktree_id.clone(),
@@ -758,7 +759,7 @@ impl ClaimCoordinator {
                 }
                 let now = self.clock.now();
                 let lease = Lease {
-                    lease_id: Uuid::new_v4().to_string(),
+                    lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
                     issue_id: issue_id.to_string(),
                     agent_id: self.agent_id.clone(),
                     worktree_id: self.worktree_id.clone(),
@@ -807,7 +808,7 @@ impl ClaimCoordinator {
     /// # Returns
     ///
     /// The updated lease with new `last_beat` timestamp.
-    pub fn heartbeat(&self, lease_id: &str) -> Result<Lease> {
+    pub fn heartbeat(&self, lease_id: &LeaseId) -> Result<Lease> {
         // 1. Acquire exclusive lock
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         fs::create_dir_all(lock_path.parent().unwrap())?;
@@ -821,7 +822,7 @@ impl ClaimCoordinator {
         // 3. Find the lease
         let lease = index
             .find_lease_by_id(lease_id)
-            .ok_or_else(|| crate::errors::LeaseNotFoundError::by_id(lease_id))?
+            .ok_or_else(|| crate::errors::LeaseNotFoundError::by_id(lease_id.as_str()))?
             .clone();
 
         // 4. Verify ownership
@@ -840,7 +841,7 @@ impl ClaimCoordinator {
 
         // 6. Append heartbeat operation to log
         let op = ClaimOp::Heartbeat {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             new_last_beat,
         };
         self.append_claim_op(&op)?;
@@ -999,7 +1000,7 @@ impl ClaimCoordinator {
     /// - Lease not found
     /// - Lease not owned by current agent
     /// - Lease already expired
-    pub fn renew_lease(&self, lease_id: &str, extension_secs: u64) -> Result<Lease> {
+    pub fn renew_lease(&self, lease_id: &LeaseId, extension_secs: u64) -> Result<Lease> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
@@ -1014,9 +1015,9 @@ impl ClaimCoordinator {
         let lease = index
             .leases
             .iter()
-            .find(|l| l.lease_id == lease_id)
+            .find(|l| &l.lease_id == lease_id)
             .ok_or_else(|| {
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
             })?;
 
         // 4. Verify ownership
@@ -1044,7 +1045,7 @@ impl ClaimCoordinator {
 
         // 6. Log renewal
         let op = ClaimOp::Renew {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             new_expires_at,
             new_last_beat,
         };
@@ -1070,7 +1071,7 @@ impl ClaimCoordinator {
     ///
     /// - Lease not found
     /// - Lease not owned by current agent
-    pub fn release_lease(&self, lease_id: &str) -> Result<()> {
+    pub fn release_lease(&self, lease_id: &LeaseId) -> Result<()> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
@@ -1084,9 +1085,9 @@ impl ClaimCoordinator {
         let lease = index
             .leases
             .iter()
-            .find(|l| l.lease_id == lease_id)
+            .find(|l| &l.lease_id == lease_id)
             .ok_or_else(|| {
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
             })?;
 
         // 4. Verify ownership
@@ -1103,7 +1104,7 @@ impl ClaimCoordinator {
 
         // 5. Log release
         let op = ClaimOp::Release {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             released_at: self.clock.now(),
         };
         self.append_claim_op(&op)?;
@@ -1125,7 +1126,7 @@ impl ClaimCoordinator {
     /// # Errors
     ///
     /// - Lease not found
-    pub fn force_evict_lease(&self, lease_id: &str, reason: &str) -> Result<()> {
+    pub fn force_evict_lease(&self, lease_id: &LeaseId, reason: &str) -> Result<()> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
@@ -1136,15 +1137,16 @@ impl ClaimCoordinator {
         let mut index = self.load_claims_index()?;
 
         // 3. Verify lease exists
-        if !index.leases.iter().any(|l| l.lease_id == lease_id) {
+        if !index.leases.iter().any(|l| &l.lease_id == lease_id) {
             return Err(
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id)).into(),
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
+                    .into(),
             );
         }
 
         // 4. Log eviction
         let op = ClaimOp::ForceEvict {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             evicted_at: self.clock.now(),
             reason: reason.to_string(),
         };
@@ -1248,7 +1250,7 @@ impl ClaimCoordinator {
         use std::io::{BufRead, BufReader};
 
         let log_path = self.paths.shared_jit.join("claims.jsonl");
-        let mut active: HashMap<String, Lease> = HashMap::new();
+        let mut active: HashMap<LeaseId, Lease> = HashMap::new();
         let mut max_seq = 0u64;
         let mut expected_seq = 1u64;
         let mut sequence_gaps = Vec::new();
@@ -1489,10 +1491,10 @@ mod tests {
     fn make_lease(ttl_secs: u64, expires_at: Option<DateTime<Utc>>) -> Lease {
         let now = Utc::now();
         Lease {
-            lease_id: "lease-x".to_string(),
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
             issue_id: "issue-x".to_string(),
             agent_id: "agent:1".parse().unwrap(),
-            worktree_id: "wt:abc123".to_string(),
+            worktree_id: "wt:abc123".parse().unwrap(),
             branch: Some("main".to_string()),
             ttl_secs,
             acquired_at: now,
@@ -1535,7 +1537,7 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             FileLocker::new(lock_wait),
-            "wt:test123".to_string(),
+            "wt:test123".parse().unwrap(),
             "agent:test".parse().unwrap(),
         );
 
@@ -1571,7 +1573,7 @@ mod tests {
 
         assert_eq!(lease.issue_id, "issue-001");
         assert_eq!(lease.agent_id.to_string(), "agent:test");
-        assert_eq!(lease.worktree_id, "wt:test123");
+        assert_eq!(lease.worktree_id.as_str(), "wt:test123");
         assert_eq!(lease.ttl_secs, 600);
         assert!(lease.expires_at.is_some());
     }
@@ -1678,7 +1680,7 @@ mod tests {
                 shared_jit: temp_dir.path().join(".git/jit"),
             },
             locker,
-            "wt:other".to_string(),
+            "wt:other".parse().unwrap(),
             "agent:other".parse().unwrap(),
         );
         let result = other.acquire_claim_synchronized(
@@ -1796,7 +1798,7 @@ mod tests {
                     let coordinator = ClaimCoordinator::new(
                         paths,
                         locker,
-                        format!("wt:thread{}", i),
+                        WorktreeId::try_from(format!("wt:thread{}", i)).unwrap(),
                         format!("agent:thread{}", i).parse().unwrap(),
                     );
 
@@ -1960,6 +1962,35 @@ mod tests {
     }
 
     #[test]
+    fn test_claim_log_round_trips_existing_lines_byte_for_byte() {
+        let header = r#"{"schema_version":1,"seq":1,"timestamp":"2026-01-06T20:00:00Z","op":"#;
+        let lease_id = "b53beeba-32f2-4671-a407-2d94e4d13d41";
+        let fields = [
+            format!(
+                r#""acquire","lease_id":"{lease_id}","issue_id":"issue-1","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z","stale":false}}"#
+            ),
+            format!(
+                r#""renew","lease_id":"{lease_id}","new_expires_at":null,"new_last_beat":"2026-01-06T20:00:00Z"}}"#
+            ),
+            format!(
+                r#""heartbeat","lease_id":"{lease_id}","new_last_beat":"2026-01-06T20:00:00Z"}}"#
+            ),
+            format!(r#""release","lease_id":"{lease_id}","released_at":"2026-01-06T20:00:00Z"}}"#),
+            format!(
+                r#""auto-evict","lease_id":"{lease_id}","evicted_at":"2026-01-06T20:00:00Z","reason":"expired"}}"#
+            ),
+            format!(
+                r#""force-evict","lease_id":"{lease_id}","evicted_at":"2026-01-06T20:00:00Z","reason":"admin"}}"#
+            ),
+        ];
+        for fields in fields {
+            let line = format!("{header}{fields}");
+            let decoded: ClaimLogEntry = serde_json::from_str(&line).unwrap();
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), line);
+        }
+    }
+
+    #[test]
     fn test_claim_log_decode_rejects_invalid_agent_id_and_names_field() {
         let now = Utc::now();
         let entry = ClaimLogEntry {
@@ -1968,10 +1999,10 @@ mod tests {
             timestamp: now,
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-1".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
                     issue_id: "issue-1".to_string(),
                     agent_id: "agent:valid".parse().unwrap(),
-                    worktree_id: "wt:main".to_string(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: now,
@@ -2016,10 +2047,10 @@ mod tests {
         // Create a lease that's already expired
         let mut index = coordinator.load_claims_index().unwrap();
         let expired_lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
+            lease_id: Uuid::new_v4().to_string().parse().unwrap(),
             issue_id: "issue-006".to_string(),
             agent_id: "agent:old".parse().unwrap(),
-            worktree_id: "wt:old".to_string(),
+            worktree_id: "wt:old".parse().unwrap(),
             branch: None,
             ttl_secs: 60,
             acquired_at: Utc::now() - Duration::seconds(120),
@@ -2137,7 +2168,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.renew_lease("fake-lease-id", 600);
+        let result = coordinator.renew_lease(
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            600,
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2163,7 +2197,7 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:other".to_string(),
+            "wt:other".parse().unwrap(),
             "agent:other".parse().unwrap(),
         );
 
@@ -2196,7 +2230,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.release_lease("fake-lease-id");
+        let result =
+            coordinator.release_lease(&"00000000-0000-4000-8000-000000000007".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2222,7 +2257,7 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:other".to_string(),
+            "wt:other".parse().unwrap(),
             "agent:other".parse().unwrap(),
         );
 
@@ -2253,7 +2288,7 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:admin".to_string(),
+            "wt:admin".parse().unwrap(),
             "admin:alice".parse().unwrap(),
         );
 
@@ -2275,7 +2310,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.force_evict_lease("fake-lease-id", "test");
+        let result = coordinator.force_evict_lease(
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            "test",
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2454,10 +2492,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-1".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
                     issue_id: "issue-1".to_string(),
                     agent_id: "agent:test".parse().unwrap(),
-                    worktree_id: "wt:main".to_string(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2474,10 +2512,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-2".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
                     issue_id: "issue-2".to_string(),
                     agent_id: "agent:test".parse().unwrap(),
-                    worktree_id: "wt:main".to_string(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2495,10 +2533,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-3".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
                     issue_id: "issue-3".to_string(),
                     agent_id: "agent:test".parse().unwrap(),
-                    worktree_id: "wt:main".to_string(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2547,11 +2585,11 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Write an index with two active leases for the same issue (corruption).
-        let make_lease = |lease_id: &str| Lease {
-            lease_id: lease_id.to_string(),
+        let make_lease = |lease_id: LeaseId| Lease {
+            lease_id,
             issue_id: "issue-dup".to_string(),
             agent_id: "agent:test".parse().unwrap(),
-            worktree_id: "wt:main".to_string(),
+            worktree_id: "wt:main".parse().unwrap(),
             branch: None,
             ttl_secs: 600,
             acquired_at: Utc::now(),
@@ -2563,7 +2601,10 @@ mod tests {
             schema_version: 1,
             generated_at: Utc::now(),
             last_seq: 2,
-            leases: vec![make_lease("lease-a"), make_lease("lease-b")],
+            leases: vec![
+                make_lease("00000000-0000-4000-8000-000000000005".parse().unwrap()),
+                make_lease("00000000-0000-4000-8000-000000000006".parse().unwrap()),
+            ],
             sequence_gaps: Vec::new(),
         };
         coordinator.write_index_atomic(&index).unwrap();
