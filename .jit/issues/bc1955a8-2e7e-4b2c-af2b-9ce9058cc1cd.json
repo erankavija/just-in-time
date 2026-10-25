@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9fb5b317-3346-4a4f-9717-65505dbb3318",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:29:37.012291044Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "acb8d40f-cc99-4506-97c4-40cfcdfa6e44",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:31:25.138786195Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item kinds hold their id pattern as IdPattern",
-  "updated_at": "2026-10-25T04:17:39.486621500Z"
+  "updated_at": "2026-10-25T04:31:25.138786195Z"
 }
