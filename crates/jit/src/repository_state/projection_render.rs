@@ -99,7 +99,7 @@ fn resolve_rows(
     config: &JitConfig,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<Vec<AddressableItem>, ProducerError> {
-    let parser = content_parser_for(None, repo_content_format(config)?)?;
+    let parser = content_parser_for(None, repo_content_format(config))?;
     let mut rows = Vec::new();
     for kind in kinds {
         if !kind.kind_scope().is_project() {
@@ -241,19 +241,6 @@ fn render_full_body(
 /// The repo-level content format (`[validation].content_format`, defaulting to
 /// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
 /// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerError> {
-    match config.validation.as_ref() {
-        Some(validation) => match validation.content_format.as_deref() {
-            None => Ok(ContentFormat::DEFAULT),
-            Some(value)
-                if value.eq_ignore_ascii_case("markdown") || value.eq_ignore_ascii_case("md") =>
-            {
-                Ok(ContentFormat::Markdown)
-            }
-            Some(value) if value.eq_ignore_ascii_case("html") => Ok(ContentFormat::Html),
-            Some(value) if value.eq_ignore_ascii_case("xml") => Ok(ContentFormat::Xml),
-            Some(value) => Err(ProducerError::InvalidContentFormat(value.to_string())),
-        },
-        None => Ok(ContentFormat::DEFAULT),
-    }
+fn repo_content_format(config: &JitConfig) -> ContentFormat {
+    config.content_format()
 }
