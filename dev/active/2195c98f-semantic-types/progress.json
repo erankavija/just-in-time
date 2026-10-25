@@ -1,7 +1,7 @@
 {
   "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "epic_short_id": "2195c98f",
-  "current_wave": 1,
+  "current_wave": 3,
   "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
   "waves": [
     {
@@ -136,7 +136,7 @@
           "short_id": "3625b18b",
           "title": "Unit tests match events through the body view",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
@@ -234,7 +234,7 @@
           "short_id": "e3d06f82",
           "title": "Integration tests match events through the body view",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
@@ -351,7 +351,7 @@
           "short_id": "d72bf093",
           "title": "Event becomes an envelope around a tagged body",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -370,14 +370,14 @@
           "short_id": "30923ea1",
           "title": "Priority orders by rank through Ord",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
           "short_id": "5d5c5514",
           "title": "Validation projections hold typed state and priority",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
@@ -412,7 +412,7 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "escalated"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
@@ -621,7 +621,13 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "e1a6c8c2",
+      "reason": "Rework exceeded MAX_REWORK_ATTEMPTS: code-review R3 failed (test fixtures join VirtualPath::X.relative() onto the data root instead of RepositoryLayout::resolve, REQ-02).",
+      "status": "open"
+    }
+  ],
   "rework_counts": {
     "b3fcd297": 2,
     "acb38457": 1,
@@ -1067,6 +1073,20 @@
       "model": "opus",
       "effort": "-",
       "reason": "Contract-setting CLI prefix boundary across main.rs (88 id sites)."
+    },
+    {
+      "issue": "d72bf093",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting event envelope swap (event-envelope contract)."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation after session reset interrupted the Claude worker; WIP preserved in 9bac2522a."
     }
   ],
   "surfaced_pitfalls": [
