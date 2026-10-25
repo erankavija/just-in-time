@@ -20366,3 +20366,5 @@
 {"gate_key":"cargo-ci","id":"812c8dcb-5c5e-4ac0-84c1-a6e7667ecefd","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","timestamp":"2026-10-25T16:33:21.004115607Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"gated","id":"0c4586d3-864c-43e5-a3b6-7e323386e4be","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","timestamp":"2026-10-25T16:37:08.171965174Z","to":"done","type":"issue_state_changed"}
 {"id":"9b44e71b-e6d6-45a1-bde1-b5855479da8c","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","timestamp":"2026-10-25T16:37:08.171965174Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"e86a7091-c46a-499d-8822-61298aa5af95","issue_id":"804a8605-267b-4934-a9ef-08422fc3686d","timestamp":"2026-10-25T16:37:29.536452865Z","type":"issue_claimed"}
+{"fields":["description"],"id":"52a92ddf-c97a-4d4e-be28-e1091793e947","issue_id":"804a8605-267b-4934-a9ef-08422fc3686d","timestamp":"2026-10-25T16:37:29.628929096Z","type":"issue_updated","updated_by":"issue-update"}
