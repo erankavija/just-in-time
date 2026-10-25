@@ -251,8 +251,8 @@ fn desugar_require_doc_type(doc_type: &str) -> Value {
 mod tests {
     use super::*;
     use crate::declarations::rules::{
-        Assertion, LabelReferenceConfig, LabelReferenceScope, Rule, RuleScope, SchemaSource,
-        Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
+        Assertion, DependencyShapeConfig, LabelReferenceConfig, LabelReferenceScope, Rule,
+        RuleScope, SchemaSource, Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
     };
     use crate::domain::id_pattern::IdPattern;
     use crate::validation::engine::SchemaEngine;
@@ -639,7 +639,11 @@ mod tests {
         })
         .is_none());
         assert!(desugar(&Assertion::DependencyShape {
-            config: toml::value::Table::new()
+            config: DependencyShapeConfig {
+                target: Selector::default(),
+                authored_mode: None,
+                authored_transitive: None,
+            }
         })
         .is_none());
         assert!(desugar(&Assertion::GateRecency {

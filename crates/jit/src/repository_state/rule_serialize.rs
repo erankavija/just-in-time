@@ -284,7 +284,19 @@ fn render_assertion(
             format!("{{ label-reference = {{ {} }} }}", parts.join(", "))
         }
         Assertion::DependencyShape { config } => {
-            format!("{{ dependency-shape = {} }}", render_config_table(config))
+            // Emit `mode` and `transitive` only when authored, so the keys
+            // round-trip as written.
+            let mut parts = vec![format!(
+                "target = {}",
+                render_selector(&config.target).unwrap_or_else(|| "{}".to_string())
+            )];
+            if let Some(mode) = config.authored_mode {
+                parts.push(format!("mode = {}", toml_basic_string(mode.as_str())));
+            }
+            if let Some(transitive) = config.authored_transitive {
+                parts.push(format!("transitive = {transitive}"));
+            }
+            format!("{{ dependency-shape = {{ {} }} }}", parts.join(", "))
         }
         Assertion::GateRecency {
             max_age_hours,
@@ -748,7 +760,7 @@ assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-
     #[test]
     fn test_round_trip_graph_config_kinds() {
         // The three graph config kinds round-trip their authored keys; label-reference
-        // keeps an explicit default scope distinct from an absent one.
+        // and dependency-shape keep an explicit default distinct from an absent one.
         let toml = test_toml(
             r#"
 [[rules]]
@@ -777,6 +789,16 @@ name = "shape"
 when = { type = "__leaf_type__" }
 severity = "error"
 assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
+
+[[rules]]
+name = "shape-default-keys"
+severity = "warn"
+assert = { dependency-shape = { target = { type = "design", state = ["ready", "done"] } } }
+
+[[rules]]
+name = "shape-should"
+severity = "warn"
+assert = { dependency-shape = { target = { label = "area:*" }, mode = "should", transitive = false } }
 "#,
         );
         let set = RuleSet::parse(&toml, None, []).unwrap();
