@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T06:40:22.490854735Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,6 +9,7 @@
   ],
   "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\n## Success Criteria\n\n- [hard] REQ-01: Each plain issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n- [hard] REQ-06: `main.rs` holds no interim call-site parse: each issue-id argument is parsed exactly once, at the boundary.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T06:38:48.684952354Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +29,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "The CLI resolves each issue-id argument once at entry",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T06:40:22.764432457Z"
 }
