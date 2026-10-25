@@ -1883,7 +1883,7 @@ pub(super) fn reject_reserved_application_targets<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Event, ProfileLifecycleOperation, ProfileLifecycleStatus};
+    use crate::domain::{Event, EventBody, ProfileLifecycleOperation, ProfileLifecycleStatus};
     use crate::profile::{ProfileContributionChange, ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
@@ -2084,9 +2084,9 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .flat_map(|event| match event {
-                Event::ProfileLifecycle { profiles, .. } => profiles
-                    .into_iter()
+            .flat_map(|event| match event.body() {
+                EventBody::ProfileLifecycle { profiles, .. } => profiles
+                    .iter()
                     .map(|profile| profile.id.to_string())
                     .collect(),
                 _ => Vec::new(),
@@ -3313,8 +3313,8 @@ template = true
         let events = storage.read_events().unwrap();
         let name: crate::profile::ProfileVariableName = "NAME".try_into().unwrap();
         assert!(matches!(
-            events.as_slice(),
-            [Event::ProfileLifecycle { profiles, .. }]
+            events.iter().map(Event::body).collect::<Vec<_>>().as_slice(),
+            [EventBody::ProfileLifecycle { profiles, .. }]
                 if profiles.len() == 1
                     && profiles[0].variables.get(&name).map(String::as_str)
                         == Some("resolved-value-last")
@@ -3415,8 +3415,12 @@ template = true
         assert_eq!(&image[..torn.len()], torn);
         let events = storage.read_events().unwrap();
         assert!(matches!(
-            events.as_slice(),
-            [Event::ProfileLifecycle {
+            events
+                .iter()
+                .map(Event::body)
+                .collect::<Vec<_>>()
+                .as_slice(),
+            [EventBody::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }]
@@ -3453,8 +3457,8 @@ template = true
         assert!(temp.path().join("docs/workflow.txt").is_file());
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
         assert!(matches!(
-            storage.read_events().unwrap().as_slice(),
-            [Event::ProfileLifecycle {
+            storage.read_events().unwrap().iter().map(Event::body).collect::<Vec<_>>().as_slice(),
+            [EventBody::ProfileLifecycle {
                 operation: ProfileLifecycleOperation::Apply,
                 profiles,
                 ..
@@ -4194,18 +4198,19 @@ template = true
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
-        let prior_event = Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            operation: ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "prior".try_into().unwrap(),
-                version: "1.0.0".to_string(),
-                status: ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail: false,
-        };
+        let prior_event = crate::test_utils::stamped_event(
+            Event::draft_profile_lifecycle(
+                ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
+                    id: "prior".try_into().unwrap(),
+                    version: "1.0.0".to_string(),
+                    status: ProfileLifecycleStatus::Installed,
+                    variables: Default::default(),
+                }],
+            ),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        );
         fs::write(
             temp.path().join(".jit/events.jsonl"),
             serde_json::to_vec(&prior_event).unwrap(),
@@ -4217,8 +4222,8 @@ template = true
         let events = storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
         assert!(matches!(
-            events.last().unwrap(),
-            Event::ProfileLifecycle {
+            events.last().unwrap().body(),
+            EventBody::ProfileLifecycle {
                 isolated_torn_tail: false,
                 ..
             }

@@ -3434,6 +3434,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::EventBody;
 
     #[test]
     fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {
@@ -4035,30 +4036,18 @@ mod tests {
             assert_eq!(events.len(), 2);
             let evidence = events
                 .iter()
-                .map(|event| match (status, event) {
-                    (
-                        GateStatus::Passed,
-                        Event::GatePassed {
-                            id,
-                            timestamp,
-                            updated_by,
-                            ..
-                        },
-                    )
-                    | (
-                        GateStatus::Failed,
-                        Event::GateFailed {
-                            id,
-                            timestamp,
-                            updated_by,
-                            ..
-                        },
-                    ) if updated_by.as_ref() == Some(&actor) => (id, timestamp),
+                .map(|event| match (status, event.body()) {
+                    (GateStatus::Passed, EventBody::GatePassed { updated_by, .. })
+                    | (GateStatus::Failed, EventBody::GateFailed { updated_by, .. })
+                        if updated_by.as_ref() == Some(&actor) =>
+                    {
+                        (event.id(), event.timestamp())
+                    }
                     _ => panic!("unexpected manual gate evidence: {event:?}"),
                 })
                 .collect::<Vec<_>>();
-            assert_eq!(*evidence[0].1, first_time);
-            assert_eq!(*evidence[1].1, second_time);
+            assert_eq!(evidence[0].1, first_time);
+            assert_eq!(evidence[1].1, second_time);
             assert_ne!(evidence[0].0, evidence[1].0);
             let mut attested_at = storage
                 .list_gate_runs_for_issue(&id)
