@@ -1241,6 +1241,11 @@
       "source": "lead",
       "finding": "cargo-ci suite-time budget (30 s) fails under host load from other projects (gf2 gate runs, load ~17); quiet-host suite is ~15 s. Run cargo-ci gates alone with --force once load clears.",
       "status": "environmental"
+    },
+    {
+      "source": "lead",
+      "finding": "The shared sccache server inherited an ephemeral TMPDIR (/tmp/tmp.*/scratch) from the process that started it; once that directory was removed every compile failed in cargo-ci setup. Fix: sccache --stop-server; the next build restarts it with the default TMPDIR.",
+      "status": "environmental"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
