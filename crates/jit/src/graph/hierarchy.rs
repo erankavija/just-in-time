@@ -425,29 +425,20 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
 fn transitively_reduced_edges<'a, T: HierarchyNode>(
     nodes: &[&'a T],
 ) -> HashMap<&'a str, Vec<&'a str>> {
-    /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
-    struct EdgeView<'a> {
-        id: &'a str,
-        deps: Vec<&'a str>,
-    }
+    /// The dependency-graph view of a hierarchy node, delegating to the node.
+    struct EdgeView<'a, T>(&'a T);
 
-    impl GraphNode for EdgeView<'_> {
+    impl<T: HierarchyNode> GraphNode for EdgeView<'_, T> {
         fn id(&self) -> &str {
-            self.id
+            self.0.id()
         }
         fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-            self.deps.iter().copied()
+            self.0.dependencies()
         }
     }
 
-    let views: Vec<EdgeView<'a>> = nodes
-        .iter()
-        .map(|n| EdgeView {
-            id: n.id(),
-            deps: n.dependencies().collect(),
-        })
-        .collect();
-    let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
+    let views: Vec<EdgeView<'a, T>> = nodes.iter().map(|n| EdgeView(*n)).collect();
+    let view_refs: Vec<&EdgeView<'a, T>> = views.iter().collect();
     let graph = DependencyGraph::new(&view_refs);
     let present: HashSet<&str> = nodes.iter().map(|n| n.id()).collect();
 
