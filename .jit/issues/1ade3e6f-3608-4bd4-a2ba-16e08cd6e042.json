@@ -27,7 +27,7 @@
     "satisfies:b697a3f7/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "One pure assembler builds every JitConfig from source bytes",
-  "updated_at": "2026-10-24T21:22:53.678000545Z"
+  "updated_at": "2026-10-25T08:41:58.035522456Z"
 }

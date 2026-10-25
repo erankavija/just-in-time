@@ -32,6 +32,7 @@ use jit::output::{
     JsonOutput, OutputContext, OutputMode,
 };
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
+use jit::repository_state::VirtualPath;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::PathBuf;
@@ -1764,10 +1765,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
         // plan when absent; the applied plan is the sole preimage
         // authority for whether this run created it.
+        let rules_path = VirtualPath::RULES.repository_relative();
         let scaffolded = init_result
             .created_paths
             .iter()
-            .any(|path| path == ".jit/rules.toml");
+            .any(|path| path == &rules_path);
         if scaffolded {
             let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
         }
@@ -5605,7 +5607,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::LabelCommands::Namespaces => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 if json {
                     use jit::output::{JsonOutput, NamespacesResponse};
@@ -5745,9 +5747,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 // Check repo config — invalid enforcement and write-policy tokens are
                 // caught at TOML parse time, so a successful load implies valid values.
-                let repo_config_path = jit_dir.join("config.toml");
+                let repo_config_path = executor
+                    .storage()
+                    .repository_layout()?
+                    .resolve(&VirtualPath::CONFIG)?;
                 if repo_config_path.exists() {
-                    if let Err(e) = JitConfig::load(&jit_dir) {
+                    if let Err(e) = JitConfig::load(&executor.storage().repository_layout()?) {
                         result.errors.push(format!("repo config: {}", e));
                     }
                 }
@@ -5803,7 +5808,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::ConfigCommands::ShowHierarchy => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 let hierarchy = namespaces.declared_type_hierarchy();
 
@@ -6609,7 +6614,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let log_file = log.map(|l| jit_dir.join(l));
 
             if stop {
-                match stop_server(&jit_dir) {
+                match stop_server(&executor_layout) {
                     Ok(StopOutcome::Stopped { pid, port: p }) => {
                         if json {
                             println!(
@@ -6647,7 +6652,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             } else if status {
-                match server_status(&jit_dir) {
+                match server_status(&executor_layout) {
                     Ok(Some(pf)) => {
                         let url = format!("http://localhost:{}", pf.port);
                         if json {
@@ -6711,7 +6716,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     };
 
                     let opts = ForegroundOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
                         server_binary: None,
@@ -6769,7 +6774,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         .filter(|d| d.is_dir())
                         .map(|d| d.display().to_string());
                     let opts = ServeOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         log_file,
                         web_dir: resolved_web_dir,

@@ -412,7 +412,7 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
@@ -438,7 +438,7 @@
           "short_id": "5491edd0",
           "title": "Worktree and server files under .jit have VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "75951558-accb-4ee9-be38-e97fee0326ee",
@@ -1103,6 +1103,13 @@
       "model": "opus",
       "effort": "-",
       "reason": "Rework R1: route remaining CLI issue-id args through resolve_issue_arg and drop downstream parses (same tier; brief had excluded composite scopes)."
+    },
+    {
+      "issue": "5491edd0",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Three constants and a narrow literal sweep with exact criteria."
     }
   ],
   "surfaced_pitfalls": [

@@ -56,18 +56,19 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 /// Write the config/templates/rules files a batch export reads. Must be called
 /// before any executor operation, since config is cached on first access.
 fn configure(h: &TestHarness) {
-    let root = h.storage.root();
-    std::fs::create_dir_all(root).unwrap();
-    std::fs::write(root.join("config.toml"), CONFIG_TOML).unwrap();
-    std::fs::write(root.join("templates.toml"), TEMPLATES_TOML).unwrap();
-    std::fs::write(root.join("rules.toml"), RULES_TOML).unwrap();
-    let rules_path = h
-        .storage
-        .repository_layout()
-        .resolve(&jit::repository_state::VirtualPath::RULES)
-        .unwrap();
-    std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-    std::fs::write(rules_path, RULES_TOML).unwrap();
+    let layout = h.storage.repository_layout();
+    for (virtual_path, contents) in [
+        (jit::repository_state::VirtualPath::CONFIG, CONFIG_TOML),
+        (
+            jit::repository_state::VirtualPath::TEMPLATES,
+            TEMPLATES_TOML,
+        ),
+        (jit::repository_state::VirtualPath::RULES, RULES_TOML),
+    ] {
+        let path = layout.resolve(&virtual_path).unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
 }
 
 fn new_issue(

@@ -16,12 +16,21 @@
 //! An explicit `JIT_DATA_DIR` override always takes precedence over discovery;
 //! that check lives in the caller (`main.rs`), not here.
 
+use crate::repository_state::{
+    RepositoryLayout, RepositoryLayoutError, RepositoryRootEvidence, VirtualPath,
+};
 use crate::storage::redo_record::{RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use std::path::{Path, PathBuf};
 
-/// Marker file that distinguishes an initialized `.jit` repository from a bare
-/// or partial `.jit` directory. Kept in sync with `json::INDEX_FILE`.
-const INDEX_FILE: &str = "index.json";
+// This layout only names lexical discovery probes; opening the selected repository
+// acquires filesystem evidence at the storage boundary.
+fn discovery_index_path(worktree: &Path, data: &Path) -> Result<PathBuf, RepositoryLayoutError> {
+    let layout = RepositoryLayout::new(
+        RepositoryRootEvidence::new(worktree, "discovery-worktree", true),
+        RepositoryRootEvidence::new(data, "discovery-data", true),
+    )?;
+    layout.resolve(&VirtualPath::INDEX)
+}
 
 /// Walk upward from `start`, using `exists` to probe each candidate path, to
 /// find the nearest ancestor directory containing an initialized `.jit`
@@ -43,7 +52,7 @@ const INDEX_FILE: &str = "index.json";
 pub fn discover_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     for ancestor in start.ancestors() {
         let candidate = ancestor.join(".jit");
-        if exists(&candidate.join(INDEX_FILE)) {
+        if exists(&discovery_index_path(ancestor, &candidate).ok()?) {
             return Some(candidate);
         }
         if exists(&ancestor.join(".git")) {
@@ -82,7 +91,7 @@ pub fn discover_recovery_jit_dir(start: &Path) -> Option<PathBuf> {
 pub fn discover_recovery_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     for ancestor in start.ancestors() {
         let jit = ancestor.join(".jit");
-        let initialized = exists(&jit.join(INDEX_FILE));
+        let initialized = exists(&discovery_index_path(ancestor, &jit).ok()?);
         let pending_record = exists(&jit.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME));
         if initialized || pending_record {
             return Some(jit);
@@ -110,7 +119,8 @@ mod tests {
     /// Path to the `index.json` marker inside a `.jit` at `dir`, the presence
     /// of which is what makes a directory count as an initialized repository.
     fn index_in(dir: &str) -> PathBuf {
-        PathBuf::from(dir).join(".jit").join("index.json")
+        let data = PathBuf::from(dir).join(".jit");
+        discovery_index_path(Path::new(dir), &data).unwrap()
     }
 
     #[test]
@@ -134,7 +144,16 @@ mod tests {
         // `.jit` has no nested `.jit` of its own, so the walk climbs past it to
         // the repo root, which does.
         let set = HashSet::from([index_in("/repo")]);
-        let found = discover_from(Path::new("/repo/.jit/issues"), exists_in(set));
+        let data = Path::new("/repo/.jit");
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "test-worktree", true),
+            RepositoryRootEvidence::new(data, "test-data", true),
+        )
+        .unwrap();
+        let found = discover_from(
+            &layout.resolve(&VirtualPath::ISSUES).unwrap(),
+            exists_in(set),
+        );
         assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
     }
 
@@ -204,7 +223,8 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let jit = temp.path().join(".jit");
         fs::create_dir(&jit).unwrap();
-        fs::write(jit.join("index.json"), "{}").unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(&jit);
+        fs::write(layout.resolve(&VirtualPath::INDEX).unwrap(), "{}").unwrap();
         let nested = temp.path().join("a/b");
         fs::create_dir_all(&nested).unwrap();
 

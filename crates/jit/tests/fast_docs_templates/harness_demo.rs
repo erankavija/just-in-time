@@ -491,8 +491,14 @@ fn test_harness_archive_candidates_are_complete_and_non_mutating() {
         "{}/archive",
         h.storage.root().file_name().unwrap().to_string_lossy()
     );
+    let config_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
     std::fs::write(
-        h.storage.root().join("config.toml"),
+        config_path,
         format!(
             "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{archive_root}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
         ),
