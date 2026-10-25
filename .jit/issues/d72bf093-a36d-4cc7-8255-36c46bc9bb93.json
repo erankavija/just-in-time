@@ -17,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "11c7a164-3634-4fbe-9491-bb1cd1b8602b",
-      "status": "failed",
-      "updated_at": "2026-10-25T22:30:35.218731460Z",
+      "run_id": "8d3e5fbd-5614-49ba-924d-0f9af3567672",
+      "status": "passed",
+      "updated_at": "2026-10-25T22:37:02.462384173Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Event becomes an envelope around a tagged body",
-  "updated_at": "2026-10-25T22:30:35.218731460Z"
+  "updated_at": "2026-10-25T22:37:02.462384173Z"
 }
