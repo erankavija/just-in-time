@@ -8,6 +8,7 @@
   ],
   "description": "Decode the type-hierarchy kind and the label-uniqueness scope of rules into enums at load.\n\n## Background\n\n`TypeHierarchyKind` (`crates/jit/src/declarations/rules.rs:1420`) is matched by a hand-written token table when rules serialize (`repository_state/rule_serialize.rs:291`), and the label-uniqueness scope is read as a string.\n\n## Success Criteria\n\n- [hard] REQ-01: `TypeHierarchyKind` and the label-uniqueness scope are declared through the macro and decoded at load.\n- [hard] REQ-02: The token match in rule serialization is gone.\n- [hard] REQ-03: A malformed value fails rule loading with an error naming the rule.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:37:06.705359849Z",
   "first_ready_at": "2026-10-25T02:35:15.438719982Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Type-hierarchy and label-uniqueness rule options are typed",
-  "updated_at": "2026-10-25T04:35:55.181957866Z"
+  "updated_at": "2026-10-25T04:37:06.705359849Z"
 }
