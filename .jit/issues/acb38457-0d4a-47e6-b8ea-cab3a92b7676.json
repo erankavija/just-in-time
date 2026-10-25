@@ -16,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "4a5e40a8-e6e7-4fd6-897b-fcb22ce648e5",
+      "run_id": "e8586b1b-6bfa-4ed3-a6c0-bf142f7016cc",
       "status": "passed",
-      "updated_at": "2026-10-25T02:46:16.563701475Z",
+      "updated_at": "2026-10-25T06:04:37.431874475Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "a92f7048-6f15-4a56-b878-c7f02fe98163",
-      "status": "failed",
-      "updated_at": "2026-10-25T02:49:30.578808151Z",
+      "run_id": "a6c0fea5-f76c-47cd-833c-362c4b97886b",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:06:00.684218049Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Graph node traits expose dependency ids as string views",
-  "updated_at": "2026-10-25T02:49:30.578808151Z"
+  "updated_at": "2026-10-25T06:06:00.684218049Z"
 }
