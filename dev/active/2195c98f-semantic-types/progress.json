@@ -54,7 +54,7 @@
           "short_id": "6e8b9f31",
           "title": "System actors are named Assignee constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
@@ -171,7 +171,7 @@
           "short_id": "7383f4ea",
           "title": "Template transform kind is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
@@ -192,7 +192,7 @@
           "short_id": "a50e9be9",
           "title": "Resolved agent identity is an Assignee",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
@@ -248,7 +248,7 @@
           "short_id": "faa19def",
           "title": "Gate-run actors are Assignee values",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -804,6 +804,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One-file route boundary with exact criteria."
+    },
+    {
+      "issue": "faa19def",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Field retype to Assignee with writer constant swap."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Identity retype through coordinator and lease with exact criteria."
     }
   ],
   "surfaced_pitfalls": [
@@ -817,6 +831,7 @@
     "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1).",
     "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
     "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
-    "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs)."
+    "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
+    "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way."
   ]
 }
