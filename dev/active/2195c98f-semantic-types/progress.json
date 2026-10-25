@@ -75,7 +75,7 @@
           "short_id": "b48d7b2a",
           "title": "Rule patterns compile at declaration load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
@@ -302,7 +302,7 @@
           "short_id": "6826f966",
           "title": "Rule severity and scope tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
@@ -853,6 +853,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One predicate plus two call sites with exact criteria."
+    },
+    {
+      "issue": "b48d7b2a",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Produces the shared IdPattern contract the assertion chain consumes."
     }
   ],
   "surfaced_pitfalls": [
