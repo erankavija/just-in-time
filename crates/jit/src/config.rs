@@ -227,26 +227,6 @@ pub struct IconConfigToml {
     pub custom: Option<HashMap<String, String>>,
 }
 
-/// Deserialize and eagerly validate `[validation].strictness`.
-///
-/// Accepts an absent key (yielding `None`) or one of the three levels
-/// (`strict`/`loose`/`permissive`, case-insensitively); any other value is
-/// rejected at deserialize time via [`Strictness`](crate::validation::Strictness)
-/// so a `config.toml` carrying an unrecognized strictness fails to load instead
-/// of persisting a silently-inert value. The validated raw string is preserved
-/// so `jit config get`/`show` round-trips the author's spelling.
-fn deserialize_strictness<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = Option::<String>::deserialize(deserializer)?;
-    if let Some(raw) = value.as_deref() {
-        raw.parse::<crate::validation::Strictness>()
-            .map_err(serde::de::Error::custom)?;
-    }
-    Ok(value)
-}
-
 /// Validation behavior configuration.
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
@@ -254,17 +234,12 @@ where
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
-    /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
-    /// `"permissive"`. It modulates which rule violations block a write or
-    /// transition, layered on top of each rule's `enforce`/severity, without
-    /// changing either. Resolved via [`ValidationConfig::strictness`].
-    ///
-    /// Validated at deserialize time (like [`ProjectName`]): loading a
-    /// `config.toml` whose `strictness` is not one of the three levels fails
-    /// eagerly rather than deferring the error to the next validation call, so an
-    /// unrecognized value can never persist and sit silently.
-    #[serde(default, deserialize_with = "deserialize_strictness")]
-    pub strictness: Option<String>,
+    /// Repo-wide enforcement strictness. It modulates which rule violations block
+    /// a write or transition, layered on top of each rule's `enforce`/severity, without
+    /// changing either. Decoded as [`Strictness`](crate::validation::Strictness)
+    /// so configuration access and serialization use its canonical token.
+    #[serde(default)]
+    pub strictness: Option<crate::validation::Strictness>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
     /// Repo-level default content format for issue bodies ("markdown", "html",
@@ -289,17 +264,10 @@ impl ValidationConfig {
         }
     }
 
-    /// Resolve the repo-wide validation
-    /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
-    /// to [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
-    ///
-    /// The value is already validated at deserialize time (see
-    /// [`deserialize_strictness`]), so a loaded config resolves infallibly; the
-    /// `Result` guards a `ValidationConfig` constructed by hand with an invalid
-    /// string, which is still surfaced as an error rather than silently
-    /// defaulting.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
-        crate::validation::Strictness::from_config_value(self.strictness.as_deref())
+    /// Resolve the repo-wide validation strictness, defaulting to
+    /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
+    pub fn strictness(&self) -> crate::validation::Strictness {
+        self.strictness.unwrap_or_default()
     }
 }
 
@@ -1317,9 +1285,9 @@ impl JitConfig {
     /// [`ValidationConfig::strictness`], or
     /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) without the
     /// section.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
+    pub fn strictness(&self) -> crate::validation::Strictness {
         self.validation.as_ref().map_or(
-            Ok(crate::validation::Strictness::DEFAULT),
+            crate::validation::Strictness::DEFAULT,
             ValidationConfig::strictness,
         )
     }
@@ -1987,36 +1955,40 @@ default_type = "task"
         assert_eq!(hierarchy.label_associations.as_ref().unwrap().len(), 2);
 
         let validation = config.validation.unwrap();
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
         assert_eq!(validation.default_type, Some("task".to_string()));
     }
 
     #[test]
     fn test_each_strictness_level_deserializes() {
-        for level in ["strict", "loose", "permissive", "STRICT"] {
+        for (level, expected) in [
+            ("strict", crate::validation::Strictness::Strict),
+            ("loose", crate::validation::Strictness::Loose),
+            ("permissive", crate::validation::Strictness::Permissive),
+        ] {
             let toml = format!("[validation]\nstrictness = \"{level}\"\n");
             let config: JitConfig =
                 toml::from_str(&toml).unwrap_or_else(|e| panic!("'{level}' must deserialize: {e}"));
-            // The validated raw spelling is preserved for round-tripping.
-            assert_eq!(
-                config.validation.unwrap().strictness,
-                Some(level.to_string())
-            );
+            assert_eq!(config.validation.unwrap().strictness, Some(expected));
         }
     }
 
     #[test]
     fn test_invalid_strictness_is_rejected_at_deserialize() {
-        // An unrecognized level must fail config load eagerly, not defer the
-        // error to a later validation call (F1). The message names the bad value.
-        let toml = "[validation]\nstrictness = \"banana\"\n";
-        let err = toml::from_str::<JitConfig>(toml).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("banana"), "names the bad value: {msg}");
-        assert!(
-            msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
-            "lists the accepted values: {msg}"
-        );
+        for token in ["banana", "STRICT"] {
+            let config_toml = format!("[validation]\nstrictness = \"{token}\"\n");
+            let err = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+            let msg = err.to_string();
+            assert!(msg.contains(token), "names the bad value: {msg}");
+            assert!(msg.contains("strictness"), "names the key: {msg}");
+            assert!(
+                msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
+                "lists the accepted values: {msg}"
+            );
+        }
     }
 
     #[test]
@@ -2149,7 +2121,10 @@ content_format = "html"
 
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
         assert_eq!(validation.content_format, Some("html".to_string()));
     }
 
@@ -2598,7 +2573,10 @@ unique = false
         // Validation
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
 
         // Namespaces
         let namespaces = config.namespaces.unwrap();

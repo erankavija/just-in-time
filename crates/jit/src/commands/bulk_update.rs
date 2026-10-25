@@ -622,7 +622,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let projected = Self::projected_after_update(issue, operations);
         let repo_format = self.repo_content_format()?;
-        let strictness = self.cached_config()?.strictness()?;
+        let strictness = self.cached_config()?.strictness();
         let evaluation =
             crate::validation::evaluate_local(&projected, self.effective_rules()?, repo_format)?
                 .with_strictness(strictness);
