@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2221a639-3740-4565-b7fe-a1cf9be239ea",
+      "run_id": "3a51e729-a973-43ab-b8f9-f90ebfa6ccfb",
       "status": "passed",
-      "updated_at": "2026-10-25T06:02:16.343379731Z",
+      "updated_at": "2026-10-25T06:12:33.727493691Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Production event matchers read events through a body view",
-  "updated_at": "2026-10-25T06:07:07.059479986Z"
+  "updated_at": "2026-10-25T06:12:33.727493691Z"
 }
