@@ -8,6 +8,7 @@
   ],
   "description": "Parse and resolve each issue-id path parameter once in the server routes, before any executor call.\n\n## Background\n\nServer routes take ids as `Path<String>` (`crates/server/src/routes.rs:97,597,627,791,836,893,910`) and pass them to executor methods that resolve them internally.\n\n## Success Criteria\n\n- [hard] REQ-01: Each issue-id path parameter is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the executor call.\n- [hard] REQ-02: A too-short prefix yields the route's invalid-prefix response, and an unknown or other malformed id yields its existing not-found response.\n- [hard] REQ-03: No other server code parses an issue-id parameter, and the routes hold no interim call-site parse.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:26:14.879341589Z",
   "first_ready_at": "2026-10-25T01:28:58.542508989Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "The server resolves each issue-id path parameter once",
-  "updated_at": "2026-10-25T02:26:14.060177562Z"
+  "updated_at": "2026-10-25T02:26:14.879341589Z"
 }
