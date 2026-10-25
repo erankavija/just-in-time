@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b831bce7-305f-409d-8698-7fab576c51f2",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:52:19.406926241Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "441904a2-e8ed-4d59-9456-d0863f77640c",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:53:49.342287488Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lease records name their issue by IssueId",
-  "updated_at": "2026-10-25T03:20:10.429674849Z"
+  "updated_at": "2026-10-25T03:53:49.342287488Z"
 }

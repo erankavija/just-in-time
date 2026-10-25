@@ -1299,7 +1299,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             let warnings = super::captured_lease_warnings(
                 mode,
                 std::slice::from_ref(&target),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let preset = parse_captured_gate_presets(&image)?

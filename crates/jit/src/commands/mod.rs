@@ -789,8 +789,7 @@ fn claims_mutation_guard(
 
 fn captured_lease_warnings(
     mode: crate::config::EnforcementMode,
-    targets: &[String],
-    issues: &[Issue],
+    targets: &[IssueId],
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
 ) -> Result<Vec<String>> {
     use crate::agent_config::resolve_agent_id;
@@ -802,14 +801,7 @@ fn captured_lease_warnings(
     let agent = resolve_agent_id(None).ok();
     let mut warnings = Vec::new();
     for id in targets {
-        let active = guard
-            .map(|guard| {
-                guard.has_active_lease(id, agent.as_ref(), |raw| {
-                    resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
-                })
-            })
-            .transpose()?
-            .unwrap_or(false);
+        let active = guard.is_some_and(|guard| guard.has_active_lease(id, agent.as_ref()));
         if active {
             continue;
         }
@@ -826,18 +818,10 @@ fn captured_lease_warnings(
 
 fn ensure_claim_available(
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
-    target: &str,
+    target: &IssueId,
     assignee: &crate::domain::Assignee,
-    issues: &[Issue],
 ) -> Result<()> {
-    let Some(lease) = guard
-        .map(|guard| {
-            guard.conflicting_lease(target, Some(assignee), |raw| {
-                resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
-            })
-        })
-        .transpose()?
-        .flatten()
+    let Some(lease) = guard.and_then(|guard| guard.conflicting_lease(target, Some(assignee)))
     else {
         return Ok(());
     };
@@ -2646,7 +2630,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     config.enforcement_mode(),
                     std::slice::from_ref(&target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2851,23 +2834,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             if let (true, Some(precheck)) = (coordinate_claims, &precheck) {
                 // Refuse before running prechecks; the held guard repeats this.
-                let preflight_issues = captured_active_issues(&precheck.image)?;
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
                     captured_lease_warnings(
                         precheck.lease_mode,
                         std::slice::from_ref(&expected_target),
-                        &preflight_issues,
                         preliminary_guard.as_ref(),
                     )?;
                 }
                 if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                    ensure_claim_available(
-                        preliminary_guard.as_ref(),
-                        &expected_target,
-                        assignee,
-                        &preflight_issues,
-                    )?;
+                    ensure_claim_available(preliminary_guard.as_ref(), &expected_target, assignee)?;
                 }
             }
             let expected_precheck = precheck.as_ref().map(|precheck| &precheck.plan);
@@ -2952,7 +2928,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     lease_mode,
                     std::slice::from_ref(&expected_target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2962,7 +2937,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .map_or_else(Vec::new, |guard| guard.warnings());
             if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee, &issues)?;
+                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee)?;
             }
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
@@ -4459,6 +4434,7 @@ enforce_leases = "strict"
 
     #[test]
     fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
+        use crate::storage::claim_coordinator::test_issue_id;
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use std::time::Duration;
@@ -4480,13 +4456,11 @@ enforce_leases = "strict"
             "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
-        let issue_id = "abcd1111111111111111111111111111";
-        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let issue_id = test_issue_id("guard-probe");
+        coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
-        assert!(guard
-            .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
-            .unwrap());
+        assert!(guard.has_active_lease(&issue_id, None));
     }
 }
 
