@@ -9,11 +9,11 @@
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
-//! [`Severity`] and [`Selector`] derive only `Deserialize`, and [`Assertion`]
-//! mixes shorthand scalars, raw schema values, and graph config tables. Rather
-//! than retrofit `Serialize` onto the model, each field is rendered by hand into
-//! inline TOML. Regex-bearing shorthands use [`toml_literal_string`] so
-//! backslashes survive verbatim (DR §8.1).
+//! [`Rule`], [`Selector`], and [`Assertion`] are not direct TOML serialization
+//! shapes: assertions mix shorthand scalars, raw schema values, and graph config
+//! tables. Each field is rendered by hand into inline TOML. Regex-bearing
+//! shorthands use [`toml_literal_string`] so backslashes survive verbatim
+//! (DR §8.1).
 //!
 //! # JSON Schema rules materialize to files
 //!
@@ -167,7 +167,7 @@ fn render_rule(
 
     out.push_str(&format!(
         "severity = {}\n",
-        toml_basic_string(rule.severity.token())
+        toml_basic_string(rule.severity.as_str())
     ));
     out.push_str(&format!("enforce = {}\n", rule.enforce));
     // The schema-file stem is derived from the rule's ORIGIN-qualified identity
