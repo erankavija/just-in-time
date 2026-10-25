@@ -160,7 +160,7 @@ pub trait HierarchyNode {
     fn id(&self) -> &str;
 
     /// IDs of the nodes this node depends on (its outgoing DAG edges).
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
 
     /// The value of this node's `type:` label (e.g. `"epic"`), or `None` when it
     /// carries no type label. Mapped to a level via the config.
@@ -172,8 +172,8 @@ impl HierarchyNode for crate::domain::Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 
     fn type_name(&self) -> Option<&str> {
@@ -428,15 +428,15 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
     /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
     struct EdgeView<'a> {
         id: &'a str,
-        deps: &'a [String],
+        deps: Vec<&'a str>,
     }
 
     impl GraphNode for EdgeView<'_> {
         fn id(&self) -> &str {
             self.id
         }
-        fn dependencies(&self) -> &[String] {
-            self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().copied()
         }
     }
 
@@ -444,7 +444,7 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
         .iter()
         .map(|n| EdgeView {
             id: n.id(),
-            deps: n.dependencies(),
+            deps: n.dependencies().collect(),
         })
         .collect();
     let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
@@ -457,8 +457,6 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
             let kept = graph.compute_transitive_reduction(node.id());
             let deps = node
                 .dependencies()
-                .iter()
-                .map(String::as_str)
                 .filter(|dep| present.contains(dep) && kept.contains(*dep))
                 .collect();
             (node.id(), deps)
@@ -675,8 +673,8 @@ mod tests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
@@ -1013,8 +1011,8 @@ mod proptests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
