@@ -7,6 +7,7 @@
   ],
   "description": "Make the graph's id-returning queries return references into the node set, so a typed caller reads the id from the node instead of parsing a string.\n\n## Background\n\n`DependencyGraph` returns owned id strings: `compute_transitive_reduction -> HashSet<String>` (`crates/jit/src/graph/mod.rs:442`), `find_shortest_path -> Vec<String>` (`:475`) and `find_redundant_edges -> Vec<(String, String)>` (`:519`). `GraphError::NodeNotFound { id: String }` (`:61`) names a dangling reference. Callers sit in `graph/hierarchy.rs`, `commands/dependency.rs`, `commands/template.rs`, `commands/validate.rs`, `validation/graph.rs`, `validation/repository.rs` and `main.rs`. Once nodes store typed ids, a caller handed a `String` would have to rebuild an id from it.\n\n## Success Criteria\n\n- [hard] REQ-01: `compute_transitive_reduction`, `find_shortest_path` and `find_redundant_edges` return references to nodes of the graph (or ids borrowed from them), not owned strings.\n- [hard] REQ-02: Each caller reads ids from the returned nodes, and no caller rebuilds an id from a string the graph produced.\n- [hard] REQ-03: `GraphError::NodeNotFound` names the missing reference for display only, and no caller converts it into an id.\n- [hard] REQ-04: `HierarchyConfig::membership_closure` (`graph/hierarchy.rs:296`) returns node references, and `MembershipDivergence.issue_id` (`:575`) holds the node's own id type.\n- [hard] REQ-05: Graph property tests pass with unchanged assertions.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T06:10:09.823600352Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Graph queries return nodes rather than id strings",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T06:10:09.823600352Z"
 }
