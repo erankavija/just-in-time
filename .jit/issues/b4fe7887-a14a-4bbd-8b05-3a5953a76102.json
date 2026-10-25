@@ -8,6 +8,7 @@
   ],
   "description": "Fold the configuration mirror of item-kind scope into the domain enum.\n\n## Background\n\n`KindScopeConfig` (`crates/jit/src/config.rs:811`) mirrors `item::KindScope` (`domain/item.rs:383`) with its own `FromStr`, `Deserialize` and `Serialize` (`config.rs:822-856`), converted at `item.rs:712-713`. `domain/item.rs:42-44` imports it from config. `KindScope::ISSUE_TOKEN` also spells the reserved `@/issue/` address segment (`item.rs:233,252,255,258,912`).\n\n## Success Criteria\n\n- [hard] REQ-01: `KindScope` is declared through the macro, and `ItemKindConfig.scope` (`config.rs:539`) is a `KindScope`.\n- [hard] REQ-02: `KindScopeConfig` and its conversion are gone, and the domain no longer imports it from config.\n- [hard] REQ-03: The `@/issue/` address segment has its own address-grammar constant.\n- [hard] REQ-04: Item-kind declarations in this repository load unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:05:20.728848887Z",
   "first_ready_at": "2026-10-24T23:55:25.890437205Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Item-kind scope has one enum",
-  "updated_at": "2026-10-25T05:01:05.139002664Z"
+  "updated_at": "2026-10-25T05:05:20.728848887Z"
 }
