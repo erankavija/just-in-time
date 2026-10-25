@@ -9,7 +9,7 @@
 use crate::declarations::{GateChecker, GateStage};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
-    DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
+    Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
 use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
@@ -17,12 +17,6 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-
-/// Actor stamped on the `by` field of a gate run recorded by the automated
-/// executor (as opposed to a human or agent attestation). A recorded pass whose
-/// `updated_by` equals this value is an auto-era pass with no human attestation
-/// behind it, which matters when a gate is later redefined to manual mode.
-pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
 
 /// One entry in the `JIT_ISSUE_DOCS` env var: the fields a checker needs to
 /// inline a linked document into a review prompt.
@@ -160,7 +154,7 @@ pub fn execute_gate_checker_with_context(
         stdout: execution_result.stdout,
         stderr: execution_result.stderr,
         command: execution_result.command,
-        by: Some(AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
         message: None,
         findings,
         // Stamped by the evaluator, which holds the gate declaration the
@@ -1443,7 +1437,7 @@ mod tests {
             stdout: "Previous review feedback".to_string(),
             stderr: String::new(),
             command: "review-checker".to_string(),
-            by: Some(AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR.to_string()),
             message: None,
             findings: None,
             inputs_digest: None,

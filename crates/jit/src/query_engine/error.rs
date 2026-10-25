@@ -8,7 +8,7 @@
 /// The canonical lifecycle state tokens accepted in a `state:` filter, listed
 /// in an [`QueryParseError::InvalidState`] message.
 pub(super) fn state_values() -> String {
-    crate::domain::State::all().map(|s| s.as_str()).join(", ")
+    crate::domain::State::ALL.map(|s| s.as_str()).join(", ")
 }
 
 /// The set of priority tokens accepted in a `priority:` filter, listed in an
@@ -54,6 +54,15 @@ pub enum QueryParseError {
         value: String,
         /// Comma-separated list of accepted priority tokens.
         valid: String,
+    },
+
+    /// An `assignee:` filter named a value that is not a `type:identifier` assignee.
+    #[error("Invalid assignee value '{value}' in filter: {reason}")]
+    InvalidAssignee {
+        /// The offending value as authored.
+        value: String,
+        /// Why the value is not a valid assignee.
+        reason: crate::domain::AssigneeParseError,
     },
 
     /// A parenthesized group was opened but never closed.

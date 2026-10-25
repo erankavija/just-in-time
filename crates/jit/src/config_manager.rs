@@ -265,14 +265,13 @@ pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
 ) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
     let namespaces = ConfigManager::new(storage.root()).get_namespaces()?;
 
-    crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces).map_err(|e| {
-        crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}")).into()
-    })
+    Ok(crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::IssueStore;
     use std::fs;
     use tempfile::TempDir;
 
@@ -389,6 +388,21 @@ unique = false
             crate::domain::type_taxonomy::HierarchyConfig::empty(),
         );
         assert_eq!(hierarchy.types().count(), 0);
+    }
+
+    #[test]
+    fn test_get_hierarchy_config_preserves_constructor_error() {
+        let (_repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        fs::write(storage.root().join("config.toml"), config).unwrap();
+
+        let error =
+            get_hierarchy_config(&storage).expect_err("invalid hierarchy must fail construction");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     #[test]

@@ -117,9 +117,9 @@ pub struct TemplateDelta {
 ///
 /// Returns an error when a node declares a document area the configured
 /// registry does not declare (naming the template, the node, and the area), or
-/// when the template references an unbound anchor, a role no node declares, or
-/// an unsupported transform kind (the registry loader rejects the latter three,
-/// so this is the defensive gate for hand-built templates).
+/// when the template references an unbound anchor or a role no node declares
+/// (the registry loader rejects both, so this is the defensive gate for
+/// hand-built templates).
 ///
 /// # Examples
 ///
@@ -239,14 +239,6 @@ pub fn expand_template(
         .find(|(_, id)| id.as_str() == container.id)
         .map(|(name, _)| name.as_str());
     for transform in &template.transforms {
-        let kind = TransformKind::from_kind(&transform.kind).ok_or_else(|| {
-            anyhow!(
-                "template '{}' declares an unsupported transform kind '{}'; supported kinds: {}",
-                template.name,
-                transform.kind,
-                TransformKind::SUPPORTED.join(", ")
-            )
-        })?;
         if !declared_role(&transform.role) {
             return Err(anyhow!(
                 "template '{}' transform targets role '{}', which no node declares",
@@ -254,7 +246,7 @@ pub fn expand_template(
                 transform.role
             ));
         }
-        match kind {
+        match transform.kind {
             TransformKind::MoveUpstreamToRole => {
                 let upstream = container_anchor
                     .and_then(|name| anchor_dependency_snapshots.get(name))
@@ -960,20 +952,6 @@ applies_to = ["epic"]
         )
         .unwrap_err();
         assert!(err.to_string().contains("container"), "{err}");
-    }
-
-    #[test]
-    fn test_expand_template_rejects_unsupported_transform_kind() {
-        // The loader rejects an unsupported kind, so this can only be reached with
-        // a hand-built template; expansion is the defensive gate and it still runs
-        // before any write.
-        let mut template = plan_template();
-        template.transforms[0].kind = "teleport".to_string();
-        let container = container("c1");
-        let err = expand(&template, &container, &bindings("c1"), &snapshots(&["u1"])).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("teleport"), "{msg}");
-        assert!(msg.contains("move-upstream-to-role"), "{msg}");
     }
 
     /// A one-node template whose node's description is exactly its interpolated

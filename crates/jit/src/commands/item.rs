@@ -356,7 +356,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
                     format!(
                         "cannot resolve issue scope '{}' in '{qualified}'",
-                        issue_ref.requested()
+                        issue_ref.as_str()
                     )
                 })?;
                 let issue = self.storage.load_issue(&full_id)?;
@@ -435,7 +435,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
                 ));
             };
-            let issue_ref = IssueIdPrefix::parse(issue_ref)?;
+            let issue_ref = IssueIdPrefix::from_str(issue_ref)?;
             // A self-id whose shape names exactly one issue-scoped kind fixes the
             // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
             // unmatched self-id leaves the kind open and defers to actual-item
@@ -491,7 +491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         self_id: addr.self_id,
                     }),
                     Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
-                        issue_ref: IssueIdPrefix::parse(&issue_ref)?,
+                        issue_ref: IssueIdPrefix::from_str(&issue_ref)?,
                         kind: Some(kind),
                         self_id: addr.self_id,
                     }),

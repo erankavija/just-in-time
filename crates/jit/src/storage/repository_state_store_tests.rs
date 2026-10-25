@@ -1,14 +1,19 @@
 use super::*;
+use crate::domain::SHORT_ID_LENGTH;
 use crate::repository_state::{CaptureBudget, RepositoryAction, EVENT_LOG_TAIL_WINDOW};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
     repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
 };
-use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
+use crate::storage::{
+    AmbiguousIdError, EventAppend, IssueNotFoundError, PutFile, RedoPoint, RECORD_FILE_NAME,
+    RECORD_SCRATCH_DIR,
+};
 use crate::test_harness::git::GitStandIn;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::Mutex;
 use tempfile::TempDir;
 
@@ -239,7 +244,7 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(
         memory
             .resolve_issue_id(
-                &crate::domain::issue_id::IssueIdPrefix::parse(&issue.short_id()).unwrap()
+                &crate::domain::identity::IssueIdPrefix::from_str(&issue.short_id()).unwrap()
             )
             .unwrap(),
         issue.id
@@ -262,44 +267,109 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(json.list_issues().unwrap(), vec![issue]);
 }
 
-/// Publish `issue` through a mutation session on `storage` rooted at `worktree`.
-fn publish_issue<S: RepositoryStateStore>(storage: &S, worktree: &Path, issue: &Issue) {
+/// Publish `issues` through one mutation session on `storage` rooted at
+/// `worktree`.
+fn publish_issues<S: RepositoryStateStore>(storage: &S, worktree: &Path, issues: &[Issue]) {
     let layout = discover_repository_layout(worktree, worktree.join(".jit")).unwrap();
+    let issue_paths = issues
+        .iter()
+        .map(|issue| VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap())
+        .collect::<Vec<_>>();
+    let roots = ["", "index.json", "issues"].map(|path| VirtualPath::data(path).unwrap());
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(issue_creation_spec(&issue.id)).unwrap();
-    let bytes = serialize_issue(issue).unwrap();
+    let image = session
+        .capture(CaptureSpec::new(roots.iter().chain(&issue_paths).cloned(), budget()).unwrap())
+        .unwrap();
+    let index = serde_json::json!({
+        "schema_version": 2,
+        "all_ids": issues.iter().map(|issue| &issue.id).collect::<Vec<_>>(),
+        "deleted_ids": [],
+    });
+    let [data, index_path, issues_dir] = roots;
+    let actions = [
+        RepositoryAction::create_directory(data, "init", ExpectedPreimage::Absent),
+        RepositoryAction::write_file(
+            index_path,
+            "init",
+            ExpectedPreimage::Absent,
+            serde_json::to_vec(&index).unwrap(),
+            FileMode::Regular,
+        ),
+        RepositoryAction::create_directory(issues_dir, "issue", ExpectedPreimage::Absent),
+    ]
+    .into_iter()
+    .chain(issues.iter().zip(issue_paths).map(|(issue, path)| {
+        RepositoryAction::write_file(
+            path,
+            "issue",
+            ExpectedPreimage::Absent,
+            serialize_issue(issue).unwrap(),
+            FileMode::Regular,
+        )
+    }))
+    .collect();
     session
         .apply(&test_plan(
             &image,
-            &issue_creation_delta(&layout, issue, &bytes),
+            &RepositoryDelta::new(&layout, actions).unwrap(),
         ))
         .unwrap();
 }
 
-/// Each backend resolves a full id in any case or hyphenation to the issue.
+/// Each backend resolves prefixes through the shared resolver: a unique prefix
+/// or any spelling of a full id names its issue, an unmatched prefix is not
+/// found, and a prefix two ids share is ambiguous.
 #[test]
-fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
-    fn assert_resolution(backend: &str, storage: &impl IssueStore, id: &str) {
-        for requested in [id.to_string(), id.to_uppercase(), id.replace('-', "")] {
-            let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&requested).unwrap();
+fn test_conformance_resolve_issue_id_resolves_prefixes_alike_on_both_backends() {
+    use crate::domain::identity::IssueIdPrefix;
+
+    fn issue_with_id(id: &str) -> Issue {
+        let mut issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
+        issue.id = id.to_string();
+        issue
+    }
+
+    fn assert_resolution(backend: &str, storage: &impl IssueStore, issues: &[Issue]) {
+        let resolve = |requested: &str| {
+            storage.resolve_issue_id(&IssueIdPrefix::from_str(requested).unwrap())
+        };
+        let id = &issues[0].id;
+        for requested in [
+            id.to_string(),
+            id.to_uppercase(),
+            id.replace('-', ""),
+            id[..SHORT_ID_LENGTH + 2].to_string(),
+        ] {
             assert_eq!(
-                storage.resolve_issue_id(&prefix).ok().as_deref(),
+                resolve(&requested).ok().as_ref(),
                 Some(id),
                 "{backend} must resolve {requested}"
             );
         }
+        let unmatched = resolve("ffffffff").unwrap_err();
+        assert!(
+            unmatched.downcast_ref::<IssueNotFoundError>().is_some(),
+            "{backend}: {unmatched}"
+        );
+        let shared = resolve(&id[..SHORT_ID_LENGTH]).unwrap_err();
+        assert!(
+            shared.downcast_ref::<AmbiguousIdError>().is_some(),
+            "{backend}: {shared}"
+        );
     }
 
-    let issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
+    let issues = [
+        issue_with_id("b53beeba-32f2-4671-a407-2d94e4d13d41"),
+        issue_with_id("b53beeba-0000-4000-8000-000000000000"),
+    ];
     let memory = InMemoryStorage::new();
     let memory_tree = TempDir::new().unwrap();
-    publish_issue(&memory, memory_tree.path(), &issue);
-    assert_resolution("memory", &memory, &issue.id);
-
     let json_tree = TempDir::new().unwrap();
     let json = JsonFileStorage::new(json_tree.path().join(".jit"));
-    publish_issue(&json, json_tree.path(), &issue);
-    assert_resolution("json", &json, &issue.id);
+    publish_issues(&memory, memory_tree.path(), &issues);
+    publish_issues(&json, json_tree.path(), &issues);
+    assert_resolution("memory", &memory, &issues);
+    assert_resolution("json", &json, &issues);
 }
 
 #[test]

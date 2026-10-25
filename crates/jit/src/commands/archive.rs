@@ -33,11 +33,12 @@ use crate::storage::{
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
-    Container(&'a crate::domain::issue_id::IssueIdPrefix),
+    Container(&'a crate::domain::identity::IssueIdPrefix),
 }
 
 /// Ids of configured non-leaf containers that are archive candidates: those that
@@ -162,7 +163,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .map(|id| {
                 self.plan_archive_target(ArchiveTarget::Container(
-                    &crate::domain::issue_id::IssueIdPrefix::of_stored(&id),
+                    &crate::domain::identity::IssueIdPrefix::from(&id),
                 ))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -177,7 +178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Build a complete non-mutating plan for one resolved container subtree.
     pub fn preview_archive_container(&self, id: &str) -> Result<ArtifactPlan> {
         self.plan_archive_target(ArchiveTarget::Container(
-            &crate::domain::issue_id::IssueIdPrefix::parse(id)?,
+            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
         ))
     }
 
@@ -518,7 +519,8 @@ impl CommandExecutor<JsonFileStorage> {
         };
         let config = crate::repository_state::assemble_config(&image)?;
         let namespaces = crate::config_manager::namespaces_from_config(&config);
-        let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
         let issues = super::captured_active_issues(&image)?;
         let root_id = match target {
             ArchiveTarget::Document(_) => None,
@@ -840,7 +842,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Execute a freshly recomputed container archive plan under one write guard.
     pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
         self.execute_archive_target(ArchiveTarget::Container(
-            &crate::domain::issue_id::IssueIdPrefix::parse(id)?,
+            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
         ))
     }
 
@@ -889,6 +891,23 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_archive_candidates_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .archive_candidates()
+            .expect_err("invalid hierarchy must fail archive candidate planning");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     fn executor(repo: &TempDir, storage: JsonFileStorage) -> CommandExecutor<JsonFileStorage> {
         let layout =

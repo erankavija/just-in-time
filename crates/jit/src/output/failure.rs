@@ -290,7 +290,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::storage::AmbiguousIdError>()
         .is_some()
         || error
-            .downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+            .downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
             .is_some()
     {
         return if error
@@ -306,10 +306,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
         || error
-            .downcast_ref::<crate::declarations::GateStageParseError>()
-            .is_some()
-        || error
-            .downcast_ref::<crate::declarations::GateModeParseError>()
+            .downcast_ref::<crate::domain::vocabulary::UnknownToken>()
             .is_some()
         || error
             .downcast_ref::<crate::document::DocumentScopeParseError>()
@@ -592,7 +589,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
-                crate::domain::issue_id::InvalidIdPrefixError::new("ab").into(),
+                crate::domain::identity::InvalidIdPrefixError::new("ab").into(),
                 2,
                 "*",
             ),

@@ -46,7 +46,6 @@
 use crate::declarations::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_ORIGIN,
 };
-use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
 use std::collections::{HashMap, HashSet};
 
@@ -366,21 +365,6 @@ pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::
         namespaces.declared_type_hierarchy().into_keys().collect();
     hierarchy_types.sort(); // deterministic schema enum order
     namespace_values_schema(crate::labels::TYPE_NAMESPACE, &hierarchy_types)
-}
-
-/// Build the repo's [`HierarchyConfig`] from its label-namespace registry.
-///
-/// The config carries exactly the `types` and `label_associations` that
-/// `config.toml`'s `[type_hierarchy]` declared, both empty for a repository
-/// declaring none. On the impossible case of a malformed hierarchy (empty type
-/// name / level 0) it yields [`HierarchyConfig::empty`] rather than panicking,
-/// keeping this total.
-///
-/// Exposed so the graph-rule evaluation call site
-/// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
-/// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
-pub fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
-    HierarchyConfig::from_declarations(namespaces).unwrap_or_else(|_| HierarchyConfig::empty())
 }
 
 /// Construct a local-scope rule with a shorthand or raw assertion already built.

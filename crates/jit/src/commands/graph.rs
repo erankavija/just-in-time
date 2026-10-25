@@ -125,7 +125,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -178,7 +178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<Issue>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -224,7 +224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         full: bool,
         scope: Option<&str>,
     ) -> Result<String> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
+        let scope = scope.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -305,7 +305,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
     pub fn export_graph_batch(&self, scope: Option<&str>) -> Result<BatchExport> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
+        let scope = scope.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -491,7 +491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::GraphTreeResponse> {
         use crate::output::{GraphTreeResponse, HierarchyNodeView};
 
-        let root = root.map(IssueIdPrefix::parse).transpose()?;
+        let root = root.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
@@ -638,6 +638,23 @@ mod tests {
     use super::*;
     use crate::domain::{Priority, State};
     use crate::output::DependencyTreeNode;
+
+    #[test]
+    fn test_resolve_hierarchy_tree_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .resolve_hierarchy_tree(None)
+            .expect_err("invalid hierarchy must fail graph resolution");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     fn make_node(id: &str, state: State) -> DependencyTreeNode {
         DependencyTreeNode {

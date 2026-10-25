@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-b3fcd297",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bb80227d45cc4de3dfce48fe6ebd89caeff60b55",
+  "completed_at": "2026-10-25T00:48:31.986842600Z",
+  "duration_ms": 95818,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/template.rs",
+        "id": "F1",
+        "line": 588,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b3fcd297/requirement/REQ-01",
+          "@/issue/2195c98f/requirement/REQ-07"
+        ],
+        "severity": "high",
+        "summary": "Template declaration loading builds schema paths with VirtualPath::data instead of VirtualPath::schema."
+      }
+    ],
+    "summary": "A production template-declaration path still bypasses VirtualPath::schema.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "63c88046-0b99-4b97-9c65-5bc5ab92c6c7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:46:56.168181446Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4991 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b3fcd297\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17086-5d4a-7673-8aa6-e20ab773125a\n--------\nuser\n--- 4978 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fa4386c73, bb80227d4\nPolicy sources: AGENTS.md\nResolved items: @/issue/b3fcd297/requirement/REQ-01 and REQ-02 (issue Markdown); @/issue/2195c98f/requirement/REQ-07 (parent issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed on the removed serialization `expect`, which bb80227d4 resolves\nTruncation recovery: narrowed the truncated workspace schema-path search to repository_state, declarations, template, and ruleset-store callers\n\n1. **[blocking][issue-impact]** `crates/jit/src/commands/template.rs:588` still builds a schema `VirtualPath` through `VirtualPath::data(&request.reference)` after loading `schemas/<name>.json` requests. This leaves a second production schema-path builder, so REQ-01 is not satisfied.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A production template-declaration path still bypasses VirtualPath::schema.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Template declaration loading builds schema paths with VirtualPath::data instead of VirtualPath::schema.\",\"file\":\"crates/jit/src/commands/template.rs\",\"line\":588,\"references\":[\"@/issue/b3fcd297/requirement/REQ-01\",\"@/issue/2195c98f/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

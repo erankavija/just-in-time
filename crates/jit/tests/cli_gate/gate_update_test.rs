@@ -9,52 +9,38 @@
 //!   5. The registry write is atomic: a sibling gate stays intact and valid TOML.
 
 use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit(temp: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path());
-    cmd
-}
-
-fn setup_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
-    temp
-}
 
 /// Define an automated gate with a checker so checker-field preservation can be
 /// exercised.
-fn define_auto_gate(temp: &TempDir, key: &str) {
-    jit(temp)
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            "Original Title",
-            "--description",
-            "Original description",
-            "--mode",
-            "auto",
-            "--checker-command",
-            "cargo test",
-            "--timeout",
-            "120",
-            "--priority",
-            "50",
-        ])
-        .assert()
-        .success();
+fn define_original_auto_gate(temp: &JitCli, key: &str) {
+    temp.command([
+        "gate",
+        "define",
+        key,
+        "--title",
+        "Original Title",
+        "--description",
+        "Original description",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "cargo test",
+        "--timeout",
+        "120",
+        "--priority",
+        "50",
+    ])
+    .assert()
+    .success();
 }
 
 /// Install a native checker through its canonical registry representation.
-fn define_review_placeholder_gate(temp: &TempDir, key: &str) {
-    let registry_path = temp.path().join(".jit").join("gates.toml");
+fn install_review_placeholder_gate(temp: &JitCli, key: &str) {
+    let registry_path = temp.root().join(".jit").join("gates.toml");
     fs::write(
         registry_path,
         format!(
@@ -77,9 +63,9 @@ type = "review_placeholder"
 }
 
 /// Read `gate show <key> --json` as a JSON value.
-fn gate_show(temp: &TempDir, key: &str) -> serde_json::Value {
-    let out = jit(temp)
-        .args(["gate", "show", key, "--json"])
+fn gate_show(temp: &JitCli, key: &str) -> serde_json::Value {
+    let out = temp
+        .command(["gate", "show", key, "--json"])
         .assert()
         .success()
         .get_output()
@@ -89,8 +75,8 @@ fn gate_show(temp: &TempDir, key: &str) -> serde_json::Value {
 }
 
 /// Parse the on-disk issue JSON file (the single file under `.jit/issues/`).
-fn read_only_issue_file(temp: &TempDir) -> serde_json::Value {
-    let issues_dir = temp.path().join(".jit").join("issues");
+fn read_only_issue_file(temp: &JitCli) -> serde_json::Value {
+    let issues_dir = temp.root().join(".jit").join("issues");
     let entry = fs::read_dir(&issues_dir)
         .unwrap()
         .filter_map(|e| e.ok())
@@ -102,11 +88,10 @@ fn read_only_issue_file(temp: &TempDir) -> serde_json::Value {
 
 #[test]
 fn test_gate_update_changes_field_in_registry() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
-    jit(&temp)
-        .args(["gate", "update", "tests", "--title", "All Tests Pass"])
+    temp.command(["gate", "update", "tests", "--title", "All Tests Pass"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Updated gate 'tests'"));
@@ -117,12 +102,11 @@ fn test_gate_update_changes_field_in_registry() {
 
 #[test]
 fn test_gate_update_preserves_unprovided_fields() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
     // Change only the title.
-    jit(&temp)
-        .args(["gate", "update", "tests", "--title", "New Title"])
+    temp.command(["gate", "update", "tests", "--title", "New Title"])
         .assert()
         .success();
 
@@ -139,12 +123,11 @@ fn test_gate_update_preserves_unprovided_fields() {
 
 #[test]
 fn test_gate_update_checker_field_preserves_command() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
     // Update only the timeout; the command must be preserved.
-    jit(&temp)
-        .args(["gate", "update", "tests", "--timeout", "600"])
+    temp.command(["gate", "update", "tests", "--timeout", "600"])
         .assert()
         .success();
 
@@ -157,19 +140,18 @@ fn test_gate_update_checker_field_preserves_command() {
 
 #[test]
 fn test_gate_update_checker_command_replaces_native_placeholder_with_exec() {
-    let temp = setup_repo();
-    define_review_placeholder_gate(&temp, "review-any-key");
+    let temp = JitCli::initialised().unwrap();
+    install_review_placeholder_gate(&temp, "review-any-key");
 
-    jit(&temp)
-        .args([
-            "gate",
-            "update",
-            "review-any-key",
-            "--checker-command",
-            "reviewer --stdin",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "update",
+        "review-any-key",
+        "--checker-command",
+        "reviewer --stdin",
+    ])
+    .assert()
+    .success();
 
     let gate = gate_show(&temp, "review-any-key");
     assert_eq!(gate["checker"]["type"], "exec");
@@ -180,11 +162,11 @@ fn test_gate_update_checker_command_replaces_native_placeholder_with_exec() {
 
 #[test]
 fn test_gate_update_json_returns_updated_definition() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
-    let out = jit(&temp)
-        .args([
+    let out = temp
+        .command([
             "gate",
             "update",
             "tests",
@@ -205,20 +187,19 @@ fn test_gate_update_json_returns_updated_definition() {
 
 #[test]
 fn test_gate_update_nonexistent_key_errors() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
 
-    jit(&temp)
-        .args(["gate", "update", "missing", "--title", "X"])
+    temp.command(["gate", "update", "missing", "--title", "X"])
         .assert()
         .failure();
 }
 
 #[test]
 fn test_gate_update_nonexistent_key_json_is_machine_readable() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
 
-    let assert = jit(&temp)
-        .args(["gate", "update", "missing", "--title", "X", "--json"])
+    let assert = temp
+        .command(["gate", "update", "missing", "--title", "X", "--json"])
         .assert()
         .failure();
     let out = assert.get_output().stdout.clone();
@@ -228,11 +209,11 @@ fn test_gate_update_nonexistent_key_json_is_machine_readable() {
 
 #[test]
 fn test_gate_update_no_fields_errors_json() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
-    let assert = jit(&temp)
-        .args(["gate", "update", "tests", "--json"])
+    let assert = temp
+        .command(["gate", "update", "tests", "--json"])
         .assert()
         .failure();
     let out = assert.get_output().stdout.clone();
@@ -242,52 +223,22 @@ fn test_gate_update_no_fields_errors_json() {
 
 #[test]
 fn test_gate_update_leaves_per_issue_status_unchanged() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     // A manual gate so the issue carries a per-issue status entry.
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "review",
-            "--title",
-            "Review",
-            "--description",
-            "Manual review",
-            "--mode",
-            "manual",
-        ])
-        .assert()
-        .success();
-
-    jit(&temp)
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Needs review",
-            "--gate",
-            "review",
-        ])
-        .assert()
-        .success();
+    let issue_id = crate::add_manual_gate_issue(&temp, "review");
 
     // Establish a concrete per-issue status (Passed) so the comparison is
     // meaningful rather than an empty-map equality.
-    let issue_id = read_only_issue_file(&temp)["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    jit(&temp)
-        .args([
-            "gate",
-            "evaluate",
-            &issue_id,
-            "review",
-            "--by",
-            "human:tester",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "evaluate",
+        &issue_id,
+        "review",
+        "--by",
+        "human:tester",
+    ])
+    .assert()
+    .success();
 
     // Capture the per-issue gate state BEFORE the registry edit.
     let before = read_only_issue_file(&temp);
@@ -299,18 +250,17 @@ fn test_gate_update_leaves_per_issue_status_unchanged() {
     );
 
     // Edit the registry definition (title + description).
-    jit(&temp)
-        .args([
-            "gate",
-            "update",
-            "review",
-            "--title",
-            "Renamed Review",
-            "--description",
-            "Different text",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "update",
+        "review",
+        "--title",
+        "Renamed Review",
+        "--description",
+        "Different text",
+    ])
+    .assert()
+    .success();
 
     // Registry changed...
     let gate = gate_show(&temp, "review");
@@ -330,36 +280,34 @@ fn test_gate_update_leaves_per_issue_status_unchanged() {
 
 #[test]
 fn test_gate_update_is_atomic_sibling_gate_intact() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "clippy",
-            "--title",
-            "Clippy",
-            "--description",
-            "Lints",
-            "--mode",
-            "auto",
-            "--checker-command",
-            "cargo clippy",
-            "--timeout",
-            "90",
-        ])
-        .assert()
-        .success();
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
+    temp.command([
+        "gate",
+        "define",
+        "clippy",
+        "--title",
+        "Clippy",
+        "--description",
+        "Lints",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "cargo clippy",
+        "--timeout",
+        "90",
+    ])
+    .assert()
+    .success();
 
-    jit(&temp)
-        .args(["gate", "update", "tests", "--timeout", "777"])
+    temp.command(["gate", "update", "tests", "--timeout", "777"])
         .assert()
         .success();
 
     // The registry file is valid TOML and the sibling gate is intact. Gates
     // persist as a `[[gates]]` array-of-tables (not a keyed JSON object), so
     // each entry is located by scanning for its `key` field.
-    let gates_path = temp.path().join(".jit").join("gates.toml");
+    let gates_path = temp.root().join(".jit").join("gates.toml");
     assert!(Path::new(&gates_path).exists());
     let registry: toml::Value = toml::from_str(&fs::read_to_string(&gates_path).unwrap())
         .expect("registry must remain valid TOML after an update");
@@ -389,41 +337,39 @@ fn test_gate_update_is_atomic_sibling_gate_intact() {
 
 /// Define an auto gate carrying every clearable checker field so clears can be
 /// exercised.
-fn define_rich_gate(temp: &TempDir, key: &str) {
-    jit(temp)
-        .args([
-            "gate",
-            "define",
-            key,
-            "--title",
-            "Rich Gate",
-            "--description",
-            "Has checker fields",
-            "--mode",
-            "auto",
-            "--checker-command",
-            "run.sh",
-            "--working-dir",
-            "subdir",
-            "--prompt",
-            "do the thing",
-            "--prompt-file",
-            "p.md",
-            "--pass-context",
-            "--env",
-            "FOO=bar",
-        ])
-        .assert()
-        .success();
+fn define_rich_gate(temp: &JitCli, key: &str) {
+    temp.command([
+        "gate",
+        "define",
+        key,
+        "--title",
+        "Rich Gate",
+        "--description",
+        "Has checker fields",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "run.sh",
+        "--working-dir",
+        "subdir",
+        "--prompt",
+        "do the thing",
+        "--prompt-file",
+        "p.md",
+        "--pass-context",
+        "--env",
+        "FOO=bar",
+    ])
+    .assert()
+    .success();
 }
 
 #[test]
 fn test_gate_update_clear_working_dir() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_rich_gate(&temp, "g");
 
-    jit(&temp)
-        .args(["gate", "update", "g", "--clear-working-dir"])
+    temp.command(["gate", "update", "g", "--clear-working-dir"])
         .assert()
         .success();
 
@@ -439,19 +385,18 @@ fn test_gate_update_clear_working_dir() {
 
 #[test]
 fn test_gate_update_clear_prompt_and_prompt_file() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_rich_gate(&temp, "g");
 
-    jit(&temp)
-        .args([
-            "gate",
-            "update",
-            "g",
-            "--clear-prompt",
-            "--clear-prompt-file",
-        ])
-        .assert()
-        .success();
+    temp.command([
+        "gate",
+        "update",
+        "g",
+        "--clear-prompt",
+        "--clear-prompt-file",
+    ])
+    .assert()
+    .success();
 
     let gate = gate_show(&temp, "g");
     assert!(
@@ -468,11 +413,10 @@ fn test_gate_update_clear_prompt_and_prompt_file() {
 
 #[test]
 fn test_gate_update_clear_env() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_rich_gate(&temp, "g");
 
-    jit(&temp)
-        .args(["gate", "update", "g", "--clear-env"])
+    temp.command(["gate", "update", "g", "--clear-env"])
         .assert()
         .success();
 
@@ -486,11 +430,10 @@ fn test_gate_update_clear_env() {
 
 #[test]
 fn test_gate_update_pass_context_false_sets_false() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_rich_gate(&temp, "g"); // defined with pass_context = true
 
-    jit(&temp)
-        .args(["gate", "update", "g", "--pass-context", "false"])
+    temp.command(["gate", "update", "g", "--pass-context", "false"])
         .assert()
         .success();
 
@@ -502,11 +445,11 @@ fn test_gate_update_pass_context_false_sets_false() {
 
 #[test]
 fn test_gate_update_set_and_clear_same_field_errors_json() {
-    let temp = setup_repo();
+    let temp = JitCli::initialised().unwrap();
     define_rich_gate(&temp, "g");
 
-    let assert = jit(&temp)
-        .args([
+    let assert = temp
+        .command([
             "gate",
             "update",
             "g",
@@ -528,15 +471,14 @@ fn test_gate_update_set_and_clear_same_field_errors_json() {
 
 #[test]
 fn test_gate_update_appends_event() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests");
+    let temp = JitCli::initialised().unwrap();
+    define_original_auto_gate(&temp, "tests");
 
-    jit(&temp)
-        .args(["gate", "update", "tests", "--title", "New"])
+    temp.command(["gate", "update", "tests", "--title", "New"])
         .assert()
         .success();
 
-    let events_path = temp.path().join(".jit").join("events.jsonl");
+    let events_path = temp.root().join(".jit").join("events.jsonl");
     let contents = fs::read_to_string(&events_path).unwrap();
     let found = contents.lines().any(|line| {
         let v: serde_json::Value = serde_json::from_str(line).unwrap();
