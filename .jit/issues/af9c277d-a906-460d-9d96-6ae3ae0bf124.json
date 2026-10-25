@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9a26e9e9-26f0-4b90-9853-62fd1c20721a",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:53:21.528181306Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "40c2c79d-bf85-465c-a173-675c24169da6",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:55:35.852986322Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "af9c277d-a906-460d-9d96-6ae3ae0bf124",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Label-reference assertions are typed at load",
-  "updated_at": "2026-10-25T04:38:28.375621879Z"
+  "updated_at": "2026-10-25T04:55:35.852986322Z"
 }
