@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "e165a5fd-c35f-4a7d-b758-5c579bb0e853",
+      "run_id": "ee5de642-1826-46a8-87c1-8688985af45d",
       "status": "failed",
-      "updated_at": "2026-10-25T10:57:40.082773036Z",
+      "updated_at": "2026-10-25T16:38:57.866696544Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The CLI resolves each issue-id argument once at entry",
-  "updated_at": "2026-10-25T16:33:38.668614724Z"
+  "updated_at": "2026-10-25T16:38:57.866696544Z"
 }
