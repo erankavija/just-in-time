@@ -59,19 +59,6 @@ fn keep_generic_label(label: &str, stripped_ns: &HashSet<String>) -> bool {
     namespace != crate::labels::TYPE_NAMESPACE && !stripped_ns.contains(namespace)
 }
 
-/// The `batch-create` priority string for `priority` (the value
-/// [`Priority::from_str`](std::str::FromStr) round-trips), so an exported def
-/// re-imports at the same priority.
-fn priority_str(priority: crate::domain::Priority) -> &'static str {
-    use crate::domain::Priority;
-    match priority {
-        Priority::Low => "low",
-        Priority::Normal => "normal",
-        Priority::High => "high",
-        Priority::Critical => "critical",
-    }
-}
-
 impl<S: IssueStore> CommandExecutor<S> {
     /// Publish rendered graph bytes to an explicitly selected filesystem path.
     ///
@@ -385,7 +372,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     title: issue.title.clone(),
                     description: issue.description.clone(),
                     r#type: crate::labels::type_label_value(&issue.labels).map(str::to_string),
-                    priority: Some(priority_str(issue.priority).to_string()),
+                    priority: Some(issue.priority),
                     labels,
                     gates: issue.gates_required.clone(),
                     depends_on,

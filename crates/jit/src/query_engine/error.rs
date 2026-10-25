@@ -13,7 +13,9 @@ pub(super) fn state_values() -> String {
 
 /// The set of priority tokens accepted in a `priority:` filter, listed in an
 /// [`QueryParseError::InvalidPriority`] message.
-pub(super) const PRIORITY_VALUES: &str = "low, normal, high, critical";
+pub(super) fn priority_values() -> String {
+    crate::domain::Priority::ALL.map(|p| p.as_str()).join(", ")
+}
 
 /// A typed failure produced while lexing or parsing a query string.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
