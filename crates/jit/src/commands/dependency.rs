@@ -309,7 +309,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             .as_ref()
                             .ok_or_else(|| anyhow!("missing source"))?,
                     ),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -405,7 +404,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     config.enforcement_mode(),
                     &[resolved_request.issue_id().to_string()],
-                    &issues,
                     claims_guard.as_ref(),
                 )?
                 .into_iter()
