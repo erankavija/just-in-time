@@ -4222,7 +4222,7 @@ mod tests {
         let lease = crate::storage::claim_coordinator::Lease {
             lease_id: "l".into(),
             issue_id: "i".into(),
-            agent_id: "agent:a".into(),
+            agent_id: "agent:a".parse().unwrap(),
             worktree_id: "w".into(),
             branch: None,
             ttl_secs: 0,

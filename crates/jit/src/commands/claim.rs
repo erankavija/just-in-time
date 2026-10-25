@@ -130,7 +130,6 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     // idempotent and convergent over both the captured issue assignment and the
     // captured event-log tail, so a crash-interrupted prior attempt converges
     // without emitting a duplicate claim event (@/inv/event-log).
-    let agent_assignee: crate::domain::Assignee = agent.parse()?;
     let worktree_root = paths.worktree_root.clone();
     let data_root = storage.root().to_path_buf();
     let (lease, ()) = coordinator.acquire_claim_synchronized(
@@ -148,7 +147,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
                 &worktree_root,
                 &data_root,
                 &full_id,
-                &agent_assignee,
+                &agent,
             )
         },
     )?;
@@ -283,16 +282,15 @@ fn sanitize_actor(name: Option<&str>) -> Option<String> {
 ///
 /// Prefers the configured agent id (`JIT_AGENT_ID` > `~/.config/jit/agent.toml`,
 /// already validated), falling back to the git `user.name` (sanitized via
-/// [`sanitize_actor`]). The returned string is always a valid
-/// `{type}:{identifier}` agent identity, so it can safely be used as the
-/// `ClaimCoordinator` agent id and recorded in the eviction audit trail.
+/// [`sanitize_actor`]). The returned assignee is valid and can be used by the
+/// `ClaimCoordinator` and recorded in the eviction audit trail.
 ///
 /// # Errors
 ///
 /// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
 /// configured agent id nor a git `user.name` is available. A release must be
 /// attributable, so no placeholder identity is invented.
-fn resolve_release_actor(worktree_root: &Path) -> Result<String> {
+fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee> {
     use crate::agent_config::resolve_agent_id;
 
     if let Ok(agent) = resolve_agent_id(None) {
@@ -309,7 +307,9 @@ fn resolve_release_actor(worktree_root: &Path) -> Result<String> {
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
 
     sanitize_actor(git_name.as_deref())
-        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))
+        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_acting_identity()))?
+        .parse()
+        .map_err(Into::into)
 }
 
 /// Execute `jit claim release <issue-id>` command.
@@ -386,8 +386,8 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
             Ok(ReleasedLeaseInfo {
                 lease_id: lease.lease_id,
                 issue_id: lease.issue_id,
-                previous_owner: lease.agent_id,
-                actor: actor.clone(),
+                previous_owner: lease.agent_id.to_string(),
+                actor: actor.to_string(),
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -499,12 +499,12 @@ pub fn execute_claim_status<S: IssueStore>(
 
     // Get active leases (default to current agent if no filters specified)
     let filter_agent = if agent_id.is_none() && issue_id.is_none() {
-        Some(current_agent_id.as_str())
+        Some(current_agent_id.to_string())
     } else {
-        agent_id
+        agent_id.map(str::to_string)
     };
 
-    let leases = coordinator.get_active_leases(issue.as_ref(), filter_agent)?;
+    let leases = coordinator.get_active_leases(issue.as_ref(), filter_agent.as_deref())?;
     Ok((leases, warnings))
 }
 
@@ -528,7 +528,7 @@ pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<Stor
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
-    let agent = crate::domain::Assignee::SYSTEM_LIST.to_string();
+    let agent = crate::domain::Assignee::SYSTEM_LIST;
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -569,7 +569,7 @@ pub fn execute_claim_force_evict(
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // For force-evict, we use a system agent (admin operation)
-    let agent = crate::domain::Assignee::SYSTEM_ADMIN.to_string();
+    let agent = crate::domain::Assignee::SYSTEM_ADMIN;
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -639,7 +639,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.warnings.extend(identity_warnings);
 
     // Create claim coordinator.
-    let agent = crate::domain::Assignee::SYSTEM_RECOVERY.to_string();
+    let agent = crate::domain::Assignee::SYSTEM_RECOVERY;
     let locker = FileLocker::with_configured_timeout();
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
@@ -801,7 +801,7 @@ mod tests {
             paths,
             locker,
             identity.worktree_id.clone(),
-            agent_id.to_string(),
+            agent_id.parse()?,
         );
         coordinator.init()?;
 
@@ -819,7 +819,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.to_string());
+            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.parse()?);
 
         // Release lease
         coordinator.release_lease(lease_id)?;
@@ -844,7 +844,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.to_string());
+            ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.parse()?);
         coordinator.init()?;
 
         let leases = coordinator.get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)?;
@@ -857,7 +857,7 @@ mod tests {
                 Ok(ReleasedLeaseInfo {
                     lease_id: lease.lease_id,
                     issue_id: lease.issue_id,
-                    previous_owner: lease.agent_id,
+                    previous_owner: lease.agent_id.to_string(),
                     actor: actor.to_string(),
                 })
             })
@@ -1021,7 +1021,7 @@ mod tests {
             paths,
             locker,
             "wt:test".to_string(),
-            agent_id.unwrap_or("agent:test").to_string(),
+            agent_id.unwrap_or("agent:test").parse().unwrap(),
         );
 
         // Initialize coordinator (creates directories)
@@ -1200,7 +1200,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let coordinator =
-            ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.to_string());
+            ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.parse()?);
 
         coordinator.renew_lease(lease_id, extension_secs)
     }
@@ -1223,7 +1223,7 @@ mod tests {
             paths,
             locker,
             "wt:test".to_string(),
-            "agent:test".to_string(),
+            "agent:test".parse().unwrap(),
         );
         let original = coordinator
             .get_active_leases(None, None)?
@@ -1417,7 +1417,7 @@ mod tests {
         assert!(result.is_ok());
         let leases = result.unwrap();
         assert_eq!(leases.len(), 1);
-        assert_eq!(leases[0].agent_id, "agent:other-agent");
+        assert_eq!(leases[0].agent_id.to_string(), "agent:other-agent");
         Ok(())
     }
 
@@ -1452,7 +1452,7 @@ mod tests {
         assert_eq!(leases.len(), 3);
 
         // Verify all agents are present
-        let agents: Vec<String> = leases.iter().map(|l| l.agent_id.clone()).collect();
+        let agents: Vec<String> = leases.iter().map(|l| l.agent_id.to_string()).collect();
         assert!(agents.contains(&"agent:alice".to_string()));
         assert!(agents.contains(&"agent:bob".to_string()));
         assert!(agents.contains(&"agent:charlie".to_string()));
@@ -1497,7 +1497,7 @@ mod tests {
             paths,
             locker,
             "wt:test".to_string(),
-            "system:list".to_string(),
+            crate::domain::Assignee::SYSTEM_LIST,
         );
         coordinator.init()?;
 
@@ -1581,7 +1581,7 @@ mod tests {
             paths,
             locker,
             "wt:test".to_string(),
-            "system:admin".to_string(),
+            crate::domain::Assignee::SYSTEM_ADMIN,
         );
         coordinator.init()?;
 
@@ -1637,7 +1637,7 @@ mod tests {
             paths.clone(),
             locker,
             identity.worktree_id.clone(),
-            agent_id.to_string(),
+            agent_id.parse()?,
         );
         coordinator.init()?;
         let agent: crate::domain::Assignee = agent_id.parse()?;
@@ -1671,7 +1671,7 @@ mod tests {
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
             identity.worktree_id,
-            agent_id.to_string(),
+            agent_id.parse()?,
         );
         coordinator.init()?;
         coordinator.acquire_claim(issue_id, 600)
@@ -1930,7 +1930,7 @@ mod tests {
             paths.clone(),
             locker,
             identity.worktree_id,
-            "agent:worker".to_string(),
+            "agent:worker".parse().unwrap(),
         );
         coordinator.init()?;
 
@@ -1970,7 +1970,7 @@ mod tests {
             paths.clone(),
             locker,
             identity.worktree_id.clone(),
-            "agent:worker".to_string(),
+            "agent:worker".parse().unwrap(),
         );
         coordinator.init()?;
         let agent: crate::domain::Assignee = "agent:worker".parse().unwrap();
