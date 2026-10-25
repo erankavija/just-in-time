@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cedea5f6-597f-4fc2-9891-cb0cd36eac67",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:32:52.582395261Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "534b4214-702a-4350-9c27-63a80171c4e0",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:34:17.704201434Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Graph queries return nodes rather than id strings",
-  "updated_at": "2026-10-25T06:11:03.208218301Z"
+  "updated_at": "2026-10-25T06:34:17.704201434Z"
 }
