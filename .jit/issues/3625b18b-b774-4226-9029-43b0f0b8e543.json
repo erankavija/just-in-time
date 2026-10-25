@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1240db28-7708-4020-996d-cb10d6c6fd16",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:35:39.998045974Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8c5ef9c2-3a66-4667-a34c-05f0cb0933a6",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:39:02.638709475Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Unit tests match events through the body view",
-  "updated_at": "2026-10-25T06:13:33.295378160Z"
+  "updated_at": "2026-10-25T06:39:02.638709475Z"
 }
