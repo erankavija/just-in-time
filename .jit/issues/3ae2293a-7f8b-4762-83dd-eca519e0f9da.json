@@ -8,6 +8,7 @@
   ],
   "description": "Declare gate stage and gate mode through the vocabulary macro.\n\n## Background\n\n`GateStage` and `GateMode` (`crates/jit/src/declarations/gates.rs:31-90`) hand-write `as_str` and `FromStr` beside their serde forms.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateStage` and `GateMode` are declared through the macro, and their hand-written `as_str` and `FromStr` are gone.\n- [hard] REQ-02: Gate registry files load and serialize byte-identically.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:39:10.294022085Z",
   "first_ready_at": "2026-10-24T23:55:25.271231512Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Gate stage and mode tokens come from one declaration",
-  "updated_at": "2026-10-25T00:35:55.384546166Z"
+  "updated_at": "2026-10-25T00:39:10.294022085Z"
 }
