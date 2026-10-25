@@ -39,14 +39,13 @@
 //! kinds, whose source path comes from config). A list entry without a matching
 //! self-id is plain prose and incurs no addressing requirement (REQ-06).
 
-use crate::config::{
-    ItemKindConfig, ItemKindSource, KindScopeConfig, SourceOfTruth, TomlSourceDescriptor,
-};
+use crate::config::{ItemKindConfig, ItemKindSource, SourceOfTruth, TomlSourceDescriptor};
 use crate::document::ContentParser;
 use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
 use crate::domain::projection::project;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -56,6 +55,9 @@ use thiserror::Error;
 /// `@/issue/<short-id>/<kind>/<self-id>` for an issue item — so the `issue`
 /// reserved segment, not the leading `@`, is what distinguishes the two.
 pub const PROJECT_SCOPE_SENTINEL: &str = "@";
+
+/// Reserved address segment that introduces issue-scoped item addresses.
+pub const ISSUE_ADDRESS_SEGMENT: &str = "issue";
 
 /// The substrate an addressable item belongs to (REQ-01), one input to its
 /// derived qualified id.
@@ -232,7 +234,7 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
     let rest: Vec<&str> = segments.collect();
 
     match rest.len() {
-        4 if rest[0] == KindScope::ISSUE_TOKEN => {
+        4 if rest[0] == ISSUE_ADDRESS_SEGMENT => {
             if !project_name.is_empty() {
                 return Err(invalid(
                     "the issue-item form must use the bare '@' scope, not a named project"
@@ -251,13 +253,12 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
         }
         4 => Err(invalid(format!(
             "expected the reserved segment '{}' after the scope, found '{}'",
-            KindScope::ISSUE_TOKEN,
-            rest[0]
+            ISSUE_ADDRESS_SEGMENT, rest[0]
         ))),
-        2 if rest[0] == KindScope::ISSUE_TOKEN => Err(invalid(format!(
+        2 if rest[0] == ISSUE_ADDRESS_SEGMENT => Err(invalid(format!(
             "'{}' is a reserved segment, not a kind name; use \
              @/issue/<short-id>/<kind>/<self-id> for issue-scoped addresses",
-            KindScope::ISSUE_TOKEN
+            ISSUE_ADDRESS_SEGMENT
         ))),
         2 => {
             let (kind, self_id) = (rest[0], rest[1]);
@@ -373,28 +374,26 @@ pub fn expand_sugar_address(
     }
 }
 
-/// The declared addressing scope of an item *kind* (as opposed to a resolved
-/// [`Scope`], which carries a concrete issue short-id).
-///
-/// A kind is either issue-scoped (its items come from issue descriptions) or
-/// project-scoped (its items come from a config-declared `source` file and address
-/// as `@/<kind>/<self-id>`). This is the `scope` half of the kind registry's six-tuple
-/// the epic builds toward; sibling work adds the remaining `source-of-truth` field
-/// without disturbing this one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KindScope {
-    /// Items are projected from issue descriptions
-    /// (`@/issue/<short-id>/<kind>/<self-id>`).
-    Issue,
-    /// Items are projected from a config-declared source file
-    /// (`@/<kind>/<self-id>`).
-    Project,
+wire_vocabulary! {
+    /// The declared addressing scope of an item kind, distinct from a resolved
+    /// [`Scope`] carrying a concrete issue short-id.
+    ///
+    /// Issue-scoped kinds project items from issue descriptions; project-scoped
+    /// kinds project from a config-declared source file. This is the fifth field
+    /// of the item-kind six-tuple `(section, id-pattern, markers,
+    /// link-namespaces, scope, source-of-truth)`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum KindScope {
+        /// Items are projected from issue descriptions
+        /// (`@/issue/<short-id>/<kind>/<self-id>`).
+        Issue = "issue",
+        /// Items are projected from a config-declared source file
+        /// (`@/<kind>/<self-id>`).
+        Project = "project",
+    }
 }
 
 impl KindScope {
-    /// The token a kind declares its issue scope with.
-    pub const ISSUE_TOKEN: &'static str = "issue";
-
     /// Whether this kind is project-scoped (`@`).
     pub fn is_project(&self) -> bool {
         matches!(self, KindScope::Project)
@@ -642,11 +641,8 @@ impl ItemKind {
                     kind: name.to_string(),
                     missing: "link-namespaces".to_string(),
                 })?;
-        // Scope is now a typed field — invalid tokens are rejected at TOML parse
-        // time, so this conversion is infallible.
         let kind_scope = match config.scope {
-            Some(KindScopeConfig::Issue) => KindScope::Issue,
-            Some(KindScopeConfig::Project) => KindScope::Project,
+            Some(scope) => scope,
             None => {
                 return Err(ItemError::MissingRequiredFields {
                     kind: name.to_string(),
@@ -844,7 +840,7 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
         Scope::Project => format!("{PROJECT_SCOPE_SENTINEL}/{kind}/{self_id}"),
         Scope::Issue(short_id) => format!(
             "{PROJECT_SCOPE_SENTINEL}/{}/{short_id}/{kind}/{self_id}",
-            KindScope::ISSUE_TOKEN
+            ISSUE_ADDRESS_SEGMENT
         ),
     }
 }
@@ -1150,9 +1146,11 @@ pub struct ProjectSource {
 ///
 /// ```
 /// use jit::config::ItemKindConfig;
-/// use jit::config::{KindScopeConfig, ItemKindSource, SourceOfTruth};
+/// use jit::config::{ItemKindSource, SourceOfTruth};
 /// use jit::document::MarkdownContentParser;
-/// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource, RawScopeItem};
+/// use jit::domain::item::{
+///     index_project_sources, ItemKind, KindScope, ProjectSource, RawScopeItem,
+/// };
 ///
 /// // A markdown-first kind (`definition`, sourced from the glossary).
 /// let kind = ItemKind::from_config(
@@ -1162,7 +1160,7 @@ pub struct ProjectSource {
 ///         id_pattern: Some("[A-Z][a-z]+".into()),
 ///         markers: Some(vec![]),
 ///         link_namespaces: Some(vec!["defines".into()]),
-///         scope: Some(KindScopeConfig::Project),
+///         scope: Some(KindScope::Project),
 ///         source: Some(ItemKindSource::Path("docs/reference/glossary.md".into())),
 ///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
 ///         aliases: None,
@@ -1496,7 +1494,7 @@ mod tests {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec!["[hard]".to_string()]),
             link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -1509,7 +1507,7 @@ mod tests {
             id_pattern: Some("D-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -1522,7 +1520,7 @@ mod tests {
             id_pattern: Some("RISK-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["mitigates".to_string(), "resolves".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -1535,7 +1533,7 @@ mod tests {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScopeConfig::Project),
+            scope: Some(KindScope::Project),
             source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
                 toml: ".jit/invariants.toml".to_string(),
                 table: "invariants".to_string(),
@@ -1774,7 +1772,7 @@ mod tests {
                 id_pattern: Some("REQ-\\d+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["per".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -1820,7 +1818,7 @@ mod tests {
             id_pattern: Some("D-\\d+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -1843,7 +1841,7 @@ mod tests {
             id_pattern: Some("REQ-(".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -1926,7 +1924,7 @@ mod tests {
     fn test_item_kind_resolution_reports_missing_declared_vocabulary_fields() {
         let config = ItemKindConfig {
             markers: Some(vec![]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             ..Default::default()
         };
@@ -1992,7 +1990,7 @@ mod tests {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScopeConfig::Project),
+            scope: Some(KindScope::Project),
             source,
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
             aliases: None,
@@ -2047,8 +2045,8 @@ mod tests {
         // config-declared `invariant` kind resolves as ordinary config like any
         // other name — declarations the old reserved-name branch rejected are now
         // accepted because the engine hardcodes no domain concept.
-        let cfg = |scope: KindScopeConfig, sot: SourceOfTruth, source: Option<ItemKindSource>| {
-            ItemKindConfig {
+        let cfg =
+            |scope: KindScope, sot: SourceOfTruth, source: Option<ItemKindSource>| ItemKindConfig {
                 section: Some("success_criteria".to_string()),
                 id_pattern: Some("[a-z][a-z0-9-]*".to_string()),
                 markers: Some(vec![]),
@@ -2057,15 +2055,14 @@ mod tests {
                 source,
                 source_of_truth: Some(sot),
                 aliases: None,
-            }
-        };
+            };
 
         // Markdown-first project `invariant` with a source: once a reserved-name
         // rejection, now an ordinary markdown-first project kind.
         let md = ItemKind::from_config(
             "invariant",
             &cfg(
-                KindScopeConfig::Project,
+                KindScope::Project,
                 SourceOfTruth::MarkdownFirst,
                 Some(ItemKindSource::Path("project-items.md".to_string())),
             ),
@@ -2079,7 +2076,7 @@ mod tests {
         // project-source requirement does not apply to issue scope).
         let issue = ItemKind::from_config(
             "invariant",
-            &cfg(KindScopeConfig::Issue, SourceOfTruth::RegistryFirst, None),
+            &cfg(KindScope::Issue, SourceOfTruth::RegistryFirst, None),
         )
         .unwrap();
         assert_eq!(issue.kind_scope(), KindScope::Issue);
@@ -2093,7 +2090,7 @@ mod tests {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
-            scope: Some(KindScopeConfig::Project),
+            scope: Some(KindScope::Project),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -2300,7 +2297,7 @@ name = \"bare\"
                 id_pattern: Some("D-\\d+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["per".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2325,7 +2322,7 @@ name = \"bare\"
                 markers: Some(vec!["[hard]".to_string()]),
                 id_pattern: Some("REQ-\\d+".to_string()),
                 link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2350,7 +2347,7 @@ name = \"bare\"
                 id_pattern: Some("C-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["references".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2385,7 +2382,7 @@ name = \"bare\"
                 id_pattern: Some("REQ-(".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2797,7 +2794,7 @@ name = \"bare\"
                 id_pattern: Some("X-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2811,7 +2808,7 @@ name = \"bare\"
                 id_pattern: Some("[A-Z]-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
