@@ -4,6 +4,7 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
+use crate::domain::Assignee;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -2588,7 +2589,7 @@ pub struct GateRunSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

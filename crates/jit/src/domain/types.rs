@@ -1011,7 +1011,7 @@ pub struct GateRunResult {
     /// Command that was executed
     pub command: String,
     /// Who triggered this execution
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     /// Optional message
     pub message: Option<String>,
     /// Structured findings parsed from the checker's machine-readable block, if
@@ -1096,7 +1096,7 @@ impl GateRunResult {
             stdout: String::new(),
             stderr: String::new(),
             command: String::new(),
-            by: by.map(ToString::to_string),
+            by: by.cloned(),
             message: None,
             findings: None,
             inputs_digest: None,
@@ -2101,6 +2101,24 @@ mod tests {
         attested.inputs_digest = Some(digest.clone());
 
         assert!(!attested.is_reusable_for("review", &digest));
+    }
+
+    #[test]
+    fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
+        let mut run = GateRunResult::attestation(
+            "issue",
+            "review",
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.by = Some(Assignee::AUTO_EXECUTOR);
+
+        let encoded = serde_json::to_string(&run).unwrap();
+        let decoded: GateRunResult = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.by, run.by);
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
     }
 
     #[test]

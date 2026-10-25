@@ -2955,7 +2955,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
                 for result in &precheck_runs {
-                    let (state, by) = gate_check::gate_state_from_run(result)?;
+                    let state = gate_check::gate_state_from_run(result);
+                    let by = result.by.clone();
                     let status = state.status;
                     issue.gates_status.insert(result.gate_key.clone(), state);
                     precheck_events.push((
