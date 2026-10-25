@@ -1300,6 +1300,27 @@ mod tests {
         assert_eq!(graph.edges[0].to, id1);
     }
 
+    #[tokio::test]
+    async fn test_get_graph_returns_server_error_for_invalid_hierarchy() {
+        let storage = test_memory_storage();
+        let config = jit::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
+        storage.add_data_file("config.toml", &config);
+
+        let state = AppState {
+            executor: test_executor(storage),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        server
+            .get("/graph")
+            .await
+            .assert_status(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     /// The response body carries the `count` envelope field, and it counts
     /// `nodes` rather than `edges` (which differ in number here).
     #[tokio::test]

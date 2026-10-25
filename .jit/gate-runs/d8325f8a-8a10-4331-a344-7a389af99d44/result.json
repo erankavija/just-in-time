@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-7383f4ea",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "919bf5f5fba0bba31035b25e83480be012401295",
+  "completed_at": "2026-10-25T01:11:01.694727497Z",
+  "duration_ms": 159530,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met: the macro-backed enum is decoded at template load, apply-time parsing is removed, and malformed kinds name their template.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8325f8a-8a10-4331-a344-7a389af99d44",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T01:08:22.164606565Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1536abfd6 (`refactor(jit:7383f4ea)`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-10 (.jit/issues/2195c98f-95a-45d0-8582-d93c1d1fec45.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T01:06:58.515572255+00:00)\nTruncation recovery: Narrowed affected-path and policy-source reads after broad searches truncated; unrelated matches were outside the impact cone.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met: the macro-backed enum is decoded at template load, apply-time parsing is removed, and malformed kinds name their template.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

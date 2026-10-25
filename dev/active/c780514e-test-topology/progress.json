@@ -1274,13 +1274,13 @@
     },
     {
       "session": 2,
-      "issue": "870e8e46",
+      "issue": "870e8e46, 9c3b9da2",
       "category": "shared test infrastructure change (escalation policy 7) / footprint expansion",
       "status": "open: awaiting user decision next session",
-      "question": "JitCli (crates/jit/src/test_cli.rs) can init git but cannot stage and commit. gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) need a repository with one commit so HEAD resolves. REQ-01/02 of 870e8e46 cannot be met without a fixture capability.",
+      "question": "The shared JitCli fixture (crates/jit/src/test_cli.rs) lacks two capabilities that migrated tests need: (1) staging and committing in its repository, needed by cli_gate gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) so HEAD resolves; (2) spawning an alternate program (a copied jit binary beside a stub jit-server) under the same environment scrub, needed by cli_issue command_exit_code_projection_tests.rs::test_command_exit_codes_serve_foreground_passthrough_is_dual_form. REQ-01/02 of 870e8e46 and 9c3b9da2 cannot be met without them.",
       "options": [
-        "A (recommended): add JitCli::commit_all(message) to the shared fixture, with one owning test in cli_process_fixture_tests.rs, as a new leaf task that 870e8e46 and any later migration needing commits depend on; footprint test_cli.rs + fixture test",
-        "B: permit a local git add/commit helper in those two files as a named convention-convergence exception"
+        "A (recommended): one new leaf task in this epic, 'The shared CLI fixture commits its repository and spawns an alternate binary on request', footprint test_cli.rs + cli_process_fixture_tests.rs, each capability with one owning test; 870e8e46 and 9c3b9da2 depend on it",
+        "B: permit named local exceptions in those files under @/inv/convention-convergence with a tracked convergence condition"
       ],
       "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here"
     },
