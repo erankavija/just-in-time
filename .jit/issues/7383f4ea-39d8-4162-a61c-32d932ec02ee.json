@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2f4100b3-7d4c-4f92-9605-06a055999956",
+      "run_id": "76e82e13-5abb-4b13-809e-4146c7bd1ce9",
       "status": "passed",
-      "updated_at": "2026-10-25T01:08:21.702318908Z",
+      "updated_at": "2026-10-25T01:17:00.039065449Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Template transform kind is typed at load",
-  "updated_at": "2026-10-25T01:11:02.107161444Z"
+  "updated_at": "2026-10-25T01:17:00.039065449Z"
 }
