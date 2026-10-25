@@ -20,6 +20,7 @@ use super::{
     RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
+use crate::domain::identity::IssueId;
 use crate::domain::{
     Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
 };
@@ -415,18 +416,18 @@ pub enum MutationIntent {
 struct PendingEvent {
     phase: u8,
     tag: String,
-    primary: String,
+    primary: Option<IssueId>,
     secondary: String,
     ordinal: usize,
     body: EventBody,
 }
 
 impl PendingEvent {
-    fn sort_key(&self) -> (u8, &str, &str, &str, usize) {
+    fn sort_key(&self) -> (u8, &str, Option<&str>, &str, usize) {
         (
             self.phase,
             self.tag.as_str(),
-            self.primary.as_str(),
+            self.primary.as_deref(),
             self.secondary.as_str(),
             self.ordinal,
         )
@@ -763,7 +764,7 @@ pub(super) fn finalize_delta(
             pending_events.push(PendingEvent {
                 phase: 0,
                 tag: "issue_created".to_string(),
-                primary: id.clone(),
+                primary: Some(id.clone()),
                 secondary: String::new(),
                 ordinal: pending_events.len(),
                 body: EventBody::draft_issue_created(&issue),
@@ -804,7 +805,7 @@ pub(super) fn finalize_delta(
                 pending_events.push(PendingEvent {
                     phase: 0,
                     tag: "issue_created".to_string(),
-                    primary: issue.id.clone(),
+                    primary: Some(issue.id.clone()),
                     secondary: String::new(),
                     ordinal: pending_events.len(),
                     body: EventBody::draft_issue_created(&issue),
@@ -813,7 +814,7 @@ pub(super) fn finalize_delta(
                     pending_events.push(PendingEvent {
                         phase: 1,
                         tag: "issue_updated".to_string(),
-                        primary: issue.id.clone(),
+                        primary: Some(issue.id.clone()),
                         secondary: String::new(),
                         ordinal: pending_events.len(),
                         body: EventBody::draft_issue_updated(
@@ -869,7 +870,7 @@ pub(super) fn finalize_delta(
                 pending_events.push(PendingEvent {
                     phase: 1,
                     tag: "issue_claimed".to_string(),
-                    primary: issue_id.clone(),
+                    primary: Some(issue_id.clone()),
                     secondary: agent.to_string(),
                     ordinal: pending_events.len(),
                     body: EventBody::draft_issue_claimed(issue_id.clone(), agent.clone()),
@@ -1322,8 +1323,8 @@ fn index_membership_action(
 }
 
 /// Primary/secondary ordering identities for an event.
-fn event_identities(body: &EventBody) -> (String, String) {
-    let issue_id = body.issue_id().cloned().unwrap_or_default();
+fn event_identities(body: &EventBody) -> (Option<IssueId>, String) {
+    let issue_id = body.issue_id().cloned();
     match body {
         EventBody::GatePassed { gate_key, .. }
         | EventBody::GateFailed { gate_key, .. }
@@ -2791,8 +2792,11 @@ mod tests {
     fn test_event_identities_repository_scoped_event_sorts_before_issue_scoped() {
         let (repository_scoped, _) =
             event_identities(&EventBody::draft_gate_definition_created("g".to_string()));
-        let (issue_scoped, _) =
-            event_identities(&EventBody::draft_issue_deleted("0000-1".to_string()));
+        let (issue_scoped, _) = event_identities(&EventBody::draft_issue_deleted(
+            "0f0e0d0c-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
+        ));
 
         assert!(repository_scoped < issue_scoped);
     }
