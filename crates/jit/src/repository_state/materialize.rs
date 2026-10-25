@@ -14,8 +14,8 @@ use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
     render_rule_block, serialize_ruleset, splice_default_membership, AmbiguousOwnershipError,
     ExpectedPreimage, FileMode, ManagedDocumentClaim, ProducerError, ProjectionInputs,
-    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
+    RegionPlacement, RepositoryAction, RepositoryActionOwner, RepositoryDeclarations,
+    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
@@ -377,7 +377,7 @@ pub(crate) fn compose_configured_projections(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "configured-projection".to_string(),
+            owner: RepositoryActionOwner::ConfiguredProjection,
             expected: ExpectedPreimage::of(entry),
             bytes: expected_bytes,
             mode: FileMode::Regular,
@@ -385,9 +385,6 @@ pub(crate) fn compose_configured_projections(
     }
     Ok(ConfiguredProjections { actions, counts })
 }
-
-/// Stable ownership identity for the data root's ignore file.
-const DATA_ROOT_IGNORE_OWNER: &str = "data-root-ignore";
 
 /// Stable region identity of the engine's block inside that file; its
 /// delimiters are this identity in the file's own comment syntax.
@@ -398,7 +395,7 @@ const DATA_ROOT_IGNORE_REGION: &str = "data-root-ignore";
 /// file's own comment syntax.
 fn data_root_ignore_claim() -> ManagedDocumentClaim {
     ManagedDocumentClaim::Region {
-        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+        owner: RepositoryActionOwner::DataRootIgnore.to_string(),
         region_id: DATA_ROOT_IGNORE_REGION.to_string(),
         begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
         end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
@@ -456,7 +453,7 @@ pub(crate) fn compose_data_root_ignore(
             );
             Ok((!unchanged).then(|| RepositoryAction::WriteFile {
                 path: path.clone(),
-                owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+                owner: RepositoryActionOwner::DataRootIgnore,
                 expected: ExpectedPreimage::of(entry),
                 bytes: expected,
                 mode: FileMode::Regular,
@@ -530,7 +527,7 @@ pub(crate) fn compose_default_ruleset(
     if expected_rules != current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
-            owner: "default-rule-membership".to_string(),
+            owner: RepositoryActionOwner::DefaultRuleMembership,
             expected: ExpectedPreimage::of(entry(image, &rules_path)?),
             bytes: expected_rules.into_bytes(),
             mode: FileMode::Regular,
@@ -558,7 +555,7 @@ pub(crate) fn compose_default_ruleset(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "default-schema".to_string(),
+            owner: RepositoryActionOwner::DefaultSchema,
             expected: ExpectedPreimage::of(occupant),
             bytes: schema.content.clone().into_bytes(),
             mode: FileMode::Regular,
@@ -617,7 +614,7 @@ pub(crate) fn compose_default_ruleset(
         {
             actions.push(RepositoryAction::DeleteFile {
                 path: vpath.clone(),
-                owner: "default-schema".to_string(),
+                owner: RepositoryActionOwner::DefaultSchema,
                 expected: ExpectedPreimage::of(occupant),
             });
         }

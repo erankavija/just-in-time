@@ -745,8 +745,13 @@ mod tests {
         coordinator.init().unwrap();
 
         // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
-        coordinator.acquire_claim("issue-short", 1).unwrap();
-        coordinator.acquire_claim("issue-long", 600).unwrap();
+        use crate::storage::claim_coordinator::test_issue_id;
+        coordinator
+            .acquire_claim(&test_issue_id("issue-short"), 1)
+            .unwrap();
+        coordinator
+            .acquire_claim(&test_issue_id("issue-long"), 600)
+            .unwrap();
 
         let active_total = |clock: &FixedClock| -> usize {
             let (entries, _warnings) = execute_worktree_list_at(&paths, clock).unwrap();

@@ -3,7 +3,7 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::JitConfig;
-use crate::domain::identity::{IssueIdPrefix, LeaseId};
+use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -140,7 +140,6 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
             coord_config.max_indefinite_leases_per_agent,
             coord_config.max_indefinite_leases_per_repo,
         ),
-        |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
         |_lease| {
             synchronize_claim_repository_state(
                 storage,
@@ -168,7 +167,7 @@ fn synchronize_claim_repository_state<S>(
     storage: &S,
     worktree_root: &Path,
     data_root: &Path,
-    full_id: &str,
+    full_id: &IssueId,
     agent: &crate::domain::Assignee,
 ) -> Result<()>
 where
@@ -180,7 +179,7 @@ where
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
     let intents = [MutationIntent::ClaimIssue {
-        issue_id: full_id.to_string(),
+        issue_id: full_id.clone(),
         agent: agent.clone(),
     }];
     let build_spec = || -> Result<CaptureSpec> {
@@ -257,7 +256,7 @@ pub struct ReleasedLeaseInfo {
     /// The lease ID that was released (resolved from the issue, not supplied by the user).
     pub lease_id: LeaseId,
     /// The full issue ID whose lease was released.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The prior owner of the released lease.
     pub previous_owner: String,
     /// The acting identity recorded in the eviction audit trail.
@@ -393,7 +392,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
         .collect::<Result<Vec<_>>>()?;
 
     let info = released.into_iter().next_back().ok_or_else(|| {
-        crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
+        crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(full_id.as_str()))
     })?;
     Ok((info, warnings))
 }
@@ -809,7 +808,7 @@ mod tests {
         coordinator.init()?;
 
         // Acquire claim
-        let lease = coordinator.acquire_claim(issue_id, ttl_secs)?;
+        let lease = coordinator.acquire_claim(&full_id, ttl_secs)?;
         Ok(lease.lease_id)
     }
 
@@ -871,7 +870,10 @@ mod tests {
             .collect::<Result<Vec<_>>>()?;
 
         released.into_iter().next_back().ok_or_else(|| {
-            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id)).into()
+            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(
+                full_id.as_str(),
+            ))
+            .into()
         })
     }
 
@@ -1672,7 +1674,6 @@ mod tests {
             ttl_secs,
             None,
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| {
                 super::synchronize_claim_repository_state(
                     storage,
@@ -1686,7 +1687,7 @@ mod tests {
         Ok(lease.lease_id)
     }
 
-    fn persist_legacy_claim(temp: &TempDir, issue_id: &str, agent_id: &str) -> Result<Lease> {
+    fn persist_claim(temp: &TempDir, issue_id: &IssueId, agent_id: &str) -> Result<Lease> {
         let paths = create_test_paths(temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let coordinator = ClaimCoordinator::new(
@@ -1702,7 +1703,7 @@ mod tests {
     }
 
     /// Count claim events for one issue by a given agent in the event log.
-    fn claim_events_for(storage: &JsonFileStorage, full_id: &str, agent: &str) -> usize {
+    fn claim_events_for(storage: &JsonFileStorage, full_id: &IssueId, agent: &str) -> usize {
         let agent: crate::domain::Assignee = agent.parse().unwrap();
         storage
             .read_events()
@@ -1797,122 +1798,6 @@ mod tests {
     }
 
     #[test]
-    fn test_claim_acquire_reuses_uniquely_resolved_legacy_short_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let first_id = create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-        let legacy = persist_legacy_claim(&temp, "abcdef12-3", "agent:worker")?;
-
-        let acquired = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &first_id,
-            600,
-            "agent:worker",
-        )?;
-
-        assert_eq!(acquired, legacy.lease_id);
-        assert_eq!(execute_claim_list_test(&temp)?.len(), 1);
-        assert_eq!(claim_events_for(&storage, &first_id, "agent:worker"), 1);
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_acquire_rejects_ambiguous_persisted_short_lease_without_mutation() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let first_id = create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-
-        persist_legacy_claim(&temp, "abcdef12", "agent:worker")?;
-
-        let paths = create_test_paths(&temp);
-        let log_path = paths.shared_jit.join("claims.jsonl");
-        let index_path = paths.shared_jit.join("claims.index.json");
-        let log_before = fs::read(&log_path)?;
-        let index_before = fs::read(&index_path)?;
-
-        let result = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &first_id,
-            600,
-            "agent:worker",
-        );
-
-        let error = result.expect_err("ambiguous persisted short lease must reject acquisition");
-        let error_chain = format!("{error:#}");
-        assert!(
-            error_chain.to_lowercase().contains("ambiguous"),
-            "resolution error should be explicit: {error_chain}"
-        );
-        assert_eq!(
-            fs::read(&log_path)?,
-            log_before,
-            "claim log must not change"
-        );
-        assert_eq!(
-            fs::read(&index_path)?,
-            index_before,
-            "claims index must not change"
-        );
-        assert!(storage.load_issue(&first_id)?.assignee.is_none());
-        assert_eq!(claim_events_for(&storage, &first_id, "agent:worker"), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_acquire_ignores_unrelated_ambiguous_persisted_short_lease() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-3000-4000-8000-000000000001",
-            "First shared-prefix issue",
-        )?;
-        create_test_issue_with_id(
-            &storage,
-            "abcdef12-4000-4000-8000-000000000002",
-            "Second shared-prefix issue",
-        )?;
-        let unrelated_id = create_test_issue_with_id(
-            &storage,
-            "12345678-9000-4000-8000-000000000003",
-            "Unrelated issue",
-        )?;
-        persist_legacy_claim(&temp, "abcdef12", "agent:worker")?;
-
-        execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &unrelated_id,
-            600,
-            "agent:worker",
-        )?;
-
-        let leases = execute_claim_list_test(&temp)?;
-        assert_eq!(leases.len(), 2);
-        assert!(leases.iter().any(|lease| lease.issue_id == "abcdef12"));
-        assert!(leases.iter().any(|lease| lease.issue_id == unrelated_id));
-        assert_eq!(claim_events_for(&storage, &unrelated_id, "agent:worker"), 1);
-        Ok(())
-    }
-
-    #[test]
     fn test_claim_acquire_distinguishes_full_ids_with_shared_prefix() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
         let first_id = create_test_issue_with_id(
@@ -1925,7 +1810,7 @@ mod tests {
             "abcdef12-4000-4000-8000-000000000002",
             "Second shared-prefix issue",
         )?;
-        persist_legacy_claim(&temp, &first_id, "agent:worker")?;
+        persist_claim(&temp, &first_id, "agent:worker")?;
 
         execute_claim_acquire_synchronized_test(&temp, &storage, &second_id, 600, "agent:worker")?;
 
@@ -1967,7 +1852,6 @@ mod tests {
             600,
             None,
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| Ok(()),
         );
         assert!(result.is_err(), "reverse guard order must be rejected");
@@ -2007,7 +1891,6 @@ mod tests {
             0,
             Some("manual oversight"),
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| {
                 super::synchronize_claim_repository_state(
                     &storage,

@@ -1,6 +1,7 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
 use super::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use crate::domain::vocabulary::wire_vocabulary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -963,7 +964,9 @@ impl TargetClaim {
     ) -> Result<Self, DeltaError> {
         layout.ensure_canonical(&target)?;
         let owner = owner.into();
-        validate_owner(&owner)?;
+        if owner.is_empty() || owner.chars().any(char::is_control) {
+            return Err(DeltaError::InvalidClaimOwner);
+        }
         Ok(Self { target, owner })
     }
 
@@ -1076,6 +1079,25 @@ impl ExpectedPreimage {
     }
 }
 
+wire_vocabulary! {
+    /// Producer of an exact repository-state action.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum RepositoryActionOwner {
+        RepositoryStateMutation = "repository-state-mutation",
+        RepositoryInit = "repository-init",
+        ProfileApplication = "profile-application",
+        GitattributesMergeDriver = "gitattributes-merge-driver",
+        ArchiveExecution = "archive-execution",
+        PackageCapture = "package-capture",
+        RepositoryExport = "repository-export",
+        ConfiguredProjection = "configured-projection",
+        DataRootIgnore = "data-root-ignore",
+        DefaultRuleMembership = "default-rule-membership",
+        DefaultSchema = "default-schema",
+        AuthoredConfig = "authored-config",
+    }
+}
+
 static EVENT_LOG: VirtualPath = VirtualPath::EVENTS;
 
 /// One exact repository-state action.
@@ -1084,13 +1106,13 @@ pub enum RepositoryAction {
     /// Create an absent directory.
     CreateDirectory {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     },
     /// Create or replace an ordinary file.
     WriteFile {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         /// Exact bytes to publish; serialization carries their digest.
         #[serde(serialize_with = "serialize_content_digest")]
@@ -1100,19 +1122,19 @@ pub enum RepositoryAction {
     /// Change only an ordinary file's mode.
     SetMode {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         mode: FileMode,
     },
     /// Delete one ordinary file.
     DeleteFile {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     },
     /// Write `bytes` into the event log at `offset`, the length its capture read.
     AppendEvents {
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         offset: u64,
         #[serde(serialize_with = "serialize_content_digest")]
@@ -1124,12 +1146,12 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn create_directory(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     ) -> Self {
         Self::CreateDirectory {
             path,
-            owner: owner.into(),
+            owner,
             expected,
         }
     }
@@ -1137,14 +1159,14 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn write_file(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         bytes: Vec<u8>,
         mode: FileMode,
     ) -> Self {
         Self::WriteFile {
             path,
-            owner: owner.into(),
+            owner,
             expected,
             bytes,
             mode,
@@ -1154,13 +1176,13 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn set_mode(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         mode: FileMode,
     ) -> Self {
         Self::SetMode {
             path,
-            owner: owner.into(),
+            owner,
             expected,
             mode,
         }
@@ -1169,25 +1191,25 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn delete_file(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     ) -> Self {
         Self::DeleteFile {
             path,
-            owner: owner.into(),
+            owner,
             expected,
         }
     }
 
     #[cfg(test)]
     pub(crate) fn append_events(
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         offset: u64,
         bytes: Vec<u8>,
     ) -> Self {
         Self::AppendEvents {
-            owner: owner.into(),
+            owner,
             expected,
             offset,
             bytes,
@@ -1206,13 +1228,13 @@ impl RepositoryAction {
     }
 
     /// Stable producer or ownership identity.
-    pub fn owner(&self) -> &str {
+    pub fn owner(&self) -> RepositoryActionOwner {
         match self {
             Self::CreateDirectory { owner, .. }
             | Self::WriteFile { owner, .. }
             | Self::SetMode { owner, .. }
             | Self::DeleteFile { owner, .. }
-            | Self::AppendEvents { owner, .. } => owner,
+            | Self::AppendEvents { owner, .. } => *owner,
         }
     }
 
@@ -1292,8 +1314,7 @@ impl RepositoryDelta {
 }
 
 fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
-    let (owner, expected) = (action.owner(), action.expected());
-    validate_owner(owner)?;
+    let expected = action.expected();
     if *action.path() == EVENT_LOG && !matches!(action, RepositoryAction::AppendEvents { .. }) {
         return Err(DeltaError::InvalidAction(
             "the event log changes only by a positioned append".into(),
@@ -1343,14 +1364,6 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
         RepositoryAction::DeleteFile { .. } => Err(DeltaError::InvalidAction(
             "file deletion requires a file preimage".into(),
         )),
-    }
-}
-
-fn validate_owner(owner: &str) -> Result<(), DeltaError> {
-    if owner.is_empty() || owner.chars().any(char::is_control) {
-        Err(DeltaError::InvalidOwner)
-    } else {
-        Ok(())
     }
 }
 
@@ -1424,8 +1437,8 @@ pub enum DeltaError {
         first: VirtualPath,
         second: VirtualPath,
     },
-    #[error("delta action owner is empty or contains control characters")]
-    InvalidOwner,
+    #[error("target claim owner is empty or contains control characters")]
+    InvalidClaimOwner,
     #[error("delta action targets machine-local engine control at {0:?}")]
     EngineControlTarget(VirtualPath),
     #[error("delta action is invalid: {0}")]
@@ -1802,7 +1815,7 @@ mod tests {
                 &layout(),
                 vec![RepositoryAction::DeleteFile {
                     path: target.clone(),
-                    owner: "delete".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: directory.clone(),
                 }],
             ),
@@ -1813,7 +1826,7 @@ mod tests {
                 &layout(),
                 vec![RepositoryAction::SetMode {
                     path: target.clone(),
-                    owner: "mode".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: directory,
                     mode: FileMode::Executable,
                 }],
@@ -1825,7 +1838,7 @@ mod tests {
             &layout(),
             vec![RepositoryAction::DeleteFile {
                 path: target,
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity,
                     mode: FileMode::Regular,
@@ -1849,25 +1862,25 @@ mod tests {
         let actions = [
             RepositoryAction::WriteFile {
                 path: lock.clone(),
-                owner: "write".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file.clone(),
                 bytes: b"clobber".to_vec(),
                 mode: FileMode::Regular,
             },
             RepositoryAction::DeleteFile {
                 path: lock.clone(),
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file.clone(),
             },
             RepositoryAction::SetMode {
                 path: lock.clone(),
-                owner: "mode".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file,
                 mode: FileMode::Executable,
             },
             RepositoryAction::CreateDirectory {
                 path: below,
-                owner: "create".into(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             },
         ];
@@ -1887,7 +1900,7 @@ mod tests {
             &layout(),
             vec![RepositoryAction::WriteFile {
                 path: VirtualPath::worktree(format!("{BOOTSTRAP_LOCK_FILE}ed")).unwrap(),
-                owner: "write".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: b"ordinary".to_vec(),
                 mode: FileMode::Regular,
@@ -1906,14 +1919,27 @@ mod tests {
         let refused = [
             RepositoryAction::write_file(
                 log.clone(),
-                "write",
+                RepositoryActionOwner::RepositoryStateMutation,
                 file.clone(),
                 b"rewritten".to_vec(),
                 FileMode::Regular,
             ),
-            RepositoryAction::delete_file(log.clone(), "delete", file.clone()),
-            RepositoryAction::set_mode(log.clone(), "mode", file.clone(), FileMode::Executable),
-            RepositoryAction::create_directory(log, "create", ExpectedPreimage::Absent),
+            RepositoryAction::delete_file(
+                log.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                file.clone(),
+            ),
+            RepositoryAction::set_mode(
+                log.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                file.clone(),
+                FileMode::Executable,
+            ),
+            RepositoryAction::create_directory(
+                log,
+                RepositoryActionOwner::RepositoryInit,
+                ExpectedPreimage::Absent,
+            ),
         ];
         for action in refused {
             assert!(
@@ -1927,7 +1953,7 @@ mod tests {
         assert!(RepositoryDelta::new(
             &layout(),
             vec![RepositoryAction::append_events(
-                "append",
+                RepositoryActionOwner::RepositoryStateMutation,
                 file,
                 3,
                 b"line\n".to_vec()
@@ -1943,14 +1969,15 @@ mod tests {
             identity: identity.clone(),
             mode: FileMode::Regular,
         };
-        let set_mode = |path: VirtualPath, owner: &str, expected: ExpectedPreimage| {
-            RepositoryAction::SetMode {
-                path,
-                owner: owner.into(),
-                expected,
-                mode: FileMode::Executable,
-            }
-        };
+        let set_mode =
+            |path: VirtualPath, owner: RepositoryActionOwner, expected: ExpectedPreimage| {
+                RepositoryAction::SetMode {
+                    path,
+                    owner,
+                    expected,
+                    mode: FileMode::Executable,
+                }
+            };
 
         // A file hard-linked into both roots captures ONE physical identity at two
         // canonical paths; the cross-root pair is rejected.
@@ -1960,10 +1987,14 @@ mod tests {
                 vec![
                     set_mode(
                         VirtualPath::worktree("shared").unwrap(),
-                        "one",
+                        RepositoryActionOwner::RepositoryStateMutation,
                         file(&shared)
                     ),
-                    set_mode(VirtualPath::data("shared").unwrap(), "two", file(&shared)),
+                    set_mode(
+                        VirtualPath::data("shared").unwrap(),
+                        RepositoryActionOwner::ProfileApplication,
+                        file(&shared)
+                    ),
                 ],
             ),
             Err(DeltaError::PhysicalAlias { .. })
@@ -1976,8 +2007,16 @@ mod tests {
             RepositoryDelta::new(
                 &layout(),
                 vec![
-                    set_mode(VirtualPath::data("a").unwrap(), "one", file(&shared)),
-                    set_mode(VirtualPath::data("b").unwrap(), "two", file(&shared)),
+                    set_mode(
+                        VirtualPath::data("a").unwrap(),
+                        RepositoryActionOwner::RepositoryStateMutation,
+                        file(&shared)
+                    ),
+                    set_mode(
+                        VirtualPath::data("b").unwrap(),
+                        RepositoryActionOwner::ProfileApplication,
+                        file(&shared)
+                    ),
                 ],
             ),
             Err(DeltaError::PhysicalAlias { .. })
@@ -1990,10 +2029,14 @@ mod tests {
             vec![
                 set_mode(
                     VirtualPath::worktree("shared").unwrap(),
-                    "one",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     file(&shared)
                 ),
-                set_mode(VirtualPath::data("shared").unwrap(), "two", file(&other)),
+                set_mode(
+                    VirtualPath::data("shared").unwrap(),
+                    RepositoryActionOwner::ProfileApplication,
+                    file(&other)
+                ),
             ],
         )
         .is_ok());
@@ -2004,14 +2047,14 @@ mod tests {
             vec![
                 RepositoryAction::WriteFile {
                     path: VirtualPath::worktree("fresh-a").unwrap(),
-                    owner: "one".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"a".to_vec(),
                     mode: FileMode::Regular,
                 },
                 RepositoryAction::WriteFile {
                     path: VirtualPath::data("fresh-b").unwrap(),
-                    owner: "two".into(),
+                    owner: RepositoryActionOwner::ProfileApplication,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"b".to_vec(),
                     mode: FileMode::Regular,
@@ -2049,14 +2092,14 @@ mod tests {
         let path = VirtualPath::data("index.json").unwrap();
         assert!(matches!(
             TargetClaim::new(&layout(), path.clone(), ""),
-            Err(DeltaError::InvalidOwner)
+            Err(DeltaError::InvalidClaimOwner)
         ));
         assert!(matches!(
             RepositoryDelta::new(
                 &layout(),
                 vec![RepositoryAction::CreateDirectory {
                     path,
-                    owner: "producer".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: EntryIdentity::for_bytes("occupant", b"metadata").unwrap(),
                         mode: FileMode::Regular,

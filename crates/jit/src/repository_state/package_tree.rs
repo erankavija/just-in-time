@@ -15,13 +15,11 @@
 
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayoutError,
-    RepositoryRootClass, RootRelativePath, VirtualPath,
+    RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
+    RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-
-const CAPTURE_OWNER: &str = "package-capture";
 
 /// One file a whole-tree republication publishes, addressed relative to the
 /// tree root.
@@ -255,7 +253,7 @@ pub fn finalize_package_tree_capture(
         .map(|path| match base.entry(&path)? {
             RepositoryEntry::Absent => Ok(Some(RepositoryAction::CreateDirectory {
                 path,
-                owner: CAPTURE_OWNER.to_string(),
+                owner: RepositoryActionOwner::PackageCapture,
                 expected: ExpectedPreimage::Absent,
             })),
             RepositoryEntry::Directory { .. } => Ok(None),
@@ -291,7 +289,7 @@ pub fn finalize_package_tree_capture(
             let action = (disposition != TreeFileDisposition::Unchanged).then(|| {
                 RepositoryAction::WriteFile {
                     path: (*path).clone(),
-                    owner: CAPTURE_OWNER.to_string(),
+                    owner: RepositoryActionOwner::PackageCapture,
                     expected: ExpectedPreimage::of(entry),
                     bytes: file.bytes.clone(),
                     mode: file.mode,
@@ -317,7 +315,7 @@ pub fn finalize_package_tree_capture(
             RepositoryEntry::File { mode, .. } => Ok(Some((
                 RepositoryAction::DeleteFile {
                     path: path.clone(),
-                    owner: CAPTURE_OWNER.to_string(),
+                    owner: RepositoryActionOwner::PackageCapture,
                     expected: ExpectedPreimage::of(entry),
                 },
                 TreeFileOutcome {
