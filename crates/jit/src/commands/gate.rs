@@ -223,7 +223,7 @@ enum CapturedGateRegistryOutcome {
 
 struct DerivedGateRegistryMutation {
     registry: crate::declarations::GateRegistry,
-    event: Event,
+    event: EventBody,
     outcome: CapturedGateRegistryOutcome,
 }
 
@@ -446,9 +446,9 @@ fn derive_gate_preset_application(
             intents.push(MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(if existed {
-                    Event::draft_gate_definition_updated(gate.key)
+                    EventBody::draft_gate_definition_updated(gate.key)
                 } else {
-                    Event::draft_gate_definition_created(gate.key)
+                    EventBody::draft_gate_definition_created(gate.key)
                 }),
             });
         }
@@ -640,7 +640,7 @@ fn derive_gate_registry_mutation(
                 .gates
                 .insert(definition.key.clone(), definition.clone());
             (
-                Event::draft_gate_definition_created(definition.key.clone()),
+                EventBody::draft_gate_definition_created(definition.key.clone()),
                 CapturedGateRegistryOutcome::Defined,
             )
         }
@@ -653,7 +653,7 @@ fn derive_gate_registry_mutation(
             let updated = updated_gate_definition(current, update.clone())?;
             registry.gates.insert(key.clone(), updated.clone());
             (
-                Event::draft_gate_definition_updated(key.clone()),
+                EventBody::draft_gate_definition_updated(key.clone()),
                 CapturedGateRegistryOutcome::Updated(Box::new(updated)),
             )
         }
@@ -662,7 +662,7 @@ fn derive_gate_registry_mutation(
                 return Err(crate::storage::GateNotFoundError::by_key(key).into());
             }
             (
-                Event::draft_gate_definition_removed(key.clone()),
+                EventBody::draft_gate_definition_removed(key.clone()),
                 CapturedGateRegistryOutcome::Removed,
             )
         }

@@ -775,7 +775,11 @@ fn test_conformance_event_log_skips_retired_tags_and_rejects_malformed_known_rec
     let known = |id: &str| {
         let mut issue = Issue::draft("Known".to_string(), String::new());
         issue.id = "issue-id".to_string();
-        crate::test_utils::stamped_event(Event::draft_issue_created(&issue), id, chrono::Utc::now())
+        crate::test_utils::stamped_event(
+            EventBody::draft_issue_created(&issue),
+            id,
+            chrono::Utc::now(),
+        )
     };
     let (first, second) = (known("first"), known("second"));
     let retired = concat!(
@@ -2049,7 +2053,7 @@ fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
     let issue = req01_issue(id, Some(agent.clone()));
     // A committed claim event so both issue and tail already reflect the claim.
     let claim_event = crate::test_utils::stamped_event(
-        Event::draft_issue_claimed(id.to_string(), agent.clone()),
+        EventBody::draft_issue_claimed(id.to_string(), agent.clone()),
         "evt",
         req01_instant(),
     );
@@ -2104,11 +2108,7 @@ fn test_conformance_identical_full_finalizer_plan_matches_both_backends() {
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
-    let event = crate::test_utils::stamped_event(
-        Event::draft_gate_definition_created("cargo-ci".to_string()),
-        String::new(),
-        req01_instant(),
-    );
+    let event = EventBody::draft_gate_definition_created("cargo-ci".to_string());
     let intents = [MutationIntent::RecordEvent {
         phase: 0,
         event: Box::new(event),
@@ -2316,7 +2316,7 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
     let provenance = crate::test_utils::stamped_event(
-        Event::draft_gate_definition_created("cargo-ci".to_string()),
+        EventBody::draft_gate_definition_created("cargo-ci".to_string()),
         "prov-1",
         req01_instant(),
     );
@@ -2466,30 +2466,22 @@ fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
     }
 }
 
-fn lifecycle_event() -> Event {
-    crate::test_utils::stamped_event(
-        Event::draft_profile_lifecycle(
-            crate::domain::ProfileLifecycleOperation::Apply,
-            vec![crate::domain::ProfileLifecycleProfile {
-                id: "example"
-                    .try_into()
-                    .expect("the conformance profile id is canonical"),
-                version: "1.0.0".to_string(),
-                status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-        ),
-        String::new(),
-        req01_instant(),
+fn lifecycle_event() -> EventBody {
+    EventBody::draft_profile_lifecycle(
+        crate::domain::ProfileLifecycleOperation::Apply,
+        vec![crate::domain::ProfileLifecycleProfile {
+            id: "example"
+                .try_into()
+                .expect("the conformance profile id is canonical"),
+            version: "1.0.0".to_string(),
+            status: crate::domain::ProfileLifecycleStatus::Installed,
+            variables: Default::default(),
+        }],
     )
 }
 
-fn gate_def_created(gate_key: &str) -> Event {
-    crate::test_utils::stamped_event(
-        Event::draft_gate_definition_created(gate_key.into()),
-        String::new(),
-        req01_instant(),
-    )
+fn gate_def_created(gate_key: &str) -> EventBody {
+    EventBody::draft_gate_definition_created(gate_key.into())
 }
 
 #[test]
