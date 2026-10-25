@@ -884,8 +884,12 @@ fn derive_profile_application_candidate(
     push_file_actions(base, &files, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
-    if profile.target_hashes.contains_key(".jit/config.toml")
-        || profile.target_hashes.contains_key(".jit/rules.toml")
+    if profile
+        .target_hashes
+        .contains_key(VirtualPath::CONFIG.repository_relative().as_str())
+        || profile
+            .target_hashes
+            .contains_key(VirtualPath::RULES.repository_relative().as_str())
     {
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;

@@ -115,7 +115,7 @@
           "short_id": "18dc6e3e",
           "title": "Repository-state code names well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
@@ -309,7 +309,7 @@
           "short_id": "8cfbf19d",
           "title": "Lease and worktree ids are dedicated types",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
@@ -323,7 +323,7 @@
           "short_id": "945f65f3",
           "title": "Commands name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
@@ -384,7 +384,7 @@
           "short_id": "98404e0c",
           "title": "Lease records name their issue by IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
@@ -889,6 +889,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One-enum macro adoption with a wire-contract check."
+    },
+    {
+      "issue": "98404e0c",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lease issue retype and tolerance removal over three files."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in commands, same pattern as 18dc6e3e."
     }
   ],
   "surfaced_pitfalls": [

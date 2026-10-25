@@ -238,10 +238,10 @@ fn entry_identity(contribution: &Contribution) -> String {
 /// The caller reads these paths and hands their text to
 /// [`contribution_drift_reports`], so which files the comparison consults comes
 /// from the manifest rather than from a list beside it.
-pub fn contributed_registry_paths(contributions: &[Contribution]) -> BTreeSet<&'static str> {
+pub fn contributed_registry_paths(contributions: &[Contribution]) -> BTreeSet<String> {
     contributions
         .iter()
-        .map(Contribution::registry_path)
+        .map(|contribution| contribution.registry_path().repository_relative())
         .collect()
 }
 
@@ -299,26 +299,28 @@ pub fn contribution_drift_reports(
 fn parsed_registries(
     contributions: &[Contribution],
     registries: &BTreeMap<String, String>,
-) -> Result<BTreeMap<&'static str, Value>, ContributionDriftError> {
+) -> Result<BTreeMap<String, Value>, ContributionDriftError> {
     contributions
         .iter()
-        .map(Contribution::registry_path)
+        .map(|contribution| contribution.registry_path().repository_relative())
         .collect::<BTreeSet<_>>()
         .into_iter()
         .map(|registry| {
-            let text = registries.get(registry).ok_or_else(|| {
+            let text = registries.get(&registry).ok_or_else(|| {
                 ContributionDriftError::RegistryMissing {
-                    registry: registry.to_string(),
+                    registry: registry.clone(),
                     entry: contributions
                         .iter()
-                        .find(|contribution| contribution.registry_path() == registry)
+                        .find(|contribution| {
+                            contribution.registry_path().repository_relative() == registry
+                        })
                         .map(entry_identity)
                         .unwrap_or_default(),
                 }
             })?;
             let document = toml_edit::de::from_str::<Value>(text).map_err(|source| {
                 ContributionDriftError::RegistryParse {
-                    registry: registry.to_string(),
+                    registry: registry.clone(),
                     source,
                 }
             })?;
@@ -333,20 +335,20 @@ fn contribution_report(
     package: &str,
     manifest: &str,
     contribution: &Contribution,
-    documents: &BTreeMap<&'static str, Value>,
+    documents: &BTreeMap<String, Value>,
     overrides: &[DeclaredOverride],
 ) -> Result<Option<DriftReport>, ContributionDriftError> {
-    let registry = contribution.registry_path();
+    let registry = contribution.registry_path().repository_relative();
     let identity = entry_identity(contribution);
     let document =
         documents
-            .get(registry)
+            .get(&registry)
             .ok_or_else(|| ContributionDriftError::RegistryMissing {
-                registry: registry.to_string(),
+                registry: registry.clone(),
                 entry: identity.clone(),
             })?;
     let subject = |entry: String| DriftSubject {
-        repository: DriftCarrier::new(registry, entry),
+        repository: DriftCarrier::new(registry.clone(), entry),
         packaged: DriftCarrier::new(manifest, format!("contribution '{identity}'")),
         field_root: format!("{registry}[{identity}]"),
         remedy: format!(
@@ -375,7 +377,7 @@ fn contribution_report(
         return Ok(subject(format!("{table}.{key}")).reporting(missing));
     }
 
-    let Some((entry, authored)) = repository_entry(registry, document, contribution)? else {
+    let Some((entry, authored)) = repository_entry(&registry, document, contribution)? else {
         return Ok(None);
     };
     let packaged = contributed_value(contribution);
@@ -982,7 +984,10 @@ kind = \"advisory\"
 
         assert_eq!(
             paths,
-            BTreeSet::from([".jit/invariants.toml", ".jit/config.toml"])
+            BTreeSet::from([
+                ".jit/invariants.toml".to_string(),
+                ".jit/config.toml".to_string(),
+            ])
         );
     }
 }

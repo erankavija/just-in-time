@@ -2767,7 +2767,10 @@ mod tests {
         assert!(manifest
             .contributions
             .iter()
-            .all(|contribution| contribution.registry_path() == ".jit/config.toml"));
+            .all(
+                |contribution| contribution.registry_path().repository_relative()
+                    == ".jit/config.toml"
+            ));
     }
 
     #[test]
