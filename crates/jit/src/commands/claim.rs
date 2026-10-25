@@ -3,7 +3,7 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use crate::config::JitConfig;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::IssueIdPrefix;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -14,6 +14,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
+use std::str::FromStr;
 
 /// True when the selected worktree root is inside a git working tree, regardless
 /// of whether any commit exists yet.
@@ -89,7 +90,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     use crate::agent_config::resolve_agent_id;
 
     // Resolve short ID to full ID
-    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
     // Validate issue exists
     let _issue = storage
@@ -140,7 +141,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
             coord_config.max_indefinite_leases_per_agent,
             coord_config.max_indefinite_leases_per_repo,
         ),
-        |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
+        |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
         |_lease| {
             synchronize_claim_repository_state(
                 storage,
@@ -335,7 +336,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
     // Resolve short ID to full ID (errors if the issue does not exist).
     let full_id = storage
-        .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)
+        .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)
         .with_context(|| format!("Failed to resolve issue id {}", issue_id))?;
 
     // Get current branch for identity
@@ -367,7 +368,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 
     // Resolve the issue's active (non-expired) lease(s).
     let leases = coordinator
-        .get_active_leases(Some(&IssueIdPrefix::of_stored(&full_id)), None)
+        .get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)
         .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?;
 
     let released = leases
@@ -527,7 +528,7 @@ pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<Stor
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
-    let agent = "system:list".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_LIST.to_string();
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -568,7 +569,7 @@ pub fn execute_claim_force_evict(
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // For force-evict, we use a system agent (admin operation)
-    let agent = "system:admin".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_ADMIN.to_string();
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -638,7 +639,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.warnings.extend(identity_warnings);
 
     // Create claim coordinator.
-    let agent = "system:recovery".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_RECOVERY.to_string();
     let locker = FileLocker::with_configured_timeout();
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
@@ -780,7 +781,7 @@ mod tests {
         agent_id: &str,
     ) -> Result<String> {
         // Resolve short ID to full ID
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Validate issue exists
         let _issue = storage.load_issue(&full_id)?;
@@ -836,7 +837,7 @@ mod tests {
         issue_id: &str,
         actor: &str,
     ) -> Result<ReleasedLeaseInfo> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let paths = create_test_paths(temp);
 
         let locker = FileLocker::new(Duration::from_secs(
@@ -846,8 +847,7 @@ mod tests {
             ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.to_string());
         coordinator.init()?;
 
-        let leases =
-            coordinator.get_active_leases(Some(&IssueIdPrefix::of_stored(&full_id)), None)?;
+        let leases = coordinator.get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)?;
 
         let released = leases
             .into_iter()
@@ -1008,7 +1008,7 @@ mod tests {
     /// Execute claim status with manually constructed paths (for testing)
     fn execute_claim_status_test(
         temp: &TempDir,
-        issue_id: Option<&str>,
+        issue_id: Option<&crate::domain::identity::IssueId>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
         let paths = create_test_paths(temp);
@@ -1028,8 +1028,8 @@ mod tests {
         coordinator.init()?;
 
         // Get active leases
-        let leases = coordinator
-            .get_active_leases(issue_id.map(IssueIdPrefix::of_stored).as_ref(), agent_id)?;
+        let leases =
+            coordinator.get_active_leases(issue_id.map(IssueIdPrefix::from).as_ref(), agent_id)?;
         Ok(leases)
     }
 
@@ -1627,7 +1627,7 @@ mod tests {
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<String> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let paths = create_test_paths(temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let locker = FileLocker::new(Duration::from_secs(
@@ -1648,7 +1648,7 @@ mod tests {
             ttl_secs,
             None,
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
+            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| {
                 super::synchronize_claim_repository_state(
                     storage,
@@ -1919,7 +1919,7 @@ mod tests {
 
         let (temp, storage) = setup_test_repo()?;
         let issue_id = create_test_issue(&storage, "Reverse Order")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&issue_id)?)?;
+        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&issue_id)?)?;
 
         let paths = create_test_paths(&temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
@@ -1943,7 +1943,7 @@ mod tests {
             600,
             None,
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
+            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| Ok(()),
         );
         assert!(result.is_err(), "reverse guard order must be rejected");
@@ -1959,7 +1959,7 @@ mod tests {
     fn test_release_renew_heartbeat_never_touch_repository_state() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
         let issue_id = create_test_issue(&storage, "Coordinator Only")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&issue_id)?)?;
+        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&issue_id)?)?;
 
         let paths = create_test_paths(&temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
@@ -1983,7 +1983,7 @@ mod tests {
             0,
             Some("manual oversight"),
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
+            |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::from_str(persisted_id)?),
             |_lease| {
                 super::synchronize_claim_repository_state(
                     &storage,

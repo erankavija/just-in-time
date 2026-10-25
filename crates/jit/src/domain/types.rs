@@ -5,6 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::identity::ProfileId;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
@@ -16,6 +17,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str::FromStr;
 #[cfg(test)]
@@ -271,17 +273,45 @@ wire_vocabulary! {
 /// via deserialization), so a raw, unvalidated string can never reach storage.
 ///
 /// The fields are private; construct an `Assignee` by parsing (`str::parse` /
-/// [`FromStr`]) and read the parts via [`Assignee::kind`] /
-/// [`Assignee::identifier`]. It serializes transparently as the
-/// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
-/// issue JSON is unchanged.
+/// [`FromStr`]) or take an engine-owned actor from its associated constant, and
+/// read the parts via [`Assignee::kind`] / [`Assignee::identifier`]. It
+/// serializes transparently as the `kind:identifier` string (through
+/// [`Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
-    kind: String,
-    identifier: String,
+    kind: Cow<'static, str>,
+    identifier: Cow<'static, str>,
 }
 
 impl Assignee {
+    /// Coordinator actor for listing active leases.
+    pub const SYSTEM_LIST: Self = Self::engine_actor("system", "list");
+    /// Coordinator actor for checking a lease.
+    pub const SYSTEM_CHECK: Self = Self::engine_actor("system", "check");
+    /// Coordinator actor for force-evicting a lease.
+    pub const SYSTEM_ADMIN: Self = Self::engine_actor("system", "admin");
+    /// Coordinator actor for claims and lease recovery.
+    pub const SYSTEM_RECOVERY: Self = Self::engine_actor("system", "recovery");
+    /// Coordinator actor guarding a repository mutation when no agent identity
+    /// resolves.
+    pub const SYSTEM_LEASE_CHECK: Self = Self::engine_actor("system", "lease-check");
+    /// Actor stamped on the `by` field of a gate run recorded by the automated
+    /// executor (as opposed to a human or agent attestation). A recorded pass
+    /// whose `updated_by` equals this value is an auto-era pass with no human
+    /// attestation behind it, which matters when a gate is later redefined to
+    /// manual mode.
+    pub const AUTO_EXECUTOR: Self = Self::engine_actor("auto", "executor");
+
+    /// Builds an engine-owned actor without parsing. Private so that only the
+    /// constants above use it; each must equal the parse of its spelling: a
+    /// non-empty, colon-free `kind` and a non-empty `identifier`.
+    const fn engine_actor(kind: &'static str, identifier: &'static str) -> Self {
+        Self {
+            kind: Cow::Borrowed(kind),
+            identifier: Cow::Borrowed(identifier),
+        }
+    }
+
     /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
     pub fn kind(&self) -> &str {
         &self.kind
@@ -338,8 +368,8 @@ impl FromStr for Assignee {
             return Err(AssigneeParseError::EmptyIdentifier(s.to_string()));
         }
         Ok(Assignee {
-            kind: kind.to_string(),
-            identifier: identifier.to_string(),
+            kind: Cow::Owned(kind.to_string()),
+            identifier: Cow::Owned(identifier.to_string()),
         })
     }
 }
@@ -1207,7 +1237,7 @@ pub enum ProfileLifecycleStatus {
 #[serde(deny_unknown_fields)]
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
-    pub id: crate::profile::ProfileId,
+    pub id: ProfileId,
     /// The package version applied.
     pub version: String,
     /// The action observed for this profile.
@@ -3084,6 +3114,20 @@ mod tests {
                 let parsed = Assignee::from_str(raw).unwrap();
                 assert_eq!(parsed.to_string(), raw);
                 assert_eq!(Assignee::from_str(&parsed.to_string()).unwrap(), parsed);
+            }
+        }
+
+        #[test]
+        fn test_assignee_system_actor_constants_equal_parsed_spelling() {
+            for (constant, spelling) in [
+                (Assignee::SYSTEM_LIST, "system:list"),
+                (Assignee::SYSTEM_CHECK, "system:check"),
+                (Assignee::SYSTEM_ADMIN, "system:admin"),
+                (Assignee::SYSTEM_RECOVERY, "system:recovery"),
+                (Assignee::SYSTEM_LEASE_CHECK, "system:lease-check"),
+                (Assignee::AUTO_EXECUTOR, "auto:executor"),
+            ] {
+                assert_eq!(Assignee::from_str(spelling).unwrap(), constant);
             }
         }
 

@@ -5,6 +5,7 @@
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 
+use crate::domain::identity::ProfileId;
 mod archive;
 mod default_rules;
 mod export;
@@ -498,7 +499,7 @@ pub struct MaterializationPlan {
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 /// What one profile decided about one target it participates in.
@@ -527,7 +528,7 @@ pub(crate) struct ProfileTargetMaterialization {
     /// reader that reports per profile needs each decision to name the profile
     /// that made it. A target two packages both contribute is decided by each
     /// of them and therefore appears once per contributing owner.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,
@@ -542,7 +543,7 @@ pub(crate) struct ProfileTargetMaterialization {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileContributionMaterialization {
     /// Package whose composed claims decided this declaration.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     /// Canonical semantic identity the decision is about.
     pub(crate) identity: ContributionIdentity,
     pub(crate) disposition: ProfileTargetDisposition,
@@ -553,7 +554,7 @@ struct MaterializationDerivation {
     delta: RepositoryDelta,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 impl MaterializationDerivation {
@@ -580,10 +581,7 @@ impl MaterializationDerivation {
     }
 
     /// Record packages whose candidate derivations have a non-event effect.
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }
@@ -614,9 +612,7 @@ impl MaterializationPlan {
     }
 
     /// Package identities responsible for a non-event effect in this plan.
-    pub(crate) fn applied_profiles(
-        &self,
-    ) -> &std::collections::BTreeSet<crate::profile::ProfileId> {
+    pub(crate) fn applied_profiles(&self) -> &std::collections::BTreeSet<ProfileId> {
         &self.applied_profiles
     }
 
@@ -650,10 +646,7 @@ impl MaterializationPlan {
         self
     }
 
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }

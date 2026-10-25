@@ -21,7 +21,8 @@ use super::{
     TargetClaim, VirtualPath,
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
-use crate::profile::{ProfileId, RegionId, ResolvedVariables};
+use crate::domain::identity::ProfileId;
+use crate::profile::{RegionId, ResolvedVariables};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
