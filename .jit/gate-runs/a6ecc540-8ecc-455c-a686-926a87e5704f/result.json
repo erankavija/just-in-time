@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-5c232305",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "06a56c3a2c8091206dccd477670b880c8705bd54",
+  "completed_at": "2026-10-25T00:08:33.042775465Z",
+  "duration_ms": 57048,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change moves and validates ProfileId in the domain layer, unifies the predicate, updates all references, and has passing Rust CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5c232305-0ba2-4838-9419-4bd63af92dce",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a6ecc540-8ecc-455c-a686-926a87e5704f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:07:35.994278355Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5ab7b0a83 `refactor(jit:5c232305): define ProfileId and the kebab predicate in domain::identity`\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-09 and @/issue/3e353abd/requirement/REQ-01,REQ-03 (.jit issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, architecture-dependency-direction, canonical-cutover, essential-code-prose, orthogonal-tests, no-ignored-tests, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:06:12Z); code-review pending (no run)\nTruncation recovery: reread AGENTS.md, policy sources, and the attributable patch in bounded path groups; inspected current identity, manifest, graph, imports, and gate record\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change moves and validates ProfileId in the domain layer, unifies the predicate, updates all references, and has passing Rust CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

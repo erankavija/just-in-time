@@ -1017,7 +1017,7 @@ jit issue update --filter "assignee:agent:worker-1" --assignee "agent:worker-2"
 jit issue update --filter "label:epic:auth" --priority critical
 
 # Complex queries with AND/OR/NOT
-jit issue update --filter "state:ready AND NOT assignee:* AND priority:high" --assignee "agent:worker-1"
+jit issue update --filter "state:ready AND unassigned AND priority:high" --assignee "agent:worker-1"
 
 # Remove labels from multiple issues
 jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
