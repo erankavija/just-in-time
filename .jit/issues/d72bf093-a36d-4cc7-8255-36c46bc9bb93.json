@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:2195c98f-lead",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-25T08:16:15.734601941Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
@@ -23,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "769d663f-d74f-4b34-8d6d-108559ff781a",
-      "status": "failed",
-      "updated_at": "2026-10-25T22:02:16.583736265Z",
+      "run_id": "124d1fc4-a642-481d-bab1-b80e1a974102",
+      "status": "passed",
+      "updated_at": "2026-10-25T22:16:29.069917007Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Event becomes an envelope around a tagged body",
-  "updated_at": "2026-10-25T22:09:25.642082284Z"
+  "updated_at": "2026-10-25T22:16:29.069917007Z"
 }
