@@ -34,25 +34,6 @@ enum CapturedDependencyMutation<Id = IssueIdPrefix> {
     },
 }
 
-/// Parse a batch's requested dependency ids, naming every one that is too
-/// short in one batch rejection.
-fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<IssueIdPrefix>> {
-    let mut rejected = Vec::new();
-    let parsed = ids
-        .iter()
-        .filter_map(|id| {
-            IssueIdPrefix::from_str(id)
-                .map_err(|error| rejected.push((id.clone(), error.into())))
-                .ok()
-        })
-        .collect();
-    if rejected.is_empty() {
-        Ok(parsed)
-    } else {
-        Err(DependencyBatchRejectedError::new(from.as_str(), rejected).into())
-    }
-}
-
 enum CapturedDependencyOutcome {
     Single {
         result: DependencyAddResult,
@@ -191,8 +172,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Add multiple dependencies under an explicit [`RedundancyPolicy`], atomically.
     ///
-    /// All-or-nothing (jit:c8518f2a): every requested edge is validated —
-    /// id parsing before any read, then id resolution, cycle detection and (under
+    /// Takes full ids the caller already resolved. All-or-nothing
+    /// (jit:c8518f2a): every requested edge is validated — id resolution
+    /// against the capture, cycle detection and (under
     /// [`RedundancyPolicy::Reject`]) the transitive-reduction check, all against
     /// the WOULD-BE final graph with every edge of this call applied at once —
     /// before anything is written. If any edge fails, `Err(`[`DependencyBatchRejectedError`]`)`
@@ -218,11 +200,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let issue_id = IssueIdPrefix::from_str(issue_id)?;
-        let dependency_ids = parse_dependency_batch(&issue_id, dep_ids)?;
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
-            issue_id,
-            dependency_ids,
+            issue_id: IssueIdPrefix::from(&issue_id.to_owned()),
+            dependency_ids: dep_ids.iter().map(IssueIdPrefix::from).collect(),
             policy,
         })? {
             CapturedDependencyOutcome::Batch(result) => Ok(result),
@@ -453,7 +433,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn remove_dependencies(
         &self,
         issue_id: &str,
-        dep_ids: &[String],
+        dep_ids: &[IssueIdPrefix],
     ) -> Result<DependenciesRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
@@ -463,11 +443,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
-                issue_id: IssueIdPrefix::from_str(issue_id)?,
-                dependency_ids: dep_ids
-                    .iter()
-                    .map(|id| IssueIdPrefix::from_str(id))
-                    .collect::<Result<_, _>>()?,
+                issue_id: IssueIdPrefix::from(&issue_id.to_owned()),
+                dependency_ids: dep_ids.to_vec(),
             },
         )? {
             CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
@@ -1092,7 +1069,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
         assert!(executor
-            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
             .is_err());
 
         drop(recovered.open_mutation_session(layout.clone()).unwrap());
@@ -1103,7 +1080,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
         executor
-            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
             .unwrap();
         let updated = recovered.load_issue(&source_id).unwrap();
         assert_eq!(updated.state, State::Ready);
@@ -1147,7 +1124,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let error = executor
-            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
             .expect_err("the ready graph rule blocks only the automatic transition");
         assert!(error
             .downcast_ref::<crate::errors::TransitionBlockedError>()
@@ -1181,7 +1158,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage).with_layout(layout);
         let result = executor
-            .remove_dependencies(&source_id, &[dependency_id.clone(), prefix.clone()])
+            .remove_dependencies(
+                &source_id,
+                &[dependency_id.parse().unwrap(), prefix.parse().unwrap()],
+            )
             .unwrap();
         assert_eq!(result.removed, vec![dependency_id]);
         assert_eq!(result.not_found, vec![prefix]);

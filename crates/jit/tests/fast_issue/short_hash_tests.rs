@@ -5,24 +5,20 @@
 use jit::test_cli::JitCli;
 use jit::test_harness::TestHarness;
 
-/// Every issue-id position of the CLI accepts a unique short prefix and acts on
-/// the issue it names.
+/// The issue commands accept a unique short prefix and act on the issue it names.
 #[test]
 fn test_cli_issue_id_arguments_resolve_a_unique_short_prefix() {
     let cli = JitCli::initialised().unwrap();
     let from = cli.create_issue(["From"]).unwrap();
     let to = cli.create_issue(["To"]).unwrap();
-    let short = |id: &str| id[..8].to_string();
 
     let shown = cli.run_json(["issue", "show", &short(&from)]).unwrap();
     assert_eq!(shown["id"], from.as_str());
 
     cli.run(["issue", "update", &short(&from), "--title", "Renamed"])
         .unwrap();
-    cli.run(["dep", "add", &short(&from), &short(&to)]).unwrap();
     let updated = cli.run_json(["issue", "show", &from]).unwrap();
     assert_eq!(updated["title"], "Renamed");
-    assert_eq!(updated["dependencies"][0]["id"], to.as_str());
 
     let deleted = cli
         .command_with_env(
@@ -96,6 +92,7 @@ fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_record
         &["claim", "acquire", SHORT, "--agent-id", "agent:a"],
         &["claim", "release", SHORT],
         &["claim", "status", "--issue", SHORT],
+        &["snapshot", "export", "--scope", "issue:{short}"],
     ];
 
     let cli = JitCli::initialised().unwrap();
@@ -133,49 +130,202 @@ fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_record
     );
 }
 
-/// The event-query issue filter and the server document reads resolve a full
-/// id in any case or hyphenation to the issue it names.
+/// The server document reads resolve a full id in any case or hyphenation to
+/// the issue it names.
 #[test]
-fn test_issue_id_filters_and_document_reads_resolve_any_spelling_of_a_full_id() {
+fn test_read_document_content_resolves_any_spelling_of_a_full_id() {
     let h = TestHarness::new();
     let id = h.create_issue("Documented");
     h.executor
         .add_document_reference(&id, "d.md", None, None, None, true)
         .unwrap();
-    let events = h
-        .executor
-        .query_events(None, Some(id.clone()), 100)
-        .unwrap();
-    assert!(!events.is_empty());
     // The in-memory store backs no document bytes, so a read that resolved the
     // issue fails on the document exactly as the canonical spelling does.
     let read = |id: &str| format!("{:?}", h.executor.read_document_content(id, "d.md", None));
     assert_ne!(read(&id), read("ffffffff"));
-
     for spelling in [id.to_uppercase(), id.replace('-', "")] {
-        assert_eq!(
-            h.executor
-                .query_events(None, Some(spelling.clone()), 100)
-                .unwrap(),
-            events,
-            "{spelling}"
-        );
         assert_eq!(read(&spelling), read(&id), "{spelling}");
     }
 }
 
-/// An event-query issue filter naming a deleted issue still selects its
-/// events, in any spelling.
-#[test]
-fn test_query_events_issue_filter_matches_a_deleted_issue_in_any_spelling() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Deleted");
-    h.executor.issues().delete_issue(&id).unwrap();
+fn short(id: &str) -> String {
+    id[..8].to_string()
+}
 
-    let events = h
-        .executor
-        .query_events(None, Some(id.to_uppercase()), 100)
+/// `jit args --json` with `{short}` naming a too-short prefix refuses it as an
+/// invalid prefix with the argument-error exit code.
+fn assert_rejects_too_short_prefix(cli: &JitCli, args: &[&str]) {
+    let too_short = "abc";
+    let args: Vec<String> = args
+        .iter()
+        .map(|arg| arg.replace("{short}", too_short))
+        .chain(std::iter::once("--json".to_string()))
+        .collect();
+    let output = cli.command(&args).output().unwrap();
+    assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "INVALID_ID_PREFIX", "{args:?}");
+}
+
+fn events_of(cli: &JitCli, filter: &str) -> serde_json::Value {
+    cli.run_json(["events", "query", "--issue-id", filter])
+        .unwrap()["events"]
+        .clone()
+}
+
+/// `dep add` resolves each target prefix at the CLI.
+#[test]
+fn test_cli_dep_add_targets_resolve_short_prefixes() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = cli.create_issue(["To"]).unwrap();
+    let other = cli.create_issue(["Other"]).unwrap();
+
+    let added = cli
+        .run_json(["dep", "add", &from, &short(&to), &short(&other)])
         .unwrap();
-    assert!(!events.is_empty());
-    assert!(events.iter().all(|event| event.get_issue_id() == id));
+    assert_eq!(added["added"], serde_json::json!([to, other]));
+    assert_rejects_too_short_prefix(&cli, &["dep", "add", &from, &to, "{short}"]);
+}
+
+/// `dep rm` parses each target prefix at the CLI and removes the edge it names.
+#[test]
+fn test_cli_dep_rm_targets_resolve_short_prefixes() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = cli.create_issue(["To"]).unwrap();
+    cli.run(["dep", "add", &from, &to]).unwrap();
+
+    cli.run(["dep", "rm", &from, &short(&to)]).unwrap();
+    let shown = cli.run_json(["issue", "show", &from]).unwrap();
+    assert_eq!(shown["dependencies"], serde_json::json!([]));
+    assert_rejects_too_short_prefix(&cli, &["dep", "rm", &from, "{short}"]);
+}
+
+/// The event-query issue filter resolves a short prefix or any spelling of a
+/// live issue's id to that issue's events.
+#[test]
+fn test_cli_events_query_issue_filter_resolves_short_prefix_and_any_spelling() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Filtered"]).unwrap();
+    cli.create_issue(["Unrelated"]).unwrap();
+
+    let events = events_of(&cli, &id);
+    assert!(events
+        .as_array()
+        .is_some_and(|events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id)));
+    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+        assert_eq!(events_of(&cli, &spelling), events, "{spelling}");
+    }
+    assert_rejects_too_short_prefix(&cli, &["events", "query", "--issue-id", "{short}"]);
+}
+
+/// An event-query issue filter naming a deleted issue still selects its events,
+/// in any spelling.
+#[test]
+fn test_cli_events_query_issue_filter_matches_a_deleted_issue_in_any_spelling() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Deleted"]).unwrap();
+    let deleted = cli
+        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
+        .output()
+        .unwrap();
+    assert!(deleted.status.success(), "{deleted:?}");
+
+    let events = events_of(&cli, &id.to_uppercase());
+    assert!(events
+        .as_array()
+        .is_some_and(|events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id)));
+}
+
+/// `doc check-links --scope issue:<prefix>` resolves the scope's issue at the CLI.
+#[test]
+fn test_cli_doc_check_links_issue_scope_resolves_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Scoped"]).unwrap();
+
+    let scope = format!("issue:{}", short(&id));
+    cli.run(["doc", "check-links", "--scope", &scope]).unwrap();
+    assert!(cli
+        .run(["doc", "check-links", "--scope", "issue:ffffffff"])
+        .is_err());
+    assert_rejects_too_short_prefix(&cli, &["doc", "check-links", "--scope", "issue:{short}"]);
+}
+
+/// `snapshot export --scope issue:<prefix>` resolves the scope's issue at the CLI.
+#[test]
+fn test_cli_snapshot_export_issue_scope_resolves_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = cli.create_issue(["To"]).unwrap();
+    cli.run(["dep", "add", &from, &to]).unwrap();
+
+    let out = cli.root().join("snapshot");
+    let scope = format!("issue:{}", short(&from));
+    cli.run([
+        "snapshot",
+        "export",
+        "--scope",
+        &scope,
+        "--out",
+        out.to_str().unwrap(),
+    ])
+    .unwrap();
+    assert!(out.exists());
+    assert_rejects_too_short_prefix(
+        &cli,
+        &[
+            "snapshot",
+            "export",
+            "--scope",
+            "issue:{short}",
+            "--out",
+            "unused",
+        ],
+    );
+}
+
+/// `archive container` resolves its container prefix at the CLI.
+#[test]
+fn test_cli_archive_container_resolves_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Container"]).unwrap();
+
+    let plan = cli.run_json(["archive", "container", &short(&id)]).unwrap();
+    assert_eq!(plan["target"]["id"], id.as_str());
+    assert_rejects_too_short_prefix(&cli, &["archive", "container", "{short}"]);
+}
+
+/// `claim status --issue` resolves its filter prefix at the CLI.
+#[test]
+fn test_cli_claim_status_issue_filter_resolves_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    let commit = std::process::Command::new("git")
+        .current_dir(cli.root())
+        .args(["commit", "--allow-empty", "-m", "init"])
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .output()
+        .unwrap();
+    assert!(commit.status.success(), "{commit:?}");
+    let claimed = cli.create_issue(["Claimed"]).unwrap();
+    let agent = [("JIT_AGENT_ID", "agent:a")];
+    let acquire = cli
+        .command_with_env(["claim", "acquire", &claimed], agent)
+        .output()
+        .unwrap();
+    assert!(acquire.status.success(), "{acquire:?}");
+
+    let status = cli
+        .command_with_env(
+            ["claim", "status", "--issue", &short(&claimed), "--json"],
+            agent,
+        )
+        .output()
+        .unwrap();
+    assert!(status.status.success(), "{status:?}");
+    let leases: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert_eq!(leases["leases"][0]["issue_id"], claimed.as_str());
+    assert_rejects_too_short_prefix(&cli, &["claim", "status", "--issue", "{short}"]);
 }

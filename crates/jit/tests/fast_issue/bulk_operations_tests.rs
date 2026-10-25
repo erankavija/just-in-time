@@ -273,7 +273,7 @@ fn test_remove_multiple_dependencies() {
 
     // Remove two
     h.executor
-        .remove_dependencies(&from, &[to1.clone(), to2.clone()])
+        .remove_dependencies(&from, &[to1.parse().unwrap(), to2.parse().unwrap()])
         .unwrap();
 
     let loaded = h.storage.load_issue(&from).unwrap();
@@ -294,7 +294,7 @@ fn test_remove_dependencies_some_not_present() {
 
     let result = h
         .executor
-        .remove_dependencies(&from, &[to1.clone(), to2.clone()])
+        .remove_dependencies(&from, &[to1.parse().unwrap(), to2.parse().unwrap()])
         .unwrap();
 
     assert_eq!(result.removed.len(), 1); // to1

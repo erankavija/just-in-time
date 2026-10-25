@@ -9,15 +9,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(events[start..].to_vec())
     }
 
+    /// Newest-first events matching `event_type` and the `issue` filter.
     pub fn query_events(
         &self,
         event_type: Option<String>,
-        issue_id: Option<String>,
+        issue: Option<IssueIdPrefix>,
         limit: usize,
     ) -> Result<Vec<Event>> {
-        let issue = issue_id
-            .map(|id| super::resolve_issue_filter(&self.storage, &id))
-            .transpose()?;
         let events = self.storage.read_events()?;
 
         let filtered: Vec<Event> = events
@@ -107,7 +105,9 @@ mod tests {
             executor
                 .query_events(
                     None,
-                    Some("00000000-0000-0000-0000-000000000001".to_string()),
+                    Some(IssueIdPrefix::from(
+                        &"00000000-0000-0000-0000-000000000001".to_string()
+                    )),
                     10,
                 )
                 .expect("the event query succeeds")

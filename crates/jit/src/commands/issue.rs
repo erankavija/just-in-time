@@ -2412,7 +2412,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let events_before = executor.storage.read_events().unwrap().len();
         executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
             .unwrap();
 
         let logged = executor
@@ -2451,7 +2451,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor.remove_dependency(&a_id, &b_id).unwrap();
         executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
             .unwrap();
 
         assert_eq!(
@@ -2597,7 +2597,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
 
         let result = executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
             .unwrap();
 
         assert_eq!(result.removed, vec![b_id.clone()]);
@@ -2628,7 +2628,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let prefix = b_id[..8].to_string();
         let result = executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
+            .remove_dependencies(&a_id, &[prefix.parse().unwrap()])
             .unwrap();
 
         assert_eq!(result.removed, vec![prefix]);
@@ -2653,7 +2653,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let prefix = "abcd1234".to_string();
         let err = executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
+            .remove_dependencies(&a_id, &[prefix.parse().unwrap()])
             .unwrap_err();
         assert!(
             err.to_string().to_lowercase().contains("ambiguous"),

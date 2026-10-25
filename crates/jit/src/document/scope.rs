@@ -23,7 +23,8 @@ pub enum DocumentScopeParseError {
 pub enum DocumentScope {
     /// Check the documents of every issue.
     All,
-    /// Check the documents of a single issue, identified by id (possibly partial).
+    /// Check the documents of a single issue. Parsing keeps the requested id;
+    /// the CLI resolves it to the full id before the check.
     Issue(String),
 }
 

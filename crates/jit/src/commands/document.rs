@@ -1111,13 +1111,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Resolve the scope to the set of issues whose documents to check.
         let issues = match scope {
             DocumentScope::All => self.storage.list_issues()?,
-            DocumentScope::Issue(issue_id) => {
-                let full_id = self
-                    .storage
-                    .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
-                let issue = self.storage.load_issue(&full_id)?;
-                vec![issue]
-            }
+            DocumentScope::Issue(issue_id) => vec![self.storage.load_issue(issue_id)?],
         };
 
         // Every document in scope, explicit or derived, is checked and tracked.

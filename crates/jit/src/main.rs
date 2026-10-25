@@ -1033,6 +1033,48 @@ fn resolve_issue_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<Issu
     storage.resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
 }
 
+/// Resolve a `jit dep add` batch's targets, naming every unresolvable one in a
+/// single [`DependencyBatchRejectedError`](jit::errors::DependencyBatchRejectedError).
+fn resolve_dependency_args<S: IssueStore>(
+    storage: &S,
+    from_id: &IssueId,
+    requested: &[String],
+) -> Result<Vec<IssueId>> {
+    let (resolved, rejected): (Vec<_>, Vec<_>) = requested
+        .iter()
+        .map(|id| (id, resolve_issue_arg(storage, id)))
+        .partition(|(_, result)| result.is_ok());
+    if rejected.is_empty() {
+        resolved.into_iter().map(|(_, result)| result).collect()
+    } else {
+        Err(jit::errors::DependencyBatchRejectedError::new(
+            from_id.as_str(),
+            rejected
+                .into_iter()
+                .filter_map(|(id, result)| result.err().map(|error| (id.clone(), error)))
+                .collect(),
+        )
+        .into())
+    }
+}
+
+/// Parse an issue-id filter into the prefix that matches stored ids: the
+/// canonical id it resolves to or, when it names no live issue, the parsed
+/// input itself, so records of a deleted issue still match.
+///
+/// # Errors
+///
+/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
+/// any read, or [`AmbiguousIdError`](jit::storage::AmbiguousIdError).
+fn resolve_issue_filter_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<IssueIdPrefix> {
+    let prefix = requested.parse::<IssueIdPrefix>()?;
+    match storage.resolve_issue_id(&prefix) {
+        Ok(id) => Ok(IssueIdPrefix::from(&id)),
+        Err(error) if error.is::<jit::storage::IssueNotFoundError>() => Ok(prefix),
+        Err(error) => Err(error),
+    }
+}
+
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
 /// issue id, loading its enriched dependencies and gate runs.
 ///
@@ -3028,7 +3070,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         command_json_error(&e, jit::output::ErrorCode::DependencyError)
                     ),
                 };
-                match executor.add_dependencies_with_policy(&from_id, &to_ids, policy) {
+                match resolve_dependency_args(&storage, &from_id, &to_ids).and_then(|to_ids| {
+                    executor.add_dependencies_with_policy(&from_id, &to_ids, policy)
+                }) {
                     Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
@@ -3102,7 +3146,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         command_json_error(&e, jit::output::ErrorCode::DependencyError)
                     ),
                 };
-                match executor.remove_dependencies(&from_id, &to_ids) {
+                match to_ids
+                    .iter()
+                    .map(|id| id.parse::<IssueIdPrefix>().map_err(anyhow::Error::from))
+                    .collect::<Result<Vec<_>>>()
+                    .and_then(|to_ids| executor.remove_dependencies(&from_id, &to_ids))
+                {
                     Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
@@ -4725,7 +4774,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 issue_id,
                 limit,
             } => {
-                let events = executor.query_events(event_type, issue_id, limit)?;
+                let issue = issue_id
+                    .map(|id| resolve_issue_filter_arg(&storage, &id))
+                    .transpose()?;
+                let events = executor.query_events(event_type, issue, limit)?;
                 if json {
                     use jit::output::{EventListResponse, JsonOutput};
                     let msg = format!("{} event(s)", events.len());
@@ -5153,7 +5205,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use std::str::FromStr;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                let scope = DocumentScope::from_str(&scope)?;
+                let scope = match DocumentScope::from_str(&scope)? {
+                    DocumentScope::Issue(id) => {
+                        DocumentScope::Issue(resolve_issue_arg(&storage, &id)?)
+                    }
+                    DocumentScope::All => DocumentScope::All,
+                };
                 let result = executor.check_document_links(&scope)?;
 
                 if json {
@@ -5242,6 +5299,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ArchiveCommands::Container { id, execute } => {
+                let id = resolve_issue_arg(&storage, &id)?;
                 if execute {
                     let result = executor.execute_archive_container(&id)?;
                     if json {
@@ -6967,12 +7025,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
                 };
 
-                match execute_claim_status(
-                    &storage,
-                    &worktree_paths,
-                    issue.as_deref(),
-                    agent.as_deref(),
-                ) {
+                match issue
+                    .map(|id| resolve_issue_filter_arg(&storage, &id))
+                    .transpose()
+                    .and_then(|issue| {
+                        execute_claim_status(&worktree_paths, issue.as_ref(), agent.as_deref())
+                    }) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
@@ -7342,8 +7400,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::snapshot::{SnapshotFormat, SnapshotScope};
 
                 // Parse scope
-                let snapshot_scope = SnapshotScope::parse(&scope)
-                    .with_context(|| format!("Invalid scope: {}", scope))?;
+                let snapshot_scope = match SnapshotScope::parse(&scope)
+                    .with_context(|| format!("Invalid scope: {}", scope))?
+                {
+                    SnapshotScope::Issue(id) => {
+                        SnapshotScope::Issue(resolve_issue_arg(&storage, &id)?)
+                    }
+                    other => other,
+                };
 
                 // Parse format
                 let snapshot_format = SnapshotFormat::parse(&format)

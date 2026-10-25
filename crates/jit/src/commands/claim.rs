@@ -449,9 +449,7 @@ pub fn execute_claim_renew(
 ///
 /// # Arguments
 ///
-/// * `storage` - Issue storage that resolves `issue_id`
-/// * `issue_id` - Optional filter by issue ID, resolved as
-///   [`resolve_issue_filter`](super::resolve_issue_filter) describes
+/// * `issue` - Optional filter matching each lease's stored issue id
 /// * `agent_id` - Optional filter by agent ID
 ///
 /// # Returns
@@ -465,17 +463,12 @@ pub fn execute_claim_renew(
 ///
 /// Returns an error if the selected worktree's branch cannot be resolved or the
 /// leases cannot be read.
-pub fn execute_claim_status<S: IssueStore>(
-    storage: &S,
+pub fn execute_claim_status(
     paths: &WorktreePaths,
-    issue_id: Option<&str>,
+    issue: Option<&IssueIdPrefix>,
     agent_id: Option<&str>,
 ) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
-
-    let issue = issue_id
-        .map(|id| super::resolve_issue_filter(storage, id))
-        .transpose()?;
 
     // Get current branch for identity
     let branch = get_current_branch(&paths.worktree_root)?;
@@ -497,13 +490,13 @@ pub fn execute_claim_status<S: IssueStore>(
     coordinator.init()?;
 
     // Get active leases (default to current agent if no filters specified)
-    let filter_agent = if agent_id.is_none() && issue_id.is_none() {
+    let filter_agent = if agent_id.is_none() && issue.is_none() {
         Some(current_agent_id.to_string())
     } else {
         agent_id.map(str::to_string)
     };
 
-    let leases = coordinator.get_active_leases(issue.as_ref(), filter_agent.as_deref())?;
+    let leases = coordinator.get_active_leases(issue, filter_agent.as_deref())?;
     Ok((leases, warnings))
 }
 

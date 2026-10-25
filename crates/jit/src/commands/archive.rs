@@ -33,7 +33,6 @@ use crate::storage::{
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use std::str::FromStr;
 
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
@@ -178,7 +177,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Build a complete non-mutating plan for one resolved container subtree.
     pub fn preview_archive_container(&self, id: &str) -> Result<ArtifactPlan> {
         self.plan_archive_target(ArchiveTarget::Container(
-            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
+            &crate::domain::identity::IssueIdPrefix::from(&id.to_owned()),
         ))
     }
 
@@ -842,7 +841,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Execute a freshly recomputed container archive plan under one write guard.
     pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
         self.execute_archive_target(ArchiveTarget::Container(
-            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
+            &crate::domain::identity::IssueIdPrefix::from(&id.to_owned()),
         ))
     }
 
@@ -2262,7 +2261,7 @@ mod tests {
         fs::create_dir_all(&destination).unwrap();
         fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
 
-        let plan = executor.preview_archive_container(&id[..8]).unwrap();
+        let plan = executor.preview_archive_container(&id).unwrap();
         assert!(!plan.eligible());
         assert!(plan
             .blockers()
