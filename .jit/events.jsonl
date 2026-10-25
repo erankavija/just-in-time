@@ -20412,3 +20412,4 @@
 {"fields":["dependencies"],"id":"468bf705-ff90-447a-b6a6-cb08af0825d2","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-10-25T21:56:34.366698784Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["description"],"id":"d728b0c1-59a6-4ff6-a7d6-b767baeec0d3","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:09:25.642082284Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"code-review","id":"42fc1917-bdcb-4b13-8c6b-9a193d09fdac","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:16:29.069917007Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"51758dd6-2beb-432f-8098-989b670c772a","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:30:35.218731460Z","type":"gate_failed","updated_by":"auto:executor"}
