@@ -20352,3 +20352,5 @@
 {"assignee":"agent:2195c98f-lead","id":"884803e9-5c6f-4579-8167-b95dfea2a213","issue_id":"5491edd0-b77e-4d2d-9cd2-83a0e4cd56cb","timestamp":"2026-10-25T08:43:20.359978113Z","type":"issue_claimed"}
 {"id":"38bccac9-8f4b-4fed-8e27-83eda706cd29","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","priority":"normal","timestamp":"2026-10-25T10:55:53.042521617Z","title":"This repository's event log is in canonical writer form","type":"issue_created"}
 {"fields":["dependencies"],"id":"d81f8310-efb9-42da-9de7-ad9de42027e3","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T10:56:00.345122259Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"7adfd636-b91e-4053-9e18-1004db17797d","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","timestamp":"2026-10-25T10:56:44.181227746Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:2195c98f-lead","id":"d5d28998-2607-49f1-b04e-56d3c2b8bb38","issue_id":"b01208cb-b85f-4705-bd2f-311129e01b56","timestamp":"2026-10-25T10:56:44.181227746Z","type":"issue_claimed"}
