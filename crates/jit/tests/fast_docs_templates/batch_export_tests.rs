@@ -202,7 +202,7 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
     let e_def = def_for(&export.defs, &s.e);
     assert_eq!(e_def.title, "Auth epic");
     assert_eq!(e_def.r#type.as_deref(), Some("epic"));
-    assert_eq!(e_def.priority.as_deref(), Some("high"));
+    assert_eq!(e_def.priority, Some(Priority::High));
     assert_eq!(e_def.gates, vec!["code-review".to_string()]);
     // E depends on c1 and c2 (E → B dropped as a bracket edge). depends_on is
     // sorted by short id, so compare against the sorted expectation.
