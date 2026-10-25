@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "60e1e8b1-6891-42b6-a418-83f37feef9dd",
+      "run_id": "74564bf4-a137-4a21-9911-505bf88a6252",
       "status": "passed",
-      "updated_at": "2026-10-25T01:21:30.816039039Z",
+      "updated_at": "2026-10-25T01:32:21.955685117Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "System actors are named Assignee constants",
-  "updated_at": "2026-10-25T01:21:30.816039039Z"
+  "updated_at": "2026-10-25T01:32:21.955685117Z"
 }
