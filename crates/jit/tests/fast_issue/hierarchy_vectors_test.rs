@@ -42,8 +42,8 @@ impl HierarchyNode for FixtureNode {
     fn id(&self) -> &str {
         &self.id
     }
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
     fn type_name(&self) -> Option<&str> {
         self.type_name.as_deref()

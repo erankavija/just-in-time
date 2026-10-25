@@ -748,7 +748,7 @@ impl CommandSchema {
 
     fn generate_types() -> HashMap<String, Value> {
         use crate::declarations::GateChecker;
-        use crate::domain::State;
+        use crate::domain::{Priority, State};
 
         let mut types = HashMap::new();
 
@@ -768,11 +768,15 @@ impl CommandSchema {
             }),
         );
 
+        let priority_values: Vec<Value> = Priority::ALL
+            .iter()
+            .map(|priority| Value::String(priority.as_str().to_string()))
+            .collect();
         types.insert(
             "Priority".to_string(),
             json!({
                 "type": "enum",
-                "enum": ["low", "normal", "high", "critical"],
+                "enum": priority_values,
                 "description": "Issue priority level"
             }),
         );

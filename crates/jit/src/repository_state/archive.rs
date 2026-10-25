@@ -12,7 +12,7 @@ use crate::domain::artifact_plan::{
     ReferenceChange, WarningCode,
 };
 use crate::domain::event_log::EventLogError;
-use crate::domain::{Event, Issue, State};
+use crate::domain::{Event, EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Close a captured archive plan into one materialization plan, which
@@ -563,8 +563,8 @@ fn archive_coverage(
 ) -> (Vec<(String, ContentIdentity)>, Vec<ReferenceChange>) {
     events
         .iter()
-        .filter_map(|event| match event {
-            Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            EventBody::ArtifactArchiveExecuted {
                 target: found,
                 destination_root,
                 publications,

@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -61,7 +61,7 @@
           "short_id": "acb38457",
           "title": "Graph node traits expose dependency ids as string views",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
@@ -136,7 +136,7 @@
           "short_id": "3625b18b",
           "title": "Unit tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
@@ -164,7 +164,7 @@
           "short_id": "72dfc0d7",
           "title": "Built-in gate findings use closed severity and disposition enums",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
@@ -220,7 +220,7 @@
           "short_id": "bf87bbdb",
           "title": "Graph queries return nodes rather than id strings",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
@@ -234,7 +234,7 @@
           "short_id": "e3d06f82",
           "title": "Integration tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -363,21 +363,21 @@
           "short_id": "1622756a",
           "title": "Human output renders vocabulary tokens, not Debug names",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
           "short_id": "30923ea1",
           "title": "Priority orders by rank through Ord",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
           "short_id": "5d5c5514",
           "title": "Validation projections hold typed state and priority",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
@@ -525,7 +525,7 @@
           "short_id": "7e8f1525",
           "title": "Label-coverage assertions are typed and compiled at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
@@ -626,7 +626,8 @@
     "b3fcd297": 2,
     "acb38457": 1,
     "98404e0c": 2,
-    "945f65f3": 1
+    "945f65f3": 1,
+    "e1a6c8c2": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -996,6 +997,76 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Closed finding enums with a typed constructor, open wire fields."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: server fixtures, issues-dir literal (lead brief error), no-op replace."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R2 (final): literals in test modules of listed files."
+    },
+    {
+      "issue": "bf87bbdb",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Graph query return types across eight files with property tests."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Mechanical unit-test migration onto the body view."
+    },
+    {
+      "issue": "e3d06f82",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical integration-test migration onto the body view."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Debug-render sweep over three files."
+    },
+    {
+      "issue": "30923ea1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Ord by rank plus two sort rewrites."
+    },
+    {
+      "issue": "5d5c5514",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Projection field retype with schema contract update."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation after Claude worker tooling fault (classifier errors); Codex avoids that path."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting CLI prefix boundary across main.rs (88 id sites)."
     }
   ],
   "surfaced_pitfalls": [
@@ -1013,7 +1084,16 @@
     },
     {
       "source": "5613ef50",
-      "note": "transition_graph_enforcement_tests' two evaluation-time config-error tests now use a label-coverage rule with a bad child-link; 7e8f1525 (label-coverage typed at load) must re-home them, since that error will move to load."
+      "note": "transition_graph_enforcement_tests' two evaluation-time config-error tests now use a label-coverage rule with a bad child-link; 7e8f1525 (label-coverage typed at load) must re-home them, since that error will move to load.",
+      "resolved": "7e8f1525 removed the two evaluation-time config-error transition tests; load rejection is owned by test_parse_label_coverage_rejects_malformed_options_naming_rule."
+    },
+    {
+      "source": "e1a6c8c2",
+      "note": "Code-review read REQ-01 ('no literal ... builds or matches a well-known .jit path') as covering test modules. 18dc6e3e (repository_state/) and 945f65f3 (commands/) passed review but kept such literals in #[cfg(test)] code and doctests. Epic REQ-07 says 'No production format! builds one of these paths' (production only), so likely fine at the epic gate; recheck before the epic holistic review."
+    },
+    {
+      "source": "18bcafb8",
+      "note": "Event::set_isolated_torn_tail(&mut self, bool) was added in domain/types.rs as part of the body-view bridge; the envelope task (d72bf093) must move it onto the body or the envelope and delete the bridge method."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1024,6 +1104,9 @@
     "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
     "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way.",
     "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id).",
-    "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision)."
+    "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision).",
+    "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
+    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
+    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex."
   ]
 }

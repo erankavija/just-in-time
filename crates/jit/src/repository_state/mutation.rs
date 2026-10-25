@@ -21,7 +21,7 @@ use super::{
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{
-    Assignee, Event, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
+    Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -482,11 +482,12 @@ pub enum MutationError {
     GatePresetAlreadyExists(String),
 }
 
-/// Placeholder timestamp for a finalizer-built event before identity assignment.
+/// Placeholder timestamp of an event drafted before identity assignment.
 ///
-/// Semantic event drafts carry this same empty identity/epoch convention; the
-/// finalizer overwrites it via [`Event::assign_identity`] with the single mutation
+/// Event drafts carry this same empty identity/epoch convention; the finalizer
+/// overwrites it via [`Event::assign_identity`] with the single mutation
 /// timestamp. The sentinel therefore never reaches serialized bytes.
+#[cfg(test)]
 fn sentinel_time() -> DateTime<Utc> {
     DateTime::from_timestamp(0, 0).expect("epoch is representable")
 }
@@ -688,13 +689,13 @@ fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee)
     events
         .iter()
         .rev()
-        .find_map(|event| match event {
-            Event::IssueClaimed {
+        .find_map(|event| match event.body() {
+            EventBody::IssueClaimed {
                 issue_id: id,
                 assignee,
                 ..
             } if id == issue_id => Some(assignee == agent),
-            Event::IssueReleased { issue_id: id, .. } if id == issue_id => Some(false),
+            EventBody::IssueReleased { issue_id: id, .. } if id == issue_id => Some(false),
             _ => None,
         })
         .unwrap_or(false)
@@ -775,13 +776,7 @@ pub(super) fn finalize_delta(
                 primary: id.clone(),
                 secondary: String::new(),
                 ordinal: pending_events.len(),
-                event: Event::IssueCreated {
-                    id: String::new(),
-                    issue_id: id.clone(),
-                    timestamp: sentinel_time(),
-                    title: issue.title.clone(),
-                    priority: issue.priority,
-                },
+                event: Event::draft_issue_created(&issue),
             });
         }
     }
@@ -887,12 +882,7 @@ pub(super) fn finalize_delta(
                     primary: issue_id.clone(),
                     secondary: agent.to_string(),
                     ordinal: pending_events.len(),
-                    event: Event::IssueClaimed {
-                        id: String::new(),
-                        issue_id: issue_id.clone(),
-                        timestamp: sentinel_time(),
-                        assignee: agent.clone(),
-                    },
+                    event: Event::draft_issue_claimed(issue_id.clone(), agent.clone()),
                 });
             }
         }
@@ -931,15 +921,16 @@ pub(super) fn finalize_delta(
                     state.run_id = Some(run_id.clone());
                 }
                 let records_evidence = intents.iter().any(|intent| match intent {
-                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
+                    MutationIntent::RecordEvent { event, .. } => match (event.body(), state.status)
+                    {
                         (
-                            Event::GatePassed {
+                            EventBody::GatePassed {
                                 issue_id, gate_key, ..
                             },
                             GateStatus::Passed,
                         )
                         | (
-                            Event::GateFailed {
+                            EventBody::GateFailed {
                                 issue_id, gate_key, ..
                             },
                             GateStatus::Failed,
@@ -1195,7 +1186,7 @@ fn compose_event_action(
     let torn_tail = prefix_has_torn_tail(final_line);
     let has_marker = pending_events
         .iter()
-        .any(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }));
+        .any(|pending| matches!(pending.event.body(), EventBody::ProfileLifecycle { .. }));
     if torn_tail && !has_marker {
         // Appending non-certifying events after an uncertified torn tail would
         // produce a log the reader rejects; refuse instead of corrupting it.
@@ -1209,12 +1200,7 @@ fn compose_event_action(
     for pending in &mut pending_events {
         let id = context.allocate();
         pending.event.assign_identity(id, now);
-        if let Event::ProfileLifecycle {
-            isolated_torn_tail, ..
-        } = &mut pending.event
-        {
-            *isolated_torn_tail = torn_tail;
-        }
+        pending.event.set_isolated_torn_tail(torn_tail);
     }
     // Over a torn tail, the certifying marker must be composed as the line
     // immediately following the torn partial; the remaining events keep their
@@ -1222,7 +1208,7 @@ fn compose_event_action(
     if torn_tail {
         let marker = pending_events
             .iter()
-            .position(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }))
+            .position(|pending| matches!(pending.event.body(), EventBody::ProfileLifecycle { .. }))
             .expect("a markerless torn tail was already rejected");
         let certifier = pending_events.remove(marker);
         pending_events.insert(0, certifier);
@@ -1343,15 +1329,15 @@ fn index_membership_action(
 /// Primary/secondary ordering identities for an event.
 fn event_identities(event: &Event) -> (String, String) {
     let issue_id = event.get_issue_id().to_string();
-    match event {
-        Event::GatePassed { gate_key, .. }
-        | Event::GateFailed { gate_key, .. }
-        | Event::GateAdded { gate_key, .. }
-        | Event::GateRemoved { gate_key, .. }
-        | Event::GateDefinitionCreated { gate_key, .. }
-        | Event::GateDefinitionUpdated { gate_key, .. }
-        | Event::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.clone()),
-        Event::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
+    match event.body() {
+        EventBody::GatePassed { gate_key, .. }
+        | EventBody::GateFailed { gate_key, .. }
+        | EventBody::GateAdded { gate_key, .. }
+        | EventBody::GateRemoved { gate_key, .. }
+        | EventBody::GateDefinitionCreated { gate_key, .. }
+        | EventBody::GateDefinitionUpdated { gate_key, .. }
+        | EventBody::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.clone()),
+        EventBody::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
         _ => (issue_id, String::new()),
     }
 }

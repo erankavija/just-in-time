@@ -96,6 +96,18 @@ pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue
     issue
 }
 
+/// The event recording `body`, stamped with `id` and `timestamp` as the
+/// mutation finalizer would stamp it.
+pub fn stamped_event(
+    body: crate::domain::EventBody,
+    id: impl Into<String>,
+    timestamp: chrono::DateTime<chrono::Utc>,
+) -> crate::domain::Event {
+    let mut event = body;
+    event.assign_identity(id.into(), timestamp);
+    event
+}
+
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;

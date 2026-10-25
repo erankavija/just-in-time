@@ -7,7 +7,6 @@ use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::ProfileId;
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
 // identity here keeps the domain layer pure while leaving one canonical type
@@ -114,31 +113,18 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
 }
 
-/// Issue priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Priority {
-    /// Low priority
-    Low,
-    /// Normal priority (default)
-    Normal,
-    /// High priority
-    High,
-    /// Critical priority
-    Critical,
-}
-
-impl FromStr for Priority {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "low" => Ok(Priority::Low),
-            "normal" => Ok(Priority::Normal),
-            "high" => Ok(Priority::High),
-            "critical" => Ok(Priority::Critical),
-            _ => Err(InvalidArgumentError::new(format!("Invalid priority: {s}")).into()),
-        }
+wire_vocabulary! {
+    /// Issue priority level
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum Priority {
+        /// Low priority
+        Low = "low",
+        /// Normal priority (default)
+        Normal = "normal",
+        /// High priority
+        High = "high",
+        /// Critical priority
+        Critical = "critical",
     }
 }
 
@@ -836,8 +822,8 @@ impl crate::graph::GraphNode for Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 }
 
@@ -1579,7 +1565,24 @@ pub enum Event {
     },
 }
 
+/// The tagged body of an [`Event`]: its variant and payload fields.
+///
+/// A temporary alias while `Event` still carries `id` and `timestamp` in each
+/// variant; matchers read [`Event::body`] so the envelope swap that makes this
+/// the real body enum leaves them unchanged.
+pub type EventBody = Event;
+
 impl Event {
+    /// The tagged body this event records.
+    pub fn body(&self) -> &EventBody {
+        self
+    }
+
+    /// Consume this event, yielding its tagged body.
+    pub fn into_body(self) -> EventBody {
+        self
+    }
+
     /// This event's identity, as assigned by [`Self::assign_identity`].
     ///
     /// A drafted event that has not reached the mutation finalizer carries an
@@ -1607,6 +1610,36 @@ impl Event {
             | Event::GateDefinitionRemoved { id, .. }
             | Event::ProfileLifecycle { id, .. }
             | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
+        }
+    }
+
+    /// When this event occurred, as stamped by [`Self::assign_identity`].
+    ///
+    /// A drafted event that has not reached the mutation finalizer carries the
+    /// Unix epoch.
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        match self {
+            Event::IssueCreated { timestamp, .. }
+            | Event::IssueClaimed { timestamp, .. }
+            | Event::IssueStateChanged { timestamp, .. }
+            | Event::GatePassed { timestamp, .. }
+            | Event::GateFailed { timestamp, .. }
+            | Event::GateAdded { timestamp, .. }
+            | Event::GateRemoved { timestamp, .. }
+            | Event::IssueCompleted { timestamp, .. }
+            | Event::IssueDeleted { timestamp, .. }
+            | Event::IssueReleased { timestamp, .. }
+            | Event::ArtifactArchiveExecuted { timestamp, .. }
+            | Event::IssueUpdated { timestamp, .. }
+            | Event::DependencyReduced { timestamp, .. }
+            | Event::LocalRuleBypassed { timestamp, .. }
+            | Event::TransitionBlocked { timestamp, .. }
+            | Event::GraphRuleBypassed { timestamp, .. }
+            | Event::GateDefinitionUpdated { timestamp, .. }
+            | Event::GateDefinitionCreated { timestamp, .. }
+            | Event::GateDefinitionRemoved { timestamp, .. }
+            | Event::ProfileLifecycle { timestamp, .. }
+            | Event::LinkedCheckoutWriteOverridden { timestamp, .. } => *timestamp,
         }
     }
 
@@ -1641,6 +1674,17 @@ impl Event {
                 *id = new_id;
                 *timestamp = new_timestamp;
             }
+        }
+    }
+
+    /// Record whether this profile lifecycle marker certifies the torn tail it
+    /// follows; any other event is left unchanged.
+    pub fn set_isolated_torn_tail(&mut self, torn_tail: bool) {
+        if let Event::ProfileLifecycle {
+            isolated_torn_tail, ..
+        } = self
+        {
+            *isolated_torn_tail = torn_tail;
         }
     }
 
@@ -1987,6 +2031,19 @@ mod tests {
         issue.state = state;
         issue.archived_from = archived_from;
         serde_json::to_value(&issue).unwrap()
+    }
+
+    #[test]
+    fn test_stamped_event_reads_back_its_body_and_identity() {
+        let body = Event::draft_gate_added("issue".to_string(), "tests".to_string());
+        let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
+
+        assert_eq!(event.id(), "event");
+        assert_eq!(event.timestamp(), timestamp);
+        assert_eq!(event.body().tag(), body.tag());
+        assert_eq!(event.into_body().get_issue_id(), body.get_issue_id());
     }
 
     #[test]
@@ -2850,42 +2907,6 @@ mod tests {
         use super::*;
         use crate::declarations::GateMode;
         use std::str::FromStr;
-
-        #[test]
-        fn test_priority_from_str_valid_lowercase() {
-            assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("high").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("critical").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_uppercase() {
-            assert_eq!(Priority::from_str("LOW").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("NORMAL").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("HIGH").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("CRITICAL").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_mixedcase() {
-            assert_eq!(Priority::from_str("Low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("Normal").unwrap(), Priority::Normal);
-        }
-
-        #[test]
-        fn test_priority_from_str_invalid() {
-            assert!(Priority::from_str("invalid").is_err());
-            assert!(Priority::from_str("").is_err());
-            assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_priority_parse_method() {
-            // Test using str::parse() method
-            let priority: Priority = "high".parse().unwrap();
-            assert_eq!(priority, Priority::High);
-        }
 
         // GateStage FromStr/Display/as_str
 

@@ -4,8 +4,8 @@
 //! hand-written create+dependency loops with one declarative array of issue
 //! definitions that reference each other by symbolic `key`. The whole file is
 //! FULLY pre-validated (duplicate/unknown keys, unknown `depends_on` references,
-//! cycle detection over the symbolic graph, type/label/gate validity, priority
-//! parse) BEFORE any write, so a malformed batch never leaves partially-created
+//! cycle detection over the symbolic graph, type/label/gate validity)
+//! BEFORE any write, so a malformed batch never leaves partially-created
 //! issues behind.
 //!
 //! ## Atomicity
@@ -20,7 +20,6 @@
 use super::*;
 use crate::domain::SHORT_ID_LENGTH;
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 use thiserror::Error;
 
 /// One issue definition in a batch-create file.
@@ -78,10 +77,9 @@ pub struct BatchIssueDef {
     /// configured default type when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    /// Priority string (e.g. `low`, `normal`, `high`, `critical`). Defaults to
-    /// `normal`.
+    /// Priority. Defaults to `normal`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<String>,
+    pub priority: Option<Priority>,
     /// Additional labels in `namespace:value` format.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
@@ -116,8 +114,6 @@ pub enum BatchValidationProblem {
     },
     /// The symbolic `depends_on` graph contains a cycle (the keys forming it).
     Cycle { keys: Vec<String> },
-    /// An entry's priority string does not parse.
-    InvalidPriority { key: String, value: String },
     /// An entry's type is not a known type in the project's type hierarchy.
     UnknownType { key: String, value: String },
     /// An entry requires a gate key absent from the gate registry.
@@ -149,9 +145,6 @@ impl std::fmt::Display for BatchValidationProblem {
             ),
             Self::Cycle { keys } => {
                 write!(f, "dependency cycle among keys: {}", keys.join(" -> "))
-            }
-            Self::InvalidPriority { key, value } => {
-                write!(f, "entry '{key}' has invalid priority '{value}'")
             }
             Self::UnknownType { key, value } => {
                 write!(f, "entry '{key}' has unknown type '{value}'")
@@ -245,7 +238,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Runs FULL pre-validation (duplicate/unknown keys, unknown `depends_on`
     /// references, cycle detection over the symbolic graph, type/label/gate
-    /// validity, priority parse) BEFORE any write. On any validation failure it
+    /// validity) BEFORE any write. On any validation failure it
     /// returns a [`BatchValidationError`] enumerating every offender and creates
     /// ZERO issues. On success it finalizes every issue and dependency edge into
     /// one recoverable delta, returning the `{key: id}` map.
@@ -347,12 +340,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         })?,
                         ..def.clone()
                     };
-                    let priority = def
-                        .priority
-                        .as_deref()
-                        .map(Priority::from_str)
-                        .transpose()?
-                        .unwrap_or(Priority::Normal);
+                    let priority = def.priority.unwrap_or(Priority::Normal);
                     Ok(Self::batch_candidate_issue(
                         def,
                         priority,
@@ -445,7 +433,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             problems.push(BatchValidationProblem::Cycle { keys: cycle });
         }
 
-        // 4-7. Per-entry field validity: priority parse, type, gates, and the
+        // 4-7. Per-entry field validity: type, gates, and the
         //       FULL write-time validation against each entry's final issue shape.
         let known_types = declarations
             .config()
@@ -461,22 +449,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let gate_registry = declarations.gates();
 
         for (def, labels) in defs.iter().zip(resolved_labels) {
-            // Priority must parse before we can build the candidate issue; a parse
-            // failure is reported and we skip write-time validation for this entry
-            // (there is no valid shape to validate).
-            let priority = match &def.priority {
-                Some(p) => match Priority::from_str(p) {
-                    Ok(priority) => priority,
-                    Err(_) => {
-                        problems.push(BatchValidationProblem::InvalidPriority {
-                            key: def.key.clone(),
-                            value: p.clone(),
-                        });
-                        continue;
-                    }
-                },
-                None => Priority::Normal,
-            };
+            let priority = def.priority.unwrap_or(Priority::Normal);
 
             // Type validity: only enforced when the project configures a type
             // hierarchy; an empty set means any type is accepted. (The write-time
@@ -764,17 +737,6 @@ mod tests {
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "bad")
         ));
-    }
-
-    #[test]
-    fn test_collect_problems_invalid_priority() {
-        let exec = executor();
-        let mut d = def("a", &[]);
-        d.priority = Some("urgentish".to_string());
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
-        assert!(problems
-            .iter()
-            .any(|p| matches!(p, BatchValidationProblem::InvalidPriority { .. })));
     }
 
     #[test]
