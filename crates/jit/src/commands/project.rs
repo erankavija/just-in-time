@@ -19,7 +19,7 @@
 //! (declaration scope), so a single-name render leaves sibling targets untouched.
 
 use super::*;
-use crate::config::JitConfig;
+use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
 
 /// The result of rendering ONE projection, serialized as an element of
 /// [`ProjectRenderResult::projections`].
@@ -29,10 +29,10 @@ pub struct ProjectionRenderReport {
     pub name: String,
     /// The repo-relative documentation target that was written.
     pub target: String,
-    /// The projection mode used, as its config token (`separate-file`|`region`).
-    pub mode: String,
-    /// The render style used, as its config token (`id-anchor`|`full`).
-    pub style: String,
+    /// The projection mode used.
+    pub mode: ProjectionMode,
+    /// The render style used.
+    pub style: ProjectionStyle,
     /// The kind name(s) rendered, in declaration order.
     pub kinds: Vec<String>,
     /// Rows (id-anchor) or registry entries (full) rendered into the target.
@@ -190,8 +190,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     Ok(ProjectionRenderReport {
                         name: proj_name.clone(),
                         target,
-                        mode: projection.mode().to_string(),
-                        style: projection.style().to_string(),
+                        mode: projection.mode(),
+                        style: projection.style(),
                         kinds: projection.kinds().to_vec(),
                         count,
                     })
@@ -211,6 +211,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_projection_render_report_serializes_enum_tokens_to_identical_json() {
+        let report = ProjectionRenderReport {
+            name: "invariants".to_string(),
+            target: ".jit/invariants.md".to_string(),
+            mode: ProjectionMode::Region,
+            style: ProjectionStyle::IdAnchor,
+            kinds: vec!["invariant".to_string()],
+            count: 2,
+        };
+
+        assert_eq!(
+            serde_json::to_string(&report).unwrap(),
+            r#"{"name":"invariants","target":".jit/invariants.md","mode":"region","style":"id-anchor","kinds":["invariant"],"count":2}"#
+        );
+    }
 
     #[test]
     fn test_project_producer_error_preserves_projection_source_for_downcast() {
