@@ -1960,8 +1960,8 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
                 .unwrap()
                 .iter()
                 .any(|event| matches!(
-                    event,
-                    crate::domain::Event::GatePassed { issue_id: subject, gate_key, .. }
+                    event.body(),
+                    crate::domain::EventBody::GatePassed { issue_id: subject, gate_key, .. }
                         if subject == &issue_id && gate_key == "durability-check"
                 )),
             "the evaluation must already have logged its gate-passed event"
@@ -4865,8 +4865,8 @@ source-of-truth = "markdown-first"
                 .into_iter()
                 .filter(|event| {
                     matches!(
-                        event,
-                        crate::domain::Event::GatePassed {
+                        event.body(),
+                        crate::domain::EventBody::GatePassed {
                             issue_id: event_issue,
                             gate_key,
                             ..
@@ -4921,8 +4921,8 @@ source-of-truth = "markdown-first"
                 .into_iter()
                 .filter(|event| {
                     matches!(
-                        event,
-                        crate::domain::Event::GatePassed { issue_id: event_issue, gate_key, .. }
+                        event.body(),
+                        crate::domain::EventBody::GatePassed { issue_id: event_issue, gate_key, .. }
                             if event_issue == &issue_id && gate_key == "single-record-race"
                     )
                 })

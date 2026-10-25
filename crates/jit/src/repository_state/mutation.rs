@@ -1584,7 +1584,12 @@ mod tests {
     fn override_records(events: &[Event]) -> Vec<&Event> {
         events
             .iter()
-            .filter(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .filter(|event| {
+                matches!(
+                    event.body(),
+                    EventBody::LinkedCheckoutWriteOverridden { .. }
+                )
+            })
             .collect()
     }
 
@@ -1612,13 +1617,12 @@ mod tests {
             1,
             "the permitted mutation carries exactly one override record; events: {events:?}"
         );
-        let Event::LinkedCheckoutWriteOverridden {
-            id,
-            timestamp,
+        let EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
-        } = records[0]
+            ..
+        } = records[0].body()
         else {
             unreachable!("the record was selected by its variant");
         };
@@ -1637,24 +1641,30 @@ mod tests {
             "the record names the checkout and the two stances the dispatch site set"
         );
         assert!(
-            !id.is_empty(),
+            !records[0].id().is_empty(),
             "the finalizer assigns the record an identity like any other event"
         );
 
         let creation_timestamp = events
             .iter()
-            .find_map(|event| match event {
-                Event::IssueCreated { timestamp, .. } => Some(timestamp),
+            .find_map(|event| match event.body() {
+                EventBody::IssueCreated { .. } => Some(event.timestamp()),
                 _ => None,
             })
             .expect("the mutation's own event is in the same append");
         assert_eq!(
-            creation_timestamp, timestamp,
+            creation_timestamp,
+            records[0].timestamp(),
             "the record carries the one mutation timestamp, so it belongs to this mutation"
         );
         let record_position = events
             .iter()
-            .position(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .position(|event| {
+                matches!(
+                    event.body(),
+                    EventBody::LinkedCheckoutWriteOverridden { .. }
+                )
+            })
             .expect("the record is in the append");
         assert_eq!(
             record_position,
@@ -1707,12 +1717,11 @@ mod tests {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue("55555555-5555-4555-8555-555555555555", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
+        let event = crate::test_utils::stamped_event(
+            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            "e",
+            fixed_instant(),
+        );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
@@ -1824,7 +1833,7 @@ mod tests {
         assert!(
             events
                 .iter()
-                .any(|event| matches!(event, Event::ProfileLifecycle { .. })),
+                .any(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. })),
             "the caller's own event is in the same append; events: {events:?}"
         );
 
@@ -1923,11 +1932,11 @@ mod tests {
             "gate-run bytes preserve the repository record"
         );
 
-        let event = Event::GateDefinitionCreated {
-            id: "event-1".into(),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let event = crate::test_utils::stamped_event(
+            Event::draft_gate_definition_created("cargo-ci".into()),
+            "event-1",
+            fixed_instant(),
+        );
         let event_bytes = serialize_event(&event).unwrap();
         assert!(event_bytes.starts_with(b"{"));
         assert!(!event_bytes.contains(&b'\n'));
@@ -2086,12 +2095,11 @@ mod tests {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue("11111111-1111-4111-8111-111111111111", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
+        let event = crate::test_utils::stamped_event(
+            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            "e",
+            fixed_instant(),
+        );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
@@ -2126,12 +2134,11 @@ mod tests {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue("44444444-4444-4444-8444-444444444444", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = Event::IssueClaimed {
-            id: "e".into(),
-            issue_id: issue.id.clone(),
-            timestamp: fixed_instant(),
-            assignee: agent.clone(),
-        };
+        let event = crate::test_utils::stamped_event(
+            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            "e",
+            fixed_instant(),
+        );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
@@ -2223,12 +2230,11 @@ mod tests {
         expected_issue.updated_at = fixed_instant();
         assert_eq!(bytes, &serialize_issue(&expected_issue).unwrap());
 
-        let expected_event = Event::IssueClaimed {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
-            issue_id: expected_issue.id,
-            timestamp: fixed_instant(),
-            assignee: agent,
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            Event::draft_issue_claimed(expected_issue.id, agent),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            fixed_instant(),
+        );
         let mut expected_event_line = serialize_event(&expected_event).unwrap();
         expected_event_line.push(b'\n');
         assert_eq!(
@@ -2254,11 +2260,11 @@ mod tests {
         let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
         let intent = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
+            event: Box::new(crate::test_utils::stamped_event(
+                Event::draft_gate_definition_created("cargo-ci".into()),
+                String::new(),
+                sentinel_time(),
+            )),
         };
         let context = ctx();
         let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
@@ -2269,11 +2275,11 @@ mod tests {
             serde_json::to_vec(retry.delta()).unwrap(),
             "the same image and context produce byte-identical provenance plans"
         );
-        let expected_event = Event::GateDefinitionCreated {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(0),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            Event::draft_gate_definition_created("cargo-ci".into()),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(0),
+            fixed_instant(),
+        );
         let mut expected_line = serialize_event(&expected_event).unwrap();
         expected_line.push(b'\n');
         assert_eq!(
@@ -2301,11 +2307,11 @@ mod tests {
         };
         let provenance = MutationIntent::RecordEvent {
             phase: 5,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
+            event: Box::new(crate::test_utils::stamped_event(
+                Event::draft_gate_definition_created("cargo-ci".into()),
+                String::new(),
+                sentinel_time(),
+            )),
         };
         let intents = [intent, provenance];
         let context = ctx();
@@ -2336,11 +2342,11 @@ mod tests {
         expected.completed_at = Some(fixed_instant());
         assert_eq!(bytes, &serialize_gate_run(&expected).unwrap());
 
-        let expected_event = Event::GateDefinitionCreated {
-            id: IdAuthority::from_seed([7u8; 32]).uuid_at(1),
-            timestamp: fixed_instant(),
-            gate_key: "cargo-ci".into(),
-        };
+        let expected_event = crate::test_utils::stamped_event(
+            Event::draft_gate_definition_created("cargo-ci".into()),
+            IdAuthority::from_seed([7u8; 32]).uuid_at(1),
+            fixed_instant(),
+        );
         let mut expected_line = serialize_event(&expected_event).unwrap();
         expected_line.push(b'\n');
         assert_eq!(
@@ -2361,19 +2367,19 @@ mod tests {
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(Event::GateDefinitionCreated {
-                    id: String::new(),
-                    timestamp: sentinel_time(),
-                    gate_key: "bbb".into(),
-                }),
+                event: Box::new(crate::test_utils::stamped_event(
+                    Event::draft_gate_definition_created("bbb".into()),
+                    String::new(),
+                    sentinel_time(),
+                )),
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(Event::GateDefinitionCreated {
-                    id: String::new(),
-                    timestamp: sentinel_time(),
-                    gate_key: "aaa".into(),
-                }),
+                event: Box::new(crate::test_utils::stamped_event(
+                    Event::draft_gate_definition_created("aaa".into()),
+                    String::new(),
+                    sentinel_time(),
+                )),
             },
         ];
         let image = creation_image();
@@ -2388,18 +2394,18 @@ mod tests {
         let events = appended_events(first.delta());
 
         assert!(matches!(
-            &events[..],
+            events.iter().map(Event::body).collect::<Vec<_>>().as_slice(),
             [
-                Event::IssueCreated { id, timestamp, .. },
-                Event::GateDefinitionCreated { id: first_id, timestamp: first_time, gate_key: first_key },
-                Event::GateDefinitionCreated { id: second_id, timestamp: second_time, gate_key: second_key },
-            ] if id == &ids.uuid_at(1)
-                && *timestamp == fixed_instant()
-                && first_id == &ids.uuid_at(2)
-                && *first_time == fixed_instant()
+                EventBody::IssueCreated { .. },
+                EventBody::GateDefinitionCreated { gate_key: first_key, .. },
+                EventBody::GateDefinitionCreated { gate_key: second_key, .. },
+            ] if events[0].id() == ids.uuid_at(1)
+                && events[0].timestamp() == fixed_instant()
+                && events[1].id() == ids.uuid_at(2)
+                && events[1].timestamp() == fixed_instant()
                 && first_key == "aaa"
-                && second_id == &ids.uuid_at(3)
-                && *second_time == fixed_instant()
+                && events[2].id() == ids.uuid_at(3)
+                && events[2].timestamp() == fixed_instant()
                 && second_key == "bbb"
         ), "events are canonically ordered before the finalizer allocates their identities: {events:?}");
     }
@@ -2634,29 +2640,31 @@ mod tests {
 
     #[test]
     fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
-        let prior = serialize_event(&Event::GateDefinitionCreated {
-            id: "e0".into(),
-            timestamp: fixed_instant(),
-            gate_key: "prior".into(),
-        })
+        let prior = serialize_event(&crate::test_utils::stamped_event(
+            Event::draft_gate_definition_created("prior".into()),
+            "e0",
+            fixed_instant(),
+        ))
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
         // A valid final line longer than the tail window, read back to its start.
-        let long = serialize_event(&Event::GateDefinitionCreated {
-            id: "e1".into(),
-            timestamp: fixed_instant(),
-            gate_key: "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
-        })
+        let long = serialize_event(&crate::test_utils::stamped_event(
+            Event::draft_gate_definition_created(
+                "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
+            ),
+            "e1",
+            fixed_instant(),
+        ))
         .unwrap();
         let long_log = [terminated.as_slice(), &long].concat();
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
         let record = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            }),
+            event: Box::new(crate::test_utils::stamped_event(
+                Event::draft_gate_definition_created("cargo-ci".into()),
+                String::new(),
+                sentinel_time(),
+            )),
         };
         let whole = |log: Vec<u8>| {
             let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
@@ -2697,20 +2705,21 @@ mod tests {
     }
 
     fn profile_lifecycle_marker() -> Event {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: sentinel_time(),
-            operation: crate::domain::ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "example"
-                    .try_into()
-                    .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
-                status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail: false,
-        }
+        crate::test_utils::stamped_event(
+            Event::draft_profile_lifecycle(
+                crate::domain::ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
+                    id: "example"
+                        .try_into()
+                        .expect("the profile marker has a canonical identifier"),
+                    version: "1.0.0".to_string(),
+                    status: crate::domain::ProfileLifecycleStatus::Installed,
+                    variables: Default::default(),
+                }],
+            ),
+            String::new(),
+            sentinel_time(),
+        )
     }
 
     const TORN_LOG: &[u8] = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti";
@@ -2729,11 +2738,11 @@ mod tests {
         let long_torn = [TORN_LOG, &vec![b'x'; 2 * window]].concat();
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
         for image in [torn_tail_image(), long_image] {
-            let event = Event::GateDefinitionCreated {
-                id: String::new(),
-                timestamp: sentinel_time(),
-                gate_key: "cargo-ci".into(),
-            };
+            let event = crate::test_utils::stamped_event(
+                Event::draft_gate_definition_created("cargo-ci".into()),
+                String::new(),
+                sentinel_time(),
+            );
             let result = finalize(
                 &layout(),
                 &image,
@@ -2764,8 +2773,8 @@ mod tests {
             .and_then(|text| text.lines().next())
             .expect("a separator ends the torn partial, then the certifier follows");
         assert!(matches!(
-            serde_json::from_str::<Event>(first_line).unwrap(),
-            Event::ProfileLifecycle {
+            serde_json::from_str::<Event>(first_line).unwrap().body(),
+            EventBody::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }

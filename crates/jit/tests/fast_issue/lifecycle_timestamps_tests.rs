@@ -5,7 +5,7 @@
 //! unit-tested at the domain layer (`Issue::mark_*`); here we verify the command
 //! paths wire those helpers in.
 
-use jit::domain::{Event, State};
+use jit::domain::{EventBody, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -125,7 +125,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
         .count();
     assert_eq!(claimed, 1);
 }

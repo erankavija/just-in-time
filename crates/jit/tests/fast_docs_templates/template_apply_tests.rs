@@ -1571,8 +1571,8 @@ fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() 
     for demoted in [&container_id, &breakdown_id] {
         assert!(
             events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+                event.body(),
+                jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                     if issue_id == demoted
                         && *from == jit::domain::State::Ready
                         && *to == jit::domain::State::Backlog
@@ -1602,8 +1602,8 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
     for dependent in [&container_id, &breakdown_id] {
         assert!(
             events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueUpdated { issue_id, updated_by, .. }
+                event.body(),
+                jit::domain::EventBody::IssueUpdated { issue_id, updated_by, .. }
                     if issue_id == dependent && updated_by == "dependency-add"
             )),
             "no dependency-add event recorded for the dependent {dependent}"

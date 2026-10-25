@@ -147,17 +147,17 @@ fn group_by_identity<'a, T>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{fixture_issue, Priority};
+    use crate::domain::fixture_issue;
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &str, title: &str) -> Event {
-        Event::IssueCreated {
-            id: id.to_string(),
-            issue_id: issue_id.to_string(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            title: title.to_string(),
-            priority: Priority::Normal,
-        }
+        let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
+        issue.id = issue_id.to_string();
+        crate::test_utils::stamped_event(
+            crate::domain::Event::draft_issue_created(&issue),
+            id,
+            chrono::DateTime::UNIX_EPOCH,
+        )
     }
 
     /// One side of a comparison over the given records.

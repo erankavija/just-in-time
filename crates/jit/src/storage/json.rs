@@ -2257,13 +2257,11 @@ mod tests {
                 crate::repository_state::serialize_issue(&linked_only).unwrap(),
             )
             .unwrap();
-            let primary_event = Event::IssueCreated {
-                id: "primary-event".to_string(),
-                issue_id: primary_only.id.clone(),
-                timestamp: chrono::Utc::now(),
-                title: primary_only.title.clone(),
-                priority: primary_only.priority,
-            };
+            let primary_event = crate::test_utils::stamped_event(
+                crate::domain::Event::draft_issue_created(&primary_only),
+                "primary-event",
+                chrono::Utc::now(),
+            );
             fs::write(
                 repo_path
                     .join(".jit")
@@ -2271,13 +2269,14 @@ mod tests {
                 format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
             )
             .unwrap();
-            let linked_event = Event::IssueCreated {
-                id: "linked-event".to_string(),
-                issue_id: "linked-issue".to_string(),
-                timestamp: chrono::Utc::now(),
-                title: "Only in linked event log".to_string(),
-                priority: crate::domain::Priority::Normal,
-            };
+            let mut linked_issue =
+                crate::domain::Issue::draft("Only in linked event log".to_string(), String::new());
+            linked_issue.id = "linked-issue".to_string();
+            let linked_event = crate::test_utils::stamped_event(
+                crate::domain::Event::draft_issue_created(&linked_issue),
+                "linked-event",
+                chrono::Utc::now(),
+            );
             fs::write(
                 secondary_data.join(VirtualPath::EVENTS.relative().as_str()),
                 format!("{}\n", serde_json::to_string(&linked_event).unwrap()),

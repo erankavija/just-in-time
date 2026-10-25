@@ -1711,8 +1711,8 @@ mod tests {
             .into_iter()
             .filter(|event| {
                 matches!(
-                    event,
-                    crate::domain::Event::IssueClaimed { issue_id, assignee, .. }
+                    event.body(),
+                    crate::domain::EventBody::IssueClaimed { issue_id, assignee, .. }
                         if issue_id == full_id && assignee == &agent
                 )
             })

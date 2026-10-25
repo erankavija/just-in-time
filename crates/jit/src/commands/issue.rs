@@ -910,6 +910,7 @@ mod tests {
     use super::*;
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::domain::State;
     use crate::storage::{InMemoryStorage, MutationPoint};
     use std::collections::HashMap;
@@ -1850,8 +1851,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
             .expect("a gate-blocked field edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "title"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -2040,8 +2041,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
             .expect("description edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "description"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -2094,7 +2095,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == issue_id)
             .expect("deletion must log an issue_deleted event");
-        assert!(matches!(logged, Event::IssueDeleted { .. }));
+        assert!(matches!(logged.body(), EventBody::IssueDeleted { .. }));
     }
 
     #[test]
@@ -2340,8 +2341,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("dependency addition must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2386,8 +2387,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2422,8 +2423,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("CLI dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2505,8 +2506,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("the cascade cleanup of A's dependencies must be event-logged");
-        match cascade_event {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match cascade_event.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "cascade event must record the dependencies edit, got: {fields:?}"
             ),
@@ -2517,7 +2518,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == b_id)
             .expect("deleting B must still log its own issue_deleted event");
-        assert!(matches!(delete_event, Event::IssueDeleted { .. }));
+        assert!(matches!(
+            delete_event.body(),
+            EventBody::IssueDeleted { .. }
+        ));
     }
 
     #[test]
