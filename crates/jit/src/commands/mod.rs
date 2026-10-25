@@ -3456,7 +3456,7 @@ mod tests {
 
     #[test]
     fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
-        use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
+        use crate::declarations::rules::{Rule, RuleScope, RuleSet, Selector, Severity};
 
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let type_name = taxonomy.type_at_level(4).to_string();
@@ -3478,9 +3478,15 @@ mod tests {
                 },
                 severity: Severity::Error,
                 enforce: false,
-                assert: Assertion::LabelCoverage {
-                    config: Default::default(),
-                },
+                assert: RuleSet::parse(
+                    "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+                    None,
+                    [],
+                )
+                .unwrap()
+                .rules[0]
+                    .assert
+                    .clone(),
                 scope: RuleScope::Graph,
             }],
         };
