@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1ca65001-6064-4ebf-99d9-031197182a00",
+      "run_id": "bde683be-efc2-43b8-b1da-a7291bf8cc3d",
       "status": "passed",
-      "updated_at": "2026-10-25T06:38:48.207371968Z",
+      "updated_at": "2026-10-25T06:48:15.919700648Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validation projections hold typed state and priority",
-  "updated_at": "2026-10-25T06:41:48.889411004Z"
+  "updated_at": "2026-10-25T06:48:15.919700648Z"
 }
