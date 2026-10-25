@@ -185,7 +185,7 @@
           "short_id": "96bb0941",
           "title": "Validation strictness is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
@@ -391,7 +391,7 @@
           "short_id": "a4b94a17",
           "title": "Type-hierarchy and label-uniqueness rule options are typed",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
@@ -412,7 +412,7 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
@@ -940,6 +940,20 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "One-file convergence on the shared IdPattern."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal sweep in storage and loaders; brief carries the bare-name lesson."
+    },
+    {
+      "issue": "a4b94a17",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Two rule-option enums decoded at load."
     }
   ],
   "surfaced_pitfalls": [
