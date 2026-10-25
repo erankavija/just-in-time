@@ -1945,6 +1945,38 @@ mod tests {
         assert_eq!(round_trip, event);
     }
 
+    /// Lines the canonical writer produced decode and re-serialize to their own
+    /// bytes. Earlier writers' lines (other key order, spacing or timestamp
+    /// precision) are not canonical bytes, so they are only required to decode.
+    #[test]
+    fn test_serialize_event_reproduces_every_canonical_line_of_this_repository_log() {
+        let log = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/events.jsonl"),
+        )
+        .unwrap();
+        let reproduced = log
+            .lines()
+            .filter(|line| {
+                canonical_json(&serde_json::from_str::<Value>(line).unwrap(), false).unwrap()
+                    == line.as_bytes()
+            })
+            .flat_map(|line| {
+                crate::domain::event_log::parse_known_events(line)
+                    .unwrap()
+                    .into_iter()
+                    .map(move |event| (line, event))
+            })
+            .inspect(|(line, event)| {
+                assert_eq!(
+                    std::str::from_utf8(&serialize_event(event).unwrap()).unwrap(),
+                    *line
+                );
+            })
+            .count();
+        assert!(reproduced > 0, "the repository log holds canonical known events");
+        crate::domain::event_log::parse_known_events(&log).unwrap();
+    }
+
     #[test]
     fn test_update_issue_stamps_changed_gate_state_from_mutation_context() {
         let id = "11111111-1111-4111-8111-111111111111";
