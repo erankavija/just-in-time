@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "33435907-59b7-46b9-bb14-6e1478f6c8d9",
+      "run_id": "c7da6f41-e8d3-43f5-8acd-5c2304065725",
       "status": "passed",
-      "updated_at": "2026-10-25T01:57:15.040937798Z",
+      "updated_at": "2026-10-25T02:13:50.510542278Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Schema paths come from a VirtualPath constructor",
-  "updated_at": "2026-10-25T02:01:43.782840039Z"
+  "updated_at": "2026-10-25T02:13:50.510542278Z"
 }
