@@ -2025,6 +2025,14 @@ fn image_repo_bytes(
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
+/// Read a known virtual path from the captured image.
+pub(crate) fn image_virtual_bytes(
+    image: &crate::repository_state::RepositoryImage,
+    path: &crate::repository_state::VirtualPath,
+) -> Result<Option<Vec<u8>>> {
+    Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
+}
+
 /// Project a delta finalized over `image` to the file-overlay validation reads
 /// ([`crate::repository_state::action_overrides`]). This is the exact proposed
 /// repository state — only what the delta writes — used by init/profile to
@@ -2093,7 +2101,9 @@ fn discover_gate_run_results(
             listing
                 .names()
                 .iter()
-                .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
+                .map(|run_id| {
+                    VirtualPath::data(VirtualPath::GATE_RUNS.relative().as_path().join(run_id))
+                })
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )?;
     }
@@ -2536,7 +2546,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
-                let rules_path = self.storage.root().join("rules.toml");
+                let layout = self.require_layout().map_err(|error| error.to_string())?;
+                let rules_path = layout
+                    .resolve(&crate::repository_state::VirtualPath::RULES)
+                    .map_err(|error| error.to_string())?;
                 if rules_path.exists() {
                     // File present (even empty) supplies the operative rule set.
                     // Its default-origin rules are a config PROJECTION: reconcile

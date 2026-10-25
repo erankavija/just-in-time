@@ -140,7 +140,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let spec = CaptureSpec::new(registries()?, budget)?;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let config = assemble_config(image)?;
-                let rules_text = image_repo_bytes(image, ".jit/rules.toml")?
+                let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
                     .map(String::from_utf8)
                     .transpose()?;
                 let closure = render_capture_closure(

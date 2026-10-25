@@ -459,15 +459,18 @@ This is a read-only export. Future versions may support:
             std::fs::write(issue_path, issue_json)?;
         }
 
-        for name in ["config.toml", "gates.toml"] {
-            let relative = crate::repository_state::RootRelativePath::parse(name)?;
+        for path in [
+            crate::repository_state::VirtualPath::CONFIG,
+            crate::repository_state::VirtualPath::GATES,
+        ] {
+            let relative = path.relative();
             if let Some(bytes) =
                 crate::storage::repository_state_store::read_repository_file_nofollow(
                     &self.data_root,
-                    &relative,
+                    relative,
                 )?
             {
-                std::fs::write(jit_dir.join(name), bytes)?;
+                std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
             }
         }
 

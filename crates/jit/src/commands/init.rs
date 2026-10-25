@@ -359,7 +359,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .unwrap_or(""),
         )
         .parse()?;
-        let (config, project_name) = match super::image_repo_bytes(&image, ".jit/config.toml")? {
+        let (config, project_name) = match super::image_virtual_bytes(
+            &image,
+            &crate::repository_state::VirtualPath::CONFIG,
+        )? {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
@@ -554,9 +557,14 @@ fn worktree_is_git_work_tree(worktree: &Path) -> bool {
 /// The canonical `.jit/events.jsonl` passes through unchanged; patterns containing
 /// whitespace or a quote use Git's C-style quoting layer.
 fn git_events_pattern(relative: &Path) -> String {
-    let path = relative.to_string_lossy();
-    let mut escaped = String::with_capacity(path.len() + "/events.jsonl".len());
-    for ch in path.chars().chain("/events.jsonl".chars()) {
+    let path = relative.join(
+        crate::repository_state::VirtualPath::EVENTS
+            .relative()
+            .as_path(),
+    );
+    let path = path.to_string_lossy();
+    let mut escaped = String::with_capacity(path.len());
+    for ch in path.chars() {
         if ch == std::path::MAIN_SEPARATOR {
             escaped.push('/');
             continue;

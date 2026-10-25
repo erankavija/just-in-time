@@ -719,9 +719,12 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
     // untouched — a core capability made conditional on git history, against
     // `@/charter/D-4`. Repairing first keeps the repair unconditional while
     // preserving the git phase's own failure.
-    if paths.local_jit.join("config.toml").is_file() {
-        let layout =
-            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    let layout =
+        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    if layout
+        .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+        .is_file()
+    {
         let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
         report.derived_state_repaired = executor.repair_derived_state(false)?.0;
     }
