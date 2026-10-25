@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6fb0238a-f351-4064-a942-e459a881cfdc",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:10:55.384969702Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3590a06e-03c1-45db-ac07-fc98b00fc619",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:11:44.030355418Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5613ef50-362b-43ef-a268-12afc91f5b52",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Dependency-shape assertions are typed at load",
-  "updated_at": "2026-10-25T04:57:44.778772034Z"
+  "updated_at": "2026-10-25T05:11:44.030355418Z"
 }
