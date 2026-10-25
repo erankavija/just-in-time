@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9cb3ccb7-d130-4123-bd82-735c599ed8e5",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:11:49.450716059Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "48edd335-723e-4a91-b767-c4673669ab7f",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:15:39.837032574Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lease and worktree ids are dedicated types",
-  "updated_at": "2026-10-25T02:48:42.308704670Z"
+  "updated_at": "2026-10-25T03:15:39.837032574Z"
 }
