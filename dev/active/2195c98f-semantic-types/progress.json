@@ -82,7 +82,7 @@
           "short_id": "cccfd407",
           "title": "One VirtualPath predicate recognises reserved application targets",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
@@ -330,7 +330,7 @@
           "short_id": "a57c5057",
           "title": "The server resolves each issue-id path parameter once",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
@@ -846,6 +846,13 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Trait signature change across five files on the identity critical path."
+    },
+    {
+      "issue": "cccfd407",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One predicate plus two call sites with exact criteria."
     }
   ],
   "surfaced_pitfalls": [
