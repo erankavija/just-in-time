@@ -107,7 +107,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
@@ -240,7 +240,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::commands::DocumentListResult> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documents = self
             .with_issue_documents(vec![issue])?
@@ -279,7 +279,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documentation = self
             .config_manager
@@ -383,7 +383,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         self.publish_document_remove(&full_id, path)
     }
 
@@ -505,7 +505,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
@@ -563,7 +563,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -590,7 +590,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -643,7 +643,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
         use crate::storage::{AmbiguousIdError, IssueNotFoundError, PathReadError};
 
-        let prefix = IssueIdPrefix::parse(issue_id)
+        let prefix = IssueIdPrefix::from_str(issue_id)
             .map_err(|error| PathReadError::NotFound(error.to_string()))?;
         let full_id = self.storage.resolve_issue_id(&prefix).map_err(|error| {
             if error.is::<IssueNotFoundError>() || error.is::<AmbiguousIdError>() {
@@ -930,7 +930,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
@@ -1114,7 +1114,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             DocumentScope::Issue(issue_id) => {
                 let full_id = self
                     .storage
-                    .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+                    .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
                 let issue = self.storage.load_issue(&full_id)?;
                 vec![issue]
             }

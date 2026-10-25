@@ -859,8 +859,8 @@ impl IssueStore for FailingMutationStorage {
 
     fn resolve_issue_id(
         &self,
-        prefix: &jit::domain::issue_id::IssueIdPrefix,
-    ) -> anyhow::Result<String> {
+        prefix: &jit::domain::identity::IssueIdPrefix,
+    ) -> anyhow::Result<jit::domain::identity::IssueId> {
         self.inner.resolve_issue_id(prefix)
     }
 
