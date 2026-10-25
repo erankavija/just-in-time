@@ -22,7 +22,7 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::issue_id::IssueIdPrefix;
+use jit::domain::identity::IssueIdPrefix;
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
@@ -77,7 +77,7 @@ fn dep_add_batch_json_error(
         {
             ErrorCode::IssueNotFound.as_str()
         } else if err
-            .downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
+            .downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
             .is_some()
         {
             ErrorCode::InvalidIdPrefix.as_str()
@@ -2725,7 +2725,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2753,7 +2753,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     assign_only,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
 
                     if assign_only {
                         // Assign without transitioning state: reuse the same
@@ -2821,7 +2821,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Unassign { id } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     let warnings = executor.issues().unassign_issue(&full_id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2838,7 +2838,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Reject { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
 
                     for warning in executor
                         .issues()
@@ -2863,7 +2863,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Release { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     executor.issues().release_issue(&full_id, &reason)?;
 
                     if json {
@@ -3703,7 +3703,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // actionable did-you-mean rather than misparsing into
                     // "issue not found".
                     let is_issue = |raw: &str| {
-                        IssueIdPrefix::parse(raw).is_ok_and(|prefix| {
+                        IssueIdPrefix::from_str(raw).is_ok_and(|prefix| {
                             executor.storage().resolve_issue_id(&prefix).is_ok()
                         })
                     };
@@ -4820,7 +4820,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
                             || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
+                            || e.downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
                                 .is_some()
                         {
                             JsonError::issue_not_found(&id)

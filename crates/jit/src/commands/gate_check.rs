@@ -684,7 +684,7 @@ fn label_target_report(
             "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found an empty target"
         );
     }
-    let target = super::resolve_issue_from_capture(&issues, &IssueIdPrefix::parse(target)?)?;
+    let target = super::resolve_issue_from_capture(&issues, &IssueIdPrefix::from_str(target)?)?;
     captured_scope_rule_report(image, &target)
 }
 
@@ -762,7 +762,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::issue_id::IssueIdPrefix,
+        prefix: &crate::domain::identity::IssueIdPrefix,
         gate_key: &str,
         run_paths: &[crate::repository_state::VirtualPath],
     ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
@@ -910,7 +910,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, MutationIntent};
 
-        let requested = IssueIdPrefix::parse(issue_id)?;
+        let requested = IssueIdPrefix::from_str(issue_id)?;
         let layout = self.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.identifier_at(0);
@@ -983,7 +983,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some((final_image, _)) = self.capture_gate_evaluation_image(
                 session.as_mut(),
-                &IssueIdPrefix::of_stored(&target_id),
+                &IssueIdPrefix::from(&target_id),
                 gate_key,
                 &run_paths,
             )?
@@ -1078,7 +1078,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn execute_builtin_checker_with_repository_view(
         &self,
         gate_key: &str,
-        issue_id: &str,
+        issue_id: &IssueId,
         stage: GateStage,
         checker: &crate::declarations::GateChecker,
         repository_image: &crate::repository_state::RepositoryImage,
@@ -1109,7 +1109,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
             GateChecker::RuleValidation { rule } => super::validate::rule_validation_outcome(
                 repository_image,
-                &IssueIdPrefix::of_stored(issue_id),
+                &IssueIdPrefix::from(issue_id),
                 rule,
             )
             .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
@@ -1236,7 +1236,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Option<GateRunResult>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.projected_gate_run(&issue, gate_key)
     }
@@ -1371,7 +1371,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<(Vec<GateRunResult>, Vec<String>)> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1410,7 +1410,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<(String, GateStatus)>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1571,7 +1571,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -2603,7 +2603,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let image = executor
             .capture_gate_evaluation_image(
                 session.as_mut(),
-                &crate::domain::issue_id::IssueIdPrefix::parse(issue_id).unwrap(),
+                &issue_id
+                    .parse::<crate::domain::identity::IssueIdPrefix>()
+                    .unwrap(),
                 gate_key,
                 &run_paths,
             )
@@ -4699,13 +4701,13 @@ source-of-truth = "markdown-first"
 
         let error = executor
             .check_gate(
-                &issue_id[..crate::domain::issue_id::MIN_ID_PREFIX_LENGTH - 1],
+                &issue_id[..crate::domain::identity::IssueIdPrefix::MIN_ID_PREFIX_LENGTH - 1],
                 "short-id",
             )
             .unwrap_err();
         assert!(
             error
-                .downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+                .downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
                 .is_some(),
             "{error:?}"
         );

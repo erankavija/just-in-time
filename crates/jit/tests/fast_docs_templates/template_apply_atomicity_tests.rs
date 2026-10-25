@@ -136,7 +136,10 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
         self.inner.load_issue_or_not_found(id)
     }
-    fn resolve_issue_id(&self, prefix: &jit::domain::issue_id::IssueIdPrefix) -> Result<String> {
+    fn resolve_issue_id(
+        &self,
+        prefix: &jit::domain::identity::IssueIdPrefix,
+    ) -> Result<jit::domain::identity::IssueId> {
         assert_eq!(
             self.active_sessions.load(Ordering::SeqCst),
             0,

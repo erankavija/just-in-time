@@ -708,7 +708,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -754,7 +754,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -800,7 +800,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .transpose()?;
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -898,7 +898,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
 
         // Fail-fast: pass each required gate in order, stopping at the first that
@@ -965,7 +965,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .transpose()?;
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -1267,7 +1267,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
-        let issue_id = &IssueIdPrefix::parse(issue_id)?;
+        let issue_id = &IssueIdPrefix::from_str(issue_id)?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
@@ -1345,7 +1345,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<crate::domain::GateRunResult>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
 
         if let Some(key) = gate_key_filter {
@@ -1373,7 +1373,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        let from_issue_id = &IssueIdPrefix::parse(from_issue_id)?;
+        let from_issue_id = &IssueIdPrefix::from_str(from_issue_id)?;
 
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();

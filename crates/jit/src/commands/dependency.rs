@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::IssueIdPrefix;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::{AmbiguousIdError, IssueNotFoundError};
@@ -53,7 +53,7 @@ fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<Is
     let parsed = ids
         .iter()
         .filter_map(|id| {
-            IssueIdPrefix::parse(id)
+            IssueIdPrefix::from_str(id)
                 .map_err(|error| rejected.push((id.clone(), error.into())))
                 .ok()
         })
@@ -61,7 +61,7 @@ fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<Is
     if rejected.is_empty() {
         Ok(parsed)
     } else {
-        Err(DependencyBatchRejectedError::new(from.requested(), rejected).into())
+        Err(DependencyBatchRejectedError::new(from.as_str(), rejected).into())
     }
 }
 
@@ -153,8 +153,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Single {
-            issue_id: IssueIdPrefix::parse(issue_id)?,
-            dependency_id: IssueIdPrefix::parse(dep_id)?,
+            issue_id: IssueIdPrefix::from_str(issue_id)?,
+            dependency_id: IssueIdPrefix::from_str(dep_id)?,
             policy,
         })? {
             CapturedDependencyOutcome::Single { result, warning } => {
@@ -173,8 +173,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveSingle {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
-                dependency_id: IssueIdPrefix::parse(dep_id)?,
+                issue_id: IssueIdPrefix::from_str(issue_id)?,
+                dependency_id: IssueIdPrefix::from_str(dep_id)?,
             },
         )? {
             CapturedDependencyOutcome::RemovedSingle { warning } => {
@@ -230,7 +230,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let issue_id = IssueIdPrefix::parse(issue_id)?;
+        let issue_id = IssueIdPrefix::from_str(issue_id)?;
         let dependency_ids = parse_dependency_batch(&issue_id, dep_ids)?;
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
             issue_id,
@@ -466,10 +466,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
+                issue_id: IssueIdPrefix::from_str(issue_id)?,
                 dependency_ids: dep_ids
                     .iter()
-                    .map(|id| IssueIdPrefix::parse(id))
+                    .map(|id| IssueIdPrefix::from_str(id))
                     .collect::<Result<_, _>>()?,
             },
         )? {
@@ -544,7 +544,7 @@ fn derive_dependency_removal(
             let mut reported_removed = Vec::new();
             let mut not_found = Vec::new();
             for prefix in dependency_ids {
-                let requested = prefix.requested();
+                let requested = prefix.as_str();
                 let matches = issue
                     .dependencies
                     .iter()
@@ -718,7 +718,7 @@ fn derive_batch_dependency_add(
     let mut seen = HashSet::new();
 
     for (ordinal, prefix) in dependency_ids.iter().enumerate() {
-        let dependency_id = prefix.requested().to_string();
+        let dependency_id = prefix.as_str().to_string();
         match super::resolve_issue_from_capture(issues, prefix) {
             Ok(full_id) if from_deps.contains(&full_id) || !seen.insert(full_id.clone()) => {
                 already_exist.push(dependency_id);
