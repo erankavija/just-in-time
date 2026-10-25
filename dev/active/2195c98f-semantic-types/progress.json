@@ -82,7 +82,7 @@
           "short_id": "cccfd407",
           "title": "One VirtualPath predicate recognises reserved application targets",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
@@ -108,21 +108,21 @@
           "short_id": "179dcef9",
           "title": "Repository action owners are one enum",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
           "short_id": "18dc6e3e",
           "title": "Repository-state code names well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
           "short_id": "256c8eb1",
           "title": "Error codes come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
@@ -185,7 +185,7 @@
           "short_id": "96bb0941",
           "title": "Validation strictness is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
@@ -281,7 +281,7 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
@@ -309,7 +309,7 @@
           "short_id": "8cfbf19d",
           "title": "Lease and worktree ids are dedicated types",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
@@ -323,7 +323,7 @@
           "short_id": "945f65f3",
           "title": "Commands name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
@@ -384,7 +384,7 @@
           "short_id": "98404e0c",
           "title": "Lease records name their issue by IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
@@ -623,7 +623,10 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "b3fcd297": 2
+    "b3fcd297": 2,
+    "acb38457": 1,
+    "98404e0c": 2,
+    "945f65f3": 1
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -867,12 +870,83 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Two new identity types across nine files with fallback error paths."
+    },
+    {
+      "issue": "acb38457",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework R1 to the same worker: EdgeView storage type changed against REQ-02."
+    },
+    {
+      "issue": "18dc6e3e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in one module family."
+    },
+    {
+      "issue": "256c8eb1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-enum macro adoption with a wire-contract check."
+    },
+    {
+      "issue": "98404e0c",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lease issue retype and tolerance removal over three files."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in commands, same pattern as 18dc6e3e."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: bare-name well-known literals in init_response_paths and sweep."
+    },
+    {
+      "issue": "179dcef9",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Owner enum across ten repository-state files with behaviour branches."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1 dispatched (recorded)."
+    },
+    {
+      "issue": "96bb0941",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded strictness with exact tokens."
     }
   ],
   "surfaced_pitfalls": [
     {
       "source": "c400730c",
       "note": "While IssueId is the String alias, IssueIdPrefix::try_from(&String) picks the infallible From<&IssueId> and skips the length check; staging briefs must say to parse with from_str. Disappears at the flip (7abcc22d)."
+    },
+    {
+      "source": "98404e0c",
+      "note": "storage/claim_coordinator.rs test_issue_id is a named convention-convergence exception; 0af95f14 (canonical-unit-test-ids, produces test-issue-id-fixture) must replace it. Check at bf87bbdb review."
+    },
+    {
+      "source": "179dcef9",
+      "note": "TargetClaim owners (profile-asset:<target>, profile-region:<id>) remain dynamic strings with an inline InvalidClaimOwner check; they belong to profile ownership code that 3d9a0ce3 (D-8) deletes. Epic REQ-10 names 'repository action owner': reconcile at the epic gate (likely out of scope as profile ownership, per plan DEC-06)."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -881,6 +955,7 @@
     "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
     "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
     "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
-    "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way."
+    "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way.",
+    "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id)."
   ]
 }

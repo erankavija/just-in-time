@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-945f65f3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d8ac8325232afb865706fe10cdc4822ee9bb93a7",
+  "completed_at": "2026-10-25T03:53:12.533264161Z",
+  "duration_ms": 290390,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/init.rs",
+        "id": "F1",
+        "line": 444,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2195c98f/requirement/REQ-07",
+          "@/invariant/semantic-types",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "init_response_paths still builds and matches well-known .jit paths from literals rather than VirtualPath constants."
+      }
+    ],
+    "summary": "One issue-impact blocker: init still constructs well-known file paths from literals instead of constants.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "945f65f3-9c13-49fd-b85d-1307122cb654",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "16ff29a1-d7c4-4e60-9fb4-ce8c723b79a3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T03:48:22.143017984Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7624 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-945f65f3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1712c-78a2-7822-a6b3-d9cc480d487a\n--------\nuser\n--- 7611 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `3caf81a50` (`jit:945f65f3`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`; `.jit/gates.toml`\nResolved items: `@/issue/2195c98f/requirement/REQ-07`; `@/invariant/semantic-types`; `@/charter/D-18`; `@/gate/cargo-ci`\nGate evidence: cargo-ci passed (exit 0, but recorded for non-reachable commit `d8ac8325`); code-review pending\nTruncation recovery: narrowed reads of path constants, layout resolution, item sources, D-18, production literal sites, and changed fixtures\n\n1. **F1 — blocking, issue-impact (high):** `init_response_paths` still builds and compares the fixed well-known data files from raw literals (`\"index.json\"`, `\"config.toml\"`, etc.) via `VirtualPath::data(relative)`. This violates the issue’s requirement that these sites use `VirtualPath` constants; iterate the relevant constants instead. [crates/jit/src/commands/init.rs:444](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-945f65f3/crates/jit/src/commands/init.rs:444) References: `@/issue/2195c98f/requirement/REQ-07`, `@/invariant/semantic-types`, `@/charter/D-18`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocker: init still constructs well-known file paths from literals instead of constants.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"init_response_paths still builds and matches well-known .jit paths from literals rather than VirtualPath constants.\",\"file\":\"crates/jit/src/commands/init.rs\",\"line\":444,\"references\":[\"@/issue/2195c98f/requirement/REQ-07\",\"@/invariant/semantic-types\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

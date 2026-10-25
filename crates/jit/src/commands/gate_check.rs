@@ -1718,6 +1718,13 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             ".jit/rules.toml",
             RULE_VALIDATION_TEST_RULES,
         );
+        let rules_path = executor
+            .storage
+            .repository_layout()
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
+        std::fs::write(rules_path, RULE_VALIDATION_TEST_RULES).unwrap();
     }
 
     fn seed_unrelated_manual_gate(executor: &CommandExecutor<InMemoryStorage>) {

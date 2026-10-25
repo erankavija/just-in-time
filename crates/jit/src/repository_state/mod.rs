@@ -40,8 +40,8 @@ pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
     EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, PinnedDocumentEvidence,
-    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
+    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
@@ -426,9 +426,9 @@ pub(crate) fn declarations_from_image(
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config_bytes = image
-        .file_bytes(&VirtualPath::CONFIG)?
-        .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
+    let config_bytes = image.file_bytes(&VirtualPath::CONFIG)?.ok_or_else(|| {
+        DeclarationParseError::MissingCapture(VirtualPath::CONFIG.repository_relative())
+    })?;
     let configuration = crate::declarations::parse_configuration(config_bytes)?;
     let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
     let hierarchy_types = config
@@ -792,7 +792,7 @@ pub fn finalize_config_edit(
     // preimages, since only `config.toml` is overlaid).
     let mut actions = vec![RepositoryAction::WriteFile {
         path: config_path.clone(),
-        owner: "authored-config".to_string(),
+        owner: RepositoryActionOwner::AuthoredConfig,
         expected: ExpectedPreimage::of(base.entry(&config_path).map_err(ProducerError::from)?),
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
@@ -1119,19 +1119,19 @@ mod tests {
         let actions = [
             RepositoryAction::CreateDirectory {
                 path: target.clone(),
-                owner: "directory".into(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             },
             RepositoryAction::WriteFile {
                 path: target.clone(),
-                owner: "writer".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: b"expected".to_vec(),
                 mode: FileMode::Regular,
             },
             RepositoryAction::SetMode {
                 path: target.clone(),
-                owner: "mode".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant.clone(),
                     mode: FileMode::Regular,
@@ -1140,7 +1140,7 @@ mod tests {
             },
             RepositoryAction::DeleteFile {
                 path: target.clone(),
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant,
                     mode: FileMode::Regular,
@@ -1213,12 +1213,12 @@ mod tests {
             vec![
                 RepositoryAction::CreateDirectory {
                     path: create.clone(),
-                    owner: "directory".into(),
+                    owner: RepositoryActionOwner::RepositoryInit,
                     expected: ExpectedPreimage::Absent,
                 },
                 RepositoryAction::DeleteFile {
                     path: delete.clone(),
-                    owner: "delete".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: delete_identity,
                         mode: FileMode::Regular,
@@ -1226,7 +1226,7 @@ mod tests {
                 },
                 RepositoryAction::SetMode {
                     path: set_mode.clone(),
-                    owner: "mode".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: mode_identity,
                         mode: FileMode::Regular,
@@ -1235,7 +1235,7 @@ mod tests {
                 },
                 RepositoryAction::WriteFile {
                     path: write.clone(),
-                    owner: "writer".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"new".to_vec(),
                     mode: FileMode::Regular,

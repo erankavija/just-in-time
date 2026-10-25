@@ -1077,7 +1077,7 @@ mod tests {
         crate::profile::contribution_drift::contributed_registry_paths(contributions)
             .into_iter()
             .map(|registry| {
-                let text = fs::read_to_string(root.join(registry))
+                let text = fs::read_to_string(root.join(&registry))
                     .unwrap_or_else(|error| panic!("failed to read {registry}: {error}"));
                 (registry.to_string(), text)
             })
@@ -1248,14 +1248,16 @@ mod tests {
     fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
         let (_workspace, package) = assembled_package();
         let contributions = &package.model().contributions;
-        let registry = KeyedArrayTarget::Invariants.registry_path();
+        let registry = KeyedArrayTarget::Invariants
+            .registry_path()
+            .repository_relative();
         let mut registries = contributed_registries(contributions);
         let committed = registries
-            .get(registry)
+            .get(&registry)
             .expect("the invariant registry")
             .clone();
         registries.insert(
-            registry.to_string(),
+            registry.clone(),
             seeded_invariant_statement(&committed, "domain-agnostic"),
         );
 

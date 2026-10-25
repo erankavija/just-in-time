@@ -765,8 +765,19 @@ fn claims_mutation_guard(
     }
     let agent = crate::agent_config::resolve_agent_id(None)
         .unwrap_or(crate::domain::Assignee::SYSTEM_LEASE_CHECK);
-    let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
-        .unwrap_or_else(|| paths.worktree_root.display().to_string());
+    let worktree_id =
+        match crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)? {
+            Some(id) => id,
+            None => crate::domain::identity::WorktreeId::try_from(
+                paths.worktree_root.display().to_string(),
+            )
+            .with_context(|| {
+                format!(
+                    "Invalid worktree id fallback from root path '{}'",
+                    paths.worktree_root.display()
+                )
+            })?,
+        };
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         FileLocker::with_configured_timeout(),
@@ -778,8 +789,7 @@ fn claims_mutation_guard(
 
 fn captured_lease_warnings(
     mode: crate::config::EnforcementMode,
-    targets: &[String],
-    issues: &[Issue],
+    targets: &[IssueId],
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
 ) -> Result<Vec<String>> {
     use crate::agent_config::resolve_agent_id;
@@ -791,14 +801,7 @@ fn captured_lease_warnings(
     let agent = resolve_agent_id(None).ok();
     let mut warnings = Vec::new();
     for id in targets {
-        let active = guard
-            .map(|guard| {
-                guard.has_active_lease(id, agent.as_ref(), |raw| {
-                    resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
-                })
-            })
-            .transpose()?
-            .unwrap_or(false);
+        let active = guard.is_some_and(|guard| guard.has_active_lease(id, agent.as_ref()));
         if active {
             continue;
         }
@@ -815,18 +818,10 @@ fn captured_lease_warnings(
 
 fn ensure_claim_available(
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
-    target: &str,
+    target: &IssueId,
     assignee: &crate::domain::Assignee,
-    issues: &[Issue],
 ) -> Result<()> {
-    let Some(lease) = guard
-        .map(|guard| {
-            guard.conflicting_lease(target, Some(assignee), |raw| {
-                resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
-            })
-        })
-        .transpose()?
-        .flatten()
+    let Some(lease) = guard.and_then(|guard| guard.conflicting_lease(target, Some(assignee)))
     else {
         return Ok(());
     };
@@ -2014,6 +2009,14 @@ fn image_repo_bytes(
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
+/// Read a known virtual path from the captured image.
+pub(crate) fn image_virtual_bytes(
+    image: &crate::repository_state::RepositoryImage,
+    path: &crate::repository_state::VirtualPath,
+) -> Result<Option<Vec<u8>>> {
+    Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
+}
+
 /// Project a delta finalized over `image` to the file-overlay validation reads
 /// ([`crate::repository_state::action_overrides`]). This is the exact proposed
 /// repository state — only what the delta writes — used by init/profile to
@@ -2082,7 +2085,9 @@ fn discover_gate_run_results(
             listing
                 .names()
                 .iter()
-                .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
+                .map(|run_id| {
+                    VirtualPath::data(VirtualPath::GATE_RUNS.relative().as_path().join(run_id))
+                })
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )?;
     }
@@ -2525,7 +2530,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
-                let rules_path = self.storage.root().join("rules.toml");
+                let layout = self.require_layout().map_err(|error| error.to_string())?;
+                let rules_path = layout
+                    .resolve(&crate::repository_state::VirtualPath::RULES)
+                    .map_err(|error| error.to_string())?;
                 if rules_path.exists() {
                     // File present (even empty) supplies the operative rule set.
                     // Its default-origin rules are a config PROJECTION: reconcile
@@ -2635,7 +2643,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     config.enforcement_mode(),
                     std::slice::from_ref(&target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2840,23 +2847,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             if let (true, Some(precheck)) = (coordinate_claims, &precheck) {
                 // Refuse before running prechecks; the held guard repeats this.
-                let preflight_issues = captured_active_issues(&precheck.image)?;
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
                     captured_lease_warnings(
                         precheck.lease_mode,
                         std::slice::from_ref(&expected_target),
-                        &preflight_issues,
                         preliminary_guard.as_ref(),
                     )?;
                 }
                 if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                    ensure_claim_available(
-                        preliminary_guard.as_ref(),
-                        &expected_target,
-                        assignee,
-                        &preflight_issues,
-                    )?;
+                    ensure_claim_available(preliminary_guard.as_ref(), &expected_target, assignee)?;
                 }
             }
             let expected_precheck = precheck.as_ref().map(|precheck| &precheck.plan);
@@ -2941,7 +2941,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     lease_mode,
                     std::slice::from_ref(&expected_target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2951,7 +2950,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .map_or_else(Vec::new, |guard| guard.warnings());
             if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee, &issues)?;
+                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee)?;
             }
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
@@ -3434,6 +3433,25 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("worktree with spaces");
+        let paths = crate::storage::WorktreePaths {
+            git_repository: true,
+            common_dir: root.join(".git"),
+            local_jit: root.join(".jit"),
+            shared_jit: root.join(".git/jit"),
+            worktree_root: root.clone(),
+        };
+        let error = claims_mutation_guard(&paths).err().unwrap();
+        assert!(error.to_string().contains("root path"));
+        assert!(error.to_string().contains(root.to_str().unwrap()));
+        assert!(error
+            .downcast_ref::<crate::domain::identity::InvalidWorktreeIdError>()
+            .is_some());
+    }
 
     #[test]
     fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
@@ -4429,6 +4447,7 @@ enforce_leases = "strict"
 
     #[test]
     fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
+        use crate::storage::claim_coordinator::test_issue_id;
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use std::time::Duration;
@@ -4446,17 +4465,15 @@ enforce_leases = "strict"
         let coordinator = ClaimCoordinator::new(
             paths.clone(),
             FileLocker::new(Duration::from_secs(1)),
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
-        let issue_id = "abcd1111111111111111111111111111";
-        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let issue_id = test_issue_id("guard-probe");
+        coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
-        assert!(guard
-            .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
-            .unwrap());
+        assert!(guard.has_active_lease(&issue_id, None));
     }
 }
 

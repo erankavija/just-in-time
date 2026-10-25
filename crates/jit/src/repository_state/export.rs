@@ -2,13 +2,11 @@
 
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, RootRelativePath, VirtualPath,
+    RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
+    RepositoryLayout, RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
-
-const EXPORT_OWNER: &str = "repository-export";
 
 /// A lexically normalized output path classified outside both repository roots.
 ///
@@ -181,7 +179,7 @@ fn finalize_export_payload(
             };
             vec![RepositoryAction::WriteFile {
                 path: target.clone(),
-                owner: EXPORT_OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryExport,
                 expected: ExpectedPreimage::of(target_entry),
                 bytes,
                 mode,
@@ -191,7 +189,7 @@ fn finalize_export_payload(
             require_absent(target_entry, target)?;
             vec![RepositoryAction::WriteFile {
                 path: target.clone(),
-                owner: EXPORT_OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryExport,
                 expected: ExpectedPreimage::Absent,
                 bytes,
                 mode: FileMode::Regular,
@@ -201,7 +199,7 @@ fn finalize_export_payload(
             require_absent(target_entry, target)?;
             let mut actions = vec![RepositoryAction::CreateDirectory {
                 path: target.clone(),
-                owner: EXPORT_OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryExport,
                 expected: ExpectedPreimage::Absent,
             }];
             for relative in directories {
@@ -209,7 +207,7 @@ fn finalize_export_payload(
                 require_absent(base.entry(&path)?, &path)?;
                 actions.push(RepositoryAction::CreateDirectory {
                     path,
-                    owner: EXPORT_OWNER.to_string(),
+                    owner: RepositoryActionOwner::RepositoryExport,
                     expected: ExpectedPreimage::Absent,
                 });
             }
@@ -218,7 +216,7 @@ fn finalize_export_payload(
                 require_absent(base.entry(&path)?, &path)?;
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: EXPORT_OWNER.to_string(),
+                    owner: RepositoryActionOwner::RepositoryExport,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: FileMode::Regular,
@@ -395,7 +393,7 @@ mod tests {
                 bytes,
                 mode: FileMode::Executable,
                 ..
-            } if owner == EXPORT_OWNER && bytes == b"new"
+            } if *owner == RepositoryActionOwner::RepositoryExport && bytes == b"new"
         ));
     }
 

@@ -1725,7 +1725,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let payload = InitResponse {
                 repository_root: current_dir.display().to_string(),
                 data_dir: jit_dir.display().to_string(),
-                repository_id: worktree_identity.map(|identity| identity.worktree_id),
+                repository_id: worktree_identity.map(|identity| identity.worktree_id.to_string()),
                 gitattributes_status: gitattributes_outcome,
                 created_paths: init_result.created_paths,
                 modified_paths: init_result.modified_paths,
