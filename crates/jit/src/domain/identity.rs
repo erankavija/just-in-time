@@ -100,11 +100,138 @@ impl fmt::Display for ValidatedIssueId {
     }
 }
 
+/// Error raised when a profile id is not a lowercase-kebab token.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("invalid profile id '{input}'; expected lowercase-kebab")]
+pub struct InvalidProfileIdError {
+    input: String,
+}
+
+/// Stable lowercase-kebab identifier used to name a profile package.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+#[schemars(with = "String")]
+pub struct ProfileId(String);
+
+impl ProfileId {
+    /// Borrow the canonical package identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for ProfileId {
+    type Error = InvalidProfileIdError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        is_lowercase_kebab(input)
+            .then(|| Self(input.to_string()))
+            .ok_or_else(|| InvalidProfileIdError {
+                input: input.to_string(),
+            })
+    }
+}
+
+impl TryFrom<String> for ProfileId {
+    type Error = InvalidProfileIdError;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Self::try_from(input.as_str())
+    }
+}
+
+impl FromStr for ProfileId {
+    type Err = InvalidProfileIdError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::try_from(input)
+    }
+}
+
+impl From<ProfileId> for String {
+    fn from(id: ProfileId) -> Self {
+        id.0
+    }
+}
+
+impl fmt::Display for ProfileId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
+    let mut segments = value.split('-');
+    segments.next().is_some_and(|first| {
+        !first.is_empty()
+            && first.starts_with(|character: char| character.is_ascii_lowercase())
+            && first
+                .chars()
+                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+    }) && segments.all(|segment| {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
     use serde_json::{json, Value};
+
+    #[test]
+    fn test_profile_id_round_trips_canonical_tokens() {
+        for input in ["a", "jit-default", "profile2", "profile-2-extra"] {
+            let id = ProfileId::try_from(input).unwrap();
+            assert_eq!(id.as_str(), input);
+            assert_eq!(id.to_string(), input);
+            assert_eq!(input.parse::<ProfileId>().unwrap(), id);
+            let encoded = serde_json::to_value(&id).unwrap();
+            assert_eq!(encoded, json!(input));
+            assert_eq!(serde_json::from_value::<ProfileId>(encoded).unwrap(), id);
+        }
+    }
+
+    #[test]
+    fn test_profile_id_rejects_non_canonical_tokens_at_parse_boundaries() {
+        for input in [
+            "",
+            "2profile",
+            "-profile",
+            "profile-",
+            "profile--id",
+            "Profile",
+            "profile_id",
+            "profile.id",
+            "profile/id",
+            "profile id",
+            " profile",
+            "profile\n",
+            "pröfile",
+        ] {
+            let error = ProfileId::try_from(input).unwrap_err();
+            assert!(error.to_string().contains(input));
+            assert!(input.parse::<ProfileId>().is_err());
+            assert!(serde_json::from_value::<ProfileId>(json!(input)).is_err());
+        }
+    }
+
+    #[test]
+    fn test_profile_id_json_schema_preserves_the_published_string_contract() {
+        let schema = ProfileId::json_schema(&mut schemars::gen::SchemaGenerator::default());
+        assert_eq!(
+            serde_json::to_value(schema).unwrap(),
+            json!({
+                "description": "Stable lowercase-kebab identifier used to name a profile package.",
+                "type": "string"
+            })
+        );
+    }
 
     fn canonical_id() -> impl Strategy<Value = String> {
         any::<u128>().prop_map(|bits| Uuid::from_u128(bits).to_string())

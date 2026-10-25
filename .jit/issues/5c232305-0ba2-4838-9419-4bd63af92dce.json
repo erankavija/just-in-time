@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c77ab653-0ad7-43b2-a2dc-335cd3ba0872",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:07:35.555200252Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a6ecc540-8ecc-455c-a686-926a87e5704f",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:08:33.270860713Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "ProfileId is defined in the domain layer",
-  "updated_at": "2026-10-24T23:31:16.327022315Z"
+  "updated_at": "2026-10-25T00:08:33.270860713Z"
 }
