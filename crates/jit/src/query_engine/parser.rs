@@ -280,7 +280,7 @@ mod tests {
             QueryParseError::InvalidState { value, .. } if value == "notastate"
         ));
         let message = err.to_string();
-        for state in crate::domain::State::all() {
+        for state in crate::domain::State::ALL {
             assert!(
                 message.contains(state.as_str()),
                 "missing {state:?}: {message}"
