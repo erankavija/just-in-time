@@ -5,6 +5,7 @@
 //! independently of the CLI orchestration layer.
 
 use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 /// Optional restrictions on available work; label patterns are AND-combined.
@@ -21,12 +22,7 @@ pub fn query_available(issues: &[Issue], filter: AvailableFilter<'_>) -> Vec<Iss
     if let Some(priority) = filter.priority {
         matches = query_by_priority(&matches, priority);
     }
-    matches.sort_by_key(|issue| match issue.priority {
-        Priority::Critical => 0,
-        Priority::High => 1,
-        Priority::Normal => 2,
-        Priority::Low => 3,
-    });
+    matches.sort_by_key(|issue| Reverse(issue.priority));
     matches
 }
 
