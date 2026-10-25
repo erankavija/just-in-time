@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1ca65001-6064-4ebf-99d9-031197182a00",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:38:48.207371968Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "20598c03-2974-4544-810d-e80ea6375100",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:41:48.889411004Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validation projections hold typed state and priority",
-  "updated_at": "2026-10-25T06:17:13.295576744Z"
+  "updated_at": "2026-10-25T06:41:48.889411004Z"
 }
