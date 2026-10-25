@@ -157,6 +157,41 @@ fn test_schema_has_standardized_json_output_types() {
 }
 
 #[test]
+fn test_schema_declares_list_envelope_outputs_for_count_bearing_commands() {
+    let schema = CommandSchema::generate();
+    let declared = |path: &[&str]| {
+        let (head, rest) = path.split_first().unwrap();
+        let command = rest
+            .iter()
+            .fold(schema.commands.get(*head).unwrap(), |command, name| {
+                command
+                    .subcommands
+                    .as_ref()
+                    .and_then(|subcommands| subcommands.get(*name))
+                    .unwrap_or_else(|| panic!("command {path:?} is missing from the schema"))
+            });
+        command.output.as_ref().unwrap()
+    };
+
+    for (path, response) in [
+        (&["gate", "preset", "list"][..], "GatePresetListResponse"),
+        (&["events", "tail"], "EventListResponse"),
+        (&["events", "query"], "EventListResponse"),
+        (&["label", "values"], "LabelValuesResponse"),
+        (&["claim", "status"], "LeaseListResponse"),
+        (&["claim", "list"], "LeaseListResponse"),
+        (&["graph", "rdeps"], "GraphDownstreamResponse"),
+    ] {
+        let output = declared(path);
+        assert_eq!(output.success, response, "output of {path:?}");
+        assert!(
+            output.success_schema.is_some(),
+            "{path:?} must publish a success schema"
+        );
+    }
+}
+
+#[test]
 fn test_schema_serializes_to_valid_json() {
     let schema = CommandSchema::generate();
     let json = serde_json::to_string_pretty(&schema).unwrap();

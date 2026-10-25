@@ -265,11 +265,7 @@ pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
 ) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
     let namespaces = ConfigManager::new(storage.root()).get_namespaces()?;
 
-    crate::domain::type_taxonomy::HierarchyConfig::new(
-        namespaces.declared_type_hierarchy(),
-        namespaces.label_associations.unwrap_or_default(),
-    )
-    .map_err(|e| {
+    crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces).map_err(|e| {
         crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}")).into()
     })
 }

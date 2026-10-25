@@ -44,5 +44,6 @@ pub mod repository_inputs;
 pub mod store_divergence;
 pub mod type_taxonomy;
 mod types;
+pub mod vocabulary;
 
 pub use types::*;

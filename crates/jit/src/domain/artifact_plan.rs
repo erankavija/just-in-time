@@ -13,7 +13,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::fmt;
 
 /// The first archive-plan JSON schema version.
 ///
@@ -1111,89 +1110,41 @@ impl ArtifactPlan {
 }
 
 /// Construction and execution-readiness failures for the plan model.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PlanError {
     /// A symbolic, abbreviated, uppercase, or otherwise non-canonical pin.
+    #[error("pinned artifact version is not a canonical full commit OID: {0}")]
     NonCanonicalCommitOid(String),
     /// A recorded digest that is not exactly 64 lowercase hexadecimal characters.
+    #[error("content identity is not a lowercase SHA-256: {0}")]
     InvalidContentHash(String),
     /// A publication or deletion lacks its required source identity.
+    #[error("published or deleted working-tree artifact lacks content identity: {0}")]
     MissingContentIdentity(String),
     /// An operation carrying no publication or deletion supplied an identity.
+    #[error("non-publishing artifact unexpectedly carries content identity: {0}")]
     UnexpectedContentIdentity(String),
     /// A move/copy action lacks its mirror destination.
+    #[error("relocating artifact lacks a destination: {0}")]
     MissingDestination(String),
     /// A retained artifact incorrectly names a relocation destination.
+    #[error("retained artifact unexpectedly has a destination: {0}")]
     UnexpectedDestination(String),
     /// A pinned historical entry attempted a relocating operation.
+    #[error("pinned historical artifact cannot relocate: {0}")]
     RelocatingPinnedArtifact(String),
     /// Execution was asked to consume an unknown wire schema.
+    #[error("unsupported artifact-plan schema version: {0}")]
     UnsupportedSchemaVersion(u32),
     /// Derived fields or ordering do not match the artifact contents.
+    #[error("artifact plan ordering, count, or action counts are not canonical")]
     NonCanonicalEnvelope,
     /// Policy or plan blockers prohibit mutation.
+    #[error("artifact plan is not eligible for execution")]
     Ineligible,
     /// Classification lacked evidence for a path it names.
-    Evidence(ArtifactEvidenceError),
-}
-
-impl fmt::Display for PlanError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NonCanonicalCommitOid(oid) => write!(
-                formatter,
-                "pinned artifact version is not a canonical full commit OID: {oid}"
-            ),
-            Self::InvalidContentHash(hash) => {
-                write!(
-                    formatter,
-                    "content identity is not a lowercase SHA-256: {hash}"
-                )
-            }
-            Self::MissingContentIdentity(path) => write!(
-                formatter,
-                "published or deleted working-tree artifact lacks content identity: {path}"
-            ),
-            Self::UnexpectedContentIdentity(path) => write!(
-                formatter,
-                "non-publishing artifact unexpectedly carries content identity: {path}"
-            ),
-            Self::MissingDestination(path) => {
-                write!(formatter, "relocating artifact lacks a destination: {path}")
-            }
-            Self::UnexpectedDestination(path) => {
-                write!(
-                    formatter,
-                    "retained artifact unexpectedly has a destination: {path}"
-                )
-            }
-            Self::RelocatingPinnedArtifact(path) => {
-                write!(
-                    formatter,
-                    "pinned historical artifact cannot relocate: {path}"
-                )
-            }
-            Self::UnsupportedSchemaVersion(version) => {
-                write!(
-                    formatter,
-                    "unsupported artifact-plan schema version: {version}"
-                )
-            }
-            Self::NonCanonicalEnvelope => formatter
-                .write_str("artifact plan ordering, count, or action counts are not canonical"),
-            Self::Ineligible => formatter.write_str("artifact plan is not eligible for execution"),
-            Self::Evidence(error) => write!(formatter, "{error}"),
-        }
-    }
-}
-
-impl std::error::Error for PlanError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Evidence(error) => Some(error),
-            _ => None,
-        }
-    }
+    #[error("{0}")]
+    Evidence(#[source] ArtifactEvidenceError),
 }
 
 impl From<ArtifactEvidenceError> for PlanError {
