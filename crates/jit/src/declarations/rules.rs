@@ -635,18 +635,30 @@ pub enum Assertion {
     },
 }
 
-/// The legacy type-hierarchy warning expressed by an
-/// [`Assertion::TypeHierarchy`].
-///
-/// Each variant reuses one existing domain function over the whole issue set:
-/// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
-/// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TypeHierarchyKind {
-    /// A leaf-level issue (e.g. a task) carries no parent association label.
-    OrphanLeaf,
-    /// A strategic-type issue (e.g. an epic) is missing its identifying label.
-    StrategicConsistency,
+wire_vocabulary! {
+    /// The legacy type-hierarchy warning expressed by an
+    /// [`Assertion::TypeHierarchy`].
+    ///
+    /// Each variant reuses one existing domain function over the whole issue set:
+    /// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
+    /// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TypeHierarchyKind {
+        /// A leaf-level issue (e.g. a task) carries no parent association label.
+        OrphanLeaf = "orphan-leaf",
+        /// A strategic-type issue (e.g. an epic) is missing its identifying label.
+        StrategicConsistency = "strategic-consistency",
+    }
+}
+
+wire_vocabulary! {
+    /// The `scope` of a `label-uniqueness` assert. Uniqueness is inherently
+    /// repo-wide, so `all` is the only scope.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LabelUniquenessScope {
+        /// Every issue matching the rule's selector.
+        All = "all",
+    }
 }
 
 impl Assertion {
@@ -1030,9 +1042,7 @@ fn compile_id_pattern(rule: &str, source: Option<String>) -> Result<IdPattern, R
 /// The `label-uniqueness` assert payload.
 ///
 /// `namespace` names the label namespace whose values must be unique across all
-/// matching issues. `scope` must be `"all"` (the only permitted value for this
-/// kind; `"linked"` is not supported because uniqueness is inherently a
-/// repo-wide property).
+/// matching issues. `scope` must name a [`LabelUniquenessScope`].
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLabelUniqueness {
@@ -1384,19 +1394,12 @@ impl RawAssert {
             return gr.into_assertion(rule);
         }
         if let Some(th) = self.type_hierarchy {
-            let kind = match th.kind.as_str() {
-                "orphan-leaf" => TypeHierarchyKind::OrphanLeaf,
-                "strategic-consistency" => TypeHierarchyKind::StrategicConsistency,
-                other => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: format!(
-                            "type-hierarchy 'kind' must be 'orphan-leaf' or \
-                             'strategic-consistency', found '{other}'"
-                        ),
-                    });
+            let kind = th.kind.parse::<TypeHierarchyKind>().map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: format!("type-hierarchy 'kind': {e}"),
                 }
-            };
+            })?;
             return Ok(Assertion::TypeHierarchy { kind });
         }
         if let Some(clm) = self.criteria_label_match {
@@ -1422,30 +1425,13 @@ impl RawAssert {
             return ctc.into_assertion(rule);
         }
         if let Some(lu) = self.label_uniqueness {
-            // `scope = "all"` is the only permitted value. `"linked"` is rejected
-            // because uniqueness is inherently a repo-wide concept; the design
-            // explicitly reserves `"all"` for this kind to avoid synonym confusion
-            // with `label-reference`'s `"global"`. An absent scope is also rejected
-            // (future-proofing: scope is required, not defaulted).
-            match lu.scope.as_str() {
-                "all" => {}
-                "linked" => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: "label-uniqueness does not support scope = \"linked\"; \
-                                  uniqueness is repo-wide — use scope = \"all\""
-                            .to_string(),
-                    });
+            // Scope is required, not defaulted; `all` is the only value.
+            lu.scope.parse::<LabelUniquenessScope>().map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: format!("label-uniqueness 'scope': {e}"),
                 }
-                other => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: format!(
-                            "label-uniqueness 'scope' must be \"all\", found \"{other}\""
-                        ),
-                    });
-                }
-            }
+            })?;
             return Ok(Assertion::LabelUniqueness {
                 namespace: lu.namespace,
             });
