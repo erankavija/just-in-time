@@ -338,7 +338,7 @@ impl Selector {
 
 /// Comma-separated canonical state tokens, for [`RuleConfigError::InvalidState`].
 fn valid_state_tokens() -> String {
-    State::all().map(State::as_str).join(", ")
+    State::ALL.map(State::as_str).join(", ")
 }
 
 /// A `when` state predicate: one or more lifecycle states a rule applies to.
@@ -1722,7 +1722,7 @@ assert = { require-section = { heading = "Plan" } }
                     "value should indicate empty list, got: {value}"
                 );
                 // The valid list must name every legal token.
-                for token in State::all().map(State::as_str) {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -1737,7 +1737,7 @@ assert = { require-section = { heading = "Plan" } }
     fn test_state_predicate_matches_typed_set_equals_token_set() {
         // The pre-parsed set membership must agree with the authored tokens for
         // every lifecycle state.
-        let all = State::all();
+        let all = State::ALL;
         let pred = StatePredicate::list(["ready", "in_progress", "done"]);
         for state in all {
             let want = matches!(state, State::Ready | State::InProgress | State::Done);
@@ -1762,7 +1762,7 @@ assert = { label-coverage = { child-state = "don" } }
                 assert_eq!(rule, "typo-child-state");
                 assert_eq!(value, "don");
                 // The valid list names every legal token.
-                for token in State::all().map(State::as_str) {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"

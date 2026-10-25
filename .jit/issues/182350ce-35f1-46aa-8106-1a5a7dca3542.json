@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:56:38.382781829Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Declare priority through the vocabulary macro and delete each restated priority token.\n\n## Background\n\nPriority tokens are restated by `priority_str` (`crates/jit/src/commands/graph.rs:64-71`), used for `BatchIssueDef.priority: Option<String>` (`:372`), by a hand-written list in `schema.rs:780`, and by the query language's `PRIORITY_VALUES` (`query_engine/error.rs`). `Priority::from_str` folds case (`domain/types.rs:192`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Priority` is declared through the macro, and its parser accepts exact tokens only.\n- [hard] REQ-02: `priority_str` and the hand-written schema list are gone, and `BatchIssueDef.priority` is typed.\n- [hard] REQ-03: The query language's priority value list derives from the enum.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T01:51:08.311127294Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Priority tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T01:56:38.632008975Z"
 }
