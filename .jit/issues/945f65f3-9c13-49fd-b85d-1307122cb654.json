@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c0404f3-17af-4a69-ac90-20dfe89c06b4",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:06:26.842698934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3d97ecea-78ea-414f-9ba7-fc24745a4977",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:07:48.045059720Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Commands name well-known files through VirtualPath constants",
-  "updated_at": "2026-10-25T03:22:45.887082993Z"
+  "updated_at": "2026-10-25T04:07:48.045059720Z"
 }
