@@ -17,6 +17,12 @@
       "status": "failed",
       "updated_at": "2026-10-25T16:14:50.558443876Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "300233c7-05a9-4e33-9b87-5bfa25a4e7c3",
+      "status": "passed",
+      "updated_at": "2026-10-25T16:22:15.055080907Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b01208cb-b85f-4705-bd2f-311129e01b56",
@@ -32,5 +38,5 @@
   "priority": "normal",
   "state": "gated",
   "title": "This repository's event log is in canonical writer form",
-  "updated_at": "2026-10-25T16:14:50.558443876Z"
+  "updated_at": "2026-10-25T16:22:15.055080907Z"
 }
