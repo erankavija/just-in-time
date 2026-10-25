@@ -269,7 +269,9 @@ impl EventTag {
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
     pub fn sample(self) -> Event {
-        let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
+        let issue_id: crate::domain::identity::IssueId = "00000000-0000-0000-0000-000000000001"
+            .parse()
+            .expect("sample issue id is a canonical issue id");
         let gate_key = "tests".to_string();
         let assignee: Assignee = "agent:worker-1"
             .parse()
@@ -316,7 +318,9 @@ impl EventTag {
                 issue_id,
                 2,
                 1,
-                vec!["00000000-0000-0000-0000-000000000002".to_string()],
+                vec!["00000000-0000-0000-0000-000000000002"
+                    .parse::<crate::domain::identity::IssueId>()
+                    .expect("sample dependency id is a canonical issue id")],
             ),
             EventTag::LocalRuleBypassed => {
                 EventBody::draft_local_rule_bypassed(issue_id, "type-required".to_string())
