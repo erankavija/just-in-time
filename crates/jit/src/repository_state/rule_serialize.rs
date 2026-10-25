@@ -34,7 +34,9 @@
 //! reference. The round-trip test compares field-wise, excluding those two.
 
 use super::VirtualPath;
-use crate::declarations::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
+use crate::declarations::rules::{
+    Assertion, Rule, RuleSet, Selector, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
+};
 use std::collections::HashSet;
 
 /// A `rules.toml` body together with the schema files it references.
@@ -318,8 +320,11 @@ fn render_assertion(
             if let Some(m) = marker {
                 parts.push(format!("marker = {}", toml_basic_string(m)));
             }
-            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
-                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
+            if id_pattern.as_str() != DEFAULT_CRITERION_ID_PATTERN {
+                parts.push(format!(
+                    "id-pattern = {}",
+                    toml_literal_string(id_pattern.as_str())
+                ));
             }
             format!("{{ criteria-label-match = {{ {} }} }}", parts.join(", "))
         }
@@ -342,8 +347,11 @@ fn render_assertion(
             if let Some(m) = marker {
                 parts.push(format!("marker = {}", toml_basic_string(m)));
             }
-            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
-                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
+            if id_pattern.as_str() != DEFAULT_CRITERION_ID_PATTERN {
+                parts.push(format!(
+                    "id-pattern = {}",
+                    toml_literal_string(id_pattern.as_str())
+                ));
             }
             if let Some(prefix) = gate_prefix {
                 parts.push(format!("gate-prefix = {}", toml_basic_string(prefix)));
