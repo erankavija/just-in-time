@@ -527,7 +527,7 @@ pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<Stor
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
-    let agent = "system:list".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_LIST.to_string();
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -568,7 +568,7 @@ pub fn execute_claim_force_evict(
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // For force-evict, we use a system agent (admin operation)
-    let agent = "system:admin".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_ADMIN.to_string();
 
     // Create claim coordinator
     let locker = FileLocker::with_configured_timeout();
@@ -638,7 +638,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.warnings.extend(identity_warnings);
 
     // Create claim coordinator.
-    let agent = "system:recovery".to_string();
+    let agent = crate::domain::Assignee::SYSTEM_RECOVERY.to_string();
     let locker = FileLocker::with_configured_timeout();
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;

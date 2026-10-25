@@ -763,7 +763,7 @@ fn claims_mutation_guard(
         return Ok(None);
     }
     let agent = crate::agent_config::resolve_agent_id(None)
-        .unwrap_or_else(|_| "system:lease-check".to_string());
+        .unwrap_or_else(|_| crate::domain::Assignee::SYSTEM_LEASE_CHECK.to_string());
     let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
         .unwrap_or_else(|| paths.worktree_root.display().to_string());
     let coordinator = ClaimCoordinator::new(

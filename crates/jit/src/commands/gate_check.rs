@@ -4,7 +4,7 @@ use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{GateFinding, GateFindings};
 use crate::domain::{
-    GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
+    Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
@@ -52,7 +52,7 @@ fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> 
         stdout: String::new(),
         stderr: String::new(),
         command: source.command.clone(),
-        by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
         message: None,
         findings: source.findings.clone(),
         inputs_digest: source.inputs_digest.clone(),
@@ -717,7 +717,7 @@ fn builtin_fault_run(
         stdout: String::new(),
         stderr: summary,
         command: command.to_string(),
-        by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
         message: None,
         findings: None,
         inputs_digest: None,
@@ -1205,7 +1205,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             stdout,
             stderr: String::new(),
             command: command.to_string(),
-            by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR.to_string()),
             message,
             findings: Some(GateFindings {
                 verdict: if status == GateRunStatus::Passed {
