@@ -463,7 +463,7 @@ pub(crate) fn validation_declarations_from_image(
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;
@@ -976,8 +976,8 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config).schema_files {
-            let vpath = VirtualPath::data(format!("schemas/{}", schema.name))?;
+        for schema in materialize::serialized_default_ruleset(&config)?.schema_files {
+            let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);
             }

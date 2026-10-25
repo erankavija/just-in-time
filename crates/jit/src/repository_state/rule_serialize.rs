@@ -33,6 +33,7 @@
 //! which necessarily change from the in-code placeholder to the on-disk file
 //! reference. The round-trip test compares field-wise, excluding those two.
 
+use super::VirtualPath;
 use crate::declarations::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
 use std::collections::HashSet;
 
@@ -59,7 +60,7 @@ pub struct SchemaFile {
 /// Pure: performs no I/O. The header documents that the file is the operative
 /// source. JSON Schema rules are materialized into [`SchemaFile`]s referenced by
 /// `schemas/<sanitized-name>.json`.
-pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
+pub fn serialize_ruleset(set: &RuleSet) -> Result<SerializedRuleSet, super::RepositoryLayoutError> {
     let mut rules_toml = String::new();
     rules_toml.push_str(FILE_HEADER);
 
@@ -71,14 +72,14 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     let mut used_stems: HashSet<String> = HashSet::new();
 
     for rule in &set.rules {
-        render_rule(rule, &mut rules_toml, &mut schema_files, &mut used_stems);
+        render_rule(rule, &mut rules_toml, &mut schema_files, &mut used_stems)?;
         rules_toml.push('\n');
     }
 
-    SerializedRuleSet {
+    Ok(SerializedRuleSet {
         rules_toml,
         schema_files,
-    }
+    })
 }
 
 /// Render a single rule as a standalone, reloadable `[[rules]]` block (with
@@ -93,13 +94,13 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 /// the same file the whole-set serialization does. Persisting that file is the
 /// caller's: the default-rule materialization writes every schema the current
 /// configuration derives in the same pass that splices the referencing row in.
-pub fn render_rule_block(rule: &Rule) -> String {
+pub fn render_rule_block(rule: &Rule) -> Result<String, super::RepositoryLayoutError> {
     let mut out = String::new();
     let mut schema_files: Vec<SchemaFile> = Vec::new();
     let mut used_stems: HashSet<String> = HashSet::new();
-    render_rule(rule, &mut out, &mut schema_files, &mut used_stems);
+    render_rule(rule, &mut out, &mut schema_files, &mut used_stems)?;
     out.push('\n');
-    out
+    Ok(out)
 }
 
 /// Pick a schema-file stem for `identity` (a rule's schema identity — see
@@ -148,7 +149,7 @@ fn render_rule(
     out: &mut String,
     schema_files: &mut Vec<SchemaFile>,
     used_stems: &mut HashSet<String>,
-) {
+) -> Result<(), super::RepositoryLayoutError> {
     out.push_str("[[rules]]\n");
     out.push_str(&format!("name = {}\n", toml_basic_string(&rule.name)));
     if let Some(origin) = &rule.origin {
@@ -182,8 +183,9 @@ fn render_rule(
     };
     out.push_str(&format!(
         "assert = {}\n",
-        render_assertion(&schema_identity, &rule.assert, schema_files, used_stems)
+        render_assertion(&schema_identity, &rule.assert, schema_files, used_stems)?
     ));
+    Ok(())
 }
 
 /// Render a [`Selector`] as an inline table, or `None` when it is empty (so an
@@ -225,8 +227,8 @@ fn render_assertion(
     assertion: &Assertion,
     schema_files: &mut Vec<SchemaFile>,
     used_stems: &mut HashSet<String>,
-) -> String {
-    match assertion {
+) -> Result<String, super::RepositoryLayoutError> {
+    Ok(match assertion {
         Assertion::RequireLabel { label, min, max } => {
             let mut parts = vec![format!("label = {}", toml_basic_string(label))];
             if let Some(min) = min {
@@ -252,13 +254,14 @@ fn render_assertion(
         ),
         Assertion::JsonSchema(source) => {
             let file_name = format!("{}.json", unique_schema_stem(schema_identity, used_stems));
+            let schema_path = VirtualPath::schema(&file_name)?;
             schema_files.push(SchemaFile {
                 name: file_name.clone(),
                 content: pretty_schema(&source.schema),
             });
             format!(
                 "{{ json-schema = {} }}",
-                toml_basic_string(&format!("schemas/{file_name}"))
+                toml_basic_string(schema_path.relative().as_str())
             )
         }
         Assertion::CheckerCommand(cmd) => {
@@ -358,7 +361,7 @@ fn render_assertion(
                 toml_basic_string(namespace)
             )
         }
-    }
+    })
 }
 
 /// Render a graph rule's `toml::value::Table` as an inline TOML table, reusing
@@ -484,7 +487,7 @@ mod tests {
 
     /// Write the serialized ruleset to a temp `.jit` and reload it.
     fn round_trip(set: &RuleSet) -> (tempfile::TempDir, RuleSet) {
-        let out = serialize_ruleset(set);
+        let out = serialize_ruleset(set).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let schemas = dir.path().join("schemas");
         std::fs::create_dir_all(&schemas).unwrap();
@@ -596,7 +599,7 @@ mod tests {
         // The schema file is materialized under its ORIGIN-qualified stem, so a
         // fresh `jit init` reproduces the historical `default-label-format.json`
         // file name even though `name` itself is now colon-free.
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out
             .schema_files
             .iter()
@@ -636,7 +639,7 @@ assert = { require-section = { heading = "Goals" } }
         let set = RuleSet::parse(toml, None, []).unwrap();
         assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
         assert_eq!(set.rules[1].origin, None);
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains("origin = \"bracket\""));
         assert_round_trips(&set);
     }
@@ -663,7 +666,7 @@ assert = { require-section = { heading = "Goals" } }
             Some("Every label must be namespace:value.")
         );
         assert_eq!(set.rules[1].description, None);
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out
             .rules_toml
             .contains("description = \"Every label must be namespace:value.\""));
@@ -694,7 +697,7 @@ assert = { require-section = { heading = "Goals" } }
             );
         }
         // The seeded descriptions survive serialization into rules.toml text.
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains("description = \""));
     }
 
@@ -766,7 +769,7 @@ name = "marker"
 assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' } }
 "#;
         let set = RuleSet::parse(toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // Rendered as a literal string (single quotes), backslashes intact.
         assert!(out.rules_toml.contains(r"regex = '^\[hard\]\s+\w+'"));
         assert_round_trips(&set);
@@ -797,7 +800,7 @@ assert = { require-section = { heading = "Plan" } }
 "#,
         );
         let set = RuleSet::parse(&toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains(r#"state = "in_progress""#));
         assert!(out
             .rules_toml
@@ -835,7 +838,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_
         // A rule with no selector must NOT emit `when = {}` (which the loader
         // accepts, but the canonical form omits it).
         let set = default_ruleset(&registry(vec![]));
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(!out.rules_toml.contains("when = {}"));
         assert!(!out.rules_toml.contains("when = { }"));
     }
@@ -870,7 +873,7 @@ assert = { json-schema = "schemas/second.json" }
         )
         .unwrap();
 
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // Both rules carry a JsonSchema, so two schema files are emitted.
         assert_eq!(out.schema_files.len(), 2, "two json-schema rules");
         // The file names must be UNIQUE despite the sanitized-name collision.
@@ -900,8 +903,8 @@ assert = { json-schema = "schemas/second.json" }
         // the reloaded set (whose JsonSchema references now point at files).
         let set = default_ruleset(&registry(vec![]));
         let (_dir, reloaded) = round_trip(&set);
-        let first = serialize_ruleset(&set).rules_toml;
-        let second = serialize_ruleset(&reloaded).rules_toml;
+        let first = serialize_ruleset(&set).unwrap().rules_toml;
+        let second = serialize_ruleset(&reloaded).unwrap().rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
     }
 
@@ -922,8 +925,8 @@ assert = { json-schema = "schemas/second.json" }
             .find(|r| r.name == "namespace-unique-team")
             .unwrap();
 
-        let standalone = render_rule_block(rule);
-        let full = serialize_ruleset(&set).rules_toml;
+        let standalone = render_rule_block(rule).unwrap();
+        let full = serialize_ruleset(&set).unwrap().rules_toml;
         assert!(
             full.contains(&standalone),
             "standalone block must appear verbatim in the full serialization:\n\
@@ -942,7 +945,7 @@ assert = { json-schema = "schemas/second.json" }
             .iter()
             .find(|r| r.name == "namespace-unique-priority")
             .unwrap();
-        let block = render_rule_block(rule);
+        let block = render_rule_block(rule).unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
@@ -968,7 +971,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#,
         );
         let set = RuleSet::parse(&toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // The rendered form must contain the namespace and scope.
         assert!(
             out.rules_toml.contains("namespace = \"req\""),

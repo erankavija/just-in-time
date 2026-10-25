@@ -23,7 +23,7 @@
 //! and stored here without being evaluated.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -32,6 +32,7 @@ use crate::config::JitConfig;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
+use crate::repository_state::VirtualPath;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
@@ -1450,36 +1451,16 @@ impl RawAssert {
 
 /// Validate that a `json-schema` reference names a safe file under `schemas/`.
 ///
-/// A reference MUST be a relative path that starts with `schemas/`, ends with
-/// `.json`, and contains no `..` (parent) component. Absolute paths are
-/// rejected because [`Path::join`] would discard the `.jit` root, letting a rule
-/// read an arbitrary file; `..` is rejected to prevent traversal out of
-/// `<jit_root>/schemas/`. After these checks the resolved path is guaranteed to
-/// live under `<jit_root>/schemas/`.
+/// The shared path constructor enforces the `schemas/<name>.json` shape and
+/// confines the reference to one file-name component.
 fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConfigError> {
     let reject = |message: &str| RuleConfigError::InvalidSchemaReference {
         rule: rule.to_string(),
         reference: reference.to_string(),
         message: message.to_string(),
     };
-
-    let ref_path = Path::new(reference);
-
-    if ref_path.is_absolute() {
-        return Err(reject("reference must be a relative path, not absolute"));
-    }
-    if ref_path
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(reject("reference must not contain a '..' path component"));
-    }
-    if !reference.starts_with("schemas/") {
-        return Err(reject("reference must start with 'schemas/'"));
-    }
-    if !reference.ends_with(".json") {
-        return Err(reject("reference must end with '.json'"));
-    }
+    VirtualPath::schema_reference(reference)
+        .map_err(|_| reject("reference must be one relative 'schemas/<name>.json' file"))?;
     Ok(())
 }
 
@@ -2522,6 +2503,16 @@ assert = { json-schema = "/etc/passwd.json" }
     #[test]
     fn test_schema_reference_parent_traversal_is_rejected() {
         let toml = schema_rule_toml("schemas/../escape.json");
+        let err = parse(&toml).unwrap_err();
+        assert!(matches!(
+            err,
+            RuleConfigError::InvalidSchemaReference { .. }
+        ));
+    }
+
+    #[test]
+    fn test_schema_reference_nested_file_name_is_rejected() {
+        let toml = schema_rule_toml("schemas/nested/x.json");
         let err = parse(&toml).unwrap_err();
         assert!(matches!(
             err,
