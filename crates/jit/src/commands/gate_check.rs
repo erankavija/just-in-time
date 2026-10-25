@@ -480,9 +480,8 @@ fn captured_issue_rule_report(
         .iter()
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect::<Vec<_>>();
-    let hierarchy = crate::repository_state::hierarchy_config(
-        &crate::config_manager::namespaces_from_config(&config),
-    );
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
     let plan_content = super::validate::plan_content_from_image(image, &issues)?;
     findings.extend(
         crate::validation::graph::evaluate_graph(
@@ -556,9 +555,9 @@ fn captured_scope_rule_report(
         .filter(|rule| slice.iter().any(|issue| rule.when.matches(issue)))
         .collect::<Vec<_>>();
     if !graph_rules.is_empty() {
-        let hierarchy = crate::repository_state::hierarchy_config(
-            &crate::config_manager::namespaces_from_config(&config),
-        );
+        let namespaces = crate::config_manager::namespaces_from_config(&config);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
         let plan_content = super::validate::plan_content_from_image(image, &slice)?;
         findings.extend(
             crate::validation::graph::evaluate_graph_scoped(
@@ -2139,6 +2138,27 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .add_gate(&issue_id, "not-a-reserved-repository-key".to_string())
             .unwrap();
         (repo, executor, issue_id)
+    }
+
+    #[test]
+    fn test_captured_issue_rule_report_preserves_invalid_hierarchy_error() {
+        let (_repo, executor, issue_id) = setup_file_repository();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::invalid_hierarchy_config_fragment()
+        );
+        std::fs::write(executor.storage().root().join("config.toml"), &config).unwrap();
+        let image = executor
+            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .unwrap();
+
+        let error = super::captured_issue_rule_report(&image, &issue_id)
+            .expect_err("invalid hierarchy must fail gate rule evaluation");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     /// A file-backed repository whose declared gate inputs live under

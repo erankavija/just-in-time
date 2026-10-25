@@ -28,8 +28,8 @@ pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
-    type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
+    default_ruleset, reconcile_default_rules_with_config, type_hierarchy_known_schema,
+    TYPE_HIERARCHY_SCHEMA_FILE,
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,

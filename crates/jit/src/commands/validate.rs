@@ -1056,9 +1056,8 @@ pub(super) fn rule_validation_outcome(
         })
         .collect::<Vec<_>>();
     let plan_content = plan_content_from_image(image, &plan_sources)?;
-    let hierarchy = crate::repository_state::hierarchy_config(
-        &crate::config_manager::namespaces_from_config(&config),
-    );
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
     let context = crate::validation::graph::GraphEvaluationContext {
         graph_context: &issues,
         resolution_index: &issues,
@@ -1473,9 +1472,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // The repo HierarchyConfig is injected into `type-hierarchy` rules at
         // evaluation time (D1); it is no longer stored in the parsed rule. Build
-        // it from the same namespace registry the default rules derive from.
+        // it from the same namespace registry as the rule declarations.
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
         let repo_format = self.repo_content_format()?;
 
         // Resolve any external plan documents from the captured validation image
@@ -1813,7 +1813,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-            let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
             // Resolve external plan docs for the in-scope issues from the captured
             // validation image so a container whose criteria live in an external
             // file validates against the FILE (closed-read, no live filesystem).
@@ -2545,6 +2546,23 @@ depends_on = ["planning"]
         let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
 
         assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .evaluate_graph_rules(&[])
+            .expect_err("invalid hierarchy must fail graph-rule evaluation");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     #[test]

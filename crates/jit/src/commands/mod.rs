@@ -1173,7 +1173,8 @@ fn derive_state_transition(
                 })
                 .collect::<Vec<_>>();
             let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
-            let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
             let repo_format = evidence.config.content_format()?;
             let strictness = evidence.config.strictness()?;
             let enforcing = rules
@@ -3433,6 +3434,67 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
+        use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let type_name = taxonomy.type_at_level(4).to_string();
+        let mut issue = crate::domain::fixture_issue("Transition".into(), String::new());
+        issue.labels = vec![format!("type:{type_name}")];
+
+        let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        let config: JitConfig = toml::from_str(&config_text).unwrap();
+        let configuration =
+            crate::declarations::parse_configuration(config_text.as_bytes()).unwrap();
+        let rules = RuleSet {
+            rules: vec![Rule {
+                name: "graph-probe".to_string(),
+                origin: None,
+                description: None,
+                when: Selector {
+                    type_: Some(type_name),
+                    ..Selector::default()
+                },
+                severity: Severity::Error,
+                enforce: false,
+                assert: Assertion::LabelCoverage {
+                    config: Default::default(),
+                },
+                scope: RuleScope::Graph,
+            }],
+        };
+        let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
+            configuration,
+            config,
+            crate::declarations::GateRegistry::default(),
+            rules,
+        );
+        let issues = [issue.clone()];
+        let plan_content = std::collections::HashMap::new();
+        let context = production_mutation_context();
+
+        let error = derive_state_transition(
+            issue,
+            crate::domain::State::InProgress,
+            false,
+            CapturedTransitionEvidence {
+                issues: &issues,
+                declarations: &declarations,
+                config: declarations.config(),
+                plan_content: &plan_content,
+                context: &context,
+            },
+        )
+        .err()
+        .expect("invalid hierarchy must abort the transition");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     #[test]
     fn test_production_mutation_context_factory_defaults_to_empty_annotation() {
