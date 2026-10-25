@@ -26,30 +26,31 @@ use uuid::Uuid;
 /// Length of short issue ID (git-style short hash)
 pub const SHORT_ID_LENGTH: usize = 8;
 
-/// Issue lifecycle state
-///
-/// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
-/// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
-/// lets states be stored in ordered collections such as `BTreeSet<State>`.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum State {
-    /// Created but not actionable yet (blocked by dependencies)
-    Backlog,
-    /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
-    Ready,
-    /// Currently being worked on
-    InProgress,
-    /// Work complete, awaiting quality gate approval
-    Gated,
-    /// Completed successfully
-    Done,
-    /// Won't implement (bypasses gates)
-    Rejected,
-    /// No longer relevant
-    Archived,
+wire_vocabulary! {
+    /// Issue lifecycle state
+    ///
+    /// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
+    /// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
+    /// lets states be stored in ordered collections such as `BTreeSet<State>`.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+    )]
+    pub enum State {
+        /// Created but not actionable yet (blocked by dependencies)
+        Backlog = "backlog",
+        /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
+        Ready = "ready",
+        /// Currently being worked on
+        InProgress = "in_progress",
+        /// Work complete, awaiting quality gate approval
+        Gated = "gated",
+        /// Completed successfully
+        Done = "done",
+        /// Won't implement (bypasses gates)
+        Rejected = "rejected",
+        /// No longer relevant
+        Archived = "archived",
+    }
 }
 
 impl State {
@@ -59,41 +60,6 @@ impl State {
     /// or decision not to implement (Rejected). Both unblock dependent issues.
     pub fn is_terminal(self) -> bool {
         matches!(self, State::Done | State::Rejected)
-    }
-
-    /// The canonical snake_case string for this state.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
-    /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
-    /// is needed (e.g. a compact one-line status render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            State::Backlog => "backlog",
-            State::Ready => "ready",
-            State::InProgress => "in_progress",
-            State::Gated => "gated",
-            State::Done => "done",
-            State::Rejected => "rejected",
-            State::Archived => "archived",
-        }
-    }
-
-    /// Every `State` variant, in canonical lifecycle order.
-    ///
-    /// Use this to enumerate the state space exhaustively instead of hardcoding
-    /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
-    /// rollup, for instance, must list every state so its shape stays stable
-    /// and complete as the enum evolves.
-    pub const fn all() -> [State; 7] {
-        [
-            State::Backlog,
-            State::Ready,
-            State::InProgress,
-            State::Gated,
-            State::Done,
-            State::Rejected,
-            State::Archived,
-        ]
     }
 }
 
@@ -148,17 +114,6 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
 }
 
-impl FromStr for State {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        State::all()
-            .into_iter()
-            .find(|state| state.as_str() == s)
-            .ok_or_else(|| InvalidArgumentError::new(format!("Invalid state: {s}")).into())
-    }
-}
-
 /// Issue priority level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -187,66 +142,34 @@ impl FromStr for Priority {
     }
 }
 
-/// The content format of an issue body, selecting which [`ContentParser`] the
-/// validation projection uses to extract `sections`.
-///
-/// Serialized lowercase (`"markdown"`, `"html"`, `"xml"`) so issue JSON stays
-/// human-readable. When absent on an issue the repo default
-/// (`[validation].content_format`) applies; the final fallback is
-/// [`ContentFormat::DEFAULT`]. HTML/XML are only usable when the `html`/`xml`
-/// cargo features are built (see
-/// [`content_parser_for`](crate::document::content_parser_for)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ContentFormat {
-    /// Markdown body (always available).
-    Markdown,
-    /// HTML body (requires the `html` cargo feature to parse).
-    Html,
-    /// XML body (requires the `xml` cargo feature to parse).
-    Xml,
+wire_vocabulary! {
+    /// The content format of an issue body, selecting which [`ContentParser`] the
+    /// validation projection uses to extract `sections`.
+    ///
+    /// When absent on an issue the repo default (`[validation].content_format`)
+    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. HTML/XML are
+    /// only usable when the `html`/`xml` cargo features are built (see
+    /// [`content_parser_for`](crate::document::content_parser_for)).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum ContentFormat {
+        /// Markdown body (always available).
+        Markdown = "markdown",
+        /// HTML body (requires the `html` cargo feature to parse).
+        Html = "html",
+        /// XML body (requires the `xml` cargo feature to parse).
+        Xml = "xml",
+    }
 }
 
 impl ContentFormat {
     /// Format applied when neither the issue nor `[validation]` declares one.
     /// It must be a format that is always compiled in.
     pub const DEFAULT: Self = Self::Markdown;
-
-    /// The token naming this format, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ContentFormat::Markdown => "markdown",
-            ContentFormat::Html => "html",
-            ContentFormat::Xml => "xml",
-        }
-    }
 }
 
 impl Default for ContentFormat {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for ContentFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
-    }
-}
-
-impl FromStr for ContentFormat {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "markdown" | "md" => Ok(ContentFormat::Markdown),
-            "html" => Ok(ContentFormat::Html),
-            "xml" => Ok(ContentFormat::Xml),
-            _ => Err(InvalidArgumentError::new(format!(
-                "Invalid content format: '{s}' (expected markdown, html, or xml)"
-            ))
-            .into()),
-        }
     }
 }
 
@@ -2642,23 +2565,18 @@ mod tests {
     }
 
     #[test]
-    fn test_state_serialization_backlog() {
-        let state = State::Backlog;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"backlog\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
-    }
-
-    #[test]
-    fn test_state_serialization_gated() {
-        let state = State::Gated;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"gated\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
+    fn test_state_enumeration_preserves_lifecycle_order() {
+        let lifecycle = [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ];
+        assert_eq!(State::ALL, lifecycle);
+        assert!(lifecycle.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
@@ -2934,37 +2852,6 @@ mod tests {
         use std::str::FromStr;
 
         #[test]
-        fn test_state_from_str_accepts_only_serde_tokens() {
-            for state in State::all() {
-                let token = state.as_str();
-                assert_eq!(serde_json::to_value(state).unwrap(), token);
-                let letters: Vec<usize> = token
-                    .char_indices()
-                    .filter(|(_, c)| c.is_ascii_alphabetic())
-                    .map(|(i, _)| i)
-                    .collect();
-                // Every case assignment of the token's letters; mask 0 is canonical.
-                (0u32..1 << letters.len()).for_each(|mask| {
-                    let variant: String = token
-                        .char_indices()
-                        .map(|(i, c)| match letters.iter().position(|&l| l == i) {
-                            Some(bit) if mask & (1 << bit) != 0 => c.to_ascii_uppercase(),
-                            _ => c,
-                        })
-                        .collect();
-                    match mask {
-                        0 => assert_eq!(State::from_str(&variant).unwrap(), state),
-                        _ => assert!(State::from_str(&variant).is_err(), "accepted {variant:?}"),
-                    }
-                });
-                assert!(State::from_str(&format!(" {token}")).is_err());
-            }
-            for token in ["open", "inprogress", "invalid", "pending", ""] {
-                assert!(State::from_str(token).is_err(), "accepted {token:?}");
-            }
-        }
-
-        #[test]
         fn test_priority_from_str_valid_lowercase() {
             assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
             assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
@@ -2991,13 +2878,6 @@ mod tests {
             assert!(Priority::from_str("invalid").is_err());
             assert!(Priority::from_str("").is_err());
             assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_state_parse_method() {
-            // Test using str::parse() method
-            let state: State = "ready".parse().unwrap();
-            assert_eq!(state, State::Ready);
         }
 
         #[test]

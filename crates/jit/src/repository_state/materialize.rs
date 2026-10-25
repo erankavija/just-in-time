@@ -14,15 +14,17 @@ use super::{
     compose_managed_documents, default_ruleset, parse_rule_identities, render_projection_body,
     render_rule_block, serialize_ruleset, splice_default_membership, AmbiguousOwnershipError,
     ExpectedPreimage, FileMode, ManagedDocumentClaim, ProducerError, ProjectionInputs,
-    RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
+    RegionPlacement, RepositoryAction, RepositoryActionOwner, RepositoryDeclarations,
+    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
 use crate::repository_state::default_rule_membership_diff_from_identities;
 use std::collections::BTreeMap;
 
-pub(super) fn serialized_default_ruleset(config: &JitConfig) -> super::SerializedRuleSet {
+pub(super) fn serialized_default_ruleset(
+    config: &JitConfig,
+) -> Result<super::SerializedRuleSet, super::RepositoryLayoutError> {
     let namespaces = crate::config_manager::namespaces_from_config(config);
     serialize_ruleset(&default_ruleset(&namespaces))
 }
@@ -52,7 +54,14 @@ fn read_text(
     repo_relative: &str,
 ) -> Result<Option<String>, ProducerError> {
     let vpath = image_path(image, repo_relative)?;
-    match image.file_bytes(&vpath)? {
+    read_text_at(image, &vpath)
+}
+
+fn read_text_at(
+    image: &RepositoryImage,
+    path: &VirtualPath,
+) -> Result<Option<String>, ProducerError> {
+    match image.file_bytes(path)? {
         Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
         None => Ok(None),
     }
@@ -66,7 +75,7 @@ fn read_text(
 /// is an empty registry, matching the on-disk load boundary.
 pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
     let config_bytes = image
-        .file_bytes(&image_path(image, ".jit/config.toml")?)?
+        .file_bytes(&VirtualPath::CONFIG)?
         .ok_or(ProducerError::MissingCapture(".jit/config.toml"))?;
     let declarations = crate::declarations::parse_configuration(config_bytes)?;
     assemble_config_from_declarations(image, &declarations)
@@ -80,9 +89,9 @@ pub(crate) fn assemble_config_from_declarations(
 ) -> Result<JitConfig, ProducerError> {
     // An invariants.toml outside the captured closure (or captured absent) is an
     // empty registry, matching the on-disk load boundary.
-    let invariants_path = image_path(image, ".jit/invariants.toml")?;
+    let invariants_path = VirtualPath::INVARIANTS;
     let invariants = if image.capture_spec().contains_path(&invariants_path) {
-        match read_text(image, ".jit/invariants.toml")? {
+        match read_text_at(image, &invariants_path)? {
             Some(text) => InvariantRegistry::from_toml_str(&text)?,
             None => InvariantRegistry::empty(),
         }
@@ -123,10 +132,10 @@ pub fn render_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
     ];
     let registry = config.projection.clone().unwrap_or_default();
     let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
@@ -163,10 +172,8 @@ pub fn render_capture_closure(
         }
     }
     if let Some(content) = rules_content {
-        // A rule schema reference is relative to the data root (`schemas/...`),
-        // so it is a `Data(...)` path directly rather than a repo-relative one.
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     paths.sort();
@@ -218,13 +225,13 @@ pub fn validate_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
-        layout.classify_repository_relative(".jit/templates.toml")?,
-        layout.classify_repository_relative(".jit/index.json")?,
-        layout.classify_repository_relative(".jit/events.jsonl")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
+        VirtualPath::TEMPLATES,
+        VirtualPath::INDEX,
+        VirtualPath::EVENTS,
         // The data root's ignore file, so derived-state repair sees the target
         // its producer composes rather than treating it as uncaptured.
         VirtualPath::DATA_IGNORE,
@@ -280,14 +287,14 @@ pub fn validate_capture_closure(
 
     if let Some(content) = rules_content {
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::data(&request.reference)?);
+            paths.push(VirtualPath::schema_reference(&request.reference)?);
         }
     }
     // Every schema the CURRENT configuration derives, whether or not the authored
     // file references it yet: a newly-declared table adds a default rule whose
     // projection must be publishable in the same pass that adds its row.
-    for schema in &serialized_default_ruleset(config).schema_files {
-        paths.push(VirtualPath::data(format!("schemas/{}", schema.name))?);
+    for schema in &serialized_default_ruleset(config)?.schema_files {
+        paths.push(VirtualPath::schema(&schema.name)?);
     }
     paths.sort();
     paths.dedup();
@@ -370,7 +377,7 @@ pub(crate) fn compose_configured_projections(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "configured-projection".to_string(),
+            owner: RepositoryActionOwner::ConfiguredProjection,
             expected: ExpectedPreimage::of(entry),
             bytes: expected_bytes,
             mode: FileMode::Regular,
@@ -378,9 +385,6 @@ pub(crate) fn compose_configured_projections(
     }
     Ok(ConfiguredProjections { actions, counts })
 }
-
-/// Stable ownership identity for the data root's ignore file.
-const DATA_ROOT_IGNORE_OWNER: &str = "data-root-ignore";
 
 /// Stable region identity of the engine's block inside that file; its
 /// delimiters are this identity in the file's own comment syntax.
@@ -391,7 +395,7 @@ const DATA_ROOT_IGNORE_REGION: &str = "data-root-ignore";
 /// file's own comment syntax.
 fn data_root_ignore_claim() -> ManagedDocumentClaim {
     ManagedDocumentClaim::Region {
-        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+        owner: RepositoryActionOwner::DataRootIgnore.to_string(),
         region_id: DATA_ROOT_IGNORE_REGION.to_string(),
         begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
         end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
@@ -449,7 +453,7 @@ pub(crate) fn compose_data_root_ignore(
             );
             Ok((!unchanged).then(|| RepositoryAction::WriteFile {
                 path: path.clone(),
-                owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+                owner: RepositoryActionOwner::DataRootIgnore,
                 expected: ExpectedPreimage::of(entry),
                 bytes: expected,
                 mode: FileMode::Regular,
@@ -490,11 +494,11 @@ pub(crate) fn compose_default_ruleset(
     // A ruleset outside the captured closure (or captured absent) is not an owned
     // materialization: defaults live only in memory, nothing on disk to keep
     // coherent, so no rules/schema targets are owned.
-    let rules_path = image_path(image, ".jit/rules.toml")?;
+    let rules_path = VirtualPath::RULES;
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
+    let Some(current_rules) = read_text_at(image, &rules_path)? else {
         return Ok(Vec::new());
     };
     let namespaces = crate::config_manager::namespaces_from_config(config);
@@ -510,16 +514,20 @@ pub(crate) fn compose_default_ruleset(
     // rules.toml: splice only the generated default-family membership + assertions,
     // preserving every authored byte outside those proven-generated spans.
     let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
-    let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
+    let rendered_add: Vec<String> = diff
+        .to_add
+        .iter()
+        .map(render_rule_block)
+        .collect::<Result<_, _>>()?;
     let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
         .map_err(ProducerError::RulesDocument)?;
-    let serialized = serialized_default_ruleset(config);
+    let serialized = serialized_default_ruleset(config)?;
     let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
         .map_err(ProducerError::RulesDocument)?;
     if expected_rules != current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
-            owner: "default-rule-membership".to_string(),
+            owner: RepositoryActionOwner::DefaultRuleMembership,
             expected: ExpectedPreimage::of(entry(image, &rules_path)?),
             bytes: expected_rules.into_bytes(),
             mode: FileMode::Regular,
@@ -535,7 +543,7 @@ pub(crate) fn compose_default_ruleset(
         .map(|f| f.name.as_str())
         .collect();
     for schema in &serialized.schema_files {
-        let vpath = image_path(image, &format!(".jit/schemas/{}", schema.name))?;
+        let vpath = VirtualPath::schema(&schema.name)?;
         if !image.capture_spec().contains_path(&vpath) {
             continue;
         }
@@ -547,7 +555,7 @@ pub(crate) fn compose_default_ruleset(
         }
         actions.push(RepositoryAction::WriteFile {
             path: vpath.clone(),
-            owner: "default-schema".to_string(),
+            owner: RepositoryActionOwner::DefaultSchema,
             expected: ExpectedPreimage::of(occupant),
             bytes: schema.content.clone().into_bytes(),
             mode: FileMode::Regular,
@@ -571,34 +579,42 @@ pub(crate) fn compose_default_ruleset(
         .collect();
     let mut default_refs = std::collections::BTreeSet::new();
     let mut foreign_refs = std::collections::BTreeSet::new();
-    for req in
-        crate::declarations::rules::RuleSet::schema_requests(&current_rules).unwrap_or_default()
+    for req in crate::declarations::rules::RuleSet::schema_requests(&current_rules)
+        .map_err(ProducerError::from)?
     {
+        let schema_path = VirtualPath::schema_reference(&req.reference)?;
         if origins.get(req.rule.as_str()).copied().flatten()
             == Some(crate::declarations::rules::DEFAULT_ORIGIN)
         {
-            default_refs.insert(req.reference);
+            default_refs.insert(schema_path);
         } else {
-            foreign_refs.insert(req.reference);
+            foreign_refs.insert(schema_path);
         }
     }
     for (vpath, occupant) in image.entries() {
         let RepositoryEntry::File { .. } = occupant else {
             continue;
         };
-        let Some(name) = schema_file_name(vpath) else {
+        let Some(schema_path) = schema_file_path(vpath) else {
             continue;
         };
-        let reference = format!("schemas/{name}");
+        let Some(name) = schema_path
+            .relative()
+            .as_path()
+            .file_name()
+            .and_then(|name| name.to_str())
+        else {
+            continue;
+        };
         // Proven generated (referenced ONLY by default rules), not shared with any
         // custom rule, and no longer an expected target.
-        if default_refs.contains(&reference)
-            && !foreign_refs.contains(&reference)
+        if default_refs.contains(&schema_path)
+            && !foreign_refs.contains(&schema_path)
             && !expected_names.contains(name)
         {
             actions.push(RepositoryAction::DeleteFile {
                 path: vpath.clone(),
-                owner: "default-schema".to_string(),
+                owner: RepositoryActionOwner::DefaultSchema,
                 expected: ExpectedPreimage::of(occupant),
             });
         }
@@ -628,16 +644,16 @@ fn entry<'a>(
         .map_err(|error| ProducerError::from(error).into())
 }
 
-/// The file name of a `Data("schemas/<name>")` entry, or `None` for any other
-/// path. Used to locate obsolete generated schema targets for repair.
-fn schema_file_name(path: &VirtualPath) -> Option<&str> {
+/// Parse a schema entry's relative spelling through the shared reference parser.
+fn schema_file_path(path: &VirtualPath) -> Option<VirtualPath> {
     if path.root_class() != crate::repository_state::RepositoryRootClass::Data {
         return None;
     }
     match path.relative() {
-        crate::repository_state::RootRelativePath::Descendant(rel) => rel
-            .strip_prefix("schemas/")
-            .filter(|name| !name.contains('/')),
+        crate::repository_state::RootRelativePath::Descendant(rel) => {
+            let schema_path = VirtualPath::schema_reference(rel.as_ref()).ok()?;
+            schema_path.eq(path).then_some(schema_path)
+        }
         crate::repository_state::RootRelativePath::Root => None,
     }
 }
@@ -1228,7 +1244,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
@@ -1267,7 +1283,7 @@ kind = "advisory"
         let config_partial = ns_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         // Authored content the repair must preserve unconditionally.
         let authored_rules = format!(
             "{}\n[[rules]]\nname = \"custom-shape\"\n# hand-authored comment\nseverity = \"warn\"\nassert = {{ require-section = {{ heading = \"Goals\" }} }}\n",
@@ -1337,7 +1353,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let mut schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1382,7 +1398,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete.json\" }}\n",
             scaffold.rules_toml
@@ -1437,7 +1453,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let custom = "[[rules]]\nname = \"namespace-registry\"\nseverity = \"warn\"\nassert = { json-schema = \"schemas/custom-namespace.json\" }\n";
         let rules_toml = if custom_first {
             format!("{custom}\n{}", scaffold.rules_toml)
@@ -1485,7 +1501,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n\
              [[rules]]\nname = \"custom-consumer\"\nseverity = \"warn\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n",
@@ -1595,7 +1611,7 @@ kind = "advisory"
         let config_full = ns_and_projection_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1658,7 +1674,7 @@ kind = "advisory"
         let config = ns_and_projection_config(&["component"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         // Default-ruleset family: a syntax-preserving targeted swap of one baked
         // assertion (rules.toml must stay parseable — the producer needs to splice

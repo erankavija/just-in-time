@@ -218,6 +218,14 @@ pub fn test_taxonomy() -> TestTaxonomy {
     }
 }
 
+/// The shared taxonomy rendered with one invalid hierarchy level.
+pub fn invalid_hierarchy_config_fragment() -> String {
+    let mut taxonomy = test_taxonomy();
+    let type_name = taxonomy.type_at_level(1).to_string();
+    taxonomy.hierarchy.insert(type_name, 0);
+    taxonomy.config_fragment()
+}
+
 /// A repository initialized from [`test_taxonomy`], paired with the declaration
 /// that authored its vocabulary so a test reads type names from it.
 pub struct TaxonomyRepo {

@@ -23,14 +23,20 @@
 //! and stored here without being evaluated.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::JitConfig;
+use crate::domain::id_pattern::IdPattern;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
+use crate::repository_state::VirtualPath;
+
+/// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
+pub const DEFAULT_CRITERION_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
@@ -159,58 +165,36 @@ pub enum RuleConfigError {
     },
 }
 
-/// Severity of a rule finding.
-///
-/// `off` disables the rule entirely; `warn` reports without blocking; `error`
-/// reports and (when `enforce` is set) can block a write.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Severity {
-    /// Rule is disabled.
-    Off,
-    /// Rule reports a warning but never blocks.
-    #[default]
-    Warn,
-    /// Rule reports an error (blocks writes when `enforce` is true).
-    Error,
-}
-
-impl Severity {
-    /// Stable snake_case token for this severity, matching the TOML grammar.
+wire_vocabulary! {
+    /// Severity of a rule finding.
     ///
-    /// Used to render severities consistently in both human and `--json`
-    /// validation output.
-    pub fn token(self) -> &'static str {
-        match self {
-            Severity::Off => "off",
-            Severity::Warn => "warn",
-            Severity::Error => "error",
-        }
+    /// `off` disables the rule entirely; `warn` reports without blocking; `error`
+    /// reports and (when `enforce` is set) can block a write.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+    pub enum Severity {
+        /// Rule is disabled.
+        Off = "off",
+        /// Rule reports a warning but never blocks.
+        #[default]
+        Warn = "warn",
+        /// Rule reports an error (blocks writes when `enforce` is true).
+        Error = "error",
     }
 }
 
-/// Evaluation scope of a rule, derived from its assertion kind.
-///
-/// `Local` rules are pure predicates over a single projected issue and run on
-/// write. `Graph` rules need cross-issue context and run in `jit validate`,
-/// gate checkers, and at state transitions (where an enforcing failure blocks
-/// the transition); they never run on plain field writes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RuleScope {
-    /// Per-issue, runs on write.
-    Local,
-    /// Aggregate/graph, runs only on demand.
-    Graph,
-}
-
-impl RuleScope {
-    /// Stable snake_case token for this scope, matching the TOML grammar.
-    pub fn token(self) -> &'static str {
-        match self {
-            RuleScope::Local => "local",
-            RuleScope::Graph => "graph",
-        }
+wire_vocabulary! {
+    /// Evaluation scope of a rule, derived from its assertion kind.
+    ///
+    /// `Local` rules are pure predicates over a single projected issue and run
+    /// on write. `Graph` rules need cross-issue context and run in `jit validate`,
+    /// gate checkers, and at state transitions (where an enforcing failure
+    /// blocks the transition); they never run on plain field writes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum RuleScope {
+        /// Per-issue, runs on write.
+        Local = "local",
+        /// Aggregate/graph, runs only on demand.
+        Graph = "graph",
     }
 }
 
@@ -337,7 +321,7 @@ impl Selector {
 
 /// Comma-separated canonical state tokens, for [`RuleConfigError::InvalidState`].
 fn valid_state_tokens() -> String {
-    State::all().map(State::as_str).join(", ")
+    State::ALL.map(State::as_str).join(", ")
 }
 
 /// A `when` state predicate: one or more lifecycle states a rule applies to.
@@ -538,8 +522,8 @@ pub enum Assertion {
     },
     /// A from-reference resolves to a declared source. Graph scope.
     LabelReference {
-        /// Raw configuration table for the reference rule (evaluated downstream).
-        config: toml::value::Table,
+        /// The reference rule's configuration, decoded at load.
+        config: LabelReferenceConfig,
     },
     /// A selector must/should depend on a target selector. Graph scope.
     DependencyShape {
@@ -589,9 +573,9 @@ pub enum Assertion {
         /// Items without the marker are not present in the extracted id set,
         /// so a label matching an unmarked id is a stray. Optional.
         marker: Option<String>,
-        /// Regex that extracts a criterion id from an item's text. Optional;
-        /// defaults to `"[A-Z][A-Z0-9]*-[0-9]+"`.
-        id_pattern: String,
+        /// Extracts a criterion id from an item's text. Optional; defaults to
+        /// [`DEFAULT_CRITERION_ID_PATTERN`].
+        id_pattern: IdPattern,
     },
     /// Every criterion in a configured section maps to a verifiable check.
     /// Graph scope. "Checked" means the issue carries a required gate keyed
@@ -607,7 +591,7 @@ pub enum Assertion {
     /// assert = { criteria-to-check = {
     ///   criteria-section = "success_criteria",  # optional, default success_criteria
     ///   marker = "[hard]",                       # optional: only marked items
-    ///   id-pattern = "REQ-[0-9]+",               # optional, default [A-Z][A-Z0-9]*-[0-9]+
+    ///   id-pattern = "REQ-[0-9]+",               # optional, default DEFAULT_CRITERION_ID_PATTERN
     ///   gate-prefix = "verify:",                 # at least one of gate-prefix / check-namespace
     ///   check-namespace = "checks",              # at least one of gate-prefix / check-namespace
     /// } }
@@ -619,9 +603,9 @@ pub enum Assertion {
         /// Optional marker filter; when set, only items starting with this
         /// marker contribute criterion ids.
         marker: Option<String>,
-        /// Regex extracting the criterion id from an item's text (default
-        /// `"[A-Z][A-Z0-9]*-[0-9]+"`).
-        id_pattern: String,
+        /// Extracts the criterion id from an item's text (default
+        /// [`DEFAULT_CRITERION_ID_PATTERN`]).
+        id_pattern: IdPattern,
         /// Optional gate key prefix. A criterion `<id>` is "gate-checked" when
         /// the issue has `"<gate_prefix><id>"` in `gates_required`.
         gate_prefix: Option<String>,
@@ -651,18 +635,66 @@ pub enum Assertion {
     },
 }
 
-/// The legacy type-hierarchy warning expressed by an
-/// [`Assertion::TypeHierarchy`].
+wire_vocabulary! {
+    /// The legacy type-hierarchy warning expressed by an
+    /// [`Assertion::TypeHierarchy`].
+    ///
+    /// Each variant reuses one existing domain function over the whole issue set:
+    /// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
+    /// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TypeHierarchyKind {
+        /// A leaf-level issue (e.g. a task) carries no parent association label.
+        OrphanLeaf = "orphan-leaf",
+        /// A strategic-type issue (e.g. an epic) is missing its identifying label.
+        StrategicConsistency = "strategic-consistency",
+    }
+}
+
+/// The `label-reference` assert payload.
 ///
-/// Each variant reuses one existing domain function over the whole issue set:
-/// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
-/// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TypeHierarchyKind {
-    /// A leaf-level issue (e.g. a task) carries no parent association label.
-    OrphanLeaf,
-    /// A strategic-type issue (e.g. an epic) is missing its identifying label.
-    StrategicConsistency,
+/// Every `from`-namespace label value on a matching issue must be declared as a
+/// `to`-namespace label value within `scope`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelReferenceConfig {
+    /// Namespace of the reference labels (e.g. `"satisfies"`).
+    pub from: String,
+    /// Namespace that declares the valid sources (e.g. `"req"`).
+    pub to: String,
+    /// The authored `scope`, kept as written so serialization emits the
+    /// authored keys; read the effective scope through [`Self::scope`].
+    pub authored_scope: Option<LabelReferenceScope>,
+}
+
+impl LabelReferenceConfig {
+    /// Where a declaration may live: the authored scope, or
+    /// [`LabelReferenceScope::Global`] when none was authored.
+    pub fn scope(&self) -> LabelReferenceScope {
+        self.authored_scope.unwrap_or_default()
+    }
+}
+
+wire_vocabulary! {
+    /// The `scope` of a `label-reference` assert.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LabelReferenceScope {
+        /// Any issue in the evaluated set.
+        #[default]
+        Global = "global",
+        /// Only issues linked to the referencing issue by a dependency edge in
+        /// either direction.
+        Linked = "linked",
+    }
+}
+
+wire_vocabulary! {
+    /// The `scope` of a `label-uniqueness` assert. Uniqueness is inherently
+    /// repo-wide, so `all` is the only scope.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LabelUniquenessScope {
+        /// Every issue matching the rule's selector.
+        All = "all",
+    }
 }
 
 impl Assertion {
@@ -706,9 +738,7 @@ impl Assertion {
             Assertion::LabelUniqueness { .. } => true,
             // A label-reference rule is repo-wide unless explicitly scoped to
             // linked issues (which the neighborhood slice fully contains).
-            Assertion::LabelReference { config } => {
-                config.get("scope").and_then(|v| v.as_str()) != Some("linked")
-            }
+            Assertion::LabelReference { config } => config.scope() != LabelReferenceScope::Linked,
             // Type-hierarchy checks reason over the whole set's relations.
             Assertion::TypeHierarchy { .. } => true,
             // The remaining graph kinds are per-issue / neighborhood-local.
@@ -1026,21 +1056,27 @@ impl RawCriteriaToCheck {
                 .criteria_section
                 .unwrap_or_else(|| "success_criteria".to_string()),
             marker: self.marker,
-            id_pattern: self
-                .id_pattern
-                .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: compile_id_pattern(rule, self.id_pattern)?,
             gate_prefix: self.gate_prefix,
             check_namespace: self.check_namespace,
         })
     }
 }
 
+/// Compile an authored `id-pattern`, or the default when absent.
+fn compile_id_pattern(rule: &str, source: Option<String>) -> Result<IdPattern, RuleConfigError> {
+    IdPattern::new(source.unwrap_or_else(|| DEFAULT_CRITERION_ID_PATTERN.to_string())).map_err(
+        |error| RuleConfigError::InvalidAssertion {
+            rule: rule.to_string(),
+            message: format!("'id-pattern': {error}"),
+        },
+    )
+}
+
 /// The `label-uniqueness` assert payload.
 ///
 /// `namespace` names the label namespace whose values must be unique across all
-/// matching issues. `scope` must be `"all"` (the only permitted value for this
-/// kind; `"linked"` is not supported because uniqueness is inherently a
-/// repo-wide property).
+/// matching issues. `scope` must name a [`LabelUniquenessScope`].
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLabelUniqueness {
@@ -1099,14 +1135,38 @@ struct RawLabelCoverage {
     kind: Option<String>,
 }
 
-/// The keys and value types of a `label-reference` payload, checked at load.
+/// The `label-reference` assert payload, lowered by
+/// [`RawLabelReference::into_assertion`].
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
 struct RawLabelReference {
     from: String,
     to: String,
     scope: Option<String>,
+}
+
+impl RawLabelReference {
+    /// Lower into an [`Assertion::LabelReference`], rejecting an unknown scope.
+    fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
+        let authored_scope = self
+            .scope
+            .map(|scope| {
+                scope.parse::<LabelReferenceScope>().map_err(|e| {
+                    RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: format!("label-reference 'scope': {e}"),
+                    }
+                })
+            })
+            .transpose()?;
+        Ok(Assertion::LabelReference {
+            config: LabelReferenceConfig {
+                from: self.from,
+                to: self.to,
+                authored_scope,
+            },
+        })
+    }
 }
 
 /// The keys and value types of a `dependency-shape` payload, checked at load.
@@ -1378,8 +1438,8 @@ impl RawAssert {
             return Ok(Assertion::LabelCoverage { config });
         }
         if let Some(config) = self.label_reference {
-            check_payload::<RawLabelReference>(rule, "label-reference", &config)?;
-            return Ok(Assertion::LabelReference { config });
+            return check_payload::<RawLabelReference>(rule, "label-reference", &config)?
+                .into_assertion(rule);
         }
         if let Some(config) = self.dependency_shape {
             let raw: RawDependencyShape = check_payload(rule, "dependency-shape", &config)?;
@@ -1392,19 +1452,12 @@ impl RawAssert {
             return gr.into_assertion(rule);
         }
         if let Some(th) = self.type_hierarchy {
-            let kind = match th.kind.as_str() {
-                "orphan-leaf" => TypeHierarchyKind::OrphanLeaf,
-                "strategic-consistency" => TypeHierarchyKind::StrategicConsistency,
-                other => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: format!(
-                            "type-hierarchy 'kind' must be 'orphan-leaf' or \
-                             'strategic-consistency', found '{other}'"
-                        ),
-                    });
+            let kind = th.kind.parse::<TypeHierarchyKind>().map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: format!("type-hierarchy 'kind': {e}"),
                 }
-            };
+            })?;
             return Ok(Assertion::TypeHierarchy { kind });
         }
         if let Some(clm) = self.criteria_label_match {
@@ -1423,39 +1476,20 @@ impl RawAssert {
                     .criteria_section
                     .unwrap_or_else(|| "success_criteria".to_string()),
                 marker: clm.marker,
-                id_pattern: clm
-                    .id_pattern
-                    .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+                id_pattern: compile_id_pattern(rule, clm.id_pattern)?,
             });
         }
         if let Some(ctc) = self.criteria_to_check {
             return ctc.into_assertion(rule);
         }
         if let Some(lu) = self.label_uniqueness {
-            // `scope = "all"` is the only permitted value. `"linked"` is rejected
-            // because uniqueness is inherently a repo-wide concept; the design
-            // explicitly reserves `"all"` for this kind to avoid synonym confusion
-            // with `label-reference`'s `"global"`. An absent scope is also rejected
-            // (future-proofing: scope is required, not defaulted).
-            match lu.scope.as_str() {
-                "all" => {}
-                "linked" => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: "label-uniqueness does not support scope = \"linked\"; \
-                                  uniqueness is repo-wide — use scope = \"all\""
-                            .to_string(),
-                    });
+            // Scope is required, not defaulted; `all` is the only value.
+            lu.scope.parse::<LabelUniquenessScope>().map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: format!("label-uniqueness 'scope': {e}"),
                 }
-                other => {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: format!(
-                            "label-uniqueness 'scope' must be \"all\", found \"{other}\""
-                        ),
-                    });
-                }
-            }
+            })?;
             return Ok(Assertion::LabelUniqueness {
                 namespace: lu.namespace,
             });
@@ -1471,36 +1505,16 @@ impl RawAssert {
 
 /// Validate that a `json-schema` reference names a safe file under `schemas/`.
 ///
-/// A reference MUST be a relative path that starts with `schemas/`, ends with
-/// `.json`, and contains no `..` (parent) component. Absolute paths are
-/// rejected because [`Path::join`] would discard the `.jit` root, letting a rule
-/// read an arbitrary file; `..` is rejected to prevent traversal out of
-/// `<jit_root>/schemas/`. After these checks the resolved path is guaranteed to
-/// live under `<jit_root>/schemas/`.
+/// The shared path constructor enforces the `schemas/<name>.json` shape and
+/// confines the reference to one file-name component.
 fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConfigError> {
     let reject = |message: &str| RuleConfigError::InvalidSchemaReference {
         rule: rule.to_string(),
         reference: reference.to_string(),
         message: message.to_string(),
     };
-
-    let ref_path = Path::new(reference);
-
-    if ref_path.is_absolute() {
-        return Err(reject("reference must be a relative path, not absolute"));
-    }
-    if ref_path
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(reject("reference must not contain a '..' path component"));
-    }
-    if !reference.starts_with("schemas/") {
-        return Err(reject("reference must start with 'schemas/'"));
-    }
-    if !reference.ends_with(".json") {
-        return Err(reject("reference must end with '.json'"));
-    }
+    VirtualPath::schema_reference(reference)
+        .map_err(|_| reject("reference must be one relative 'schemas/<name>.json' file"))?;
     Ok(())
 }
 
@@ -1741,7 +1755,7 @@ assert = { require-section = { heading = "Plan" } }
                     "value should indicate empty list, got: {value}"
                 );
                 // The valid list must name every legal token.
-                for token in State::all().map(State::as_str) {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -1756,7 +1770,7 @@ assert = { require-section = { heading = "Plan" } }
     fn test_state_predicate_matches_typed_set_equals_token_set() {
         // The pre-parsed set membership must agree with the authored tokens for
         // every lifecycle state.
-        let all = State::all();
+        let all = State::ALL;
         let pred = StatePredicate::list(["ready", "in_progress", "done"]);
         for state in all {
             let want = matches!(state, State::Ready | State::InProgress | State::Done);
@@ -1781,7 +1795,7 @@ assert = { label-coverage = { child-state = "don" } }
                 assert_eq!(rule, "typo-child-state");
                 assert_eq!(value, "don");
                 // The valid list names every legal token.
-                for token in State::all().map(State::as_str) {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -2314,7 +2328,7 @@ assert = { criteria-label-match = { namespace = "req" } }
                 assert_eq!(namespace, "req");
                 assert_eq!(criteria_section, "success_criteria"); // default
                 assert!(marker.is_none());
-                assert_eq!(id_pattern, "[A-Z][A-Z0-9]*-[0-9]+"); // default
+                assert_eq!(id_pattern.as_str(), DEFAULT_CRITERION_ID_PATTERN);
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
@@ -2340,7 +2354,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "succe
                 assert_eq!(namespace, "req");
                 assert_eq!(criteria_section, "success_criteria");
                 assert_eq!(marker.as_deref(), Some("[hard]"));
-                assert_eq!(id_pattern, "REQ-[0-9]+");
+                assert_eq!(id_pattern.as_str(), "REQ-[0-9]+");
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
@@ -2373,6 +2387,23 @@ assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
 "#;
         let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
+    }
+
+    #[test]
+    fn test_parse_invalid_criteria_id_pattern_fails_naming_the_rule() {
+        for payload in [
+            "criteria-label-match = { namespace = \"req\", id-pattern = 'REQ-(' }",
+            "criteria-to-check = { gate-prefix = \"verify:\", id-pattern = 'REQ-(' }",
+        ] {
+            let toml = format!("[[rules]]\nname = \"bad-pattern\"\nassert = {{ {payload} }}\n");
+            match parse(&toml).unwrap_err() {
+                RuleConfigError::InvalidAssertion { rule, message } => {
+                    assert_eq!(rule, "bad-pattern");
+                    assert!(message.contains("REQ-("), "message was: {message}");
+                }
+                other => panic!("expected InvalidAssertion for {payload}, got {other:?}"),
+            }
+        }
     }
 
     #[test]
@@ -2543,6 +2574,16 @@ assert = { json-schema = "/etc/passwd.json" }
     #[test]
     fn test_schema_reference_parent_traversal_is_rejected() {
         let toml = schema_rule_toml("schemas/../escape.json");
+        let err = parse(&toml).unwrap_err();
+        assert!(matches!(
+            err,
+            RuleConfigError::InvalidSchemaReference { .. }
+        ));
+    }
+
+    #[test]
+    fn test_schema_reference_nested_file_name_is_rejected() {
+        let toml = schema_rule_toml("schemas/nested/x.json");
         let err = parse(&toml).unwrap_err();
         assert!(matches!(
             err,
@@ -2997,6 +3038,33 @@ assert = { dependency-shape = { target = { state = "don" } } }
             matches!(&err, RuleConfigError::InvalidState { value, .. } if value == "don"),
             "target state is validated at load: {err:?}"
         );
+    }
+
+    #[test]
+    fn test_parse_label_reference_lowers_scope_and_rejects_unknown_scope() {
+        let parse_reference = |extra: &str| {
+            parse(&format!(
+                "[[rules]]\nname = \"reference\"\n\
+                 assert = {{ label-reference = {{ from = \"satisfies\", to = \"req\"{extra} }} }}\n"
+            ))
+        };
+        for (extra, expected) in [
+            ("", LabelReferenceScope::Global),
+            (", scope = \"linked\"", LabelReferenceScope::Linked),
+        ] {
+            let set = parse_reference(extra).unwrap();
+            match &set.rules[0].assert {
+                Assertion::LabelReference { config } => assert_eq!(config.scope(), expected),
+                other => panic!("expected LabelReference, got {other:?}"),
+            }
+        }
+        match parse_reference(", scope = \"nearby\"").unwrap_err() {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "reference");
+                assert!(message.contains("nearby"), "message was: {message}");
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
     }
 
     #[test]

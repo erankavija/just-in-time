@@ -3,8 +3,8 @@
 use super::mutation::finalize_delta;
 use super::{
     ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
-    MutationIntent, ProducerError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryStateError, VirtualPath,
+    MutationIntent, ProducerError, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_plan::{
@@ -14,8 +14,6 @@ use crate::domain::artifact_plan::{
 use crate::domain::event_log::EventLogError;
 use crate::domain::{Event, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
-
-const OWNER: &str = "archive-execution";
 
 /// Close a captured archive plan into one materialization plan, which
 /// publishes as one redo record.
@@ -84,7 +82,7 @@ pub fn finalize_archive_execution(
                 )?;
                 actions.push(RepositoryAction::WriteFile {
                     path: destination_path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: source_mode,
@@ -130,7 +128,7 @@ pub fn finalize_archive_execution(
                 create_ancestors(image, &path, &mut created_directories, &mut actions)?;
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: FileMode::Regular,
@@ -259,7 +257,7 @@ pub fn finalize_archive_execution(
                 if ContentIdentity::from_bytes(content.bytes()) == deletion.content_identity {
                     actions.push(RepositoryAction::DeleteFile {
                         path,
-                        owner: OWNER.into(),
+                        owner: RepositoryActionOwner::ArchiveExecution,
                         expected: ExpectedPreimage::of(captured_entry(
                             image,
                             &archive_path(image, &deletion.source)?,
@@ -391,7 +389,7 @@ fn create_ancestors(
             RepositoryEntry::Absent if created.insert(ancestor.clone()) => {
                 actions.push(RepositoryAction::CreateDirectory {
                     path: ancestor,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                 })
             }

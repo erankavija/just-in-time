@@ -872,7 +872,7 @@ mod tests {
         // core JSON Pointer resolution, not gated by those features, so
         // compiling and validating against a schema shaped that way must
         // keep working unchanged.
-        let states: Vec<serde_json::Value> = State::all()
+        let states: Vec<serde_json::Value> = State::ALL
             .iter()
             .map(|s| serde_json::Value::String(s.as_str().to_string()))
             .collect();

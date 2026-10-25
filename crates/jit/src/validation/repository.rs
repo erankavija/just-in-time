@@ -559,7 +559,7 @@ fn collect_rule_findings(
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
 ) -> Result<Vec<ReportedFinding>> {
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut reported = Vec::new();
     for issue in issues {
         let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)?;
@@ -575,7 +575,7 @@ fn collect_rule_findings(
         .iter()
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
-    let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
     let plan_content = project_plan_content(read, issues, config)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
@@ -700,7 +700,7 @@ fn collect_item_link_findings(
     if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut addresses = HashSet::new();
     let issue_kinds: Vec<_> = kinds
         .iter()
@@ -888,6 +888,24 @@ mod tests {
             )
             .unwrap();
         repo
+    }
+
+    #[test]
+    fn test_validate_repository_preserves_invalid_hierarchy_error() {
+        let repo = fixture();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+
+        let failure = executor(&repo)
+            .validate_repository_report()
+            .unwrap()
+            .unwrap_err();
+        let (error, _report) = failure.into_parts();
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     /// A file-backed executor with the fixture's canonical layout, used to capture

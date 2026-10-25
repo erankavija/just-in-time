@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T02:48:42.095004297Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Give lease ids and worktree ids their own validated types in lease records and the claim coordinator.\n\n## Background\n\nLease ids are generated as `Uuid::new_v4().to_string()` (`crates/jit/src/storage/claim_coordinator.rs:479,612,774`) and stored as `Lease.lease_id: String` (`:33`); worktree ids are `Lease.worktree_id: String` (`:39`) and `WorktreeIdentity.worktree_id` (`storage/worktree_identity.rs:24`). Two fallbacks produce worktree ids outside the `wt:<hex>` form: `commands/worktree.rs:282` (`wt:{branch}`) and `commands/mod.rs:731` (the worktree root path). `commands/worktree.rs:19,34,144` carry worktree ids as `String` fields and parameters.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::LeaseId` accepts canonical UUIDs, and `domain::identity::WorktreeId` accepts non-empty tokens without whitespace. Both serialize as plain strings.\n- [hard] REQ-02: `Lease`, `ClaimOp`, `ClaimCoordinator` and `WorktreeIdentity` hold `LeaseId` and `WorktreeId`.\n- [hard] REQ-03: Both fallback producers construct a `WorktreeId`, and a fallback source that is not a valid token yields an error naming it.\n- [hard] REQ-04: Lease-id CLI arguments are parsed once into `LeaseId` at the boundary.\n- [hard] REQ-05: No field or parameter in `commands/worktree.rs`, `storage/worktree_identity.rs` or `storage/claim_coordinator.rs` holds a lease or worktree id as `String` or `&str`.\n- [hard] REQ-06: Lease fixtures in tests use canonical lease ids, including the `claims.index.json` fixtures of `crates/jit/tests/cli_item_validate/validation_lease_tests.rs`.\n\n## Notes\n\nRemoving the fallbacks was rejected as a behaviour change outside this scope. Lease-sequence restructuring is out of scope; only fields and constructors change.\n",
   "documents": [],
+  "done_at": "2026-10-25T03:18:10.255993453Z",
+  "first_ready_at": "2026-10-25T02:46:52.785835744Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9cb3ccb7-d130-4123-bd82-735c599ed8e5",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:11:49.450716059Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "48edd335-723e-4a91-b767-c4673669ab7f",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:15:39.837032574Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Lease and worktree ids are dedicated types",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T03:18:10.255993453Z"
 }

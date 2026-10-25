@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-a4b94a17",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ca22c2c1a40802d0a43f89b31981e02b6d86f961",
+  "completed_at": "2026-10-25T04:35:54.952958202Z",
+  "duration_ms": 51052,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied by the attributable change.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce82634d-bee5-411f-ae16-ff8af7e13d6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T04:35:03.900742333Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8f4c721c1 (`jit:a4b94a17`); uncommitted JIT metadata excluded\nPolicy sources: AGENTS.md\nResolved items: @/issue/a4b94a17/requirement/REQ-01..03 and @/issue/2195c98f/requirement/REQ-10,REQ-15 (.jit issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T04:33:39Z); code-review pending\nTruncation recovery: narrowed rules vocabulary/parser, serialization, tests, and reference searches after broad-search truncation\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied by the attributable change.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

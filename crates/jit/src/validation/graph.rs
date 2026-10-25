@@ -59,8 +59,10 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+    Assertion, LabelReferenceConfig, LabelReferenceScope, Rule, RuleScope, Selector, Severity,
+    StatePredicate, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
 };
+use crate::domain::id_pattern::IdPattern;
 use crate::validation::engine::Finding;
 
 /// Default label namespace whose values name the criterion a child claims to
@@ -69,9 +71,6 @@ const DEFAULT_SATISFIES_NAMESPACE: &str = "satisfies";
 
 /// Default projection slug of the section holding success criteria.
 const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
-
-/// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
-const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
 /// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
 /// a label value in `crates/jit/src` (excluding tests) falls into one of three
@@ -724,19 +723,6 @@ fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
     }
 }
 
-/// Read a required string key from a config table, or `Err(GraphFinding)`.
-fn require_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
-        None => Err(config_error(rule, format!("missing required key '{key}'"))),
-    }
-}
-
 /// Read an optional string key, defaulting when absent. A present non-string is
 /// a config error.
 fn optional_str<'a>(
@@ -778,8 +764,8 @@ fn optional_str<'a>(
 ///   projection slug of the section whose list items hold the criteria.
 /// - `marker` (string, optional): when set, only items whose text begins with
 ///   this marker (e.g. `"[hard]"`) are required; others are ignored.
-/// - `id-pattern` (string, optional, default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex
-///   that extracts the criterion id from an item's text.
+/// - `id-pattern` (string, optional, default [`DEFAULT_CRITERION_ID_PATTERN`]):
+///   regex that extracts the criterion id from an item's text.
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
 ///   namespace on children whose value names the satisfied criterion (see
 ///   [`label_credits_id`]).
@@ -828,10 +814,11 @@ fn evaluate_label_coverage(
         Some(toml::Value::String(s)) => Some(s.as_str()),
         Some(_) => return vec![config_error(rule, "key 'marker' must be a string")],
     };
-    let id_pattern_src = match optional_str(rule, config, "id-pattern", DEFAULT_ID_PATTERN) {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
+    let id_pattern_src =
+        match optional_str(rule, config, "id-pattern", DEFAULT_CRITERION_ID_PATTERN) {
+            Ok(v) => v,
+            Err(f) => return vec![f],
+        };
     let id_pattern = match regex::Regex::new(id_pattern_src) {
         Ok(re) => re,
         Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
@@ -1176,48 +1163,15 @@ fn children_of<'a>(
 ///
 /// Every issue matching the rule's selector and carrying a `from`-namespace
 /// reference label must have each referenced value declared as a `to`-namespace
-/// source within the configured scope.
-///
-/// # Config keys
-///
-/// - `from` (string, required): namespace of the reference label whose values
-///   must resolve (e.g. `"satisfies"`).
-/// - `to` (string, required): namespace that DECLARES valid source ids (e.g.
-///   `"req"`).
-/// - `scope` (string, optional, default `"global"`): where a declaration may
-///   live — `"global"` (any issue in the set) or `"linked"` (only issues this
-///   issue depends on, or that depend on it).
-///
-/// One finding is produced per dangling reference. A malformed config yields a
-/// single `config-error` finding.
+/// source within the configured scope. One finding is produced per dangling
+/// reference.
 fn evaluate_label_reference(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelReferenceConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    let from_ns = match require_str(rule, config, "from") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let to_ns = match require_str(rule, config, "to") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let scope = match optional_str(rule, config, "scope", "global") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let linked = match scope {
-        "global" => false,
-        "linked" => true,
-        other => {
-            return vec![config_error(
-                rule,
-                format!("key 'scope' must be 'global' or 'linked', got '{other}'"),
-            )]
-        }
-    };
+    let (from_ns, to_ns, scope) = (&config.from, &config.to, config.scope());
 
     // Globally declared source ids (the `to` namespace values across all issues).
     let global_sources: BTreeSet<&str> = graph_context
@@ -1229,7 +1183,7 @@ fn evaluate_label_reference(
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if linked {
+            let allowed: BTreeSet<&str> = if scope == LabelReferenceScope::Linked {
                 linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
@@ -1533,7 +1487,7 @@ fn evaluate_gate_recency(
 ///   section whose list items hold the criteria.
 /// - `marker` (optional): when set, only items starting with this marker
 ///   contribute criterion ids.
-/// - `id_pattern` (default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex extracting the
+/// - `id_pattern` (default [`DEFAULT_CRITERION_ID_PATTERN`]): extracts the
 ///   criterion id from an item's text.
 /// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
 ///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
@@ -1551,20 +1505,13 @@ fn evaluate_criteria_to_check(
     rule: &Rule,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
+    id_pattern: &IdPattern,
     gate_prefix: Option<&str>,
     check_namespace: Option<&str>,
     issues: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
-    // Compile the id pattern (already validated at load for user-authored rules;
-    // this compile step is a pure guard for programmatic callers).
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     issues
         .iter()
         .filter(|issue| rule.when.matches(issue))
@@ -1573,7 +1520,7 @@ fn evaluate_criteria_to_check(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {
@@ -1713,10 +1660,9 @@ fn evaluate_type_hierarchy(
 ///
 /// # Config
 ///
-/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields;
-/// this evaluator receives the resolved values directly, so it never produces a
-/// `config-error` finding from missing keys (only from an invalid `id-pattern`
-/// regex, caught at load).
+/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields,
+/// with `id-pattern` compiled; this evaluator receives the resolved values, so
+/// its only `config-error` finding is an unparsable criteria source.
 ///
 /// # Finding text
 ///
@@ -1728,16 +1674,11 @@ fn evaluate_criteria_label_match(
     namespace: &str,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
+    id_pattern: &IdPattern,
     issues: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
     // `success_criteria` renders as `Success Criteria` in the message. This is
@@ -1755,7 +1696,7 @@ fn evaluate_criteria_label_match(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {
@@ -2998,27 +2939,6 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
-    }
-
-    #[test]
-    fn test_label_reference_missing_key_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = reference_rule("from = \"implements\", to = \"req\"");
-        if let Assertion::LabelReference { config } = &mut rule.assert {
-            config.remove("to");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[issue("x", &["implements:REQ-01"])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("'to'"));
     }
 
     // --- dependency-shape --------------------------------------------------

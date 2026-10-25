@@ -1728,7 +1728,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let payload = InitResponse {
                 repository_root: current_dir.display().to_string(),
                 data_dir: jit_dir.display().to_string(),
-                repository_id: worktree_identity.map(|identity| identity.worktree_id),
+                repository_id: worktree_identity.map(|identity| identity.worktree_id.to_string()),
                 gitattributes_status: gitattributes_outcome,
                 created_paths: init_result.created_paths,
                 modified_paths: init_result.modified_paths,
@@ -6057,8 +6057,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             "  [{}] {} ({}, {}) selector: {}",
                             status,
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector
                         );
                         for message in &outcome.messages {
@@ -6078,8 +6078,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!(
                             "  [SKIP] {} ({}, {}) selector: {} — {}",
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector,
                             reason
                         );
