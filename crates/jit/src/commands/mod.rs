@@ -1049,7 +1049,7 @@ fn derive_write_validation(
     config: &JitConfig,
     force: bool,
 ) -> Result<WriteValidation> {
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
@@ -1171,7 +1171,7 @@ fn derive_state_transition(
             let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
             let hierarchy =
                 crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-            let repo_format = evidence.config.content_format()?;
+            let repo_format = evidence.config.content_format();
             let strictness = evidence.config.strictness();
             let enforcing = rules
                 .iter()
@@ -1413,7 +1413,7 @@ fn derive_field_update(
     }
     let validation = match &request.label_edit {
         Some(CapturedLabelEdit::AppendUnchecked(_)) => {
-            let repo_format = evidence.config.content_format()?;
+            let repo_format = evidence.config.content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
                 &evidence.declarations.rules,
@@ -1442,7 +1442,7 @@ fn derive_field_update(
         )?,
     };
     if request.issue_type.is_some() {
-        let repo_format = evidence.config.content_format()?;
+        let repo_format = evidence.config.content_format();
         let explicit_type = crate::validation::evaluate_local(
             &projected,
             &evidence.declarations.rules,
@@ -2431,7 +2431,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if explicit_type {
-                let repo_format = declarations.config().content_format()?;
+                let repo_format = declarations.config().content_format();
                 let evaluation = crate::validation::evaluate_local(
                     &final_draft,
                     declarations.rules(),
@@ -2603,7 +2603,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Resolve the repository's configured default content format.
     fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        self.cached_config()?.content_format()
+        Ok(self.cached_config()?.content_format())
     }
 
     fn publish_captured_field_update(

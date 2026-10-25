@@ -242,26 +242,20 @@ pub struct ValidationConfig {
     pub strictness: Option<crate::validation::Strictness>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
-    /// Repo-level default content format for issue bodies ("markdown", "html",
-    /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
-    /// to extract `sections` for issues that carry no per-issue `content_format`.
-    pub content_format: Option<String>,
+    /// Repo-level default content format for issue bodies. Selects the
+    /// [`ContentParser`](crate::document::ContentParser) used to extract
+    /// `sections` for issues that carry no per-issue `content_format`.
+    #[serde(default)]
+    pub content_format: Option<crate::domain::ContentFormat>,
 }
 
 impl ValidationConfig {
-    /// Resolve the repo-level default content format, defaulting to
+    /// Return the repo-level default content format, defaulting to
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) when
-    /// unset. An invalid value is surfaced as an error rather than silently
-    /// defaulting, so a misconfigured `config.toml` cannot quietly pick the wrong
-    /// parser.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
-        use std::str::FromStr;
-        match self.content_format.as_deref() {
-            None => Ok(crate::domain::ContentFormat::DEFAULT),
-            Some(value) => crate::domain::ContentFormat::from_str(value).with_context(|| {
-                format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
-            }),
-        }
+    /// unset. Serde rejects values outside the exact wire vocabulary while
+    /// loading configuration.
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
+        self.content_format.unwrap_or_default()
     }
 
     /// Resolve the repo-wide validation strictness, defaulting to
@@ -1274,9 +1268,9 @@ impl JitConfig {
     /// [`ValidationConfig::content_format`], or
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) without
     /// the section.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
         self.validation.as_ref().map_or(
-            Ok(crate::domain::ContentFormat::DEFAULT),
+            crate::domain::ContentFormat::DEFAULT,
             ValidationConfig::content_format,
         )
     }
@@ -2125,7 +2119,25 @@ content_format = "html"
             validation.strictness,
             Some(crate::validation::Strictness::Loose)
         );
-        assert_eq!(validation.content_format, Some("html".to_string()));
+        assert_eq!(
+            validation.content_format,
+            Some(crate::domain::ContentFormat::Html)
+        );
+    }
+
+    #[test]
+    fn test_parse_validation_rejects_noncanonical_content_format_tokens() {
+        ["md", "HTML", "unknown-format"]
+            .into_iter()
+            .for_each(|value| {
+                let config_toml = format!("[validation]\ncontent_format = \"{value}\"\n");
+                let error = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+
+                assert!(
+                    error.to_string().contains(value),
+                    "the error must name rejected token {value}: {error}"
+                );
+            });
     }
 
     #[test]
