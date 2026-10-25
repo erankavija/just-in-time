@@ -2,6 +2,7 @@ use schemars::{schema::RootSchema, schema_for, JsonSchema};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::fmt;
 
+use crate::domain::identity::{is_lowercase_kebab, ProfileId};
 use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 use crate::repository_state::Contribution;
 
@@ -18,41 +19,6 @@ pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
 /// data in the manifest rather than an inventory a reader keeps, and it holds
 /// for every package rather than for one.
 pub const LIVE_ASSET_SOURCE_PREFIX: &str = "assets/live/";
-
-/// Stable lowercase-kebab identifier used to name a profile package.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
-#[serde(transparent)]
-#[schemars(with = "String")]
-pub struct ProfileId(String);
-
-impl ProfileId {
-    /// Borrow the canonical package identifier.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl TryFrom<&str> for ProfileId {
-    type Error = String;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if is_lowercase_kebab(value) {
-            Ok(Self(value.to_string()))
-        } else {
-            Err(format!(
-                "invalid profile id '{value}'; expected lowercase-kebab"
-            ))
-        }
-    }
-}
-
-impl TryFrom<String> for ProfileId {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
-    }
-}
 
 /// Canonical lowercase-kebab marker identity for one managed profile region.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
@@ -97,28 +63,6 @@ impl<'de> Deserialize<'de> for RegionId {
         D: Deserializer<'de>,
     {
         Self::try_from(String::deserialize(deserializer)?).map_err(de::Error::custom)
-    }
-}
-
-impl fmt::Display for ProfileId {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(formatter)
-    }
-}
-
-impl AsRef<str> for ProfileId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl<'de> Deserialize<'de> for ProfileId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Self::try_from(value).map_err(de::Error::custom)
     }
 }
 
@@ -394,25 +338,19 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
-pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
-    let mut segments = value.split('-');
-    segments.next().is_some_and(|first| {
-        !first.is_empty()
-            && first.starts_with(|character: char| character.is_ascii_lowercase())
-            && first
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    }) && segments.all(|segment| {
-        !segment.is_empty()
-            && segment
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_region_id_validates_through_the_domain_token_rule() {
+        let canonical = "managed-region-2";
+        assert!(is_lowercase_kebab(canonical));
+        assert_eq!(RegionId::try_from(canonical).unwrap().as_str(), canonical);
+        let invalid = "managed_region";
+        assert!(!is_lowercase_kebab(invalid));
+        assert!(serde_json::from_value::<RegionId>(serde_json::json!(invalid)).is_err());
+    }
 
     /// One manifest whose metadata is fixed and whose body is under test.
     fn manifest_of(body: &str) -> Result<ProfilePackageModel, String> {

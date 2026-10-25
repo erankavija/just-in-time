@@ -6,9 +6,10 @@
 
 use super::manifest::{
     AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration, ProfileDependencyRequirement,
-    ProfileId, ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration,
-    ProfileVariableName, RegionDeclaration,
+    ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration, ProfileVariableName,
+    RegionDeclaration,
 };
+use crate::domain::identity::ProfileId;
 use crate::repository_state::Contribution;
 use serde::Deserialize;
 

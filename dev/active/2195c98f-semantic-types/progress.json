@@ -89,7 +89,7 @@
           "short_id": "f8523c62",
           "title": "Query assignee filters parse to an Assignee",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -129,7 +129,7 @@
           "short_id": "2ac50581",
           "title": "Lifecycle state tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
@@ -150,14 +150,14 @@
           "short_id": "5c232305",
           "title": "ProfileId is defined in the domain layer",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
           "short_id": "6add7ca6",
           "title": "Projection mode and style reach output typed",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
@@ -171,7 +171,7 @@
           "short_id": "7383f4ea",
           "title": "Template transform kind is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
@@ -281,7 +281,7 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
@@ -622,7 +622,9 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "b3fcd297": 1
+  },
   "external_blockers": {
     "c780514e test-topology (paused)": [
       "0af95f14",
@@ -732,8 +734,51 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Mechanical macro adoption, one file."
+    },
+    {
+      "issue": "b3fcd297",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: remove library-code expect flagged by code-review (same tier; slip, not capability)."
+    },
+    {
+      "issue": "428646c5",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Small retype of one resolver and its graph comparisons."
+    },
+    {
+      "issue": "2ac50581",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Thirteen-file token consolidation on the priority critical path."
+    },
+    {
+      "issue": "7383f4ea",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Load-time enum decode with one error-path criterion."
+    },
+    {
+      "issue": "6add7ca6",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Two-file macro adoption with byte-identity check."
     }
   ],
-  "surfaced_pitfalls": [],
-  "started_at": "2026-10-24T23:06:41.581082+00:00"
+  "surfaced_pitfalls": [
+    {
+      "source": "c400730c",
+      "note": "While IssueId is the String alias, IssueIdPrefix::try_from(&String) picks the infallible From<&IssueId> and skips the length check; staging briefs must say to parse with from_str. Disappears at the flip (7abcc22d)."
+    }
+  ],
+  "started_at": "2026-10-24T23:06:41.581082+00:00",
+  "lessons": [
+    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1)."
+  ]
 }

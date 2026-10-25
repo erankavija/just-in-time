@@ -53,10 +53,7 @@ impl QueryEvaluator {
 
             QueryCondition::Priority(priority) => issue.priority == *priority,
 
-            QueryCondition::Assignee(assignee) => issue
-                .assignee
-                .as_ref()
-                .is_some_and(|a| a == assignee.as_str()),
+            QueryCondition::Assignee(assignee) => issue.assignee.as_ref() == Some(assignee),
 
             QueryCondition::Unassigned => issue.assignee.is_none(),
 
@@ -183,10 +180,10 @@ mod tests {
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
-        let cond = QueryCondition::Assignee("agent:worker-1".to_string());
+        let cond = QueryCondition::Assignee("agent:worker-1".parse().unwrap());
         assert!(QueryEvaluator::eval_condition(&cond, &issue, &context));
 
-        let cond = QueryCondition::Assignee("agent:worker-2".to_string());
+        let cond = QueryCondition::Assignee("agent:worker-2".parse().unwrap());
         assert!(!QueryEvaluator::eval_condition(&cond, &issue, &context));
     }
 
