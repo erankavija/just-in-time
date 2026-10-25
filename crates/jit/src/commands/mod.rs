@@ -764,7 +764,7 @@ fn claims_mutation_guard(
         return Ok(None);
     }
     let agent = crate::agent_config::resolve_agent_id(None)
-        .unwrap_or_else(|_| crate::domain::Assignee::SYSTEM_LEASE_CHECK.to_string());
+        .unwrap_or(crate::domain::Assignee::SYSTEM_LEASE_CHECK);
     let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
         .unwrap_or_else(|| paths.worktree_root.display().to_string());
     let coordinator = ClaimCoordinator::new(
@@ -793,7 +793,7 @@ fn captured_lease_warnings(
     for id in targets {
         let active = guard
             .map(|guard| {
-                guard.has_active_lease(id, agent.as_deref(), |raw| {
+                guard.has_active_lease(id, agent.as_ref(), |raw| {
                     resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
                 })
             })
@@ -821,7 +821,7 @@ fn ensure_claim_available(
 ) -> Result<()> {
     let Some(lease) = guard
         .map(|guard| {
-            guard.conflicting_lease(target, Some(&assignee.to_string()), |raw| {
+            guard.conflicting_lease(target, Some(assignee), |raw| {
                 resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
             })
         })
@@ -4385,7 +4385,7 @@ enforce_leases = "strict"
             paths.clone(),
             FileLocker::new(Duration::from_secs(1)),
             "wt:test".to_string(),
-            "agent:test".to_string(),
+            "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
         let issue_id = "abcd1111111111111111111111111111";
