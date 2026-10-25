@@ -16,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "8c3633b0-09bd-4be8-ab11-27aa9ecd9adb",
+      "run_id": "0caf24ba-602b-4142-9a77-6ebeceebca14",
       "status": "passed",
-      "updated_at": "2026-10-25T08:17:51.082507167Z",
+      "updated_at": "2026-10-25T10:56:00.315110409Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "a37c93cf-04f1-4597-a8ed-a59077e9edb5",
+      "run_id": "e165a5fd-c35f-4a7d-b758-5c579bb0e853",
       "status": "failed",
-      "updated_at": "2026-10-25T08:22:00.050816640Z",
+      "updated_at": "2026-10-25T10:57:40.082773036Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The CLI resolves each issue-id argument once at entry",
-  "updated_at": "2026-10-25T08:22:00.050816640Z"
+  "updated_at": "2026-10-25T10:57:40.082773036Z"
 }
