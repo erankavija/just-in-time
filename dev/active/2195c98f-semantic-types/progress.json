@@ -1,7 +1,7 @@
 {
   "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "epic_short_id": "2195c98f",
-  "current_wave": 3,
+  "current_wave": 4,
   "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
   "waves": [
     {
@@ -419,14 +419,14 @@
           "short_id": "e98ae5a4",
           "title": "Event tags declare their wire spelling once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f265e748-e350-4ba6-949f-575acf122bd9",
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -1166,6 +1166,20 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Rework R1: rewrite one repository-log round-trip test to the amended REQ-03; small and exact; alternation slot is Claude after the Codex 91081bd3 dispatch."
+    },
+    {
+      "issue": "e98ae5a4",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Macro adoption plus two narrow retypes with exact criteria; alternation slot is Codex."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Accessor retype with a known caller list; alternation slot is Claude."
     }
   ],
   "surfaced_pitfalls": [
