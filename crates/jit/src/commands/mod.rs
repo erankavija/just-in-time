@@ -1050,7 +1050,7 @@ fn derive_write_validation(
     force: bool,
 ) -> Result<WriteValidation> {
     let repo_format = config.content_format()?;
-    let strictness = config.strictness()?;
+    let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
         .with_strictness(strictness);
@@ -1172,7 +1172,7 @@ fn derive_state_transition(
             let hierarchy =
                 crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
             let repo_format = evidence.config.content_format()?;
-            let strictness = evidence.config.strictness()?;
+            let strictness = evidence.config.strictness();
             let enforcing = rules
                 .iter()
                 .filter(|rule| rule.enforce)
