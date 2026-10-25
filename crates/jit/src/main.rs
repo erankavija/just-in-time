@@ -4668,6 +4668,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .into());
                 }
                 let output_ctx = OutputContext::new(quiet, false);
+                let scope = scope
+                    .map(|scope| resolve_issue_arg(&storage, &scope))
+                    .transpose()?;
 
                 // `batch` runs a distinct projection (issue definitions plus
                 // reported boundary edges); every other format renders the graph.
@@ -6841,11 +6844,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match resolve_issue_arg(&storage, &issue_id)
-                    .with_context(|| format!("Failed to resolve issue id {}", issue_id))
-                    .and_then(|full_id| {
-                        execute_claim_release_by_issue(&storage, &worktree_paths, &full_id)
-                    }) {
+                match resolve_issue_arg(&storage, &issue_id).and_then(|full_id| {
+                    execute_claim_release_by_issue(&storage, &worktree_paths, &full_id)
+                }) {
                     Ok((released, warnings)) => {
                         if json {
                             let response = serde_json::json!({

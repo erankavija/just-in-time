@@ -1,330 +1,131 @@
 //! Tests for short hash issue ID resolution
 //!
-//! Validates that partial UUID prefixes work like git short hashes.
-use jit::storage::IssueStore;
+//! Validates that partial UUID prefixes work like git short hashes. Short
+//! prefixes enter through the CLI, which resolves each issue-id argument once.
+use jit::test_cli::JitCli;
 use jit::test_harness::TestHarness;
 
+/// Every issue-id position of the CLI accepts a unique short prefix and acts on
+/// the issue it names.
 #[test]
-fn test_cli_show_with_short_hash() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Test issue");
+fn test_cli_issue_id_arguments_resolve_a_unique_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = cli.create_issue(["To"]).unwrap();
+    let short = |id: &str| id[..8].to_string();
 
-    // Use short hash in show command
-    let prefix = &id[..8];
-    let issue = h.executor.issues().show_issue(prefix).unwrap();
-    assert_eq!(issue.id, id);
-    assert_eq!(issue.title, "Test issue");
-}
+    let shown = cli.run_json(["issue", "show", &short(&from)]).unwrap();
+    assert_eq!(shown["id"], from.as_str());
 
-#[test]
-fn test_cli_update_with_short_hash() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Test issue");
-
-    // Use short hash in update command
-    let prefix = &id[..8];
-    let _ = h
-        .executor
-        .issues()
-        .update_issue(
-            prefix,
-            None,
-            None,
-            None,
-            None,
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
+    cli.run(["issue", "update", &short(&from), "--title", "Renamed"])
         .unwrap();
+    cli.run(["dep", "add", &short(&from), &short(&to)]).unwrap();
+    let updated = cli.run_json(["issue", "show", &from]).unwrap();
+    assert_eq!(updated["title"], "Renamed");
+    assert_eq!(updated["dependencies"][0]["id"], to.as_str());
 
-    // Verify it worked
-    let issue = h.storage.load_issue(&id).unwrap();
-    assert_eq!(issue.id, id);
+    let deleted = cli
+        .command_with_env(
+            ["issue", "delete", &short(&to)],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
+        .output()
+        .unwrap();
+    assert!(deleted.status.success(), "{deleted:?}");
+    assert!(cli.run(["issue", "show", &to]).is_err());
 }
 
+/// Every CLI issue-id argument refuses a prefix below the minimum as an invalid
+/// prefix before reading any issue record: the only record is unreadable, so a
+/// read before the refusal surfaces instead.
 #[test]
-fn test_cli_dependency_with_short_hashes() {
-    let h = TestHarness::new();
-    let id1 = h.create_issue("Issue 1");
-    let id2 = h.create_issue("Issue 2");
-
-    // Use short hashes for both IDs
-    let prefix1 = &id1[..8];
-    let prefix2 = &id2[..8];
-
-    h.executor.add_dependency(prefix1, prefix2).unwrap();
-
-    // Verify dependency was added
-    let issue1 = h.storage.load_issue(&id1).unwrap();
-    assert!(issue1.dependencies.contains(&id2));
-}
-
-#[test]
-fn test_cli_delete_with_short_hash() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Test issue");
-
-    // Delete using short hash
-    let prefix = &id[..8];
-    h.executor.issues().delete_issue(prefix).unwrap();
-
-    // Verify it's gone
-    let result = h.storage.load_issue(&id);
-    assert!(result.is_err());
-}
-
-/// Every command entry point taking an issue id refuses a prefix below the
-/// minimum as an invalid prefix before reading any issue record: the only
-/// record is unreadable, so a read before the refusal surfaces instead.
-#[test]
-fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records() {
-    use jit::commands::GraphExportFormat;
-    use jit::document::DocumentScope;
-    use std::collections::BTreeMap;
-
-    type EntryPoint = fn(&TestHarness, &str, &str) -> anyhow::Result<()>;
-    let entry_points: &[(&str, EntryPoint)] = &[
-        ("issue show", |h, short, _| {
-            h.executor.issues().show_issue(short).map(drop)
-        }),
-        ("issue children", |h, short, _| {
-            h.executor.issues().issue_children(short).map(drop)
-        }),
-        ("issue progress", |h, short, _| {
-            h.executor.issues().issue_progress(short).map(drop)
-        }),
-        ("issue update", |h, short, _| {
-            h.executor
-                .issues()
-                .update_issue(
-                    short,
-                    Some("t".into()),
-                    None,
-                    None,
-                    None,
-                    vec![],
-                    vec![],
-                    None,
-                    None,
-                    false,
-                )
-                .map(drop)
-        }),
-        ("issue state", |h, short, _| {
-            h.executor
-                .issues()
-                .update_issue_state(short, jit::domain::State::Done)
-                .map(drop)
-        }),
-        ("issue reject", |h, short, _| {
-            h.executor.issues().reject_issue(short, None).map(drop)
-        }),
-        ("issue reject with reason", |h, short, _| {
-            h.executor
-                .issues()
-                .reject_issue(short, Some("dup"))
-                .map(drop)
-        }),
-        ("issue assign", |h, short, _| {
-            h.executor
-                .issues()
-                .assign_issue(short, "agent:a".into())
-                .map(drop)
-        }),
-        ("issue claim", |h, short, _| {
-            h.executor
-                .issues()
-                .claim_issue(short, "agent:a".into())
-                .map(drop)
-        }),
-        ("issue unassign", |h, short, _| {
-            h.executor.issues().unassign_issue(short).map(drop)
-        }),
-        ("issue release", |h, short, _| {
-            h.executor.issues().release_issue(short, "r")
-        }),
-        ("issue delete", |h, short, _| {
-            h.executor.issues().delete_issue(short).map(drop)
-        }),
-        ("dep add source", |h, short, full| {
-            h.executor.add_dependency(short, full).map(drop)
-        }),
-        ("dep add target", |h, short, full| {
-            h.executor.add_dependency(full, short).map(drop)
-        }),
-        ("dep add batch", |h, short, full| {
-            h.executor
-                .add_dependencies(full, &[short.to_string()])
-                .map(drop)
-        }),
-        ("dep rm source", |h, short, full| {
-            h.executor.remove_dependency(short, full).map(drop)
-        }),
-        ("dep rm target", |h, short, full| {
-            h.executor.remove_dependency(full, short).map(drop)
-        }),
-        ("dep rm batch", |h, short, full| {
-            h.executor
-                .remove_dependencies(full, &[short.to_string()])
-                .map(drop)
-        }),
-        ("template container", |h, short, _| {
-            h.executor
-                .apply_template("t", short, &BTreeMap::new(), false)
-                .map(drop)
-        }),
-        ("template anchor", |h, short, full| {
-            let anchors = BTreeMap::from([("a".to_string(), short.to_string())]);
-            h.executor
-                .apply_template("t", full, &anchors, false)
-                .map(drop)
-        }),
-        ("gate add", |h, short, _| {
-            h.executor.add_gates(short, &["g".into()]).map(drop)
-        }),
-        ("gate remove", |h, short, _| {
-            h.executor.remove_gates(short, &["g".into()]).map(drop)
-        }),
-        ("gate pass", |h, short, _| {
-            h.executor
-                .pass_gate(short, "g".into(), None, false)
-                .map(drop)
-        }),
-        ("gate pass all", |h, short, _| {
-            h.executor.pass_all_gates(short, None, false).map(drop)
-        }),
-        ("gate fail", |h, short, _| {
-            h.executor.fail_gate(short, "g".into(), None).map(drop)
-        }),
-        ("gate evaluate", |h, short, _| {
-            h.executor.check_gate(short, "g").map(drop)
-        }),
-        ("gate preset apply", |h, short, _| {
-            h.executor
-                .apply_gate_preset(short, "p", None, false, false, &[])
-                .map(drop)
-        }),
-        ("gate preset create", |h, short, _| {
-            h.executor.create_gate_preset("p", short).map(drop)
-        }),
-        ("gate runs", |h, short, _| {
-            h.executor.list_gate_runs(short, None).map(drop)
-        }),
-        ("gate last run", |h, short, _| {
-            h.executor.get_last_gate_run(short, "g").map(drop)
-        }),
-        ("gate last runs", |h, short, _| {
-            h.executor.get_last_gate_runs_for_issue(short).map(drop)
-        }),
-        ("gate statuses", |h, short, _| {
-            h.executor
-                .get_required_gate_statuses_for_issue(short)
-                .map(drop)
-        }),
-        ("doc add", |h, short, _| {
-            h.executor
-                .add_document_reference(short, "d.md", None, None, None, true)
-                .map(drop)
-        }),
-        ("doc list", |h, short, _| {
-            h.executor.list_document_references(short).map(drop)
-        }),
-        ("doc remove", |h, short, _| {
-            h.executor
-                .remove_document_reference(short, "d.md")
-                .map(drop)
-        }),
-        ("doc show", |h, short, _| {
-            h.executor
-                .show_document_content(short, "d.md", None)
-                .map(drop)
-        }),
-        ("doc history", |h, short, _| {
-            h.executor.document_history(short, "d.md").map(drop)
-        }),
-        ("doc diff", |h, short, _| {
-            h.executor
-                .document_diff(short, "d.md", "HEAD", None)
-                .map(drop)
-        }),
-        ("doc assets", |h, short, _| {
-            h.executor
-                .list_document_assets(short, "d.md", false)
-                .map(drop)
-        }),
-        ("doc artifact dir", |h, short, _| {
-            h.executor
-                .resolve_issue_artifact_directory(short, "a")
-                .map(drop)
-        }),
-        ("doc check links", |h, short, _| {
-            h.executor
-                .check_document_links(&DocumentScope::Issue(short.to_string()))
-                .map(drop)
-        }),
-        ("graph tree", |h, short, _| {
-            h.executor.build_dependency_tree(short, 1).map(drop)
-        }),
-        ("graph deps", |h, short, _| {
-            h.executor.show_dependencies_with_depth(short, 1).map(drop)
-        }),
-        ("graph rdeps", |h, short, _| {
-            h.executor.show_rdeps_with_depth(short, 1).map(drop)
-        }),
-        ("graph export", |h, short, _| {
-            h.executor
-                .export_graph(GraphExportFormat::Dot, false, Some(short))
-                .map(drop)
-        }),
-        ("graph batch", |h, short, _| {
-            h.executor.export_graph_batch(Some(short)).map(drop)
-        }),
-        ("graph hierarchy", |h, short, _| {
-            h.executor.resolve_hierarchy_tree(Some(short)).map(drop)
-        }),
-        ("validate issue", |h, short, _| {
-            h.executor.run_rules(Some(short)).map(drop)
-        }),
-        ("validate scope", |h, short, _| {
-            h.executor.validate_scope(short).map(drop)
-        }),
-        ("validate rule", |h, short, _| {
-            h.executor.validate_rule(short, "r").map(drop)
-        }),
-        ("validate explain", |h, short, _| {
-            h.executor.explain_rules(short).map(drop)
-        }),
-        ("item show", |h, short, _| {
-            h.executor.show_item(&format!("{short}/x")).map(drop)
-        }),
-        ("archive preview", |h, short, _| {
-            h.executor.preview_archive_container(short).map(drop)
-        }),
-        ("events query", |h, short, _| {
-            h.executor
-                .query_events(None, Some(short.into()), 10)
-                .map(drop)
-        }),
+fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_records() {
+    const SHORT: &str = "{short}";
+    const FULL: &str = "{full}";
+    let invocations: &[&[&str]] = &[
+        &["issue", "show", SHORT],
+        &["issue", "status", SHORT],
+        &["issue", "children", SHORT],
+        &["issue", "progress", SHORT],
+        &["issue", "update", SHORT, "--title", "t"],
+        &["issue", "delete", SHORT],
+        &["issue", "assign", SHORT, "agent:a"],
+        &["issue", "claim", SHORT, "agent:a"],
+        &["issue", "unassign", SHORT],
+        &["issue", "reject", SHORT],
+        &["issue", "release", SHORT, "r"],
+        &["dep", "add", SHORT, FULL],
+        &["dep", "add", FULL, SHORT],
+        &["dep", "rm", SHORT, FULL],
+        &["dep", "rm", FULL, SHORT],
+        &["apply", "t", SHORT],
+        &["apply", "t", FULL, "--anchor", "a={short}"],
+        &["gate", "add", SHORT, "g"],
+        &["gate", "evaluate", SHORT, "g"],
+        &["gate", "evaluate-all", SHORT],
+        &["gate", "evaluate-many", "g", SHORT],
+        &["gate", "fail", SHORT, "g"],
+        &["gate", "status", SHORT, "g"],
+        &["gate", "status", SHORT, "g", "--findings"],
+        &["gate", "status", SHORT, "g", "--stdout"],
+        &["gate", "status", SHORT, "--all"],
+        &["gate", "status-all", SHORT],
+        &["gate", "preset", "apply", "p", SHORT],
+        &["gate", "preset", "create", SHORT, "p"],
+        &["doc", "add", SHORT, "d.md"],
+        &["doc", "list", SHORT],
+        &["doc", "remove", SHORT, "d.md"],
+        &["doc", "show", SHORT, "d.md"],
+        &["doc", "dir", SHORT, "a"],
+        &["doc", "history", SHORT, "d.md"],
+        &["doc", "diff", SHORT, "d.md", "--from", "HEAD"],
+        &["doc", "assets", "list", SHORT, "d.md"],
+        &["doc", "check-links", "--scope", "issue:{short}"],
+        &["graph", "deps", SHORT],
+        &["graph", "rdeps", SHORT],
+        &["graph", "tree", SHORT],
+        &["graph", "export", "--scope", SHORT],
+        &["graph", "export", "--format", "batch", "--scope", SHORT],
+        &["validate", SHORT],
+        &["validate", "--scope", SHORT],
+        &["validate", SHORT, "--rule", "r"],
+        &["validate", SHORT, "--explain"],
+        &["item", "show", "{short}/x"],
+        &["archive", "container", SHORT],
+        &["events", "query", "--issue-id", SHORT],
+        &["claim", "acquire", SHORT, "--agent-id", "agent:a"],
+        &["claim", "release", SHORT],
+        &["claim", "status", "--issue", SHORT],
     ];
 
-    let h = TestHarness::new();
-    let full = h.create_issue("Unreadable");
-    h.storage
-        .add_data_file(format!("issues/{full}.json"), "not an issue record");
+    let cli = JitCli::initialised().unwrap();
+    let full = cli.create_issue(["Unreadable"]).unwrap();
+    std::fs::write(
+        cli.root().join(format!(".jit/issues/{full}.json")),
+        "not an issue record",
+    )
+    .unwrap();
     let short = &full[..jit::domain::identity::IssueIdPrefix::MIN_ID_PREFIX_LENGTH - 1];
+    let refusal = jit::domain::identity::InvalidIdPrefixError::new(short).to_string();
 
-    let unrefused: Vec<String> = entry_points
+    let unrefused: Vec<String> = invocations
         .iter()
-        .filter_map(|(name, call)| {
-            let refused = call(&h, short, &full).is_err_and(|error| {
-                jit::output::failure::classify(&error).error.code
-                    == jit::output::ErrorCode::InvalidIdPrefix
-            });
-            (!refused).then(|| name.to_string())
+        .map(|args| {
+            args.iter()
+                .map(|arg| arg.replace(SHORT, short).replace(FULL, &full))
+                .collect::<Vec<_>>()
         })
+        .filter(|args| {
+            let output = cli
+                .command_with_env(args, [("JIT_ALLOW_DELETION", "1")])
+                .output()
+                .unwrap();
+            let reported = [&output.stdout, &output.stderr]
+                .iter()
+                .any(|stream| String::from_utf8_lossy(stream).contains(&refusal));
+            output.status.success() || !reported
+        })
+        .map(|args| args.join(" "))
         .collect();
     assert!(
         unrefused.is_empty(),
