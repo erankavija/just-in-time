@@ -192,7 +192,7 @@
           "short_id": "a50e9be9",
           "title": "Resolved agent identity is an Assignee",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
@@ -309,7 +309,7 @@
           "short_id": "8cfbf19d",
           "title": "Lease and worktree ids are dedicated types",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
@@ -860,6 +860,13 @@
       "model": "opus",
       "effort": "-",
       "reason": "Produces the shared IdPattern contract the assertion chain consumes."
+    },
+    {
+      "issue": "8cfbf19d",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Two new identity types across nine files with fallback error paths."
     }
   ],
   "surfaced_pitfalls": [
