@@ -218,13 +218,13 @@ Extends the expiry time of an existing lease. For finite leases, adds time to th
 
 ```bash
 # Extend by the default TTL
-jit claim renew abc12345-6789-...
+jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41
 
 # Extend by 1 hour
-jit claim renew abc12345-6789-... --extension 3600
+jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 3600
 
 # JSON output
-jit claim renew abc12345-6789-... --json
+jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --json
 ```
 
 ### Failure modes
@@ -265,10 +265,10 @@ Updates the `last_beat` timestamp for an indefinite (TTL=0) lease without changi
 
 ```bash
 # Send heartbeat
-jit claim heartbeat abc12345-6789-...
+jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41
 
 # JSON output
-jit claim heartbeat abc12345-6789-... --json
+jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41 --json
 ```
 
 ### Staleness
@@ -340,7 +340,7 @@ jit claim status --json
 
 For finite leases:
 ```
-Lease: abc12345-6789-...
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue:    01ABC123
   Agent:    agent:copilot-1
   Worktree: wt:a1b2c3
@@ -351,7 +351,7 @@ Lease: abc12345-6789-...
 
 For indefinite leases:
 ```
-Lease: abc12345-6789-...
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue:    01ABC123
   Agent:    agent:copilot-1
   Worktree: wt:a1b2c3
@@ -364,7 +364,7 @@ Lease: abc12345-6789-...
 For stale indefinite leases:
 ```
   ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
-     Use 'jit claim heartbeat abc12345-6789-...' to refresh
+     Use 'jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41' to refresh
 ```
 
 ### Failure modes
@@ -443,13 +443,13 @@ Removes a lease immediately regardless of ownership. This is an administrative o
 
 ```bash
 # Evict a stale lease from crashed agent
-jit claim force-evict abc12345-6789-... --reason "Agent crashed, no heartbeat for 2 hours"
+jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Agent crashed, no heartbeat for 2 hours"
 
 # Emergency override
-jit claim force-evict abc12345-6789-... --reason "Emergency: blocking deployment"
+jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Emergency: blocking deployment"
 
 # JSON output
-jit claim force-evict abc12345-6789-... --reason "Stale" --json
+jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Stale" --json
 ```
 
 ### Audit Trail

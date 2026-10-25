@@ -3,6 +3,7 @@
 //! This module provides deterministic worktree ID generation and persistence
 //! to support parallel multi-agent work with git worktrees.
 
+use crate::domain::identity::WorktreeId;
 use crate::repository_state::WORKTREE_IDENTITY_FILE;
 use crate::storage::atomic_write::{sync_directory, write_file_synced};
 use crate::storage::{RepositoryNotFoundError, StorageWarning};
@@ -21,8 +22,8 @@ pub struct WorktreeIdentity {
     /// Schema version for future compatibility
     pub schema_version: u32,
 
-    /// Stable worktree identifier (format: "wt:{8-hex-chars}")
-    pub worktree_id: String,
+    /// Stable worktree identifier (generated as "wt:{8-hex-chars}")
+    pub worktree_id: WorktreeId,
 
     /// Current git branch
     pub branch: String,
@@ -46,14 +47,17 @@ pub struct WorktreeIdentity {
 /// # Format
 ///
 /// `wt:{8-hex-chars}` (e.g., `wt:abc123ef`)
-pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
+pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> Result<WorktreeId> {
     let mut hasher = Sha256::new();
     hasher.update(path.to_string_lossy().as_bytes());
     hasher.update(created_at.to_rfc3339().as_bytes());
     let hash = hasher.finalize();
 
     // Truncate to first 4 bytes (8 hex chars)
-    format!("wt:{}", hex::encode(&hash[..4]))
+    Ok(WorktreeId::try_from(format!(
+        "wt:{}",
+        hex::encode(&hash[..4])
+    ))?)
 }
 
 /// Load or create worktree identity.
@@ -187,7 +191,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
 
     // Create new identity (either no file existed, or we deleted a copied one)
     let now = Utc::now();
-    let worktree_id = generate_worktree_id(&paths.worktree_root, now);
+    let worktree_id = generate_worktree_id(&paths.worktree_root, now)?;
 
     let identity = WorktreeIdentity {
         schema_version: 1,
@@ -215,7 +219,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
 /// Returns `Ok(None)` when the file is absent (the worktree has no recorded
 /// identity yet), `Ok(Some(id))` when present and parseable, and an error only
 /// when the file exists but cannot be read or parsed.
-pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
+pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<WorktreeId>> {
     let wt_file = worktree_root.join(".jit").join(WORKTREE_IDENTITY_FILE);
     if !wt_file.exists() {
         return Ok(None);
@@ -267,10 +271,10 @@ mod tests {
         let path = PathBuf::from("/test/path");
         let timestamp = Utc::now();
 
-        let id = generate_worktree_id(&path, timestamp);
+        let id = generate_worktree_id(&path, timestamp).unwrap();
 
-        assert!(id.starts_with("wt:"));
-        assert_eq!(id.len(), 11); // "wt:" + 8 hex chars
+        assert!(id.as_str().starts_with("wt:"));
+        assert_eq!(id.as_str().len(), 11); // "wt:" + 8 hex chars
     }
 
     #[test]
@@ -280,8 +284,8 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
 
-        let id1 = generate_worktree_id(&path, timestamp);
-        let id2 = generate_worktree_id(&path, timestamp);
+        let id1 = generate_worktree_id(&path, timestamp).unwrap();
+        let id2 = generate_worktree_id(&path, timestamp).unwrap();
 
         assert_eq!(id1, id2);
     }
@@ -332,7 +336,7 @@ mod tests {
         // deterministic.
         let stored = WorktreeIdentity {
             schema_version: 1,
-            worktree_id: "wt:deadbeef".to_string(),
+            worktree_id: "wt:deadbeef".parse().unwrap(),
             branch: "main".to_string(),
             root: "/nonexistent/old/worktree/path".to_string(),
             created_at: Utc::now(),
@@ -349,7 +353,7 @@ mod tests {
             load_or_create_worktree_identity_with_warnings(&paths, "main").unwrap();
 
         // The stable worktree_id is preserved across the relocation.
-        assert_eq!(identity.worktree_id, "wt:deadbeef");
+        assert_eq!(identity.worktree_id.as_str(), "wt:deadbeef");
         assert_eq!(
             warnings,
             vec![StorageWarning::WorktreeRelocated {
@@ -361,6 +365,6 @@ mod tests {
 
         // The convenience wrapper drops the warning but yields the same identity.
         let plain = load_or_create_worktree_identity(&paths, "main").unwrap();
-        assert_eq!(plain.worktree_id, "wt:deadbeef");
+        assert_eq!(plain.worktree_id.as_str(), "wt:deadbeef");
     }
 }
