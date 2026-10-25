@@ -26,7 +26,7 @@
           "short_id": "1f6d3754",
           "title": "Artifact-plan errors use the derive-based error convention",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3e353abd-9b73-4da2-a8e7-ea07512f3e3e",
@@ -40,21 +40,21 @@
           "short_id": "3f026bb1",
           "title": "One macro declares a closed wire vocabulary",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "62a0085a-a0e4-4877-8dbf-2bd8f4a6e1c3",
           "short_id": "62a0085a",
           "title": "HierarchyConfig has one fallible constructor from declarations",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "6e8b9f31-64ae-4a05-b4e8-dbe39d35638b",
           "short_id": "6e8b9f31",
           "title": "System actors are named Assignee constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
@@ -143,7 +143,7 @@
           "short_id": "3ae2293a",
           "title": "Gate stage and mode tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
@@ -178,7 +178,7 @@
           "short_id": "80fe846e",
           "title": "Artifact-plan codes declare their wire spelling once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "96bb0941-07f3-4f55-bd69-93ad587c5540",
@@ -206,7 +206,7 @@
           "short_id": "b8506ce7",
           "title": "Store divergence tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
@@ -241,7 +241,7 @@
           "short_id": "f8f80eea",
           "title": "Hierarchy callers propagate the constructor's error",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "faa19def-4484-4706-becf-dab559f0f3d4",
@@ -697,6 +697,41 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Multi-file type move across 14 files with a layer constraint."
+    },
+    {
+      "issue": "f8f80eea",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Caller sweep with exact criteria."
+    },
+    {
+      "issue": "6e8b9f31",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting const Assignee constructor."
+    },
+    {
+      "issue": "80fe846e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical macro adoption, one file."
+    },
+    {
+      "issue": "3ae2293a",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Mechanical macro adoption with a byte-identity check."
+    },
+    {
+      "issue": "b8506ce7",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical macro adoption, one file."
     }
   ],
   "surfaced_pitfalls": [],
