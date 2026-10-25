@@ -27,9 +27,6 @@ pub const GATES_LOCK_FILE: &str = ".gates.lock";
 /// The data root's event-log lock.
 pub const EVENTS_LOCK_FILE: &str = ".events.lock";
 
-/// The data root's machine-local worktree identity record.
-pub const WORKTREE_IDENTITY_FILE: &str = "worktree.json";
-
 /// Whether `path` names the worktree bootstrap lock, or something below it.
 ///
 /// No mutation may target it. Publication writes a file by staging it and
@@ -258,6 +255,11 @@ mod identity {
             &self.relative
         }
 
+        /// Final path component, when this identity is below its selected root.
+        pub fn file_name(&self) -> Option<&str> {
+            self.relative().as_path().file_name()?.to_str()
+        }
+
         /// The data root's scratch directory is the one namespace no semantic
         /// identity may name: what sits there is engine state mid-publication,
         /// which no repository path addresses. The worktree has no such
@@ -329,6 +331,12 @@ mod identity {
         INVARIANTS: Data = "invariants.toml";
         /// Append-only event log under the data root (`.jit/events.jsonl`).
         EVENTS: Data = "events.jsonl";
+        /// Machine-local worktree identity record under the data root.
+        WORKTREE_IDENTITY: Data = "worktree.json";
+        /// Server process record under the data root.
+        SERVER_PID: Data = "server.pid.json";
+        /// Server output log under the data root.
+        SERVER_LOG: Data = "server.log";
         /// Applied-profile state directory under the data root (`.jit/profiles`).
         PROFILES: Data = "profiles";
         /// Per-issue record directory under the data root (`.jit/issues`).
@@ -584,6 +592,7 @@ impl RepositoryLayout {
     /// the data root is not in the set, so its edits reach a digest.
     pub(crate) fn tracker_written_paths(&self) -> Vec<RootRelativePath> {
         let records = VirtualPath::RECORDS;
+        let worktree_identity = VirtualPath::WORKTREE_IDENTITY;
         let data_entries = records
             .iter()
             .map(|record| record.relative().as_str())
@@ -593,7 +602,7 @@ impl RepositoryLayout {
                 GATES_LOCK_FILE,
                 EVENTS_LOCK_FILE,
                 RECORD_SCRATCH_DIR,
-                WORKTREE_IDENTITY_FILE,
+                worktree_identity.relative().as_str(),
             ]);
         std::iter::once(RootRelativePath::Descendant(Cow::Borrowed(
             BOOTSTRAP_LOCK_FILE,
@@ -1146,6 +1155,16 @@ mod tests {
             VirtualPath::ALL_KNOWN.len(),
             "the well-known declaration names one repository path twice"
         );
+    }
+
+    #[test]
+    fn test_virtual_path_file_name_returns_the_final_component() {
+        assert_eq!(VirtualPath::SERVER_LOG.file_name(), Some("server.log"));
+        assert_eq!(
+            VirtualPath::data("nested/file").unwrap().file_name(),
+            Some("file")
+        );
+        assert_eq!(VirtualPath::worktree("").unwrap().file_name(), None);
     }
 
     #[test]
