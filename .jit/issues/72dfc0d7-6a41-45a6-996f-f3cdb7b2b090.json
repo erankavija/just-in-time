@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "77c897e9-a15a-4526-a3fc-f2845dc2b481",
+      "run_id": "519912bb-6eeb-45c7-a0e6-4e703cb15fb8",
       "status": "passed",
-      "updated_at": "2026-10-25T05:32:15.881889690Z",
+      "updated_at": "2026-10-25T05:34:36.524721606Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Built-in gate findings use closed severity and disposition enums",
-  "updated_at": "2026-10-25T05:33:10.053654660Z"
+  "updated_at": "2026-10-25T05:34:36.524721606Z"
 }
