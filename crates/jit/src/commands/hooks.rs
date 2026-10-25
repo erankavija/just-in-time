@@ -201,7 +201,7 @@ mod tests {
 
     fn grant_lease(repo: &Path, holder: &str) {
         let index = serde_json::json!({ "leases": [{
-            "lease_id": "l1", "issue_id": ISSUE_ID, "agent_id": holder, "stale": false
+            "lease_id": "00000000-0000-4000-8000-000000000001", "issue_id": ISSUE_ID, "agent_id": holder, "stale": false
         }] });
         write(repo, ".git/jit/claims.index.json", &index.to_string());
     }

@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-256c8eb1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dde4fe683a9e4f42fdd2ae82f6dce1f3df320177",
+  "completed_at": "2026-10-25T03:25:22.148026874Z",
+  "duration_ms": 104957,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "scripts/generate-error-code-reference.sh",
+        "id": "F1",
+        "line": 13,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "The error-code reference generator still describes the removed derive-checked ErrorCode conformance test instead of the vocabulary macro."
+      }
+    ],
+    "summary": "Both hard criteria are satisfied; one advisory stale script comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "45d9476b-ef57-4551-81d5-0306ed63ac40",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T03:23:37.190687760Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e1d89b865ceb16f7d34082a52c56eaf72fcf1adf (`jit:256c8eb1`; `crates/jit/src/output.rs`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-10 and REQ-13 (.jit issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, essential-code-prose, single-source-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T03:21:56Z); code-review pending before this review\nTruncation recovery: reread the tagged patch in two hunk-bounded reads; narrowed current macro, tests, caller, documentation generator, and post-merge diff reads\n\n1. **F1 — advisory, issue-impact, low:** [scripts/generate-error-code-reference.sh:13](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-256c8eb1/scripts/generate-error-code-reference.sh:13) still says a derive-checked member list and a declaration-adjacent conformance test enforce completeness. The attributed change removed that test and now relies on `wire_vocabulary!`; update this stale mechanism description. References: @/invariant/essential-code-prose, @/invariant/single-source-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are satisfied; one advisory stale script comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The error-code reference generator still describes the removed derive-checked ErrorCode conformance test instead of the vocabulary macro.\",\"file\":\"scripts/generate-error-code-reference.sh\",\"line\":13,\"references\":[\"@/invariant/essential-code-prose\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

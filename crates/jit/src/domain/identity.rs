@@ -101,6 +101,132 @@ impl fmt::Display for ValidatedIssueId {
     }
 }
 
+/// Invalid lease identity, including the rejected input.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("invalid lease id '{input}'; expected a lowercase hyphenated UUID")]
+pub struct InvalidLeaseIdError {
+    input: String,
+}
+
+/// A lease id in the canonical lowercase hyphenated UUID form.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+#[schemars(with = "String", description = "")]
+pub struct LeaseId(String);
+
+impl LeaseId {
+    /// Borrow the id.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for LeaseId {
+    type Error = InvalidLeaseIdError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        (Uuid::parse_str(input)
+            .ok()
+            .is_some_and(|uuid| uuid.to_string() == input))
+        .then(|| Self(input.to_string()))
+        .ok_or_else(|| InvalidLeaseIdError {
+            input: input.to_string(),
+        })
+    }
+}
+
+impl TryFrom<String> for LeaseId {
+    type Error = InvalidLeaseIdError;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Self::try_from(input.as_str())
+    }
+}
+
+impl FromStr for LeaseId {
+    type Err = InvalidLeaseIdError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::try_from(input)
+    }
+}
+
+impl From<LeaseId> for String {
+    fn from(id: LeaseId) -> Self {
+        id.0
+    }
+}
+
+impl fmt::Display for LeaseId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+/// Invalid worktree identity, including the rejected input.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("invalid worktree id '{input}'; expected a non-empty token without whitespace")]
+pub struct InvalidWorktreeIdError {
+    input: String,
+}
+
+/// A non-empty worktree token without whitespace.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+#[schemars(with = "String", description = "")]
+pub struct WorktreeId(String);
+
+impl WorktreeId {
+    /// Borrow the id.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for WorktreeId {
+    type Error = InvalidWorktreeIdError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        (!input.is_empty() && !input.chars().any(char::is_whitespace))
+            .then(|| Self(input.to_string()))
+            .ok_or_else(|| InvalidWorktreeIdError {
+                input: input.to_string(),
+            })
+    }
+}
+
+impl TryFrom<String> for WorktreeId {
+    type Error = InvalidWorktreeIdError;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Self::try_from(input.as_str())
+    }
+}
+
+impl FromStr for WorktreeId {
+    type Err = InvalidWorktreeIdError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::try_from(input)
+    }
+}
+
+impl From<WorktreeId> for String {
+    fn from(id: WorktreeId) -> Self {
+        id.0
+    }
+}
+
+impl fmt::Display for WorktreeId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 /// Error raised when an issue-id prefix normalises to fewer than
 /// [`IssueIdPrefix::MIN_ID_PREFIX_LENGTH`] characters.
 ///
@@ -350,6 +476,94 @@ mod tests {
                 "type": "string"
             })
         );
+    }
+
+    #[test]
+    fn test_lease_id_round_trips_canonical_uuid_at_parse_boundaries() {
+        let input = "b53beeba-32f2-4671-a407-2d94e4d13d41";
+        let id = LeaseId::try_from(input).unwrap();
+        assert_eq!(id.as_str(), input);
+        assert_eq!(id.to_string(), input);
+        assert_eq!(input.parse::<LeaseId>().unwrap(), id);
+        assert_eq!(LeaseId::try_from(input.to_string()).unwrap(), id);
+        let encoded = serde_json::to_value(&id).unwrap();
+        assert_eq!(encoded, json!(input));
+        assert_eq!(serde_json::from_value::<LeaseId>(encoded).unwrap(), id);
+        assert_eq!(String::from(id), input);
+    }
+
+    #[test]
+    fn test_lease_id_rejects_non_canonical_uuid_at_parse_boundaries() {
+        for input in [
+            "",
+            "lease-1",
+            "b53beeba32f24671a4072d94e4d13d41",
+            "B53BEEBA-32F2-4671-A407-2D94E4D13D41",
+            "{b53beeba-32f2-4671-a407-2d94e4d13d41}",
+            "urn:uuid:b53beeba-32f2-4671-a407-2d94e4d13d41",
+            " b53beeba-32f2-4671-a407-2d94e4d13d41",
+        ] {
+            assert!(LeaseId::try_from(input)
+                .unwrap_err()
+                .to_string()
+                .contains(input));
+            assert!(input.parse::<LeaseId>().is_err());
+            assert!(serde_json::from_value::<LeaseId>(json!(input)).is_err());
+        }
+    }
+
+    #[test]
+    fn test_worktree_id_round_trips_non_empty_tokens_at_parse_boundaries() {
+        for input in [
+            "wt:abc123ef",
+            "wt:feature/branch",
+            "/tmp/repo",
+            "token",
+            "树",
+        ] {
+            let id = WorktreeId::try_from(input).unwrap();
+            assert_eq!(id.as_str(), input);
+            assert_eq!(id.to_string(), input);
+            assert_eq!(input.parse::<WorktreeId>().unwrap(), id);
+            assert_eq!(WorktreeId::try_from(input.to_string()).unwrap(), id);
+            let encoded = serde_json::to_value(&id).unwrap();
+            assert_eq!(encoded, json!(input));
+            assert_eq!(serde_json::from_value::<WorktreeId>(encoded).unwrap(), id);
+            assert_eq!(String::from(id), input);
+        }
+    }
+
+    #[test]
+    fn test_worktree_id_rejects_empty_or_whitespace_tokens_at_parse_boundaries() {
+        for input in [
+            "",
+            " ",
+            "wt:two words",
+            "wt:tab\t",
+            "\nwt:newline",
+            "wt:unicode\u{2003}space",
+        ] {
+            assert!(WorktreeId::try_from(input)
+                .unwrap_err()
+                .to_string()
+                .contains(input));
+            assert!(input.parse::<WorktreeId>().is_err());
+            assert!(serde_json::from_value::<WorktreeId>(json!(input)).is_err());
+        }
+    }
+
+    #[test]
+    fn test_lease_and_worktree_id_json_schemas_preserve_plain_strings() {
+        let mut generator = schemars::gen::SchemaGenerator::default();
+        for schema in [
+            LeaseId::json_schema(&mut generator),
+            WorktreeId::json_schema(&mut generator),
+        ] {
+            assert_eq!(
+                serde_json::to_value(schema).unwrap(),
+                json!({"type": "string"})
+            );
+        }
     }
 
     fn canonical_id() -> impl Strategy<Value = String> {

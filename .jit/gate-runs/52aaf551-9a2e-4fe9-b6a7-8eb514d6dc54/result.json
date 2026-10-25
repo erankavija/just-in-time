@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-18dc6e3e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d80ef87f3f02ceb3bb245bdf1de2e21011afb0cd",
+  "completed_at": "2026-10-25T03:19:04.959664287Z",
+  "duration_ms": 104359,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-attributed well-known repository-state file sites use VirtualPath constants; the recorded cargo-ci gate passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "52aaf551-9a2e-4fe9-b6a7-8eb514d6dc54",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T03:17:20.599692248Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a080cbf64 (`jit:18dc6e3e`; 11 files)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/2195c98f/requirement/REQ-07 (.jit issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T03:15:48Z)\nTruncation recovery: per-file patch reads; targeted policy, item-source, current-source, and test-boundary literal scans\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-attributed well-known repository-state file sites use VirtualPath constants; the recorded cargo-ci gate passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -34,7 +34,9 @@ unique = true
 }
 
 fn executor(jit_root: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
-    CommandExecutor::new(JsonFileStorage::new(jit_root))
+    let layout =
+        jit::storage::discover_repository_layout(jit_root.parent().unwrap(), jit_root).unwrap();
+    CommandExecutor::new(JsonFileStorage::new(jit_root)).with_layout(layout)
 }
 
 #[test]

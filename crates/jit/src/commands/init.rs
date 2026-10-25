@@ -359,7 +359,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .unwrap_or(""),
         )
         .parse()?;
-        let (config, project_name) = match super::image_repo_bytes(&image, ".jit/config.toml")? {
+        let (config, project_name) = match super::image_virtual_bytes(
+            &image,
+            &crate::repository_state::VirtualPath::CONFIG,
+        )? {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
@@ -397,11 +400,19 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         package: &ProfilePackage,
         variable_inputs: &VariableInputs,
     ) -> Result<ProfileApplicationInput> {
-        super::profile::reject_reserved_application_targets(
-            package.hashes().targets.keys().map(String::as_str),
-        )?;
-        let metadata = package.model();
         let layout = self.require_layout()?;
+        let targets = package
+            .hashes()
+            .targets
+            .keys()
+            .map(|target| {
+                layout
+                    .classify_repository_relative(target)
+                    .map_err(Into::into)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        super::profile::reject_reserved_application_targets(targets.iter())?;
+        let metadata = package.model();
         let resolved = resolve_package(
             package,
             &variable_inputs.for_declarations(&package.model().variables),
@@ -430,28 +441,23 @@ fn init_response_paths(
     gitattributes: GitattributesStatus,
 ) -> Result<(Vec<String>, Vec<String>)> {
     let mut created = [
-        (".jit/index.json", "index.json"),
-        (".jit/gates.toml", "gates.toml"),
-        (".jit/invariants.toml", "invariants.toml"),
-        (".jit/events.jsonl", "events.jsonl"),
-        (".jit/config.toml", "config.toml"),
-        (".jit/rules.toml", "rules.toml"),
+        VirtualPath::INDEX,
+        VirtualPath::GATES,
+        VirtualPath::INVARIANTS,
+        VirtualPath::EVENTS,
+        VirtualPath::CONFIG,
+        VirtualPath::RULES,
     ]
     .into_iter()
-    .map(|(reported, relative)| {
-        let path = VirtualPath::data(relative)?;
-        Ok(plan
-            .delta()
+    .filter_map(|path| {
+        plan.delta()
             .actions()
             .iter()
             .find(|action| action.path() == &path)
             // Each of these paths is a file, so an absent preimage means it is created.
             .is_some_and(|action| *action.expected() == ExpectedPreimage::Absent)
-            .then(|| reported.to_string()))
+            .then(|| path.repository_relative())
     })
-    .collect::<Result<Vec<_>>>()?
-    .into_iter()
-    .flatten()
     .collect::<Vec<_>>();
     let mut modified = Vec::new();
 
@@ -546,9 +552,14 @@ fn worktree_is_git_work_tree(worktree: &Path) -> bool {
 /// The canonical `.jit/events.jsonl` passes through unchanged; patterns containing
 /// whitespace or a quote use Git's C-style quoting layer.
 fn git_events_pattern(relative: &Path) -> String {
-    let path = relative.to_string_lossy();
-    let mut escaped = String::with_capacity(path.len() + "/events.jsonl".len());
-    for ch in path.chars().chain("/events.jsonl".chars()) {
+    let path = relative.join(
+        crate::repository_state::VirtualPath::EVENTS
+            .relative()
+            .as_path(),
+    );
+    let path = path.to_string_lossy();
+    let mut escaped = String::with_capacity(path.len());
+    for ch in path.chars() {
         if ch == std::path::MAIN_SEPARATOR {
             escaped.push('/');
             continue;

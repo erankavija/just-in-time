@@ -249,7 +249,7 @@
           "key": "cli-gate-definition-spawn-migration",
           "title": "gate definition tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "blocked"
         },
         {
           "id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
@@ -257,7 +257,7 @@
           "key": "cli-gate-evaluate-spawn-migration",
           "title": "gate evaluation tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "blocked"
         },
         {
           "id": "5353463c-6517-43ba-b104-b42cf951b4ce",
@@ -1274,13 +1274,13 @@
     },
     {
       "session": 2,
-      "issue": "870e8e46",
+      "issue": "870e8e46, 9c3b9da2, 8e69776c",
       "category": "shared test infrastructure change (escalation policy 7) / footprint expansion",
       "status": "open: awaiting user decision next session",
-      "question": "JitCli (crates/jit/src/test_cli.rs) can init git but cannot stage and commit. gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) need a repository with one commit so HEAD resolves. REQ-01/02 of 870e8e46 cannot be met without a fixture capability.",
+      "question": "The shared JitCli fixture (crates/jit/src/test_cli.rs) lacks two capabilities that migrated tests need: (1) staging and committing in its repository, needed by cli_gate gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) so HEAD resolves; (2) spawning an alternate program (a copied jit binary beside a stub jit-server) under the same environment scrub, needed by cli_issue command_exit_code_projection_tests.rs::test_command_exit_codes_serve_foreground_passthrough_is_dual_form. REQ-01/02 of 870e8e46 and 9c3b9da2 cannot be met without them. (3) 8e69776c: cli_repo_workflow divergence_recovery_journey_tests.rs needs commits and linked checkouts; its helpers (linked_checkout_fixture, create_issue_in, store_divergence_output) live in files outside the batch, so it stays unmigrated under the same commit gap.",
       "options": [
-        "A (recommended): add JitCli::commit_all(message) to the shared fixture, with one owning test in cli_process_fixture_tests.rs, as a new leaf task that 870e8e46 and any later migration needing commits depend on; footprint test_cli.rs + fixture test",
-        "B: permit a local git add/commit helper in those two files as a named convention-convergence exception"
+        "A (recommended): one new leaf task in this epic, 'The shared CLI fixture commits its repository and spawns an alternate binary on request', footprint test_cli.rs + cli_process_fixture_tests.rs, each capability with one owning test; 870e8e46 and 9c3b9da2 depend on it",
+        "B: permit named local exceptions in those files under @/inv/convention-convergence with a tracked convergence condition"
       ],
       "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here"
     },
@@ -1334,6 +1334,12 @@
       "session": 2,
       "finding": "Lead dispatched wave-2 cli_gate batch (870e8e46, 5353463c, eaf543c7) while wave-1 df505379 was still in progress, against wave discipline and the session-1 handoff instruction.",
       "disposition": "Containment: the batch is not merged or gated until df505379 closes and wave 1 is complete. No further wave-2 dispatch before then."
+    },
+    {
+      "session": 2,
+      "from": "w-crw1",
+      "finding": "JitCli has no constructor for a repository root with a chosen basename; project-name seeding tests in project_config_tests.rs and profile_acceptance_tests.rs build one inline with tempfile::Builder + JitCli::with_repository.",
+      "disposition": "Accepted as composition of the shared fixture (no local constructor function). A JitCli::with_named_root constructor would remove the inline builder; fold into the fixture-gap task if the user approves option A."
     }
   ],
   "traps": [
@@ -1985,6 +1991,34 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "mechanical spawn-migration batch in cli_repo_workflow"
+    },
+    {
+      "session": 2,
+      "issue": "fec9b43b,9c3b9da2,5f4daf6b",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "follow-up: first run stopped on stdin (not a gap) and the serve sibling-binary gap"
     }
-  ]
+  ],
+  "checkpoint": {
+    "session": 2,
+    "at": "2026-10-25",
+    "handoff": "dev/active/c780514e-test-topology/handoff-2.md",
+    "unmerged": {
+      "worktree-agent-w2-cli-issue": [
+        "b5faab2f",
+        "e7764cb1",
+        "7bf48536"
+      ],
+      "worktree-agent-w2-crw1": [
+        "e230e621",
+        "8e69776c(partial)",
+        "c9442f7f",
+        "37218dff"
+      ]
+    },
+    "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
+    "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
+  }
 }

@@ -8,7 +8,7 @@
 /// The canonical lifecycle state tokens accepted in a `state:` filter, listed
 /// in an [`QueryParseError::InvalidState`] message.
 pub(super) fn state_values() -> String {
-    crate::domain::State::all().map(|s| s.as_str()).join(", ")
+    crate::domain::State::ALL.map(|s| s.as_str()).join(", ")
 }
 
 /// The set of priority tokens accepted in a `priority:` filter, listed in an

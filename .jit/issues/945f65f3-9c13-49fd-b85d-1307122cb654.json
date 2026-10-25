@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T03:22:45.671242133Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Replace literal well-known `.jit` file names in commands with `VirtualPath` constants.\n\n## Background\n\n`VirtualPath` declares well-known data-root files through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:259-310`), and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`). Commands spell them as literals in `commands/validate.rs` (7 lines), `commands/init.rs` (7), and `commands/gate.rs`, `commands/mod.rs`, `commands/config.rs`, `commands/profile.rs`, `commands/claim.rs`, `commands/snapshot.rs` and `commands/project.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal under `crates/jit/src/commands/`, server control files excepted, builds or matches the path of a well-known `.jit` file; message text that names a file for a reader is not a path site.\n- [hard] REQ-02: Each such site uses a `VirtualPath` constant, and host paths derive through `RepositoryLayout::resolve`.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:07:50.188048424Z",
+  "first_ready_at": "2026-10-25T03:21:22.912947987Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c0404f3-17af-4a69-ac90-20dfe89c06b4",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:06:26.842698934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3d97ecea-78ea-414f-9ba7-fc24745a4977",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:07:48.045059720Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Commands name well-known files through VirtualPath constants",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:07:50.188048424Z"
 }

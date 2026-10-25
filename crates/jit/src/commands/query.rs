@@ -225,7 +225,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(rollup.extras.done, 1);
     /// assert_eq!(rollup.extras.percent, 50);
     /// // Every lifecycle state has a bucket, zero-count states included.
-    /// assert_eq!(rollup.items.len(), State::all().len());
+    /// assert_eq!(rollup.items.len(), State::ALL.len());
     /// ```
     pub fn query_count_by_state(
         &self,

@@ -177,6 +177,24 @@ pub fn memory_executor_declaring(
     config: &str,
 ) -> CommandExecutor<InMemoryStorage> {
     let layout = storage.repository_layout();
+    let rules_source = storage.root().join(VirtualPath::RULES.relative().as_path());
+    let rules_target = layout
+        .resolve(&VirtualPath::RULES)
+        .expect("test layout resolves its rules path");
+    match std::fs::read(&rules_source) {
+        Ok(bytes) => {
+            if let Some(parent) = rules_target.parent() {
+                std::fs::create_dir_all(parent).expect("create test rules directory");
+            }
+            std::fs::write(&rules_target, bytes).expect("mirror test rules through the layout");
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if rules_target.exists() {
+                std::fs::remove_file(&rules_target).expect("remove absent test rules mirror");
+            }
+        }
+        Err(error) => panic!("read test rules fixture: {error}"),
+    }
     let pristine = InMemoryStorage::rooted_at(storage.root());
     {
         let held = storage.repository_state();

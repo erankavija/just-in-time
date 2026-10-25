@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-6add7ca6",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c7c471a46a830e5bfa5fb8c70d9922dc51ed44f9",
+  "completed_at": "2026-10-25T02:02:18.171908393Z",
+  "duration_ms": 154385,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The typed render report, macro-declared vocabularies, removed token helpers, and preserved JSON serialization satisfy both issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "57ae47b9-4f2f-41c8-921a-77262f84061f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T01:59:43.786573215Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c7c471a46, 67b2f5af2 (`jit:6add7ca6`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-10 and REQ-13 (issue description)\nGate evidence: cargo-ci: passed (exit 0, 2026-10-25T01:58:17Z)\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The typed render report, macro-declared vocabularies, removed token helpers, and preserved JSON serialization satisfy both issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
