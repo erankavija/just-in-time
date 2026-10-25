@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "57a447a0-0d20-4ca4-9560-804f836c148c",
+      "run_id": "5ecebf87-5163-4470-9cec-6a47b80af6e7",
       "status": "passed",
-      "updated_at": "2026-10-25T03:03:15.737723726Z",
+      "updated_at": "2026-10-25T03:07:27.563469220Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Profile dependency resolution compares ProfileId values",
-  "updated_at": "2026-10-25T03:05:54.051861493Z"
+  "updated_at": "2026-10-25T03:07:27.563469220Z"
 }
