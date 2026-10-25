@@ -14,7 +14,6 @@ fn gate_entry<'a>(issue: &'a serde_json::Value, key: &str) -> Option<&'a serde_j
     issue["gates"].as_array()?.iter().find(|g| g["key"] == key)
 }
 
-/// Define each `(key, checker)` auto gate and create an issue requiring all of them.
 fn add_multi_auto_gate_issue(cli: &JitCli, gates: &[(&str, &str)]) -> String {
     gates
         .iter()
