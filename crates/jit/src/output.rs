@@ -21,7 +21,7 @@ use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
     Priority, State,
 };
-use crate::errors::{short_id, state_name, TransitionBlockedError, TransitionBlocker};
+use crate::errors::{short_id, TransitionBlockedError, TransitionBlocker};
 
 /// Render the complete schema-v1 archive plan without introducing a second
 /// decision model. Every action, fact, edge, relink, deletion, warning, and
@@ -1357,7 +1357,7 @@ impl From<ErrorCode> for String {
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) =
-        error.downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
     {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
@@ -1413,8 +1413,8 @@ impl JsonError {
         Self::new(blocked.error_code(), blocked.summary())
             .with_details(serde_json::json!({
                 "issue_id": blocked.issue_id(),
-                "requested_state": state_name(blocked.requested_state()),
-                "actual_state": state_name(blocked.actual_state()),
+                "requested_state": blocked.requested_state().as_str(),
+                "actual_state": blocked.actual_state().as_str(),
                 "blockers": blocked.blockers().iter().map(transition_blocker_json).collect::<Vec<_>>(),
                 "warnings": blocked.warnings(),
                 "remediation": blocked.remediation_commands(),
@@ -1434,7 +1434,7 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "issue_id": issue_id,
             "short_id": short_id(issue_id),
             "title": title,
-            "state": state_name(*state),
+            "state": state.as_str(),
         }),
         TransitionBlocker::MissingDependency { issue_id } => serde_json::json!({
             "type": "dependency",
@@ -1460,10 +1460,10 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         }),
         TransitionBlocker::ArchivedRevive { origin } => serde_json::json!({
             "type": "archived_revive",
-            "origin": state_name(*origin),
+            "origin": origin.as_str(),
             "message": format!(
                 "an archived issue only revives to its pre-archive state '{}'",
-                state_name(*origin)
+                origin.as_str()
             ),
         }),
     }
@@ -2168,7 +2168,7 @@ pub struct StateCount {
 /// issues, shared by `jit issue progress` (over a container's direct children)
 /// and `jit query count --by state` (over a label bucket or the whole repo).
 ///
-/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
+/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::ALL`]
 /// order, zero-count states included, so the shape is stable and complete
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (one entry per state).

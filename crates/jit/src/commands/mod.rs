@@ -105,7 +105,7 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{
     is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
@@ -117,6 +117,7 @@ use crate::storage::IssueStore;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::cell::RefCell;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 thread_local! {
@@ -763,7 +764,7 @@ fn claims_mutation_guard(
         return Ok(None);
     }
     let agent = crate::agent_config::resolve_agent_id(None)
-        .unwrap_or_else(|_| "system:lease-check".to_string());
+        .unwrap_or_else(|_| crate::domain::Assignee::SYSTEM_LEASE_CHECK.to_string());
     let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
         .unwrap_or_else(|| paths.worktree_root.display().to_string());
     let coordinator = ClaimCoordinator::new(
@@ -793,7 +794,7 @@ fn captured_lease_warnings(
         let active = guard
             .map(|guard| {
                 guard.has_active_lease(id, agent.as_deref(), |raw| {
-                    resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
+                    resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
                 })
             })
             .transpose()?
@@ -821,7 +822,7 @@ fn ensure_claim_available(
     let Some(lease) = guard
         .map(|guard| {
             guard.conflicting_lease(target, Some(&assignee.to_string()), |raw| {
-                resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
+                resolve_issue_from_capture(issues, &IssueIdPrefix::from_str(raw)?)
             })
         })
         .transpose()?
@@ -1173,7 +1174,8 @@ fn derive_state_transition(
                 })
                 .collect::<Vec<_>>();
             let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
-            let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
             let repo_format = evidence.config.content_format()?;
             let strictness = evidence.config.strictness()?;
             let enforcing = rules
@@ -2096,21 +2098,21 @@ fn discover_gate_run_results(
 ///
 /// # Errors
 ///
-/// [`InvalidIdPrefixError`](crate::domain::issue_id::InvalidIdPrefixError) before any
+/// [`InvalidIdPrefixError`](crate::domain::identity::InvalidIdPrefixError) before any
 /// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
 pub(crate) fn resolve_issue_filter<S: IssueStore>(
     storage: &S,
     requested: &str,
 ) -> Result<IssueIdPrefix> {
-    let prefix = IssueIdPrefix::parse(requested)?;
+    let prefix = IssueIdPrefix::from_str(requested)?;
     match storage.resolve_issue_id(&prefix) {
-        Ok(id) => Ok(IssueIdPrefix::of_stored(&id)),
+        Ok(id) => Ok(IssueIdPrefix::from(&id)),
         Err(error) if error.is::<crate::storage::IssueNotFoundError>() => Ok(prefix),
         Err(error) => Err(error),
     }
 }
 
-fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<String> {
+fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<IssueId> {
     crate::storage::resolve_issue_id_among(prefix, issues)
 }
 
@@ -2641,7 +2643,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = IssueIdPrefix::of_stored(&target);
+            effective_request.issue_id = IssueIdPrefix::from(&target);
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2692,8 +2694,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let request =
-            CapturedFieldUpdate::bulk(IssueIdPrefix::of_stored(&issue_id), operations, force)?;
+        let request = CapturedFieldUpdate::bulk(IssueIdPrefix::from(&issue_id), operations, force)?;
         self.publish_captured_field_update(request)
     }
 
@@ -3340,7 +3341,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
 
-        let prefix = IssueIdPrefix::parse(issue_id)?;
+        let prefix = IssueIdPrefix::from_str(issue_id)?;
         let paths = self.require_worktree_paths()?;
 
         // Load the active-lease index through storage (an absent index yields an
@@ -3433,6 +3434,67 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
+        use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let type_name = taxonomy.type_at_level(4).to_string();
+        let mut issue = crate::domain::fixture_issue("Transition".into(), String::new());
+        issue.labels = vec![format!("type:{type_name}")];
+
+        let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        let config: JitConfig = toml::from_str(&config_text).unwrap();
+        let configuration =
+            crate::declarations::parse_configuration(config_text.as_bytes()).unwrap();
+        let rules = RuleSet {
+            rules: vec![Rule {
+                name: "graph-probe".to_string(),
+                origin: None,
+                description: None,
+                when: Selector {
+                    type_: Some(type_name),
+                    ..Selector::default()
+                },
+                severity: Severity::Error,
+                enforce: false,
+                assert: Assertion::LabelCoverage {
+                    config: Default::default(),
+                },
+                scope: RuleScope::Graph,
+            }],
+        };
+        let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
+            configuration,
+            config,
+            crate::declarations::GateRegistry::default(),
+            rules,
+        );
+        let issues = [issue.clone()];
+        let plan_content = std::collections::HashMap::new();
+        let context = production_mutation_context();
+
+        let error = derive_state_transition(
+            issue,
+            crate::domain::State::InProgress,
+            false,
+            CapturedTransitionEvidence {
+                issues: &issues,
+                declarations: &declarations,
+                config: declarations.config(),
+                plan_content: &plan_content,
+                context: &context,
+            },
+        )
+        .err()
+        .expect("invalid hierarchy must abort the transition");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     #[test]
     fn test_production_mutation_context_factory_defaults_to_empty_annotation() {
@@ -3656,7 +3718,7 @@ mod tests {
             .capture_mutation_base(
                 session.as_mut(),
                 &[],
-                Some(&IssueIdPrefix::parse(issue_id).unwrap()),
+                Some(&IssueIdPrefix::from_str(issue_id).unwrap()),
             )
             .unwrap()
             .unwrap();

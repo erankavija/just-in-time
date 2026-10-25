@@ -20,7 +20,8 @@ fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
     let namespaces = jit::config_manager::namespaces_from_config(&config);
     let defaults = jit::repository_state::serialize_ruleset(
         &jit::repository_state::default_ruleset(&namespaces),
-    );
+    )
+    .unwrap();
     let rules = format!("{}{}", defaults.rules_toml, rules_toml);
     std::fs::write(storage.root().join("rules.toml"), &rules).unwrap();
     storage.add_data_file("rules.toml", &rules);

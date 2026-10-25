@@ -212,7 +212,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -238,7 +238,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::issue_id::IssueIdPrefix,
+        prefix: &crate::domain::identity::IssueIdPrefix,
         needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
@@ -337,7 +337,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
         mutation: bool,
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
@@ -789,7 +789,7 @@ fn discover_issue_closure(
     issues: &[Issue],
     config: &JitConfig,
     effective: &Effective<'_>,
-    precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+    precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -1015,7 +1015,7 @@ pub(crate) fn plan_content_with_issues(
 /// reporting: the CLI an error finding, the gate checker an `error` run.
 pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &crate::domain::issue_id::IssueIdPrefix,
+    requested_issue_id: &crate::domain::identity::IssueIdPrefix,
     rule_name: &str,
 ) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
@@ -1025,7 +1025,7 @@ pub(super) fn rule_validation_outcome(
     let issue = issues
         .iter()
         .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.requested()))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.as_str()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format()?;
@@ -1056,9 +1056,8 @@ pub(super) fn rule_validation_outcome(
         })
         .collect::<Vec<_>>();
     let plan_content = plan_content_from_image(image, &plan_sources)?;
-    let hierarchy = crate::repository_state::hierarchy_config(
-        &crate::config_manager::namespaces_from_config(&config),
-    );
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
     let context = crate::validation::graph::GraphEvaluationContext {
         graph_context: &issues,
         resolution_index: &issues,
@@ -1182,7 +1181,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((fixes_applied, messages))
     }
 
-    fn apply_type_fix(&self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()>
+    fn apply_type_fix(&self, issue_id: &IssueId, old_type: &str, new_type: &str) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1191,7 +1190,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let new_label = label_utils::type_label(new_type);
 
         self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
-            crate::domain::issue_id::IssueIdPrefix::of_stored(issue_id),
+            crate::domain::identity::IssueIdPrefix::from(issue_id),
             CapturedLabelEdit::ReplaceExact {
                 old: old_label,
                 new: new_label,
@@ -1473,9 +1472,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // The repo HierarchyConfig is injected into `type-hierarchy` rules at
         // evaluation time (D1); it is no longer stored in the parsed rule. Build
-        // it from the same namespace registry the default rules derive from.
+        // it from the same namespace registry as the rule declarations.
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
         let repo_format = self.repo_content_format()?;
 
         // Resolve any external plan documents from the captured validation image
@@ -1546,7 +1546,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         let id = id
-            .map(crate::domain::issue_id::IssueIdPrefix::parse)
+            .map(crate::domain::identity::IssueIdPrefix::from_str)
             .transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
@@ -1744,7 +1744,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let container_id = crate::domain::issue_id::IssueIdPrefix::parse(container_id)?;
+        let container_id = crate::domain::identity::IssueIdPrefix::from_str(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
 
@@ -1813,7 +1813,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-            let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
             // Resolve external plan docs for the in-scope issues from the captured
             // validation image so a container whose criteria live in an external
             // file validates against the FILE (closed-read, no live filesystem).
@@ -1870,7 +1871,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issue_id = crate::domain::issue_id::IssueIdPrefix::parse(issue_id)?;
+        let issue_id = crate::domain::identity::IssueIdPrefix::from_str(issue_id)?;
         let image = self.capture_validation_image()?;
         rule_validation_outcome(&image, &issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
@@ -1904,7 +1905,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
-        let id = crate::domain::issue_id::IssueIdPrefix::parse(id)?;
+        let id = crate::domain::identity::IssueIdPrefix::from_str(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
         // `load_issue` keys on the FULL id; resolve a short-id prefix first.
@@ -2545,6 +2546,23 @@ depends_on = ["planning"]
         let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
 
         assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .evaluate_graph_rules(&[])
+            .expect_err("invalid hierarchy must fail graph-rule evaluation");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     #[test]
@@ -3393,8 +3411,8 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
 
-    fn prefix(id: &str) -> crate::domain::issue_id::IssueIdPrefix {
-        crate::domain::issue_id::IssueIdPrefix::parse(id).unwrap()
+    fn prefix(id: &str) -> crate::domain::identity::IssueIdPrefix {
+        crate::domain::identity::IssueIdPrefix::from_str(id).unwrap()
     }
 
     /// A session counting the capture rounds it opens.

@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -54,7 +54,7 @@
           "short_id": "6e8b9f31",
           "title": "System actors are named Assignee constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
@@ -129,7 +129,7 @@
           "short_id": "2ac50581",
           "title": "Lifecycle state tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
@@ -143,7 +143,7 @@
           "short_id": "3ae2293a",
           "title": "Gate stage and mode tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
@@ -171,14 +171,14 @@
           "short_id": "7383f4ea",
           "title": "Template transform kind is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
           "short_id": "80fe846e",
           "title": "Artifact-plan codes declare their wire spelling once",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "96bb0941-07f3-4f55-bd69-93ad587c5540",
@@ -192,7 +192,7 @@
           "short_id": "a50e9be9",
           "title": "Resolved agent identity is an Assignee",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
@@ -206,7 +206,7 @@
           "short_id": "b8506ce7",
           "title": "Store divergence tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
@@ -227,7 +227,7 @@
           "short_id": "c400730c",
           "title": "Id prefixes parse once into an IssueIdPrefix",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
@@ -241,14 +241,14 @@
           "short_id": "f8f80eea",
           "title": "Hierarchy callers propagate the constructor's error",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "faa19def-4484-4706-becf-dab559f0f3d4",
           "short_id": "faa19def",
           "title": "Gate-run actors are Assignee values",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -302,7 +302,7 @@
           "short_id": "6826f966",
           "title": "Rule severity and scope tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
@@ -330,7 +330,7 @@
           "short_id": "a57c5057",
           "title": "The server resolves each issue-id path parameter once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
@@ -623,7 +623,7 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "b3fcd297": 1
+    "b3fcd297": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -769,6 +769,76 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Two-file macro adoption with byte-identity check."
+    },
+    {
+      "issue": "2ac50581",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation: approved footprint extension (doctest) and finish checks blocked by the CI lock."
+    },
+    {
+      "issue": "6add7ca6",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation: approved test-assertion update outside footprint; finish checks."
+    },
+    {
+      "issue": "b3fcd297",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R2: route every schema-reference path site through one parser (sweep miss, same tier)."
+    },
+    {
+      "issue": "18bcafb8",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-producing event body view over 20 files."
+    },
+    {
+      "issue": "a57c5057",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-file route boundary with exact criteria."
+    },
+    {
+      "issue": "faa19def",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Field retype to Assignee with writer constant swap."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Identity retype through coordinator and lease with exact criteria."
+    },
+    {
+      "issue": "182350ce",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Macro adoption across five files on the priority chain."
+    },
+    {
+      "issue": "6826f966",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Two-enum macro adoption, two files."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation: approved forced fixture edits; finish REQ-03 and checks."
     }
   ],
   "surfaced_pitfalls": [
@@ -779,6 +849,10 @@
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
   "lessons": [
-    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1)."
+    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1).",
+    "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
+    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
+    "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
+    "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way."
   ]
 }

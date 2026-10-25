@@ -17,6 +17,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str::FromStr;
 #[cfg(test)]
@@ -25,30 +26,31 @@ use uuid::Uuid;
 /// Length of short issue ID (git-style short hash)
 pub const SHORT_ID_LENGTH: usize = 8;
 
-/// Issue lifecycle state
-///
-/// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
-/// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
-/// lets states be stored in ordered collections such as `BTreeSet<State>`.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum State {
-    /// Created but not actionable yet (blocked by dependencies)
-    Backlog,
-    /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
-    Ready,
-    /// Currently being worked on
-    InProgress,
-    /// Work complete, awaiting quality gate approval
-    Gated,
-    /// Completed successfully
-    Done,
-    /// Won't implement (bypasses gates)
-    Rejected,
-    /// No longer relevant
-    Archived,
+wire_vocabulary! {
+    /// Issue lifecycle state
+    ///
+    /// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
+    /// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
+    /// lets states be stored in ordered collections such as `BTreeSet<State>`.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+    )]
+    pub enum State {
+        /// Created but not actionable yet (blocked by dependencies)
+        Backlog = "backlog",
+        /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
+        Ready = "ready",
+        /// Currently being worked on
+        InProgress = "in_progress",
+        /// Work complete, awaiting quality gate approval
+        Gated = "gated",
+        /// Completed successfully
+        Done = "done",
+        /// Won't implement (bypasses gates)
+        Rejected = "rejected",
+        /// No longer relevant
+        Archived = "archived",
+    }
 }
 
 impl State {
@@ -58,41 +60,6 @@ impl State {
     /// or decision not to implement (Rejected). Both unblock dependent issues.
     pub fn is_terminal(self) -> bool {
         matches!(self, State::Done | State::Rejected)
-    }
-
-    /// The canonical snake_case string for this state.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
-    /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
-    /// is needed (e.g. a compact one-line status render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            State::Backlog => "backlog",
-            State::Ready => "ready",
-            State::InProgress => "in_progress",
-            State::Gated => "gated",
-            State::Done => "done",
-            State::Rejected => "rejected",
-            State::Archived => "archived",
-        }
-    }
-
-    /// Every `State` variant, in canonical lifecycle order.
-    ///
-    /// Use this to enumerate the state space exhaustively instead of hardcoding
-    /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
-    /// rollup, for instance, must list every state so its shape stays stable
-    /// and complete as the enum evolves.
-    pub const fn all() -> [State; 7] {
-        [
-            State::Backlog,
-            State::Ready,
-            State::InProgress,
-            State::Gated,
-            State::Done,
-            State::Rejected,
-            State::Archived,
-        ]
     }
 }
 
@@ -145,17 +112,6 @@ pub fn is_effectively_terminal(state: State, archived_from: Option<State>) -> bo
 /// input.
 pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
-}
-
-impl FromStr for State {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        State::all()
-            .into_iter()
-            .find(|state| state.as_str() == s)
-            .ok_or_else(|| InvalidArgumentError::new(format!("Invalid state: {s}")).into())
-    }
 }
 
 /// Issue priority level
@@ -272,17 +228,45 @@ wire_vocabulary! {
 /// via deserialization), so a raw, unvalidated string can never reach storage.
 ///
 /// The fields are private; construct an `Assignee` by parsing (`str::parse` /
-/// [`FromStr`]) and read the parts via [`Assignee::kind`] /
-/// [`Assignee::identifier`]. It serializes transparently as the
-/// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
-/// issue JSON is unchanged.
+/// [`FromStr`]) or take an engine-owned actor from its associated constant, and
+/// read the parts via [`Assignee::kind`] / [`Assignee::identifier`]. It
+/// serializes transparently as the `kind:identifier` string (through
+/// [`Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
-    kind: String,
-    identifier: String,
+    kind: Cow<'static, str>,
+    identifier: Cow<'static, str>,
 }
 
 impl Assignee {
+    /// Coordinator actor for listing active leases.
+    pub const SYSTEM_LIST: Self = Self::engine_actor("system", "list");
+    /// Coordinator actor for checking a lease.
+    pub const SYSTEM_CHECK: Self = Self::engine_actor("system", "check");
+    /// Coordinator actor for force-evicting a lease.
+    pub const SYSTEM_ADMIN: Self = Self::engine_actor("system", "admin");
+    /// Coordinator actor for claims and lease recovery.
+    pub const SYSTEM_RECOVERY: Self = Self::engine_actor("system", "recovery");
+    /// Coordinator actor guarding a repository mutation when no agent identity
+    /// resolves.
+    pub const SYSTEM_LEASE_CHECK: Self = Self::engine_actor("system", "lease-check");
+    /// Actor stamped on the `by` field of a gate run recorded by the automated
+    /// executor (as opposed to a human or agent attestation). A recorded pass
+    /// whose `updated_by` equals this value is an auto-era pass with no human
+    /// attestation behind it, which matters when a gate is later redefined to
+    /// manual mode.
+    pub const AUTO_EXECUTOR: Self = Self::engine_actor("auto", "executor");
+
+    /// Builds an engine-owned actor without parsing. Private so that only the
+    /// constants above use it; each must equal the parse of its spelling: a
+    /// non-empty, colon-free `kind` and a non-empty `identifier`.
+    const fn engine_actor(kind: &'static str, identifier: &'static str) -> Self {
+        Self {
+            kind: Cow::Borrowed(kind),
+            identifier: Cow::Borrowed(identifier),
+        }
+    }
+
     /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
     pub fn kind(&self) -> &str {
         &self.kind
@@ -339,8 +323,8 @@ impl FromStr for Assignee {
             return Err(AssigneeParseError::EmptyIdentifier(s.to_string()));
         }
         Ok(Assignee {
-            kind: kind.to_string(),
-            identifier: identifier.to_string(),
+            kind: Cow::Owned(kind.to_string()),
+            identifier: Cow::Owned(identifier.to_string()),
         })
     }
 }
@@ -2595,23 +2579,18 @@ mod tests {
     }
 
     #[test]
-    fn test_state_serialization_backlog() {
-        let state = State::Backlog;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"backlog\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
-    }
-
-    #[test]
-    fn test_state_serialization_gated() {
-        let state = State::Gated;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"gated\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
+    fn test_state_enumeration_preserves_lifecycle_order() {
+        let lifecycle = [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ];
+        assert_eq!(State::ALL, lifecycle);
+        assert!(lifecycle.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
@@ -2887,37 +2866,6 @@ mod tests {
         use std::str::FromStr;
 
         #[test]
-        fn test_state_from_str_accepts_only_serde_tokens() {
-            for state in State::all() {
-                let token = state.as_str();
-                assert_eq!(serde_json::to_value(state).unwrap(), token);
-                let letters: Vec<usize> = token
-                    .char_indices()
-                    .filter(|(_, c)| c.is_ascii_alphabetic())
-                    .map(|(i, _)| i)
-                    .collect();
-                // Every case assignment of the token's letters; mask 0 is canonical.
-                (0u32..1 << letters.len()).for_each(|mask| {
-                    let variant: String = token
-                        .char_indices()
-                        .map(|(i, c)| match letters.iter().position(|&l| l == i) {
-                            Some(bit) if mask & (1 << bit) != 0 => c.to_ascii_uppercase(),
-                            _ => c,
-                        })
-                        .collect();
-                    match mask {
-                        0 => assert_eq!(State::from_str(&variant).unwrap(), state),
-                        _ => assert!(State::from_str(&variant).is_err(), "accepted {variant:?}"),
-                    }
-                });
-                assert!(State::from_str(&format!(" {token}")).is_err());
-            }
-            for token in ["open", "inprogress", "invalid", "pending", ""] {
-                assert!(State::from_str(token).is_err(), "accepted {token:?}");
-            }
-        }
-
-        #[test]
         fn test_priority_from_str_valid_lowercase() {
             assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
             assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
@@ -2944,13 +2892,6 @@ mod tests {
             assert!(Priority::from_str("invalid").is_err());
             assert!(Priority::from_str("").is_err());
             assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_state_parse_method() {
-            // Test using str::parse() method
-            let state: State = "ready".parse().unwrap();
-            assert_eq!(state, State::Ready);
         }
 
         #[test]
@@ -3085,6 +3026,20 @@ mod tests {
                 let parsed = Assignee::from_str(raw).unwrap();
                 assert_eq!(parsed.to_string(), raw);
                 assert_eq!(Assignee::from_str(&parsed.to_string()).unwrap(), parsed);
+            }
+        }
+
+        #[test]
+        fn test_assignee_system_actor_constants_equal_parsed_spelling() {
+            for (constant, spelling) in [
+                (Assignee::SYSTEM_LIST, "system:list"),
+                (Assignee::SYSTEM_CHECK, "system:check"),
+                (Assignee::SYSTEM_ADMIN, "system:admin"),
+                (Assignee::SYSTEM_RECOVERY, "system:recovery"),
+                (Assignee::SYSTEM_LEASE_CHECK, "system:lease-check"),
+                (Assignee::AUTO_EXECUTOR, "auto:executor"),
+            ] {
+                assert_eq!(Assignee::from_str(spelling).unwrap(), constant);
             }
         }
 
