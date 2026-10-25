@@ -1,11 +1,12 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
+use crate::domain::identity::ProfileId;
 use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
 use crate::profile::profile_plan_entry;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
     read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfilePackEntry, ProfilePackResult,
+    ProfileComposedApplyResult, ProfileGraphError, ProfilePackEntry, ProfilePackResult,
     ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfileShowEntry, ProfileShowResult, ProfileTargetAction, ProfileTargetChange,
     ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,

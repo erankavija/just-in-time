@@ -5,6 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::identity::ProfileId;
 use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -1220,7 +1221,7 @@ pub enum ProfileLifecycleStatus {
 #[serde(deny_unknown_fields)]
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
-    pub id: crate::profile::ProfileId,
+    pub id: ProfileId,
     /// The package version applied.
     pub version: String,
     /// The action observed for this profile.

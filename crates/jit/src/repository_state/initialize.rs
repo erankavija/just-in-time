@@ -22,6 +22,7 @@ use crate::config::ProjectName;
 use crate::config_manager::namespaces_from_config;
 use crate::declarations::invariants::{serialize_invariant_registry, InvariantRegistry};
 use crate::declarations::{serialize_gate_registry, GateRegistry};
+use crate::domain::identity::ProfileId;
 use crate::domain::{
     Event, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
 };
@@ -910,7 +911,7 @@ pub(super) fn derive_profile_applications(
     profiles: &[ProfileApplicationInput],
     context: &MutationContext,
     operation: ProfileLifecycleOperation,
-    forced_changed: std::collections::BTreeSet<crate::profile::ProfileId>,
+    forced_changed: std::collections::BTreeSet<ProfileId>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let mut proposed = base.clone();
     let mut actions = BTreeMap::new();
@@ -1116,7 +1117,7 @@ mod tests {
 
     fn profile_input(id: &str) -> ProfileApplicationInput {
         ProfileApplicationInput {
-            id: crate::profile::ProfileId::try_from(id).unwrap(),
+            id: ProfileId::try_from(id).unwrap(),
             version: "1.0.0".to_string(),
             variables: serde_json::from_value(serde_json::json!({
                 "NAME": {"value": "value", "source": "set"}

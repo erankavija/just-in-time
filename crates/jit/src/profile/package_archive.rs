@@ -60,11 +60,12 @@
 //! The result is a value in memory: this module opens nothing, writes nothing,
 //! and leaves the decision of where a package goes to its caller.
 
-use super::manifest::{ProfileId, ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::manifest::{ProfilePackageModel, MANIFEST_FILE_NAME};
 use super::package::{
     ProfilePackage, ProfilePackageError, MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
 use super::package_capture::{compose_captured_tree, CapturedFile, CapturedPackageTree};
+use crate::domain::identity::ProfileId;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::FileMode;
 use crate::tar_format::reproducible_tar_header;
