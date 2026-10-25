@@ -29,10 +29,14 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::JitConfig;
+use crate::domain::id_pattern::IdPattern;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
 use crate::repository_state::VirtualPath;
+
+/// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
+pub const DEFAULT_CRITERION_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
@@ -569,9 +573,9 @@ pub enum Assertion {
         /// Items without the marker are not present in the extracted id set,
         /// so a label matching an unmarked id is a stray. Optional.
         marker: Option<String>,
-        /// Regex that extracts a criterion id from an item's text. Optional;
-        /// defaults to `"[A-Z][A-Z0-9]*-[0-9]+"`.
-        id_pattern: String,
+        /// Extracts a criterion id from an item's text. Optional; defaults to
+        /// [`DEFAULT_CRITERION_ID_PATTERN`].
+        id_pattern: IdPattern,
     },
     /// Every criterion in a configured section maps to a verifiable check.
     /// Graph scope. "Checked" means the issue carries a required gate keyed
@@ -587,7 +591,7 @@ pub enum Assertion {
     /// assert = { criteria-to-check = {
     ///   criteria-section = "success_criteria",  # optional, default success_criteria
     ///   marker = "[hard]",                       # optional: only marked items
-    ///   id-pattern = "REQ-[0-9]+",               # optional, default [A-Z][A-Z0-9]*-[0-9]+
+    ///   id-pattern = "REQ-[0-9]+",               # optional, default DEFAULT_CRITERION_ID_PATTERN
     ///   gate-prefix = "verify:",                 # at least one of gate-prefix / check-namespace
     ///   check-namespace = "checks",              # at least one of gate-prefix / check-namespace
     /// } }
@@ -599,9 +603,9 @@ pub enum Assertion {
         /// Optional marker filter; when set, only items starting with this
         /// marker contribute criterion ids.
         marker: Option<String>,
-        /// Regex extracting the criterion id from an item's text (default
-        /// `"[A-Z][A-Z0-9]*-[0-9]+"`).
-        id_pattern: String,
+        /// Extracts the criterion id from an item's text (default
+        /// [`DEFAULT_CRITERION_ID_PATTERN`]).
+        id_pattern: IdPattern,
         /// Optional gate key prefix. A criterion `<id>` is "gate-checked" when
         /// the issue has `"<gate_prefix><id>"` in `gates_required`.
         gate_prefix: Option<String>,
@@ -1006,13 +1010,21 @@ impl RawCriteriaToCheck {
                 .criteria_section
                 .unwrap_or_else(|| "success_criteria".to_string()),
             marker: self.marker,
-            id_pattern: self
-                .id_pattern
-                .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: compile_id_pattern(rule, self.id_pattern)?,
             gate_prefix: self.gate_prefix,
             check_namespace: self.check_namespace,
         })
     }
+}
+
+/// Compile an authored `id-pattern`, or the default when absent.
+fn compile_id_pattern(rule: &str, source: Option<String>) -> Result<IdPattern, RuleConfigError> {
+    IdPattern::new(source.unwrap_or_else(|| DEFAULT_CRITERION_ID_PATTERN.to_string())).map_err(
+        |error| RuleConfigError::InvalidAssertion {
+            rule: rule.to_string(),
+            message: format!("'id-pattern': {error}"),
+        },
+    )
 }
 
 /// The `label-uniqueness` assert payload.
@@ -1403,9 +1415,7 @@ impl RawAssert {
                     .criteria_section
                     .unwrap_or_else(|| "success_criteria".to_string()),
                 marker: clm.marker,
-                id_pattern: clm
-                    .id_pattern
-                    .unwrap_or_else(|| "[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+                id_pattern: compile_id_pattern(rule, clm.id_pattern)?,
             });
         }
         if let Some(ctc) = self.criteria_to_check {
@@ -2274,7 +2284,7 @@ assert = { criteria-label-match = { namespace = "req" } }
                 assert_eq!(namespace, "req");
                 assert_eq!(criteria_section, "success_criteria"); // default
                 assert!(marker.is_none());
-                assert_eq!(id_pattern, "[A-Z][A-Z0-9]*-[0-9]+"); // default
+                assert_eq!(id_pattern.as_str(), DEFAULT_CRITERION_ID_PATTERN);
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
@@ -2300,7 +2310,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "succe
                 assert_eq!(namespace, "req");
                 assert_eq!(criteria_section, "success_criteria");
                 assert_eq!(marker.as_deref(), Some("[hard]"));
-                assert_eq!(id_pattern, "REQ-[0-9]+");
+                assert_eq!(id_pattern.as_str(), "REQ-[0-9]+");
             }
             other => panic!("expected CriteriaLabelMatch, got {other:?}"),
         }
@@ -2333,6 +2343,23 @@ assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
 "#;
         let err = parse(toml).unwrap_err();
         assert!(matches!(err, RuleConfigError::Toml(_)));
+    }
+
+    #[test]
+    fn test_parse_invalid_criteria_id_pattern_fails_naming_the_rule() {
+        for payload in [
+            "criteria-label-match = { namespace = \"req\", id-pattern = 'REQ-(' }",
+            "criteria-to-check = { gate-prefix = \"verify:\", id-pattern = 'REQ-(' }",
+        ] {
+            let toml = format!("[[rules]]\nname = \"bad-pattern\"\nassert = {{ {payload} }}\n");
+            match parse(&toml).unwrap_err() {
+                RuleConfigError::InvalidAssertion { rule, message } => {
+                    assert_eq!(rule, "bad-pattern");
+                    assert!(message.contains("REQ-("), "message was: {message}");
+                }
+                other => panic!("expected InvalidAssertion for {payload}, got {other:?}"),
+            }
+        }
     }
 
     #[test]

@@ -251,8 +251,9 @@ fn desugar_require_doc_type(doc_type: &str) -> Value {
 mod tests {
     use super::*;
     use crate::declarations::rules::{
-        Assertion, Rule, RuleScope, SchemaSource, Selector, Severity,
+        Assertion, Rule, RuleScope, SchemaSource, Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
     };
+    use crate::domain::id_pattern::IdPattern;
     use crate::validation::engine::SchemaEngine;
     use serde_json::Value;
     use std::path::PathBuf;
@@ -644,7 +645,7 @@ mod tests {
         assert!(desugar(&Assertion::CriteriaToCheck {
             criteria_section: "success_criteria".to_string(),
             marker: None,
-            id_pattern: "[A-Z][A-Z0-9]*-[0-9]+".to_string(),
+            id_pattern: IdPattern::new(DEFAULT_CRITERION_ID_PATTERN).unwrap(),
             gate_prefix: Some("verify:".to_string()),
             check_namespace: None,
         })
