@@ -733,12 +733,12 @@ mod tests {
     #[test]
     fn test_linked_checkout_write_overridden_names_checkout_stance_and_override() {
         let event = EventTag::LinkedCheckoutWriteOverridden.sample();
-        let Event::LinkedCheckoutWriteOverridden {
+        let EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
             ..
-        } = &event
+        } = event.body()
         else {
             panic!("the tag's sample is the override record");
         };
