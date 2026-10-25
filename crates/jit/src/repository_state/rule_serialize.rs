@@ -35,7 +35,7 @@
 
 use super::VirtualPath;
 use crate::declarations::rules::{
-    Assertion, Rule, RuleSet, Selector, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, LabelUniquenessScope, Rule, RuleSet, Selector, DEFAULT_CRITERION_ID_PATTERN,
 };
 use std::collections::HashSet;
 
@@ -292,13 +292,9 @@ fn render_assertion(
             format!("{{ gate-recency = {{ {} }} }}", parts.join(", "))
         }
         Assertion::TypeHierarchy { kind } => {
-            let kind_token = match kind {
-                TypeHierarchyKind::OrphanLeaf => "orphan-leaf",
-                TypeHierarchyKind::StrategicConsistency => "strategic-consistency",
-            };
             format!(
                 "{{ type-hierarchy = {{ kind = {} }} }}",
-                toml_basic_string(kind_token)
+                toml_basic_string(kind.as_str())
             )
         }
         Assertion::CriteriaLabelMatch {
@@ -362,11 +358,11 @@ fn render_assertion(
             format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
         Assertion::LabelUniqueness { namespace } => {
-            // scope = "all" is the only valid value; round-trip it explicitly
-            // so the reloaded rule is identical to the original.
+            // Round-trip the required scope explicitly so the reload is identical.
             format!(
-                "{{ label-uniqueness = {{ namespace = {}, scope = \"all\" }} }}",
-                toml_basic_string(namespace)
+                "{{ label-uniqueness = {{ namespace = {}, scope = {} }} }}",
+                toml_basic_string(namespace),
+                toml_basic_string(LabelUniquenessScope::All.as_str())
             )
         }
     })

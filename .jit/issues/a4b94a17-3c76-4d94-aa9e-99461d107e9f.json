@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a86351b7-ca23-49aa-9fe2-10e9497620e5",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:35:03.205762436Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ce82634d-bee5-411f-ae16-ff8af7e13d6a",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:35:55.181957866Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Type-hierarchy and label-uniqueness rule options are typed",
-  "updated_at": "2026-10-25T04:24:55.941536954Z"
+  "updated_at": "2026-10-25T04:35:55.181957866Z"
 }
