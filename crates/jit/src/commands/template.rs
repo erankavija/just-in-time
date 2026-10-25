@@ -1239,7 +1239,14 @@ fn add_captured_template_edge(
         let graph = DependencyGraph::new(&refs);
         issues
             .keys()
-            .map(|id| (id.clone(), graph.compute_transitive_reduction(id)))
+            .map(|id| {
+                let reduced = graph
+                    .compute_transitive_reduction(id)
+                    .into_iter()
+                    .map(|node| node.id.clone())
+                    .collect::<HashSet<_>>();
+                (id.clone(), reduced)
+            })
             .collect::<BTreeMap<_, _>>()
     };
     // Publish the reduced dependency set of every issue the new edge reshaped.
