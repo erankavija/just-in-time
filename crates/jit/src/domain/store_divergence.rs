@@ -151,13 +151,7 @@ mod tests {
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &str, title: &str) -> Event {
-        Event::IssueCreated {
-            id: id.to_string(),
-            issue_id: issue_id.to_string(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            title: title.to_string(),
-            priority: Priority::Normal,
-        }
+        crate::test_utils::issue_created_event(id, issue_id, title, chrono::DateTime::UNIX_EPOCH)
     }
 
     /// One side of a comparison over the given records.

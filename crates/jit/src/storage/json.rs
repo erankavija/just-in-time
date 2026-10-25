@@ -2158,25 +2158,23 @@ mod tests {
                 crate::repository_state::serialize_issue(&linked_only).unwrap(),
             )
             .unwrap();
-            let primary_event = Event::IssueCreated {
-                id: "primary-event".to_string(),
-                issue_id: primary_only.id.clone(),
-                timestamp: chrono::Utc::now(),
-                title: primary_only.title.clone(),
-                priority: primary_only.priority,
-            };
+            let primary_event = crate::test_utils::issue_created_event(
+                "primary-event",
+                &primary_only.id,
+                &primary_only.title,
+                chrono::Utc::now(),
+            );
             fs::write(
                 repo_path.join(".jit").join(EVENTS_FILE),
                 format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
             )
             .unwrap();
-            let linked_event = Event::IssueCreated {
-                id: "linked-event".to_string(),
-                issue_id: "linked-issue".to_string(),
-                timestamp: chrono::Utc::now(),
-                title: "Only in linked event log".to_string(),
-                priority: crate::domain::Priority::Normal,
-            };
+            let linked_event = crate::test_utils::issue_created_event(
+                "linked-event",
+                "linked-issue",
+                "Only in linked event log",
+                chrono::Utc::now(),
+            );
             fs::write(
                 secondary_data.join(EVENTS_FILE),
                 format!("{}\n", serde_json::to_string(&linked_event).unwrap()),

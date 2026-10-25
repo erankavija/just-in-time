@@ -3972,13 +3972,7 @@ mod tests {
 
     #[test]
     fn test_event_list_response_serializes_events_under_collection_key() {
-        let event = crate::domain::Event::IssueCreated {
-            id: "e".into(),
-            issue_id: "i".into(),
-            timestamp: chrono::Utc::now(),
-            title: "title".into(),
-            priority: crate::domain::Priority::Normal,
-        };
+        let event = crate::test_utils::issue_created_event("e", "i", "title", chrono::Utc::now());
         let value =
             serde_json::to_value(EventListResponse::new(vec![event.clone(), event])).unwrap();
         assert_envelope_value(&value, "events", 2);
