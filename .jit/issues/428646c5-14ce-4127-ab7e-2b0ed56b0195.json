@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "57a447a0-0d20-4ca4-9560-804f836c148c",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:03:15.737723726Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e1fedc5c-4ec1-4bf6-9c3a-b0cfd2c7edf2",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:05:54.051861493Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "428646c5-14ce-4127-ab7e-2b0ed56b0195",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Profile dependency resolution compares ProfileId values",
-  "updated_at": "2026-10-25T00:18:08.834626407Z"
+  "updated_at": "2026-10-25T03:05:54.051861493Z"
 }
