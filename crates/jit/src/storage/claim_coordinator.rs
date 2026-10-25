@@ -20,6 +20,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -774,7 +775,7 @@ impl ClaimCoordinator {
     /// issue id. This is only a resolver-call shortlist: canonical equality after
     /// `resolve_issue_id` remains the identity decision.
     fn is_issue_identity_candidate(stored: &str, requested: &str) -> bool {
-        crate::domain::issue_id::IssueIdPrefix::parse(stored)
+        crate::domain::identity::IssueIdPrefix::from_str(stored)
             .is_ok_and(|stored| stored.matches(requested))
     }
 
@@ -1156,7 +1157,7 @@ impl ClaimCoordinator {
     /// Returns an error if the index cannot be loaded
     pub fn get_active_leases(
         &self,
-        issue_id: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        issue_id: Option<&crate::domain::identity::IssueIdPrefix>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
         // 1. Acquire exclusive lock with metadata (needed for evict_expired which writes)

@@ -8,7 +8,7 @@
 
 use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::IssueIdPrefix;
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
@@ -1235,7 +1235,7 @@ impl IssueStore for JsonFileStorage {
         )))
     }
 
-    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String> {
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<crate::domain::identity::IssueId> {
         let index = self.load_aggregated_index()?;
         crate::storage::resolve_unique_issue_id(
             prefix,

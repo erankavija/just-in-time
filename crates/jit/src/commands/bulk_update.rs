@@ -382,7 +382,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .filter_map(|candidate| {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
                         let request = CapturedFieldUpdate::bulk(
-                            IssueIdPrefix::of_stored(&fresh.id),
+                            IssueIdPrefix::from(&fresh.id),
                             operations,
                             force,
                         )

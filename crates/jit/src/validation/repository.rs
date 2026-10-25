@@ -26,6 +26,7 @@ use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
+use std::str::FromStr;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -788,7 +789,8 @@ fn collect_item_link_findings(
                         Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
                     AddressScope::Issue(issue_ref) => {
-                        let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&issue_ref).ok();
+                        let prefix =
+                            crate::domain::identity::IssueIdPrefix::from_str(&issue_ref).ok();
                         let matches: Vec<&Issue> = issues
                             .iter()
                             .filter(|candidate| {
