@@ -535,10 +535,10 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
     assert_eq!(after.state, State::InProgress, "blocked: nothing persisted");
 }
 
-/// A `dependency-shape` rule with an unknown `mode`: a CONFIG ERROR. The rule
+/// A `label-coverage` rule with an unknown `child-link`: a CONFIG ERROR. The rule
 /// applies to `type:epic` issues at the done transition and `enforce = true`, so
 /// a broken (misconfigured) guard must BLOCK rather than silently degrade to a
-/// warning. Neighborhood-local (dependency-shape is not repo-wide), so it runs
+/// warning. Neighborhood-local (label-coverage is not repo-wide), so it runs
 /// at transition time.
 const DONE_RULE_MISCONFIGURED: &str = r#"
 [[rules]]
@@ -546,13 +546,13 @@ name = "epic-done-broken-shape"
 when = { type = "epic", state = "done" }
 severity = "error"
 enforce = true
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
+assert = { label-coverage = { child-link = "sideways" } }
 "#;
 
 #[test]
 fn test_enforce_rule_config_error_blocks_transition() {
-    // A typo in an `enforce = true` rule (here: a dependency-shape rule with an
-    // unknown `mode`) must NOT silently disable the guard. The config error blocks the
+    // A typo in an `enforce = true` rule (here: a label-coverage rule with an
+    // unknown `child-link`) must NOT silently disable the guard. The config error blocks the
     // done transition with exit 4, and the rendered error makes clear the rule
     // itself is misconfigured.
     let executor = executor_with_rules(DONE_RULE_MISCONFIGURED);
@@ -604,7 +604,7 @@ name = "epic-done-broken-shape-warn"
 when = { type = "epic", state = "done" }
 severity = "error"
 enforce = false
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
+assert = { label-coverage = { child-link = "sideways" } }
 "#;
     let executor = executor_with_rules(rules);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);

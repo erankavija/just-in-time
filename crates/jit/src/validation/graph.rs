@@ -29,9 +29,9 @@
 //!
 //! # Config interpretation
 //!
-//! Each graph [`Assertion`] carries a raw, unvalidated [`toml::value::Table`].
-//! This module interprets the keys each kind expects and DOCUMENTS them on the
-//! per-kind evaluators below. Malformed or missing required config never panics:
+//! `label-coverage` carries a raw, unvalidated [`toml::value::Table`]; this
+//! module interprets its keys and DOCUMENTS them on the evaluator below. The
+//! other config kinds are decoded at rule load. Malformed or missing required config never panics:
 //! it surfaces as a `config-error` [`Finding`] (attributed to the rule) so the
 //! problem is visible rather than silently swallowed. Optional keys fall back to
 //! documented defaults.
@@ -59,8 +59,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::declarations::rules::{
-    Assertion, LabelReferenceConfig, LabelReferenceScope, Rule, RuleScope, Selector, Severity,
-    StatePredicate, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, DependencyShapeConfig, LabelReferenceConfig, LabelReferenceScope, Rule, RuleScope,
+    Selector, Severity, StatePredicate, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
 };
 use crate::domain::id_pattern::IdPattern;
 use crate::validation::engine::Finding;
@@ -1266,54 +1266,17 @@ fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
 /// ought to) depend — directly or transitively, over the dependency DAG — on at
 /// least one issue matching the `target` selector.
 ///
-/// # Config keys
-///
-/// - `target` (table, required): a [`Selector`]-shaped table (`type`/`label`/
-///   `state`/`has_doc_type`) identifying the issues the source must depend on.
-/// - `mode` (string, optional, default `"must"`): `"must"` or `"should"`. This
-///   only shapes the finding message; the finding's blocking weight comes from
-///   the rule's own [`Severity`].
-/// - `transitive` (boolean, optional, default `false`): when `true`, a
-///   transitive dependency satisfies the rule; otherwise only a direct
-///   dependency does.
-///
-/// One finding is produced per source issue lacking a qualifying dependency. A
-/// malformed config yields a single `config-error` finding.
+/// `mode` only shapes the finding message; the finding's blocking weight comes
+/// from the rule's own [`Severity`]. One finding is produced per source issue
+/// lacking a qualifying dependency.
 fn evaluate_dependency_shape(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &DependencyShapeConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    // `target` must be a table we can deserialize into a Selector.
-    let target = match config.get("target") {
-        Some(value @ toml::Value::Table(_)) => match value.clone().try_into::<Selector>() {
-            Ok(sel) => sel,
-            Err(e) => {
-                return vec![config_error(
-                    rule,
-                    format!("invalid 'target' selector: {e}"),
-                )]
-            }
-        },
-        Some(_) => return vec![config_error(rule, "key 'target' must be a table")],
-        None => return vec![config_error(rule, "missing required key 'target'")],
-    };
-    let mode = match optional_str(rule, config, "mode", "must") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    if mode != "must" && mode != "should" {
-        return vec![config_error(
-            rule,
-            format!("key 'mode' must be 'must' or 'should', got '{mode}'"),
-        )];
-    }
-    let transitive = match config.get("transitive") {
-        None => false,
-        Some(toml::Value::Boolean(b)) => *b,
-        Some(_) => return vec![config_error(rule, "key 'transitive' must be a boolean")],
-    };
+    let target = &config.target;
+    let transitive = config.is_transitive();
 
     // Set of issue ids matching the target selector.
     let target_ids: BTreeSet<&str> = graph_context
@@ -1336,7 +1299,7 @@ fn evaluate_dependency_shape(
                 format!(
                     "issue {} {} depend on an issue matching the target selector but does not",
                     source.short_id(),
-                    mode
+                    config.mode().as_str()
                 ),
             )
         })
@@ -3026,27 +2989,6 @@ source-of-truth = "markdown-first"
             findings.is_empty(),
             "transitive dep satisfies: {findings:?}"
         );
-    }
-
-    #[test]
-    fn test_dependency_shape_missing_target_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = shape_rule("target = { type = \"design\" }");
-        if let Assertion::DependencyShape { config } = &mut rule.assert {
-            config.remove("target");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[typed_issue(&test_type(4), 4, &[])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("target"));
     }
 
     // --- gate-recency ------------------------------------------------------

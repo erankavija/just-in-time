@@ -527,8 +527,8 @@ pub enum Assertion {
     },
     /// A selector must/should depend on a target selector. Graph scope.
     DependencyShape {
-        /// Raw configuration table for the dependency-shape rule.
-        config: toml::value::Table,
+        /// The shape rule's configuration, decoded at load.
+        config: DependencyShapeConfig,
     },
     /// An issue's recorded gate results must be no older than a configured age.
     /// Graph scope. Age is computed against `GateState.updated_at` at evaluation
@@ -671,6 +671,48 @@ impl LabelReferenceConfig {
     /// [`LabelReferenceScope::Global`] when none was authored.
     pub fn scope(&self) -> LabelReferenceScope {
         self.authored_scope.unwrap_or_default()
+    }
+}
+
+/// The `dependency-shape` assert payload.
+///
+/// Every issue matching the rule's selector must (or should) depend on an issue
+/// matching `target`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyShapeConfig {
+    /// The issues the source must depend on; its state tokens are validated at load.
+    pub target: Selector,
+    /// The authored `mode`, kept as written so serialization emits the authored
+    /// keys; read the effective mode through [`Self::mode`].
+    pub authored_mode: Option<DependencyShapeMode>,
+    /// The authored `transitive`, kept as written; read the effective value
+    /// through [`Self::is_transitive`].
+    pub authored_transitive: Option<bool>,
+}
+
+impl DependencyShapeConfig {
+    /// The authored mode, or [`DependencyShapeMode::Must`] when none was authored.
+    pub fn mode(&self) -> DependencyShapeMode {
+        self.authored_mode.unwrap_or_default()
+    }
+
+    /// Whether a transitive dependency satisfies the rule; a direct dependency
+    /// is required when none was authored.
+    pub fn is_transitive(&self) -> bool {
+        self.authored_transitive.unwrap_or(false)
+    }
+}
+
+wire_vocabulary! {
+    /// The `mode` of a `dependency-shape` assert. It shapes the finding message
+    /// only; the blocking weight comes from the rule's severity.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum DependencyShapeMode {
+        /// The dependency is required.
+        #[default]
+        Must = "must",
+        /// The dependency is expected.
+        Should = "should",
     }
 }
 
@@ -1169,15 +1211,41 @@ impl RawLabelReference {
     }
 }
 
-/// The keys and value types of a `dependency-shape` payload, checked at load.
+/// The `dependency-shape` assert payload, lowered by
+/// [`RawDependencyShape::into_assertion`].
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawDependencyShape {
     target: Selector,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
     mode: Option<String>,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
     transitive: Option<bool>,
+}
+
+impl RawDependencyShape {
+    /// Lower into an [`Assertion::DependencyShape`], rejecting an unknown mode
+    /// or an invalid state token in the target.
+    fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
+        if let Some(state) = &self.target.state {
+            state.validate(rule)?;
+        }
+        let authored_mode = self
+            .mode
+            .map(|mode| {
+                mode.parse::<DependencyShapeMode>()
+                    .map_err(|e| RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: format!("dependency-shape 'mode': {e}"),
+                    })
+            })
+            .transpose()?;
+        Ok(Assertion::DependencyShape {
+            config: DependencyShapeConfig {
+                target: self.target,
+                authored_mode,
+                authored_transitive: self.transitive,
+            },
+        })
+    }
 }
 
 /// Check a graph-assertion payload against its raw struct `T`, so an unknown or
@@ -1442,11 +1510,8 @@ impl RawAssert {
                 .into_assertion(rule);
         }
         if let Some(config) = self.dependency_shape {
-            let raw: RawDependencyShape = check_payload(rule, "dependency-shape", &config)?;
-            if let Some(state) = &raw.target.state {
-                state.validate(rule)?;
-            }
-            return Ok(Assertion::DependencyShape { config });
+            return check_payload::<RawDependencyShape>(rule, "dependency-shape", &config)?
+                .into_assertion(rule);
         }
         if let Some(gr) = self.gate_recency {
             return gr.into_assertion(rule);
@@ -3035,9 +3100,39 @@ assert = { dependency-shape = { target = { state = "don" } } }
         )
         .unwrap_err();
         assert!(
-            matches!(&err, RuleConfigError::InvalidState { value, .. } if value == "don"),
+            matches!(&err, RuleConfigError::InvalidState { rule, value, .. } if rule == "shape" && value == "don"),
             "target state is validated at load: {err:?}"
         );
+    }
+
+    #[test]
+    fn test_parse_dependency_shape_lowers_mode_and_transitive_and_rejects_unknown_mode() {
+        let parse_shape = |extra: &str| {
+            parse(&format!(
+                "[[rules]]\nname = \"shape\"\n\
+                 assert = {{ dependency-shape = {{ target = {{ type = \"design\" }}{extra} }} }}\n"
+            ))
+        };
+        for (extra, mode, transitive) in [
+            ("", DependencyShapeMode::Must, false),
+            (", mode = \"should\"", DependencyShapeMode::Should, false),
+            (", transitive = true", DependencyShapeMode::Must, true),
+        ] {
+            let set = parse_shape(extra).unwrap();
+            match &set.rules[0].assert {
+                Assertion::DependencyShape { config } => {
+                    assert_eq!(config.mode(), mode);
+                    assert_eq!(config.is_transitive(), transitive);
+                }
+                other => panic!("expected DependencyShape, got {other:?}"),
+            }
+        }
+        for extra in [", mode = \"maybe\"", ", transitive = \"yes\""] {
+            match parse_shape(extra).unwrap_err() {
+                RuleConfigError::InvalidAssertion { rule, .. } => assert_eq!(rule, "shape"),
+                other => panic!("expected InvalidAssertion, got {other:?}"),
+            }
+        }
     }
 
     #[test]
