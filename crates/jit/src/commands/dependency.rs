@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::{AmbiguousIdError, IssueNotFoundError};
@@ -32,18 +32,6 @@ enum CapturedDependencyMutation<Id = IssueIdPrefix> {
         issue_id: Id,
         dependency_ids: Vec<IssueIdPrefix>,
     },
-}
-
-impl CapturedDependencyMutation<String> {
-    fn issue_id(&self) -> &str {
-        match self {
-            Self::Single { issue_id, .. }
-            | Self::Batch { issue_id, .. }
-            | Self::RemoveSingle { issue_id, .. }
-            | Self::RemoveBatch { issue_id, .. } => issue_id,
-            Self::ReduceAll { .. } => "",
-        }
-    }
 }
 
 /// Parse a batch's requested dependency ids, naming every one that is too
@@ -382,7 +370,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = crate::repository_state::assemble_config(&image)?;
-            let resolved_request: CapturedDependencyMutation<String> = match &request {
+            let resolved_request: CapturedDependencyMutation<IssueId> = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
                     dependency_id,
@@ -401,9 +389,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
+                let (CapturedDependencyMutation::RemoveSingle {
+                    issue_id: resolved_id,
+                    ..
+                }
+                | CapturedDependencyMutation::RemoveBatch {
+                    issue_id: resolved_id,
+                    ..
+                }) = &resolved_request
+                else {
+                    unreachable!("removal coordinator receives only removals");
+                };
                 captured_lease_warnings(
                     config.enforcement_mode(),
-                    &[resolved_request.issue_id().to_string()],
+                    std::slice::from_ref(resolved_id),
                     claims_guard.as_ref(),
                 )?
                 .into_iter()
