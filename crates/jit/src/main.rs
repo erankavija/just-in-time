@@ -6175,7 +6175,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // --rule path: evaluate exactly one configured graph rule with the
             // positional issue as its sole firing subject. The command keeps the
             // same report and exit contract as per-issue validation.
-            if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_deref()) {
+            if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
                 let report = executor.validate_rule(issue_id, rule_name)?;
                 let exit_nonzero = report.has_errors();
                 if json {
@@ -6215,7 +6215,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
 
             // --explain path: report matched selectors -> rule names -> outcomes.
-            if let (true, Some(issue_id)) = (explain, id.as_deref()) {
+            if let (true, Some(issue_id)) = (explain, id.as_ref()) {
                 let report = executor.explain_rules(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
@@ -6282,7 +6282,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // (`--fix`/`--branch-drift`/`--leases` + id) were already rejected above,
             // so a present id here is always a pure per-issue rule run.
             if id.is_some() {
-                let report = executor.run_rules(id.as_deref())?;
+                let report = executor.run_rules(id.as_ref())?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;

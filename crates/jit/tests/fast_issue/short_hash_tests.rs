@@ -237,6 +237,27 @@ fn test_cli_dep_rm_reports_a_repeated_target_as_not_found() {
     assert_eq!(removed["not_found"], serde_json::json!([short(&to)]));
 }
 
+/// `validate` resolves its issue and scope prefixes at the CLI to the issue
+/// the full id names.
+#[test]
+fn test_cli_validate_resolves_short_prefixes() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Validated"]).unwrap();
+
+    for args in [
+        vec!["validate"],
+        vec!["validate", "--explain"],
+        vec!["validate", "--scope"],
+    ] {
+        let by = |id: &str| {
+            let mut args = args.clone();
+            args.push(id);
+            cli.run_json(args).unwrap()
+        };
+        assert_eq!(by(&short(&id)), by(&id), "{args:?}");
+    }
+}
+
 /// The event-query issue filter resolves a short prefix or any spelling of a
 /// live issue's id to that issue's events.
 #[test]

@@ -1096,13 +1096,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             ),
             GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
                 .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
-            GateChecker::RuleValidation { rule } => super::validate::rule_validation_outcome(
-                repository_image,
-                &IssueIdPrefix::from(issue_id),
-                rule,
-            )
-            .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
-            .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
+            GateChecker::RuleValidation { rule } => {
+                super::validate::rule_validation_outcome(repository_image, issue_id, rule)
+                    .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
+                    .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
+            }
             GateChecker::LabelTargetValidation { label_namespace } => {
                 label_target_report(repository_image, issue_id, label_namespace)
                     .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))

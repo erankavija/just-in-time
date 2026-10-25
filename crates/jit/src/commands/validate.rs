@@ -1037,17 +1037,16 @@ pub(crate) fn plan_content_with_issues(
 /// reporting: the CLI an error finding, the gate checker an `error` run.
 pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &crate::domain::identity::IssueIdPrefix,
+    issue_id: &IssueId,
     rule_name: &str,
 ) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
 
     let issues = super::captured_active_issues(image)?;
-    let issue_id = super::resolve_issue_from_capture(&issues, requested_issue_id)?;
     let issue = issues
         .iter()
-        .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.as_str()))?;
+        .find(|issue| &issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.as_str()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format();
@@ -1548,8 +1547,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
     /// whole-repo report.
     ///
-    /// When `id` is `Some`, the issue is resolved (partial ids accepted) and its
-    /// matching local rules are evaluated, then graph rules are evaluated across
+    /// When `id` is `Some`, the issue's matching local rules are evaluated, then graph rules are evaluated across
     /// the whole store and filtered to those that pertain to this issue using
     /// structured attribution (each graph finding carries its issue id), plus any
     /// `config-error` finding for a graph rule whose selector applies to this
@@ -1561,18 +1559,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
-    /// resolved, or a matching local rule's schema fails to compile (a
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
+    /// found, or a matching local rule's schema fails to compile (a
     /// misconfigured rule never silently disables enforcement).
-    pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport>
+    pub fn run_rules(&self, id: Option<&IssueId>) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let id = id
-            .map(crate::domain::identity::IssueIdPrefix::from_str)
-            .transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
         // for a binding into the unloadable source (REQ-01), and the parse problem
@@ -1609,11 +1604,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
 
-        match &id {
-            Some(prefix) => {
-                // `load_issue` keys on the FULL id.
-                let full_id = self.storage.resolve_issue_id(prefix)?;
-                let issue = self.storage.load_issue(&full_id)?;
+        match id {
+            Some(full_id) => {
+                let issue = self.storage.load_issue(full_id)?;
 
                 // Local rules for this issue only.
                 let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
@@ -1757,11 +1750,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the container id cannot
-    /// be resolved, or a matching local rule's schema fails to compile.
+    /// Returns an error if `.jit/rules.toml` is malformed, the container is not
+    /// found, or a matching local rule's schema fails to compile.
     pub fn validate_scope(
         &self,
-        container_id: &str,
+        container_full_id: &IssueId,
     ) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1769,12 +1762,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let container_id = crate::domain::identity::IssueIdPrefix::from_str(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
-
-        // Resolve the container (partial ids accepted) and build the slice.
-        let container_full_id = self.storage.resolve_issue_id(&container_id)?;
         let all = self.storage.list_issues()?;
 
         // The breakdown boundary type is template-driven: resolve the container's
@@ -1782,10 +1771,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // breakdown-node type. No applicable template (a non-bracketed container)
         // → no boundary, so the scope walk is the full dependency closure (see
         // `bracket_scope_ids`).
-        let container_type = all
+        let container = all
             .iter()
-            .find(|i| i.id == container_full_id)
-            .and_then(|c| label_utils::type_label_value(&c.labels).map(str::to_string));
+            .find(|i| &i.id == container_full_id)
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(container_full_id.as_str()))?;
+        let container_type = label_utils::type_label_value(&container.labels).map(str::to_string);
         let templates = &self.cached_config()?.templates;
         let breakdown_type = container_type
             .as_deref()
@@ -1794,7 +1784,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(str::to_string);
 
         let scope_ids = crate::domain::queries::bracket_scope_ids(
-            &container_full_id,
+            container_full_id,
             &all,
             breakdown_type.as_deref(),
         );
@@ -1890,15 +1880,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// rather than an empty passing report.
     pub fn validate_rule(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         rule_name: &str,
     ) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issue_id = crate::domain::identity::IssueIdPrefix::from_str(issue_id)?;
         let image = self.capture_validation_image()?;
-        rule_validation_outcome(&image, &issue_id, rule_name)
+        rule_validation_outcome(&image, issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
     }
 
@@ -1921,21 +1910,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
-    /// resolved, or a matching local rule's schema fails to compile.
-    pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport>
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
+    /// found, or a matching local rule's schema fails to compile.
+    pub fn explain_rules(&self, id: &IssueId) -> Result<crate::validation::report::ExplainReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
-        let id = crate::domain::identity::IssueIdPrefix::from_str(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
-        // `load_issue` keys on the FULL id; resolve a short-id prefix first.
-        let full_id = self.storage.resolve_issue_id(&id)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.storage.load_issue(id)?;
         let issues = self.storage.list_issues()?;
 
         // Local findings for this issue, grouped by rule name.
@@ -3311,49 +3297,6 @@ priority = 100
         // The finding serializes (used by `jit validate --json`).
         let value = serde_json::to_value(&report.findings).unwrap();
         assert!(value.to_string().contains(DANGLING_LINK_RULE));
-    }
-
-    /// `jit validate <id>` takes the same short-id prefix every other command
-    /// takes. `load_issue` keys on the full id, so `run_rules` must resolve the
-    /// prefix first; without that it reports the issue as not found.
-    #[test]
-    fn test_run_rules_accepts_short_id_prefix() {
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let full_id = target.id.clone();
-        let short_id = target.short_id();
-        let exec = dangling_exec(vec![target]);
-
-        let by_short = exec
-            .run_rules(Some(&short_id))
-            .expect("short-id prefix must resolve");
-        let by_full = exec
-            .run_rules(Some(&full_id))
-            .expect("full id must resolve");
-
-        assert_eq!(
-            by_short.findings.len(),
-            by_full.findings.len(),
-            "the short-id prefix must select the same issue as the full id"
-        );
-    }
-
-    /// The same resolution holds for `jit validate --explain <id>`.
-    #[test]
-    fn test_explain_rules_accepts_short_id_prefix() {
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let full_id = target.id.clone();
-        let short_id = target.short_id();
-        let exec = dangling_exec(vec![target]);
-
-        let by_short = exec
-            .explain_rules(&short_id)
-            .expect("short-id prefix must resolve");
-        let by_full = exec.explain_rules(&full_id).expect("full id must resolve");
-
-        assert_eq!(by_short.issue_id, by_full.issue_id);
-        assert_eq!(by_short.outcomes.len(), by_full.outcomes.len());
     }
 
     /// An issue mutation captures no issue document reference, working-tree or
