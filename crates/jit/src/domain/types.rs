@@ -7,7 +7,6 @@ use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::ProfileId;
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
 // identity here keeps the domain layer pure while leaving one canonical type
