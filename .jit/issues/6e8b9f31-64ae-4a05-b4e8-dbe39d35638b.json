@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3bfb5998-94c7-4f8e-b270-3d1a8b96aa1f",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:13:30.827615093Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b5a6f59f-1acd-4797-b270-17c35c0ab743",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:14:49.504813570Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6e8b9f31-64ae-4a05-b4e8-dbe39d35638b",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "System actors are named Assignee constants",
-  "updated_at": "2026-10-24T23:55:22.579371100Z"
+  "updated_at": "2026-10-25T01:14:49.504813570Z"
 }
