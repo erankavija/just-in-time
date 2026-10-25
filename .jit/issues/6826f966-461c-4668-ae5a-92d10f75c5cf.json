@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c8bcad4-2397-4a67-8504-bef67ccfed0e",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:33:55.342742811Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "db595e1b-af45-42ad-b317-a1b5050bdb37",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:34:36.365391757Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6826f966-461c-4668-ae5a-92d10f75c5cf",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rule severity and scope tokens come from one declaration",
-  "updated_at": "2026-10-25T01:56:38.941102245Z"
+  "updated_at": "2026-10-25T02:34:36.365391757Z"
 }
