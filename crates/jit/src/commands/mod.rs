@@ -105,7 +105,7 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
-use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::identity::IssueId;
 use crate::domain::{
     is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
@@ -117,7 +117,6 @@ use crate::storage::IssueStore;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::cell::RefCell;
-use std::str::FromStr;
 use std::sync::OnceLock;
 
 thread_local! {
@@ -477,22 +476,22 @@ pub fn with_mutation_session<S: crate::storage::RepositoryStateStore, T>(
 #[derive(Clone)]
 enum CapturedIssueMutation {
     Assign {
-        issue_id: String,
+        issue_id: IssueId,
         assignee: crate::domain::Assignee,
     },
     Unassign {
-        issue_id: String,
+        issue_id: IssueId,
     },
     AddGates {
-        issue_id: String,
+        issue_id: IssueId,
         gate_keys: Vec<String>,
     },
     RemoveGates {
-        issue_id: String,
+        issue_id: IssueId,
         gate_keys: Vec<String>,
     },
     SetManualGateStatus {
-        issue_id: String,
+        issue_id: IssueId,
         gate_key: String,
         status: GateStatus,
         by: Option<crate::domain::Assignee>,
@@ -500,7 +499,7 @@ enum CapturedIssueMutation {
 }
 
 impl CapturedIssueMutation {
-    fn issue_id(&self) -> &str {
+    fn issue_id(&self) -> &IssueId {
         match self {
             Self::Assign { issue_id, .. }
             | Self::Unassign { issue_id }
@@ -561,7 +560,7 @@ struct CapturedTransitionEvidence<'a> {
     issues: &'a [Issue],
     declarations: &'a crate::repository_state::CapturedRepositoryDeclarations,
     config: &'a JitConfig,
-    plan_content: &'a std::collections::HashMap<String, String>,
+    plan_content: &'a std::collections::HashMap<IssueId, String>,
     context: &'a crate::repository_state::MutationContext,
 }
 
@@ -617,7 +616,7 @@ struct CapturedPrecheckPlan {
 /// inputs moved; that drift is recorded on the reused run instead of launching
 /// the checker again.
 struct CachedPrecheckExecution {
-    target_id: String,
+    target_id: IssueId,
     /// The captured inputs are retained so a reused precheck can be recorded as
     /// stable or as having moved while its checker ran.
     evidence: PrecheckEvidence,
@@ -840,36 +839,36 @@ fn ensure_claim_available(
 #[derive(Clone)]
 enum CapturedLifecycleMutation {
     State {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
         target: State,
         force: bool,
         divert_unpassed_gates: bool,
         enforce_lease: bool,
     },
     Claim {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
         assignee: crate::domain::Assignee,
     },
     Release {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
         reason: String,
     },
     AutoReady {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
     },
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`,
     /// restoring agreement between stored readiness and the dependency graph
     /// (`@/invariant/derived-state-coherence`). The inverse of [`Self::AutoReady`].
     AutoBacklog {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
     },
     AutoDone {
-        issue_id: IssueIdPrefix,
+        issue_id: IssueId,
     },
 }
 
 impl CapturedLifecycleMutation {
-    fn issue_id(&self) -> &IssueIdPrefix {
+    fn issue_id(&self) -> &IssueId {
         match self {
             Self::State { issue_id, .. }
             | Self::Claim { issue_id, .. }
@@ -903,7 +902,7 @@ struct PrecheckPreflight {
 }
 
 struct CapturedLifecycleOutcome {
-    target_id: String,
+    target_id: IssueId,
     changed: bool,
     warnings: Vec<String>,
     storage_warnings: Vec<crate::storage::StorageWarning>,
@@ -911,7 +910,7 @@ struct CapturedLifecycleOutcome {
 
 #[derive(Clone)]
 struct CapturedFieldUpdate {
-    issue_id: IssueIdPrefix,
+    issue_id: IssueId,
     title: Option<String>,
     description: Option<DescriptionUpdate>,
     priority: Option<Priority>,
@@ -944,7 +943,7 @@ impl CapturedFieldUpdate {
     /// identical authoritative request through [`derive_field_update`] --
     /// there is exactly one place that turns `UpdateOperations` into a
     /// captured request, so the two call sites cannot silently drift apart.
-    fn bulk(issue_id: IssueIdPrefix, operations: &UpdateOperations, force: bool) -> Result<Self> {
+    fn bulk(issue_id: IssueId, operations: &UpdateOperations, force: bool) -> Result<Self> {
         Ok(Self {
             issue_id,
             title: None,
@@ -969,11 +968,11 @@ impl CapturedFieldUpdate {
     /// The standalone gate and assignee operations a single-issue update
     /// composes, in the order its CLI flags apply; bulk updates fold these
     /// fields into their own `issue_updated` record instead.
-    fn issue_local_mutations(&self, issue_id: &str) -> Vec<CapturedIssueMutation> {
+    fn issue_local_mutations(&self, issue_id: &IssueId) -> Vec<CapturedIssueMutation> {
         if self.bulk {
             return Vec::new();
         }
-        let issue_id = issue_id.to_string();
+        let issue_id = issue_id.clone();
         let assignment = if self.unassign {
             Some(CapturedIssueMutation::Unassign {
                 issue_id: issue_id.clone(),
@@ -1002,7 +1001,7 @@ impl CapturedFieldUpdate {
         .collect()
     }
 
-    fn label_edit(issue_id: IssueIdPrefix, label_edit: CapturedLabelEdit) -> Self {
+    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
         Self {
             issue_id,
             title: None,
@@ -1037,7 +1036,7 @@ struct DerivedFieldUpdate {
 
 #[derive(Debug)]
 struct CapturedFieldUpdateOutcome {
-    target_id: String,
+    target_id: IssueId,
     changed: bool,
     entered_terminal: bool,
     warnings: Vec<String>,
@@ -1094,7 +1093,7 @@ fn derive_state_transition(
     if old_state == State::Archived {
         if let Some(origin) = issue.archived_from.filter(|origin| target != *origin) {
             return Err(crate::errors::TransitionBlockedError::archived_revive(
-                issue.id.clone(),
+                issue.id.to_string(),
                 target,
                 origin,
             )
@@ -1109,7 +1108,7 @@ fn derive_state_transition(
         );
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
-                issue.id.clone(),
+                issue.id.to_string(),
                 target,
                 old_state,
                 blockers,
@@ -1118,7 +1117,7 @@ fn derive_state_transition(
         }
         if target == State::Done && issue.has_unpassed_gates() {
             return Err(crate::errors::TransitionBlockedError::gates(
-                issue.id.clone(),
+                issue.id.to_string(),
                 target,
                 old_state,
                 unpassed_gate_blockers(&issue, &evidence.declarations.gates),
@@ -1146,13 +1145,13 @@ fn derive_state_transition(
             let mut ids = HashSet::from([projected.id.clone()]);
             ids.extend(
                 graph
-                    .get_transitive_dependents(&projected.id)
+                    .get_transitive_dependents(projected.id.as_str())
                     .into_iter()
                     .map(|candidate| candidate.id.clone()),
             );
             ids.extend(
                 graph
-                    .get_transitive_dependencies(&projected.id)
+                    .get_transitive_dependencies(projected.id.as_str())
                     .into_iter()
                     .map(|candidate| candidate.id.clone()),
             );
@@ -1189,8 +1188,7 @@ fn derive_state_transition(
             let mut blocking = Vec::new();
             for finding in findings {
                 let config_error = finding.is_config_error();
-                let pertains =
-                    config_error || finding.issue_id.as_deref() == Some(projected.id.as_str());
+                let pertains = config_error || finding.issue_id.as_ref() == Some(&projected.id);
                 if pertains
                     && strictness.blocks(
                         enforcing.contains(finding.finding.rule.as_str()),
@@ -1240,7 +1238,7 @@ fn derive_state_transition(
                 } else {
                     return Ok(DerivedStateTransition::GraphBlocked {
                         error: crate::errors::TransitionBlockedError::graph_rules(
-                            issue.id.clone(),
+                            issue.id.to_string(),
                             target,
                             old_state,
                             blocking,
@@ -1389,7 +1387,7 @@ fn derive_field_update(
             );
             if !blockers.is_empty() {
                 return Err(crate::errors::TransitionBlockedError::dependencies(
-                    issue.id.clone(),
+                    issue.id.to_string(),
                     State::Done,
                     original.state,
                     blockers,
@@ -1397,7 +1395,7 @@ fn derive_field_update(
                 .into());
             }
             gate_error = Some(crate::errors::TransitionBlockedError::gates(
-                issue.id.clone(),
+                issue.id.to_string(),
                 State::Done,
                 State::Gated,
                 unpassed_gate_blockers(&issue, &evidence.declarations.gates),
@@ -1826,7 +1824,7 @@ pub struct StatusSummary {
 /// Result of listing document references for an issue
 #[derive(Debug, Serialize)]
 pub struct DocumentListResult {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     pub documents: Vec<crate::domain::DocumentReference>,
     pub count: usize,
 }
@@ -1841,7 +1839,7 @@ pub struct DocumentHistory {
 /// Result of listing assets for a document
 #[derive(Debug, Serialize)]
 pub struct AssetListResult {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     pub document_path: String,
     /// Number of assets in `assets` (list envelope `count`; equals `assets.len()`).
     pub count: usize,
@@ -1872,7 +1870,7 @@ pub struct DocumentDiffResult {
 /// Result of adding a document reference
 #[derive(Debug, Serialize)]
 pub struct DocumentAddResult {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     pub document: crate::domain::DocumentReference,
     /// `true` when `path` was already linked to the issue and this call
     /// refreshed that entry in place; `false` when it appended a new one.
@@ -1882,7 +1880,7 @@ pub struct DocumentAddResult {
 /// Result of removing a document reference
 #[derive(Debug, Serialize)]
 pub struct DocumentRemoveResult {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     pub path: String,
 }
 
@@ -2048,7 +2046,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
             let bytes = match image.entry(&path)? {
                 RepositoryEntry::File { content, .. } => content.bytes(),
                 RepositoryEntry::Absent => {
-                    return Err(crate::storage::IssueNotFoundError::new(id).into())
+                    return Err(crate::storage::IssueNotFoundError::new(id.to_string()).into())
                 }
                 _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
             };
@@ -2097,8 +2095,12 @@ fn discover_gate_run_results(
     Ok(())
 }
 
-fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<IssueId> {
-    crate::storage::resolve_issue_id_among(prefix, issues)
+fn require_issue_in_capture(issues: &[Issue], id: &IssueId) -> Result<IssueId> {
+    issues
+        .iter()
+        .find(|issue| &issue.id == id)
+        .map(|issue| issue.id.clone())
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.to_string()).into())
 }
 
 /// Executes CLI commands with business logic and validation.
@@ -2343,13 +2345,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                         })?
                     }
                     RepositoryEntry::Absent => {
-                        return Err(
-                            crate::storage::IssueNotFoundError::new(request.issue_id()).into()
+                        return Err(crate::storage::IssueNotFoundError::new(
+                            request.issue_id().to_string(),
                         )
+                        .into())
                     }
                     _ => return Err(anyhow!("captured issue path is not an ordinary file")),
                 };
-                if issue.id != request.issue_id() {
+                if &issue.id != request.issue_id() {
                     return Err(anyhow!(
                         "captured issue identity mismatch: requested {}, found {}",
                         request.issue_id(),
@@ -2385,7 +2388,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         draft: Issue,
         explicit_type: bool,
         force: bool,
-    ) -> Result<(String, WriteValidation)>
+    ) -> Result<(IssueId, WriteValidation)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2628,12 +2631,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
+            let target = require_issue_in_capture(&issues, &request.issue_id)?;
             let issue = issues
                 .iter()
                 .find(|issue| issue.id == target)
                 .cloned()
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.to_string()))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
             let lease_warnings = if request.enforce_lease {
@@ -2647,7 +2650,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = IssueIdPrefix::from(&target);
+            effective_request.issue_id = target.clone();
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2691,20 +2694,20 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     fn publish_captured_bulk_update(
         &self,
-        issue_id: String,
+        issue_id: &IssueId,
         operations: &UpdateOperations,
         force: bool,
     ) -> Result<CapturedFieldUpdateOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let request = CapturedFieldUpdate::bulk(IssueIdPrefix::from(&issue_id), operations, force)?;
+        let request = CapturedFieldUpdate::bulk(issue_id.clone(), operations, force)?;
         self.publish_captured_field_update(request)
     }
 
     fn publish_captured_state_transition(
         &self,
-        issue_id: IssueIdPrefix,
+        issue_id: &IssueId,
         target: State,
         force: bool,
         divert_unpassed_gates: bool,
@@ -2714,7 +2717,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::State {
-            issue_id,
+            issue_id: issue_id.clone(),
             target,
             force,
             divert_unpassed_gates,
@@ -2724,7 +2727,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     fn publish_captured_claim(
         &self,
-        issue_id: IssueIdPrefix,
+        issue_id: &IssueId,
         assignee: crate::domain::Assignee,
     ) -> Result<Vec<crate::storage::StorageWarning>>
     where
@@ -2732,35 +2735,37 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         Ok(self
             .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id,
+                issue_id: issue_id.clone(),
                 assignee,
             })?
             .storage_warnings)
     }
 
-    fn publish_captured_release(&self, issue_id: IssueIdPrefix, reason: String) -> Result<()>
+    fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
         self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
-            issue_id,
+            issue_id: issue_id.clone(),
             reason,
         })?;
         Ok(())
     }
 
-    fn publish_captured_auto_transition(
-        &self,
-        issue_id: IssueIdPrefix,
-        target: State,
-    ) -> Result<bool>
+    fn publish_captured_auto_transition(&self, issue_id: &IssueId, target: State) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let request = match target {
-            State::Ready => CapturedLifecycleMutation::AutoReady { issue_id },
-            State::Backlog => CapturedLifecycleMutation::AutoBacklog { issue_id },
-            State::Done => CapturedLifecycleMutation::AutoDone { issue_id },
+            State::Ready => CapturedLifecycleMutation::AutoReady {
+                issue_id: issue_id.clone(),
+            },
+            State::Backlog => CapturedLifecycleMutation::AutoBacklog {
+                issue_id: issue_id.clone(),
+            },
+            State::Done => CapturedLifecycleMutation::AutoDone {
+                issue_id: issue_id.clone(),
+            },
             _ => {
                 return Err(anyhow!(
                     "unsupported automatic transition target '{}'",
@@ -2811,7 +2816,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let issue = issues
                         .into_iter()
                         .find(|issue| issue.id == light.target.id)
-                        .ok_or_else(|| crate::storage::IssueNotFoundError::new(&light.target.id))?;
+                        .ok_or_else(|| {
+                            crate::storage::IssueNotFoundError::new(light.target.id.to_string())
+                        })?;
                     let declarations = crate::repository_state::declarations_from_image(&image)?;
                     let lease_mode = declarations.config().enforcement_mode();
                     let registry = declarations.gates;
@@ -2900,14 +2907,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            if resolve_issue_from_capture(&issues, request.issue_id())? != expected_target {
+            if require_issue_in_capture(&issues, request.issue_id())? != expected_target {
                 return Ok(AttemptOutcome::Retry);
             }
             let mut issue = issues
                 .iter()
                 .find(|issue| issue.id == expected_target)
                 .cloned()
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
+                .ok_or_else(|| {
+                    crate::storage::IssueNotFoundError::new(expected_target.to_string())
+                })?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let lease_mode = declarations.config().enforcement_mode();
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
@@ -3034,7 +3043,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         );
                         if !blockers.is_empty() {
                             return Err(crate::errors::TransitionBlockedError::dependencies(
-                                issue.id.clone(),
+                                issue.id.to_string(),
                                 State::InProgress,
                                 issue.state,
                                 blockers,
@@ -3110,7 +3119,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 );
                 if !blockers.is_empty() {
                     return Err(crate::errors::TransitionBlockedError::dependencies(
-                        issue.id.clone(),
+                        issue.id.to_string(),
                         target,
                         issue.state,
                         blockers,
@@ -3118,7 +3127,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
                 after_apply_error = Some(crate::errors::TransitionBlockedError::gates(
-                    issue.id.clone(),
+                    issue.id.to_string(),
                     State::Done,
                     State::Gated,
                     unpassed_gate_blockers(&issue, &declarations.gates),
@@ -3263,7 +3272,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let blockers = issue::blocking_dependencies(issue, &resolved);
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
-                issue.id.clone(),
+                issue.id.to_string(),
                 target,
                 issue.state,
                 blockers,
@@ -3274,7 +3283,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if target == State::Done && issue.has_unpassed_gates() {
             let registry = self.storage.load_gate_registry()?;
             return Err(crate::errors::TransitionBlockedError::gates(
-                issue.id.clone(),
+                issue.id.to_string(),
                 State::Done,
                 issue.state,
                 unpassed_gate_blockers(issue, &registry),
@@ -3334,11 +3343,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns false if no lease exists, lease is stale, or belongs to another agent.
     ///
     /// In tests: If JIT_AGENT_ID is not set, any valid lease counts (single-user mode).
-    fn check_active_lease(&self, issue_id: &str) -> Result<bool> {
+    fn check_active_lease(&self, issue_id: &IssueId) -> Result<bool> {
         use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
 
-        let prefix = IssueIdPrefix::from_str(issue_id)?;
         let paths = self.require_worktree_paths()?;
 
         // Load the active-lease index through storage (an absent index yields an
@@ -3349,7 +3357,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let current_agent = resolve_agent_id(None).ok();
 
         // Check if active lease exists for this issue
-        let full_id = self.storage.resolve_issue_id(&prefix)?;
+        let full_id = issue_id.clone();
         let now = chrono::Utc::now();
 
         let has_active_lease = claims_index.leases.iter().any(|lease| {
@@ -3394,7 +3402,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// In `off` mode, always returns Ok with None.
     ///
     /// Returns: Result<Option<String>> where Some(warning) should be printed by the CLI layer.
-    pub fn require_active_lease(&self, issue_id: &str) -> Result<Option<String>> {
+    pub fn require_active_lease(&self, issue_id: &IssueId) -> Result<Option<String>> {
         use crate::config::EnforcementMode;
 
         // This legacy preflight is rechecked from captured config by mutation
@@ -3730,7 +3738,7 @@ mod tests {
 
     fn capture_precheck_plan(
         executor: &CommandExecutor<crate::storage::InMemoryStorage>,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> CapturedPrecheckPlan {
         use crate::storage::RepositoryStateStore;
         let mut session = executor
@@ -3738,16 +3746,12 @@ mod tests {
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
         let crate::commands::validate::MutationBase { image, issues } = executor
-            .capture_mutation_base(
-                session.as_mut(),
-                &[],
-                Some(&IssueIdPrefix::from_str(issue_id).unwrap()),
-            )
+            .capture_mutation_base(session.as_mut(), &[], Some(issue_id))
             .unwrap()
             .unwrap();
         let issue = issues
             .into_iter()
-            .find(|issue| issue.id == issue_id)
+            .find(|issue| &issue.id == issue_id)
             .unwrap();
         let registry = crate::repository_state::declarations_from_image(&image)
             .unwrap()
@@ -3755,13 +3759,13 @@ mod tests {
         captured_precheck_plan(&image, &issue, &registry).unwrap()
     }
 
-    fn prior_precheck_run(issue_id: &str) -> crate::domain::GateRunResult {
+    fn prior_precheck_run(issue_id: &IssueId) -> crate::domain::GateRunResult {
         crate::domain::GateRunResult {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
             run_id: "prior-run".to_string(),
             gate_key: "auto-start".to_string(),
             stage: crate::declarations::GateStage::Precheck,
-            issue_id: issue_id.to_string(),
+            issue_id: issue_id.clone(),
             commit: None,
             branch: None,
             status: crate::domain::GateRunStatus::Passed,
@@ -3781,7 +3785,7 @@ mod tests {
         }
     }
 
-    fn captured_issue_spec(id: &str) -> crate::repository_state::CaptureSpec {
+    fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let paths = std::collections::BTreeSet::from([
             VirtualPath::data(format!("issues/{id}.json")).unwrap(),
@@ -3801,7 +3805,7 @@ mod tests {
     /// The capture of an issue mutation over `id` whose gate-run records
     /// `context` allocates.
     fn captured_gate_issue_spec(
-        id: &str,
+        id: &IssueId,
         context: &crate::repository_state::MutationContext,
     ) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
@@ -3822,7 +3826,7 @@ mod tests {
         .unwrap()
     }
 
-    fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &str) -> Issue {
+    fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {
         let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json")).unwrap();
         serde_json::from_slice(image.file_bytes(&path).unwrap().unwrap()).unwrap()
     }

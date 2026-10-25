@@ -1,6 +1,7 @@
 //! Event log operations
 
 use super::*;
+use crate::domain::identity::IssueIdPrefix;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
@@ -45,6 +46,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::identity::IssueIdPrefix;
     use crate::domain::EventBody;
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;

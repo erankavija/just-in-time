@@ -14,7 +14,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
-use std::str::FromStr;
 
 /// True when the selected worktree root is inside a git working tree, regardless
 /// of whether any commit exists yet.
@@ -77,12 +76,12 @@ fn get_current_branch(worktree_root: &Path) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Returns an error if the issue cannot be resolved or loaded, or if the lease
+/// Returns an error if the issue cannot be loaded, or if the lease
 /// cannot be acquired (e.g. it is already held by another agent).
 pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStore>(
     storage: &S,
     paths: &WorktreePaths,
-    issue_id: &str,
+    issue_id: &IssueId,
     ttl_secs: u64,
     agent_id: Option<&str>,
     reason: Option<&str>,
@@ -90,7 +89,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     use crate::agent_config::resolve_agent_id;
 
     // Resolve short ID to full ID
-    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+    let full_id = issue_id.clone();
 
     // Validate issue exists
     let _issue = storage
@@ -318,25 +317,22 @@ fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee
 /// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
 /// (or an actor with no configured agent identity) can release the lease.
 ///
-/// The positional argument is an ISSUE ID (short ids are resolved), not a lease
-/// UUID. If the issue holds more than one active lease (which should not happen
+/// The argument is a resolved issue id. If the issue holds more than one active lease (which should not happen
 /// under exclusive claiming), every active lease is released; the returned
 /// [`ReleasedLeaseInfo`] reports the last one released.
 ///
 /// # Errors
 ///
-/// Returns an error if the issue id cannot be resolved, if the issue has no
+/// Returns an error if the issue does not exist, if it has no
 /// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
 /// eviction fails.
 pub fn execute_claim_release_by_issue<S: IssueStore>(
     storage: &S,
     paths: &WorktreePaths,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
-    // Resolve short ID to full ID (errors if the issue does not exist).
-    let full_id = storage
-        .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)
-        .with_context(|| format!("Failed to resolve issue id {}", issue_id))?;
+    storage.load_issue(issue_id)?;
+    let full_id = issue_id.clone();
 
     // Get current branch for identity
     let branch = get_current_branch(&paths.worktree_root)?;
@@ -367,8 +363,11 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 
     // Resolve the issue's active (non-expired) lease(s).
     let leases = coordinator
-        .get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)
-        .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?;
+        .get_active_leases(None, None)
+        .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?
+        .into_iter()
+        .filter(|lease| lease.issue_id == full_id)
+        .collect::<Vec<_>>();
 
     let released = leases
         .into_iter()
@@ -751,6 +750,7 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::commands::CommandExecutor;
     use crate::storage::claim_coordinator::Lease;
     // Test helpers below load identity with explicit paths and don't surface
@@ -771,12 +771,12 @@ mod tests {
     fn execute_claim_acquire_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<LeaseId> {
         // Resolve short ID to full ID
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Validate issue exists
         let _issue = storage.load_issue(&full_id)?;
@@ -833,10 +833,11 @@ mod tests {
     fn execute_claim_release_by_issue_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
         actor: &str,
     ) -> Result<ReleasedLeaseInfo> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        storage.load_issue(issue_id)?;
+        let full_id = issue_id.clone();
         let paths = create_test_paths(temp);
 
         let locker = FileLocker::new(Duration::from_secs(
@@ -846,7 +847,11 @@ mod tests {
             ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), actor.parse()?);
         coordinator.init()?;
 
-        let leases = coordinator.get_active_leases(Some(&IssueIdPrefix::from(&full_id)), None)?;
+        let leases = coordinator
+            .get_active_leases(None, None)?
+            .into_iter()
+            .filter(|lease| lease.issue_id == full_id)
+            .collect::<Vec<_>>();
 
         let released = leases
             .into_iter()
@@ -990,23 +995,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_release_by_issue_resolves_short_id() -> Result<()> {
-        let (temp, storage) = setup_test_repo()?;
-        let issue_id = create_test_issue(&storage, "Test Issue")?;
-
-        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
-
-        // Use a short prefix of the issue id.
-        let short_id = &issue_id[..8];
-        let released =
-            execute_claim_release_by_issue_test(&temp, &storage, short_id, "agent:actor")?;
-
-        assert_eq!(released.issue_id, issue_id);
-        assert_eq!(execute_claim_list_test(&temp)?.len(), 0);
-        Ok(())
-    }
-
     /// Execute claim status with manually constructed paths (for testing)
     fn execute_claim_status_test(
         temp: &TempDir,
@@ -1036,7 +1024,7 @@ mod tests {
     }
 
     /// Helper to create a test issue
-    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<String> {
+    fn create_test_issue(storage: &JsonFileStorage, title: &str) -> Result<IssueId> {
         let layout = storage.configured_layout()?;
         CommandExecutor::new(storage.clone())
             .with_layout(layout)
@@ -1057,12 +1045,12 @@ mod tests {
     /// Seed an exact identifier precondition for short-id collision tests.
     fn create_test_issue_with_id(
         storage: &JsonFileStorage,
-        id: &str,
+        id: &IssueId,
         title: &str,
-    ) -> Result<String> {
+    ) -> Result<IssueId> {
         let mut issue =
             crate::test_utils::fixture_issue(title.to_string(), "Test description".to_string());
-        issue.id = id.to_string();
+        issue.id = id.clone();
         let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
         std::fs::write(
             storage.root().join("issues").join(format!("{id}.json")),
@@ -1072,19 +1060,25 @@ mod tests {
         let index_path = storage.root().join("index.json");
         let mut index =
             crate::repository_state::RepositoryIndex::parse(&std::fs::read(&index_path)?)?;
-        index.all_ids.push(id.to_string());
+        index.all_ids.push(id.clone());
         index.all_ids.sort();
         index.all_ids.dedup();
         index.deleted_ids.retain(|deleted| deleted != id);
         std::fs::write(index_path, index.to_pretty_bytes()?)?;
-        Ok(id.to_string())
+        Ok(id.clone())
     }
 
     #[test]
     fn test_claim_acquire_fails_when_issue_does_not_exist() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
 
-        let result = execute_claim_acquire_test(&temp, &storage, "nonexistent", 600, "agent:test");
+        let result = execute_claim_acquire_test(
+            &temp,
+            &storage,
+            &fixture_id("nonexistent"),
+            600,
+            "agent:test",
+        );
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1642,11 +1636,11 @@ mod tests {
     fn execute_claim_acquire_synchronized_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
-        issue_id: &str,
+        issue_id: &IssueId,
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<LeaseId> {
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let paths = create_test_paths(temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let locker = FileLocker::new(Duration::from_secs(
@@ -1795,12 +1789,12 @@ mod tests {
         let (temp, storage) = setup_test_repo()?;
         let first_id = create_test_issue_with_id(
             &storage,
-            "abcdef12-3000-4000-8000-000000000001",
+            &fixture_id("abcdef12-3000-4000-8000-000000000001"),
             "First shared-prefix issue",
         )?;
         let second_id = create_test_issue_with_id(
             &storage,
-            "abcdef12-4000-4000-8000-000000000002",
+            &fixture_id("abcdef12-4000-4000-8000-000000000002"),
             "Second shared-prefix issue",
         )?;
         persist_claim(&temp, &first_id, "agent:worker")?;
@@ -1821,7 +1815,7 @@ mod tests {
 
         let (temp, storage) = setup_test_repo()?;
         let issue_id = create_test_issue(&storage, "Reverse Order")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&issue_id)?)?;
+        let full_id = issue_id.clone();
 
         let paths = create_test_paths(&temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
@@ -1860,7 +1854,7 @@ mod tests {
     fn test_release_renew_heartbeat_never_touch_repository_state() -> Result<()> {
         let (temp, storage) = setup_test_repo()?;
         let issue_id = create_test_issue(&storage, "Coordinator Only")?;
-        let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&issue_id)?)?;
+        let full_id = issue_id.clone();
 
         let paths = create_test_paths(&temp);
         let identity = load_or_create_worktree_identity(&paths, "test-branch")?;

@@ -7,6 +7,7 @@
 //! - Result storage for audit trail
 
 use crate::declarations::{GateChecker, GateStage};
+use crate::domain::identity::IssueId;
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
     Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
@@ -68,7 +69,7 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
 /// `JIT_CONTEXT_FILE` env var.
 pub fn execute_gate_checker_with_context(
     gate_key: &str,
-    issue_id: &str,
+    issue_id: &IssueId,
     stage: GateStage,
     checker: &GateChecker,
     working_dir: &Path,
@@ -143,7 +144,7 @@ pub fn execute_gate_checker_with_context(
         run_id: String::new(),
         gate_key: gate_key.to_string(),
         stage,
-        issue_id: issue_id.to_string(),
+        issue_id: issue_id.clone(),
         commit,
         branch,
         status,
@@ -563,6 +564,7 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::repository_state::{
         gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
@@ -586,7 +588,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -616,7 +618,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -645,7 +647,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -684,7 +686,7 @@ mod tests {
         let start = Instant::now();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1117,7 +1119,7 @@ mod tests {
         };
         let result = execute_gate_checker_with_context(
             "g",
-            "issue-1",
+            &fixture_id("issue-1"),
             GateStage::Postcheck,
             &checker,
             temp.path(),
@@ -1153,7 +1155,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1183,7 +1185,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            "issue-123",
+            &fixture_id("issue-123"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1251,7 +1253,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            "issue-123",
+            &fixture_id("issue-123"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1287,7 +1289,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            "issue-123",
+            &fixture_id("issue-123"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1326,7 +1328,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "review",
-            "issue-123",
+            &fixture_id("issue-123"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1373,7 +1375,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1409,7 +1411,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            "test-issue",
+            &fixture_id("test-issue"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1431,7 +1433,7 @@ mod tests {
             run_id: "prev-run-1".to_string(),
             gate_key: "review".to_string(),
             stage: GateStage::Postcheck,
-            issue_id: "issue-123".to_string(),
+            issue_id: fixture_id("issue-123"),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: RS::Failed,
@@ -1471,7 +1473,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "review",
-            "issue-123",
+            &fixture_id("issue-123"),
             GateStage::Postcheck,
             &checker,
             &temp_dir,

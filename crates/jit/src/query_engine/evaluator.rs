@@ -3,6 +3,7 @@
 //! This layer contains all domain knowledge and reuses existing Issue methods.
 
 use super::parser::{QueryCondition, QueryExpr};
+use crate::domain::identity::IssueId;
 use crate::domain::Issue;
 use crate::labels;
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 ///
 /// Contains all issues for dependency graph evaluation (blocking checks).
 pub struct QueryContext<'a> {
-    pub all_issues: HashMap<String, &'a Issue>,
+    pub all_issues: HashMap<IssueId, &'a Issue>,
 }
 
 impl<'a> QueryContext<'a> {
@@ -68,24 +69,25 @@ impl QueryEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::domain::{Priority, State};
 
     fn create_issue(
-        id: &str,
+        id: &IssueId,
         state: State,
         priority: Priority,
         assignee: Option<&str>,
         labels: Vec<&str>,
-        dependencies: Vec<&str>,
+        dependencies: Vec<IssueId>,
     ) -> Issue {
         Issue {
-            id: id.to_string(),
+            id: id.clone(),
             title: format!("Test {}", id),
             description: String::new(),
             state,
             priority,
             assignee: assignee.map(|s| s.parse().unwrap()),
-            dependencies: dependencies.iter().map(|s| s.to_string()).collect(),
+            dependencies,
             gates_required: vec![],
             gates_status: Default::default(),
             context: Default::default(),
@@ -103,7 +105,14 @@ mod tests {
 
     #[test]
     fn test_eval_state_condition() {
-        let issue = create_issue("1", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let issue = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
@@ -116,7 +125,14 @@ mod tests {
 
     #[test]
     fn test_eval_priority_condition() {
-        let issue = create_issue("1", State::Ready, Priority::High, None, vec![], vec![]);
+        let issue = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::High,
+            None,
+            vec![],
+            vec![],
+        );
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
@@ -130,7 +146,7 @@ mod tests {
     #[test]
     fn test_eval_label_exact_match() {
         let issue = create_issue(
-            "1",
+            &fixture_id("1"),
             State::Ready,
             Priority::Normal,
             None,
@@ -150,7 +166,7 @@ mod tests {
     #[test]
     fn test_eval_label_wildcard() {
         let issue = create_issue(
-            "1",
+            &fixture_id("1"),
             State::Ready,
             Priority::Normal,
             None,
@@ -170,7 +186,7 @@ mod tests {
     #[test]
     fn test_eval_assignee_condition() {
         let issue = create_issue(
-            "1",
+            &fixture_id("1"),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
@@ -190,14 +206,21 @@ mod tests {
     #[test]
     fn test_eval_unassigned_condition() {
         let assigned = create_issue(
-            "1",
+            &fixture_id("1"),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
             vec![],
             vec![],
         );
-        let unassigned = create_issue("2", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let unassigned = create_issue(
+            &fixture_id("2"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
 
         let issues = [assigned.clone(), unassigned.clone()];
         let context = QueryContext::from_issues(&issues);
@@ -216,16 +239,30 @@ mod tests {
 
     #[test]
     fn test_eval_blocked_condition() {
-        let dep = create_issue("dep", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let dep = create_issue(
+            &fixture_id("dep"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
         let blocked = create_issue(
-            "blocked",
+            &fixture_id("blocked"),
             State::Backlog,
             Priority::Normal,
             None,
             vec![],
-            vec!["dep"],
+            vec![fixture_id("dep")],
         );
-        let not_blocked = create_issue("ok", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let not_blocked = create_issue(
+            &fixture_id("ok"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
 
         let issues = [dep, blocked.clone(), not_blocked.clone()];
         let context = QueryContext::from_issues(&issues);
@@ -244,7 +281,14 @@ mod tests {
 
     #[test]
     fn test_eval_and_expression() {
-        let issue = create_issue("1", State::Ready, Priority::High, None, vec![], vec![]);
+        let issue = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::High,
+            None,
+            vec![],
+            vec![],
+        );
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
@@ -260,7 +304,14 @@ mod tests {
 
     #[test]
     fn test_eval_or_expression() {
-        let issue = create_issue("1", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let issue = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
@@ -274,7 +325,14 @@ mod tests {
 
     #[test]
     fn test_eval_not_expression() {
-        let issue = create_issue("1", State::Ready, Priority::Normal, None, vec![], vec![]);
+        let issue = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
@@ -285,9 +343,30 @@ mod tests {
 
     #[test]
     fn test_eval_complex_expression() {
-        let issue1 = create_issue("1", State::Ready, Priority::High, None, vec![], vec![]);
-        let issue2 = create_issue("2", State::Done, Priority::Normal, None, vec![], vec![]);
-        let issue3 = create_issue("3", State::InProgress, Priority::Low, None, vec![], vec![]);
+        let issue1 = create_issue(
+            &fixture_id("1"),
+            State::Ready,
+            Priority::High,
+            None,
+            vec![],
+            vec![],
+        );
+        let issue2 = create_issue(
+            &fixture_id("2"),
+            State::Done,
+            Priority::Normal,
+            None,
+            vec![],
+            vec![],
+        );
+        let issue3 = create_issue(
+            &fixture_id("3"),
+            State::InProgress,
+            Priority::Low,
+            None,
+            vec![],
+            vec![],
+        );
 
         let issues = [issue1.clone(), issue2.clone(), issue3.clone()];
         let context = QueryContext::from_issues(&issues);

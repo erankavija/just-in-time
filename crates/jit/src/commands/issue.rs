@@ -42,7 +42,7 @@ pub struct IssueLocalUpdate {
 
 pub(super) fn blocking_dependencies(
     issue: &Issue,
-    resolved_issues: &std::collections::HashMap<String, &Issue>,
+    resolved_issues: &std::collections::HashMap<IssueId, &Issue>,
 ) -> Vec<TransitionBlocker> {
     issue
         .dependencies
@@ -52,7 +52,7 @@ pub(super) fn blocking_dependencies(
                 None
             }
             Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
-            None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
+            None => Some(TransitionBlocker::missing_dependency(dep_id.to_string())),
         })
         .collect()
 }
@@ -68,7 +68,7 @@ fn derive_issue_deletion(
     image: &crate::repository_state::RepositoryImage,
     context: &crate::repository_state::MutationContext,
     issues: &[Issue],
-    target_id: &str,
+    target_id: &IssueId,
 ) -> Result<DerivedIssueDeletion> {
     use crate::repository_state::MutationIntent;
 
@@ -76,7 +76,7 @@ fn derive_issue_deletion(
     let config = crate::repository_state::assemble_config(image)?;
     let mut projected = issues
         .iter()
-        .filter(|issue| issue.id != target_id)
+        .filter(|issue| &issue.id != target_id)
         .cloned()
         .collect::<Vec<_>>();
     let dependent_ids = projected
@@ -90,7 +90,7 @@ fn derive_issue_deletion(
     let plan_content = validate::plan_content_from_image(image, &projected)?;
 
     let mut intents = vec![MutationIntent::DeleteIssue {
-        issue_id: target_id.to_string(),
+        issue_id: target_id.clone(),
     }];
     let mut error_after_apply = None;
     for dependent_id in dependent_ids {
@@ -154,7 +154,7 @@ fn derive_issue_deletion(
     }
     intents.push(MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_deleted(target_id.to_string())),
+        event: Box::new(Event::draft_issue_deleted(target_id.clone())),
     });
     Ok(DerivedIssueDeletion {
         intents,
@@ -186,7 +186,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         content_format: Option<crate::domain::ContentFormat>,
         issue_type: Option<String>,
         force: bool,
-    ) -> Result<(String, Vec<String>)>
+    ) -> Result<(IssueId, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -276,11 +276,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
         Ok(filtered)
     }
 
-    pub fn show_issue(&self, id: &str) -> Result<Issue> {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
+    pub fn show_issue(&self, id: &IssueId) -> Result<Issue> {
+        let full_id = id.clone();
         self.exec.storage.load_issue(&full_id)
     }
 
@@ -337,7 +334,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// precedent) rather than silently dropped. Only a not-found id is treated
     /// as dangling: any genuine storage error (I/O, deserialization) propagates
     /// via `?` instead of being swallowed. Dangling ids are returned sorted.
-    fn resolve_direct_children(&self, container: &Issue) -> Result<(Vec<Issue>, Vec<String>)> {
+    fn resolve_direct_children(&self, container: &Issue) -> Result<(Vec<Issue>, Vec<IssueId>)> {
         let mut children = Vec::new();
         let mut dangling = Vec::new();
         for dep_id in &container.dependencies {
@@ -392,7 +389,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(response.items[0].title, "Child");
     /// assert!(response.extras.dangling.is_empty());
     /// ```
-    pub fn issue_children(&self, id: &str) -> Result<crate::output::IssueChildrenResponse> {
+    pub fn issue_children(&self, id: &IssueId) -> Result<crate::output::IssueChildrenResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -453,7 +450,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(progress.rollup.extras.percent, 50);
     /// assert!(progress.dangling.is_empty());
     /// ```
-    pub fn issue_progress(&self, id: &str) -> Result<crate::output::ContainerProgressResponse> {
+    pub fn issue_progress(&self, id: &IssueId) -> Result<crate::output::ContainerProgressResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -475,7 +472,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue(
         &self,
-        id: &str,
+        id: &IssueId,
         title: Option<String>,
         description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
@@ -514,7 +511,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue_resolved(
         &self,
-        id: &str,
+        id: &IssueId,
         title: Option<String>,
         description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
@@ -525,7 +522,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue_type: Option<String>,
         local: IssueLocalUpdate,
         force: bool,
-    ) -> Result<(String, Vec<String>)>
+    ) -> Result<(IssueId, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -536,7 +533,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let outcome = self
             .exec
             .publish_captured_field_update(CapturedFieldUpdate {
-                issue_id: IssueIdPrefix::from_str(id)?,
+                issue_id: id.clone(),
                 title,
                 description,
                 priority,
@@ -574,18 +571,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// without mutating global process state. Returns
     /// [`DeletionNotConfirmedError`] (classified by `output::failure::classify` as
     /// `ExitCode::InvalidArgument`, exit code 2) rather than performing the
-    /// delete when `allowed` is `false`; `id` is echoed verbatim in the
-    /// refusal's example remediation command, so it need not be a resolved
-    /// full id.
+    /// delete when `allowed` is `false`; the resolved `id` names the refused deletion.
     pub fn confirm_deletion_allowed(
         &self,
-        id: &str,
+        id: &IssueId,
         allowed: bool,
     ) -> std::result::Result<(), DeletionNotConfirmedError> {
         if allowed {
             Ok(())
         } else {
-            Err(DeletionNotConfirmedError::new(id))
+            Err(DeletionNotConfirmedError::new(id.to_string()))
         }
     }
 
@@ -609,13 +604,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// requiring target resolution) and `jit issue show --json`'s
     /// `dangling_dependency_ids` field remain as defense-in-depth for legacy or
     /// externally edited data.
-    pub fn delete_issue(&self, id: &str) -> Result<Vec<String>>
+    pub fn delete_issue(&self, id: &IssueId) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::finalize;
 
-        let id = &IssueIdPrefix::from_str(id)?;
+        let id = &id.clone();
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
@@ -643,7 +638,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let target_id = resolve_issue_from_capture(&issues, id)?;
+            let target_id = require_issue_in_capture(&issues, id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let current_mode = config.enforcement_mode();
             if target_id != expected_target || current_mode != expected_mode {
@@ -682,12 +677,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// the actual state mutation/publication are delegated to captured transition
     /// derivation (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
-    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>>
+    pub fn update_issue_state(&self, id: &IssueId, new_state: State) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let outcome = self.exec.publish_captured_state_transition(
-            IssueIdPrefix::from_str(id)?,
+            id,
             new_state,
             false,
             new_state == State::Done,
@@ -703,7 +698,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Reject an issue, recording `reason` as its `resolution:` label in the
     /// same mutation. Rejection bypasses rule enforcement, so label-rule
     /// findings surface as warnings.
-    pub fn reject_issue(&self, id: &str, reason: Option<&str>) -> Result<Vec<String>>
+    pub fn reject_issue(&self, id: &IssueId, reason: Option<&str>) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -711,7 +706,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             return self.update_issue_state(id, State::Rejected);
         };
         let mut request = CapturedFieldUpdate::label_edit(
-            IssueIdPrefix::from_str(id)?,
+            id.clone(),
             CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
         );
         request.state = Some(State::Rejected);
@@ -722,14 +717,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Assign an issue to someone.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<Vec<String>>
+    pub fn assign_issue(&self, id: &IssueId, assignee: String) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
+        let full_id = id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -753,7 +745,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
     /// observed while checking leases) so the calling command can surface them
     /// at its own output boundary; this method never writes to stderr.
-    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>>
+    pub fn claim_issue(&self, id: &IssueId, assignee: String) -> Result<Vec<StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -761,21 +753,17 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
-        self.exec
-            .publish_captured_claim(IssueIdPrefix::from_str(id)?, claimant)
+        self.exec.publish_captured_claim(id, claimant)
     }
 
     /// Unassign an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn unassign_issue(&self, id: &str) -> Result<Vec<String>>
+    pub fn unassign_issue(&self, id: &IssueId) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
+        let full_id = id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -790,16 +778,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
         Ok(warnings)
     }
 
-    pub fn release_issue(&self, id: &str, reason: &str) -> Result<()>
+    pub fn release_issue(&self, id: &IssueId, reason: &str) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
+        let full_id = id.clone();
         self.exec
-            .publish_captured_release(IssueIdPrefix::from(&full_id), reason.to_string())
+            .publish_captured_release(&full_id, reason.to_string())
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -811,7 +796,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         &self,
         assignee: String,
         filter: Option<String>,
-    ) -> Result<(String, Vec<StorageWarning>)>
+    ) -> Result<(IssueId, Vec<StorageWarning>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -842,14 +827,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_ready(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Ready)
+        let full_id = issue_id.clone();
+        self.publish_captured_auto_transition(&full_id, State::Ready)
     }
 
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
@@ -859,24 +842,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// stored readiness drifted from its graph converges from either side. Returns
     /// whether the issue changed state; an issue whose stored state already agrees
     /// with the graph is left untouched.
-    pub(super) fn auto_transition_to_backlog(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_backlog(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Backlog)
+        let full_id = issue_id.clone();
+        self.publish_captured_auto_transition(&full_id, State::Backlog)
     }
 
-    pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_done(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
-        if self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Done)? {
+        let full_id = issue_id.clone();
+        if self.publish_captured_auto_transition(&full_id, State::Done)? {
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
             Ok(true)
@@ -908,6 +887,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use crate::domain::EventBody;
@@ -1380,10 +1360,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let error = executor
-            .publish_captured_claim(
-                IssueIdPrefix::from_str(&issue_id).unwrap(),
-                "agent:test".parse().unwrap(),
-            )
+            .publish_captured_claim(&issue_id, "agent:test".parse().unwrap())
             .expect_err("the graph rule must block the claim");
         assert!(
             error
@@ -1417,7 +1394,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let outcome = executor
             .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id: IssueIdPrefix::from_str(&issue_id).unwrap(),
+                issue_id: issue_id.clone(),
                 assignee: "agent:test".parse().unwrap(),
             })
             .unwrap();
@@ -1460,10 +1437,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
-            .publish_captured_claim(
-                IssueIdPrefix::from_str(&issue_id).unwrap(),
-                "agent:test".parse().unwrap(),
-            )
+            .publish_captured_claim(&issue_id, "agent:test".parse().unwrap())
             .expect_err("the newly required manual precheck must block the claim");
 
         assert!(error
@@ -1476,30 +1450,20 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_gated_postchecks_use_canonical_transition_target_after_short_id_race() {
+    fn test_gated_postchecks_keep_resolved_target_after_a_new_issue_appears() {
         let executor = setup();
         let mut issue = crate::domain::fixture_issue("Target".to_string(), String::new());
-        issue.id = "abcd1111111111111111111111111111".to_string();
+        issue.id = fixture_id("abcd1111111111111111111111111111");
         issue.state = State::InProgress;
         crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
         let outcome = executor
-            .publish_captured_state_transition(
-                IssueIdPrefix::from_str("abcd").unwrap(),
-                State::Gated,
-                false,
-                false,
-                true,
-            )
+            .publish_captured_state_transition(&issue.id, State::Gated, false, false, true)
             .unwrap();
         let mut collision = crate::domain::fixture_issue("Collision".to_string(), String::new());
-        collision.id = "abcd2222222222222222222222222222".to_string();
+        collision.id = fixture_id("abcd2222222222222222222222222222");
         crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
-        assert!(executor
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str("abcd").unwrap())
-            .is_err());
         executor.run_postchecks(&outcome.target_id).unwrap();
         assert_eq!(outcome.target_id, issue.id);
         assert_eq!(
@@ -2056,7 +2020,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let result = executor
             .issues()
-            .confirm_deletion_allowed("abc12345", false);
+            .confirm_deletion_allowed(&fixture_id("abc12345"), false);
 
         let err = result.expect_err("must refuse without confirmation");
         assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
@@ -2069,7 +2033,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert!(executor
             .issues()
-            .confirm_deletion_allowed("abc12345", true)
+            .confirm_deletion_allowed(&fixture_id("abc12345"), true)
             .is_ok());
     }
 
@@ -2237,14 +2201,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_delete_issue_rechecks_ambiguous_target_after_preflight() {
+    fn test_delete_issue_keeps_resolved_target_after_a_new_issue_appears() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::domain::fixture_issue("Target".into(), String::new());
-        target.id = "22221111111111111111111111111111".to_string();
+        target.id = fixture_id("22221111111111111111111111111111");
         crate::commands::test_helpers::seed_issue(&storage, target.clone());
         let mut collision = crate::domain::fixture_issue("Collision".into(), String::new());
-        collision.id = "22222222222222222222222222222222".to_string();
+        collision.id = fixture_id("22222222222222222222222222222222");
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
@@ -2252,17 +2216,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let error = executor
-            .issues()
-            .delete_issue("2222")
-            .expect_err("recaptured prefix must become ambiguous");
+        executor.issues().delete_issue(&target.id).unwrap();
 
-        assert!(error
-            .downcast_ref::<crate::storage::AmbiguousIdError>()
-            .is_some());
-        assert!(executor.storage.load_issue(&target.id).is_ok());
+        assert!(executor.storage.load_issue(&target.id).is_err());
         assert!(executor.storage.load_issue(&collision.id).is_ok());
-        assert!(executor.storage.read_events().unwrap().is_empty());
+        assert_eq!(executor.storage.read_events().unwrap().len(), 1);
     }
 
     #[test]
@@ -2589,10 +2547,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
         assert!(
-            executor
-                .storage
-                .resolve_issue_id(&IssueIdPrefix::from_str(&b_id).unwrap())
-                .is_err(),
+            executor.storage.load_issue(&b_id).is_err(),
             "the missing dependency must not resolve, matching the reported bug"
         );
 
@@ -2626,7 +2581,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Test".to_string());
-        issue.dependencies = vec![dep_id.clone(), "missing-id".to_string()];
+        issue.dependencies = vec![dep_id.clone(), fixture_id("missing-id")];
 
         let resolved = executor.issues().get_dependencies_enriched(&issue);
         assert_eq!(resolved.len(), 1, "only the resolvable dep must appear");
@@ -2821,13 +2776,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
     }
 
-    fn seed_fixture_issue(executor: &CommandExecutor<InMemoryStorage>, issue: Issue) -> String {
+    fn seed_fixture_issue(executor: &CommandExecutor<InMemoryStorage>, issue: Issue) -> IssueId {
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         id
     }
 
-    fn issue_event_types(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> Vec<String> {
+    fn issue_event_types(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> Vec<String> {
         let mut types = executor
             .storage
             .read_events()
@@ -2842,9 +2797,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     fn combined_update(
         executor: &CommandExecutor<InMemoryStorage>,
-        id: &str,
+        id: &IssueId,
         local: IssueLocalUpdate,
-    ) -> Result<(String, Vec<String>)> {
+    ) -> Result<(IssueId, Vec<String>)> {
         executor.issues().update_issue_resolved(
             id,
             None,
@@ -2911,7 +2866,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             template.gates_required = vec!["code-review".into()];
             template.assignee = Some("agent:prior".parse().unwrap());
             let separate = seed_fixture_issue(&executor, template.clone());
-            template.id = uuid::Uuid::new_v4().to_string();
+            template.id = crate::domain::fixture_issue(String::new(), String::new()).id;
             let combined = seed_fixture_issue(&executor, template);
 
             executor.add_gates(&separate, &local.add_gates).unwrap();
@@ -2943,7 +2898,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 .unwrap();
             combined_update(&executor, &combined, local).unwrap();
 
-            let observable = |id: &str| {
+            let observable = |id: &IssueId| {
                 let issue = executor.storage.load_issue(id).unwrap();
                 let gates = issue
                     .gates_status
@@ -2991,7 +2946,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = setup();
         let template = crate::domain::fixture_issue("Reject".into(), String::new());
         let mut twin = template.clone();
-        twin.id = uuid::Uuid::new_v4().to_string();
+        twin.id = crate::domain::fixture_issue(String::new(), String::new()).id;
         let with_reason = seed_fixture_issue(&executor, template);
         let state_only = seed_fixture_issue(&executor, twin);
 

@@ -3,7 +3,6 @@
 //! Validates that partial UUID prefixes work like git short hashes. Short
 //! prefixes enter through the CLI, which resolves each issue-id argument once.
 use jit::test_cli::JitCli;
-use jit::test_harness::TestHarness;
 
 /// The issue commands accept a unique short prefix and act on the issue it names.
 #[test]
@@ -29,6 +28,19 @@ fn test_cli_issue_id_arguments_resolve_a_unique_short_prefix() {
         .unwrap();
     assert!(deleted.status.success(), "{deleted:?}");
     assert!(cli.run(["issue", "show", &to]).is_err());
+}
+
+#[test]
+fn test_cli_issue_delete_resolves_unknown_id_before_confirmation() {
+    let cli = JitCli::initialised().unwrap();
+    let output = cli
+        .command(["issue", "delete", "deadbeef", "--json"])
+        .env_remove("JIT_ALLOW_DELETION")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3), "{output:?}");
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "ISSUE_NOT_FOUND");
 }
 
 /// Every CLI issue-id argument refuses a prefix below the minimum as an invalid
@@ -130,21 +142,15 @@ fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_record
     );
 }
 
-/// The server document reads resolve a full id in any case or hyphenation to
-/// the issue it names.
 #[test]
-fn test_read_document_content_resolves_any_spelling_of_a_full_id() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Documented");
-    h.executor
-        .add_document_reference(&id, "d.md", None, None, None, true)
-        .unwrap();
-    // The in-memory store backs no document bytes, so a read that resolved the
-    // issue fails on the document exactly as the canonical spelling does.
-    let read = |id: &str| format!("{:?}", h.executor.read_document_content(id, "d.md", None));
-    assert_ne!(read(&id), read("ffffffff"));
+fn test_cli_issue_show_resolves_noncanonical_full_ids() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Canonical"]).unwrap();
     for spelling in [id.to_uppercase(), id.replace('-', "")] {
-        assert_eq!(read(&spelling), read(&id), "{spelling}");
+        assert_eq!(
+            cli.run_json(["issue", "show", &spelling]).unwrap()["id"],
+            id
+        );
     }
 }
 
@@ -355,6 +361,23 @@ fn test_cli_archive_container_resolves_short_prefix() {
 /// `claim status --issue` resolves its filter prefix at the CLI.
 #[test]
 fn test_cli_claim_status_issue_filter_resolves_short_prefix() {
+    let (cli, claimed) = claimed_cli();
+    let agent = [("JIT_AGENT_ID", "agent:a")];
+
+    let status = cli
+        .command_with_env(
+            ["claim", "status", "--issue", &short(&claimed), "--json"],
+            agent,
+        )
+        .output()
+        .unwrap();
+    assert!(status.status.success(), "{status:?}");
+    let leases: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert_eq!(leases["leases"][0]["issue_id"], claimed.as_str());
+    assert_rejects_too_short_prefix(&cli, &["claim", "status", "--issue", "{short}"]);
+}
+
+fn claimed_cli() -> (JitCli, String) {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap();
     let commit = std::process::Command::new("git")
@@ -373,15 +396,73 @@ fn test_cli_claim_status_issue_filter_resolves_short_prefix() {
         .unwrap();
     assert!(acquire.status.success(), "{acquire:?}");
 
+    (cli, claimed)
+}
+
+#[test]
+fn test_cli_claim_release_resolves_short_prefix() {
+    let (cli, claimed) = claimed_cli();
+    let output = cli
+        .command_with_env(
+            ["claim", "release", &short(&claimed)],
+            [("JIT_AGENT_ID", "agent:a")],
+        )
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
     let status = cli
         .command_with_env(
-            ["claim", "status", "--issue", &short(&claimed), "--json"],
-            agent,
+            ["claim", "status", "--issue", &claimed, "--json"],
+            [("JIT_AGENT_ID", "agent:a")],
         )
         .output()
         .unwrap();
     assert!(status.status.success(), "{status:?}");
-    let leases: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
-    assert_eq!(leases["leases"][0]["issue_id"], claimed.as_str());
-    assert_rejects_too_short_prefix(&cli, &["claim", "status", "--issue", "{short}"]);
+    let status: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert!(status["leases"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn test_cli_gate_evaluation_and_run_loading_resolve_issue_spellings() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "verified",
+        "--title",
+        "Verified",
+        "--description",
+        "Passes",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "true",
+    ])
+    .unwrap();
+    let id = cli.create_issue(["Gated", "--gate", "verified"]).unwrap();
+    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+        cli.run(["gate", "evaluate", &spelling, "verified"])
+            .unwrap();
+        let run = cli
+            .run_json(["gate", "status", &spelling, "verified"])
+            .unwrap();
+        let canonical = cli.run_json(["gate", "status", &id, "verified"]).unwrap();
+        assert_eq!(run, canonical);
+    }
+}
+
+#[test]
+fn test_cli_document_reads_resolve_issue_spellings() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["Documented"]).unwrap();
+    std::fs::write(cli.root().join("document.md"), "# Document\n").unwrap();
+    cli.run(["doc", "add", &id, "document.md"]).unwrap();
+    let canonical = cli.run_json(["doc", "show", &id, "document.md"]).unwrap();
+    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+        assert_eq!(
+            cli.run_json(["doc", "show", &spelling, "document.md"])
+                .unwrap(),
+            canonical
+        );
+    }
 }

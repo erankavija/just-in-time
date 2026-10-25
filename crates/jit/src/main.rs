@@ -1122,7 +1122,7 @@ fn resolve_issue_filter_arg<S: IssueStore>(storage: &S, requested: &str) -> Resu
 /// each issue renders from the same shape as `issue show --json`.
 fn build_issue_show_response<S: IssueStore>(
     executor: &CommandExecutor<S>,
-    id: &str,
+    id: &IssueId,
 ) -> Result<jit::output::IssueShowResponse> {
     let issue = executor
         .issues()
@@ -2804,14 +2804,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // `IssueOps::confirm_deletion_allowed`, so it stays testable
                     // without mutating global process state.
                     //
-                    // The id is parsed before the refusal and resolved after it,
-                    // so a refused deletion reads no record.
                     let allow_deletion =
                         std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
-                    let prefix = id.parse::<IssueIdPrefix>()?;
+                    let id = resolve_issue_arg(&storage, &id)?;
                     if let Err(e) = executor
                         .issues()
-                        .confirm_deletion_allowed(prefix.as_str(), allow_deletion)
+                        .confirm_deletion_allowed(&id, allow_deletion)
                     {
                         if json {
                             let json_error = jit::output::JsonError::new(
@@ -2829,7 +2827,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Err(e.into());
                     }
 
-                    let id = storage.resolve_issue_id(&prefix)?;
                     let output_ctx = OutputContext::new(quiet, json);
                     let warnings = executor.issues().delete_issue(&id)?;
                     for warning in warnings {
@@ -4685,7 +4682,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let root = root
                     .map(|root| resolve_issue_arg(&storage, &root))
                     .transpose()?;
-                let response = executor.resolve_hierarchy_tree(root.as_deref())?;
+                let response = executor.resolve_hierarchy_tree(root.as_ref())?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -4761,7 +4758,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // `batch` runs a distinct projection (issue definitions plus
                 // reported boundary edges); every other format renders the graph.
                 let graph_output = if format == GraphExportFormat::Batch {
-                    let export = executor.export_graph_batch(scope.as_deref())?;
+                    let export = executor.export_graph_batch(scope.as_ref())?;
                     // Boundary edges never join the array (it must stay a clean
                     // batch-create payload); they are reported to stderr so no
                     // crossing edge is dropped silently (REQ-06).
@@ -4776,7 +4773,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     serde_json::to_string_pretty(&export.defs)?
                 } else {
-                    executor.export_graph(format, full, scope.as_deref())?
+                    executor.export_graph(format, full, scope.as_ref())?
                 };
 
                 if let Some(path) = output {
@@ -5239,15 +5236,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             DocCommands::CheckLinks { scope } => {
                 use jit::document::DocumentScope;
                 use jit::output::JsonOutput;
-                use std::str::FromStr;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                let scope = match DocumentScope::from_str(&scope)? {
-                    DocumentScope::Issue(id) => {
-                        DocumentScope::Issue(resolve_issue_arg(&storage, &id)?)
-                    }
-                    DocumentScope::All => DocumentScope::All,
-                };
+                let scope = DocumentScope::parse(&scope, |id| resolve_issue_arg(&storage, id))?;
                 let result = executor.check_document_links(&scope)?;
 
                 if json {
@@ -7440,14 +7431,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::snapshot::{SnapshotFormat, SnapshotScope};
 
                 // Parse scope
-                let snapshot_scope = match SnapshotScope::parse(&scope)
-                    .with_context(|| format!("Invalid scope: {}", scope))?
-                {
-                    SnapshotScope::Issue(id) => {
-                        SnapshotScope::Issue(resolve_issue_arg(&storage, &id)?)
-                    }
-                    other => other,
-                };
+                let snapshot_scope =
+                    SnapshotScope::parse(&scope, |id| resolve_issue_arg(&storage, id))?;
 
                 // Parse format
                 let snapshot_format = SnapshotFormat::parse(&format)

@@ -4,6 +4,7 @@
 
 use crate::commands::CommandExecutor;
 use crate::declarations::GateRegistry;
+use crate::domain::identity::IssueId;
 use crate::domain::Issue;
 use crate::repository_state::{RepositoryIndex, VirtualPath};
 use crate::storage::{InMemoryStorage, IssueStore, MutationPoint};
@@ -71,7 +72,7 @@ impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
 
 pub(crate) enum SessionRaceAction {
     Save(Box<crate::domain::Issue>),
-    Delete(String),
+    Delete(IssueId),
     WriteRepoFile {
         path: String,
         content: String,
@@ -310,6 +311,11 @@ pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
 /// Create an executor with enforcement disabled (for backward compatibility tests).
 pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
+}
+
+/// Decode an issue identity at the fixture boundary.
+pub(crate) fn fixture_id(value: &str) -> IssueId {
+    serde_json::from_value(serde_json::json!(value)).expect("fixture issue id decodes")
 }
 
 #[cfg(test)]

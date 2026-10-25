@@ -12,7 +12,7 @@ use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
 /// Drive a dependency-free issue to `Done` (no gates required).
-fn drive_to_done(h: &TestHarness, id: &str) {
+fn drive_to_done(h: &TestHarness, id: &jit::domain::identity::IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::InProgress)
@@ -25,14 +25,14 @@ fn drive_to_done(h: &TestHarness, id: &str) {
 }
 
 /// Park an issue into `Archived` the way `jit issue update --state archived` does.
-fn archive(h: &TestHarness, id: &str) {
+fn archive(h: &TestHarness, id: &jit::domain::identity::IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::Archived)
         .unwrap();
 }
 
-fn count_state_changes(h: &TestHarness, id: &str) -> usize {
+fn count_state_changes(h: &TestHarness, id: &jit::domain::identity::IssueId) -> usize {
     h.storage
         .read_events()
         .unwrap()

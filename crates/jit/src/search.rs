@@ -8,6 +8,7 @@
 //! This module requires `ripgrep` (command `rg`) to be installed on the system.
 //! If not found, search operations return a helpful error message with installation instructions.
 
+use crate::domain::identity::IssueId;
 use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ pub enum SearchError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SearchResult {
     /// Issue ID extracted from filename (None for non-issue files like documents)
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// File path relative to search root
     pub path: String,
     /// Line number where match was found
@@ -213,7 +214,7 @@ fn parse_ripgrep_json(json: &[u8], max: Option<usize>) -> Result<Vec<SearchResul
 }
 
 /// Extract issue ID from a file path
-pub fn extract_issue_id(path: &str) -> Option<String> {
+pub fn extract_issue_id(path: &str) -> Option<IssueId> {
     let path_obj = Path::new(path);
 
     // Only extract from files in "issues/" directory
@@ -224,7 +225,7 @@ pub fn extract_issue_id(path: &str) -> Option<String> {
     path_obj
         .file_stem()
         .and_then(|s| s.to_str())
-        .map(String::from)
+        .and_then(|id| serde_json::from_value(serde_json::json!(id)).ok())
 }
 
 #[cfg(test)]
@@ -263,7 +264,7 @@ mod tests {
     #[test]
     fn test_search_result_serialization() {
         let result = SearchResult {
-            issue_id: Some("abc123".to_string()),
+            issue_id: Some(serde_json::from_value(serde_json::json!("abc123")).unwrap()),
             path: "issues/abc123.json".to_string(),
             line_number: 5,
             line_text: "  \"title\": \"Test Issue\",\n".to_string(),
@@ -288,7 +289,10 @@ mod tests {
         assert_eq!(results.len(), 1);
 
         let result = &results[0];
-        assert_eq!(result.issue_id, Some("abc123".to_string()));
+        assert_eq!(
+            result.issue_id,
+            Some(serde_json::from_value(serde_json::json!("abc123")).unwrap())
+        );
         assert_eq!(result.path, "issues/abc123.json");
         assert_eq!(result.line_number, 3);
         assert!(result.line_text.contains("Test"));
