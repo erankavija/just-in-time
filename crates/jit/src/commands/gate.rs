@@ -10,7 +10,7 @@ use crate::domain::{GateRunResult, GateRunStatus};
 /// without disagreeing with the persisted `gates_status` value.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
