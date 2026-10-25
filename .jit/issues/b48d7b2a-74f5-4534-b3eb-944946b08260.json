@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5835f616-670a-4a71-9936-a887c64ba0b4",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:11:28.948663056Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b27ba256-fec5-4ba5-bb24-1ce346c3b365",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:14:23.678608269Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b48d7b2a-74f5-4534-b3eb-944946b08260",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rule patterns compile at declaration load",
-  "updated_at": "2026-10-25T02:36:31.344684300Z"
+  "updated_at": "2026-10-25T04:14:23.678608269Z"
 }
