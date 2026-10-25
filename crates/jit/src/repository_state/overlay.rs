@@ -147,6 +147,7 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RepositoryActionOwner;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, ExpectedPreimage, RepositoryLayout, RepositoryRootEvidence,
     };
@@ -212,7 +213,7 @@ mod tests {
     fn test_action_overrides_extend_the_captured_log_by_its_append() {
         let base = base_image(&[(".jit/events.jsonl", "prior")], None);
         let append = RepositoryAction::append_events(
-            "append",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(base.entry(&VirtualPath::EVENTS).unwrap()),
             5,
             b"\nnext\n".to_vec(),

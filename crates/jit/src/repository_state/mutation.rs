@@ -16,8 +16,8 @@
 
 use super::{
     CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction,
-    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
-    RootRelativePath, VirtualPath,
+    RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{
@@ -482,9 +482,6 @@ pub enum MutationError {
     GatePresetAlreadyExists(String),
 }
 
-/// Owner identity stamped on finalizer-produced actions.
-const OWNER: &str = "repository-state-mutation";
-
 /// Placeholder timestamp for a finalizer-built event before identity assignment.
 ///
 /// Semantic event drafts carry this same empty identity/epoch convention; the
@@ -747,7 +744,7 @@ pub(super) fn finalize_delta(
         ) {
             actions.push(RepositoryAction::CreateDirectory {
                 path: parent,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
             });
         }
@@ -970,7 +967,7 @@ pub(super) fn finalize_delta(
             let path = issue_path(issue_id)?;
             actions.push(RepositoryAction::DeleteFile {
                 path: path.clone(),
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: expected_of(image, &path)?,
             });
             index_deletions.push(issue_id.clone());
@@ -994,7 +991,7 @@ pub(super) fn finalize_delta(
             ) {
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: OWNER.to_string(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::of(current),
                     bytes,
                     mode: FileMode::Regular,
@@ -1017,7 +1014,7 @@ pub(super) fn finalize_delta(
                     crate::repository_state::RepositoryEntry::Absent => {
                         actions.push(RepositoryAction::CreateDirectory {
                             path: parent,
-                            owner: OWNER.to_string(),
+                            owner: RepositoryActionOwner::RepositoryStateMutation,
                             expected: ExpectedPreimage::Absent,
                         });
                     }
@@ -1043,7 +1040,7 @@ pub(super) fn finalize_delta(
             }
             actions.push(RepositoryAction::WriteFile {
                 path,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: canonical_json(&**preset, true)?,
                 mode: FileMode::Regular,
@@ -1060,7 +1057,7 @@ pub(super) fn finalize_delta(
         ) {
             actions.push(RepositoryAction::CreateDirectory {
                 path: parent,
-                owner: OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
             });
         }
@@ -1081,12 +1078,12 @@ pub(super) fn finalize_delta(
         // The run directory is freshly named by an allocated id, so it is absent.
         actions.push(RepositoryAction::CreateDirectory {
             path: dir,
-            owner: OWNER.to_string(),
+            owner: RepositoryActionOwner::RepositoryStateMutation,
             expected: ExpectedPreimage::Absent,
         });
         actions.push(RepositoryAction::WriteFile {
             path: file,
-            owner: OWNER.to_string(),
+            owner: RepositoryActionOwner::RepositoryStateMutation,
             expected: ExpectedPreimage::Absent,
             bytes: serialize_gate_run(&result)?,
             mode: FileMode::Regular,
@@ -1235,7 +1232,7 @@ fn compose_event_action(
         .map(|pending| serialize_event(&pending.event))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Some(RepositoryAction::AppendEvents {
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected: expected_of(image, &VirtualPath::EVENTS)?,
         offset: length,
         bytes: compose_events(final_line, &lines),
@@ -1290,7 +1287,7 @@ fn write_issue_action(
     let path = issue_path(&issue.id)?;
     Ok(RepositoryAction::WriteFile {
         path: path.clone(),
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected: expected_of(image, &path)?,
         bytes: serialize_issue(issue)?,
         mode: FileMode::Regular,
@@ -1336,7 +1333,7 @@ fn index_membership_action(
     }
     Ok(RepositoryAction::WriteFile {
         path,
-        owner: OWNER.to_string(),
+        owner: RepositoryActionOwner::RepositoryStateMutation,
         expected,
         bytes: index.to_pretty_bytes()?,
         mode: FileMode::Regular,
