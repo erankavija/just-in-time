@@ -36,7 +36,7 @@ pub enum EventLogError {
 /// Parse current-vocabulary events while retaining retired/unknown records.
 ///
 /// Invalid JSON is rejected except for exactly one physical line immediately
-/// followed by a valid [`Event::ProfileLifecycle`] whose
+/// followed by a valid [`EventBody::ProfileLifecycle`] whose
 /// `isolated_torn_tail` flag is true. That marker is written in the same
 /// append that isolates the preserved prefix, making the exception explicit and
 /// auditable rather than broadly accepting malformed history.
@@ -95,8 +95,8 @@ mod tests {
     use super::*;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        let mut event = crate::test_utils::stamped_event(
-            Event::draft_profile_lifecycle(
+        crate::test_utils::stamped_event(
+            EventBody::draft_profile_lifecycle(
                 crate::domain::ProfileLifecycleOperation::Apply,
                 vec![crate::domain::ProfileLifecycleProfile {
                     id: "example"
@@ -106,12 +106,11 @@ mod tests {
                     status: crate::domain::ProfileLifecycleStatus::Installed,
                     variables: Default::default(),
                 }],
-            ),
+            )
+            .with_isolated_torn_tail(isolated_torn_tail),
             String::new(),
             chrono::DateTime::UNIX_EPOCH,
-        );
-        event.set_isolated_torn_tail(isolated_torn_tail);
-        event
+        )
     }
 
     #[test]

@@ -1336,15 +1336,19 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        let valid = Event::draft_artifact_archive_executed(
-            PlanTarget::Document {
-                path: "fixtures/root.md".into(),
-            },
-            "archive".into(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            true,
+        let valid = crate::test_utils::stamped_event(
+            EventBody::draft_artifact_archive_executed(
+                PlanTarget::Document {
+                    path: "fixtures/root.md".into(),
+                },
+                "archive".into(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                true,
+            ),
+            "valid-archive",
+            chrono::DateTime::UNIX_EPOCH,
         );
         let valid_json = serde_json::to_string(&valid).unwrap();
         fs::write(&events_path, format!("{nested_torn}\n{valid_json}\n")).unwrap();
@@ -2195,22 +2199,26 @@ mod tests {
         fs::write(repo.path().join(canonical_destination), b"# Target\n").unwrap();
         fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
 
-        let historical_event = Event::draft_artifact_archive_executed(
-            PlanTarget::Document {
-                path: source.into(),
-            },
-            "workspace/archive".into(),
-            vec![crate::domain::artifact_execution::ArchivePublication {
-                source: Some(source.into()),
-                destination: historical_destination.into(),
-                content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
-                    b"# Target\n",
-                ),
-                adopted: false,
-            }],
-            Vec::new(),
-            Vec::new(),
-            false,
+        let historical_event = crate::test_utils::stamped_event(
+            EventBody::draft_artifact_archive_executed(
+                PlanTarget::Document {
+                    path: source.into(),
+                },
+                "workspace/archive".into(),
+                vec![crate::domain::artifact_execution::ArchivePublication {
+                    source: Some(source.into()),
+                    destination: historical_destination.into(),
+                    content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                        b"# Target\n",
+                    ),
+                    adopted: false,
+                }],
+                Vec::new(),
+                Vec::new(),
+                false,
+            ),
+            "historical-archive",
+            chrono::DateTime::UNIX_EPOCH,
         );
         let events_path = repo.path().join(".jit/events.jsonl");
         let mut event_bytes = fs::read(&events_path).unwrap_or_default();

@@ -4199,7 +4199,7 @@ template = true
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
         let prior_event = crate::test_utils::stamped_event(
-            Event::draft_profile_lifecycle(
+            EventBody::draft_profile_lifecycle(
                 ProfileLifecycleOperation::Apply,
                 vec![crate::domain::ProfileLifecycleProfile {
                     id: "prior".try_into().unwrap(),

@@ -406,8 +406,8 @@ pub enum MutationIntent {
     RecordEvent {
         /// Deterministic ordering phase within the mutation.
         phase: u8,
-        /// Event whose id/timestamp are assigned by the finalizer.
-        event: Box<Event>,
+        /// Drafted body the finalizer stamps with an id and timestamp.
+        event: Box<EventBody>,
     },
 }
 
@@ -418,7 +418,7 @@ struct PendingEvent {
     primary: String,
     secondary: String,
     ordinal: usize,
-    event: Event,
+    body: EventBody,
 }
 
 impl PendingEvent {
@@ -480,16 +480,6 @@ pub enum MutationError {
     /// The canonical custom-preset target was already occupied.
     #[error("custom gate preset '{0}' already exists")]
     GatePresetAlreadyExists(String),
-}
-
-/// Placeholder timestamp of an event drafted before identity assignment.
-///
-/// Event drafts carry this same empty identity/epoch convention; the finalizer
-/// overwrites it via [`Event::assign_identity`] with the single mutation
-/// timestamp. The sentinel therefore never reaches serialized bytes.
-#[cfg(test)]
-fn sentinel_time() -> DateTime<Utc> {
-    DateTime::from_timestamp(0, 0).expect("epoch is representable")
 }
 
 /// The canonical path for one issue record.
@@ -776,7 +766,7 @@ pub(super) fn finalize_delta(
                 primary: id.clone(),
                 secondary: String::new(),
                 ordinal: pending_events.len(),
-                event: Event::draft_issue_created(&issue),
+                body: EventBody::draft_issue_created(&issue),
             });
         }
     }
@@ -817,7 +807,7 @@ pub(super) fn finalize_delta(
                     primary: issue.id.clone(),
                     secondary: String::new(),
                     ordinal: pending_events.len(),
-                    event: Event::draft_issue_created(&issue),
+                    body: EventBody::draft_issue_created(&issue),
                 });
                 if !issue.dependencies.is_empty() {
                     pending_events.push(PendingEvent {
@@ -826,7 +816,7 @@ pub(super) fn finalize_delta(
                         primary: issue.id.clone(),
                         secondary: String::new(),
                         ordinal: pending_events.len(),
-                        event: Event::draft_issue_updated(
+                        body: EventBody::draft_issue_updated(
                             issue.id.clone(),
                             "batch-create".to_string(),
                             vec!["dependencies".to_string(), "state".to_string()],
@@ -882,7 +872,7 @@ pub(super) fn finalize_delta(
                     primary: issue_id.clone(),
                     secondary: agent.to_string(),
                     ordinal: pending_events.len(),
-                    event: Event::draft_issue_claimed(issue_id.clone(), agent.clone()),
+                    body: EventBody::draft_issue_claimed(issue_id.clone(), agent.clone()),
                 });
             }
         }
@@ -921,8 +911,7 @@ pub(super) fn finalize_delta(
                     state.run_id = Some(run_id.clone());
                 }
                 let records_evidence = intents.iter().any(|intent| match intent {
-                    MutationIntent::RecordEvent { event, .. } => match (event.body(), state.status)
-                    {
+                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
                         (
                             EventBody::GatePassed {
                                 issue_id, gate_key, ..
@@ -1091,7 +1080,7 @@ pub(super) fn finalize_delta(
                 primary,
                 secondary,
                 ordinal: pending_events.len(),
-                event: (**event).clone(),
+                body: (**event).clone(),
             });
         }
     }
@@ -1131,25 +1120,25 @@ const ANNOTATION_PHASE: u8 = u8::MAX;
 /// record. Each plan that emits events carries the record, which is what makes the
 /// record and the mutation it explains durable in the same application.
 fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Option<PendingEvent> {
-    let event = match context.dispatch_annotation()? {
+    let body = match context.dispatch_annotation()? {
         MutationContextAnnotation::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
-        } => Event::draft_linked_checkout_write_overridden(
+        } => EventBody::draft_linked_checkout_write_overridden(
             checkout.clone(),
             *declared_stance,
             *invocation_override,
         ),
     };
-    let (primary, secondary) = event_identities(&event);
+    let (primary, secondary) = event_identities(&body);
     Some(PendingEvent {
         phase: ANNOTATION_PHASE,
-        tag: event.get_type().to_string(),
+        tag: body.get_type().to_string(),
         primary,
         secondary,
         ordinal,
-        event,
+        body,
     })
 }
 
@@ -1186,7 +1175,7 @@ fn compose_event_action(
     let torn_tail = prefix_has_torn_tail(final_line);
     let has_marker = pending_events
         .iter()
-        .any(|pending| matches!(pending.event.body(), EventBody::ProfileLifecycle { .. }));
+        .any(|pending| matches!(pending.body, EventBody::ProfileLifecycle { .. }));
     if torn_tail && !has_marker {
         // Appending non-certifying events after an uncertified torn tail would
         // produce a log the reader rejects; refuse instead of corrupting it.
@@ -1197,25 +1186,32 @@ fn compose_event_action(
     // Assign identifiers in canonical event order, stamping the single mutation
     // timestamp and the torn-tail evidence.
     pending_events.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
-    for pending in &mut pending_events {
-        let id = context.allocate();
-        pending.event.assign_identity(id, now);
-        pending.event.set_isolated_torn_tail(torn_tail);
-    }
+    let mut events = pending_events
+        .into_iter()
+        .map(|pending| {
+            Event::new(
+                context.allocate(),
+                now,
+                pending.body.with_isolated_torn_tail(torn_tail),
+            )
+        })
+        .collect::<Vec<_>>();
     // Over a torn tail, the certifying marker must be composed as the line
     // immediately following the torn partial; the remaining events keep their
     // canonical order after it.
-    if torn_tail {
-        let marker = pending_events
-            .iter()
-            .position(|pending| matches!(pending.event.body(), EventBody::ProfileLifecycle { .. }))
-            .expect("a markerless torn tail was already rejected");
-        let certifier = pending_events.remove(marker);
-        pending_events.insert(0, certifier);
+    let certifier = torn_tail
+        .then(|| {
+            events
+                .iter()
+                .position(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. }))
+        })
+        .flatten();
+    if let Some(marker) = certifier {
+        events[..=marker].rotate_right(1);
     }
-    let lines = pending_events
+    let lines = events
         .iter()
-        .map(|pending| serialize_event(&pending.event))
+        .map(serialize_event)
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Some(RepositoryAction::AppendEvents {
         owner: RepositoryActionOwner::RepositoryStateMutation,
@@ -1228,8 +1224,7 @@ fn compose_event_action(
 /// Compose the exact `events.jsonl` append action for repository-owned provenance
 /// events emitted by a delta the record finalizer does not otherwise build — the
 /// init/profile finalizers, whose deltas also carry asset/registry/record file
-/// actions. Each `(phase, event)` pair is an inline event variant carrying a
-/// sentinel id/timestamp; this resets the context's frozen allocation order, then
+/// actions. Each `(phase, body)` pair is a drafted event body; this resets the context's frozen allocation order, then
 /// assigns identifiers and the single mutation timestamp and certifies a torn tail
 /// exactly as [`finalize`] does. Returns `None` when `events` is empty (no append,
 /// no identity or time sampling).
@@ -1240,7 +1235,7 @@ fn compose_event_action(
 pub(crate) fn finalize_audit_append(
     image: &RepositoryImage,
     context: &MutationContext,
-    events: Vec<(u8, Event)>,
+    events: Vec<(u8, EventBody)>,
 ) -> Result<Option<RepositoryAction>, MutationError> {
     if events.is_empty() {
         return Ok(None);
@@ -1249,15 +1244,15 @@ pub(crate) fn finalize_audit_append(
     let pending = events
         .into_iter()
         .enumerate()
-        .map(|(ordinal, (phase, event))| {
-            let (primary, secondary) = event_identities(&event);
+        .map(|(ordinal, (phase, body))| {
+            let (primary, secondary) = event_identities(&body);
             PendingEvent {
                 phase,
-                tag: event.get_type().to_string(),
+                tag: body.get_type().to_string(),
                 primary,
                 secondary,
                 ordinal,
-                event,
+                body,
             }
         })
         .collect();
@@ -1327,9 +1322,9 @@ fn index_membership_action(
 }
 
 /// Primary/secondary ordering identities for an event.
-fn event_identities(event: &Event) -> (String, String) {
-    let issue_id = event.get_issue_id().to_string();
-    match event.body() {
+fn event_identities(body: &EventBody) -> (String, String) {
+    let issue_id = body.get_issue_id().to_string();
+    match body {
         EventBody::GatePassed { gate_key, .. }
         | EventBody::GateFailed { gate_key, .. }
         | EventBody::GateAdded { gate_key, .. }
@@ -1718,7 +1713,7 @@ mod tests {
         let issue = seeded_issue("55555555-5555-4555-8555-555555555555", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
-            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
             "e",
             fixed_instant(),
         );
@@ -1933,7 +1928,7 @@ mod tests {
         );
 
         let event = crate::test_utils::stamped_event(
-            Event::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".into()),
             "event-1",
             fixed_instant(),
         );
@@ -1943,6 +1938,39 @@ mod tests {
         assert!(!event_bytes.ends_with(b"\n"));
         let round_trip: Event = serde_json::from_slice(&event_bytes).unwrap();
         assert_eq!(round_trip, event);
+    }
+
+    /// Every repository log line with a current tag re-serializes to its own
+    /// bytes; the only lines the parser skips carry retired tags.
+    #[test]
+    fn test_serialize_event_reproduces_current_lines_and_parser_skips_only_retired_tags() {
+        let log = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/events.jsonl"),
+        )
+        .unwrap();
+        let reproduced = log
+            .lines()
+            .map(|line| {
+                let events = crate::domain::event_log::parse_known_events(line).unwrap();
+                if events.is_empty() {
+                    let tag = serde_json::from_str::<Value>(line).unwrap()["type"].clone();
+                    assert!(
+                        ["document_archived", "lifecycle_timestamps_backfilled"]
+                            .iter()
+                            .any(|retired| tag == *retired),
+                        "parser skipped a line with a current or unknown tag: {line}"
+                    );
+                }
+                events.iter().for_each(|event| {
+                    assert_eq!(
+                        std::str::from_utf8(&serialize_event(event).unwrap()).unwrap(),
+                        line
+                    );
+                });
+                usize::from(!events.is_empty())
+            })
+            .sum::<usize>();
+        assert!(reproduced > 0, "the repository log holds current events");
     }
 
     #[test]
@@ -2096,7 +2124,7 @@ mod tests {
         let issue = seeded_issue("11111111-1111-4111-8111-111111111111", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
-            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
             "e",
             fixed_instant(),
         );
@@ -2135,7 +2163,7 @@ mod tests {
         let issue = seeded_issue("44444444-4444-4444-8444-444444444444", Some(agent.clone()));
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
-            Event::draft_issue_claimed(issue.id.clone(), agent.clone()),
+            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
             "e",
             fixed_instant(),
         );
@@ -2231,7 +2259,7 @@ mod tests {
         assert_eq!(bytes, &serialize_issue(&expected_issue).unwrap());
 
         let expected_event = crate::test_utils::stamped_event(
-            Event::draft_issue_claimed(expected_issue.id, agent),
+            EventBody::draft_issue_claimed(expected_issue.id, agent),
             IdAuthority::from_seed([7u8; 32]).uuid_at(0),
             fixed_instant(),
         );
@@ -2260,11 +2288,7 @@ mod tests {
         let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
         let intent = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(crate::test_utils::stamped_event(
-                Event::draft_gate_definition_created("cargo-ci".into()),
-                String::new(),
-                sentinel_time(),
-            )),
+            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
         };
         let context = ctx();
         let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
@@ -2276,7 +2300,7 @@ mod tests {
             "the same image and context produce byte-identical provenance plans"
         );
         let expected_event = crate::test_utils::stamped_event(
-            Event::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".into()),
             IdAuthority::from_seed([7u8; 32]).uuid_at(0),
             fixed_instant(),
         );
@@ -2307,11 +2331,7 @@ mod tests {
         };
         let provenance = MutationIntent::RecordEvent {
             phase: 5,
-            event: Box::new(crate::test_utils::stamped_event(
-                Event::draft_gate_definition_created("cargo-ci".into()),
-                String::new(),
-                sentinel_time(),
-            )),
+            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
         };
         let intents = [intent, provenance];
         let context = ctx();
@@ -2343,7 +2363,7 @@ mod tests {
         assert_eq!(bytes, &serialize_gate_run(&expected).unwrap());
 
         let expected_event = crate::test_utils::stamped_event(
-            Event::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".into()),
             IdAuthority::from_seed([7u8; 32]).uuid_at(1),
             fixed_instant(),
         );
@@ -2367,19 +2387,11 @@ mod tests {
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(crate::test_utils::stamped_event(
-                    Event::draft_gate_definition_created("bbb".into()),
-                    String::new(),
-                    sentinel_time(),
-                )),
+                event: Box::new(EventBody::draft_gate_definition_created("bbb".into())),
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(crate::test_utils::stamped_event(
-                    Event::draft_gate_definition_created("aaa".into()),
-                    String::new(),
-                    sentinel_time(),
-                )),
+                event: Box::new(EventBody::draft_gate_definition_created("aaa".into())),
             },
         ];
         let image = creation_image();
@@ -2641,7 +2653,7 @@ mod tests {
     #[test]
     fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
         let prior = serialize_event(&crate::test_utils::stamped_event(
-            Event::draft_gate_definition_created("prior".into()),
+            EventBody::draft_gate_definition_created("prior".into()),
             "e0",
             fixed_instant(),
         ))
@@ -2649,7 +2661,7 @@ mod tests {
         let terminated = [prior.as_slice(), b"\n"].concat();
         // A valid final line longer than the tail window, read back to its start.
         let long = serialize_event(&crate::test_utils::stamped_event(
-            Event::draft_gate_definition_created(
+            EventBody::draft_gate_definition_created(
                 "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
             ),
             "e1",
@@ -2660,11 +2672,7 @@ mod tests {
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
         let record = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(crate::test_utils::stamped_event(
-                Event::draft_gate_definition_created("cargo-ci".into()),
-                String::new(),
-                sentinel_time(),
-            )),
+            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
         };
         let whole = |log: Vec<u8>| {
             let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
@@ -2704,21 +2712,17 @@ mod tests {
         }
     }
 
-    fn profile_lifecycle_marker() -> Event {
-        crate::test_utils::stamped_event(
-            Event::draft_profile_lifecycle(
-                crate::domain::ProfileLifecycleOperation::Apply,
-                vec![crate::domain::ProfileLifecycleProfile {
-                    id: "example"
-                        .try_into()
-                        .expect("the profile marker has a canonical identifier"),
-                    version: "1.0.0".to_string(),
-                    status: crate::domain::ProfileLifecycleStatus::Installed,
-                    variables: Default::default(),
-                }],
-            ),
-            String::new(),
-            sentinel_time(),
+    fn profile_lifecycle_marker() -> EventBody {
+        EventBody::draft_profile_lifecycle(
+            crate::domain::ProfileLifecycleOperation::Apply,
+            vec![crate::domain::ProfileLifecycleProfile {
+                id: "example"
+                    .try_into()
+                    .expect("the profile marker has a canonical identifier"),
+                version: "1.0.0".to_string(),
+                status: crate::domain::ProfileLifecycleStatus::Installed,
+                variables: Default::default(),
+            }],
         )
     }
 
@@ -2738,11 +2742,7 @@ mod tests {
         let long_torn = [TORN_LOG, &vec![b'x'; 2 * window]].concat();
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
         for image in [torn_tail_image(), long_image] {
-            let event = crate::test_utils::stamped_event(
-                Event::draft_gate_definition_created("cargo-ci".into()),
-                String::new(),
-                sentinel_time(),
-            );
+            let event = EventBody::draft_gate_definition_created("cargo-ci".into());
             let result = finalize(
                 &layout(),
                 &image,

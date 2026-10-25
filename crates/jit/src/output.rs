@@ -3975,7 +3975,7 @@ mod tests {
         let mut issue = crate::domain::Issue::draft("title".to_string(), String::new());
         issue.id = "i".to_string();
         let event = crate::test_utils::stamped_event(
-            crate::domain::Event::draft_issue_created(&issue),
+            crate::domain::EventBody::draft_issue_created(&issue),
             "e",
             chrono::Utc::now(),
         );

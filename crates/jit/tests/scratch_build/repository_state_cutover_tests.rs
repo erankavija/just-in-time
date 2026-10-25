@@ -1236,7 +1236,7 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
         .split_once("/// One profile's lifecycle result within an aggregate mutation.")
         .expect("profile lifecycle audit retains its per-profile result type")
         .1
-        .split_once("/// System event types for audit log")
+        .split_once("/// The tagged body of an [`Event`]: its variant and payload fields.")
         .expect("profile lifecycle audit inputs remain separate from unrelated event types")
         .0;
     let bridge_inventory =

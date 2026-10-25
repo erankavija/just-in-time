@@ -1006,9 +1006,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             let by = result.by.clone();
             final_issue.gates_status.insert(gate_key.to_string(), state);
             let event = if result.status == GateRunStatus::Passed {
-                Event::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
+                EventBody::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
             } else {
-                Event::draft_gate_failed(target_id.clone(), gate_key.to_string(), by)
+                EventBody::draft_gate_failed(target_id.clone(), gate_key.to_string(), by)
             };
             let intents = [
                 MutationIntent::UpdateIssue {

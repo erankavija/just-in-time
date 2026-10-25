@@ -103,9 +103,7 @@ pub fn stamped_event(
     id: impl Into<String>,
     timestamp: chrono::DateTime<chrono::Utc>,
 ) -> crate::domain::Event {
-    let mut event = body;
-    event.assign_identity(id.into(), timestamp);
-    event
+    crate::domain::Event::new(id.into(), timestamp, body)
 }
 
 #[cfg(test)]
@@ -1088,7 +1086,7 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
             crate::domain::Issue::draft(format!("Accumulated history {ordinal}"), String::new());
         issue.id = format!("00000000-0000-4000-8000-{ordinal:012}");
         let line = serde_json::to_string(&stamped_event(
-            crate::domain::Event::draft_issue_created(&issue),
+            crate::domain::EventBody::draft_issue_created(&issue),
             format!("01J0000000000000000000{ordinal:04}"),
             chrono::Utc::now(),
         ))?;

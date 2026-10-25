@@ -145,7 +145,7 @@ fn derive_issue_deletion(
         });
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_issue_updated(
+            event: Box::new(EventBody::draft_issue_updated(
                 dependent_id,
                 "dependency-cascade-delete".to_string(),
                 vec!["dependencies".to_string()],
@@ -154,7 +154,7 @@ fn derive_issue_deletion(
     }
     intents.push(MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_deleted(target_id.to_string())),
+        event: Box::new(EventBody::draft_issue_deleted(target_id.to_string())),
     });
     Ok(DerivedIssueDeletion {
         intents,

@@ -107,7 +107,7 @@ use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{
-    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
+    is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
@@ -1220,13 +1220,13 @@ fn derive_state_transition(
                         (
                             1,
                             if force {
-                                Event::draft_graph_rule_bypassed(
+                                EventBody::draft_graph_rule_bypassed(
                                     issue.id.clone(),
                                     target,
                                     rule.clone(),
                                 )
                             } else {
-                                Event::draft_transition_blocked(
+                                EventBody::draft_transition_blocked(
                                     issue.id.clone(),
                                     target,
                                     rule.clone(),
@@ -1260,10 +1260,10 @@ fn derive_state_transition(
     }
     bypass_events.push((
         2,
-        Event::draft_issue_state_changed(issue.id.clone(), old_state, target),
+        EventBody::draft_issue_state_changed(issue.id.clone(), old_state, target),
     ));
     if target == State::Done {
-        bypass_events.push((3, Event::draft_issue_completed(issue.id.clone())));
+        bypass_events.push((3, EventBody::draft_issue_completed(issue.id.clone())));
     }
     Ok(DerivedStateTransition::Applied {
         issue: Box::new(issue),
@@ -1501,13 +1501,16 @@ fn derive_field_update(
     let entered_terminal = !original.state.is_terminal() && issue.state.is_terminal();
     if issue.assignee != original.assignee {
         if let Some(assignee) = issue.assignee.clone() {
-            events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
+            events.push((
+                4,
+                EventBody::draft_issue_claimed(issue.id.clone(), assignee),
+            ));
         }
     }
     if !changed_fields.is_empty() && request.label_edit.is_none() {
         events.push((
             5,
-            Event::draft_issue_updated(
+            EventBody::draft_issue_updated(
                 issue.id.clone(),
                 if request.bulk {
                     "bulk-update".to_string()
@@ -1518,12 +1521,12 @@ fn derive_field_update(
             ),
         ));
     }
-    events.extend(
-        validation
-            .bypassed_rules
-            .into_iter()
-            .map(|rule| (9, Event::draft_local_rule_bypassed(issue.id.clone(), rule))),
-    );
+    events.extend(validation.bypassed_rules.into_iter().map(|rule| {
+        (
+            9,
+            EventBody::draft_local_rule_bypassed(issue.id.clone(), rule),
+        )
+    }));
     let intents = changed
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1595,7 +1598,7 @@ fn derive_captured_issue_mutation(
 struct AppliedIssueMutation {
     issue: Issue,
     outcome: CapturedIssueMutationOutcome,
-    events: Vec<(u8, Event)>,
+    events: Vec<(u8, EventBody)>,
     gate_runs: Vec<crate::domain::GateRunResult>,
     changed: bool,
 }
@@ -1612,7 +1615,7 @@ fn apply_captured_issue_mutation(
                 (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
             } else {
                 issue.assignee = Some(assignee.clone());
-                let event = Event::draft_issue_claimed(issue.id.clone(), assignee.clone());
+                let event = EventBody::draft_issue_claimed(issue.id.clone(), assignee.clone());
                 (
                     CapturedIssueMutationOutcome::Changed,
                     vec![(1, event)],
@@ -1625,7 +1628,7 @@ fn apply_captured_issue_mutation(
                 (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
             } else {
                 issue.assignee = None;
-                let event = Event::draft_issue_updated(
+                let event = EventBody::draft_issue_updated(
                     issue.id.clone(),
                     "issue-unassign".to_string(),
                     vec!["assignee".to_string()],
@@ -1664,7 +1667,12 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .map(|key| (1, Event::draft_gate_added(issue.id.clone(), key.clone())))
+                .map(|key| {
+                    (
+                        1,
+                        EventBody::draft_gate_added(issue.id.clone(), key.clone()),
+                    )
+                })
                 .collect();
             let changed = !added.is_empty();
             (
@@ -1690,7 +1698,12 @@ fn apply_captured_issue_mutation(
             }
             let events = removed
                 .iter()
-                .map(|key| (1, Event::draft_gate_removed(issue.id.clone(), key.clone())))
+                .map(|key| {
+                    (
+                        1,
+                        EventBody::draft_gate_removed(issue.id.clone(), key.clone()),
+                    )
+                })
                 .collect();
             let changed = !removed.is_empty();
             (
@@ -1736,10 +1749,10 @@ fn apply_captured_issue_mutation(
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
                 GateStatus::Passed => {
-                    Event::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
                 }
                 GateStatus::Failed => {
-                    Event::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
                 }
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
@@ -1965,12 +1978,12 @@ pub struct WriteValidation {
     /// findings) to surface to the caller.
     pub warnings: Vec<String>,
     /// Names of `enforce` rules whose blocking findings were overridden by
-    /// `--force`. One [`Event::LocalRuleBypassed`] must be logged per entry,
+    /// `--force`. One [`EventBody::LocalRuleBypassed`] must be logged per entry,
     /// AFTER the write commits.
     pub bypassed_rules: Vec<String>,
 }
 
-type PhasedEvents = Vec<(u8, Event)>;
+type PhasedEvents = Vec<(u8, EventBody)>;
 
 /// Convert repo-relative planned changes into a canonical overlay-override map.
 ///
@@ -2469,7 +2482,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .iter()
                     .map(|rule| MutationIntent::RecordEvent {
                         phase: 9,
-                        event: Box::new(Event::draft_local_rule_bypassed(
+                        event: Box::new(EventBody::draft_local_rule_bypassed(
                             issue_id.clone(),
                             rule.clone(),
                         )),
@@ -2979,9 +2992,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                     precheck_events.push((
                         1,
                         if status == GateStatus::Passed {
-                            Event::draft_gate_passed(issue.id.clone(), result.gate_key.clone(), by)
+                            EventBody::draft_gate_passed(
+                                issue.id.clone(),
+                                result.gate_key.clone(),
+                                by,
+                            )
                         } else {
-                            Event::draft_gate_failed(issue.id.clone(), result.gate_key.clone(), by)
+                            EventBody::draft_gate_failed(
+                                issue.id.clone(),
+                                result.gate_key.clone(),
+                                by,
+                            )
                         },
                     ));
                 }
@@ -3187,7 +3208,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         record.assignee = Some(assignee.clone());
                         events.push((
                             4,
-                            Event::draft_issue_claimed(record.id.clone(), assignee.clone()),
+                            EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
                         ));
                         if update.is_none() {
                             update = Some(issue);
@@ -3197,7 +3218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         if let Some(assignee) = record.assignee.take() {
                             events.push((
                                 4,
-                                Event::draft_issue_released(
+                                EventBody::draft_issue_released(
                                     record.id.clone(),
                                     assignee,
                                     reason.clone(),
