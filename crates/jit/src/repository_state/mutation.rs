@@ -1323,7 +1323,7 @@ fn index_membership_action(
 
 /// Primary/secondary ordering identities for an event.
 fn event_identities(body: &EventBody) -> (String, String) {
-    let issue_id = body.get_issue_id().to_string();
+    let issue_id = body.issue_id().cloned().unwrap_or_default();
     match body {
         EventBody::GatePassed { gate_key, .. }
         | EventBody::GateFailed { gate_key, .. }
@@ -2785,5 +2785,15 @@ mod tests {
                 .is_ok(),
             "the reader accepts the certified log"
         );
+    }
+
+    #[test]
+    fn test_event_identities_repository_scoped_event_sorts_before_issue_scoped() {
+        let (repository_scoped, _) =
+            event_identities(&EventBody::draft_gate_definition_created("g".to_string()));
+        let (issue_scoped, _) =
+            event_identities(&EventBody::draft_issue_deleted("0000-1".to_string()));
+
+        assert!(repository_scoped < issue_scoped);
     }
 }

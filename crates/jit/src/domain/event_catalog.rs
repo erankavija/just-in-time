@@ -17,7 +17,7 @@
 //! - A row's `carries_issue_id` follows from its [`EventScope`]: only
 //!   issue-scoped records name an issue. Tests hold that against reality from
 //!   both sides — against the serialized sample (the same `serde_json` encoding
-//!   the repository-state finalizer publishes to `events.jsonl`) and against [`EventBody::get_issue_id`],
+//!   the repository-state finalizer publishes to `events.jsonl`) and against [`EventBody::issue_id`],
 //!   the accessor every consumer reads an event's issue through.
 //! - Conformance tests compare the catalog against the variant lists schemars
 //!   derives from the enums: every serde `type` tag of [`Event`] must be
@@ -413,7 +413,7 @@ pub struct EventTagDoc {
     pub scope: EventScope,
     /// Whether records with this tag carry an `issue_id` field. True exactly for
     /// [`EventScope::Issue`] tags; tests hold this against the serialized record
-    /// and against [`EventBody::get_issue_id`].
+    /// and against [`EventBody::issue_id`].
     pub carries_issue_id: bool,
     /// What appends a record with this tag.
     pub description: String,
@@ -676,18 +676,18 @@ mod tests {
         }
     }
 
-    /// REQ-01/REQ-03: the `issue_id` column agrees with `Event::get_issue_id`,
+    /// REQ-01/REQ-03: the `issue_id` column agrees with `Event::issue_id`,
     /// the production accessor every consumer (the `--issue-id` filter, the
     /// lifecycle-timestamp derivation) reads an event's issue through: it returns
-    /// an empty id exactly for the records that carry no `issue_id` field.
+    /// `None` exactly for the records that carry no `issue_id` field.
     #[test]
-    fn test_carries_issue_id_matches_get_issue_id_accessor() {
+    fn test_carries_issue_id_matches_issue_id_accessor() {
         for row in event_catalog() {
             let event = row.tag.sample();
             assert_eq!(
                 row.carries_issue_id,
-                !event.get_issue_id().is_empty(),
-                "`{}`: catalog and Event::get_issue_id disagree",
+                event.issue_id().is_some(),
+                "`{}`: catalog and Event::issue_id disagree",
                 row.tag.as_str(),
             );
         }

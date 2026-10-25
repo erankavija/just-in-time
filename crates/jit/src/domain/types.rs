@@ -1525,9 +1525,9 @@ impl Event {
         self.timestamp
     }
 
-    /// The issue this event names; see [`EventBody::get_issue_id`].
-    pub fn get_issue_id(&self) -> &str {
-        self.body.get_issue_id()
+    /// The issue this event names; see [`EventBody::issue_id`].
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
+        self.body.issue_id()
     }
 
     /// This event's `type` tag; see [`EventBody::get_type`].
@@ -1781,30 +1781,30 @@ impl EventBody {
         }
     }
 
-    /// Get the issue ID associated with this event
-    pub fn get_issue_id(&self) -> &str {
+    /// The issue this event names; `None` for repository- and registry-scoped events.
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
         match self {
-            EventBody::IssueCreated { issue_id, .. } => issue_id,
-            EventBody::IssueClaimed { issue_id, .. } => issue_id,
-            EventBody::IssueStateChanged { issue_id, .. } => issue_id,
-            EventBody::GatePassed { issue_id, .. } => issue_id,
-            EventBody::GateFailed { issue_id, .. } => issue_id,
-            EventBody::GateAdded { issue_id, .. } => issue_id,
-            EventBody::GateRemoved { issue_id, .. } => issue_id,
-            EventBody::IssueCompleted { issue_id, .. } => issue_id,
-            EventBody::IssueDeleted { issue_id, .. } => issue_id,
-            EventBody::IssueReleased { issue_id, .. } => issue_id,
-            EventBody::IssueUpdated { issue_id, .. } => issue_id,
-            EventBody::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
-            EventBody::DependencyReduced { issue_id, .. } => issue_id,
-            EventBody::LocalRuleBypassed { issue_id, .. } => issue_id,
-            EventBody::TransitionBlocked { issue_id, .. } => issue_id,
-            EventBody::GraphRuleBypassed { issue_id, .. } => issue_id,
-            EventBody::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
-            EventBody::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
-            EventBody::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
-            EventBody::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
-            EventBody::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
+            EventBody::IssueCreated { issue_id, .. } => Some(issue_id),
+            EventBody::IssueClaimed { issue_id, .. } => Some(issue_id),
+            EventBody::IssueStateChanged { issue_id, .. } => Some(issue_id),
+            EventBody::GatePassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateFailed { issue_id, .. } => Some(issue_id),
+            EventBody::GateAdded { issue_id, .. } => Some(issue_id),
+            EventBody::GateRemoved { issue_id, .. } => Some(issue_id),
+            EventBody::IssueCompleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueDeleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueReleased { issue_id, .. } => Some(issue_id),
+            EventBody::IssueUpdated { issue_id, .. } => Some(issue_id),
+            EventBody::ArtifactArchiveExecuted { .. } => None,
+            EventBody::DependencyReduced { issue_id, .. } => Some(issue_id),
+            EventBody::LocalRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::TransitionBlocked { issue_id, .. } => Some(issue_id),
+            EventBody::GraphRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateDefinitionUpdated { .. } => None,
+            EventBody::GateDefinitionCreated { .. } => None,
+            EventBody::GateDefinitionRemoved { .. } => None,
+            EventBody::ProfileLifecycle { .. } => None,
+            EventBody::LinkedCheckoutWriteOverridden { .. } => None,
         }
     }
 

@@ -376,5 +376,5 @@ fn test_query_events_issue_filter_matches_a_deleted_issue_in_any_spelling() {
         .query_events(None, Some(id.to_uppercase()), 100)
         .unwrap();
     assert!(!events.is_empty());
-    assert!(events.iter().all(|event| event.get_issue_id() == id));
+    assert!(events.iter().all(|event| event.issue_id() == Some(&id)));
 }
