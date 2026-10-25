@@ -8,6 +8,7 @@
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::ArtifactEvidenceError;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::State;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -366,101 +367,41 @@ pub struct PendingDeletion {
     pub content_identity: ContentIdentity,
 }
 
-/// Stable evidence flags. These constrain action selection but never block it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum EvidenceCode {
-    PermanentPath,
-    OutsideDevelopmentRoot,
-    OutsideOwner,
-    ActiveOwner,
-    UnmanagedPath,
-    ArchivedSource,
-    PinnedHistorical,
-}
-
-impl EvidenceCode {
-    /// Complete schema-v1 evidence vocabulary, in binding contract order.
-    pub const ALL: [Self; 7] = [
-        Self::PermanentPath,
-        Self::OutsideDevelopmentRoot,
-        Self::OutsideOwner,
-        Self::ActiveOwner,
-        Self::UnmanagedPath,
-        Self::ArchivedSource,
-        Self::PinnedHistorical,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PermanentPath => "permanent-path",
-            Self::OutsideDevelopmentRoot => "outside-development-root",
-            Self::OutsideOwner => "outside-owner",
-            Self::ActiveOwner => "active-owner",
-            Self::UnmanagedPath => "unmanaged-path",
-            Self::ArchivedSource => "archived-source",
-            Self::PinnedHistorical => "pinned-historical",
-        }
+wire_vocabulary! {
+    /// Stable evidence flags. These constrain action selection but never block it.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum EvidenceCode {
+        PermanentPath = "permanent-path",
+        OutsideDevelopmentRoot = "outside-development-root",
+        OutsideOwner = "outside-owner",
+        ActiveOwner = "active-owner",
+        UnmanagedPath = "unmanaged-path",
+        ArchivedSource = "archived-source",
+        PinnedHistorical = "pinned-historical",
     }
 }
 
-/// Stable conditions that make a target or artifact ineligible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BlockerCode {
-    PolicyUnconfigured,
-    PolicyIncomplete,
-    UnmanagedSelectedRoot,
-    DestinationConflict,
-    DocumentNonTerminalOwner,
-    PinnedReadFailed,
-    RepositoryEscape,
-    UnresolvableEdge,
-    UnpreservableLayout,
-    NonTerminalTarget,
-    MissingSource,
-    SymlinkArtifact,
-    UnsupportedArtifactType,
+wire_vocabulary! {
+    /// Stable conditions that make a target or artifact ineligible.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum BlockerCode {
+        PolicyUnconfigured = "policy-unconfigured",
+        PolicyIncomplete = "policy-incomplete",
+        UnmanagedSelectedRoot = "unmanaged-selected-root",
+        DestinationConflict = "destination-conflict",
+        DocumentNonTerminalOwner = "document-non-terminal-owner",
+        PinnedReadFailed = "pinned-read-failed",
+        RepositoryEscape = "repository-escape",
+        UnresolvableEdge = "unresolvable-edge",
+        UnpreservableLayout = "unpreservable-layout",
+        NonTerminalTarget = "non-terminal-target",
+        MissingSource = "missing-source",
+        SymlinkArtifact = "symlink-artifact",
+        UnsupportedArtifactType = "unsupported-artifact-type",
+    }
 }
 
 impl BlockerCode {
-    /// Complete schema-v1 blocker vocabulary, in binding contract order.
-    pub const ALL: [Self; 13] = [
-        Self::PolicyUnconfigured,
-        Self::PolicyIncomplete,
-        Self::UnmanagedSelectedRoot,
-        Self::DestinationConflict,
-        Self::DocumentNonTerminalOwner,
-        Self::PinnedReadFailed,
-        Self::RepositoryEscape,
-        Self::UnresolvableEdge,
-        Self::UnpreservableLayout,
-        Self::NonTerminalTarget,
-        Self::MissingSource,
-        Self::SymlinkArtifact,
-        Self::UnsupportedArtifactType,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PolicyUnconfigured => "policy-unconfigured",
-            Self::PolicyIncomplete => "policy-incomplete",
-            Self::UnmanagedSelectedRoot => "unmanaged-selected-root",
-            Self::DestinationConflict => "destination-conflict",
-            Self::DocumentNonTerminalOwner => "document-non-terminal-owner",
-            Self::PinnedReadFailed => "pinned-read-failed",
-            Self::RepositoryEscape => "repository-escape",
-            Self::UnresolvableEdge => "unresolvable-edge",
-            Self::UnpreservableLayout => "unpreservable-layout",
-            Self::NonTerminalTarget => "non-terminal-target",
-            Self::MissingSource => "missing-source",
-            Self::SymlinkArtifact => "symlink-artifact",
-            Self::UnsupportedArtifactType => "unsupported-artifact-type",
-        }
-    }
-
     /// The permitted next action when a blocker is caused by lifecycle state,
     /// or `None` for blockers unrelated to state (`jit:45a140ae`, REQ-05).
     ///
@@ -490,53 +431,24 @@ impl BlockerCode {
     }
 }
 
-/// Stable non-blocking diagnostics emitted by planning or execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum WarningCode {
-    MissingEdgeTarget,
-    ExternalEdge,
-    NoOwner,
-    ResidueSource,
-    DeletionFailed,
-    NotSelectedSibling,
-    DynamicLoadingSuspected,
-    UnsupportedEdgeTarget,
-    /// One citation of a relocating artifact's path in the text of a scanned
-    /// file: an occurrence naming that path whole, rather than one sitting
-    /// inside a longer path such as the destination the relocation publishes.
-    /// Its [`PlanWarning::path`] names the citing file with the citation's
-    /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
-    MovingPathCitation,
-}
-
-impl WarningCode {
-    /// Complete schema-v1 warning vocabulary, in binding contract order.
-    pub const ALL: [Self; 9] = [
-        Self::MissingEdgeTarget,
-        Self::ExternalEdge,
-        Self::NoOwner,
-        Self::ResidueSource,
-        Self::DeletionFailed,
-        Self::NotSelectedSibling,
-        Self::DynamicLoadingSuspected,
-        Self::UnsupportedEdgeTarget,
-        Self::MovingPathCitation,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::MissingEdgeTarget => "missing-edge-target",
-            Self::ExternalEdge => "external-edge",
-            Self::NoOwner => "no-owner",
-            Self::ResidueSource => "residue-source",
-            Self::DeletionFailed => "deletion-failed",
-            Self::NotSelectedSibling => "not-selected-sibling",
-            Self::DynamicLoadingSuspected => "dynamic-loading-suspected",
-            Self::UnsupportedEdgeTarget => "unsupported-edge-target",
-            Self::MovingPathCitation => "moving-path-citation",
-        }
+wire_vocabulary! {
+    /// Stable non-blocking diagnostics emitted by planning or execution.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum WarningCode {
+        MissingEdgeTarget = "missing-edge-target",
+        ExternalEdge = "external-edge",
+        NoOwner = "no-owner",
+        ResidueSource = "residue-source",
+        DeletionFailed = "deletion-failed",
+        NotSelectedSibling = "not-selected-sibling",
+        DynamicLoadingSuspected = "dynamic-loading-suspected",
+        UnsupportedEdgeTarget = "unsupported-edge-target",
+        /// One citation of a relocating artifact's path in the text of a scanned
+        /// file: an occurrence naming that path whole, rather than one sitting
+        /// inside a longer path such as the destination the relocation publishes.
+        /// Its [`PlanWarning::path`] names the citing file with the citation's
+        /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
+        MovingPathCitation = "moving-path-citation",
     }
 }
 
