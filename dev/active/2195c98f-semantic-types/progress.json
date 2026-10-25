@@ -199,7 +199,7 @@
           "short_id": "b4fe7887",
           "title": "Item-kind scope has one enum",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
@@ -288,7 +288,7 @@
           "short_id": "42bcaa6e",
           "title": "Content format is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -968,6 +968,13 @@
       "model": "opus",
       "effort": "-",
       "reason": "First compiled-graph-assertion lowering; sets the pattern two later tasks follow."
+    },
+    {
+      "issue": "b4fe7887",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Fold a config mirror enum into the domain enum."
     }
   ],
   "surfaced_pitfalls": [
