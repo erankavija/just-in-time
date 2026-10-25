@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "650a3badf5347db2b2e7b63d96c6a0d0848c76fb",
+  "completed_at": "2026-10-24T23:17:33.176687521Z",
+  "duration_ms": 153760,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met: the declared gate directly runs the self-test with complete inputs, and an unavailable actionlint produces a named non-zero self-test failure.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c11bcdaa-03d2-4b89-8143-26abd58d4632",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6892966-3256-4e0c-a3e3-2b8514db5a96",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:14:59.416572200Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0cde4257, 60f98224 (`jit:c11bcdaa`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 and D-18 (dev/vision/9db27a3a-charter.md); @/invariant/no-ignored-tests, single-source-prose, essential-code-prose, orthogonal-tests (.jit/invariants.toml); @/gate/workflow-contract-selftest (.jit/gates.toml); @/issue/c780514e/requirement/REQ-10 (issue description)\nGate evidence: cargo-ci passed; workflow-contract-selftest passed (exit 0)\nTruncation recovery: reread bounded self-test, gate-registry, configuration, projection, invariant, and charter ranges\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met: the declared gate directly runs the self-test with complete inputs, and an unavailable actionlint produces a named non-zero self-test failure.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

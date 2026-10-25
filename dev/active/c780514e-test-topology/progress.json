@@ -1,7 +1,7 @@
 {
   "epic_id": "c780514e-8491-40a7-8844-3974bba91257",
   "epic_short_id": "c780514e",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -148,7 +148,7 @@
           "key": "inline-list-output-types",
           "title": "Inline list bodies in main.rs become typed list envelopes",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "9bb30f15-a995-4b63-924a-13c27e9fa61c",
@@ -164,7 +164,7 @@
           "key": "manifest-tool-test-gate",
           "title": "Breakdown-manifest tool test suite runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "7a412cb0-1969-4c46-b106-703bcdb502fe",
@@ -188,7 +188,7 @@
           "key": "session-cost-benchmark-selftest-gate",
           "title": "Session-cost benchmark self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
@@ -196,7 +196,7 @@
           "key": "shipped-policy-regions-selftest-gate",
           "title": "Shipped-policy region generator self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "7495521e-8338-4ef8-82b9-cb4ddf182739",
@@ -204,7 +204,7 @@
           "key": "standards-fix-test-gate",
           "title": "Standards-fix test suite runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "0951556f-5e8a-4a3a-ab15-31659cf7ce2a",
@@ -212,7 +212,7 @@
           "key": "standards-scan-test-gate",
           "title": "Standards-scan test suite runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "c11bcdaa-03d2-4b89-8143-26abd58d4632",
@@ -220,7 +220,7 @@
           "key": "workflow-contract-selftest-gate",
           "title": "Workflow-contract harness self-test runs as a declared gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -249,7 +249,7 @@
           "key": "cli-gate-definition-spawn-migration",
           "title": "gate definition tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
@@ -257,7 +257,7 @@
           "key": "cli-gate-evaluate-spawn-migration",
           "title": "gate evaluation tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "5353463c-6517-43ba-b104-b42cf951b4ce",
@@ -265,7 +265,7 @@
           "key": "cli-gate-status-spawn-migration",
           "title": "gate status and key tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "8e69776c-443e-4842-b818-c6af28fc73c9",
@@ -1303,6 +1303,11 @@
     {
       "finding": "9bb30f15 review advisory F1: unsupported REQ-10 coverage label on lock precondition task",
       "disposition": "Resolved by coordinator-approved metadata correction; real REQ-10 contributors retained. Coverage graph validation recorded after correction."
+    },
+    {
+      "session": 2,
+      "finding": "Lead dispatched wave-2 cli_gate batch (870e8e46, 5353463c, eaf543c7) while wave-1 df505379 was still in progress, against wave discipline and the session-1 handoff instruction.",
+      "disposition": "Containment: the batch is not merged or gated until df505379 closes and wave 1 is complete. No further wave-2 dispatch before then."
     }
   ],
   "traps": [
@@ -1712,6 +1717,171 @@
           "fa9bf296"
         ]
       }
+    },
+    "fa9bf296": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "fe68cec0-fc8f-41dd-98ed-d1b7320cf47e",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "35c5141b-1a1b-4b27-872b-4d08a34d11ba",
+          "status": "passed"
+        },
+        {
+          "key": "session-cost-benchmark-selftest",
+          "run_id": "37a3452d-759a-49f2-aaec-8c896f82ed83",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "c11bcdaa": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "d66101b1-36d8-4d2c-8c34-cbf45a874edb",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "c6892966-3256-4e0c-a3e3-2b8514db5a96",
+          "status": "passed"
+        },
+        {
+          "key": "workflow-contract-selftest",
+          "run_id": "47b2dbf6-c54d-49ef-bb58-d01faf534116",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "89406e14": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "078e1c7a-2378-4cf8-b633-4bb1c9beb257",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "11dc2e29-0f19-4158-867e-8789e71d216b",
+          "status": "passed"
+        },
+        {
+          "key": "shipped-policy-regions-selftest",
+          "run_id": "93df51f9-7e20-425f-b937-4707c919bab9",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "2c453337": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "a87d47f7-0e38-4574-914f-855942a70a2d",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "e8ea2608-830f-4596-8452-f3df28a8ffbe",
+          "status": "passed"
+        },
+        {
+          "key": "manifest-tool-test",
+          "run_id": "46d3f92d-19c2-4383-a0f0-87ce956b8c2c",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "7495521e": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "b794875c-bc1e-454e-ba2d-66cec35c0552",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "dffbc2cb-c6eb-4bef-b44c-89e59e7b8d7c",
+          "status": "passed"
+        },
+        {
+          "key": "standards-fix-test",
+          "run_id": "678dd17d-8ee3-4e04-86f7-5b307ae09e54",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "0951556f": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": [
+        {
+          "key": "cargo-ci",
+          "run_id": "90227604-dc58-43ad-8b36-0c41e273f8c1",
+          "status": "passed"
+        },
+        {
+          "key": "code-review",
+          "run_id": "21cce070-9b3d-4bde-a4d1-cd38af9c7889",
+          "status": "passed"
+        },
+        {
+          "key": "standards-scan-test",
+          "run_id": "e7ced7ee-227f-4c23-aad7-1afd5713cb0c",
+          "status": "passed"
+        }
+      ],
+      "criteria": "REQ-01 gate runs the script with mode and no auto key, inputs audited against script reads; REQ-02 self-test exit 0 on merge 650a3badf, missing-tool probe non-zero recorded in commit body; c11bcdaa REQ-03 actionlint-unavailable path reports FAIL, no SKIP",
+      "prior_findings": "none",
+      "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
+      "deferred_items": "no linked documents",
+      "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "df505379": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": "cargo-ci, mcp-ci, code-review passed on merge 1a8ef7fe6",
+      "criteria": "REQ-01 six commands emit ListEnvelope aliases registered in schema.rs, no count json! in main.rs; REQ-02 graph_rdeps key; REQ-03 one wire test per distinct shape incl. explicit null lease options; REQ-04 mcp-ci with merged binary first on PATH",
+      "lead_fix": "removed count==len re-assertion from per-shape tests (owned by ListEnvelope)",
+      "stale_narrative": "no graph_downstream schema key remains",
+      "deferred_items": "no linked documents"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
@@ -1751,5 +1921,29 @@
       "implementation": "WIP gate input roots only; projection/selftest/gates pending",
       "lease": "released at pause; issue remains in_progress"
     }
-  }
+  },
+  "dispatch_log": [
+    {
+      "session": 2,
+      "issue": "df505379",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "moderate multi-file schema/output change with fixed footprint"
+    },
+    {
+      "session": 2,
+      "issue": "c11bcdaa",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "one-file shell change with exact criteria"
+    },
+    {
+      "session": 2,
+      "issue": "870e8e46,5353463c,eaf543c7",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "mechanical test migration batch in one integration target"
+    }
+  ]
 }

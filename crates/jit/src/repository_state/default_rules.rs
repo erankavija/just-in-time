@@ -380,11 +380,7 @@ pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::
 /// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
 /// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
 pub fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
-    HierarchyConfig::new(
-        namespaces.declared_type_hierarchy(),
-        namespaces.label_associations.clone().unwrap_or_default(),
-    )
-    .unwrap_or_else(|_| HierarchyConfig::empty())
+    HierarchyConfig::from_declarations(namespaces).unwrap_or_else(|_| HierarchyConfig::empty())
 }
 
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
