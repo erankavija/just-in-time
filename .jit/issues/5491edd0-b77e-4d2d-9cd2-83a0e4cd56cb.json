@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a980da13-2c6b-4a3a-a4d7-2705b082b806",
+      "status": "passed",
+      "updated_at": "2026-10-25T10:58:25.319805854Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "98b0178d-0191-4bc4-a931-5d1f460a41f7",
+      "status": "passed",
+      "updated_at": "2026-10-25T10:59:42.264814950Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5491edd0-b77e-4d2d-9cd2-83a0e4cd56cb",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree and server files under .jit have VirtualPath constants",
-  "updated_at": "2026-10-25T08:43:20.359978113Z"
+  "updated_at": "2026-10-25T10:59:42.264814950Z"
 }
