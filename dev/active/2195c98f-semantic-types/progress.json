@@ -129,7 +129,7 @@
           "short_id": "2ac50581",
           "title": "Lifecycle state tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
@@ -241,7 +241,7 @@
           "short_id": "f8f80eea",
           "title": "Hierarchy callers propagate the constructor's error",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "faa19def-4484-4706-becf-dab559f0f3d4",
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -302,7 +302,7 @@
           "short_id": "6826f966",
           "title": "Rule severity and scope tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
@@ -818,6 +818,27 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Identity retype through coordinator and lease with exact criteria."
+    },
+    {
+      "issue": "182350ce",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Macro adoption across five files on the priority chain."
+    },
+    {
+      "issue": "6826f966",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Two-enum macro adoption, two files."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation: approved forced fixture edits; finish REQ-03 and checks."
     }
   ],
   "surfaced_pitfalls": [
