@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c3161730-2937-4060-9ef6-7cd5f381cce2",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:59:06.792581504Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d66e74e4-f43e-46d8-b407-976bb0c8de5b",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:01:05.139002664Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item-kind scope has one enum",
-  "updated_at": "2026-10-25T04:47:24.723795494Z"
+  "updated_at": "2026-10-25T05:01:05.139002664Z"
 }
