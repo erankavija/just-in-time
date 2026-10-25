@@ -54,7 +54,14 @@ fn read_text(
     repo_relative: &str,
 ) -> Result<Option<String>, ProducerError> {
     let vpath = image_path(image, repo_relative)?;
-    match image.file_bytes(&vpath)? {
+    read_text_at(image, &vpath)
+}
+
+fn read_text_at(
+    image: &RepositoryImage,
+    path: &VirtualPath,
+) -> Result<Option<String>, ProducerError> {
+    match image.file_bytes(path)? {
         Some(bytes) => Ok(Some(String::from_utf8(bytes.to_vec())?)),
         None => Ok(None),
     }
@@ -68,7 +75,7 @@ fn read_text(
 /// is an empty registry, matching the on-disk load boundary.
 pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
     let config_bytes = image
-        .file_bytes(&image_path(image, ".jit/config.toml")?)?
+        .file_bytes(&VirtualPath::CONFIG)?
         .ok_or(ProducerError::MissingCapture(".jit/config.toml"))?;
     let declarations = crate::declarations::parse_configuration(config_bytes)?;
     assemble_config_from_declarations(image, &declarations)
@@ -82,9 +89,9 @@ pub(crate) fn assemble_config_from_declarations(
 ) -> Result<JitConfig, ProducerError> {
     // An invariants.toml outside the captured closure (or captured absent) is an
     // empty registry, matching the on-disk load boundary.
-    let invariants_path = image_path(image, ".jit/invariants.toml")?;
+    let invariants_path = VirtualPath::INVARIANTS;
     let invariants = if image.capture_spec().contains_path(&invariants_path) {
-        match read_text(image, ".jit/invariants.toml")? {
+        match read_text_at(image, &invariants_path)? {
             Some(text) => InvariantRegistry::from_toml_str(&text)?,
             None => InvariantRegistry::empty(),
         }
@@ -125,10 +132,10 @@ pub fn render_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
     ];
     let registry = config.projection.clone().unwrap_or_default();
     let all_kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
@@ -218,13 +225,13 @@ pub fn validate_capture_closure(
     use crate::domain::item::resolve_item_kinds;
 
     let mut paths = vec![
-        layout.classify_repository_relative(".jit/config.toml")?,
-        layout.classify_repository_relative(".jit/invariants.toml")?,
-        layout.classify_repository_relative(".jit/rules.toml")?,
-        layout.classify_repository_relative(".jit/gates.toml")?,
-        layout.classify_repository_relative(".jit/templates.toml")?,
-        layout.classify_repository_relative(".jit/index.json")?,
-        layout.classify_repository_relative(".jit/events.jsonl")?,
+        VirtualPath::CONFIG,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+        VirtualPath::GATES,
+        VirtualPath::TEMPLATES,
+        VirtualPath::INDEX,
+        VirtualPath::EVENTS,
         // The data root's ignore file, so derived-state repair sees the target
         // its producer composes rather than treating it as uncaptured.
         VirtualPath::DATA_IGNORE,
@@ -490,11 +497,11 @@ pub(crate) fn compose_default_ruleset(
     // A ruleset outside the captured closure (or captured absent) is not an owned
     // materialization: defaults live only in memory, nothing on disk to keep
     // coherent, so no rules/schema targets are owned.
-    let rules_path = image_path(image, ".jit/rules.toml")?;
+    let rules_path = VirtualPath::RULES;
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) = read_text(image, ".jit/rules.toml")? else {
+    let Some(current_rules) = read_text_at(image, &rules_path)? else {
         return Ok(Vec::new());
     };
     let namespaces = crate::config_manager::namespaces_from_config(config);
