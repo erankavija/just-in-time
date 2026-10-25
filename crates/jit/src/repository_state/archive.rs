@@ -208,7 +208,7 @@ pub fn finalize_archive_execution(
             let from = issue.state;
             issue.archived_from = Some(from);
             issue.state = State::Archived;
-            state_event = Some(Event::draft_issue_state_changed(
+            state_event = Some(EventBody::draft_issue_state_changed(
                 id.clone(),
                 from,
                 State::Archived,
@@ -301,7 +301,7 @@ pub fn finalize_archive_execution(
     if event_needed {
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_artifact_archive_executed(
+            event: Box::new(EventBody::draft_artifact_archive_executed(
                 plan.target().clone(),
                 plan.destination_root().into(),
                 publications.clone(),

@@ -8,16 +8,16 @@
 //!
 //! The catalog is derived from the type, never restated:
 //!
-//! - [`EventTag`] is the fieldless mirror of the `Event` variant set.
-//!   [`Event::tag`] maps a record to its tag with a wildcard-free match, and
-//!   [`Event::get_type`] returns [`EventTag::as_str`] — so a new `Event` variant
+//! - [`EventTag`] is the fieldless mirror of the [`EventBody`] variant set.
+//!   [`EventBody::tag`] maps a record to its tag with a wildcard-free match, and
+//!   [`EventBody::get_type`] returns [`EventTag::as_str`] — so a new variant
 //!   fails to compile until it is given a tag here.
 //! - [`EventTag::sample`] constructs one representative record per tag with a
 //!   wildcard-free match, so a new tag fails to compile until it is sampled.
 //! - A row's `carries_issue_id` follows from its [`EventScope`]: only
 //!   issue-scoped records name an issue. Tests hold that against reality from
 //!   both sides — against the serialized sample (the same `serde_json` encoding
-//!   the repository-state finalizer publishes to `events.jsonl`) and against [`Event::get_issue_id`],
+//!   the repository-state finalizer publishes to `events.jsonl`) and against [`EventBody::get_issue_id`],
 //!   the accessor every consumer reads an event's issue through.
 //! - Conformance tests compare the catalog against the variant lists schemars
 //!   derives from the enums: every serde `type` tag of [`Event`] must be
@@ -69,10 +69,10 @@ impl EventScope {
     }
 }
 
-/// The event-log tag vocabulary: one variant per [`Event`] variant.
+/// The event-log tag vocabulary: one variant per [`EventBody`] variant.
 ///
-/// The tag is the value of a record's `type` field. [`Event::tag`] is the
-/// wildcard-free mapping from a record to its tag, and [`Event::get_type`]
+/// The tag is the value of a record's `type` field. [`EventBody::tag`] is the
+/// wildcard-free mapping from a record to its tag, and [`EventBody::get_type`]
 /// renders that tag as the string serde writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -122,7 +122,7 @@ pub enum EventTag {
 }
 
 impl EventTag {
-    /// Every tag in the vocabulary, in [`Event`] declaration order.
+    /// Every tag in the vocabulary, in [`EventBody`] declaration order.
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
@@ -275,30 +275,34 @@ impl EventTag {
             .parse()
             .expect("`agent:worker-1` is a well-formed assignee");
 
-        let mut event = match self {
-            EventTag::IssueCreated => Event::draft_issue_created(&Issue {
+        let body = match self {
+            EventTag::IssueCreated => EventBody::draft_issue_created(&Issue {
                 id: issue_id,
                 ..Issue::draft("Sample issue".to_string(), String::new())
             }),
-            EventTag::IssueClaimed => Event::draft_issue_claimed(issue_id, assignee),
+            EventTag::IssueClaimed => EventBody::draft_issue_claimed(issue_id, assignee),
             EventTag::IssueStateChanged => {
-                Event::draft_issue_state_changed(issue_id, State::Ready, State::InProgress)
+                EventBody::draft_issue_state_changed(issue_id, State::Ready, State::InProgress)
             }
-            EventTag::GatePassed => Event::draft_gate_passed(issue_id, gate_key, Some(assignee)),
-            EventTag::GateFailed => Event::draft_gate_failed(issue_id, gate_key, Some(assignee)),
-            EventTag::GateAdded => Event::draft_gate_added(issue_id, gate_key),
-            EventTag::GateRemoved => Event::draft_gate_removed(issue_id, gate_key),
-            EventTag::IssueCompleted => Event::draft_issue_completed(issue_id),
-            EventTag::IssueDeleted => Event::draft_issue_deleted(issue_id),
+            EventTag::GatePassed => {
+                EventBody::draft_gate_passed(issue_id, gate_key, Some(assignee))
+            }
+            EventTag::GateFailed => {
+                EventBody::draft_gate_failed(issue_id, gate_key, Some(assignee))
+            }
+            EventTag::GateAdded => EventBody::draft_gate_added(issue_id, gate_key),
+            EventTag::GateRemoved => EventBody::draft_gate_removed(issue_id, gate_key),
+            EventTag::IssueCompleted => EventBody::draft_issue_completed(issue_id),
+            EventTag::IssueDeleted => EventBody::draft_issue_deleted(issue_id),
             EventTag::IssueReleased => {
-                Event::draft_issue_released(issue_id, assignee, "stale lease".to_string())
+                EventBody::draft_issue_released(issue_id, assignee, "stale lease".to_string())
             }
-            EventTag::IssueUpdated => Event::draft_issue_updated(
+            EventTag::IssueUpdated => EventBody::draft_issue_updated(
                 issue_id,
                 "agent:worker-1".to_string(),
                 vec!["priority".to_string()],
             ),
-            EventTag::ArtifactArchiveExecuted => Event::draft_artifact_archive_executed(
+            EventTag::ArtifactArchiveExecuted => EventBody::draft_artifact_archive_executed(
                 crate::domain::artifact_plan::PlanTarget::Document {
                     path: "dev/plan.md".to_string(),
                 },
@@ -308,29 +312,29 @@ impl EventTag {
                 Vec::new(),
                 false,
             ),
-            EventTag::DependencyReduced => Event::draft_dependency_reduced(
+            EventTag::DependencyReduced => EventBody::draft_dependency_reduced(
                 issue_id,
                 2,
                 1,
                 vec!["00000000-0000-0000-0000-000000000002".to_string()],
             ),
             EventTag::LocalRuleBypassed => {
-                Event::draft_local_rule_bypassed(issue_id, "type-required".to_string())
+                EventBody::draft_local_rule_bypassed(issue_id, "type-required".to_string())
             }
-            EventTag::TransitionBlocked => Event::draft_transition_blocked(
+            EventTag::TransitionBlocked => EventBody::draft_transition_blocked(
                 issue_id,
                 State::Done,
                 "children-complete".to_string(),
             ),
-            EventTag::GraphRuleBypassed => Event::draft_graph_rule_bypassed(
+            EventTag::GraphRuleBypassed => EventBody::draft_graph_rule_bypassed(
                 issue_id,
                 State::Done,
                 "children-complete".to_string(),
             ),
-            EventTag::GateDefinitionUpdated => Event::draft_gate_definition_updated(gate_key),
-            EventTag::GateDefinitionCreated => Event::draft_gate_definition_created(gate_key),
-            EventTag::GateDefinitionRemoved => Event::draft_gate_definition_removed(gate_key),
-            EventTag::ProfileLifecycle => Event::draft_profile_lifecycle(
+            EventTag::GateDefinitionUpdated => EventBody::draft_gate_definition_updated(gate_key),
+            EventTag::GateDefinitionCreated => EventBody::draft_gate_definition_created(gate_key),
+            EventTag::GateDefinitionRemoved => EventBody::draft_gate_definition_removed(gate_key),
+            EventTag::ProfileLifecycle => EventBody::draft_profile_lifecycle(
                 crate::domain::ProfileLifecycleOperation::Apply,
                 vec![crate::domain::ProfileLifecycleProfile {
                     id: "example"
@@ -348,30 +352,30 @@ impl EventTag {
                 }],
             ),
             EventTag::LinkedCheckoutWriteOverridden => {
-                Event::draft_linked_checkout_write_overridden(
+                EventBody::draft_linked_checkout_write_overridden(
                     std::path::PathBuf::from("/repo/.worktrees/feature"),
                     LinkedCheckoutWriteStance::Refuse,
                     LinkedCheckoutWriteStance::Allow,
                 )
             }
         };
-        event.assign_identity(
+        Event::new(
             "00000000-0000-0000-0000-000000000000".to_string(),
             DateTime::UNIX_EPOCH,
-        );
-        event
+            body,
+        )
     }
 }
 
-impl Event {
+impl EventBody {
     /// The tag under which this record is stored.
     ///
-    /// The wildcard-free match is what binds the catalog to the `Event` type: a
-    /// new variant fails to compile until it is given a tag, and the tag then
+    /// The wildcard-free match is what binds the catalog to the `EventBody` type:
+    /// a new variant fails to compile until it is given a tag, and the tag then
     /// carries a scope, a sample, and a description with it.
-    /// [`Event::get_type`] renders the returned tag as the string serde writes.
+    /// [`EventBody::get_type`] renders the returned tag as the string serde writes.
     pub fn tag(&self) -> EventTag {
-        match self.body() {
+        match self {
             EventBody::IssueCreated { .. } => EventTag::IssueCreated,
             EventBody::IssueClaimed { .. } => EventTag::IssueClaimed,
             EventBody::IssueStateChanged { .. } => EventTag::IssueStateChanged,
@@ -409,13 +413,13 @@ pub struct EventTagDoc {
     pub scope: EventScope,
     /// Whether records with this tag carry an `issue_id` field. True exactly for
     /// [`EventScope::Issue`] tags; tests hold this against the serialized record
-    /// and against [`Event::get_issue_id`].
+    /// and against [`EventBody::get_issue_id`].
     pub carries_issue_id: bool,
     /// What appends a record with this tag.
     pub description: String,
 }
 
-/// Project the event-tag catalog: one row per [`Event`] variant.
+/// Project the event-tag catalog: one row per [`EventBody`] variant.
 ///
 /// Carried by `jit --schema` as its `events` array and rendered into the
 /// committed reference by `render_event_reference`. Every row is derived:
@@ -531,7 +535,7 @@ mod tests {
 
     /// REQ-03 (enumeration): `EventTag::ALL` must list every tag. The expected
     /// set is the variant list schemars derives from the enum itself, so a tag
-    /// added to `EventTag` — which a new `Event` variant forces, `Event::tag`
+    /// added to `EventTag` — which a new `EventBody` variant forces, `EventBody::tag`
     /// being a wildcard-free match — but left out of `ALL` fails here.
     #[test]
     fn test_all_lists_every_tag_variant() {
@@ -561,7 +565,7 @@ mod tests {
         for tag in EventTag::ALL {
             let event = tag.sample();
             assert_eq!(event.get_type(), tag.as_str());
-            assert_eq!(event.tag(), tag);
+            assert_eq!(event.body().tag(), tag);
         }
     }
 
@@ -603,14 +607,16 @@ mod tests {
         }
     }
 
-    /// REQ-03: every serde `type` tag the `Event` enum admits is cataloged.
+    /// REQ-03: every serde `type` tag the published `Event` schema admits is
+    /// cataloged.
     ///
-    /// `Event::tag()` being wildcard-free forces a new variant to be *given* a
-    /// tag, but nothing stops it being given an existing one — serde would then
+    /// `EventBody::tag()` being wildcard-free forces a new variant to be *given*
+    /// a tag, but nothing stops it being given an existing one — serde would then
     /// write a `type` string absent from the catalog while the code still
     /// compiles. This reads the tags off the schema schemars derives from `Event`
-    /// itself (each variant contributes its `type` const), so the catalog is bound
-    /// to the serde encoding rather than to `EventTag`'s own variant list.
+    /// itself (each flattened body variant contributes its `type` const), so the
+    /// catalog is bound to the serde encoding rather than to `EventTag`'s own
+    /// variant list.
     #[test]
     fn test_event_variant_tags_are_all_cataloged() {
         let schema = serde_json::to_value(schema_for!(Event)).expect("Event schema is JSON");
@@ -721,7 +727,7 @@ mod tests {
             let encoded = serde_json::to_string(&event).expect("a sample event serializes");
             let decoded: Event = serde_json::from_str(&encoded).expect("a serialized event parses");
             assert_eq!(decoded, event, "`{}` did not round-trip", tag.as_str());
-            assert_eq!(decoded.tag(), tag);
+            assert_eq!(decoded.body().tag(), tag);
         }
     }
 

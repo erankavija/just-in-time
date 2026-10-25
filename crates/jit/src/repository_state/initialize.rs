@@ -24,7 +24,7 @@ use crate::declarations::invariants::{serialize_invariant_registry, InvariantReg
 use crate::declarations::{serialize_gate_registry, GateRegistry};
 use crate::domain::identity::ProfileId;
 use crate::domain::{
-    Event, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
+    EventBody, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
 };
 
 use super::default_rules::default_ruleset;
@@ -951,7 +951,7 @@ pub(super) fn derive_profile_applications(
     }
 
     if aggregate_changed {
-        let event = Event::draft_profile_lifecycle(operation, lifecycle_profiles);
+        let event = EventBody::draft_profile_lifecycle(operation, lifecycle_profiles);
         if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
             fold_rebased_action(base, &mut actions, &action)?;
         }

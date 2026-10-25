@@ -944,7 +944,7 @@ fn derive_template_refresh(
     container: &Issue,
     issues: &[Issue],
     declarations: &DocumentDeclarations,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
 ) -> Result<(BTreeMap<String, IssueId>, BTreeMap<IssueId, Issue>)> {
     let mut mapping = BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.clone())]);
     if let Some(node) = template.breakdown_node(roles) {
@@ -999,7 +999,7 @@ fn derive_template_refresh(
         updates.insert(id.clone(), issue);
         events.push((
             1,
-            Event::draft_issue_updated(
+            EventBody::draft_issue_updated(
                 id.clone(),
                 APPLY_ACTOR.to_string(),
                 vec!["description".to_string()],
@@ -1019,7 +1019,7 @@ fn derive_fresh_template(
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     context: &MutationContext,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
 ) -> Result<FreshTemplateDerivation> {
     let created_order = (0..delta.creates.len())
         .map(|index| context.identifier_at(index as u64))
@@ -1154,7 +1154,7 @@ fn attach_captured_gates(
     issue: &mut Issue,
     registry: &mut crate::declarations::GateRegistry,
     presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
     for name in names {
@@ -1169,8 +1169,10 @@ fn attach_captured_gates(
                     .map(|template| {
                         let gate = template.to_gate();
                         if !registry.gates.contains_key(&gate.key) {
-                            events
-                                .push((0, Event::draft_gate_definition_created(gate.key.clone())));
+                            events.push((
+                                0,
+                                EventBody::draft_gate_definition_created(gate.key.clone()),
+                            ));
                             registry.gates.insert(gate.key.clone(), gate.clone());
                         }
                         gate.key
@@ -1196,7 +1198,7 @@ fn attach_captured_gates(
                     run_id: None,
                 },
             );
-            events.push((1, Event::draft_gate_added(issue.id.clone(), key)));
+            events.push((1, EventBody::draft_gate_added(issue.id.clone(), key)));
         }
     }
     Ok(())
@@ -1206,7 +1208,7 @@ fn add_captured_template_edge(
     issues: &mut BTreeMap<IssueId, Issue>,
     from: &IssueId,
     to: &IssueId,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
     lease_targets.push(from.clone());
@@ -1263,7 +1265,7 @@ fn add_captured_template_edge(
         if &id != from {
             events.push((
                 3,
-                Event::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
+                EventBody::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
             ));
         }
     }
@@ -1291,12 +1293,12 @@ fn add_captured_template_edge(
         issue.state = State::Backlog;
         events.push((
             1,
-            Event::draft_issue_state_changed(from.clone(), State::Ready, State::Backlog),
+            EventBody::draft_issue_state_changed(from.clone(), State::Ready, State::Backlog),
         ));
     }
     events.push((
         2,
-        Event::draft_issue_updated(
+        EventBody::draft_issue_updated(
             from.clone(),
             "dependency-add".to_string(),
             vec!["dependencies".to_string()],
@@ -1309,7 +1311,7 @@ fn remove_captured_template_edge(
     issues: &mut BTreeMap<IssueId, Issue>,
     from: &IssueId,
     to: &IssueId,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
     lease_targets.push(from.clone());
@@ -1325,7 +1327,7 @@ fn remove_captured_template_edge(
     }
     events.push((
         2,
-        Event::draft_issue_updated(
+        EventBody::draft_issue_updated(
             from.clone(),
             "dependency-remove".to_string(),
             vec!["dependencies".to_string()],
@@ -1352,7 +1354,7 @@ fn remove_captured_template_edge(
             .state = State::Ready;
         events.push((
             3,
-            Event::draft_issue_state_changed(from.clone(), State::Backlog, State::Ready),
+            EventBody::draft_issue_state_changed(from.clone(), State::Backlog, State::Ready),
         ));
     }
     Ok(())

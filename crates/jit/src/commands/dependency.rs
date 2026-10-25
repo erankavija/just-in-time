@@ -543,7 +543,7 @@ fn derive_dependency_removal(
     let resolved = crate::domain::queries::build_issue_map(&candidate);
     let mut intents = vec![MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_updated(
+        event: Box::new(EventBody::draft_issue_updated(
             source_id.clone(),
             "dependency-remove".to_string(),
             vec!["dependencies".to_string()],
@@ -941,7 +941,7 @@ fn derive_reduced_graph_intents(
                 issue.state = State::Backlog;
                 events.push(MutationIntent::RecordEvent {
                     phase: 1,
-                    event: Box::new(Event::draft_issue_state_changed(
+                    event: Box::new(EventBody::draft_issue_state_changed(
                         issue_id.clone(),
                         State::Ready,
                         State::Backlog,
@@ -950,7 +950,7 @@ fn derive_reduced_graph_intents(
             }
             events.push(MutationIntent::RecordEvent {
                 phase: 2,
-                event: Box::new(Event::draft_issue_updated(
+                event: Box::new(EventBody::draft_issue_updated(
                     issue_id,
                     "dependency-add".to_string(),
                     vec!["dependencies".to_string()],
@@ -959,7 +959,7 @@ fn derive_reduced_graph_intents(
         } else {
             events.push(MutationIntent::RecordEvent {
                 phase: 3,
-                event: Box::new(Event::draft_dependency_reduced(
+                event: Box::new(EventBody::draft_dependency_reduced(
                     issue_id,
                     original_deps.len(),
                     reduced.len(),

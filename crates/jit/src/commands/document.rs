@@ -1022,7 +1022,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 MutationIntent::RecordEvent {
                     phase: 1,
-                    event: Box::new(crate::domain::Event::draft_issue_updated(
+                    event: Box::new(crate::domain::EventBody::draft_issue_updated(
                         issue_id.clone(),
                         "doc-rescan".to_string(),
                         vec!["documents.assets".to_string()],
@@ -1813,7 +1813,7 @@ fn derive_document_add(
         Some(index) => issue.documents[index] = document,
         None => issue.documents.push(document),
     }
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         if updated { "doc-update" } else { "doc-add" }.to_string(),
         vec!["documents".to_string()],
@@ -1850,7 +1850,7 @@ fn derive_document_remove(
         issue_id: issue.id.clone(),
         path: path.to_string(),
     };
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         "doc-remove".to_string(),
         vec!["documents".to_string()],
