@@ -1,6 +1,8 @@
 use super::*;
 use crate::domain::SHORT_ID_LENGTH;
-use crate::repository_state::{CaptureBudget, RepositoryAction, EVENT_LOG_TAIL_WINDOW};
+use crate::repository_state::{
+    CaptureBudget, RepositoryAction, RepositoryActionOwner, EVENT_LOG_TAIL_WINDOW,
+};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
@@ -61,7 +63,7 @@ fn test_json_apply_admits_a_listing_that_changed_since_capture() {
         &layout,
         vec![RepositoryAction::write_file(
             published_path.clone(),
-            "archive",
+            RepositoryActionOwner::ArchiveExecution,
             ExpectedPreimage::Absent,
             b"published".to_vec(),
             FileMode::Regular,
@@ -132,19 +134,19 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("index.json").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("note.txt").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"note".to_vec(),
                 FileMode::Regular,
@@ -172,12 +174,12 @@ fn issue_creation_delta(
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("index.json").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 serde_json::to_vec(&serde_json::json!({
                     "schema_version": 2,
@@ -189,12 +191,12 @@ fn issue_creation_delta(
             ),
             RepositoryAction::create_directory(
                 VirtualPath::data("issues").unwrap(),
-                "issue",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap(),
-                "issue",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 issue_bytes.to_vec(),
                 FileMode::Regular,
@@ -287,21 +289,29 @@ fn publish_issues<S: RepositoryStateStore>(storage: &S, worktree: &Path, issues:
     });
     let [data, index_path, issues_dir] = roots;
     let actions = [
-        RepositoryAction::create_directory(data, "init", ExpectedPreimage::Absent),
+        RepositoryAction::create_directory(
+            data,
+            RepositoryActionOwner::RepositoryInit,
+            ExpectedPreimage::Absent,
+        ),
         RepositoryAction::write_file(
             index_path,
-            "init",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             serde_json::to_vec(&index).unwrap(),
             FileMode::Regular,
         ),
-        RepositoryAction::create_directory(issues_dir, "issue", ExpectedPreimage::Absent),
+        RepositoryAction::create_directory(
+            issues_dir,
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+        ),
     ]
     .into_iter()
     .chain(issues.iter().zip(issue_paths).map(|(issue, path)| {
         RepositoryAction::write_file(
             path,
-            "issue",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             serialize_issue(issue).unwrap(),
             FileMode::Regular,
@@ -415,7 +425,7 @@ fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
         layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("target.txt").unwrap(),
-            "image-binding-test",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"materialized".to_vec(),
             FileMode::Regular,
@@ -522,7 +532,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
         &layout,
         vec![RepositoryAction::set_mode(
             path,
-            "mode",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(
                 image
                     .entry(&VirtualPath::data("mode.txt").unwrap())
@@ -561,7 +571,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
         &stale_layout,
         vec![RepositoryAction::write_file(
             path.clone(),
-            "initialize",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -696,7 +706,7 @@ fn test_memory_set_mode_uses_exact_file_preimage() {
         &layout,
         vec![RepositoryAction::set_mode(
             path.clone(),
-            "mode",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(image.entry(&path).unwrap()),
             FileMode::Executable,
         )],
@@ -900,37 +910,37 @@ fn apply_all_action_kinds<S: RepositoryStateStore>(
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("generated").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("generated/new.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"created".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("replace.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("replace.txt"),
                 b"replaced".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("chmod.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("chmod.txt"),
                 FileMode::Executable,
             ),
             RepositoryAction::delete_file(
                 VirtualPath::data("remove.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("remove.txt"),
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("out.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"worktree".to_vec(),
                 FileMode::Regular,
@@ -1020,7 +1030,7 @@ fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::worktree("note.txt").unwrap(),
-            "wt",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"note".to_vec(),
             FileMode::Regular,
@@ -1138,7 +1148,7 @@ fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
         &layout,
         vec![RepositoryAction::write_file(
             nested.clone(),
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"x".to_vec(),
             FileMode::Regular,
@@ -1513,13 +1523,13 @@ fn test_conformance_absent_root_data_only_materializes_data_root_dir() {
         if explicit_root_dir {
             actions.push(RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "g",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ));
         }
         actions.push(RepositoryAction::write_file(
             VirtualPath::data("index.json").unwrap(),
-            "g",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1668,7 +1678,7 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("new.txt").unwrap(),
-            "f4",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"new".to_vec(),
             FileMode::Regular,
@@ -1711,7 +1721,7 @@ fn test_absent_data_parent_replacement_before_publication_never_succeeds() {
         &layout,
         vec![RepositoryAction::write_file(
             path,
-            "root-publication",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1761,13 +1771,13 @@ fn test_delta_rejects_captured_cross_root_hard_link_alias() {
         vec![
             RepositoryAction::set_mode(
                 VirtualPath::worktree("shared").unwrap(),
-                "one",
+                RepositoryActionOwner::RepositoryStateMutation,
                 worktree_pre,
                 FileMode::Executable,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("shared").unwrap(),
-                "two",
+                RepositoryActionOwner::ProfileApplication,
                 data_pre,
                 FileMode::Executable,
             ),
@@ -1798,7 +1808,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("x").unwrap(),
-            "a4",
+            RepositoryActionOwner::RepositoryStateMutation,
             expected,
             b"v2".to_vec(),
             FileMode::Regular,
@@ -2330,18 +2340,18 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
             vec![
                 RepositoryAction::create_directory(
                     run_dir.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                 ),
                 RepositoryAction::write_file(
                     run_file.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     gate_bytes.clone(),
                     FileMode::Regular,
                 ),
                 RepositoryAction::append_events(
-                    "provenance",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     0,
                     event_line.clone(),
@@ -3002,11 +3012,19 @@ fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() 
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![
-            RepositoryAction::create_directory(empty.clone(), "p0", ExpectedPreimage::Absent),
-            RepositoryAction::create_directory(ancestor, "p0", ExpectedPreimage::Absent),
+            RepositoryAction::create_directory(
+                empty.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
+            RepositoryAction::create_directory(
+                ancestor,
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
             RepositoryAction::write_file(
                 written,
-                "p0",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
@@ -3032,7 +3050,7 @@ fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![RepositoryAction::append_events(
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(image.entry(&VirtualPath::EVENTS).unwrap()),
             offset,
             b"{\"tag\":\"next\"}\n".to_vec(),
@@ -3520,7 +3538,7 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
             session.layout(),
             vec![RepositoryAction::write_file(
                 target.clone(),
-                "interrupted-publication",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 LEFTOVER_BYTES.to_vec(),
                 FileMode::Regular,
