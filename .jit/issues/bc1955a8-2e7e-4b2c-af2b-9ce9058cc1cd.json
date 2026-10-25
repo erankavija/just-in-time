@@ -8,6 +8,7 @@
   ],
   "description": "Converge item-kind id patterns on the shared compiled pattern type.\n\n## Background\n\n`ItemKind` keeps `id_pattern_src: String` beside `id_pattern: Regex` (`crates/jit/src/domain/item.rs:643-655`), a private pairing of the compiled-pattern type that rule declarations use.\n\n## Success Criteria\n\n- [hard] REQ-01: `ItemKind` holds its id pattern as an `IdPattern`, and the separate source field is gone.\n- [hard] REQ-02: An invalid item-kind id pattern fails configuration loading with an error naming the kind.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:31:26.067049905Z",
   "first_ready_at": "2026-10-25T04:16:26.261347126Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Item kinds hold their id pattern as IdPattern",
-  "updated_at": "2026-10-25T04:31:25.138786195Z"
+  "updated_at": "2026-10-25T04:31:26.067049905Z"
 }
