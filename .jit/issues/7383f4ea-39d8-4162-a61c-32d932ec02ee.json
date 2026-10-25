@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2f4100b3-7d4c-4f92-9605-06a055999956",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:08:21.702318908Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d8325f8a-8a10-4331-a344-7a389af99d44",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:11:02.107161444Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Template transform kind is typed at load",
-  "updated_at": "2026-10-25T00:24:41.900585551Z"
+  "updated_at": "2026-10-25T01:11:02.107161444Z"
 }
