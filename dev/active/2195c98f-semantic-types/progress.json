@@ -1193,6 +1193,11 @@
     {
       "source": "18bcafb8",
       "note": "Event::set_isolated_torn_tail(&mut self, bool) was added in domain/types.rs as part of the body-view bridge; the envelope task (d72bf093) must move it onto the body or the envelope and delete the bridge method."
+    },
+    {
+      "source": "lead",
+      "finding": "cargo-ci suite-time budget (30 s) fails under host load from other projects (gf2 gate runs, load ~17); quiet-host suite is ~15 s. Run cargo-ci gates alone with --force once load clears.",
+      "status": "environmental"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
