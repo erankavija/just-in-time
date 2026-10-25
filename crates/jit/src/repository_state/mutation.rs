@@ -1940,39 +1940,37 @@ mod tests {
         assert_eq!(round_trip, event);
     }
 
-    /// Lines the canonical writer produced decode and re-serialize to their own
-    /// bytes. Earlier writers' lines (other key order, spacing or timestamp
-    /// precision) are not canonical bytes, so they are only required to decode.
+    /// Every repository log line with a current tag re-serializes to its own
+    /// bytes; the only lines the parser skips carry retired tags.
     #[test]
-    fn test_serialize_event_reproduces_every_canonical_line_of_this_repository_log() {
+    fn test_serialize_event_reproduces_current_lines_and_parser_skips_only_retired_tags() {
         let log = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/events.jsonl"),
         )
         .unwrap();
         let reproduced = log
             .lines()
-            .filter(|line| {
-                canonical_json(&serde_json::from_str::<Value>(line).unwrap(), false).unwrap()
-                    == line.as_bytes()
+            .map(|line| {
+                let events = crate::domain::event_log::parse_known_events(line).unwrap();
+                if events.is_empty() {
+                    let tag = serde_json::from_str::<Value>(line).unwrap()["type"].clone();
+                    assert!(
+                        ["document_archived", "lifecycle_timestamps_backfilled"]
+                            .iter()
+                            .any(|retired| tag == *retired),
+                        "parser skipped a line with a current or unknown tag: {line}"
+                    );
+                }
+                events.iter().for_each(|event| {
+                    assert_eq!(
+                        std::str::from_utf8(&serialize_event(event).unwrap()).unwrap(),
+                        line
+                    );
+                });
+                usize::from(!events.is_empty())
             })
-            .flat_map(|line| {
-                crate::domain::event_log::parse_known_events(line)
-                    .unwrap()
-                    .into_iter()
-                    .map(move |event| (line, event))
-            })
-            .inspect(|(line, event)| {
-                assert_eq!(
-                    std::str::from_utf8(&serialize_event(event).unwrap()).unwrap(),
-                    *line
-                );
-            })
-            .count();
-        assert!(
-            reproduced > 0,
-            "the repository log holds canonical known events"
-        );
-        crate::domain::event_log::parse_known_events(&log).unwrap();
+            .sum::<usize>();
+        assert!(reproduced > 0, "the repository log holds current events");
     }
 
     #[test]
