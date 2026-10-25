@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6d8794ce-752e-4bf9-9d17-834fdfba1c0f",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:59:55.963924217Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "47b8ef36-5ad8-4155-ab08-d41b4adf361a",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:58:32.024434041Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Integration tests match events through the body view",
-  "updated_at": "2026-10-25T06:13:33.642584830Z"
+  "updated_at": "2026-10-25T06:59:55.963924217Z"
 }
