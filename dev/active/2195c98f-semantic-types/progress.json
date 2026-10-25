@@ -164,7 +164,7 @@
           "short_id": "72dfc0d7",
           "title": "Built-in gate findings use closed severity and disposition enums",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
@@ -199,7 +199,7 @@
           "short_id": "b4fe7887",
           "title": "Item-kind scope has one enum",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
@@ -248,7 +248,7 @@
           "short_id": "faa19def",
           "title": "Gate-run actors are Assignee values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -499,7 +499,7 @@
           "short_id": "5613ef50",
           "title": "Dependency-shape assertions are typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
@@ -525,7 +525,7 @@
           "short_id": "7e8f1525",
           "title": "Label-coverage assertions are typed and compiled at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
@@ -982,6 +982,20 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Second assertion lowering following af9c277d's pattern."
+    },
+    {
+      "issue": "7e8f1525",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Largest assertion lowering, five files incl. out-of-validation readers."
+    },
+    {
+      "issue": "72dfc0d7",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Closed finding enums with a typed constructor, open wire fields."
     }
   ],
   "surfaced_pitfalls": [
@@ -996,6 +1010,10 @@
     {
       "source": "179dcef9",
       "note": "TargetClaim owners (profile-asset:<target>, profile-region:<id>) remain dynamic strings with an inline InvalidClaimOwner check; they belong to profile ownership code that 3d9a0ce3 (D-8) deletes. Epic REQ-10 names 'repository action owner': reconcile at the epic gate (likely out of scope as profile ownership, per plan DEC-06)."
+    },
+    {
+      "source": "5613ef50",
+      "note": "transition_graph_enforcement_tests' two evaluation-time config-error tests now use a label-coverage rule with a bad child-link; 7e8f1525 (label-coverage typed at load) must re-home them, since that error will move to load."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
