@@ -566,7 +566,7 @@ mod tests {
     use crate::repository_state::{
         gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
-        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
+        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
     };
     use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
@@ -992,7 +992,6 @@ mod tests {
     /// Append to every path jit writes during a mutation, each named through
     /// the storage layout.
     fn write_tracker_paths(layout: &RepositoryLayout) {
-        let data = layout.data_root();
         let records = [
             VirtualPath::EVENTS,
             VirtualPath::data(
@@ -1012,16 +1011,22 @@ mod tests {
                     INDEX_LOCK_FILE,
                     GATES_LOCK_FILE,
                     EVENTS_LOCK_FILE,
-                    WORKTREE_IDENTITY_FILE,
                 ]
-                .map(|file| data.join(file)),
+                .map(|file| layout.data_root().join(file)),
             )
+            .chain(std::iter::once(
+                layout
+                    .resolve(&VirtualPath::WORKTREE_IDENTITY)
+                    .expect("the worktree identity path"),
+            ))
             .chain([
                 layout
                     .resolve(&VirtualPath::ISSUES)
                     .expect("the issue directory")
                     .join("0f0e0d0c-0000-4000-8000-000000000000.json"),
-                data.join(RECORD_SCRATCH_DIR)
+                layout
+                    .data_root()
+                    .join(RECORD_SCRATCH_DIR)
                     .join(crate::storage::RECORD_FILE_NAME),
                 layout.worktree_root().join(BOOTSTRAP_LOCK_FILE),
             ]);

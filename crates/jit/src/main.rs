@@ -6467,7 +6467,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let log_file = log.map(|l| jit_dir.join(l));
 
             if stop {
-                match stop_server(&jit_dir) {
+                match stop_server(&executor_layout) {
                     Ok(StopOutcome::Stopped { pid, port: p }) => {
                         if json {
                             println!(
@@ -6505,7 +6505,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             } else if status {
-                match server_status(&jit_dir) {
+                match server_status(&executor_layout) {
                     Ok(Some(pf)) => {
                         let url = format!("http://localhost:{}", pf.port);
                         if json {
@@ -6569,7 +6569,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     };
 
                     let opts = ForegroundOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
                         server_binary: None,
@@ -6627,7 +6627,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         .filter(|d| d.is_dir())
                         .map(|d| d.display().to_string());
                     let opts = ServeOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         log_file,
                         web_dir: resolved_web_dir,
