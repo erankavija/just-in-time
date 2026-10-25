@@ -742,7 +742,7 @@ impl TransitionBlockedError {
     }
 
     pub(crate) fn summary(&self) -> String {
-        let requested = state_name(self.requested_state);
+        let requested = self.requested_state.as_str();
         if let Some(TransitionBlocker::ArchivedRevive { origin }) = self
             .blockers
             .iter()
@@ -752,7 +752,7 @@ impl TransitionBlockedError {
                 "Cannot revive archived issue to '{}': an archived issue only revives to its \
                  pre-archive state '{}'",
                 requested,
-                state_name(*origin)
+                origin.as_str()
             )
         } else if self
             .blockers
@@ -795,7 +795,7 @@ impl TransitionBlockedError {
                 format!(
                     "jit issue update {} --state {}  # revive restores the pre-archive state",
                     self.issue_id,
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
             _ => format!("jit graph deps {}", self.issue_id),
@@ -853,7 +853,7 @@ impl TransitionBlockedError {
                     vec![format!(
                         "jit issue update {} --state {}  # the only legal revive target",
                         self.issue_id,
-                        state_name(*origin)
+                        origin.as_str()
                     )]
                 }
             }))
@@ -936,7 +936,7 @@ impl fmt::Display for TransitionBlocker {
                 "{} {} [{}]",
                 short_id(issue_id),
                 title,
-                state_name(*state)
+                state.as_str()
             ),
             Self::MissingDependency { issue_id } => {
                 write!(f, "{} (missing issue) [missing]", short_id(issue_id))
@@ -953,22 +953,10 @@ impl fmt::Display for TransitionBlocker {
                 write!(
                     f,
                     "archived issue only revives to its pre-archive state [{}]",
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
         }
-    }
-}
-
-pub(crate) fn state_name(state: State) -> &'static str {
-    match state {
-        State::Backlog => "backlog",
-        State::Ready => "ready",
-        State::InProgress => "in_progress",
-        State::Gated => "gated",
-        State::Done => "done",
-        State::Rejected => "rejected",
-        State::Archived => "archived",
     }
 }
 
