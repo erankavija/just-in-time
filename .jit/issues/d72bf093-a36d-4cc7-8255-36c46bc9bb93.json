@@ -21,6 +21,12 @@
       "status": "passed",
       "updated_at": "2026-10-25T21:57:54.620783493Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "769d663f-d74f-4b34-8d6d-108559ff781a",
+      "status": "failed",
+      "updated_at": "2026-10-25T22:02:16.583736265Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d72bf093-a36d-4cc7-8255-36c46bc9bb93",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Event becomes an envelope around a tagged body",
-  "updated_at": "2026-10-25T21:57:54.620783493Z"
+  "updated_at": "2026-10-25T22:02:16.583736265Z"
 }
