@@ -329,6 +329,8 @@ mod identity {
         INVARIANTS: Data = "invariants.toml";
         /// Append-only event log under the data root (`.jit/events.jsonl`).
         EVENTS: Data = "events.jsonl";
+        /// Applied-profile state directory under the data root (`.jit/profiles`).
+        PROFILES: Data = "profiles";
         /// Per-issue record directory under the data root (`.jit/issues`).
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
@@ -354,6 +356,19 @@ impl VirtualPath {
     /// The data root's records: issue records, the event log, gate-run
     /// records, and the index listing the issues.
     pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
+
+    /// Whether profile application must refuse this target as application-owned state.
+    pub(crate) fn is_reserved_application_target(&self) -> bool {
+        self == &Self::EVENTS
+            || (self.root_class() == RepositoryRootClass::Data
+                && Self::PROFILES.relative().contains(self.relative().as_str()))
+            || (self.root_class() == RepositoryRootClass::Worktree
+                && self
+                    .relative()
+                    .as_str()
+                    .split('/')
+                    .any(|component| component == ".git"))
+    }
 
     /// Construct a worktree-relative semantic identity.
     pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
@@ -1002,6 +1017,32 @@ mod tests {
                 "{invalid:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_virtual_path_reserved_application_target_matches_owned_paths_by_component() {
+        let reserved = [
+            VirtualPath::data("events.jsonl").unwrap(),
+            VirtualPath::data("profiles").unwrap(),
+            VirtualPath::data("profiles/installed/package.json").unwrap(),
+            VirtualPath::worktree(".git").unwrap(),
+            VirtualPath::worktree("vendor/.git/config").unwrap(),
+        ];
+        assert!(reserved
+            .iter()
+            .all(VirtualPath::is_reserved_application_target));
+
+        let ordinary = [
+            VirtualPath::data("events.jsonl.old").unwrap(),
+            VirtualPath::data("profiles-old/package.json").unwrap(),
+            VirtualPath::data("events.jsonl/child").unwrap(),
+            VirtualPath::worktree(".gitignore").unwrap(),
+            VirtualPath::worktree("vendor/git/config").unwrap(),
+            VirtualPath::data(".git/config").unwrap(),
+        ];
+        assert!(ordinary
+            .iter()
+            .all(|path| !path.is_reserved_application_target()));
     }
 
     #[test]
