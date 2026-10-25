@@ -363,7 +363,7 @@
           "short_id": "1622756a",
           "title": "Human output renders vocabulary tokens, not Debug names",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
@@ -412,7 +412,7 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "escalated"
+          "status": "dispatched"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
@@ -625,7 +625,8 @@
     {
       "issue": "e1a6c8c2",
       "reason": "Rework exceeded MAX_REWORK_ATTEMPTS: code-review R3 failed (test fixtures join VirtualPath::X.relative() onto the data root instead of RepositoryLayout::resolve, REQ-02).",
-      "status": "open"
+      "status": "resolved",
+      "resolution": "Invoker granted one final rework (R3) with a whole-file resolve brief."
     }
   ],
   "rework_counts": {
@@ -633,7 +634,8 @@
     "acb38457": 1,
     "98404e0c": 2,
     "945f65f3": 1,
-    "e1a6c8c2": 2
+    "e1a6c8c2": 3,
+    "91081bd3": 1
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -1087,6 +1089,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Continuation after session reset interrupted the Claude worker; WIP preserved in 9bac2522a."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Invoker-approved final rework R3; raised tier after two same-class misses at luna."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Rework R1: route remaining CLI issue-id args through resolve_issue_arg and drop downstream parses (same tier; brief had excluded composite scopes)."
     }
   ],
   "surfaced_pitfalls": [
@@ -1127,6 +1143,7 @@
     "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision).",
     "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
     "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
-    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex."
+    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
+    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
   ]
 }

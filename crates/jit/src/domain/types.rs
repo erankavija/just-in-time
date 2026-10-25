@@ -1086,18 +1086,19 @@ impl GateVerdictOrigin {
     }
 }
 
-/// Gate run status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GateRunStatus {
-    /// Check succeeded
-    Passed,
-    /// Check failed (expected failure, e.g., tests failed)
-    Failed,
-    /// Unexpected error (timeout, command not found, crash)
-    Error,
-    /// Not yet run (for manual gates)
-    Pending,
+wire_vocabulary! {
+    /// Gate run status
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum GateRunStatus {
+        /// Check succeeded
+        Passed = "passed",
+        /// Check failed (expected failure, e.g., tests failed)
+        Failed = "failed",
+        /// Unexpected error (timeout, command not found, crash)
+        Error = "error",
+        /// Not yet run (for manual gates)
+        Pending = "pending",
+    }
 }
 
 /// Origin vocabulary persisted for an installed profile package.

@@ -504,7 +504,7 @@ fn test_issue_create_list_show() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Title: Test Issue"));
     assert!(stdout.contains("Description: Test description"));
-    assert!(stdout.contains("Priority: High"));
+    assert!(stdout.contains("Priority: high"));
 }
 
 #[test]

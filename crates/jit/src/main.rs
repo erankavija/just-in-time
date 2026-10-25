@@ -1332,8 +1332,8 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
     println!("ID: {}", response.id);
     println!("Title: {}", response.title);
     println!("Description: {}", response.description);
-    println!("State: {:?}", response.state);
-    println!("Priority: {:?}", response.priority);
+    println!("State: {}", response.state);
+    println!("Priority: {}", response.priority);
     println!("Assignee: {:?}", response.assignee);
 
     if response.dependencies.is_empty() {
@@ -1350,12 +1350,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
             response.dependencies.len()
         );
         for dep in &response.dependencies {
-            println!(
-                "  {} - {} [{}]",
-                dep.short_id(),
-                dep.title,
-                format!("{:?}", dep.state).to_lowercase()
-            );
+            println!("  {} - {} [{}]", dep.short_id(), dep.title, dep.state);
         }
     }
 
@@ -1366,7 +1361,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         for gate in &response.gates {
             let last_run = gate.last_run_at.as_deref().unwrap_or("never run");
             println!(
-                "  - {} [{:?}] (last run: {})",
+                "  - {} [{}] (last run: {})",
                 gate.key, gate.status, last_run
             );
         }
@@ -2294,7 +2289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 let summary_response =
                                     jit::output::IssueShowSummaryResponse::from(&issue);
                                 let msg = format!(
-                                    "Issue {}: {} [{:?}]",
+                                    "Issue {}: {} [{}]",
                                     summary_response.short_id,
                                     summary_response.title,
                                     summary_response.state
@@ -2316,7 +2311,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             );
 
                             let show_msg = format!(
-                                "Issue {}: {} [{:?}]",
+                                "Issue {}: {} [{}]",
                                 &response.id[..8],
                                 response.title,
                                 response.state
@@ -2571,7 +2566,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 if json {
                                     let issue = storage.load_issue(&full_id)?;
                                     let msg = format!(
-                                        "Updated issue {} to {:?}",
+                                        "Updated issue {} to {}",
                                         issue.short_id(),
                                         issue.state
                                     );
@@ -3363,7 +3358,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let _ = output_ctx.print_info("Gates:");
                             for gate in gates {
                                 println!(
-                                    "  {} - {} ({:?}, {:?})",
+                                    "  {} - {} ({}, {})",
                                     gate.key, gate.title, gate.stage, gate.mode
                                 );
                             }
@@ -3391,8 +3386,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!("Gate: {}", gate.key);
                         println!("  Title: {}", gate.title);
                         println!("  Description: {}", gate.description);
-                        println!("  Stage: {:?}", gate.stage);
-                        println!("  Mode: {:?}", gate.mode);
+                        println!("  Stage: {}", gate.stage);
+                        println!("  Mode: {}", gate.mode);
                         if let Some(checker) = gate.checker {
                             match checker {
                                 jit::declarations::GateChecker::Exec {
@@ -3749,7 +3744,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Ok(Some(result)) => {
                             if json {
                                 use jit::output::{GateRunSummary, JsonOutput};
-                                let msg = format!("Gate '{}': {:?}", gate_key, result.status);
+                                let msg = format!("Gate '{}': {}", gate_key, result.status);
                                 let summary = GateRunSummary::full(&result);
                                 let output = JsonOutput::success(summary).with_message(msg);
                                 println!("{}", output.to_json_string()?);
@@ -5286,7 +5281,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Dependency,
                                                         detail: format!(
-                                                            "{} ({}:{:?})",
+                                                            "{} ({}:{})",
                                                             id, title, state
                                                         ),
                                                     }
@@ -5294,7 +5289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                 BlockingReason::Gate { key, status } => {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Gate,
-                                                        detail: format!("{} ({:?})", key, status),
+                                                        detail: format!("{} ({})", key, status),
                                                     }
                                                 }
                                             })
