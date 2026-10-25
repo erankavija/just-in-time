@@ -7,6 +7,7 @@
   ],
   "description": "Build the engine's own gate findings from closed enums, while external checker output stays open on the wire.\n\n## Background\n\nBuilt-in findings spell severity, disposition and origin as literals at `crates/jit/src/commands/gate_check.rs:622-629`, `:662-664`, `:1123-1125` and `:1148-1150`, and the engine branches on `disposition == Some(\"blocking\")` (`:1188`). On the wire, `GateFinding` severity, disposition and origin are checker-defined open strings (`domain/gate_findings.rs:46-66`), because external checkers emit labels such as `medium`.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain/gate_findings.rs` declares closed enums for built-in severity, disposition and origin through the macro.\n- [hard] REQ-02: The four built-in sites build findings through a typed constructor, and the engine's blocking check compares the enum.\n- [hard] REQ-03: Finding wire fields stay strings, and a finding with a checker-defined label still loads.\n",
   "documents": [],
+  "first_ready_at": "2026-10-24T23:55:25.501110853Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Built-in gate findings use closed severity and disposition enums",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-24T23:55:25.501110853Z"
 }

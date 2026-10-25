@@ -125,7 +125,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -178,7 +178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<Issue>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -224,7 +224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         full: bool,
         scope: Option<&str>,
     ) -> Result<String> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
+        let scope = scope.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -305,7 +305,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
     pub fn export_graph_batch(&self, scope: Option<&str>) -> Result<BatchExport> {
-        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
+        let scope = scope.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -491,7 +491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::GraphTreeResponse> {
         use crate::output::{GraphTreeResponse, HierarchyNodeView};
 
-        let root = root.map(IssueIdPrefix::parse).transpose()?;
+        let root = root.map(IssueIdPrefix::from_str).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let config = crate::config_manager::get_hierarchy_config(&self.storage)?;

@@ -5,6 +5,8 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::identity::ProfileId;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -247,30 +249,16 @@ impl FromStr for ContentFormat {
     }
 }
 
-/// Quality gate status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GateStatus {
-    /// Gate not yet evaluated
-    Pending,
-    /// Gate passed successfully
-    Passed,
-    /// Gate failed
-    Failed,
-}
-
-impl GateStatus {
-    /// The canonical snake_case string for this status.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`);
-    /// use it when a `&'static str` is needed (e.g. a compact `key=status`
-    /// render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            GateStatus::Pending => "pending",
-            GateStatus::Passed => "passed",
-            GateStatus::Failed => "failed",
-        }
+wire_vocabulary! {
+    /// Quality gate status
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum GateStatus {
+        /// Gate not yet evaluated
+        Pending = "pending",
+        /// Gate passed successfully
+        Passed = "passed",
+        /// Gate failed
+        Failed = "failed",
     }
 }
 
@@ -1220,7 +1208,7 @@ pub enum ProfileLifecycleStatus {
 #[serde(deny_unknown_fields)]
 pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
-    pub id: crate::profile::ProfileId,
+    pub id: ProfileId,
     /// The package version applied.
     pub version: String,
     /// The action observed for this profile.

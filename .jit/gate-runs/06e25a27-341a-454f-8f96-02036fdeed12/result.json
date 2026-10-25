@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-3ae2293a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a5f3e2d61946586fd0c849c23fe930ad4ed1b596",
+  "completed_at": "2026-10-25T00:26:13.963137679Z",
+  "duration_ms": 198787,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed macro migration satisfies both hard requirements with preserved registry serialization behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "06e25a27-341a-454f-8f96-02036fdeed12",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:22:55.175742255Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 457b4e42c (`jit:3ae2293a`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3ae2293a/requirement/REQ-01, REQ-02; @/issue/2195c98f/requirement/REQ-10 (issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, canonical-cutover, essential-code-prose, orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:21:25.838009192Z)\nTruncation recovery: narrowed reads recovered the macro, touched files, registry test/configuration, callers, dependency integration, and policy sources; unrelated historical-search output was outside the impact cone.\n\nNo findings. `gates.rs:9-33` now declares both vocabularies through the macro; the registry fixed-point test covers the shipped gate registry at `gates.rs:366-383`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed macro migration satisfies both hard requirements with preserved registry serialization behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

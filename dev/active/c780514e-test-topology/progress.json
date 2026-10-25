@@ -233,7 +233,7 @@
           "key": "cli-apply-template-spawn-migration",
           "title": "apply, preset and template tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "e230e621-1d27-46e2-90bc-cefc2ad50730",
@@ -241,7 +241,7 @@
           "key": "cli-config-spawn-migration",
           "title": "configuration and CLI-surface tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
@@ -273,7 +273,7 @@
           "key": "cli-init-discovery-spawn-migration",
           "title": "init and discovery tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "fec9b43b-ed6c-4d40-aa6c-b9cf5688501f",
@@ -281,7 +281,7 @@
           "key": "cli-issue-create-spawn-migration",
           "title": "issue create and batch tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
@@ -289,7 +289,7 @@
           "key": "cli-issue-error-output-spawn-migration",
           "title": "error-output tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "9c3b9da2-bb21-4d02-aead-6d970c71d821",
@@ -297,7 +297,7 @@
           "key": "cli-issue-failure-corpus-spawn-migration",
           "title": "failure-envelope contract tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
@@ -305,7 +305,7 @@
           "key": "cli-issue-output-mode-spawn-migration",
           "title": "output-mode and export tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "7bf48536-02ba-4fc5-99df-c242ef272368",
@@ -313,7 +313,7 @@
           "key": "cli-issue-show-spawn-migration",
           "title": "issue show and status tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "5f4daf6b-0f7f-4900-aa7f-689f9b6709c4",
@@ -321,7 +321,7 @@
           "key": "cli-issue-update-spawn-migration",
           "title": "issue search and update tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "bac4423b-ee4a-4747-90e9-6808ae929ecf",
@@ -337,7 +337,7 @@
           "key": "cli-profile-spawn-migration",
           "title": "profile tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "33be0c83-6a02-411f-9565-d73ee99fedd1",
@@ -1271,6 +1271,29 @@
       "category": "unsupported pre-existing REQ-10 contribution credit",
       "status": "coordinator approved narrow metadata correction",
       "decision": "Remove coverage label and corresponding manifest/plan source credit only; retain invariant link, criteria, gates, implementation. Validate actual REQ-10 coverage."
+    },
+    {
+      "session": 2,
+      "issue": "870e8e46",
+      "category": "shared test infrastructure change (escalation policy 7) / footprint expansion",
+      "status": "open: awaiting user decision next session",
+      "question": "JitCli (crates/jit/src/test_cli.rs) can init git but cannot stage and commit. gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) need a repository with one commit so HEAD resolves. REQ-01/02 of 870e8e46 cannot be met without a fixture capability.",
+      "options": [
+        "A (recommended): add JitCli::commit_all(message) to the shared fixture, with one owning test in cli_process_fixture_tests.rs, as a new leaf task that 870e8e46 and any later migration needing commits depend on; footprint test_cli.rs + fixture test",
+        "B: permit a local git add/commit helper in those two files as a named convention-convergence exception"
+      ],
+      "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here"
+    },
+    {
+      "session": 2,
+      "issue": "eaf543c7",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS (escalation policy 5)",
+      "status": "open: awaiting user decision next session",
+      "detail": "Two lead-review reworks (repository-setup helpers) then code-review run da226023 failed F1: restating helper rustdoc in cli_gate main.rs. The fix landed in commit attributed to 5353463c (same finding, same lines). No third rework or gate rerun performed for eaf543c7.",
+      "options": [
+        "A (recommended): authorize re-running eaf543c7 code-review on current main, where the finding is fixed",
+        "B: provide guidance / reject"
+      ]
     }
   ],
   "rework_counts": {
@@ -1278,7 +1301,10 @@
     "0bf97911": 1,
     "4a82ed46": 2,
     "22355a56": 1,
-    "871df4b0": 1
+    "871df4b0": 1,
+    "870e8e46": 2,
+    "eaf543c7": 2,
+    "5353463c": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1944,6 +1970,21 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "mechanical test migration batch in one integration target"
+    },
+    {
+      "session": 2,
+      "issue": "fec9b43b,b5faab2f,9c3b9da2,e7764cb1,5f4daf6b,7bf48536",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical spawn-migration batch in cli_issue; lead commits per footprint"
+    },
+    {
+      "session": 2,
+      "issue": "e230e621,8e69776c,c9442f7f,37218dff",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "mechanical spawn-migration batch in cli_repo_workflow"
     }
   ]
 }

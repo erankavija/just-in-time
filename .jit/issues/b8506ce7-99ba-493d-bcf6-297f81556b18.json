@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:57:16.700414735Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare the store-divergence vocabularies through the vocabulary macro.\n\n## Background\n\n`DivergentRecord` and `DivergenceClass` (`crates/jit/src/domain/store_divergence.rs:32,59`) hand-write their spellings beside serde.\n\n## Success Criteria\n\n- [hard] REQ-01: `DivergentRecord` and `DivergenceClass` are declared through the macro, and their hand-written spellings are gone.\n- [hard] REQ-02: Divergence reports are byte-identical.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:15:24.953489957Z",
+  "first_ready_at": "2026-10-24T23:55:25.992970459Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a8e04de1-ee14-4d0a-bc7c-5a5d3d8ab0ad",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:05:58.289346127Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52f5da35-7283-4772-834a-8cc6d1fd1046",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:38:21.387422978Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Store divergence tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T01:15:24.953489957Z"
 }
