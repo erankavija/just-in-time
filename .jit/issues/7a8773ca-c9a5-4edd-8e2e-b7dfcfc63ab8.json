@@ -26,7 +26,7 @@
     "satisfies:f8a6b298/REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Default search reads no history file",
-  "updated_at": "2026-10-21T10:40:09.307449762Z"
+  "updated_at": "2026-10-25T03:21:20.781248689Z"
 }

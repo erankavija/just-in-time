@@ -633,6 +633,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::EventBody;
     use crate::domain::{Issue, Priority, State};
 
     /// Fails the FIRST session open at the moment `SessionOpenCounter` also
@@ -823,7 +824,7 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+            .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
             .count();
         assert_eq!(claimed, 1);
 

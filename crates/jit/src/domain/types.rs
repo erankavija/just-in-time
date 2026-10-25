@@ -115,7 +115,7 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
 
 wire_vocabulary! {
     /// Issue priority level
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
     pub enum Priority {
         /// Low priority
         Low = "low",
@@ -2026,6 +2026,22 @@ impl Event {
 mod tests {
     use super::*;
     use crate::test_utils::{document_reference, document_reference_at, document_reference_typed};
+
+    #[test]
+    fn test_priority_ord_follows_rank() {
+        let mut priorities = Priority::ALL;
+        priorities.sort();
+
+        assert_eq!(
+            priorities,
+            [
+                Priority::Low,
+                Priority::Normal,
+                Priority::High,
+                Priority::Critical,
+            ]
+        );
+    }
 
     fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
         let mut issue = fixture_issue("Archived".to_string(), String::new());

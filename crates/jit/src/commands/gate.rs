@@ -1443,6 +1443,7 @@ mod tests {
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
@@ -1880,8 +1881,8 @@ enforce_leases = "off"
                 .unwrap()
                 .iter()
                 .any(|event| matches!(
-                    event,
-                    Event::GatePassed { gate_key, .. } if gate_key == "manual-gate"
+                    event.body(),
+                    EventBody::GatePassed { gate_key, .. } if gate_key == "manual-gate"
                 )),
             "a failed attestation must log no gate-passed event"
         );
@@ -2083,10 +2084,10 @@ style = "full"
             .expect("configured projection is materialized");
         assert!(projection.contains("projected-review"));
         let event = executor.storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
@@ -2205,10 +2206,10 @@ style = "full"
         assert!(registry.gates.contains_key("ours"));
         assert!(registry.gates.contains_key("theirs"));
         let event = storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }

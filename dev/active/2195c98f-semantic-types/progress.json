@@ -220,7 +220,7 @@
           "short_id": "bf87bbdb",
           "title": "Graph queries return nodes rather than id strings",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -363,21 +363,21 @@
           "short_id": "1622756a",
           "title": "Human output renders vocabulary tokens, not Debug names",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
           "short_id": "30923ea1",
           "title": "Priority orders by rank through Ord",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
           "short_id": "5d5c5514",
           "title": "Validation projections hold typed state and priority",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
@@ -1032,6 +1032,41 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Mechanical integration-test migration onto the body view."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Debug-render sweep over three files."
+    },
+    {
+      "issue": "30923ea1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Ord by rank plus two sort rewrites."
+    },
+    {
+      "issue": "5d5c5514",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Projection field retype with schema contract update."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation after Claude worker tooling fault (classifier errors); Codex avoids that path."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting CLI prefix boundary across main.rs (88 id sites)."
     }
   ],
   "surfaced_pitfalls": [
@@ -1071,6 +1106,7 @@
     "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id).",
     "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision).",
     "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
-    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file."
+    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
+    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex."
   ]
 }

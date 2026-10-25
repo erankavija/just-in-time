@@ -11,7 +11,7 @@
 
 use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, LinkedCheckoutWriteStance, Priority};
+use jit::domain::{EventBody, LinkedCheckoutWriteStance, Priority};
 use jit::storage::IssueStore;
 use std::path::Path;
 
@@ -62,20 +62,25 @@ fn test_create_issue_under_dispatch_override_persists_the_audit_record_with_the_
     let appended = &events_after[events_before.len()..];
     let override_records = appended
         .iter()
-        .filter(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+        .filter(|event| {
+            matches!(
+                event.body(),
+                EventBody::LinkedCheckoutWriteOverridden { .. }
+            )
+        })
         .collect::<Vec<_>>();
     assert_eq!(
         override_records.len(),
         1,
         "the permitted mutation must append exactly one linked-checkout override audit record"
     );
-    let Event::LinkedCheckoutWriteOverridden {
-        id,
-        timestamp,
+    let override_event = override_records[0];
+    let EventBody::LinkedCheckoutWriteOverridden {
         checkout,
         declared_stance,
         invocation_override,
-    } = override_records[0]
+        ..
+    } = override_event.body()
     else {
         unreachable!("the selected event is the linked-checkout override audit record");
     };
@@ -92,29 +97,29 @@ fn test_create_issue_under_dispatch_override_persists_the_audit_record_with_the_
         "the audit record must preserve the invocation stance that permitted the mutation"
     );
     assert!(
-        !id.is_empty(),
+        !override_event.id().is_empty(),
         "the finalizer must assign a non-empty identifier to the audit record"
     );
 
     let issue_created_timestamp = appended
         .iter()
-        .find_map(|event| match event {
-            Event::IssueCreated {
-                issue_id: id,
-                timestamp,
+        .find_map(|event| match event.body() {
+            EventBody::IssueCreated {
+                issue_id: event_issue_id,
                 ..
-            } if id == &issue_id => Some(timestamp),
+            } if event_issue_id == &issue_id => Some(event.timestamp()),
             _ => None,
         })
         .expect("the issue-created event must be in the same append as the audit record");
     assert_eq!(
-        timestamp, issue_created_timestamp,
+        override_event.timestamp(),
+        issue_created_timestamp,
         "the audit record and issue-created event must share one mutation timestamp"
     );
     assert!(
         matches!(
             appended.last(),
-            Some(Event::LinkedCheckoutWriteOverridden { .. })
+            Some(event) if matches!(event.body(), EventBody::LinkedCheckoutWriteOverridden { .. })
         ),
         "canonical event ordering must place the override audit record last in the append"
     );

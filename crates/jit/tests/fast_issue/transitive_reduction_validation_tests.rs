@@ -37,13 +37,13 @@ fn test_fix_transitive_reduction_logs_event() {
     assert_eq!(event.get_type(), "dependency_reduced");
     assert_eq!(event.get_issue_id(), a);
 
-    if let jit::domain::Event::DependencyReduced {
+    if let jit::domain::EventBody::DependencyReduced {
         issue_id,
         old_count,
         new_count,
         removed_deps,
         ..
-    } = event
+    } = event.body()
     {
         assert_eq!(issue_id, &a);
         assert_eq!(*old_count, 2);

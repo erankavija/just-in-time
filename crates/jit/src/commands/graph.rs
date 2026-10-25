@@ -1,6 +1,7 @@
 //! Graph visualization and traversal
 
 use super::*;
+use crate::domain::identity::IssueId;
 use crate::graph::Direction;
 use crate::output::DependencyTreeNode;
 use std::collections::{HashMap, HashSet};
@@ -234,8 +235,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Some(
                     resolution
                         .as_ref()
-                        .expect("resolution is built whenever scope is Some")
-                        .membership_closure(&container_id),
+                        .ok_or_else(|| anyhow::anyhow!("Missing hierarchy resolution for scope"))?
+                        .membership_closure(&container_id)
+                        .into_iter()
+                        .map(|node| &node.id)
+                        .collect::<HashSet<_>>(),
                 )
             }
             None => None,
@@ -254,7 +258,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &graph,
                 resolution
                     .as_ref()
-                    .expect("resolution is built for the full JSON shape"),
+                    .ok_or_else(|| anyhow::anyhow!("Missing hierarchy resolution for full JSON"))?,
             ),
             GraphExportFormat::Json => crate::visualization::export_json(&graph),
             GraphExportFormat::Batch => {
@@ -297,16 +301,22 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Membership scope (the whole graph when unscoped).
-        let member_ids: Option<HashSet<String>> = match &scope {
+        let member_ids: Option<HashSet<&IssueId>> = match &scope {
             Some(container) => {
                 let container_id = self.storage.resolve_issue_id(container)?;
                 let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
-                Some(resolution.membership_closure(&container_id))
+                Some(
+                    resolution
+                        .membership_closure(&container_id)
+                        .into_iter()
+                        .map(|node| &node.id)
+                        .collect(),
+                )
             }
             None => None,
         };
-        let in_scope = |id: &str| member_ids.as_ref().is_none_or(|m| m.contains(id));
+        let in_scope = |id: &IssueId| member_ids.as_ref().is_none_or(|m| m.contains(id));
 
         // Config-derived projection inputs.
         let stripped_ns = self.identity_bound_namespaces()?;

@@ -12,7 +12,7 @@
 //! block the diversion).
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, State};
+use jit::domain::{Event, EventBody, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -148,8 +148,8 @@ fn test_blocked_transition_records_event_in_log() {
         1,
         "exactly one TransitionBlocked event per blocking rule"
     );
-    match blocked[0] {
-        Event::TransitionBlocked {
+    match blocked[0].body() {
+        EventBody::TransitionBlocked {
             issue_id,
             target,
             rule,
@@ -200,8 +200,8 @@ fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
         1,
         "one GraphRuleBypassed per overridden rule"
     );
-    match bypassed[0] {
-        Event::GraphRuleBypassed {
+    match bypassed[0].body() {
+        EventBody::GraphRuleBypassed {
             issue_id,
             target,
             rule,

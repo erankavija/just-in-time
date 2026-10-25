@@ -772,12 +772,10 @@ fn read_events_for_log<S: IssueStore>(store: &S) -> Option<Vec<Event>> {
 
 #[test]
 fn test_conformance_event_log_skips_retired_tags_and_rejects_malformed_known_records() {
-    let known = |id: &str| Event::IssueCreated {
-        id: id.to_string(),
-        issue_id: "issue-id".to_string(),
-        timestamp: chrono::Utc::now(),
-        title: "Known".to_string(),
-        priority: crate::domain::Priority::Normal,
+    let known = |id: &str| {
+        let mut issue = Issue::draft("Known".to_string(), String::new());
+        issue.id = "issue-id".to_string();
+        crate::test_utils::stamped_event(Event::draft_issue_created(&issue), id, chrono::Utc::now())
     };
     let (first, second) = (known("first"), known("second"));
     let retired = concat!(
@@ -1842,7 +1840,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
 // byte-identical results regardless of backend. No-op operations sample
 // neither an identifier nor the mutation timestamp.
 
-use crate::domain::{Assignee, Event, GateState, GateStatus, Issue};
+use crate::domain::{Assignee, Event, EventBody, GateState, GateStatus, Issue};
 use crate::repository_state::{
     finalize, serialize_gate_run, serialize_issue, MutationClock, MutationContext, MutationIntent,
 };
@@ -2027,10 +2025,10 @@ fn test_conformance_claim_finalizer_bytes_match_across_backends() {
         crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
             .unwrap();
     assert_eq!(events.len(), 1);
-    let Event::IssueClaimed { timestamp, .. } = &events[0] else {
+    let EventBody::IssueClaimed { .. } = events[0].body() else {
         panic!("expected an issue_claimed event");
     };
-    assert_eq!(*timestamp, req01_instant());
+    assert_eq!(events[0].timestamp(), req01_instant());
 }
 
 #[test]
@@ -2050,12 +2048,11 @@ fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
     let agent: Assignee = "agent:worker-1".parse().unwrap();
     let issue = req01_issue(id, Some(agent.clone()));
     // A committed claim event so both issue and tail already reflect the claim.
-    let claim_event = Event::IssueClaimed {
-        id: "evt".into(),
-        issue_id: id.to_string(),
-        timestamp: req01_instant(),
-        assignee: agent.clone(),
-    };
+    let claim_event = crate::test_utils::stamped_event(
+        Event::draft_issue_claimed(id.to_string(), agent.clone()),
+        "evt",
+        req01_instant(),
+    );
     let mut events_bytes: Vec<u8> = crate::repository_state::serialize_event(&claim_event).unwrap();
     events_bytes.push(b'\n');
 
@@ -2107,11 +2104,11 @@ fn test_conformance_identical_full_finalizer_plan_matches_both_backends() {
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
-    let event = Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
+    let event = crate::test_utils::stamped_event(
+        Event::draft_gate_definition_created("cargo-ci".to_string()),
+        String::new(),
+        req01_instant(),
+    );
     let intents = [MutationIntent::RecordEvent {
         phase: 0,
         event: Box::new(event),
@@ -2240,11 +2237,11 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_plan() {
     let events =
         crate::domain::event_log::parse_known_events(std::str::from_utf8(event_bytes).unwrap())
             .unwrap();
-    let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
+    let EventBody::IssueClaimed { .. } = events[0].body() else {
         panic!("expected allocated claim event");
     };
     assert_eq!(
-        event_id,
+        events[0].id(),
         &crate::repository_state::IdAuthority::from_seed([23u8; 32]).uuid_at(0)
     );
 }
@@ -2318,11 +2315,11 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
         origin: crate::domain::GateVerdictOrigin::Executed,
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
-    let provenance = Event::GateDefinitionCreated {
-        id: "prov-1".into(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
+    let provenance = crate::test_utils::stamped_event(
+        Event::draft_gate_definition_created("cargo-ci".to_string()),
+        "prov-1",
+        req01_instant(),
+    );
     let mut event_line = crate::repository_state::serialize_event(&provenance).unwrap();
     event_line.push(b'\n');
     let gate_bytes = serialize_gate_run(&result).unwrap();
@@ -2470,28 +2467,29 @@ fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
 }
 
 fn lifecycle_event() -> Event {
-    Event::ProfileLifecycle {
-        id: String::new(),
-        timestamp: req01_instant(),
-        operation: crate::domain::ProfileLifecycleOperation::Apply,
-        profiles: vec![crate::domain::ProfileLifecycleProfile {
-            id: "example"
-                .try_into()
-                .expect("the conformance profile id is canonical"),
-            version: "1.0.0".to_string(),
-            status: crate::domain::ProfileLifecycleStatus::Installed,
-            variables: Default::default(),
-        }],
-        isolated_torn_tail: false,
-    }
+    crate::test_utils::stamped_event(
+        Event::draft_profile_lifecycle(
+            crate::domain::ProfileLifecycleOperation::Apply,
+            vec![crate::domain::ProfileLifecycleProfile {
+                id: "example"
+                    .try_into()
+                    .expect("the conformance profile id is canonical"),
+                version: "1.0.0".to_string(),
+                status: crate::domain::ProfileLifecycleStatus::Installed,
+                variables: Default::default(),
+            }],
+        ),
+        String::new(),
+        req01_instant(),
+    )
 }
 
 fn gate_def_created(gate_key: &str) -> Event {
-    Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: gate_key.into(),
-    }
+    crate::test_utils::stamped_event(
+        Event::draft_gate_definition_created(gate_key.into()),
+        String::new(),
+        req01_instant(),
+    )
 }
 
 #[test]
@@ -2653,16 +2651,18 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
         crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
             .unwrap();
     assert_eq!(parsed.len(), 3);
-    let event_id = |event: &Event| match event {
-        Event::IssueCreated { id, .. } | Event::GateDefinitionCreated { id, .. } => id.clone(),
+    let event_id = |event: &Event| match event.body() {
+        EventBody::IssueCreated { .. } | EventBody::GateDefinitionCreated { .. } => {
+            event.id().to_string()
+        }
         other => panic!("unexpected event {other:?}"),
     };
-    assert!(matches!(&parsed[0], Event::IssueCreated { .. }));
+    assert!(matches!(parsed[0].body(), EventBody::IssueCreated { .. }));
     assert!(
-        matches!(&parsed[1], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
+        matches!(parsed[1].body(), EventBody::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
     );
     assert!(
-        matches!(&parsed[2], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
+        matches!(parsed[2].body(), EventBody::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
     );
     assert_eq!(event_id(&parsed[0]), ids.uuid_at(1));
     assert_eq!(event_id(&parsed[1]), ids.uuid_at(2));
