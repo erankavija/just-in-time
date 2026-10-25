@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -136,7 +136,7 @@
           "short_id": "3625b18b",
           "title": "Unit tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
@@ -234,7 +234,7 @@
           "short_id": "e3d06f82",
           "title": "Integration tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -363,21 +363,21 @@
           "short_id": "1622756a",
           "title": "Human output renders vocabulary tokens, not Debug names",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
           "short_id": "30923ea1",
           "title": "Priority orders by rank through Ord",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
           "short_id": "5d5c5514",
           "title": "Validation projections hold typed state and priority",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
@@ -1018,6 +1018,41 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Graph query return types across eight files with property tests."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Mechanical unit-test migration onto the body view."
+    },
+    {
+      "issue": "e3d06f82",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical integration-test migration onto the body view."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Debug-render sweep over three files."
+    },
+    {
+      "issue": "30923ea1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Ord by rank plus two sort rewrites."
+    },
+    {
+      "issue": "5d5c5514",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Projection field retype with schema contract update."
     }
   ],
   "surfaced_pitfalls": [
