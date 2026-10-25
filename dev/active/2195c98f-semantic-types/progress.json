@@ -143,7 +143,7 @@
           "short_id": "3ae2293a",
           "title": "Gate stage and mode tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
@@ -178,7 +178,7 @@
           "short_id": "80fe846e",
           "title": "Artifact-plan codes declare their wire spelling once",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "96bb0941-07f3-4f55-bd69-93ad587c5540",
@@ -769,6 +769,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Two-file macro adoption with byte-identity check."
+    },
+    {
+      "issue": "2ac50581",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation: approved footprint extension (doctest) and finish checks blocked by the CI lock."
+    },
+    {
+      "issue": "6add7ca6",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation: approved test-assertion update outside footprint; finish checks."
     }
   ],
   "surfaced_pitfalls": [
@@ -779,6 +793,8 @@
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
   "lessons": [
-    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1)."
+    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1).",
+    "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
+    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed."
   ]
 }
