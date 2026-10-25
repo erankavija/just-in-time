@@ -56,6 +56,15 @@ pub enum QueryParseError {
         valid: String,
     },
 
+    /// An `assignee:` filter named a value that is not a `type:identifier` assignee.
+    #[error("Invalid assignee value '{value}' in filter: {reason}")]
+    InvalidAssignee {
+        /// The offending value as authored.
+        value: String,
+        /// Why the value is not a valid assignee.
+        reason: crate::domain::AssigneeParseError,
+    },
+
     /// A parenthesized group was opened but never closed.
     #[error("Expected closing parenthesis")]
     UnclosedParen,

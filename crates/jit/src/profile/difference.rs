@@ -22,9 +22,10 @@
 //! because a selection is refused as a whole and an adopter resolving one
 //! conflict per run cannot see how much work the selection actually is.
 
+use crate::domain::identity::ProfileId;
 use crate::domain::ProfileOrigin;
 use crate::profile::{
-    ProfileContributionChange, ProfileId, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
+    ProfileContributionChange, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
     ProfileTargetChange,
 };
 use crate::repository_state::{

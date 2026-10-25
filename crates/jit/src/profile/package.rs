@@ -1007,10 +1007,11 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::ProfileId;
     use crate::profile::variables::{
         resolve_package, ProfileVariableAssignment, VariableError, VariableInputs,
     };
-    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement, ProfileId};
+    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement};
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };

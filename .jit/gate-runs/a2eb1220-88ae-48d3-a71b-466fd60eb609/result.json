@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f8523c62",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4eea3a2eb0ad71125f9f6b2c750c3e89e52bfd78",
+  "completed_at": "2026-10-25T00:06:08.986990326Z",
+  "duration_ms": 39165,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue’s sole documentation update accurately replaces the invalid assignee wildcard example with the supported unassigned filter.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a2eb1220-88ae-48d3-a71b-466fd60eb609",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:05:29.821891825Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task (level 4, no resolved children); reviewed tagged commit `678a14154` individually. It updates the affected query-reference example and matches current parse-error behavior.\n\nDocumentation impact: the replacement correctly uses `unassigned` and retains a valid typed assignee filter example at [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f8523c62/docs/reference/cli-commands.md:1020).\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s sole documentation update accurately replaces the invalid assignee wildcard example with the supported unassigned filter.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
