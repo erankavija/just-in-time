@@ -219,7 +219,7 @@ impl InitializationScaffold {
             .map_err(|error| InitializationError::Config(error.to_string()))?;
         let parsed = parsed.materialization_config(InvariantRegistry::empty());
         let namespaces = namespaces_from_config(&parsed);
-        let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+        let serialized = serialize_ruleset(&default_ruleset(&namespaces))?;
         let schemas = serialized
             .schema_files
             .into_iter()

@@ -988,7 +988,7 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config).schema_files {
+        for schema in materialize::serialized_default_ruleset(&config)?.schema_files {
             let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);

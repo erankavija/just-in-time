@@ -975,7 +975,7 @@ pub(super) fn compose_profile_targets_with_context(
         .map(|(path, (bytes, _))| (path.clone(), Some(bytes.clone())));
     let proposed = apply_overlay(base, overlay)?;
     let config = assemble_config(&proposed)?;
-    let schema_overlay = serialized_default_ruleset(&config)
+    let schema_overlay = serialized_default_ruleset(&config)?
         .schema_files
         .into_iter()
         .map(|schema| {

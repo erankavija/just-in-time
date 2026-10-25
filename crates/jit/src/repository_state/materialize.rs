@@ -22,7 +22,9 @@ use crate::declarations::invariants::InvariantRegistry;
 use crate::repository_state::default_rule_membership_diff_from_identities;
 use std::collections::BTreeMap;
 
-pub(super) fn serialized_default_ruleset(config: &JitConfig) -> super::SerializedRuleSet {
+pub(super) fn serialized_default_ruleset(
+    config: &JitConfig,
+) -> Result<super::SerializedRuleSet, super::RepositoryLayoutError> {
     let namespaces = crate::config_manager::namespaces_from_config(config);
     serialize_ruleset(&default_ruleset(&namespaces))
 }
@@ -296,7 +298,7 @@ pub fn validate_capture_closure(
     // Every schema the CURRENT configuration derives, whether or not the authored
     // file references it yet: a newly-declared table adds a default rule whose
     // projection must be publishable in the same pass that adds its row.
-    for schema in &serialized_default_ruleset(config).schema_files {
+    for schema in &serialized_default_ruleset(config)?.schema_files {
         paths.push(VirtualPath::schema(&schema.name)?);
     }
     paths.sort();
@@ -520,10 +522,14 @@ pub(crate) fn compose_default_ruleset(
     // rules.toml: splice only the generated default-family membership + assertions,
     // preserving every authored byte outside those proven-generated spans.
     let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
-    let rendered_add: Vec<String> = diff.to_add.iter().map(render_rule_block).collect();
+    let rendered_add: Vec<String> = diff
+        .to_add
+        .iter()
+        .map(render_rule_block)
+        .collect::<Result<_, _>>()?;
     let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
         .map_err(ProducerError::RulesDocument)?;
-    let serialized = serialized_default_ruleset(config);
+    let serialized = serialized_default_ruleset(config)?;
     let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
         .map_err(ProducerError::RulesDocument)?;
     if expected_rules != current_rules {
@@ -1239,7 +1245,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
@@ -1278,7 +1284,7 @@ kind = "advisory"
         let config_partial = ns_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         // Authored content the repair must preserve unconditionally.
         let authored_rules = format!(
             "{}\n[[rules]]\nname = \"custom-shape\"\n# hand-authored comment\nseverity = \"warn\"\nassert = {{ require-section = {{ heading = \"Goals\" }} }}\n",
@@ -1348,7 +1354,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let mut schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1393,7 +1399,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete.json\" }}\n",
             scaffold.rules_toml
@@ -1448,7 +1454,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let custom = "[[rules]]\nname = \"namespace-registry\"\nseverity = \"warn\"\nassert = { json-schema = \"schemas/custom-namespace.json\" }\n";
         let rules_toml = if custom_first {
             format!("{custom}\n{}", scaffold.rules_toml)
@@ -1496,7 +1502,7 @@ kind = "advisory"
         let config = ns_config(&["component", "team"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
         let rules_toml = format!(
             "{}\n[[rules]]\nname = \"obsolete-default\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n\
              [[rules]]\nname = \"custom-consumer\"\nseverity = \"warn\"\nassert = {{ json-schema = \"schemas/default-shared.json\" }}\n",
@@ -1606,7 +1612,7 @@ kind = "advisory"
         let config_full = ns_and_projection_config(&["component", "team"]);
         let jc_partial: JitConfig = toml::from_str(&config_partial).unwrap();
         let ns_partial = crate::config_manager::namespaces_from_config(&jc_partial);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns_partial)).unwrap();
         let schema_paths: Vec<(String, String)> = scaffold
             .schema_files
             .iter()
@@ -1669,7 +1675,7 @@ kind = "advisory"
         let config = ns_and_projection_config(&["component"]);
         let jc: JitConfig = toml::from_str(&config).unwrap();
         let ns = crate::config_manager::namespaces_from_config(&jc);
-        let scaffold = serialize_ruleset(&default_ruleset(&ns));
+        let scaffold = serialize_ruleset(&default_ruleset(&ns)).unwrap();
 
         // Default-ruleset family: a syntax-preserving targeted swap of one baked
         // assertion (rules.toml must stay parseable — the producer needs to splice
