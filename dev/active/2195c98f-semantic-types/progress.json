@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -206,7 +206,7 @@
           "short_id": "b8506ce7",
           "title": "Store divergence tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
@@ -227,7 +227,7 @@
           "short_id": "c400730c",
           "title": "Id prefixes parse once into an IssueIdPrefix",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
@@ -330,7 +330,7 @@
           "short_id": "a57c5057",
           "title": "The server resolves each issue-id path parameter once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
@@ -790,6 +790,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Rework R2: route every schema-reference path site through one parser (sweep miss, same tier)."
+    },
+    {
+      "issue": "18bcafb8",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-producing event body view over 20 files."
+    },
+    {
+      "issue": "a57c5057",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-file route boundary with exact criteria."
     }
   ],
   "surfaced_pitfalls": [
@@ -802,6 +816,7 @@
   "lessons": [
     "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1).",
     "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
-    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed."
+    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
+    "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs)."
   ]
 }
