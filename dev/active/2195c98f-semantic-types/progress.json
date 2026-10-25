@@ -213,7 +213,7 @@
           "short_id": "bc1955a8",
           "title": "Item kinds hold their id pattern as IdPattern",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
@@ -288,7 +288,7 @@
           "short_id": "42bcaa6e",
           "title": "Content format is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -954,6 +954,13 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Two rule-option enums decoded at load."
+    },
+    {
+      "issue": "42bcaa6e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded content format, same pattern as strictness."
     }
   ],
   "surfaced_pitfalls": [
