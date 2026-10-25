@@ -8,6 +8,7 @@
   ],
   "description": "Decode the configured content format into its enum once, with exact tokens only.\n\n## Background\n\n`ValidationConfig.content_format` is `Option<String>` (`crates/jit/src/config.rs:274`), re-parsed by `content_format()` (`:283`). `ContentFormat::from_str` accepts `md` and any case (`domain/types.rs:224-237`). CLI parse sites are `main.rs:3011,3611`. The configuration reference lists only the canonical tokens.\n\n## Success Criteria\n\n- [hard] REQ-01: `ContentFormat` is declared through the macro, and `ValidationConfig.content_format` is `Option<ContentFormat>` decoded by serde.\n- [hard] REQ-02: The `md` alias and case folding are gone, and an unknown format fails configuration loading or CLI parsing with an error naming the value.\n- [hard] REQ-03: The re-parse in `content_format()` is gone.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:45:47.872477426Z",
   "first_ready_at": "2026-10-25T04:22:44.876996962Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Content format is typed at load",
-  "updated_at": "2026-10-25T04:45:46.973514231Z"
+  "updated_at": "2026-10-25T04:45:47.872477426Z"
 }
