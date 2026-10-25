@@ -20305,3 +20305,4 @@
 {"from":"in_progress","id":"29c1f30b-83bd-405f-83e5-de3634fecdec","issue_id":"bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25","timestamp":"2026-10-25T06:38:48.560385175Z","to":"done","type":"issue_state_changed"}
 {"id":"cbc38291-1653-4485-8969-139794997f60","issue_id":"bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25","timestamp":"2026-10-25T06:38:48.560385175Z","type":"issue_completed"}
 {"from":"backlog","id":"922f8b54-abe9-40d5-9114-a116f125a93b","issue_id":"91081bd3-9996-4f81-a405-a06c7cdcae8b","timestamp":"2026-10-25T06:38:48.684952354Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"750506ab-a727-494a-a453-5f9349e0953c","issue_id":"3625b18b-b774-4226-9029-43b0f0b8e543","timestamp":"2026-10-25T06:44:46.240804345Z","type":"gate_passed","updated_by":"auto:executor"}
