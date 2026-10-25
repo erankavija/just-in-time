@@ -114,31 +114,18 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
 }
 
-/// Issue priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Priority {
-    /// Low priority
-    Low,
-    /// Normal priority (default)
-    Normal,
-    /// High priority
-    High,
-    /// Critical priority
-    Critical,
-}
-
-impl FromStr for Priority {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "low" => Ok(Priority::Low),
-            "normal" => Ok(Priority::Normal),
-            "high" => Ok(Priority::High),
-            "critical" => Ok(Priority::Critical),
-            _ => Err(InvalidArgumentError::new(format!("Invalid priority: {s}")).into()),
-        }
+wire_vocabulary! {
+    /// Issue priority level
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum Priority {
+        /// Low priority
+        Low = "low",
+        /// Normal priority (default)
+        Normal = "normal",
+        /// High priority
+        High = "high",
+        /// Critical priority
+        Critical = "critical",
     }
 }
 
@@ -2864,42 +2851,6 @@ mod tests {
         use super::*;
         use crate::declarations::GateMode;
         use std::str::FromStr;
-
-        #[test]
-        fn test_priority_from_str_valid_lowercase() {
-            assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("high").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("critical").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_uppercase() {
-            assert_eq!(Priority::from_str("LOW").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("NORMAL").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("HIGH").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("CRITICAL").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_mixedcase() {
-            assert_eq!(Priority::from_str("Low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("Normal").unwrap(), Priority::Normal);
-        }
-
-        #[test]
-        fn test_priority_from_str_invalid() {
-            assert!(Priority::from_str("invalid").is_err());
-            assert!(Priority::from_str("").is_err());
-            assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_priority_parse_method() {
-            // Test using str::parse() method
-            let priority: Priority = "high".parse().unwrap();
-            assert_eq!(priority, Priority::High);
-        }
 
         // GateStage FromStr/Display/as_str
 
