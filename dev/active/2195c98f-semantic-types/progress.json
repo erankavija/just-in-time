@@ -314,7 +314,7 @@
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
           "short_id": "91081bd3",
-          "title": "The CLI resolves each issue-id argument once at entry",
+          "title": "The CLI resolves each issue-id argument once at entry and executor families take resolved ids",
           "classification": "implementation",
           "status": "dispatched"
         },
@@ -398,7 +398,7 @@
           "short_id": "c1c86312",
           "title": "Composite arguments carry their issue as a typed id",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1",
@@ -438,28 +438,28 @@
           "short_id": "5491edd0",
           "title": "Worktree and server files under .jit have VirtualPath constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "75951558-accb-4ee9-be38-e97fee0326ee",
           "short_id": "75951558",
           "title": "Issue lifecycle commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "804a8605-267b-4934-a9ef-08422fc3686d",
           "short_id": "804a8605",
           "title": "Dependency, graph and template commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "8e82fa49-1859-4e29-8972-f2da05e90b0a",
           "short_id": "8e82fa49",
           "title": "Gate commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "af9c277d-a906-460d-9d96-6ae3ae0bf124",
@@ -473,14 +473,14 @@
           "short_id": "cd8adfc1",
           "title": "Executor core carries typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "d50d6976-f978-4900-a218-6bb9d1b3fa52",
           "short_id": "d50d6976",
           "title": "Document-family commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         }
       ]
     },
@@ -620,13 +620,33 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "b01208cb-b85f-4705-bd2f-311129e01b56",
+      "short_id": "b01208cb",
+      "title": "This repository's event log is in canonical writer form",
+      "reason": "d72bf093 REQ-03 needs every log line to round-trip; ~8600 legacy lines predate the canonical writer. Lead data rewrite, wired as a d72bf093 dependency.",
+      "status": "done"
+    }
+  ],
   "escalations": [
     {
       "issue": "e1a6c8c2",
       "reason": "Rework exceeded MAX_REWORK_ATTEMPTS: code-review R3 failed (test fixtures join VirtualPath::X.relative() onto the data root instead of RepositoryLayout::resolve, REQ-02).",
       "status": "resolved",
       "resolution": "Invoker granted one final rework (R3) with a whole-file resolve brief."
+    },
+    {
+      "issue": "91081bd3",
+      "reason": "Code-review R3 failed on the same root cause a third time: executor methods re-parse ids main.rs resolved, which the breakdown assigned to five sibling family tasks; and issue delete confirmed before resolving.",
+      "status": "resolved",
+      "resolution": "Invoker: absorb 75951558, 804a8605, 8e82fa49, cd8adfc1, d50d6976 and c1c86312 into 91081bd3 (rejected as absorbed); drop their c797b59b dependency (c797b59b now gates 7abcc22d); delete resolves first and its failure-lever arm seeds the issue. Rework counter reset."
+    },
+    {
+      "issue": "804a8605",
+      "reason": "Sibling criteria contradicted 91081bd3 R2 boundary resolution for dep rm.",
+      "status": "resolved",
+      "resolution": "Invoker approved amending REQ-02/03/04; later superseded by absorption into 91081bd3."
     }
   ],
   "rework_counts": {
@@ -635,7 +655,7 @@
     "98404e0c": 2,
     "945f65f3": 1,
     "e1a6c8c2": 3,
-    "91081bd3": 1
+    "91081bd3": 0
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -644,7 +664,8 @@
       "19d9bd7d",
       "5fac48b8",
       "b45a2865",
-      "b73b3e5a"
+      "b73b3e5a",
+      "c797b59b -> 7abcc22d"
     ]
   },
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1110,6 +1131,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Three constants and a narrow literal sweep with exact criteria."
+    },
+    {
+      "issue": "b01208cb",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "One-time data rewrite of .jit/events.jsonl under the repo-write and event locks; no engine code."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Rework R2 (final): dep rm targets and validate ids resolved at the boundary; same tier, alternation slot is Claude after 5491edd0 (codex)."
     }
   ],
   "surfaced_pitfalls": [
