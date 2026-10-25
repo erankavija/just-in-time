@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9c11599e-f711-4db8-bd32-4db99b5390fc",
+      "run_id": "bf6d2a68-1a9f-4b1b-b0c7-013459e6594a",
       "status": "passed",
-      "updated_at": "2026-10-25T00:24:29.219447838Z",
+      "updated_at": "2026-10-25T00:51:38.235460114Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Id prefixes parse once into an IssueIdPrefix",
-  "updated_at": "2026-10-25T00:28:01.952864344Z"
+  "updated_at": "2026-10-25T00:51:38.235460114Z"
 }
