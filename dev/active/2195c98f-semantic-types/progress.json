@@ -89,7 +89,7 @@
           "short_id": "f8523c62",
           "title": "Query assignee filters parse to an Assignee",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -150,7 +150,7 @@
           "short_id": "5c232305",
           "title": "ProfileId is defined in the domain layer",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
@@ -281,7 +281,7 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
@@ -622,7 +622,9 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "b3fcd297": 1
+  },
   "external_blockers": {
     "c780514e test-topology (paused)": [
       "0af95f14",
@@ -732,8 +734,25 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Mechanical macro adoption, one file."
+    },
+    {
+      "issue": "b3fcd297",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: remove library-code expect flagged by code-review (same tier; slip, not capability)."
+    },
+    {
+      "issue": "428646c5",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Small retype of one resolver and its graph comparisons."
     }
   ],
   "surfaced_pitfalls": [],
-  "started_at": "2026-10-24T23:06:41.581082+00:00"
+  "started_at": "2026-10-24T23:06:41.581082+00:00",
+  "lessons": [
+    "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1)."
+  ]
 }
