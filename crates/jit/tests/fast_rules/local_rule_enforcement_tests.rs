@@ -12,7 +12,7 @@
 
 use jit::commands::bulk_update::UpdateOperations;
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, Issue, Priority, State};
+use jit::domain::{Event, EventBody, Issue, Priority, State};
 use jit::query_engine::QueryFilter;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -46,7 +46,7 @@ fn bypass_events(executor: &CommandExecutor<InMemoryStorage>) -> Vec<Event> {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .collect()
 }
 
@@ -120,8 +120,8 @@ fn test_create_force_bypasses_and_logs_event() {
     // Exactly one bypass event was logged, naming the rule and issue.
     let events = bypass_events(&executor);
     assert_eq!(events.len(), 1, "one bypass event per bypassed rule");
-    match &events[0] {
-        Event::LocalRuleBypassed { issue_id, rule, .. } => {
+    match events[0].body() {
+        EventBody::LocalRuleBypassed { issue_id, rule, .. } => {
             assert_eq!(issue_id, &id);
             assert_eq!(rule, "epic-needs-req");
         }
@@ -353,8 +353,8 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     );
     let mut rules: Vec<String> = events
         .iter()
-        .map(|e| match e {
-            Event::LocalRuleBypassed { rule, issue_id, .. } => {
+        .map(|e| match e.body() {
+            EventBody::LocalRuleBypassed { rule, issue_id, .. } => {
                 assert_eq!(issue_id, &id);
                 rule.clone()
             }
@@ -494,8 +494,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
         1,
         "a forced enforce-rule bypass must be audited on the gate-blocked path"
     );
-    match &events[0] {
-        Event::LocalRuleBypassed { rule, .. } => assert_eq!(rule, "task-needs-req"),
+    match events[0].body() {
+        EventBody::LocalRuleBypassed { rule, .. } => assert_eq!(rule, "task-needs-req"),
         other => panic!("expected LocalRuleBypassed, got {other:?}"),
     }
 }
@@ -689,11 +689,11 @@ fn test_force_bypass_event_emitted_after_successful_create_publication() {
     let events = executor.storage().read_events().unwrap();
     let created_idx = events
         .iter()
-        .position(|e| matches!(e, Event::IssueCreated { .. }))
+        .position(|e| matches!(e.body(), EventBody::IssueCreated { .. }))
         .expect("an IssueCreated event must be logged");
     let bypass_idx = events
         .iter()
-        .position(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .position(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .expect("a LocalRuleBypassed event must be logged");
     assert!(
         bypass_idx > created_idx,
@@ -749,7 +749,7 @@ fn test_no_bypass_event_when_publication_fails() {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::LocalRuleBypassed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::LocalRuleBypassed { .. }))
         .collect();
     assert!(
         bypasses.is_empty(),
