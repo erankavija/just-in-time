@@ -61,14 +61,14 @@
           "short_id": "acb38457",
           "title": "Graph node traits expose dependency ids as string views",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
           "short_id": "b3fcd297",
           "title": "Schema paths come from a VirtualPath constructor",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b48d7b2a-74f5-4534-b3eb-944946b08260",
@@ -157,7 +157,7 @@
           "short_id": "6add7ca6",
           "title": "Projection mode and style reach output typed",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
@@ -839,6 +839,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Continuation: approved forced fixture edits; finish REQ-03 and checks."
+    },
+    {
+      "issue": "acb38457",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Trait signature change across five files on the identity critical path."
     }
   ],
   "surfaced_pitfalls": [

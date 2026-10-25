@@ -587,7 +587,7 @@ fn template_declarations_from_image(
             let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         anyhow!("captured rule schema '{}' is absent", request.reference)
                     })?;
