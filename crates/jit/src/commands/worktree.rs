@@ -562,7 +562,7 @@ mod tests {
                 Lease {
                     lease_id: "lease-1".to_string(),
                     issue_id: "issue-1".to_string(),
-                    agent_id: "agent:1".to_string(),
+                    agent_id: "agent:1".parse().unwrap(),
                     worktree_id: "wt:abc123".to_string(),
                     branch: Some("main".to_string()),
                     ttl_secs: 600,
@@ -574,7 +574,7 @@ mod tests {
                 Lease {
                     lease_id: "lease-2".to_string(),
                     issue_id: "issue-2".to_string(),
-                    agent_id: "agent:1".to_string(),
+                    agent_id: "agent:1".parse().unwrap(),
                     worktree_id: "wt:abc123".to_string(),
                     branch: Some("main".to_string()),
                     ttl_secs: 600,
@@ -586,7 +586,7 @@ mod tests {
                 Lease {
                     lease_id: "lease-3".to_string(),
                     issue_id: "issue-3".to_string(),
-                    agent_id: "agent:2".to_string(),
+                    agent_id: "agent:2".parse().unwrap(),
                     worktree_id: "wt:def456".to_string(),
                     branch: Some("feature/test".to_string()),
                     ttl_secs: 600,
@@ -618,7 +618,7 @@ mod tests {
             |id: &str, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
                 lease_id: id.to_string(),
                 issue_id: format!("issue-{id}"),
-                agent_id: "agent:1".to_string(),
+                agent_id: "agent:1".parse().unwrap(),
                 worktree_id: "wt:abc123".to_string(),
                 branch: Some("main".to_string()),
                 ttl_secs,
@@ -716,7 +716,7 @@ mod tests {
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
             worktree_id,
-            "agent:test".to_string(),
+            "agent:test".parse().unwrap(),
         )
         .with_clock(clock.clone());
         coordinator.init().unwrap();
