@@ -7,6 +7,7 @@
   ],
   "description": "Render closed vocabularies in human output through their wire tokens instead of lowercased `Debug` names.\n\n## Background\n\nHuman output formats vocabularies through `Debug`, for example `format!(\"{:?}\").to_lowercase()`, which prints `inprogress` for the `in_progress` state: `crates/jit/src/main.rs:2068,2069,2091,4472,4820,6422,6466,6507,6555,6600,6754,6755`, `commands/bulk_update.rs:490` and `commands/gate.rs:13` (`{status:?}`).\n\n## Success Criteria\n\n- [hard] REQ-01: No human render in `main.rs`, `commands/bulk_update.rs` or `commands/gate.rs` formats a closed vocabulary through `Debug`; each uses `as_str` or `Display`.\n- [hard] REQ-02: Human output shows the same tokens as JSON output.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T06:15:02.735308844Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Human output renders vocabulary tokens, not Debug names",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T06:15:02.735308844Z"
 }
