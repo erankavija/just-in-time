@@ -2377,7 +2377,10 @@ fn format_duration(duration: chrono::Duration) -> String {
 }
 
 /// Check if a worktree with the given ID still exists
-fn check_worktree_exists(repository_root: &std::path::Path, worktree_id: &str) -> Result<bool> {
+fn check_worktree_exists(
+    repository_root: &std::path::Path,
+    worktree_id: &crate::domain::identity::WorktreeId,
+) -> Result<bool> {
     use std::path::PathBuf;
     use std::process::Command;
 
@@ -2411,7 +2414,7 @@ fn check_worktree_exists(repository_root: &std::path::Path, worktree_id: &str) -
         if let Some(id) =
             crate::storage::worktree_identity::read_worktree_id(&worktree_path).unwrap_or(None)
         {
-            if id == worktree_id {
+            if &id == worktree_id {
                 return Ok(true);
             }
         }

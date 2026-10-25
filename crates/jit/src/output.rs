@@ -4001,10 +4001,10 @@ mod tests {
     fn test_lease_list_response_serializes_null_options_and_empty_warnings() {
         let now = chrono::Utc::now();
         let lease = crate::storage::claim_coordinator::Lease {
-            lease_id: "l".into(),
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
             issue_id: "i".into(),
             agent_id: "agent:a".parse().unwrap(),
-            worktree_id: "w".into(),
+            worktree_id: "w".parse().unwrap(),
             branch: None,
             ttl_secs: 0,
             acquired_at: now,

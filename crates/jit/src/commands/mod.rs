@@ -765,8 +765,19 @@ fn claims_mutation_guard(
     }
     let agent = crate::agent_config::resolve_agent_id(None)
         .unwrap_or(crate::domain::Assignee::SYSTEM_LEASE_CHECK);
-    let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
-        .unwrap_or_else(|| paths.worktree_root.display().to_string());
+    let worktree_id =
+        match crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)? {
+            Some(id) => id,
+            None => crate::domain::identity::WorktreeId::try_from(
+                paths.worktree_root.display().to_string(),
+            )
+            .with_context(|| {
+                format!(
+                    "Invalid worktree id fallback from root path '{}'",
+                    paths.worktree_root.display()
+                )
+            })?,
+        };
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         FileLocker::with_configured_timeout(),
@@ -3436,6 +3447,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("worktree with spaces");
+        let paths = crate::storage::WorktreePaths {
+            git_repository: true,
+            common_dir: root.join(".git"),
+            local_jit: root.join(".jit"),
+            shared_jit: root.join(".git/jit"),
+            worktree_root: root.clone(),
+        };
+        let error = claims_mutation_guard(&paths).err().unwrap();
+        assert!(error.to_string().contains("root path"));
+        assert!(error.to_string().contains(root.to_str().unwrap()));
+        assert!(error
+            .downcast_ref::<crate::domain::identity::InvalidWorktreeIdError>()
+            .is_some());
+    }
+
+    #[test]
     fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
         use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
 
@@ -4446,7 +4476,7 @@ enforce_leases = "strict"
         let coordinator = ClaimCoordinator::new(
             paths.clone(),
             FileLocker::new(Duration::from_secs(1)),
-            "wt:test".to_string(),
+            "wt:test".parse().unwrap(),
             "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
