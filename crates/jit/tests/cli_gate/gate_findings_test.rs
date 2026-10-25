@@ -12,41 +12,10 @@
 //! data across the gate views, while keeping raw stdout available. A checker
 //! that emits no block degrades gracefully (no findings field, no error).
 
+use crate::{create_issue_requiring, define_auto_gate, run_gate_forced};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
-
-fn define_auto_gate(temp: &JitCli, key: &str, checker_command: &str) {
-    temp.command([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test gate for structured findings",
-        "--mode",
-        "auto",
-        "--checker-command",
-        checker_command,
-        "--timeout",
-        "10",
-    ])
-    .assert()
-    .success();
-}
-
-fn create_issue(temp: &JitCli, gate_keys: &[&str]) -> String {
-    let gates = gate_keys.iter().flat_map(|key| ["--gate", *key]);
-    temp.create_issue(["--title", "Test issue"].into_iter().chain(gates))
-        .unwrap()
-}
-
-fn run_gate(temp: &JitCli, issue_id: &str, gate_key: &str) {
-    // Records a fresh run by executing the checker, regardless of verdict.
-    temp.command(["gate", "evaluate", issue_id, gate_key, "--force"])
-        .assert();
-}
 
 /// A checker command that emits a conforming findings block, then exits 1.
 fn findings_checker() -> &'static str {
@@ -66,8 +35,8 @@ fn findings_checker() -> &'static str {
 fn test_findings_surface_in_latest_run_json() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
-    let id = create_issue(&temp, &["code-review"]);
-    run_gate(&temp, &id, "code-review");
+    let id = create_issue_requiring(&temp, &["code-review"]);
+    run_gate_forced(&temp, &id, "code-review");
 
     let out = temp
         .command(["gate", "status", &id, "code-review", "--json"])
@@ -106,8 +75,8 @@ fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
         "'JIT-FINDINGS-JSON>>>'; exit 0"
     );
     define_auto_gate(&temp, "doc-review", checker);
-    let id = create_issue(&temp, &["doc-review"]);
-    run_gate(&temp, &id, "doc-review");
+    let id = create_issue_requiring(&temp, &["doc-review"]);
+    run_gate_forced(&temp, &id, "doc-review");
 
     let out = temp
         .command(["gate", "status", &id, "doc-review", "--json"])
@@ -130,8 +99,8 @@ fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
 fn test_findings_surface_in_history_json() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
-    let id = create_issue(&temp, &["code-review"]);
-    run_gate(&temp, &id, "code-review");
+    let id = create_issue_requiring(&temp, &["code-review"]);
+    run_gate_forced(&temp, &id, "code-review");
 
     let out = temp
         .command(["gate", "status", &id, "--all", "--json"])
@@ -163,8 +132,8 @@ fn test_findings_survive_lean_projection_in_status_all() {
         "'JIT-FINDINGS-JSON>>>'; exit 0"
     );
     define_auto_gate(&temp, "code-review", checker);
-    let id = create_issue(&temp, &["code-review"]);
-    run_gate(&temp, &id, "code-review");
+    let id = create_issue_requiring(&temp, &["code-review"]);
+    run_gate_forced(&temp, &id, "code-review");
 
     let out = temp
         .command(["gate", "status-all", &id, "--json"])
@@ -192,8 +161,8 @@ fn test_findings_survive_lean_projection_in_status_all() {
 fn test_findings_text_view() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
-    let id = create_issue(&temp, &["code-review"]);
-    run_gate(&temp, &id, "code-review");
+    let id = create_issue_requiring(&temp, &["code-review"]);
+    run_gate_forced(&temp, &id, "code-review");
 
     let out = temp
         .command(["gate", "status", &id, "code-review", "--findings"])
@@ -220,8 +189,8 @@ fn test_findings_text_view() {
 fn test_findings_text_view_json() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
-    let id = create_issue(&temp, &["code-review"]);
-    run_gate(&temp, &id, "code-review");
+    let id = create_issue_requiring(&temp, &["code-review"]);
+    run_gate_forced(&temp, &id, "code-review");
 
     let out = temp
         .command(["gate", "status", &id, "code-review", "--findings", "--json"])
@@ -244,8 +213,8 @@ fn test_findings_text_view_json() {
 fn test_non_conforming_checker_has_no_findings() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo just plain output; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
     let out = temp
         .command(["gate", "status", &id, "tests", "--json"])
@@ -267,8 +236,8 @@ fn test_non_conforming_checker_has_no_findings() {
 fn test_findings_view_degrades_for_plaintext_checker() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo just plain output; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
     // Text form: single header line noting the absence, no error.
     let out = temp
@@ -305,7 +274,7 @@ fn test_findings_view_degrades_for_plaintext_checker() {
 fn test_findings_in_gate_failed_error_envelope() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "code-review", findings_checker());
-    let id = create_issue(&temp, &["code-review"]);
+    let id = create_issue_requiring(&temp, &["code-review"]);
 
     // `gate evaluate` (no --force) runs the checker; it exits 1 -> GATE_FAILED.
     let output = temp
@@ -329,8 +298,8 @@ fn test_findings_in_gate_failed_error_envelope() {
 fn test_findings_and_history_conflict_json_error() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "tests", "echo x; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
 
     temp.command([
         "gate",

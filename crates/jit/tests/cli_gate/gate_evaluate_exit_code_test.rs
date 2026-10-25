@@ -8,30 +8,8 @@
 //!   gate not required   -> exit 2,  no verdict (evaluate and fail)
 //!   manual gate, no --by -> exit 2, no verdict (jit:1d59070d REQ-03)
 
+use crate::add_auto_gate_issue;
 use jit::test_cli::JitCli;
-
-/// Define an auto gate `key` running `checker_command` and create an issue
-/// requiring it. Returns the issue id.
-fn add_auto_gate_issue(cli: &JitCli, key: &str, checker_command: &str) -> String {
-    cli.run([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test",
-        "--mode",
-        "auto",
-        "--checker-command",
-        checker_command,
-        "--timeout",
-        "10",
-    ])
-    .unwrap();
-    cli.create_issue(["--title", "Test issue", "--gate", key])
-        .unwrap()
-}
 
 #[test]
 fn test_gate_evaluate_success_exit_0_verdict_pass() {

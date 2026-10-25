@@ -16,7 +16,7 @@ use std::path::Path;
 
 /// Define an automated gate with a checker so checker-field preservation can be
 /// exercised.
-fn define_auto_gate(temp: &JitCli, key: &str) {
+fn define_original_auto_gate(temp: &JitCli, key: &str) {
     temp.command([
         "gate",
         "define",
@@ -39,7 +39,7 @@ fn define_auto_gate(temp: &JitCli, key: &str) {
 }
 
 /// Install a native checker through its canonical registry representation.
-fn define_review_placeholder_gate(temp: &JitCli, key: &str) {
+fn install_review_placeholder_gate(temp: &JitCli, key: &str) {
     let registry_path = temp.root().join(".jit").join("gates.toml");
     fs::write(
         registry_path,
@@ -89,7 +89,7 @@ fn read_only_issue_file(temp: &JitCli) -> serde_json::Value {
 #[test]
 fn test_gate_update_changes_field_in_registry() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     temp.command(["gate", "update", "tests", "--title", "All Tests Pass"])
         .assert()
@@ -103,7 +103,7 @@ fn test_gate_update_changes_field_in_registry() {
 #[test]
 fn test_gate_update_preserves_unprovided_fields() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     // Change only the title.
     temp.command(["gate", "update", "tests", "--title", "New Title"])
@@ -124,7 +124,7 @@ fn test_gate_update_preserves_unprovided_fields() {
 #[test]
 fn test_gate_update_checker_field_preserves_command() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     // Update only the timeout; the command must be preserved.
     temp.command(["gate", "update", "tests", "--timeout", "600"])
@@ -141,7 +141,7 @@ fn test_gate_update_checker_field_preserves_command() {
 #[test]
 fn test_gate_update_checker_command_replaces_native_placeholder_with_exec() {
     let temp = JitCli::initialised().unwrap();
-    define_review_placeholder_gate(&temp, "review-any-key");
+    install_review_placeholder_gate(&temp, "review-any-key");
 
     temp.command([
         "gate",
@@ -163,7 +163,7 @@ fn test_gate_update_checker_command_replaces_native_placeholder_with_exec() {
 #[test]
 fn test_gate_update_json_returns_updated_definition() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     let out = temp
         .command([
@@ -210,7 +210,7 @@ fn test_gate_update_nonexistent_key_json_is_machine_readable() {
 #[test]
 fn test_gate_update_no_fields_errors_json() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     let assert = temp
         .command(["gate", "update", "tests", "--json"])
@@ -308,7 +308,7 @@ fn test_gate_update_leaves_per_issue_status_unchanged() {
 #[test]
 fn test_gate_update_is_atomic_sibling_gate_intact() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
     temp.command([
         "gate",
         "define",
@@ -499,7 +499,7 @@ fn test_gate_update_set_and_clear_same_field_errors_json() {
 #[test]
 fn test_gate_update_appends_event() {
     let temp = JitCli::initialised().unwrap();
-    define_auto_gate(&temp, "tests");
+    define_original_auto_gate(&temp, "tests");
 
     temp.command(["gate", "update", "tests", "--title", "New"])
         .assert()

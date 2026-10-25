@@ -2,6 +2,7 @@
 //!
 //! These tests verify the full CLI → CommandExecutor → Storage flow
 
+use crate::{add_auto_gate_issue, create_issue_requiring, define_auto_gate};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
@@ -13,32 +14,13 @@ fn gate_entry<'a>(issue: &'a serde_json::Value, key: &str) -> Option<&'a serde_j
     issue["gates"].as_array()?.iter().find(|g| g["key"] == key)
 }
 
-/// Define a simple auto gate and create an issue with it.
-/// Returns (JitCli, issue_id_short).
-fn setup_auto_gate_issue(checker_command: &str) -> (JitCli, String) {
-    let temp = JitCli::initialised().unwrap();
-    temp.command([
-        "gate",
-        "define",
-        "test-gate",
-        "--title",
-        "Test Gate",
-        "--description",
-        "Test",
-        "--mode",
-        "auto",
-        "--checker-command",
-        checker_command,
-        "--timeout",
-        "10",
-    ])
-    .assert()
-    .success();
-
-    let issue_id = temp
-        .create_issue(["--title", "Test issue", "--gate", "test-gate"])
-        .unwrap();
-    (temp, issue_id)
+/// Define each `(key, checker)` auto gate and create an issue requiring all of them.
+fn add_multi_auto_gate_issue(cli: &JitCli, gates: &[(&str, &str)]) -> String {
+    gates
+        .iter()
+        .for_each(|(key, checker)| define_auto_gate(cli, key, checker));
+    let keys: Vec<&str> = gates.iter().map(|(key, _)| *key).collect();
+    create_issue_requiring(cli, &keys)
 }
 
 fn enable_warn_leases(temp: &JitCli) {
@@ -48,41 +30,10 @@ fn enable_warn_leases(temp: &JitCli) {
     fs::write(config_path, config).unwrap();
 }
 
-/// Define multiple auto gates and create an issue that requires all of them.
-/// Returns (JitCli, issue_id_short).
-fn setup_multi_auto_gate_issue(gates: &[(&str, &str)]) -> (JitCli, String) {
-    let temp = JitCli::initialised().unwrap();
-
-    for (gate_key, checker_command) in gates {
-        temp.command([
-            "gate",
-            "define",
-            gate_key,
-            "--title",
-            gate_key,
-            "--description",
-            "Test",
-            "--mode",
-            "auto",
-            "--checker-command",
-            checker_command,
-            "--timeout",
-            "10",
-        ])
-        .assert()
-        .success();
-    }
-
-    let gate_args = gates.iter().flat_map(|(gate_key, _)| ["--gate", *gate_key]);
-    let issue_id = temp
-        .create_issue(["--title", "Test issue"].into_iter().chain(gate_args))
-        .unwrap();
-    (temp, issue_id)
-}
-
 #[test]
 fn test_gate_status_no_prior_runs_shows_not_run_message() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // gate status before any evaluate — should say not run yet, no mutation
     temp.command(["gate", "status", &issue_id, "test-gate"])
@@ -116,7 +67,8 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
     // A corrupt result.json must make `issue show --json` fail loudly instead
     // of silently omitting the run. The deserialize cause and offending path
     // are in the error's source chain.
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // Plant a corrupt gate-run record on disk.
     let run_dir = temp
@@ -151,7 +103,8 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
 
 #[test]
 fn test_gate_status_shows_last_run_after_evaluate() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // Execute the gate via pass
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])
@@ -168,7 +121,8 @@ fn test_gate_status_shows_last_run_after_evaluate() {
 
 #[test]
 fn test_gate_status_shows_last_run_after_failure() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
 
     // Execute (will fail)
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])
@@ -198,8 +152,12 @@ fn test_gate_status_shows_last_run_after_failure() {
 
 #[test]
 fn test_gate_evaluate_json_failure_matches_persisted_status() {
-    let (temp, issue_id) =
-        setup_auto_gate_issue("printf checker-out && printf checker-err >&2 && exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(
+        &temp,
+        "test-gate",
+        "printf checker-out && printf checker-err >&2 && exit 1",
+    );
 
     let output = temp
         .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
@@ -249,7 +207,8 @@ fn test_gate_evaluate_json_failure_matches_persisted_status() {
 // hand instead of discovering.
 #[test]
 fn test_gate_evaluate_json_failure_suggests_run_history_view() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
 
     let output = temp
         .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
@@ -276,7 +235,8 @@ fn test_gate_evaluate_json_failure_suggests_run_history_view() {
 
 #[test]
 fn test_gate_evaluate_stderr_failure_suggests_run_history_view() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
 
     let output = temp
         .command(["gate", "evaluate", &issue_id, "test-gate"])
@@ -292,7 +252,8 @@ fn test_gate_evaluate_stderr_failure_suggests_run_history_view() {
 
 #[test]
 fn test_gate_evaluate_json_failure_includes_lease_warnings() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
     enable_warn_leases(&temp);
 
     let output = temp
@@ -316,7 +277,8 @@ fn test_gate_evaluate_json_failure_includes_lease_warnings() {
 
 #[test]
 fn test_gate_evaluate_human_failure_prints_lease_warnings() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
     enable_warn_leases(&temp);
 
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])
@@ -328,7 +290,8 @@ fn test_gate_evaluate_human_failure_prints_lease_warnings() {
 
 #[test]
 fn test_gate_status_is_non_mutating() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // Two gate status calls — neither should mutate
     for _ in 0..2 {
@@ -354,7 +317,8 @@ fn test_gate_status_is_non_mutating() {
 
 #[test]
 fn test_gate_status_json_output() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // Run the gate first so there's a result to show
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])
@@ -381,7 +345,8 @@ fn test_gate_status_json_output() {
 
 #[test]
 fn test_gate_evaluate_auto_executes_checker() {
-    let (temp, issue_id) = setup_auto_gate_issue("exit 0");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
@@ -840,10 +805,14 @@ fn test_gate_status_single() {
 
 #[test]
 fn test_gate_status_all() {
-    let (temp, issue_id) = setup_multi_auto_gate_issue(&[
-        ("gate-1", "printf gate-1-out && exit 0"),
-        ("gate-2", "printf gate-2-out && exit 0"),
-    ]);
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_multi_auto_gate_issue(
+        &temp,
+        &[
+            ("gate-1", "printf gate-1-out && exit 0"),
+            ("gate-2", "printf gate-2-out && exit 0"),
+        ],
+    );
 
     temp.command(["gate", "evaluate", &issue_id, "gate-1"])
         .assert()
@@ -863,8 +832,8 @@ fn test_gate_status_all() {
 
 #[test]
 fn test_gate_status_all_no_prior_runs_is_non_mutating() {
-    let (temp, issue_id) =
-        setup_multi_auto_gate_issue(&[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_multi_auto_gate_issue(&temp, &[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
 
     // All required gates pending -> strict `status-all` exits 4 (non-mutating).
     temp.command(["gate", "status-all", &issue_id])
@@ -899,10 +868,14 @@ fn test_gate_status_all_no_prior_runs_is_non_mutating() {
 
 #[test]
 fn test_gate_status_all_json_output_reports_not_run_gates() {
-    let (temp, issue_id) = setup_multi_auto_gate_issue(&[
-        ("gate-1", "printf gate-1-out && exit 0"),
-        ("gate-2", "printf gate-2-out && exit 0"),
-    ]);
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_multi_auto_gate_issue(
+        &temp,
+        &[
+            ("gate-1", "printf gate-1-out && exit 0"),
+            ("gate-2", "printf gate-2-out && exit 0"),
+        ],
+    );
 
     temp.command(["gate", "evaluate", &issue_id, "gate-1"])
         .assert()
@@ -1063,7 +1036,8 @@ fn test_gate_status_shows_complete_report_without_truncation() {
     // Checker that produces 25 lines of stdout (more than the old 20-line truncation limit)
     let checker_cmd =
         "sh -c 'i=1; while [ $i -le 25 ]; do echo \"output-line-$i\"; i=$((i+1)); done'";
-    let (temp, issue_id) = setup_auto_gate_issue(checker_cmd);
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "test-gate", checker_cmd);
 
     // Run the gate to record a result with 25 lines of stdout
     temp.command(["gate", "evaluate", &issue_id, "test-gate"])

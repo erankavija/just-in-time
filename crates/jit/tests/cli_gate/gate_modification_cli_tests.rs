@@ -2,13 +2,10 @@
 //!
 //! Tests the `--add-gate` and `--remove-gate` flags for `jit issue update`
 
+use crate::create_titled_issue;
 use jit::test_cli::JitCli;
 
-fn create_issue(temp: &JitCli, title: &str) -> String {
-    temp.create_issue(["-t", title]).unwrap()
-}
-
-fn define_gate(temp: &JitCli, key: &str, title: &str) {
+fn define_titled_gate(temp: &JitCli, key: &str, title: &str) {
     let output = temp
         .command([
             "gate",
@@ -56,8 +53,8 @@ fn gate_keys(issue: &serde_json::Value) -> Vec<String> {
 #[test]
 fn test_add_single_gate() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command(["issue", "update", &id, "--add-gate", "tests"])
@@ -78,9 +75,9 @@ fn test_add_single_gate() {
 #[test]
 fn test_add_multiple_gates_multiple_flags() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command([
@@ -110,9 +107,9 @@ fn test_add_multiple_gates_multiple_flags() {
 #[test]
 fn test_add_multiple_gates_comma_separated() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command(["issue", "update", &id, "--add-gate", "tests,clippy"])
@@ -134,8 +131,8 @@ fn test_add_multiple_gates_comma_separated() {
 #[test]
 fn test_remove_gate() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
     // Create issue with gates
     let id = temp
         .create_issue(["-t", "Test issue", "--gate", "tests,clippy"])
@@ -162,9 +159,9 @@ fn test_remove_gate() {
 #[test]
 fn test_add_and_remove_gates_combined() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    define_gate(&temp, "clippy", "Run clippy");
-    define_gate(&temp, "fmt", "Run fmt");
+    define_titled_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "clippy", "Run clippy");
+    define_titled_gate(&temp, "fmt", "Run fmt");
     // Create issue with one gate
     let id = temp
         .create_issue(["-t", "Test issue", "--gate", "tests"])
@@ -200,7 +197,7 @@ fn test_add_and_remove_gates_combined() {
 #[test]
 fn test_add_gate_invalid_key_error() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Test issue");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command(["issue", "update", &id, "--add-gate", "nonexistent"])
@@ -219,8 +216,8 @@ fn test_add_gate_invalid_key_error() {
 #[test]
 fn test_add_gate_idempotent() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     // Add gate first time
     let output = temp
@@ -246,11 +243,11 @@ fn test_add_gate_idempotent() {
 #[test]
 fn test_batch_add_gates() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "code-review", "Code review");
+    define_titled_gate(&temp, "code-review", "Code review");
 
     // Create multiple issues with same label
-    let _id1 = create_issue(&temp, "Task 1");
-    let _id2 = create_issue(&temp, "Task 2");
+    let _id1 = create_titled_issue(&temp, "Task 1");
+    let _id2 = create_titled_issue(&temp, "Task 2");
 
     // Update issues by setting label first (new issues start in ready state)
     temp.command([
@@ -302,8 +299,8 @@ fn test_batch_add_gates() {
 #[test]
 fn test_gates_in_json_output() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let update = temp
         .command(["issue", "update", &id, "--add-gate", "tests", "--json"])
@@ -328,8 +325,8 @@ fn test_gates_in_json_output() {
 #[test]
 fn test_combine_with_other_updates() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command([
@@ -364,8 +361,8 @@ fn test_combine_with_other_updates() {
 #[test]
 fn test_remove_nonexistent_gate_is_noop() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
-    let id = create_issue(&temp, "Test issue");
+    define_titled_gate(&temp, "tests", "Run tests");
+    let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
         .command(["issue", "update", &id, "--remove-gate", "tests"])
@@ -385,7 +382,7 @@ fn test_remove_nonexistent_gate_is_noop() {
 #[test]
 fn test_batch_remove_gates() {
     let temp = JitCli::initialised().unwrap();
-    define_gate(&temp, "tests", "Run tests");
+    define_titled_gate(&temp, "tests", "Run tests");
     // Create issues with gates
     temp.command([
         "issue",

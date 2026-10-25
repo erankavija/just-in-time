@@ -7,52 +7,10 @@
 //! yields exit 4. The retired verbs no longer parse at all: clap rejects them
 //! as unrecognized subcommands rather than resolving them as aliases.
 
+use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
-
-fn define_auto_gate(temp: &JitCli, key: &str, checker: &str) {
-    temp.command([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test",
-        "--mode",
-        "auto",
-        "--checker-command",
-        checker,
-        "--timeout",
-        "10",
-    ])
-    .assert()
-    .success();
-}
-
-fn define_manual_gate(temp: &JitCli, key: &str) {
-    temp.command([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test",
-        "--mode",
-        "manual",
-    ])
-    .assert()
-    .success();
-}
-
-/// Create an issue requiring the given gate keys; returns its short id.
-fn create_issue(temp: &JitCli, gate_keys: &[&str]) -> String {
-    let gates = gate_keys.iter().flat_map(|key| ["--gate", *key]);
-    temp.create_issue(["--title", "Test issue"].into_iter().chain(gates))
-        .unwrap()
-}
 
 // ===== REQ-02: status-all strict exit =====
 
@@ -60,7 +18,7 @@ fn create_issue(temp: &JitCli, gate_keys: &[&str]) -> String {
 fn test_status_all_pending_auto_gate_exits_4() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "auto-gate", "exit 0");
-    let id = create_issue(&temp, &["auto-gate"]);
+    let id = create_issue_requiring(&temp, &["auto-gate"]);
 
     // Auto gate never evaluated -> pending -> exit 4, no mutation.
     let out = temp
@@ -84,7 +42,7 @@ fn test_status_all_pending_auto_gate_exits_4() {
 fn test_status_all_pending_manual_gate_exits_4() {
     let temp = JitCli::initialised().unwrap();
     define_manual_gate(&temp, "manual-gate");
-    let id = create_issue(&temp, &["manual-gate"]);
+    let id = create_issue_requiring(&temp, &["manual-gate"]);
 
     // A required manual gate that was never attested counts as pending.
     let out = temp
@@ -114,7 +72,7 @@ fn test_status_all_pending_manual_gate_exits_4() {
 fn test_status_all_failed_gate_exits_4() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "fail-gate", "exit 1");
-    let id = create_issue(&temp, &["fail-gate"]);
+    let id = create_issue_requiring(&temp, &["fail-gate"]);
 
     // Evaluate records a failed verdict for the auto gate.
     temp.command(["gate", "evaluate", &id, "fail-gate"])
@@ -145,7 +103,7 @@ fn test_status_all_all_passed_exits_0() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "auto-ok", "exit 0");
     define_manual_gate(&temp, "manual-ok");
-    let id = create_issue(&temp, &["auto-ok", "manual-ok"]);
+    let id = create_issue_requiring(&temp, &["auto-ok", "manual-ok"]);
 
     temp.command(["gate", "evaluate", &id, "auto-ok"])
         .assert()
@@ -183,7 +141,7 @@ fn test_status_all_all_passed_exits_0() {
 fn test_eval_alias_runs_checker_like_evaluate() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "gate-b", "exit 0");
-    let id = create_issue(&temp, &["gate-b"]);
+    let id = create_issue_requiring(&temp, &["gate-b"]);
 
     temp.command(["gate", "eval", &id, "gate-b", "--json"])
         .assert()
@@ -196,7 +154,7 @@ fn test_canonical_verbs_still_work_after_alias_removal() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "gate-c", "exit 0");
     define_manual_gate(&temp, "gate-d");
-    let id = create_issue(&temp, &["gate-c", "gate-d"]);
+    let id = create_issue_requiring(&temp, &["gate-c", "gate-d"]);
 
     // `evaluate` (formerly aliased as `pass`) still runs the checker.
     let out = temp

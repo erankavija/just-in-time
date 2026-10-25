@@ -1,36 +1,14 @@
 //! Verify `jit gate status-all --json` omits stdout/stderr for passing runs
 //! by default, retains them for failing runs, and restores them under --full.
 
+use crate::add_auto_gate_issue;
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
-
-fn create_issue_with_gate(temp: &JitCli, gate_key: &str, checker_command: &str) -> String {
-    temp.command([
-        "gate",
-        "define",
-        gate_key,
-        "--title",
-        gate_key,
-        "--description",
-        "Test",
-        "--mode",
-        "auto",
-        "--checker-command",
-        checker_command,
-        "--timeout",
-        "10",
-    ])
-    .assert()
-    .success();
-
-    temp.create_issue(["--title", "Test issue", "--gate", gate_key])
-        .unwrap()
-}
 
 #[test]
 fn test_status_all_omits_stdout_for_passing_runs_by_default() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = create_issue_with_gate(&temp, "noisy-pass", "printf SECRET_OUTPUT && exit 0");
+    let issue_id = add_auto_gate_issue(&temp, "noisy-pass", "printf SECRET_OUTPUT && exit 0");
 
     temp.command(["gate", "evaluate", &issue_id, "noisy-pass"])
         .assert()
@@ -62,7 +40,7 @@ fn test_status_all_omits_stdout_for_passing_runs_by_default() {
 #[test]
 fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = create_issue_with_gate(&temp, "noisy-fail", "printf FAILURE_DETAIL && exit 1");
+    let issue_id = add_auto_gate_issue(&temp, "noisy-fail", "printf FAILURE_DETAIL && exit 1");
 
     // Run the gate so a failed result is recorded. `gate evaluate` for an auto
     // gate executes the checker and records the run regardless of status.
@@ -95,7 +73,7 @@ fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
 #[test]
 fn test_status_all_full_flag_restores_stdout_for_passing_runs() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = create_issue_with_gate(&temp, "noisy-pass2", "printf RESTORED && exit 0");
+    let issue_id = add_auto_gate_issue(&temp, "noisy-pass2", "printf RESTORED && exit 0");
 
     temp.command(["gate", "evaluate", &issue_id, "noisy-pass2"])
         .assert()

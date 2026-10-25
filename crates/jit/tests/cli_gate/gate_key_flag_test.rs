@@ -6,6 +6,7 @@
 //!   3. Supplying BOTH positional and --gate errors with an actionable message.
 //!   4. Supplying NEITHER errors with an actionable message.
 
+use crate::{add_auto_gate_issue, add_manual_gate_issue};
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
@@ -13,47 +14,6 @@ use predicates::prelude::*;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// Define manual gate `key` and create an issue requiring it. Returns the issue id.
-fn add_manual_gate_issue(cli: &JitCli, key: &str) -> String {
-    cli.run([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test",
-        "--mode",
-        "manual",
-    ])
-    .unwrap();
-    cli.create_issue(["--title", "Test issue", "--gate", key])
-        .unwrap()
-}
-
-/// Define auto gate `key` (checker `exit 0`) and create an issue requiring it.
-/// Returns the issue id.
-fn add_auto_gate_issue(cli: &JitCli, key: &str) -> String {
-    cli.run([
-        "gate",
-        "define",
-        key,
-        "--title",
-        key,
-        "--description",
-        "Test",
-        "--mode",
-        "auto",
-        "--checker-command",
-        "exit 0",
-        "--timeout",
-        "10",
-    ])
-    .unwrap();
-    cli.create_issue(["--title", "Test issue", "--gate", key])
-        .unwrap()
-}
 
 // ---------------------------------------------------------------------------
 // gate evaluate — positional (regression guard)
@@ -190,7 +150,7 @@ fn test_gate_evaluate_neither_positional_nor_flag_errors() {
 #[test]
 fn test_gate_status_positional_key_still_works() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = add_auto_gate_issue(&temp, "tests");
+    let issue_id = add_auto_gate_issue(&temp, "tests", "exit 0");
 
     // Run gate first so status has something to show
     temp.command(["gate", "evaluate", &issue_id, "tests"])
@@ -210,7 +170,7 @@ fn test_gate_status_positional_key_still_works() {
 #[test]
 fn test_gate_status_flag_key_accepted() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = add_auto_gate_issue(&temp, "tests");
+    let issue_id = add_auto_gate_issue(&temp, "tests", "exit 0");
 
     temp.command(["gate", "evaluate", &issue_id, "tests"])
         .assert()
@@ -226,7 +186,7 @@ fn test_gate_status_flag_key_accepted() {
 fn test_gate_status_flag_and_positional_produce_identical_outcome() {
     // Positional form
     let temp_pos = JitCli::initialised().unwrap();
-    let id_pos = add_auto_gate_issue(&temp_pos, "tests");
+    let id_pos = add_auto_gate_issue(&temp_pos, "tests", "exit 0");
     temp_pos
         .command(["gate", "evaluate", &id_pos, "tests"])
         .assert()
@@ -241,7 +201,7 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
 
     // Flag form
     let temp_flag = JitCli::initialised().unwrap();
-    let id_flag = add_auto_gate_issue(&temp_flag, "tests");
+    let id_flag = add_auto_gate_issue(&temp_flag, "tests", "exit 0");
     temp_flag
         .command(["gate", "evaluate", &id_flag, "tests"])
         .assert()
@@ -268,7 +228,7 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
 #[test]
 fn test_gate_status_both_positional_and_flag_errors() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = add_auto_gate_issue(&temp, "tests");
+    let issue_id = add_auto_gate_issue(&temp, "tests", "exit 0");
     temp.command(["gate", "status", &issue_id, "tests", "--gate", "tests"])
         .assert()
         .failure()
@@ -282,7 +242,7 @@ fn test_gate_status_both_positional_and_flag_errors() {
 #[test]
 fn test_gate_status_neither_positional_nor_flag_errors() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = add_auto_gate_issue(&temp, "tests");
+    let issue_id = add_auto_gate_issue(&temp, "tests", "exit 0");
     temp.command(["gate", "status", &issue_id])
         .assert()
         .failure()
@@ -321,7 +281,7 @@ fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
 #[test]
 fn test_gate_status_neither_with_json_emits_machine_readable_error() {
     let temp = JitCli::initialised().unwrap();
-    let issue_id = add_auto_gate_issue(&temp, "tests");
+    let issue_id = add_auto_gate_issue(&temp, "tests", "exit 0");
     let out = temp
         .command(["gate", "status", &issue_id, "--json"])
         .assert()
