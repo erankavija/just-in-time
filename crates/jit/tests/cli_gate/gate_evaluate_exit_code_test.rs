@@ -10,16 +10,15 @@
 
 use jit::test_cli::JitCli;
 
-/// Define an auto gate with the given checker command and create an issue that
-/// requires it. Returns (repository, issue_id).
-fn setup_auto_gate_issue(checker_command: &str) -> (JitCli, String) {
-    let cli = JitCli::initialised().unwrap();
+/// Define an auto gate `key` running `checker_command` and create an issue
+/// requiring it. Returns the issue id.
+fn add_auto_gate_issue(cli: &JitCli, key: &str, checker_command: &str) -> String {
     cli.run([
         "gate",
         "define",
-        "test-gate",
+        key,
         "--title",
-        "Test Gate",
+        key,
         "--description",
         "Test",
         "--mode",
@@ -30,15 +29,14 @@ fn setup_auto_gate_issue(checker_command: &str) -> (JitCli, String) {
         "10",
     ])
     .unwrap();
-    let id = cli
-        .create_issue(["--title", "Test issue", "--gate", "test-gate"])
-        .unwrap();
-    (cli, id)
+    cli.create_issue(["--title", "Test issue", "--gate", key])
+        .unwrap()
 }
 
 #[test]
 fn test_gate_evaluate_success_exit_0_verdict_pass() {
-    let (temp, id) = setup_auto_gate_issue("true");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "true");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -54,7 +52,8 @@ fn test_gate_evaluate_success_exit_0_verdict_pass() {
 #[test]
 fn test_gate_evaluate_checker_failure_exit_4_verdict_fail() {
     // `false` exits non-zero -> GateRunStatus::Failed -> checker failure.
-    let (temp, id) = setup_auto_gate_issue("false");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "false");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -77,7 +76,8 @@ fn test_gate_evaluate_checker_failure_exit_4_verdict_fail() {
 fn test_gate_evaluate_runner_error_exit_10_verdict_error() {
     // A checker that kills itself with SIGKILL leaves no exit code, which the
     // runner classifies as GateRunStatus::Error (runner/infra failure).
-    let (temp, id) = setup_auto_gate_issue("kill -9 $$");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "kill -9 $$");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -101,7 +101,8 @@ fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
     // A nonexistent executable makes `sh -c` exit 127 (command not found),
     // which the runner classifies as GateRunStatus::Error (runner/infra error),
     // not a checker failure.
-    let (temp, id) = setup_auto_gate_issue("jit-no-such-command-xyz");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "jit-no-such-command-xyz");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -123,7 +124,8 @@ fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
 #[test]
 fn test_gate_evaluate_checker_exit_75_records_error_run() {
     // EX_TEMPFAIL: the checker reports it could not judge.
-    let (temp, id) = setup_auto_gate_issue("exit 75");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "exit 75");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -147,7 +149,8 @@ fn test_gate_evaluate_checker_exit_75_records_error_run() {
 
 #[test]
 fn test_gate_evaluate_other_nonzero_exit_stays_failed() {
-    let (temp, id) = setup_auto_gate_issue("exit 74");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "exit 74");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate", "--json"])
@@ -162,7 +165,8 @@ fn test_gate_evaluate_other_nonzero_exit_stays_failed() {
 #[test]
 fn test_gate_evaluate_runner_error_non_json_exit_10() {
     // The non-JSON path must agree with the JSON path on exit 10.
-    let (temp, id) = setup_auto_gate_issue("kill -9 $$");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "kill -9 $$");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate"])
@@ -174,7 +178,8 @@ fn test_gate_evaluate_runner_error_non_json_exit_10() {
 
 #[test]
 fn test_gate_evaluate_checker_failure_non_json_exit_4() {
-    let (temp, id) = setup_auto_gate_issue("false");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "false");
 
     let output = temp
         .command(["gate", "evaluate", &id, "test-gate"])
@@ -355,7 +360,8 @@ fn test_gate_evaluate_manual_gate_without_by_exit_2_no_verdict() {
 fn test_gate_evaluate_builtin_checker_fault_exit_10_verdict_error() {
     // A built-in checker that cannot judge the repository reaches the same
     // runner-error reporting as an exec checker.
-    let (temp, id) = setup_auto_gate_issue("true");
+    let temp = JitCli::initialised().unwrap();
+    let id = add_auto_gate_issue(&temp, "test-gate", "true");
     let gates_path = temp.root().join(".jit/gates.toml");
     let gates = std::fs::read_to_string(&gates_path).unwrap();
     let (head, checker) = gates.split_once("[gates.checker]").unwrap();
