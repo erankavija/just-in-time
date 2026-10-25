@@ -752,8 +752,8 @@ mod tests {
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
-        assert!(changes[0].contains("Ready"));
-        assert!(changes[0].contains("Done"));
+        assert!(changes[0].contains("ready"));
+        assert!(changes[0].contains("done"));
     }
 
     #[test]

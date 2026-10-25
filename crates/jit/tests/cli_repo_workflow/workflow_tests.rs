@@ -106,8 +106,8 @@ fn test_issue_show_human_and_json_render_same_vocabulary_tokens() {
     let human =
         String::from_utf8_lossy(&run_jit(&temp, &["issue", "show", &id]).stdout).into_owned();
 
-    let state = json["data"]["state"].as_str().unwrap();
-    let priority = json["data"]["priority"].as_str().unwrap();
+    let state = json["state"].as_str().unwrap();
+    let priority = json["priority"].as_str().unwrap();
     assert_eq!(state, "in_progress");
     assert!(human.contains(&format!("State: {state}")), "got: {human}");
     assert!(
@@ -296,7 +296,7 @@ fn test_workflow_gates() {
     run_jit(&temp, &["issue", "update", &id, "--state", "done"]);
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Gated"));
+    assert!(stdout.contains("gated"));
 
     // Evaluate tests gate
     run_jit(&temp, &["gate", "evaluate", &id, "tests"]);
@@ -304,7 +304,7 @@ fn test_workflow_gates() {
     // Still in Gated (review not passed)
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Gated"));
+    assert!(stdout.contains("gated"));
 
     // Evaluate review gate
     run_jit(
@@ -315,7 +315,7 @@ fn test_workflow_gates() {
     // Now should auto-transition to Done
     let output = run_jit(&temp, &["issue", "show", &id]);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Done"));
+    assert!(stdout.contains("done"));
 }
 
 // ============================================================================

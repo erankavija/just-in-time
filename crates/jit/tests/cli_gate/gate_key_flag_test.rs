@@ -160,7 +160,7 @@ fn test_gate_status_positional_key_still_works() {
     temp.command(["gate", "status", &issue_id, "tests"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
+        .stdout(predicate::str::contains("passed"));
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn test_gate_status_flag_key_accepted() {
     temp.command(["gate", "status", &issue_id, "--gate", "tests"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
+        .stdout(predicate::str::contains("passed"));
 }
 
 #[test]
