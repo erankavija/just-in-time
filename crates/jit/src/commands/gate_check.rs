@@ -2,7 +2,9 @@
 
 use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
-use crate::domain::gate_findings::{GateFinding, GateFindings};
+use crate::domain::gate_findings::{
+    FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
+};
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
@@ -589,22 +591,19 @@ fn gate_findings_from_rule_report(
         .findings
         .iter()
         .filter(|finding| finding.severity != Severity::Off)
-        .map(|finding| GateFinding {
-            id: String::new(),
-            severity: if finding.is_error() { "high" } else { "low" }.to_string(),
-            disposition: Some(
-                if finding.is_error() {
-                    "blocking"
-                } else {
-                    "advisory"
-                }
-                .to_string(),
-            ),
-            origin: Some("issue-impact".to_string()),
-            summary: format!("[{}] {}", finding.rule, finding.message),
-            file: None,
-            line: None,
-            references: Vec::new(),
+        .map(|finding| {
+            let (severity, disposition) = if finding.is_error() {
+                (FindingSeverity::High, FindingDisposition::Blocking)
+            } else {
+                (FindingSeverity::Low, FindingDisposition::Advisory)
+            };
+            GateFinding::builtin(
+                "",
+                severity,
+                disposition,
+                FindingOrigin::IssueImpact,
+                format!("[{}] {}", finding.rule, finding.message),
+            )
         })
         .collect()
 }
@@ -1109,16 +1108,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
             }
             GateChecker::ReviewPlaceholder => Ok((
-                vec![GateFinding {
-                    id: "review-placeholder".to_string(),
-                    severity: "high".to_string(),
-                    disposition: Some("advisory".to_string()),
-                    origin: Some("pre-existing".to_string()),
-                    summary: REVIEW_PLACEHOLDER_WARNING.to_string(),
-                    file: None,
-                    line: None,
-                    references: Vec::new(),
-                }],
+                vec![GateFinding::builtin(
+                    "review-placeholder",
+                    FindingSeverity::High,
+                    FindingDisposition::Advisory,
+                    FindingOrigin::PreExisting,
+                    REVIEW_PLACEHOLDER_WARNING,
+                )],
                 false,
             )),
             GateChecker::Exec { .. } => unreachable!("exec checker is dispatched separately"),
@@ -1159,7 +1155,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         } else {
             std::iter::once(summary.clone())
                 .chain(findings.iter().map(|finding| {
-                    let label = if finding.disposition.as_deref() == Some("blocking") {
+                    let label = if finding.is_blocking() {
                         "ERROR"
                     } else {
                         "WARNING"

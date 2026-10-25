@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-72dfc0d7",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2cd0623a324151989b2b0f9238cf2ffccd4c7145",
+  "completed_at": "2026-10-25T05:33:09.826700315Z",
+  "duration_ms": 53482,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation satisfies the typed built-in finding and open wire-format criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9929b23c-3b4f-4c83-9f90-6aaf11ba5bb5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T05:32:16.344690079Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 75df5d33d (`jit:72dfc0d7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-10 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-25T05:30:52Z; code-review pending, no run\nTruncation recovery: narrowed the initially truncated repository-wide search to affected source files, constructors, tests, and policy records\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation satisfies the typed built-in finding and open wire-format criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

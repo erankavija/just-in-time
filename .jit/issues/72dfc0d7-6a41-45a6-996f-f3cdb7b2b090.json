@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "519912bb-6eeb-45c7-a0e6-4e703cb15fb8",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:34:36.524721606Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9929b23c-3b4f-4c83-9f90-6aaf11ba5bb5",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:33:10.053654660Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Built-in gate findings use closed severity and disposition enums",
-  "updated_at": "2026-10-25T05:16:05.017272051Z"
+  "updated_at": "2026-10-25T05:34:36.524721606Z"
 }
