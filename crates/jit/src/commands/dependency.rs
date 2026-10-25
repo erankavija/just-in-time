@@ -673,14 +673,21 @@ fn derive_single_dependency_add(
 
     let candidate = candidate_issues(issues, &full_issue_id, [&full_dependency_id])?;
     let candidate_graph = dependency_graph(&candidate);
-    let mut redundant = candidate_graph.find_redundant_edges();
-    redundant.sort();
+    let redundant = candidate_graph
+        .find_redundant_edges()
+        .into_iter()
+        .map(|(from, to)| (from.id.clone(), to.id.clone()))
+        .collect::<Vec<_>>();
     if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
         return Err(
             RedundantDependencyError::new((full_issue_id, full_dependency_id), redundant).into(),
         );
     }
-    let reduced = candidate_graph.compute_transitive_reduction(&full_issue_id);
+    let reduced = candidate_graph
+        .compute_transitive_reduction(&full_issue_id)
+        .into_iter()
+        .map(|node| node.id.clone())
+        .collect::<HashSet<_>>();
     let original = dependency_set(from);
     let result = if reduced == original {
         DependencyAddResult::Skipped {
@@ -754,8 +761,11 @@ fn derive_batch_dependency_add(
             valid_edges.iter().map(|(_, _, full_id)| full_id),
         )?;
         let graph = dependency_graph(&acyclic_candidate);
-        let mut redundant = graph.find_redundant_edges();
-        redundant.sort();
+        let redundant = graph
+            .find_redundant_edges()
+            .into_iter()
+            .map(|(from, to)| (from.id.clone(), to.id.clone()))
+            .collect::<Vec<_>>();
         let self_redundant = redundant
             .iter()
             .filter(|(from, to)| {
@@ -790,8 +800,11 @@ fn derive_batch_dependency_add(
                     continue;
                 }
                 let singleton = candidate_issues(issues, &full_issue_id, [full_id])?;
-                let mut singleton_redundant = dependency_graph(&singleton).find_redundant_edges();
-                singleton_redundant.sort();
+                let singleton_redundant = dependency_graph(&singleton)
+                    .find_redundant_edges()
+                    .into_iter()
+                    .map(|(from, to)| (from.id.clone(), to.id.clone()))
+                    .collect::<Vec<_>>();
                 if !singleton_redundant.is_empty() {
                     rejected.push((
                         *ordinal,
@@ -805,7 +818,11 @@ fn derive_batch_dependency_add(
                 }
             }
         }
-        reduced_from = graph.compute_transitive_reduction(&full_issue_id);
+        reduced_from = graph
+            .compute_transitive_reduction(&full_issue_id)
+            .into_iter()
+            .map(|node| node.id.clone())
+            .collect();
     }
 
     if !rejected.is_empty() {
@@ -936,7 +953,11 @@ fn derive_reduced_graph_intents(
             Some((source_id, source_reduced)) if source_id == candidate_issue.id => {
                 source_reduced.clone()
             }
-            _ => graph.compute_transitive_reduction(&candidate_issue.id),
+            _ => graph
+                .compute_transitive_reduction(&candidate_issue.id)
+                .into_iter()
+                .map(|node| node.id.clone())
+                .collect(),
         };
         if reduced == original_deps {
             continue;

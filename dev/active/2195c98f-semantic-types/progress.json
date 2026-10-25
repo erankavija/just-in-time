@@ -220,7 +220,7 @@
           "short_id": "bf87bbdb",
           "title": "Graph queries return nodes rather than id strings",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -1053,6 +1053,20 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Projection field retype with schema contract update."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation after Claude worker tooling fault (classifier errors); Codex avoids that path."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting CLI prefix boundary across main.rs (88 id sites)."
     }
   ],
   "surfaced_pitfalls": [
@@ -1092,6 +1106,7 @@
     "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id).",
     "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision).",
     "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
-    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file."
+    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
+    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex."
   ]
 }

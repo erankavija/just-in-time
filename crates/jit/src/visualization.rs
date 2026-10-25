@@ -262,7 +262,7 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// not keep.
 pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
-    resolution: &crate::graph::hierarchy::HierarchyResolution,
+    resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
 ) -> String {
     let all_nodes = graph.nodes_by_id();
 

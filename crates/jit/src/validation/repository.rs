@@ -480,7 +480,7 @@ fn validate_integrity(
     }
     for issue in issues {
         let reduced = graph.compute_transitive_reduction(&issue.id);
-        let reduced_set: HashSet<&String> = reduced.iter().collect();
+        let reduced_set: HashSet<_> = reduced.iter().map(|node| &node.id).collect();
         for dependency in &issue.dependencies {
             if !reduced_set.contains(dependency) {
                 let path = graph.find_shortest_path(&issue.id, dependency);
@@ -488,7 +488,7 @@ fn validate_integrity(
                     "unknown path".to_string()
                 } else {
                     path.iter()
-                        .map(|id| &id[..SHORT_ID_LENGTH.min(id.len())])
+                        .map(|node| node.short_id())
                         .collect::<Vec<_>>()
                         .join(" → ")
                 };

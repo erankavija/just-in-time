@@ -95,20 +95,23 @@ mod tests {
     use super::*;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            operation: crate::domain::ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "example"
-                    .try_into()
-                    .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
-                status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail,
-        }
+        let mut event = crate::test_utils::stamped_event(
+            Event::draft_profile_lifecycle(
+                crate::domain::ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
+                    id: "example"
+                        .try_into()
+                        .expect("the profile marker has a canonical identifier"),
+                    version: "1.0.0".to_string(),
+                    status: crate::domain::ProfileLifecycleStatus::Installed,
+                    variables: Default::default(),
+                }],
+            ),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        );
+        event.set_isolated_torn_tail(isolated_torn_tail);
+        event
     }
 
     #[test]
