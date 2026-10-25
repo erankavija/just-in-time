@@ -9,6 +9,7 @@
   ],
   "description": "Parse the value of a query `assignee:` filter into an `Assignee`, so malformed filters fail instead of silently matching nothing.\n\n## Background\n\n`QueryCondition::Assignee` holds a `String` (`crates/jit/src/query_engine/parser.rs:39,142`), compared as a string by the evaluator (`query_engine/evaluator.rs:56-59,186,189`). A value without a colon, or `*`, parses and matches nothing. The query reference shows `NOT assignee:*` (`docs/reference/cli-commands.md:1227`), which therefore never matches.\n\n## Success Criteria\n\n- [hard] REQ-01: `QueryCondition::Assignee` holds an `Assignee`, and an `assignee:` value that lacks a colon, or is `*`, is a parse error naming the value.\n- [hard] REQ-02: The evaluator compares `Assignee` values.\n- [hard] REQ-03: The query reference shows only working assignee filters, and its `NOT assignee:*` example is replaced by the unassigned filter.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:18:28.144798312Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
@@ -56,7 +57,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Query assignee filters parse to an Assignee",
-  "updated_at": "2026-10-25T00:13:55.734785660Z"
+  "updated_at": "2026-10-25T00:18:28.144798312Z"
 }
