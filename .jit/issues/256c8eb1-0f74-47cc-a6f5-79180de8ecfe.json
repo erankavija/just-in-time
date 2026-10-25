@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c02bc3e-5ba9-486a-aa85-aef5eec4727c",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:23:28.758497168Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "45d9476b-ef57-4551-81d5-0306ed63ac40",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:25:22.368973362Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Error codes come from one declaration",
-  "updated_at": "2026-10-25T03:09:30.725770609Z"
+  "updated_at": "2026-10-25T03:25:22.368973362Z"
 }
