@@ -61,7 +61,7 @@
           "short_id": "acb38457",
           "title": "Graph node traits expose dependency ids as string views",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
@@ -220,7 +220,7 @@
           "short_id": "bf87bbdb",
           "title": "Graph queries return nodes rather than id strings",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
@@ -1011,6 +1011,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Rework R2 (final): literals in test modules of listed files."
+    },
+    {
+      "issue": "bf87bbdb",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Graph query return types across eight files with property tests."
     }
   ],
   "surfaced_pitfalls": [
@@ -1034,6 +1041,10 @@
     {
       "source": "e1a6c8c2",
       "note": "Code-review read REQ-01 ('no literal ... builds or matches a well-known .jit path') as covering test modules. 18dc6e3e (repository_state/) and 945f65f3 (commands/) passed review but kept such literals in #[cfg(test)] code and doctests. Epic REQ-07 says 'No production format! builds one of these paths' (production only), so likely fine at the epic gate; recheck before the epic holistic review."
+    },
+    {
+      "source": "18bcafb8",
+      "note": "Event::set_isolated_torn_tail(&mut self, bool) was added in domain/types.rs as part of the body-view bridge; the envelope task (d72bf093) must move it onto the body or the envelope and delete the bridge method."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
