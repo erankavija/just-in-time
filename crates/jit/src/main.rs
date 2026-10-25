@@ -942,7 +942,10 @@ fn print_gate_run_details(result: &GateRunResult) {
     if result.origin == jit::domain::GateVerdictOrigin::Attested {
         println!(
             "  Attested by {} at {}",
-            result.by.as_deref().unwrap_or("an unnamed attestor"),
+            result
+                .by
+                .as_ref()
+                .map_or_else(|| "an unnamed attestor".to_string(), ToString::to_string),
             result.started_at.to_rfc3339()
         );
     }

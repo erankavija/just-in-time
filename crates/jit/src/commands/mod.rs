@@ -2955,7 +2955,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
                 for result in &precheck_runs {
-                    let (state, by) = gate_check::gate_state_from_run(result)?;
+                    let state = gate_check::gate_state_from_run(result);
+                    let by = result.by.clone();
                     let status = state.status;
                     issue.gates_status.insert(result.gate_key.clone(), state);
                     precheck_events.push((
@@ -3455,7 +3456,7 @@ mod tests {
 
     #[test]
     fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
-        use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
+        use crate::declarations::rules::{Rule, RuleScope, RuleSet, Selector, Severity};
 
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let type_name = taxonomy.type_at_level(4).to_string();
@@ -3477,9 +3478,15 @@ mod tests {
                 },
                 severity: Severity::Error,
                 enforce: false,
-                assert: Assertion::LabelCoverage {
-                    config: Default::default(),
-                },
+                assert: RuleSet::parse(
+                    "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+                    None,
+                    [],
+                )
+                .unwrap()
+                .rules[0]
+                    .assert
+                    .clone(),
                 scope: RuleScope::Graph,
             }],
         };

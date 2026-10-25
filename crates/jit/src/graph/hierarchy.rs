@@ -160,7 +160,7 @@ pub trait HierarchyNode {
     fn id(&self) -> &str;
 
     /// IDs of the nodes this node depends on (its outgoing DAG edges).
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
 
     /// The value of this node's `type:` label (e.g. `"epic"`), or `None` when it
     /// carries no type label. Mapped to a level via the config.
@@ -172,8 +172,8 @@ impl HierarchyNode for crate::domain::Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 
     fn type_name(&self) -> Option<&str> {
@@ -425,29 +425,20 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
 fn transitively_reduced_edges<'a, T: HierarchyNode>(
     nodes: &[&'a T],
 ) -> HashMap<&'a str, Vec<&'a str>> {
-    /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
-    struct EdgeView<'a> {
-        id: &'a str,
-        deps: &'a [String],
-    }
+    /// The dependency-graph view of a hierarchy node, delegating to the node.
+    struct EdgeView<'a, T>(&'a T);
 
-    impl GraphNode for EdgeView<'_> {
+    impl<T: HierarchyNode> GraphNode for EdgeView<'_, T> {
         fn id(&self) -> &str {
-            self.id
+            self.0.id()
         }
-        fn dependencies(&self) -> &[String] {
-            self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.0.dependencies()
         }
     }
 
-    let views: Vec<EdgeView<'a>> = nodes
-        .iter()
-        .map(|n| EdgeView {
-            id: n.id(),
-            deps: n.dependencies(),
-        })
-        .collect();
-    let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
+    let views: Vec<EdgeView<'a, T>> = nodes.iter().map(|n| EdgeView(*n)).collect();
+    let view_refs: Vec<&EdgeView<'a, T>> = views.iter().collect();
     let graph = DependencyGraph::new(&view_refs);
     let present: HashSet<&str> = nodes.iter().map(|n| n.id()).collect();
 
@@ -457,8 +448,6 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
             let kept = graph.compute_transitive_reduction(node.id());
             let deps = node
                 .dependencies()
-                .iter()
-                .map(String::as_str)
                 .filter(|dep| present.contains(dep) && kept.contains(*dep))
                 .collect();
             (node.id(), deps)
@@ -675,8 +664,8 @@ mod tests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
@@ -1013,8 +1002,8 @@ mod proptests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()

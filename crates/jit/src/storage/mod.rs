@@ -6,7 +6,7 @@
 
 use crate::declarations::GateRegistry;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
-use crate::domain::{Event, Issue};
+use crate::domain::{Event, EventBody, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -266,7 +266,7 @@ pub trait IssueStore: Clone {
         Ok(self
             .read_events()?
             .into_iter()
-            .filter(|event| matches!(event, Event::ArtifactArchiveExecuted { .. }))
+            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted { .. }))
             .collect())
     }
 

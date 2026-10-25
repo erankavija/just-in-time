@@ -25,7 +25,7 @@ use crate::domain::artifact_plan::{
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::{Event, Issue};
+use crate::domain::{Event, EventBody, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
     resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
@@ -113,8 +113,8 @@ fn apply_recorded_residue_identities(
 ) {
     let covered = events
         .iter()
-        .filter_map(|event| match event {
-            Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            EventBody::ArtifactArchiveExecuted {
                 target: event_target,
                 destination_root: event_root,
                 publications,

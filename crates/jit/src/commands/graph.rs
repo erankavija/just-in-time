@@ -395,11 +395,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         for rule in &self.effective_rules()?.rules {
             if let Assertion::LabelCoverage { config } = &rule.assert {
-                for key in ["satisfies-namespace", "container-from-label"] {
-                    if let Some(ns) = config.get(key).and_then(|v| v.as_str()) {
-                        namespaces.insert(ns.to_string());
-                    }
-                }
+                namespaces.extend(
+                    [
+                        &config.authored_satisfies_namespace,
+                        &config.container_from_label,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .cloned(),
+                );
             }
         }
 

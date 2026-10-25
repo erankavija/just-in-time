@@ -822,8 +822,8 @@ impl crate::graph::GraphNode for Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 }
 
@@ -920,7 +920,7 @@ pub struct GateRunResult {
     /// Command that was executed
     pub command: String,
     /// Who triggered this execution
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     /// Optional message
     pub message: Option<String>,
     /// Structured findings parsed from the checker's machine-readable block, if
@@ -1005,7 +1005,7 @@ impl GateRunResult {
             stdout: String::new(),
             stderr: String::new(),
             command: String::new(),
-            by: by.map(ToString::to_string),
+            by: by.cloned(),
             message: None,
             findings: None,
             inputs_digest: None,
@@ -1565,7 +1565,24 @@ pub enum Event {
     },
 }
 
+/// The tagged body of an [`Event`]: its variant and payload fields.
+///
+/// A temporary alias while `Event` still carries `id` and `timestamp` in each
+/// variant; matchers read [`Event::body`] so the envelope swap that makes this
+/// the real body enum leaves them unchanged.
+pub type EventBody = Event;
+
 impl Event {
+    /// The tagged body this event records.
+    pub fn body(&self) -> &EventBody {
+        self
+    }
+
+    /// Consume this event, yielding its tagged body.
+    pub fn into_body(self) -> EventBody {
+        self
+    }
+
     /// This event's identity, as assigned by [`Self::assign_identity`].
     ///
     /// A drafted event that has not reached the mutation finalizer carries an
@@ -1593,6 +1610,36 @@ impl Event {
             | Event::GateDefinitionRemoved { id, .. }
             | Event::ProfileLifecycle { id, .. }
             | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
+        }
+    }
+
+    /// When this event occurred, as stamped by [`Self::assign_identity`].
+    ///
+    /// A drafted event that has not reached the mutation finalizer carries the
+    /// Unix epoch.
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        match self {
+            Event::IssueCreated { timestamp, .. }
+            | Event::IssueClaimed { timestamp, .. }
+            | Event::IssueStateChanged { timestamp, .. }
+            | Event::GatePassed { timestamp, .. }
+            | Event::GateFailed { timestamp, .. }
+            | Event::GateAdded { timestamp, .. }
+            | Event::GateRemoved { timestamp, .. }
+            | Event::IssueCompleted { timestamp, .. }
+            | Event::IssueDeleted { timestamp, .. }
+            | Event::IssueReleased { timestamp, .. }
+            | Event::ArtifactArchiveExecuted { timestamp, .. }
+            | Event::IssueUpdated { timestamp, .. }
+            | Event::DependencyReduced { timestamp, .. }
+            | Event::LocalRuleBypassed { timestamp, .. }
+            | Event::TransitionBlocked { timestamp, .. }
+            | Event::GraphRuleBypassed { timestamp, .. }
+            | Event::GateDefinitionUpdated { timestamp, .. }
+            | Event::GateDefinitionCreated { timestamp, .. }
+            | Event::GateDefinitionRemoved { timestamp, .. }
+            | Event::ProfileLifecycle { timestamp, .. }
+            | Event::LinkedCheckoutWriteOverridden { timestamp, .. } => *timestamp,
         }
     }
 
@@ -1627,6 +1674,17 @@ impl Event {
                 *id = new_id;
                 *timestamp = new_timestamp;
             }
+        }
+    }
+
+    /// Record whether this profile lifecycle marker certifies the torn tail it
+    /// follows; any other event is left unchanged.
+    pub fn set_isolated_torn_tail(&mut self, torn_tail: bool) {
+        if let Event::ProfileLifecycle {
+            isolated_torn_tail, ..
+        } = self
+        {
+            *isolated_torn_tail = torn_tail;
         }
     }
 
@@ -1976,6 +2034,19 @@ mod tests {
     }
 
     #[test]
+    fn test_stamped_event_reads_back_its_body_and_identity() {
+        let body = Event::draft_gate_added("issue".to_string(), "tests".to_string());
+        let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
+
+        assert_eq!(event.id(), "event");
+        assert_eq!(event.timestamp(), timestamp);
+        assert_eq!(event.body().tag(), body.tag());
+        assert_eq!(event.into_body().get_issue_id(), body.get_issue_id());
+    }
+
+    #[test]
     fn test_issue_decode_rejects_archived_record_without_archived_from() {
         let error = serde_json::from_value::<Issue>(issue_record(State::Archived, None))
             .expect_err("an archived record without an origin must not decode");
@@ -2010,6 +2081,24 @@ mod tests {
         attested.inputs_digest = Some(digest.clone());
 
         assert!(!attested.is_reusable_for("review", &digest));
+    }
+
+    #[test]
+    fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
+        let mut run = GateRunResult::attestation(
+            "issue",
+            "review",
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.by = Some(Assignee::AUTO_EXECUTOR);
+
+        let encoded = serde_json::to_string(&run).unwrap();
+        let decoded: GateRunResult = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.by, run.by);
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
     }
 
     #[test]
