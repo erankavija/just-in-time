@@ -59,8 +59,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
-    DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, LabelReferenceConfig, LabelReferenceScope, Rule, RuleScope, Selector, Severity,
+    StatePredicate, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
 };
 use crate::domain::id_pattern::IdPattern;
 use crate::validation::engine::Finding;
@@ -723,19 +723,6 @@ fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
     }
 }
 
-/// Read a required string key from a config table, or `Err(GraphFinding)`.
-fn require_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
-        None => Err(config_error(rule, format!("missing required key '{key}'"))),
-    }
-}
-
 /// Read an optional string key, defaulting when absent. A present non-string is
 /// a config error.
 fn optional_str<'a>(
@@ -1176,48 +1163,19 @@ fn children_of<'a>(
 ///
 /// Every issue matching the rule's selector and carrying a `from`-namespace
 /// reference label must have each referenced value declared as a `to`-namespace
-/// source within the configured scope.
-///
-/// # Config keys
-///
-/// - `from` (string, required): namespace of the reference label whose values
-///   must resolve (e.g. `"satisfies"`).
-/// - `to` (string, required): namespace that DECLARES valid source ids (e.g.
-///   `"req"`).
-/// - `scope` (string, optional, default `"global"`): where a declaration may
-///   live — `"global"` (any issue in the set) or `"linked"` (only issues this
-///   issue depends on, or that depend on it).
-///
-/// One finding is produced per dangling reference. A malformed config yields a
-/// single `config-error` finding.
+/// source within the configured scope. One finding is produced per dangling
+/// reference.
 fn evaluate_label_reference(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelReferenceConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    let from_ns = match require_str(rule, config, "from") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let to_ns = match require_str(rule, config, "to") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let scope = match optional_str(rule, config, "scope", "global") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let linked = match scope {
-        "global" => false,
-        "linked" => true,
-        other => {
-            return vec![config_error(
-                rule,
-                format!("key 'scope' must be 'global' or 'linked', got '{other}'"),
-            )]
-        }
-    };
+    let LabelReferenceConfig {
+        from: from_ns,
+        to: to_ns,
+        scope,
+    } = config;
 
     // Globally declared source ids (the `to` namespace values across all issues).
     let global_sources: BTreeSet<&str> = graph_context
@@ -1229,7 +1187,7 @@ fn evaluate_label_reference(
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if linked {
+            let allowed: BTreeSet<&str> = if *scope == LabelReferenceScope::Linked {
                 linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
@@ -2985,27 +2943,6 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
-    }
-
-    #[test]
-    fn test_label_reference_missing_key_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = reference_rule("from = \"implements\", to = \"req\"");
-        if let Assertion::LabelReference { config } = &mut rule.assert {
-            config.remove("to");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[issue("x", &["implements:REQ-01"])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("'to'"));
     }
 
     // --- dependency-shape --------------------------------------------------

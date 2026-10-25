@@ -35,7 +35,8 @@
 
 use super::VirtualPath;
 use crate::declarations::rules::{
-    Assertion, LabelUniquenessScope, Rule, RuleSet, Selector, DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, LabelReferenceScope, LabelUniquenessScope, Rule, RuleSet, Selector,
+    DEFAULT_CRITERION_ID_PATTERN,
 };
 use std::collections::HashSet;
 
@@ -273,7 +274,18 @@ fn render_assertion(
             format!("{{ label-coverage = {} }}", render_config_table(config))
         }
         Assertion::LabelReference { config } => {
-            format!("{{ label-reference = {} }}", render_config_table(config))
+            // Omit the default scope so round-tripped rules stay canonical.
+            let mut parts = vec![
+                format!("from = {}", toml_basic_string(&config.from)),
+                format!("to = {}", toml_basic_string(&config.to)),
+            ];
+            if config.scope != LabelReferenceScope::default() {
+                parts.push(format!(
+                    "scope = {}",
+                    toml_basic_string(config.scope.as_str())
+                ));
+            }
+            format!("{{ label-reference = {{ {} }} }}", parts.join(", "))
         }
         Assertion::DependencyShape { config } => {
             format!("{{ dependency-shape = {} }}", render_config_table(config))
