@@ -426,9 +426,9 @@ pub(crate) fn declarations_from_image(
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config_bytes = image
-        .file_bytes(&VirtualPath::CONFIG)?
-        .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
+    let config_bytes = image.file_bytes(&VirtualPath::CONFIG)?.ok_or_else(|| {
+        DeclarationParseError::MissingCapture(VirtualPath::CONFIG.repository_relative())
+    })?;
     let configuration = crate::declarations::parse_configuration(config_bytes)?;
     let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
     let hierarchy_types = config

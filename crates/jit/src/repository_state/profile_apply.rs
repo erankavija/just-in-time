@@ -57,12 +57,12 @@ pub enum Contribution {
 }
 
 impl Contribution {
-    pub fn registry_path(&self) -> &'static str {
+    pub fn registry_path(&self) -> VirtualPath {
         match self {
             Self::Scalar { .. }
             | Self::MapEntry { .. }
             | Self::SetString { .. }
-            | Self::Projection { .. } => ".jit/config.toml",
+            | Self::Projection { .. } => VirtualPath::CONFIG,
             Self::KeyedArray { target, .. } => target.registry_path(),
         }
     }
@@ -140,14 +140,14 @@ pub enum ContributionRegistry {
 }
 
 impl ContributionRegistry {
-    /// Repository-relative path of the registry file this vocabulary names.
-    pub fn path(self) -> &'static str {
+    /// Virtual path of the registry file this vocabulary names.
+    pub fn path(self) -> VirtualPath {
         match self {
-            Self::Config => ".jit/config.toml",
-            Self::Gates => ".jit/gates.toml",
-            Self::Invariants => ".jit/invariants.toml",
-            Self::Rules => ".jit/rules.toml",
-            Self::Templates => ".jit/templates.toml",
+            Self::Config => VirtualPath::CONFIG,
+            Self::Gates => VirtualPath::GATES,
+            Self::Invariants => VirtualPath::INVARIANTS,
+            Self::Rules => VirtualPath::RULES,
+            Self::Templates => VirtualPath::TEMPLATES,
         }
     }
 }
@@ -180,7 +180,7 @@ pub enum ContributionIdentityTarget {
 
 impl std::fmt::Display for ContributionIdentity {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{}:", self.registry.path())?;
+        write!(formatter, "{}:", self.registry.path().repository_relative())?;
         match &self.target {
             ContributionIdentityTarget::Scalar { target } => write!(formatter, "scalar:{target}"),
             ContributionIdentityTarget::MapEntry { target, name } => {
@@ -447,12 +447,12 @@ pub enum KeyedArrayTarget {
 }
 
 impl KeyedArrayTarget {
-    pub(crate) fn registry_path(self) -> &'static str {
+    pub(crate) fn registry_path(self) -> VirtualPath {
         match self {
-            Self::Gates => ".jit/gates.toml",
-            Self::Invariants => ".jit/invariants.toml",
-            Self::Rules => ".jit/rules.toml",
-            Self::Templates => ".jit/templates.toml",
+            Self::Gates => VirtualPath::GATES,
+            Self::Invariants => VirtualPath::INVARIANTS,
+            Self::Rules => VirtualPath::RULES,
+            Self::Templates => VirtualPath::TEMPLATES,
         }
     }
 
@@ -705,19 +705,7 @@ impl ProfileClaims {
 
 impl Contribution {
     fn registry_target(&self) -> Result<VirtualPath, super::RepositoryLayoutError> {
-        let relative = match self {
-            Self::Scalar { .. }
-            | Self::MapEntry { .. }
-            | Self::SetString { .. }
-            | Self::Projection { .. } => "config.toml",
-            Self::KeyedArray { target, .. } => match target {
-                KeyedArrayTarget::Gates => "gates.toml",
-                KeyedArrayTarget::Invariants => "invariants.toml",
-                KeyedArrayTarget::Rules => "rules.toml",
-                KeyedArrayTarget::Templates => "templates.toml",
-            },
-        };
-        VirtualPath::data(relative)
+        Ok(self.registry_path())
     }
 }
 
@@ -786,8 +774,11 @@ impl ProfileApplicationInput {
     /// reference, so an application of it reaches the generated schema
     /// directory whether or not the package names a target under it.
     pub(crate) fn owns_default_rule_authority(&self) -> bool {
-        self.target_hashes.contains_key(".jit/config.toml")
-            || self.target_hashes.contains_key(".jit/rules.toml")
+        self.target_hashes
+            .contains_key(VirtualPath::CONFIG.repository_relative().as_str())
+            || self
+                .target_hashes
+                .contains_key(VirtualPath::RULES.repository_relative().as_str())
     }
 }
 
@@ -1166,28 +1157,35 @@ fn render_composed_contributions(
     base: &RepositoryImage,
     contributions: &[ComposedContribution],
 ) -> Result<BTreeMap<VirtualPath, (Vec<u8>, FileMode)>, RepositoryStateError> {
-    let mut documents = BTreeMap::<String, MergeDocument>::new();
+    let mut documents = BTreeMap::<VirtualPath, MergeDocument>::new();
     for contribution in contributions {
-        let target = contribution.definition.registry_path().to_string();
-        if !documents.contains_key(&target) {
-            let path = base.layout().classify_repository_relative(&target)?;
-            let existing = match base.entry(&path).map_err(ProducerError::from)? {
-                RepositoryEntry::File { content, mode } => Some((content.bytes().to_vec(), *mode)),
-                RepositoryEntry::Absent => None,
-                _ => return Err(ProducerError::ProfileRegistryNotFile { target }.into()),
-            };
-            documents.insert(target.clone(), MergeDocument::load(&target, existing)?);
-        }
-        let document = documents
-            .get_mut(&target)
-            .expect("profile registry document was inserted");
+        let path = contribution.definition.registry_path();
+        let target = path.repository_relative();
+        let document = match documents.entry(path.clone()) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                let existing = match base.entry(&path).map_err(ProducerError::from)? {
+                    RepositoryEntry::File { content, mode } => {
+                        Some((content.bytes().to_vec(), *mode))
+                    }
+                    RepositoryEntry::Absent => None,
+                    _ => {
+                        return Err(ProducerError::ProfileRegistryNotFile {
+                            target: target.clone(),
+                        }
+                        .into())
+                    }
+                };
+                entry.insert(MergeDocument::load(&target, existing)?)
+            }
+        };
         render_composed_contribution(&target, &mut document.document, &contribution.definition)?;
     }
     documents
         .into_iter()
         .map(|(path, document)| {
             Ok((
-                base.layout().classify_repository_relative(&path)?,
+                path,
                 (document.document.to_string().into_bytes(), document.mode),
             ))
         })
@@ -1203,13 +1201,12 @@ fn repository_definition(
     identity: &ContributionIdentity,
 ) -> Result<Option<Contribution>, RepositoryStateError> {
     let registry = identity.registry.path();
-    let path = base.layout().classify_repository_relative(registry)?;
-    let bytes = match base.entry(&path).map_err(ProducerError::from)? {
+    let bytes = match base.entry(&registry).map_err(ProducerError::from)? {
         RepositoryEntry::Absent => return Ok(None),
         RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
         _ => {
             return Err(ProducerError::ProfileRegistryNotFile {
-                target: registry.to_string(),
+                target: registry.repository_relative(),
             }
             .into())
         }
@@ -1233,9 +1230,9 @@ pub(crate) fn contribution_in_registry(
     identity: &ContributionIdentity,
     text: &[u8],
 ) -> Result<Option<Contribution>, RepositoryStateError> {
-    let registry = identity.registry.path();
-    let document = MergeDocument::load(registry, Some((text.to_vec(), FileMode::Regular)))?;
-    let semantic = semantic_document(registry, &document.document)?;
+    let registry = identity.registry.path().repository_relative();
+    let document = MergeDocument::load(&registry, Some((text.to_vec(), FileMode::Regular)))?;
+    let semantic = semantic_document(&registry, &document.document)?;
     match &identity.target {
         ContributionIdentityTarget::Scalar { target } => {
             let (table, key) = target.config_path();
@@ -1243,7 +1240,7 @@ pub(crate) fn contribution_in_registry(
                 return Ok(None);
             };
             let value = value.as_str().ok_or_else(|| {
-                profile_registry_error(registry, ProfileRegistryParseError::ScalarTargetNotString)
+                profile_registry_error(&registry, ProfileRegistryParseError::ScalarTargetNotString)
             })?;
             Ok(Some(Contribution::Scalar {
                 target: *target,
@@ -1266,11 +1263,11 @@ pub(crate) fn contribution_in_registry(
                 return Ok(None);
             };
             let values = values.as_array().ok_or_else(|| {
-                profile_registry_error(registry, ProfileRegistryParseError::SetTargetNotArray)
+                profile_registry_error(&registry, ProfileRegistryParseError::SetTargetNotArray)
             })?;
             if values.iter().any(|value| !value.is_string()) {
                 return Err(profile_registry_error(
-                    registry,
+                    &registry,
                     ProfileRegistryParseError::SetTargetNonStringMember,
                 ));
             }
@@ -1288,7 +1285,7 @@ pub(crate) fn contribution_in_registry(
             };
             let entries = entries.as_array().ok_or_else(|| {
                 profile_registry_error(
-                    registry,
+                    &registry,
                     ProfileRegistryParseError::NotArrayOfTables {
                         key: target.array_name().to_string(),
                     },
@@ -1320,7 +1317,7 @@ pub(crate) fn contribution_in_registry(
                     })
                     .map_err(|error| {
                         profile_registry_error(
-                            registry,
+                            &registry,
                             ProfileRegistryParseError::ProjectionDefinition(error.to_string()),
                         )
                     })
@@ -1753,8 +1750,9 @@ pub(crate) fn contributed_json_value(
             Ok(JsonValue::String(value.clone()))
         }
         Contribution::Projection { value, .. } => serde_json::to_value(value).map_err(|error| {
+            let registry = contribution.registry_path().repository_relative();
             profile_registry_error(
-                contribution.registry_path(),
+                &registry,
                 ProfileRegistryParseError::ProjectionDefinition(error.to_string()),
             )
         }),
