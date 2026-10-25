@@ -1085,11 +1085,11 @@ mod tests {
 
     use crate::watcher::ChangeTracker;
 
-    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
+    fn test_repository_layout<S>(storage: &S) -> jit::repository_state::RepositoryLayout
     where
         S: IssueStore + RepositoryStateStore,
     {
-        let layout = if storage.is_file_backed() {
+        if storage.is_file_backed() {
             let data_root = storage.root();
             let worktree_root = data_root
                 .parent()
@@ -1109,13 +1109,27 @@ mod tests {
                 ),
             )
             .unwrap()
-        };
+        }
+    }
+
+    fn write_test_config(storage: &jit::storage::InMemoryStorage, config: &str) {
+        let path = test_repository_layout(storage)
+            .resolve(&jit::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, config).unwrap();
+        storage.add_data_file("config.toml", config);
+    }
+
+    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
+    where
+        S: IssueStore + RepositoryStateStore,
+    {
+        let layout = test_repository_layout(&storage);
         Arc::new(CommandExecutor::new(storage).with_layout(layout))
     }
 
     fn test_memory_storage() -> InMemoryStorage {
-        use jit::storage::IssueStore;
-
         let storage = InMemoryStorage::new();
         // The taxonomy the taxonomy-serving routes answer with, declared by this
         // repository. The config-reading routes resolve it through a
@@ -1125,9 +1139,7 @@ mod tests {
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             jit::test_taxonomy::test_taxonomy().config_fragment()
         );
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
-        storage.add_data_file("config.toml", &config);
+        write_test_config(&storage, &config);
         storage.add_data_file(
             "index.json",
             r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
@@ -1304,8 +1316,7 @@ mod tests {
     async fn test_get_graph_returns_server_error_for_invalid_hierarchy() {
         let storage = test_memory_storage();
         let config = jit::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
-        storage.add_data_file("config.toml", &config);
+        write_test_config(&storage, &config);
 
         let state = AppState {
             executor: test_executor(storage),

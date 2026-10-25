@@ -367,7 +367,10 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .all_ids
         .iter()
         .map(|id| {
-            let path = format!(".jit/issues/{id}.json");
+            let mut path = VirtualPath::ISSUES.repository_relative();
+            path.push('/');
+            path.push_str(&id.to_string());
+            path.push_str(".json");
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
             if issue.id != *id {
@@ -1245,10 +1248,6 @@ mod tests {
         let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
             ";
-        let config = config.replace(
-            "__INVARIANTS_PATH__",
-            &VirtualPath::INVARIANTS.repository_relative(),
-        );
         let config = config.replace(
             "__INVARIANTS_PATH__",
             &VirtualPath::INVARIANTS.repository_relative(),

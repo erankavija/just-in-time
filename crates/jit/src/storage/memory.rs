@@ -333,8 +333,14 @@ impl InMemoryStorage {
     }
 
     /// Canonical `Data(...)` identity for one issue record.
-    fn issue_vpath(id: &str) -> VirtualPath {
-        VirtualPath::data(format!("issues/{id}.json")).expect("issue record path is canonical")
+    fn issue_vpath(id: &str) -> Result<VirtualPath> {
+        VirtualPath::data(
+            VirtualPath::ISSUES
+                .relative()
+                .as_path()
+                .join(format!("{id}.json")),
+        )
+        .context("invalid issue record path")
     }
 
     /// Canonical `Data(...)` identity for one gate-run result.
@@ -469,7 +475,7 @@ impl InMemoryStorage {
 
     /// Deserialize one captured issue record, if present.
     fn load_issue_entry(state: &MemoryRepositoryState, id: &str) -> Result<Option<Issue>> {
-        Self::data_entry_bytes(state, &Self::issue_vpath(id))
+        Self::data_entry_bytes(state, &Self::issue_vpath(id)?)
             .map(|bytes| {
                 serde_json::from_slice::<Issue>(&bytes)
                     .context("Failed to deserialize issue from repository image")
