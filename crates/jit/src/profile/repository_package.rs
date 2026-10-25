@@ -1701,15 +1701,15 @@ mod tests {
         let invariants = reloaded.project_render(Some("invariants")).unwrap();
         let invariants = &invariants.projections[0];
         assert_eq!(invariants.target, "AGENTS.md");
-        assert_eq!(invariants.mode, "region");
-        assert_eq!(invariants.style, "id-anchor");
+        assert_eq!(invariants.mode, crate::config::ProjectionMode::Region);
+        assert_eq!(invariants.style, ProjectionStyle::IdAnchor);
         assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, contributed.invariants.len());
         let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
         let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
-        assert_eq!(reference.mode, "separate-file");
-        assert_eq!(reference.style, "full");
+        assert_eq!(reference.mode, crate::config::ProjectionMode::SeparateFile);
+        assert_eq!(reference.style, ProjectionStyle::Full);
         assert_eq!(reference.kinds, ["rule", "gate"]);
         // The separate-file target carries the profile's six gates (registry
         // composition asserted through the rendered `## Gates` section).
