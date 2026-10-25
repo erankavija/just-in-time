@@ -18,9 +18,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ade255d9-4eef-4d0c-bf10-2f0391a1dbf1",
+      "run_id": "000a6da2-8029-459e-b489-4168dae01640",
       "status": "passed",
-      "updated_at": "2026-10-25T00:03:11.372033397Z",
+      "updated_at": "2026-10-25T00:13:55.734785660Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -58,5 +58,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Query assignee filters parse to an Assignee",
-  "updated_at": "2026-10-25T00:06:12.998380316Z"
+  "updated_at": "2026-10-25T00:13:55.734785660Z"
 }
