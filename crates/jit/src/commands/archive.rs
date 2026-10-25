@@ -959,19 +959,19 @@ mod tests {
             };
         let issues = vec![
             issue(
-                &fixture_id("done-container"),
+                &fixture_id("3073ec9d-481e-5d93-bcbd-8d3a829604ea"),
                 State::Done,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                &fixture_id("rejected-container"),
+                &fixture_id("c81ca1b2-8274-5bc5-ab45-4bcdc90631e7"),
                 State::Rejected,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                &fixture_id("active-container"),
+                &fixture_id("58a2e44c-2115-5819-bd02-0be9e12b79b2"),
                 State::InProgress,
                 None,
                 Some("portfolio"),
@@ -979,7 +979,7 @@ mod tests {
             // Archived from a terminal state is effectively terminal, so it is a
             // reconcilable candidate — same as the direct archive path accepts.
             issue(
-                &fixture_id("archived-from-done"),
+                &fixture_id("8f2e6a1f-4078-5d9c-b05c-90bf43cf08c2"),
                 State::Archived,
                 Some(State::Done),
                 Some("portfolio"),
@@ -987,19 +987,40 @@ mod tests {
             // Archived from a non-terminal state is not effectively terminal, so
             // it is excluded.
             issue(
-                &fixture_id("archived-from-active"),
+                &fixture_id("ef2490cc-b561-527e-9bdf-3a3c1258a630"),
                 State::Archived,
                 Some(State::InProgress),
                 Some("portfolio"),
             ),
-            issue(&fixture_id("done-leaf"), State::Done, None, Some("unit")),
-            issue(&fixture_id("done-unknown"), State::Done, None, Some("epic")),
-            issue(&fixture_id("done-untyped"), State::Done, None, None),
+            issue(
+                &fixture_id("907a9f01-03f8-54fa-b8d7-66a8b06627fe"),
+                State::Done,
+                None,
+                Some("unit"),
+            ),
+            issue(
+                &fixture_id("64938dc3-1cd3-507f-a34c-91686888506d"),
+                State::Done,
+                None,
+                Some("epic"),
+            ),
+            issue(
+                &fixture_id("748fd8b6-c7e4-5c20-9543-1654446a06ac"),
+                State::Done,
+                None,
+                None,
+            ),
         ];
 
+        let mut expected = vec![
+            issues[0].id.clone(),
+            issues[1].id.clone(),
+            issues[3].id.clone(),
+        ];
+        expected.sort();
         assert_eq!(
             effectively_terminal_container_ids(&issues, &hierarchy),
-            vec!["archived-from-done", "done-container", "rejected-container"]
+            expected
         );
     }
 

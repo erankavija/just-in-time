@@ -3060,7 +3060,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // the positional container's default anchor from its captured
             // template declaration; these explicit bindings override that
             // default.
-            let mut bindings: std::collections::BTreeMap<String, String> =
+            let mut bindings: std::collections::BTreeMap<String, IssueId> =
                 std::collections::BTreeMap::new();
             for pair in &anchor {
                 let (role, id) = pair.split_once('=').ok_or_else(|| {

@@ -1453,7 +1453,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_gated_postchecks_keep_resolved_target_after_a_new_issue_appears() {
         let executor = setup();
         let mut issue = crate::domain::fixture_issue("Target".to_string(), String::new());
-        issue.id = fixture_id("abcd1111111111111111111111111111");
+        issue.id = fixture_id("abcd1111-1111-1111-1111-111111111111");
         issue.state = State::InProgress;
         crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
@@ -1461,7 +1461,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .publish_captured_state_transition(&issue.id, State::Gated, false, false, true)
             .unwrap();
         let mut collision = crate::domain::fixture_issue("Collision".to_string(), String::new());
-        collision.id = fixture_id("abcd2222222222222222222222222222");
+        collision.id = fixture_id("abcd2222-2222-2222-2222-222222222222");
         crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
         executor.run_postchecks(&outcome.target_id).unwrap();
@@ -2020,7 +2020,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let result = executor
             .issues()
-            .confirm_deletion_allowed(&fixture_id("abc12345"), false);
+            .confirm_deletion_allowed(&fixture_id("abc12345-0000-0000-0000-000000000000"), false);
 
         let err = result.expect_err("must refuse without confirmation");
         assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
@@ -2033,7 +2033,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert!(executor
             .issues()
-            .confirm_deletion_allowed(&fixture_id("abc12345"), true)
+            .confirm_deletion_allowed(&fixture_id("abc12345-0000-0000-0000-000000000000"), true)
             .is_ok());
     }
 
@@ -2205,10 +2205,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::domain::fixture_issue("Target".into(), String::new());
-        target.id = fixture_id("22221111111111111111111111111111");
+        target.id = fixture_id("22221111-1111-1111-1111-111111111111");
         crate::commands::test_helpers::seed_issue(&storage, target.clone());
         let mut collision = crate::domain::fixture_issue("Collision".into(), String::new());
-        collision.id = fixture_id("22222222222222222222222222222222");
+        collision.id = fixture_id("22222222-2222-2222-2222-222222222222");
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
@@ -2581,7 +2581,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Test".to_string());
-        issue.dependencies = vec![dep_id.clone(), fixture_id("missing-id")];
+        issue.dependencies = vec![
+            dep_id.clone(),
+            fixture_id("592c59ad-7b54-5f2b-8415-68e1de5a3bf9"),
+        ];
 
         let resolved = executor.issues().get_dependencies_enriched(&issue);
         assert_eq!(resolved.len(), 1, "only the resolvable dep must appear");

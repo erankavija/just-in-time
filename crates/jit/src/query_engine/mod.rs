@@ -129,30 +129,55 @@ mod tests {
     #[test]
     fn test_filter_by_state() {
         let issues = vec![
-            create_test_issue(&fixture_id("1"), State::Ready, Priority::Normal, vec![]),
-            create_test_issue(&fixture_id("2"), State::Done, Priority::Normal, vec![]),
-            create_test_issue(&fixture_id("3"), State::Ready, Priority::High, vec![]),
+            create_test_issue(
+                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                State::Ready,
+                Priority::Normal,
+                vec![],
+            ),
+            create_test_issue(
+                &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+                State::Done,
+                Priority::Normal,
+                vec![],
+            ),
+            create_test_issue(
+                &fixture_id("b309dea0-e93c-56db-9922-c57f00081a4f"),
+                State::Ready,
+                Priority::High,
+                vec![],
+            ),
         ];
 
         let filter = QueryFilter::parse("state:ready").unwrap();
         let matched = filter.filter_issues(&issues).unwrap();
 
         assert_eq!(matched.len(), 2);
-        assert_eq!(matched[0].id, "1");
-        assert_eq!(matched[1].id, "3");
+        assert_eq!(matched[0].id, issues[0].id);
+        assert_eq!(matched[1].id, issues[2].id);
     }
 
     #[test]
     fn test_filter_by_priority() {
         let issues = vec![
-            create_test_issue(&fixture_id("1"), State::Ready, Priority::High, vec![]),
-            create_test_issue(&fixture_id("2"), State::Ready, Priority::Normal, vec![]),
+            create_test_issue(
+                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                State::Ready,
+                Priority::High,
+                vec![],
+            ),
+            create_test_issue(
+                &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+                State::Ready,
+                Priority::Normal,
+                vec![],
+            ),
         ];
 
         let filter = QueryFilter::parse("priority:high").unwrap();
         let matched = filter.filter_issues(&issues).unwrap();
 
         assert_eq!(matched.len(), 1);
-        assert_eq!(matched[0].id, "1");
+        assert_eq!(matched[0].id, issues[0].id);
     }
 }

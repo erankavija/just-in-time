@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn test_eval_state_condition() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             None,
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_eval_priority_condition() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::High,
             None,
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_eval_label_exact_match() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             None,
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_eval_label_wildcard() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             None,
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn test_eval_assignee_condition() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn test_eval_unassigned_condition() {
         let assigned = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
@@ -214,7 +214,7 @@ mod tests {
             vec![],
         );
         let unassigned = create_issue(
-            &fixture_id("2"),
+            &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
             State::Ready,
             Priority::Normal,
             None,
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_eval_blocked_condition() {
         let dep = create_issue(
-            &fixture_id("dep"),
+            &fixture_id("f4a698f0-7af7-5d08-8331-30d305c22da0"),
             State::Ready,
             Priority::Normal,
             None,
@@ -248,15 +248,15 @@ mod tests {
             vec![],
         );
         let blocked = create_issue(
-            &fixture_id("blocked"),
+            &fixture_id("3e9688bd-a715-50ab-b754-0cce3ea8599e"),
             State::Backlog,
             Priority::Normal,
             None,
             vec![],
-            vec![fixture_id("dep")],
+            vec![fixture_id("f4a698f0-7af7-5d08-8331-30d305c22da0")],
         );
         let not_blocked = create_issue(
-            &fixture_id("ok"),
+            &fixture_id("c646cd52-320a-5274-a9f2-3a1aa166a253"),
             State::Ready,
             Priority::Normal,
             None,
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn test_eval_and_expression() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::High,
             None,
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn test_eval_or_expression() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             None,
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn test_eval_not_expression() {
         let issue = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::Normal,
             None,
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn test_eval_complex_expression() {
         let issue1 = create_issue(
-            &fixture_id("1"),
+            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
             State::Ready,
             Priority::High,
             None,
@@ -352,7 +352,7 @@ mod tests {
             vec![],
         );
         let issue2 = create_issue(
-            &fixture_id("2"),
+            &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
             State::Done,
             Priority::Normal,
             None,
@@ -360,7 +360,7 @@ mod tests {
             vec![],
         );
         let issue3 = create_issue(
-            &fixture_id("3"),
+            &fixture_id("b309dea0-e93c-56db-9922-c57f00081a4f"),
             State::InProgress,
             Priority::Low,
             None,

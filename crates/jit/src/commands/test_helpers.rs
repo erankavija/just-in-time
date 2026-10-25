@@ -315,7 +315,7 @@ pub fn setup() -> CommandExecutor<InMemoryStorage> {
 
 /// Decode an issue identity at the fixture boundary.
 pub(crate) fn fixture_id(value: &str) -> IssueId {
-    serde_json::from_value(serde_json::json!(value)).expect("fixture issue id decodes")
+    value.parse().expect("fixture issue id is a canonical UUID")
 }
 
 #[cfg(test)]

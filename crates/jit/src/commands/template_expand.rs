@@ -793,10 +793,7 @@ applies_to = ["epic"]
 
     /// The container anchor's pre-apply dependency snapshot.
     pub(crate) fn snapshots(container_deps: &[IssueId]) -> BTreeMap<String, Vec<IssueId>> {
-        BTreeMap::from([(
-            "container".to_string(),
-            container_deps.iter().map(|s| s.to_string()).collect(),
-        )])
+        BTreeMap::from([("container".to_string(), container_deps.to_vec())])
     }
 
     /// Expand `template` against these declarations.
@@ -856,12 +853,12 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_produces_creates_edges_and_removals() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("c1")),
-            &snapshots(&[fixture_id("u1")]),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
 
@@ -870,7 +867,7 @@ applies_to = ["epic"]
         assert_eq!(delta.creates[0].role, "planning");
         assert_eq!(
             delta.creates[0].description,
-            "Plan Auth epic. Doc: dev/active/c1-plan.md."
+            format!("Plan Auth epic. Doc: dev/active/{}-plan.md.", container.id)
         );
         assert_eq!(delta.creates[0].gates, vec!["plan-review".to_string()]);
         assert!(delta.creates[1]
@@ -886,12 +883,16 @@ applies_to = ["epic"]
                     dependency: DeltaEndpoint::CreatedRole("planning".to_string()),
                 },
                 DeltaEdge {
-                    dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
+                    dependent: DeltaEndpoint::ExistingIssue(fixture_id(
+                        "1590ce6c-9129-512f-befc-1e8508dc7963"
+                    )),
                     dependency: DeltaEndpoint::CreatedRole("breakdown".to_string()),
                 },
                 DeltaEdge {
                     dependent: DeltaEndpoint::CreatedRole("planning".to_string()),
-                    dependency: DeltaEndpoint::ExistingIssue("u1".to_string()),
+                    dependency: DeltaEndpoint::ExistingIssue(fixture_id(
+                        "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                    )),
                 },
             ]
         );
@@ -900,8 +901,12 @@ applies_to = ["epic"]
         assert_eq!(
             delta.remove_edges,
             vec![DeltaEdge {
-                dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
-                dependency: DeltaEndpoint::ExistingIssue("u1".to_string()),
+                dependent: DeltaEndpoint::ExistingIssue(fixture_id(
+                    "1590ce6c-9129-512f-befc-1e8508dc7963"
+                )),
+                dependency: DeltaEndpoint::ExistingIssue(fixture_id(
+                    "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                )),
             }]
         );
 
@@ -909,7 +914,7 @@ applies_to = ["epic"]
         assert_eq!(
             delta.anchor_gates,
             vec![AnchorGates {
-                anchor_issue_id: fixture_id("c1"),
+                anchor_issue_id: fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
                 gates: vec!["repo-validate".to_string()],
             }]
         );
@@ -919,11 +924,11 @@ applies_to = ["epic"]
     fn test_expand_template_moves_only_pre_apply_upstream_deps() {
         // The transform reads the SNAPSHOT, so an id absent from it is never
         // moved even when the same delta wires an edge to it (APPB-02).
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -944,7 +949,7 @@ applies_to = ["epic"]
             .expect("plan template declares a breakdown node")
             .labels = vec!["custom-anchor:{container.short_id}".to_string()];
 
-        let container = container(&fixture_id("abcdef123456"));
+        let container = container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
         let delta = expand(
             &template,
             &container,
@@ -965,7 +970,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_unbound_anchor() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let err = expand(
             &plan_template(),
             &container,
@@ -1008,13 +1013,13 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_declared_document_area_into_the_document_path() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let template = document_template("{container.dir}/plan.md", Some(AREA));
 
         let delta = expand(
             &template,
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1033,7 +1038,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_a_document_area_the_registry_does_not_declare() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{AREA}-drafts");
@@ -1042,7 +1047,7 @@ applies_to = ["epic"]
         let error = expand(
             &template,
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap_err();
@@ -1066,7 +1071,7 @@ applies_to = ["epic"]
         assert!(expand(
             &document_template("{container.dir}/plan.md", Some(AREA)),
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .is_ok());
@@ -1074,14 +1079,14 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_node_that_declares_no_document_area_without_a_directory() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
 
         // A flat area-plus-prefix declaration resolves from the container tokens
         // alone.
         let flat = expand(
             &document_template("dev/active/{container.short_id}-plan.md", None),
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1095,7 +1100,7 @@ applies_to = ["epic"]
         let unscoped = expand(
             &document_template("{container.dir}/plan.md", None),
             &container,
-            &bindings(&fixture_id("c1")),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1104,17 +1109,20 @@ applies_to = ["epic"]
 
     #[test]
     fn test_validate_delta_acyclic_accepts_the_plan_spine() {
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("c1")),
-            &snapshots(&[fixture_id("u1")]),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec![]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
     }
@@ -1148,21 +1156,30 @@ applies_to = ["epic"]
 "#,
             "cyclic",
         );
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let bindings = BTreeMap::from([
-            ("container".to_string(), "c1".to_string()),
-            ("upstream".to_string(), "u1".to_string()),
+            (
+                "container".to_string(),
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+            ),
+            (
+                "upstream".to_string(),
+                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
+            ),
         ]);
         let delta = expand(
             &template,
             &container,
             &bindings,
-            &snapshots(&[fixture_id("u1")]),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec![]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
         ]);
         let err = validate_delta_acyclic(&delta, store).unwrap_err();
         assert!(err.to_string().contains("cycle"), "{err}");
@@ -1189,19 +1206,25 @@ applies_to = ["epic"]
 "#,
             "mover",
         );
-        let container = container(&fixture_id("c1"));
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &template,
             &container,
-            &bindings(&fixture_id("c1")),
-            &snapshots(&[fixture_id("u1")]),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
         // u1 depends on c1, and c1 depends on u1: the store is already cyclic
         // EXCEPT that the transform removes c1→u1, leaving u1→c1 and P→u1.
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec!["c1".to_string()]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (
+                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
+                vec![fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")],
+            ),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
     }
@@ -1224,7 +1247,7 @@ applies_to = ["epic"]
     fn test_interpolation_resolves_container_and_doc_tokens() {
         let mut issue =
             crate::domain::fixture_issue("Auth epic".to_string(), "- [hard] REQ-01: x".to_string());
-        issue.id = fixture_id("abc123def456");
+        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
         let node = TemplateNode {
             role: "planning".to_string(),
             type_name: "planning".to_string(),
@@ -1242,7 +1265,7 @@ applies_to = ["epic"]
         let rendered = node_description(&node, &ctx);
         assert!(rendered.contains("Auth epic"));
         assert!(rendered.contains("abc123de")); // short id (8 chars)
-        assert!(rendered.contains("dev/active/abc123def456-plan.md")); // {doc}
+        assert!(rendered.contains("dev/active/abc123de-f456-0000-0000-000000000000-plan.md")); // {doc}
         assert!(rendered.contains("[hard] REQ-01: x"));
     }
 
@@ -1294,7 +1317,7 @@ applies_to = ["epic"]
         // templating language: an unsupported `{token}` is left untouched while the
         // known container tokens around it still resolve.
         let mut issue = crate::domain::fixture_issue("Auth epic".to_string(), String::new());
-        issue.id = fixture_id("abc123def456");
+        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
         let ctx = InterpolationContext::for_container(&issue);
         let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
         assert_eq!(rendered, "Auth epic then {totally.unknown} end");
@@ -1306,7 +1329,7 @@ applies_to = ["epic"]
         // membership labels (NOT the container's own `type:`), the node's own
         // `type:<node.type>`, and its interpolated `labels`. The `{container.short_id}`
         // token in a node label must resolve to the container's short id.
-        let container = container(&fixture_id("abc123def456"));
+        let container = container(&fixture_id("abc123de-f456-0000-0000-000000000000"));
         let short = container.short_id();
 
         let node = TemplateNode {

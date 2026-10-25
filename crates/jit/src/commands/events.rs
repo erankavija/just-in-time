@@ -108,7 +108,9 @@ mod tests {
                 .query_events(
                     None,
                     Some(IssueIdPrefix::from(
-                        &"00000000-0000-0000-0000-000000000001".to_string()
+                        &"00000000-0000-0000-0000-000000000001"
+                            .parse::<crate::domain::identity::IssueId>()
+                            .unwrap()
                     )),
                     10,
                 )

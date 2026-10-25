@@ -1739,7 +1739,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             run_id: run_id.to_string(),
             gate_key: gate_key.to_string(),
             stage: GateStage::Postcheck,
-            issue_id: fixture_id("issue-1"),
+            issue_id: fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2"),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: GateRunStatus::Failed,
@@ -1835,7 +1835,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
     #[test]
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
         let mut issue = crate::domain::fixture_issue("Test".into(), String::new());
-        issue.id = fixture_id("issue-1");
+        issue.id = fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2");
         issue.gates_required = vec!["first".into(), "second".into()];
         let mut run = prior_run("", "first", 10, None);
         run.status = GateRunStatus::Passed;
@@ -2773,7 +2773,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }));
 
         let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
-        planned_issue.dependencies.push(fixture_id("nonexistent"));
+        planned_issue
+            .dependencies
+            .push(fixture_id("5a1f6645-96bf-59db-932e-7f49ee5cc6bb"));
         let overrides = crate::commands::overrides_from_repo_changes(
             live_image.layout(),
             [
@@ -3039,7 +3041,7 @@ source-of-truth = "markdown-first"
             "type:task".to_string(),
             "satisfies:@/requirement/missing".to_string(),
         ];
-        local_failure.dependencies = vec![fixture_id("missing-dependency")];
+        local_failure.dependencies = vec![fixture_id("04d64f1d-4c96-5feb-9570-9e34e4c85810")];
         local_failure.gates_required = vec!["unrelated-pending".to_string()];
         seed_issue(&executor.storage, local_failure);
 
@@ -3108,7 +3110,10 @@ source-of-truth = "markdown-first"
 
         let ambiguous_executor = setup();
         seed_rule_validation_rules(&ambiguous_executor);
-        for id in ["deadbeef-a", "deadbeef-b"] {
+        for id in [
+            "deadbeef-0000-4000-8000-000000000001",
+            "deadbeef-0000-4000-8000-000000000002",
+        ] {
             let mut target =
                 crate::domain::fixture_issue(format!("Ambiguous target {id}"), String::new());
             target.id = fixture_id(id);

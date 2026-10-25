@@ -49,11 +49,12 @@ impl fmt::Display for DocumentScope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueId;
 
     #[test]
     fn test_document_scope_parse_all() {
         assert_eq!(
-            DocumentScope::parse("all", |id| Ok(id.to_string())).unwrap(),
+            DocumentScope::parse("all", |id| Ok(id.parse::<IssueId>()?)).unwrap(),
             DocumentScope::All
         );
         assert_eq!(DocumentScope::All.to_string(), "all");
@@ -61,14 +62,21 @@ mod tests {
 
     #[test]
     fn test_document_scope_parse_issue() {
-        let scope = DocumentScope::parse("issue:abc123", |id| Ok(id.to_string())).unwrap();
-        assert_eq!(scope, DocumentScope::Issue("abc123".to_string()));
-        assert_eq!(scope.to_string(), "issue:abc123");
+        let resolved = "0f0e0d0c-0000-4000-8000-000000000001"
+            .parse::<IssueId>()
+            .unwrap();
+        let scope = DocumentScope::parse("issue:abc123", |id| {
+            assert_eq!(id, "abc123");
+            Ok(resolved.clone())
+        })
+        .unwrap();
+        assert_eq!(scope, DocumentScope::Issue(resolved.clone()));
+        assert_eq!(scope.to_string(), format!("issue:{resolved}"));
     }
 
     #[test]
     fn test_document_scope_parse_invalid() {
-        let err = DocumentScope::parse("label:epic", |id| Ok(id.to_string())).unwrap_err();
+        let err = DocumentScope::parse("label:epic", |id| Ok(id.parse::<IssueId>()?)).unwrap_err();
         assert_eq!(
             err.downcast_ref::<DocumentScopeParseError>().unwrap(),
             &DocumentScopeParseError::UnknownScope("label:epic".to_string())
@@ -78,10 +86,12 @@ mod tests {
     }
 
     #[test]
-    fn test_document_scope_issue_roundtrips_empty_id() {
-        // `issue:` with an empty id parses to an empty-id Issue and round-trips.
-        let scope = DocumentScope::parse("issue:", |id| Ok(id.to_string())).unwrap();
-        assert_eq!(scope, DocumentScope::Issue(String::new()));
-        assert_eq!(scope.to_string(), "issue:");
+    fn test_document_scope_parse_issue_delegates_empty_id_to_resolver() {
+        let err = DocumentScope::parse("issue:", |id| {
+            assert!(id.is_empty());
+            anyhow::bail!("empty issue argument")
+        })
+        .unwrap_err();
+        assert_eq!(err.to_string(), "empty issue argument");
     }
 }

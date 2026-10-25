@@ -676,9 +676,18 @@ mod tests {
     #[test]
     fn test_compute_dependency_summary_keys_by_state_enum() {
         let tree = vec![
-            make_node(&fixture_id("id-done-1"), State::Done),
-            make_node(&fixture_id("id-done-2"), State::Done),
-            make_node(&fixture_id("id-in-progress"), State::InProgress),
+            make_node(
+                &fixture_id("9a3beda4-9e53-59a5-8c6f-d2b0438f8263"),
+                State::Done,
+            ),
+            make_node(
+                &fixture_id("89c1f9f1-1a8b-5963-9831-82d71ca2a3a0"),
+                State::Done,
+            ),
+            make_node(
+                &fixture_id("b23c207c-daac-5d84-92d4-d5f9ba8732e3"),
+                State::InProgress,
+            ),
         ];
 
         let summary = compute_dependency_summary(&tree);
@@ -692,11 +701,23 @@ mod tests {
     #[test]
     fn test_compute_dependency_summary_deduplicates_shared_ids() {
         // Same ID appearing as both a direct and nested dep should count once.
-        let mut child = make_node(&fixture_id("shared-id"), State::Done);
+        let mut child = make_node(
+            &fixture_id("5bd55d8a-315a-50d0-9915-32285331aff3"),
+            State::Done,
+        );
         child.level = 2;
-        let mut parent = make_node(&fixture_id("parent-id"), State::InProgress);
+        let mut parent = make_node(
+            &fixture_id("fa69be22-3ce2-5e38-8dd9-a1a8fe34cc5c"),
+            State::InProgress,
+        );
         parent.children = vec![child];
-        let tree = vec![make_node(&fixture_id("shared-id"), State::Done), parent];
+        let tree = vec![
+            make_node(
+                &fixture_id("5bd55d8a-315a-50d0-9915-32285331aff3"),
+                State::Done,
+            ),
+            parent,
+        ];
 
         let summary = compute_dependency_summary(&tree);
 
@@ -708,8 +729,14 @@ mod tests {
     fn test_dependency_summary_json_uses_snake_case_state_keys() {
         // Regression guard: keys must be "in_progress" not "inprogress".
         let tree = vec![
-            make_node(&fixture_id("a"), State::Done),
-            make_node(&fixture_id("b"), State::InProgress),
+            make_node(
+                &fixture_id("f6b286c5-54d5-5acd-bd26-cc734e2292e3"),
+                State::Done,
+            ),
+            make_node(
+                &fixture_id("3ba09e56-907e-5586-9d02-2c3d23d4d8ae"),
+                State::InProgress,
+            ),
         ];
         let summary = compute_dependency_summary(&tree);
         let json = serde_json::to_string(&summary).expect("summary serializes");

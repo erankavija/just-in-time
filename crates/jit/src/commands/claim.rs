@@ -1075,7 +1075,7 @@ mod tests {
         let result = execute_claim_acquire_test(
             &temp,
             &storage,
-            &fixture_id("nonexistent"),
+            &fixture_id("5a1f6645-96bf-59db-932e-7f49ee5cc6bb"),
             600,
             "agent:test",
         );

@@ -231,6 +231,7 @@ pub fn compute_sha256(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueId;
 
     #[test]
     fn test_compute_sha256() {
@@ -254,24 +255,29 @@ mod tests {
 
     #[test]
     fn test_scope_parse_all() {
-        let scope = SnapshotScope::parse("all", |id| Ok(id.to_string())).unwrap();
+        let scope = SnapshotScope::parse("all", |id| Ok(id.parse::<IssueId>()?)).unwrap();
         matches!(scope, SnapshotScope::All);
         assert_eq!(scope.to_string(), "all");
     }
 
     #[test]
     fn test_scope_parse_issue() {
-        let scope = SnapshotScope::parse("issue:abc123", |id| Ok(id.to_string())).unwrap();
-        match &scope {
-            SnapshotScope::Issue(id) => assert_eq!(id, "abc123"),
-            _ => panic!("Expected Issue variant"),
-        }
-        assert_eq!(scope.to_string(), "issue:abc123");
+        let resolved = "0f0e0d0c-0000-4000-8000-000000000001"
+            .parse::<IssueId>()
+            .unwrap();
+        let scope = SnapshotScope::parse("issue:abc123", |id| {
+            assert_eq!(id, "abc123");
+            Ok(resolved.clone())
+        })
+        .unwrap();
+        assert!(matches!(&scope, SnapshotScope::Issue(id) if id == &resolved));
+        assert_eq!(scope.to_string(), format!("issue:{resolved}"));
     }
 
     #[test]
     fn test_scope_parse_label() {
-        let scope = SnapshotScope::parse("label:epic:auth", |id| Ok(id.to_string())).unwrap();
+        let scope =
+            SnapshotScope::parse("label:epic:auth", |id| Ok(id.parse::<IssueId>()?)).unwrap();
         match &scope {
             SnapshotScope::Label { namespace, value } => {
                 assert_eq!(namespace, "epic");
@@ -284,7 +290,8 @@ mod tests {
 
     #[test]
     fn test_scope_parse_label_milestone() {
-        let scope = SnapshotScope::parse("label:milestone:v1.0", |id| Ok(id.to_string())).unwrap();
+        let scope =
+            SnapshotScope::parse("label:milestone:v1.0", |id| Ok(id.parse::<IssueId>()?)).unwrap();
         match &scope {
             SnapshotScope::Label { namespace, value } => {
                 assert_eq!(namespace, "milestone");
@@ -302,12 +309,10 @@ mod tests {
         // prefix) stops at the first colon, so a widened-grammar `@`-prefixed
         // value — itself carrying `/`-delimited segments — passes through
         // whole, unsplit any further.
-        let scope =
-            SnapshotScope::parse(
-                "label:enforces:@/rule/label-format",
-                |id| Ok(id.to_string()),
-            )
-            .unwrap();
+        let scope = SnapshotScope::parse("label:enforces:@/rule/label-format", |id| {
+            Ok(id.parse::<IssueId>()?)
+        })
+        .unwrap();
         match &scope {
             SnapshotScope::Label { namespace, value } => {
                 assert_eq!(namespace, "enforces");
@@ -319,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_scope_parse_label_missing_value() {
-        let result = SnapshotScope::parse("label:epic", |id| Ok(id.to_string()));
+        let result = SnapshotScope::parse("label:epic", |id| Ok(id.parse::<IssueId>()?));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -329,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_scope_parse_invalid() {
-        let result = SnapshotScope::parse("invalid:123", |id| Ok(id.to_string()));
+        let result = SnapshotScope::parse("invalid:123", |id| Ok(id.parse::<IssueId>()?));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

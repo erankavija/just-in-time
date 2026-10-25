@@ -235,12 +235,20 @@ mod tests {
     #[test]
     fn test_extract_issue_id_from_issue_file() {
         assert_eq!(
-            extract_issue_id("issues/abc123.json"),
-            Some("abc123".to_string())
+            extract_issue_id("issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"),
+            Some(
+                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
+                    .parse::<IssueId>()
+                    .unwrap()
+            )
         );
         assert_eq!(
-            extract_issue_id(".jit/issues/def456.json"),
-            Some("def456".to_string())
+            extract_issue_id(".jit/issues/8fde4411-626f-5466-82f0-605630dfc6ee.json"),
+            Some(
+                "8fde4411-626f-5466-82f0-605630dfc6ee"
+                    .parse::<IssueId>()
+                    .unwrap()
+            )
         );
     }
 
@@ -264,8 +272,12 @@ mod tests {
     #[test]
     fn test_search_result_serialization() {
         let result = SearchResult {
-            issue_id: Some(serde_json::from_value(serde_json::json!("abc123")).unwrap()),
-            path: "issues/abc123.json".to_string(),
+            issue_id: Some(
+                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
+                    .parse::<IssueId>()
+                    .unwrap(),
+            ),
+            path: "issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json".to_string(),
             line_number: 5,
             line_text: "  \"title\": \"Test Issue\",\n".to_string(),
             matches: vec![SearchMatch {
@@ -282,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_single_match() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"  \"title\": \"Test\",\n"},"line_number":3,"submatches":[{"match":{"text":"Test"},"start":12,"end":16}]}}
+        let json = r#"{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"  \"title\": \"Test\",\n"},"line_number":3,"submatches":[{"match":{"text":"Test"},"start":12,"end":16}]}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -291,9 +303,16 @@ mod tests {
         let result = &results[0];
         assert_eq!(
             result.issue_id,
-            Some(serde_json::from_value(serde_json::json!("abc123")).unwrap())
+            Some(
+                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
+                    .parse::<IssueId>()
+                    .unwrap()
+            )
         );
-        assert_eq!(result.path, "issues/abc123.json");
+        assert_eq!(
+            result.path,
+            "issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"
+        );
         assert_eq!(result.line_number, 3);
         assert!(result.line_text.contains("Test"));
         assert_eq!(result.matches.len(), 1);
@@ -302,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_multiple_matches() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"test test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4},{"match":{"text":"test"},"start":5,"end":9}]}}
+        let json = r#"{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"test test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4},{"match":{"text":"test"},"start":5,"end":9}]}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -312,9 +331,9 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_ignores_non_match_events() {
-        let json = r#"{"type":"begin","data":{"path":{"text":"issues/abc123.json"}}}
-{"type":"match","data":{"path":{"text":"issues/abc123.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4}]}}
-{"type":"end","data":{"path":{"text":"issues/abc123.json"}}}
+        let json = r#"{"type":"begin","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
+{"type":"match","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[{"match":{"text":"test"},"start":0,"end":4}]}}
+{"type":"end","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();
@@ -334,8 +353,8 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_no_matches() {
-        let json = r#"{"type":"begin","data":{"path":{"text":"issues/abc123.json"}}}
-{"type":"end","data":{"path":{"text":"issues/abc123.json"}}}
+        let json = r#"{"type":"begin","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
+{"type":"end","data":{"path":{"text":"issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"}}}
 "#;
 
         let results = parse_ripgrep_json(json.as_bytes(), None).unwrap();

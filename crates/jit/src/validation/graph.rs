@@ -2578,8 +2578,12 @@ source-of-truth = "markdown-first"
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
-        a.id = "abcd1111-0000-0000-0000-000000000000".to_string();
-        b.id = "abcd2222-0000-0000-0000-000000000000".to_string();
+        a.id = "abcd1111-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        b.id = "abcd2222-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown.labels.push("brackets:abcd".to_string());
 
@@ -2615,8 +2619,12 @@ source-of-truth = "markdown-first"
         let mut a = initiative_with_criteria(&["REQ-01"]);
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
-        a.id = "abcd1234-1111-0000-0000-000000000000".to_string();
-        b.id = "abcd1234-2222-0000-0000-000000000000".to_string();
+        a.id = "abcd1234-1111-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        b.id = "abcd1234-2222-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
         assert_eq!(
             a.short_id(),
             b.short_id(),
@@ -3760,8 +3768,12 @@ source-of-truth = "markdown-first"
         let mut initiative_a = issue("initiative-a", &["req:REQ-42"]);
         let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
-        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
-        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
+        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(

@@ -2531,14 +2531,14 @@ depends_on = ["planning"]
         let template = registry.get("custom-plan").unwrap();
 
         let mut container = crate::domain::fixture_issue("container".to_string(), String::new());
-        container.id = fixture_id("container-12345678");
+        container.id = fixture_id("69cf16b3-cd81-56d8-b74a-832a97365c98");
 
         let mut planning = crate::domain::fixture_issue("planning".to_string(), String::new());
-        planning.id = fixture_id("planning-12345678");
+        planning.id = fixture_id("d8936a00-b4cb-51e2-ab13-a1422f784c62");
         planning.labels = vec!["type:planning".to_string()];
 
         let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
-        breakdown.id = fixture_id("breakdown-12345678");
+        breakdown.id = fixture_id("e8f20edc-3573-5a7e-98c3-97b9ba5646af");
         breakdown.labels = vec![
             "type:breakdown".to_string(),
             format!("scaffold:{}", container.short_id()),

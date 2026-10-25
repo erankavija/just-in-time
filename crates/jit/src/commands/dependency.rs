@@ -1149,14 +1149,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
-        dependency.id = fixture_id("22221111111111111111111111111111");
+        dependency.id = fixture_id("22221111-1111-1111-1111-111111111111");
         let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
-        source.id = fixture_id("11111111111111111111111111111111");
+        source.id = fixture_id("11111111-1111-1111-1111-111111111111");
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
         let mut collision = crate::test_utils::fixture_issue("collision".into(), String::new());
-        collision.id = fixture_id("22222222222222222222222222222222");
+        collision.id = fixture_id("22222222-2222-2222-2222-222222222222");
         crate::commands::test_helpers::seed_issue(&storage, collision);
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -1192,9 +1192,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
-        dependency.id = fixture_id("22221111111111111111111111111111");
+        dependency.id = fixture_id("22221111-1111-1111-1111-111111111111");
         let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
-        source.id = fixture_id("11111111111111111111111111111111");
+        source.id = fixture_id("11111111-1111-1111-1111-111111111111");
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
