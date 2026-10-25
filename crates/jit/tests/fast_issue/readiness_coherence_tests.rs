@@ -84,8 +84,8 @@ fn test_add_dependency_demotes_a_ready_dependent_and_records_the_state_change() 
     let events = h.storage.read_events().unwrap();
     assert!(
         events.iter().any(|event| matches!(
-            event,
-            jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                 if *issue_id == dependent && *from == State::Ready && *to == State::Backlog
         )),
         "the demotion must append its own state-change event"
@@ -165,8 +165,8 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     assert!(events.len() > events_before);
     assert!(
         events.iter().skip(events_before).any(|event| matches!(
-            event,
-            jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                 if *issue_id == dependent && *from == State::Ready && *to == State::Backlog
         )),
         "the repair must append its own Ready → Backlog event"
