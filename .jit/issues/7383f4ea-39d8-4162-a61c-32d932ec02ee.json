@@ -8,6 +8,7 @@
   ],
   "description": "Decode template transform kinds into their enum when templates load.\n\n## Background\n\n`Transform.kind` is a `String` (`crates/jit/src/templates.rs:384-389`), parsed at load (`:603`) and again at apply (`commands/template_expand.rs:242-249`). `TransformKind` hand-writes `MOVE_UPSTREAM_TO_ROLE` and `SUPPORTED` (`templates.rs:167-182`), and `UnknownTransformKind` (`:139`) reports an unknown kind.\n\n## Success Criteria\n\n- [hard] REQ-01: `TransformKind` is declared through the macro, and `Transform.kind` is a `TransformKind`.\n- [hard] REQ-02: The hand-written constants and the apply-time check are gone.\n- [hard] REQ-03: An unknown transform kind fails template loading with an error naming the template.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:34:57.514198368Z",
   "first_ready_at": "2026-10-24T23:55:25.603707317Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Template transform kind is typed at load",
-  "updated_at": "2026-10-25T01:26:28.133872829Z"
+  "updated_at": "2026-10-25T01:34:57.514198368Z"
 }
