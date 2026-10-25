@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2d41dca7-80f2-4f3e-b790-1595b874d0d6",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:43:10.041770562Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "97b494c4-719a-4339-b39d-cf84eff49173",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:45:46.973514231Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Content format is typed at load",
-  "updated_at": "2026-10-25T04:32:53.449343287Z"
+  "updated_at": "2026-10-25T04:45:46.973514231Z"
 }
