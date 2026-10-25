@@ -1077,7 +1077,7 @@ mod tests {
         crate::profile::contribution_drift::contributed_registry_paths(contributions)
             .into_iter()
             .map(|registry| {
-                let text = fs::read_to_string(root.join(registry))
+                let text = fs::read_to_string(root.join(&registry))
                     .unwrap_or_else(|error| panic!("failed to read {registry}: {error}"));
                 (registry.to_string(), text)
             })
@@ -1248,14 +1248,16 @@ mod tests {
     fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
         let (_workspace, package) = assembled_package();
         let contributions = &package.model().contributions;
-        let registry = KeyedArrayTarget::Invariants.registry_path();
+        let registry = KeyedArrayTarget::Invariants
+            .registry_path()
+            .repository_relative();
         let mut registries = contributed_registries(contributions);
         let committed = registries
-            .get(registry)
+            .get(&registry)
             .expect("the invariant registry")
             .clone();
         registries.insert(
-            registry.to_string(),
+            registry.clone(),
             seeded_invariant_statement(&committed, "domain-agnostic"),
         );
 
@@ -1701,15 +1703,15 @@ mod tests {
         let invariants = reloaded.project_render(Some("invariants")).unwrap();
         let invariants = &invariants.projections[0];
         assert_eq!(invariants.target, "AGENTS.md");
-        assert_eq!(invariants.mode, "region");
-        assert_eq!(invariants.style, "id-anchor");
+        assert_eq!(invariants.mode, crate::config::ProjectionMode::Region);
+        assert_eq!(invariants.style, ProjectionStyle::IdAnchor);
         assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, contributed.invariants.len());
         let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
         let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
-        assert_eq!(reference.mode, "separate-file");
-        assert_eq!(reference.style, "full");
+        assert_eq!(reference.mode, crate::config::ProjectionMode::SeparateFile);
+        assert_eq!(reference.style, ProjectionStyle::Full);
         assert_eq!(reference.kinds, ["rule", "gate"]);
         // The separate-file target carries the profile's six gates (registry
         // composition asserted through the rendered `## Gates` section).

@@ -245,7 +245,7 @@ fn test_validate_leases_detects_expired_lease() {
     // Create expired lease (acquired 2 days ago, 1 hour TTL)
     let acquired_at = Utc::now() - Duration::days(2);
     let expired_lease = create_test_lease(
-        "lease-expired-123",
+        "00000000-0000-4000-8000-000000000001",
         issue_id,
         &worktree_id,
         3600, // 1 hour TTL
@@ -269,7 +269,7 @@ fn test_validate_leases_detects_expired_lease() {
         "Error should mention expiration"
     );
     assert!(
-        stderr.contains("lease-expired-123") || stderr.contains(&issue_id[..8]),
+        stderr.contains("00000000-0000-4000-8000-000000000001") || stderr.contains(&issue_id[..8]),
         "Error should reference the lease or issue"
     );
 }
@@ -294,7 +294,7 @@ fn test_validate_leases_detects_missing_worktree() {
 
     // Create valid lease for the worktree
     let lease = create_test_lease(
-        "lease-valid-123",
+        "00000000-0000-4000-8000-000000000002",
         issue_id,
         &worktree_id,
         7200, // 2 hours TTL
@@ -343,7 +343,7 @@ fn test_validate_leases_detects_missing_issue() {
     // Create lease for non-existent issue
     let fake_issue_id = "00000000-0000-0000-0000-000000000000";
     let lease = create_test_lease(
-        "lease-orphan-123",
+        "00000000-0000-4000-8000-000000000003",
         fake_issue_id,
         &worktree_id,
         7200,
@@ -390,7 +390,7 @@ fn test_validate_leases_all_valid_succeeds() {
 
     // Create valid lease (not expired, worktree exists, issue exists)
     let lease = create_test_lease(
-        "lease-valid-456",
+        "00000000-0000-4000-8000-000000000004",
         issue_id,
         &worktree_id,
         7200, // 2 hours TTL
@@ -436,7 +436,7 @@ fn test_validate_leases_json_output_on_failure() {
     // Create expired lease
     let acquired_at = Utc::now() - Duration::days(1);
     let expired_lease = create_test_lease(
-        "lease-json-test",
+        "00000000-0000-4000-8000-000000000005",
         issue_id,
         &worktree_id,
         3600, // 1 hour TTL

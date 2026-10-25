@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T02:58:12.244537913Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Replace literal well-known `.jit` file names in repository-state code with `VirtualPath` constants.\n\n## Background\n\n`VirtualPath` declares well-known data-root files through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:259-310`), and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`). Repository-state code still spells them as literals: `repository_state/profile_apply.rs` (17 lines), `repository_state/materialize.rs` (17), `repository_state/initialize.rs` (7), `repository_state/projection_render.rs` (3) and `repository_state/mod.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal under `crates/jit/src/repository_state/`, outside `path.rs`, builds or matches the path of a well-known `.jit` file; message text that names a file for a reader is not a path site.\n- [hard] REQ-02: Each such site uses a `VirtualPath` constant, and host paths derive through `RepositoryLayout::resolve`.\n",
   "documents": [],
+  "done_at": "2026-10-25T03:21:17.078360556Z",
+  "first_ready_at": "2026-10-25T02:13:51.531500208Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f81f2e7d-d0d4-4026-bc47-ce21311b3b93",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:21:09.551981327Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52aaf551-9a2e-4fe9-b6a7-8eb514d6dc54",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:19:05.181352297Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository-state code names well-known files through VirtualPath constants",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T03:21:17.078360556Z"
 }

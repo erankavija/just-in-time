@@ -652,7 +652,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             let warnings = captured_lease_warnings(
                 current_mode,
                 std::slice::from_ref(&target_id),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;

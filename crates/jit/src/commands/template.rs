@@ -587,7 +587,7 @@ fn template_declarations_from_image(
             let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         anyhow!("captured rule schema '{}' is absent", request.reference)
                     })?;
@@ -1122,8 +1122,8 @@ fn validate_captured_issue_write(
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
 ) -> Result<()> {
-    let format = config.content_format()?;
-    let strictness = config.strictness()?;
+    let format = config.content_format();
+    let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, rules, format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
         .with_strictness(strictness);

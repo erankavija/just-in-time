@@ -31,8 +31,8 @@ fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
     let coordinator = ClaimCoordinator::new(
         paths,
         locker,
-        "wt:proptest".to_string(),
-        "agent:proptest".to_string(),
+        "wt:proptest".parse().unwrap(),
+        "agent:proptest".parse().unwrap(),
     )
     .with_fsync(false);
 
@@ -50,8 +50,8 @@ fn io_config() -> ProptestConfig {
 }
 
 // Generator for valid issue IDs
-fn issue_id_strategy() -> impl Strategy<Value = String> {
-    "[a-z]{3}-[0-9]{3}".prop_map(|s| s.to_string())
+fn issue_id_strategy() -> impl Strategy<Value = IssueId> {
+    "[a-z]{3}-[0-9]{3}".prop_map(|label| test_issue_id(&label))
 }
 
 // Generator for TTL values (mix of finite and indefinite)
@@ -333,10 +333,10 @@ proptest! {
     ) {
         let now = chrono::Utc::now();
         let lease = Lease {
-            lease_id: uuid::Uuid::new_v4().to_string(),
-            issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:test".to_string(),
+            lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
+            issue_id: test_issue_id("test"),
+            agent_id: "agent:test".parse().unwrap(),
+            worktree_id: "wt:test".parse().unwrap(),
             branch: None,
             ttl_secs: 0, // Indefinite
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),
@@ -363,10 +363,10 @@ proptest! {
     ) {
         let now = chrono::Utc::now();
         let lease = Lease {
-            lease_id: uuid::Uuid::new_v4().to_string(),
-            issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:test".to_string(),
+            lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
+            issue_id: test_issue_id("test"),
+            agent_id: "agent:test".parse().unwrap(),
+            worktree_id: "wt:test".parse().unwrap(),
             branch: None,
             ttl_secs: ttl,
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),

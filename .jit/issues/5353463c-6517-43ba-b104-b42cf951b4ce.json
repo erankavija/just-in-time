@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ebb7715f-7044-47f3-af0b-a1c790231929",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:54:55.734618505Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6b170ef0-5322-4958-9220-b37860e82fe0",
+      "status": "failed",
+      "updated_at": "2026-10-25T00:59:50.797786428Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5353463c-6517-43ba-b104-b42cf951b4ce",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "gate status and key tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-24T23:16:21.704000744Z"
+  "updated_at": "2026-10-25T00:59:50.797786428Z"
 }

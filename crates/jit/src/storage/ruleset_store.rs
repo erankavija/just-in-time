@@ -6,6 +6,7 @@
 
 use crate::config::JitConfig;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
+use crate::repository_state::VirtualPath;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -25,26 +26,34 @@ pub fn load_ruleset(jit_root: &Path, config: &JitConfig) -> Result<RuleSet, Rule
         }
         Err(source) => return Err(RuleConfigError::Io { path, source }),
     };
-    let schemas = RuleSet::schema_requests(&content)?.into_iter().try_fold(
-        BTreeMap::new(),
-        |mut schemas, request| {
-            let schema_path = jit_root.join(&request.reference);
-            match std::fs::read(&schema_path) {
-                Ok(bytes) => {
-                    schemas.insert(request.reference, bytes);
+    let schemas =
+        RuleSet::schema_requests(&content)?.into_iter().try_fold(
+            BTreeMap::new(),
+            |mut schemas, request| {
+                let schema_virtual_path = VirtualPath::schema_reference(&request.reference)
+                    .map_err(|_| RuleConfigError::InvalidSchemaReference {
+                        rule: request.rule.clone(),
+                        reference: request.reference.clone(),
+                        message: "reference must be one relative 'schemas/<name>.json' file"
+                            .to_string(),
+                    })?;
+                let schema_path = jit_root.join(schema_virtual_path.relative().as_path());
+                match std::fs::read(&schema_path) {
+                    Ok(bytes) => {
+                        schemas.insert(request.reference, bytes);
+                    }
+                    Err(_) if !request.required => {}
+                    Err(source) => {
+                        return Err(RuleConfigError::SchemaIo {
+                            rule: request.rule,
+                            path: schema_path,
+                            source,
+                        });
+                    }
                 }
-                Err(_) if !request.required => {}
-                Err(source) => {
-                    return Err(RuleConfigError::SchemaIo {
-                        rule: request.rule,
-                        path: schema_path,
-                        source,
-                    });
-                }
-            }
-            Ok(schemas)
-        },
-    )?;
+                Ok(schemas)
+            },
+        )?;
     RuleSet::parse(&content, Some(config), schemas)
 }
 

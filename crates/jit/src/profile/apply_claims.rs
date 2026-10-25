@@ -113,7 +113,7 @@ fn validate_target_overlaps(package: &ResolvedProfileContent) -> Result<(), Prof
         .model()
         .contributions
         .iter()
-        .map(|contribution| contribution.registry_path().to_string())
+        .map(|contribution| contribution.registry_path().repository_relative())
         .collect::<BTreeSet<_>>();
     let content = package
         .model()

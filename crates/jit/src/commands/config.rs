@@ -246,8 +246,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let current =
-                super::image_repo_bytes(&config_image, ".jit/config.toml")?.unwrap_or_default();
+            let current = super::image_virtual_bytes(&config_image, &VirtualPath::CONFIG)?
+                .unwrap_or_default();
             let mut doc = String::from_utf8(current)
                 .context("existing .jit/config.toml is not UTF-8")?
                 .parse::<toml_edit::DocumentMut>()

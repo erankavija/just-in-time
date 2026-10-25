@@ -3,6 +3,7 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -226,26 +227,6 @@ pub struct IconConfigToml {
     pub custom: Option<HashMap<String, String>>,
 }
 
-/// Deserialize and eagerly validate `[validation].strictness`.
-///
-/// Accepts an absent key (yielding `None`) or one of the three levels
-/// (`strict`/`loose`/`permissive`, case-insensitively); any other value is
-/// rejected at deserialize time via [`Strictness`](crate::validation::Strictness)
-/// so a `config.toml` carrying an unrecognized strictness fails to load instead
-/// of persisting a silently-inert value. The validated raw string is preserved
-/// so `jit config get`/`show` round-trips the author's spelling.
-fn deserialize_strictness<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = Option::<String>::deserialize(deserializer)?;
-    if let Some(raw) = value.as_deref() {
-        raw.parse::<crate::validation::Strictness>()
-            .map_err(serde::de::Error::custom)?;
-    }
-    Ok(value)
-}
-
 /// Validation behavior configuration.
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
@@ -253,52 +234,34 @@ where
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
-    /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
-    /// `"permissive"`. It modulates which rule violations block a write or
-    /// transition, layered on top of each rule's `enforce`/severity, without
-    /// changing either. Resolved via [`ValidationConfig::strictness`].
-    ///
-    /// Validated at deserialize time (like [`ProjectName`]): loading a
-    /// `config.toml` whose `strictness` is not one of the three levels fails
-    /// eagerly rather than deferring the error to the next validation call, so an
-    /// unrecognized value can never persist and sit silently.
-    #[serde(default, deserialize_with = "deserialize_strictness")]
-    pub strictness: Option<String>,
+    /// Repo-wide enforcement strictness. It modulates which rule violations block
+    /// a write or transition, layered on top of each rule's `enforce`/severity, without
+    /// changing either. Decoded as [`Strictness`](crate::validation::Strictness)
+    /// so configuration access and serialization use its canonical token.
+    #[serde(default)]
+    pub strictness: Option<crate::validation::Strictness>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
-    /// Repo-level default content format for issue bodies ("markdown", "html",
-    /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
-    /// to extract `sections` for issues that carry no per-issue `content_format`.
-    pub content_format: Option<String>,
+    /// Repo-level default content format for issue bodies. Selects the
+    /// [`ContentParser`](crate::document::ContentParser) used to extract
+    /// `sections` for issues that carry no per-issue `content_format`.
+    #[serde(default)]
+    pub content_format: Option<crate::domain::ContentFormat>,
 }
 
 impl ValidationConfig {
-    /// Resolve the repo-level default content format, defaulting to
+    /// Return the repo-level default content format, defaulting to
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) when
-    /// unset. An invalid value is surfaced as an error rather than silently
-    /// defaulting, so a misconfigured `config.toml` cannot quietly pick the wrong
-    /// parser.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
-        use std::str::FromStr;
-        match self.content_format.as_deref() {
-            None => Ok(crate::domain::ContentFormat::DEFAULT),
-            Some(value) => crate::domain::ContentFormat::from_str(value).with_context(|| {
-                format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
-            }),
-        }
+    /// unset. Serde rejects values outside the exact wire vocabulary while
+    /// loading configuration.
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
+        self.content_format.unwrap_or_default()
     }
 
-    /// Resolve the repo-wide validation
-    /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
-    /// to [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
-    ///
-    /// The value is already validated at deserialize time (see
-    /// [`deserialize_strictness`]), so a loaded config resolves infallibly; the
-    /// `Result` guards a `ValidationConfig` constructed by hand with an invalid
-    /// string, which is still surfaced as an error rather than silently
-    /// defaulting.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
-        crate::validation::Strictness::from_config_value(self.strictness.as_deref())
+    /// Resolve the repo-wide validation strictness, defaulting to
+    /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
+    pub fn strictness(&self) -> crate::validation::Strictness {
+        self.strictness.unwrap_or_default()
     }
 }
 
@@ -1040,33 +1003,25 @@ impl ProjectionConfig {
     }
 }
 
-/// How a registry is projected into its documentation target.
-///
-/// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
-/// serde rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionMode {
-    /// Write the rendered block to a separate whole file.
-    #[serde(rename = "separate-file")]
-    SeparateFile,
-    /// Replace only a delimited region within an existing file, byte-preserving
-    /// everything outside the delimiters.
-    #[serde(rename = "region")]
-    Region,
+wire_vocabulary! {
+    /// How a registry is projected into its documentation target.
+    ///
+    /// Deserialized from the kebab-case tokens `separate-file` and `region`;
+    /// an unrecognized value is a descriptive parse error rather than a silent
+    /// default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionMode {
+        /// Write the rendered block to a separate whole file.
+        SeparateFile = "separate-file",
+        /// Replace only a delimited region within an existing file, byte-preserving
+        /// everything outside the delimiters.
+        Region = "region",
+    }
 }
 
 impl ProjectionMode {
     /// Mode applied when a projection omits `mode`.
     pub const DEFAULT: Self = Self::SeparateFile;
-
-    /// The config token naming this mode, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionMode::SeparateFile => "separate-file",
-            ProjectionMode::Region => "region",
-        }
-    }
 }
 
 impl Default for ProjectionMode {
@@ -1075,61 +1030,38 @@ impl Default for ProjectionMode {
     }
 }
 
-impl std::fmt::Display for ProjectionMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
+wire_vocabulary! {
+    /// How a projected registry is rendered into the markdown block.
+    ///
+    /// Deserialized from the tokens `full` and `id-anchor`; an unrecognized
+    /// value is a descriptive parse error rather than a silent default. The
+    /// default (no `style` field) is [`ProjectionStyle::DEFAULT`].
+    ///
+    /// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet
+    ///   list of `- **{self-id}** — {text}` rows from any addressable item kind.
+    /// - [`ProjectionStyle::Full`] renders the built-in rich registry views,
+    ///   with typed metadata absent from a generic addressable row.
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionStyle {
+        /// Render the built-in rich registry view for the projection's kind(s): the
+        /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
+        /// registries' `## Rules` / `## Gates` sections with metadata.
+        Full = "full",
+        /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
+        /// rows from the kind's addressable items, for embedding beneath a
+        /// hand-authored heading. Kind-agnostic: any item kind renders this way.
+        IdAnchor = "id-anchor",
     }
-}
-
-/// How a projected registry is rendered into the markdown block.
-///
-/// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
-/// rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `style` field) is [`ProjectionStyle::DEFAULT`].
-///
-/// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet list of
-///   `- **{self-id}** — {text}` rows from a kind's addressable items — the
-///   kind-agnostic style any item kind can use with no dedicated code.
-/// - [`ProjectionStyle::Full`] renders the built-in rich registry views (the
-///   invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-///   registries' `## Rules` / `## Gates` sections with severity/enforce metadata),
-///   which carry typed fields absent from a generic addressable row.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionStyle {
-    /// Render the built-in rich registry view for the projection's kind(s): the
-    /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-    /// registries' `## Rules` / `## Gates` sections with metadata.
-    #[serde(rename = "full")]
-    Full,
-    /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
-    /// rows from the kind's addressable items, for embedding beneath a
-    /// hand-authored heading. Kind-agnostic: any item kind renders this way.
-    #[serde(rename = "id-anchor")]
-    IdAnchor,
 }
 
 impl ProjectionStyle {
     /// Style applied when a projection omits `style`.
     pub const DEFAULT: Self = Self::Full;
-
-    /// The config token naming this style, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionStyle::Full => "full",
-            ProjectionStyle::IdAnchor => "id-anchor",
-        }
-    }
 }
 
 impl Default for ProjectionStyle {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for ProjectionStyle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
     }
 }
 
@@ -1336,9 +1268,9 @@ impl JitConfig {
     /// [`ValidationConfig::content_format`], or
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) without
     /// the section.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
         self.validation.as_ref().map_or(
-            Ok(crate::domain::ContentFormat::DEFAULT),
+            crate::domain::ContentFormat::DEFAULT,
             ValidationConfig::content_format,
         )
     }
@@ -1347,9 +1279,9 @@ impl JitConfig {
     /// [`ValidationConfig::strictness`], or
     /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) without the
     /// section.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
+    pub fn strictness(&self) -> crate::validation::Strictness {
         self.validation.as_ref().map_or(
-            Ok(crate::validation::Strictness::DEFAULT),
+            crate::validation::Strictness::DEFAULT,
             ValidationConfig::strictness,
         )
     }
@@ -2017,36 +1949,40 @@ default_type = "task"
         assert_eq!(hierarchy.label_associations.as_ref().unwrap().len(), 2);
 
         let validation = config.validation.unwrap();
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
         assert_eq!(validation.default_type, Some("task".to_string()));
     }
 
     #[test]
     fn test_each_strictness_level_deserializes() {
-        for level in ["strict", "loose", "permissive", "STRICT"] {
+        for (level, expected) in [
+            ("strict", crate::validation::Strictness::Strict),
+            ("loose", crate::validation::Strictness::Loose),
+            ("permissive", crate::validation::Strictness::Permissive),
+        ] {
             let toml = format!("[validation]\nstrictness = \"{level}\"\n");
             let config: JitConfig =
                 toml::from_str(&toml).unwrap_or_else(|e| panic!("'{level}' must deserialize: {e}"));
-            // The validated raw spelling is preserved for round-tripping.
-            assert_eq!(
-                config.validation.unwrap().strictness,
-                Some(level.to_string())
-            );
+            assert_eq!(config.validation.unwrap().strictness, Some(expected));
         }
     }
 
     #[test]
     fn test_invalid_strictness_is_rejected_at_deserialize() {
-        // An unrecognized level must fail config load eagerly, not defer the
-        // error to a later validation call (F1). The message names the bad value.
-        let toml = "[validation]\nstrictness = \"banana\"\n";
-        let err = toml::from_str::<JitConfig>(toml).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("banana"), "names the bad value: {msg}");
-        assert!(
-            msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
-            "lists the accepted values: {msg}"
-        );
+        for token in ["banana", "STRICT"] {
+            let config_toml = format!("[validation]\nstrictness = \"{token}\"\n");
+            let err = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+            let msg = err.to_string();
+            assert!(msg.contains(token), "names the bad value: {msg}");
+            assert!(msg.contains("strictness"), "names the key: {msg}");
+            assert!(
+                msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
+                "lists the accepted values: {msg}"
+            );
+        }
     }
 
     #[test]
@@ -2179,8 +2115,29 @@ content_format = "html"
 
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
-        assert_eq!(validation.content_format, Some("html".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
+        assert_eq!(
+            validation.content_format,
+            Some(crate::domain::ContentFormat::Html)
+        );
+    }
+
+    #[test]
+    fn test_parse_validation_rejects_noncanonical_content_format_tokens() {
+        ["md", "HTML", "unknown-format"]
+            .into_iter()
+            .for_each(|value| {
+                let config_toml = format!("[validation]\ncontent_format = \"{value}\"\n");
+                let error = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+
+                assert!(
+                    error.to_string().contains(value),
+                    "the error must name rejected token {value}: {error}"
+                );
+            });
     }
 
     #[test]
@@ -2628,7 +2585,10 @@ unique = false
         // Validation
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
 
         // Namespaces
         let namespaces = config.namespaces.unwrap();

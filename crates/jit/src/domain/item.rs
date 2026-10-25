@@ -43,6 +43,7 @@ use crate::config::{
     ItemKindConfig, ItemKindSource, KindScopeConfig, SourceOfTruth, TomlSourceDescriptor,
 };
 use crate::document::ContentParser;
+use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
 use crate::domain::projection::project;
 use crate::domain::Issue;
 use serde::Serialize;
@@ -297,7 +298,7 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 ///
 /// The sugar form omits the kind segment [`parse_kind_segmented_address`]
 /// requires explicit; this recovers it by matching `self_id` against every
-/// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `id_pattern.find`
+/// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `IdPattern::regex().find`
 /// mechanism [`extract_raw_items`] uses to mint items). PROJECT-scoped kinds
 /// (`scope = "project"`, e.g. `invariant`, `definition`) are excluded from
 /// candidate matching regardless of whether their pattern would otherwise
@@ -348,7 +349,7 @@ pub fn expand_sugar_address(
     let candidates: Vec<&ItemKind> = kinds
         .iter()
         .filter(|kind| kind.kind_scope() == KindScope::Issue)
-        .filter(|kind| kind.id_pattern.find(self_id).is_some())
+        .filter(|kind| kind.id_pattern.regex().find(self_id).is_some())
         .collect();
 
     match candidates.as_slice() {
@@ -412,14 +413,12 @@ pub enum ItemError {
         missing: String,
     },
     /// A kind's `id-pattern` is not a valid regular expression.
-    #[error("item kind '{kind}' has an invalid id-pattern '{pattern}': {source}")]
+    #[error("item kind '{kind}' has an {source}")]
     InvalidIdPattern {
         /// The offending kind name.
         kind: String,
-        /// The pattern string that failed to compile.
-        pattern: String,
-        /// The underlying regex compilation error.
-        source: regex::Error,
+        /// The pattern that failed to compile.
+        source: InvalidIdPatternError,
     },
     /// Two addressable items of the SAME kind in one scope share a self-id
     /// (REQ-03). The same self-id under a *different* scope, or under a
@@ -583,8 +582,7 @@ pub enum ItemError {
 pub struct ItemKind {
     name: String,
     section: String,
-    id_pattern_src: String,
-    id_pattern: regex::Regex,
+    id_pattern: IdPattern,
     markers: Vec<String>,
     link_namespaces: Vec<String>,
     kind_scope: KindScope,
@@ -616,19 +614,18 @@ impl ItemKind {
                 kind: name.to_string(),
                 missing: "section".to_string(),
             })?;
-        let id_pattern_src =
-            config
-                .id_pattern
-                .clone()
-                .ok_or_else(|| ItemError::MissingRequiredFields {
-                    kind: name.to_string(),
-                    missing: "id-pattern".to_string(),
-                })?;
-        let id_pattern =
-            regex::Regex::new(&id_pattern_src).map_err(|source| ItemError::InvalidIdPattern {
+        let id_pattern = config
+            .id_pattern
+            .clone()
+            .ok_or_else(|| ItemError::MissingRequiredFields {
                 kind: name.to_string(),
-                pattern: id_pattern_src.clone(),
-                source,
+                missing: "id-pattern".to_string(),
+            })
+            .and_then(|source| {
+                IdPattern::new(source).map_err(|source| ItemError::InvalidIdPattern {
+                    kind: name.to_string(),
+                    source,
+                })
             })?;
         let markers = config
             .markers
@@ -695,7 +692,6 @@ impl ItemKind {
         Ok(Self {
             name: name.to_string(),
             section,
-            id_pattern_src,
             id_pattern,
             markers,
             link_namespaces,
@@ -787,7 +783,7 @@ impl ItemKind {
         (
             &self.section,
             self.markers.first().map(String::as_str),
-            &self.id_pattern_src,
+            self.id_pattern.as_str(),
         )
     }
 
@@ -1060,7 +1056,11 @@ fn extract_raw_items(
                     return None;
                 }
                 // No self-id match means plain prose: skip, never error (REQ-06).
-                let self_id = kind.id_pattern.find(text).map(|m| m.as_str().to_string())?;
+                let self_id = kind
+                    .id_pattern
+                    .regex()
+                    .find(text)
+                    .map(|m| m.as_str().to_string())?;
                 Some(RawScopeItem {
                     kind: kind.name().to_string(),
                     self_id,
@@ -1850,6 +1850,11 @@ mod tests {
         };
         let err = ItemKind::from_config("broken", &cfg).unwrap_err();
         assert!(matches!(err, ItemError::InvalidIdPattern { .. }));
+        let message = err.to_string();
+        assert!(
+            message.contains("broken") && message.contains("REQ-("),
+            "error was: {message}"
+        );
     }
 
     #[test]

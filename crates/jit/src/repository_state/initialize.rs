@@ -29,8 +29,8 @@ use crate::domain::{
 
 use super::default_rules::default_ruleset;
 use super::image::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta,
-    RepositoryEntry, RepositoryImage,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryActionOwner,
+    RepositoryDelta, RepositoryEntry, RepositoryImage,
 };
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
@@ -41,13 +41,6 @@ use super::{
     ProfileApplicationInput, ProfileContributionMaterialization, ProfileTargetDisposition,
     ProfileTargetMaterialization,
 };
-
-/// Stable ownership identity for the neutral scaffold materialization.
-const SCAFFOLD_OWNER: &str = "repository-init";
-/// Stable ownership identity for profile-applied targets.
-const PROFILE_OWNER: &str = "profile-application";
-/// Stable ownership identity for the worktree `.gitattributes` line-set claim.
-const GITATTRIBUTES_OWNER: &str = "gitattributes-merge-driver";
 
 /// The configuration schema version a fresh repository declares.
 pub const FRESH_CONFIG_SCHEMA_VERSION: u32 = 2;
@@ -167,7 +160,7 @@ struct DesiredFile {
     bytes: Vec<u8>,
     mode: FileMode,
     policy: WritePolicy,
-    owner: &'static str,
+    owner: RepositoryActionOwner,
 }
 
 /// A fully-rendered fresh (or missing-file) repository scaffold.
@@ -220,7 +213,7 @@ impl InitializationScaffold {
             .map_err(|error| InitializationError::Config(error.to_string()))?;
         let parsed = parsed.materialization_config(InvariantRegistry::empty());
         let namespaces = namespaces_from_config(&parsed);
-        let serialized = serialize_ruleset(&default_ruleset(&namespaces));
+        let serialized = serialize_ruleset(&default_ruleset(&namespaces))?;
         let schemas = serialized
             .schema_files
             .into_iter()
@@ -326,44 +319,44 @@ impl InitializationScaffold {
                 bytes: self.config.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::INDEX,
                 bytes: self.index.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::GATES,
                 bytes: self.gates.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::INVARIANTS,
                 bytes: self.invariants.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
             DesiredFile {
                 path: VirtualPath::RULES,
                 bytes: self.rules.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             },
         ];
         for (name, bytes) in &self.schemas {
             files.push(DesiredFile {
-                path: VirtualPath::data(format!("schemas/{name}"))?,
+                path: VirtualPath::schema(name)?,
                 bytes: bytes.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::Always,
-                owner: SCAFFOLD_OWNER,
+                owner: RepositoryActionOwner::RepositoryInit,
             });
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
@@ -525,7 +518,12 @@ fn coupled_default_repair_profile<'a>(
 ) -> Option<&'a ProfileApplicationInput> {
     actions
         .iter()
-        .any(|action| matches!(action.owner(), "default-rule-membership" | "default-schema"))
+        .any(|action| {
+            matches!(
+                action.owner(),
+                RepositoryActionOwner::DefaultRuleMembership | RepositoryActionOwner::DefaultSchema
+            )
+        })
         .then(|| {
             profiles
                 .iter()
@@ -561,7 +559,7 @@ pub(super) fn derive_initialization(
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
         .iter()
-        .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
+        .map(|(name, _)| VirtualPath::schema(name))
         .collect::<Result<_, _>>()?;
     let desired = dedup_last_wins(scaffold.desired_files()?);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
@@ -708,7 +706,7 @@ fn fold_rebased_action(
             path.clone(),
             RepositoryAction::WriteFile {
                 path: path.clone(),
-                owner: owner.clone(),
+                owner: *owner,
                 expected: expected.clone(),
                 bytes: bytes.clone(),
                 mode: *mode,
@@ -729,7 +727,7 @@ fn events_action(base: &RepositoryImage) -> Result<Option<RepositoryAction>, Ini
     let path = VirtualPath::EVENTS;
     match base.entry(&path)? {
         RepositoryEntry::Absent => Ok(Some(RepositoryAction::AppendEvents {
-            owner: SCAFFOLD_OWNER.to_string(),
+            owner: RepositoryActionOwner::RepositoryInit,
             expected: ExpectedPreimage::Absent,
             offset: 0,
             bytes: Vec::new(),
@@ -754,7 +752,7 @@ fn push_gitattributes_action(
     if let (_status, Some(bytes)) = resolve_gitattributes(entry, line)? {
         actions.push(RepositoryAction::WriteFile {
             path,
-            owner: GITATTRIBUTES_OWNER.to_string(),
+            owner: RepositoryActionOwner::GitattributesMergeDriver,
             expected: ExpectedPreimage::of(entry),
             bytes,
             mode: FileMode::Regular,
@@ -877,15 +875,19 @@ fn derive_profile_application_candidate(
             bytes,
             mode,
             policy: WritePolicy::Always,
-            owner: PROFILE_OWNER,
+            owner: RepositoryActionOwner::ProfileApplication,
         })
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
-    if profile.target_hashes.contains_key(".jit/config.toml")
-        || profile.target_hashes.contains_key(".jit/rules.toml")
+    if profile
+        .target_hashes
+        .contains_key(VirtualPath::CONFIG.repository_relative().as_str())
+        || profile
+            .target_hashes
+            .contains_key(VirtualPath::RULES.repository_relative().as_str())
     {
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;
@@ -1029,7 +1031,7 @@ fn directory_actions(
         match base.entry(&dir)? {
             RepositoryEntry::Absent => actions.push(RepositoryAction::CreateDirectory {
                 path: dir,
-                owner: SCAFFOLD_OWNER.to_string(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             }),
             RepositoryEntry::Directory { .. } => {}
@@ -1090,7 +1092,7 @@ fn push_file_actions(
         if write {
             actions.push(RepositoryAction::WriteFile {
                 path: file.path.clone(),
-                owner: file.owner.to_string(),
+                owner: file.owner,
                 expected: ExpectedPreimage::of(entry),
                 bytes: file.bytes.clone(),
                 mode: file.mode,
