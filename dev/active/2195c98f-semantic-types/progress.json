@@ -661,7 +661,7 @@
     "98404e0c": 2,
     "945f65f3": 1,
     "e1a6c8c2": 3,
-    "91081bd3": 0,
+    "91081bd3": 1,
     "d72bf093": 1
   },
   "external_blockers": {
@@ -1180,6 +1180,13 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Accessor retype with a known caller list; alternation slot is Claude."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 1 of the widened scope: typed anchor map in main.rs and newtype-safe id construction in unit tests; same tier as the implementation."
     }
   ],
   "surfaced_pitfalls": [
