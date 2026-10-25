@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "33050c57-cd35-4bfd-bf40-856530a9e605",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:30:20.838704172Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "91067cfa-bc00-4089-a86f-48fccce71bac",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:32:45.488169844Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7e8f1525-9efc-4c41-97e9-829eb7dc9a25",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Label-coverage assertions are typed and compiled at load",
-  "updated_at": "2026-10-25T05:16:04.661588325Z"
+  "updated_at": "2026-10-25T05:32:45.488169844Z"
 }
