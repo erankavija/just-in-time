@@ -1,7 +1,7 @@
 //! Pure parsing for the append-only event log.
 
 use super::event_catalog::EventTag;
-use super::Event;
+use super::{Event, EventBody};
 
 /// Structural failure while reading a known event-log record.
 #[derive(Debug, thiserror::Error)]
@@ -81,8 +81,8 @@ fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
         .and_then(|line| serde_json::from_str::<Event>(line).ok())
         .is_some_and(|event| {
             matches!(
-                event,
-                Event::ProfileLifecycle {
+                event.body(),
+                EventBody::ProfileLifecycle {
                     isolated_torn_tail: true,
                     ..
                 }

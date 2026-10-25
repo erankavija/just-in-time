@@ -168,8 +168,8 @@ pub fn recorded_archived_copies(
 ) -> BTreeMap<String, String> {
     events
         .iter()
-        .filter_map(|event| match event {
-            crate::domain::Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            crate::domain::EventBody::ArtifactArchiveExecuted {
                 target: recorded,
                 publications,
                 ..

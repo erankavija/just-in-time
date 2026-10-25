@@ -25,11 +25,11 @@
 //!   test asserts the committed reference equals the projection
 //!   (`@/inv/single-source-prose`).
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
+use super::{Assignee, Event, EventBody, Issue, LinkedCheckoutWriteStance, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -269,146 +269,70 @@ impl EventTag {
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
     pub fn sample(self) -> Event {
-        let id = "00000000-0000-0000-0000-000000000000".to_string();
         let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
         let gate_key = "tests".to_string();
-        let timestamp: DateTime<Utc> =
-            DateTime::from_timestamp(0, 0).expect("the Unix epoch is a valid timestamp");
         let assignee: Assignee = "agent:worker-1"
             .parse()
             .expect("`agent:worker-1` is a well-formed assignee");
 
-        match self {
-            EventTag::IssueCreated => Event::IssueCreated {
-                id,
+        let mut event = match self {
+            EventTag::IssueCreated => Event::draft_issue_created(&Issue {
+                id: issue_id,
+                ..Issue::draft("Sample issue".to_string(), String::new())
+            }),
+            EventTag::IssueClaimed => Event::draft_issue_claimed(issue_id, assignee),
+            EventTag::IssueStateChanged => {
+                Event::draft_issue_state_changed(issue_id, State::Ready, State::InProgress)
+            }
+            EventTag::GatePassed => Event::draft_gate_passed(issue_id, gate_key, Some(assignee)),
+            EventTag::GateFailed => Event::draft_gate_failed(issue_id, gate_key, Some(assignee)),
+            EventTag::GateAdded => Event::draft_gate_added(issue_id, gate_key),
+            EventTag::GateRemoved => Event::draft_gate_removed(issue_id, gate_key),
+            EventTag::IssueCompleted => Event::draft_issue_completed(issue_id),
+            EventTag::IssueDeleted => Event::draft_issue_deleted(issue_id),
+            EventTag::IssueReleased => {
+                Event::draft_issue_released(issue_id, assignee, "stale lease".to_string())
+            }
+            EventTag::IssueUpdated => Event::draft_issue_updated(
                 issue_id,
-                timestamp,
-                title: "Sample issue".to_string(),
-                priority: Priority::Normal,
-            },
-            EventTag::IssueClaimed => Event::IssueClaimed {
-                id,
-                issue_id,
-                timestamp,
-                assignee,
-            },
-            EventTag::IssueStateChanged => Event::IssueStateChanged {
-                id,
-                issue_id,
-                timestamp,
-                from: State::Ready,
-                to: State::InProgress,
-            },
-            EventTag::GatePassed => Event::GatePassed {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-                updated_by: Some(assignee),
-            },
-            EventTag::GateFailed => Event::GateFailed {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-                updated_by: Some(assignee),
-            },
-            EventTag::GateAdded => Event::GateAdded {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateRemoved => Event::GateRemoved {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::IssueCompleted => Event::IssueCompleted {
-                id,
-                issue_id,
-                timestamp,
-            },
-            EventTag::IssueDeleted => Event::IssueDeleted {
-                id,
-                issue_id,
-                timestamp,
-            },
-            EventTag::IssueReleased => Event::IssueReleased {
-                id,
-                issue_id,
-                timestamp,
-                assignee,
-                reason: "stale lease".to_string(),
-            },
-            EventTag::IssueUpdated => Event::IssueUpdated {
-                id,
-                issue_id,
-                timestamp,
-                updated_by: "agent:worker-1".to_string(),
-                fields: vec!["priority".to_string()],
-            },
-            EventTag::ArtifactArchiveExecuted => Event::ArtifactArchiveExecuted {
-                id,
-                timestamp,
-                target: crate::domain::artifact_plan::PlanTarget::Document {
+                "agent:worker-1".to_string(),
+                vec!["priority".to_string()],
+            ),
+            EventTag::ArtifactArchiveExecuted => Event::draft_artifact_archive_executed(
+                crate::domain::artifact_plan::PlanTarget::Document {
                     path: "dev/plan.md".to_string(),
                 },
-                destination_root: "dev/archive".to_string(),
-                publications: Vec::new(),
-                reference_changes: Vec::new(),
-                planned_deletions: Vec::new(),
-                reconciling: false,
-            },
-            EventTag::DependencyReduced => Event::DependencyReduced {
-                id,
+                "dev/archive".to_string(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                false,
+            ),
+            EventTag::DependencyReduced => Event::draft_dependency_reduced(
                 issue_id,
-                timestamp,
-                old_count: 2,
-                new_count: 1,
-                removed_deps: vec!["00000000-0000-0000-0000-000000000002".to_string()],
-            },
-            EventTag::LocalRuleBypassed => Event::LocalRuleBypassed {
-                id,
+                2,
+                1,
+                vec!["00000000-0000-0000-0000-000000000002".to_string()],
+            ),
+            EventTag::LocalRuleBypassed => {
+                Event::draft_local_rule_bypassed(issue_id, "type-required".to_string())
+            }
+            EventTag::TransitionBlocked => Event::draft_transition_blocked(
                 issue_id,
-                timestamp,
-                rule: "type-required".to_string(),
-            },
-            EventTag::TransitionBlocked => Event::TransitionBlocked {
-                id,
+                State::Done,
+                "children-complete".to_string(),
+            ),
+            EventTag::GraphRuleBypassed => Event::draft_graph_rule_bypassed(
                 issue_id,
-                timestamp,
-                target: State::Done,
-                rule: "children-complete".to_string(),
-            },
-            EventTag::GraphRuleBypassed => Event::GraphRuleBypassed {
-                id,
-                issue_id,
-                timestamp,
-                target: State::Done,
-                rule: "children-complete".to_string(),
-            },
-            EventTag::GateDefinitionUpdated => Event::GateDefinitionUpdated {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateDefinitionCreated => Event::GateDefinitionCreated {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateDefinitionRemoved => Event::GateDefinitionRemoved {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::ProfileLifecycle => Event::ProfileLifecycle {
-                id,
-                timestamp,
-                operation: crate::domain::ProfileLifecycleOperation::Apply,
-                profiles: vec![crate::domain::ProfileLifecycleProfile {
+                State::Done,
+                "children-complete".to_string(),
+            ),
+            EventTag::GateDefinitionUpdated => Event::draft_gate_definition_updated(gate_key),
+            EventTag::GateDefinitionCreated => Event::draft_gate_definition_created(gate_key),
+            EventTag::GateDefinitionRemoved => Event::draft_gate_definition_removed(gate_key),
+            EventTag::ProfileLifecycle => Event::draft_profile_lifecycle(
+                crate::domain::ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
                     id: "example"
                         .try_into()
                         .expect("sample profile id is canonical"),
@@ -422,16 +346,20 @@ impl EventTag {
                     )]
                     .into(),
                 }],
-                isolated_torn_tail: false,
-            },
-            EventTag::LinkedCheckoutWriteOverridden => Event::LinkedCheckoutWriteOverridden {
-                id,
-                timestamp,
-                checkout: std::path::PathBuf::from("/repo/.worktrees/feature"),
-                declared_stance: LinkedCheckoutWriteStance::Refuse,
-                invocation_override: LinkedCheckoutWriteStance::Allow,
-            },
-        }
+            ),
+            EventTag::LinkedCheckoutWriteOverridden => {
+                Event::draft_linked_checkout_write_overridden(
+                    std::path::PathBuf::from("/repo/.worktrees/feature"),
+                    LinkedCheckoutWriteStance::Refuse,
+                    LinkedCheckoutWriteStance::Allow,
+                )
+            }
+        };
+        event.assign_identity(
+            "00000000-0000-0000-0000-000000000000".to_string(),
+            DateTime::UNIX_EPOCH,
+        );
+        event
     }
 }
 
@@ -443,28 +371,30 @@ impl Event {
     /// carries a scope, a sample, and a description with it.
     /// [`Event::get_type`] renders the returned tag as the string serde writes.
     pub fn tag(&self) -> EventTag {
-        match self {
-            Event::IssueCreated { .. } => EventTag::IssueCreated,
-            Event::IssueClaimed { .. } => EventTag::IssueClaimed,
-            Event::IssueStateChanged { .. } => EventTag::IssueStateChanged,
-            Event::GatePassed { .. } => EventTag::GatePassed,
-            Event::GateFailed { .. } => EventTag::GateFailed,
-            Event::GateAdded { .. } => EventTag::GateAdded,
-            Event::GateRemoved { .. } => EventTag::GateRemoved,
-            Event::IssueCompleted { .. } => EventTag::IssueCompleted,
-            Event::IssueDeleted { .. } => EventTag::IssueDeleted,
-            Event::IssueReleased { .. } => EventTag::IssueReleased,
-            Event::IssueUpdated { .. } => EventTag::IssueUpdated,
-            Event::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
-            Event::DependencyReduced { .. } => EventTag::DependencyReduced,
-            Event::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
-            Event::TransitionBlocked { .. } => EventTag::TransitionBlocked,
-            Event::GraphRuleBypassed { .. } => EventTag::GraphRuleBypassed,
-            Event::GateDefinitionUpdated { .. } => EventTag::GateDefinitionUpdated,
-            Event::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
-            Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
-            Event::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
-            Event::LinkedCheckoutWriteOverridden { .. } => EventTag::LinkedCheckoutWriteOverridden,
+        match self.body() {
+            EventBody::IssueCreated { .. } => EventTag::IssueCreated,
+            EventBody::IssueClaimed { .. } => EventTag::IssueClaimed,
+            EventBody::IssueStateChanged { .. } => EventTag::IssueStateChanged,
+            EventBody::GatePassed { .. } => EventTag::GatePassed,
+            EventBody::GateFailed { .. } => EventTag::GateFailed,
+            EventBody::GateAdded { .. } => EventTag::GateAdded,
+            EventBody::GateRemoved { .. } => EventTag::GateRemoved,
+            EventBody::IssueCompleted { .. } => EventTag::IssueCompleted,
+            EventBody::IssueDeleted { .. } => EventTag::IssueDeleted,
+            EventBody::IssueReleased { .. } => EventTag::IssueReleased,
+            EventBody::IssueUpdated { .. } => EventTag::IssueUpdated,
+            EventBody::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
+            EventBody::DependencyReduced { .. } => EventTag::DependencyReduced,
+            EventBody::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
+            EventBody::TransitionBlocked { .. } => EventTag::TransitionBlocked,
+            EventBody::GraphRuleBypassed { .. } => EventTag::GraphRuleBypassed,
+            EventBody::GateDefinitionUpdated { .. } => EventTag::GateDefinitionUpdated,
+            EventBody::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
+            EventBody::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
+            EventBody::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
+            EventBody::LinkedCheckoutWriteOverridden { .. } => {
+                EventTag::LinkedCheckoutWriteOverridden
+            }
         }
     }
 }

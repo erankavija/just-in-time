@@ -1627,7 +1627,24 @@ pub enum Event {
     },
 }
 
+/// The tagged body of an [`Event`]: its variant and payload fields.
+///
+/// A temporary alias while `Event` still carries `id` and `timestamp` in each
+/// variant; matchers read [`Event::body`] so the envelope swap that makes this
+/// the real body enum leaves them unchanged.
+pub type EventBody = Event;
+
 impl Event {
+    /// The tagged body this event records.
+    pub fn body(&self) -> &EventBody {
+        self
+    }
+
+    /// Consume this event, yielding its tagged body.
+    pub fn into_body(self) -> EventBody {
+        self
+    }
+
     /// This event's identity, as assigned by [`Self::assign_identity`].
     ///
     /// A drafted event that has not reached the mutation finalizer carries an
@@ -1655,6 +1672,36 @@ impl Event {
             | Event::GateDefinitionRemoved { id, .. }
             | Event::ProfileLifecycle { id, .. }
             | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
+        }
+    }
+
+    /// When this event occurred, as stamped by [`Self::assign_identity`].
+    ///
+    /// A drafted event that has not reached the mutation finalizer carries the
+    /// Unix epoch.
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        match self {
+            Event::IssueCreated { timestamp, .. }
+            | Event::IssueClaimed { timestamp, .. }
+            | Event::IssueStateChanged { timestamp, .. }
+            | Event::GatePassed { timestamp, .. }
+            | Event::GateFailed { timestamp, .. }
+            | Event::GateAdded { timestamp, .. }
+            | Event::GateRemoved { timestamp, .. }
+            | Event::IssueCompleted { timestamp, .. }
+            | Event::IssueDeleted { timestamp, .. }
+            | Event::IssueReleased { timestamp, .. }
+            | Event::ArtifactArchiveExecuted { timestamp, .. }
+            | Event::IssueUpdated { timestamp, .. }
+            | Event::DependencyReduced { timestamp, .. }
+            | Event::LocalRuleBypassed { timestamp, .. }
+            | Event::TransitionBlocked { timestamp, .. }
+            | Event::GraphRuleBypassed { timestamp, .. }
+            | Event::GateDefinitionUpdated { timestamp, .. }
+            | Event::GateDefinitionCreated { timestamp, .. }
+            | Event::GateDefinitionRemoved { timestamp, .. }
+            | Event::ProfileLifecycle { timestamp, .. }
+            | Event::LinkedCheckoutWriteOverridden { timestamp, .. } => *timestamp,
         }
     }
 
@@ -1689,6 +1736,17 @@ impl Event {
                 *id = new_id;
                 *timestamp = new_timestamp;
             }
+        }
+    }
+
+    /// Record whether this profile lifecycle marker certifies the torn tail it
+    /// follows; any other event is left unchanged.
+    pub fn set_isolated_torn_tail(&mut self, torn_tail: bool) {
+        if let Event::ProfileLifecycle {
+            isolated_torn_tail, ..
+        } = self
+        {
+            *isolated_torn_tail = torn_tail;
         }
     }
 
@@ -2035,6 +2093,19 @@ mod tests {
         issue.state = state;
         issue.archived_from = archived_from;
         serde_json::to_value(&issue).unwrap()
+    }
+
+    #[test]
+    fn test_stamped_event_reads_back_its_body_and_identity() {
+        let body = Event::draft_gate_added("issue".to_string(), "tests".to_string());
+        let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
+
+        assert_eq!(event.id(), "event");
+        assert_eq!(event.timestamp(), timestamp);
+        assert_eq!(event.body().tag(), body.tag());
+        assert_eq!(event.into_body().get_issue_id(), body.get_issue_id());
     }
 
     #[test]

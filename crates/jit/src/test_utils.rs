@@ -1034,6 +1034,18 @@ pub fn seed_data_root_ignore(data_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// The event recording `body`, stamped with `id` and `timestamp` as the
+/// mutation finalizer would stamp it.
+pub fn stamped_event(
+    body: crate::domain::EventBody,
+    id: impl Into<String>,
+    timestamp: chrono::DateTime<chrono::Utc>,
+) -> crate::domain::Event {
+    let mut event = body;
+    event.assign_identity(id.into(), timestamp);
+    event
+}
+
 /// Append well-formed events for unrelated issues until the log exceeds
 /// `bytes`, so a capture over it is decided by nothing but its own tail.
 pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()> {
