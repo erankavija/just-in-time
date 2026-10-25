@@ -16,7 +16,32 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "000a6da2-8029-459e-b489-4168dae01640",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:13:55.734785660Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ea388f61-6856-4e93-ba38-c1dd9446bc5d",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:05:29.367092359Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "a2eb1220-88ae-48d3-a71b-466fd60eb609",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:06:09.221546677Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "fad76715-bfd9-40ff-beec-e958e122cedb",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:06:12.998380316Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
   "labels": [
     "type:task",
@@ -33,5 +58,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Query assignee filters parse to an Assignee",
-  "updated_at": "2026-10-24T23:17:59.062967192Z"
+  "updated_at": "2026-10-25T00:13:55.734785660Z"
 }
