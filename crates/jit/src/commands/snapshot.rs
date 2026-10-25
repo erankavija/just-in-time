@@ -446,7 +446,9 @@ This is a read-only export. Future versions may support:
     /// Copy .jit state files to snapshot
     fn copy_jit_state(&self, base: &Path, issues: &[Issue]) -> Result<()> {
         let jit_dir = base.join(".jit");
-        std::fs::create_dir_all(jit_dir.join("issues"))?;
+        std::fs::create_dir_all(
+            base.join(crate::repository_state::VirtualPath::ISSUES.repository_relative()),
+        )?;
 
         // Copy issue files
         for issue in issues {

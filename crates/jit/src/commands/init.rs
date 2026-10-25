@@ -441,28 +441,23 @@ fn init_response_paths(
     gitattributes: GitattributesStatus,
 ) -> Result<(Vec<String>, Vec<String>)> {
     let mut created = [
-        (".jit/index.json", "index.json"),
-        (".jit/gates.toml", "gates.toml"),
-        (".jit/invariants.toml", "invariants.toml"),
-        (".jit/events.jsonl", "events.jsonl"),
-        (".jit/config.toml", "config.toml"),
-        (".jit/rules.toml", "rules.toml"),
+        VirtualPath::INDEX,
+        VirtualPath::GATES,
+        VirtualPath::INVARIANTS,
+        VirtualPath::EVENTS,
+        VirtualPath::CONFIG,
+        VirtualPath::RULES,
     ]
     .into_iter()
-    .map(|(reported, relative)| {
-        let path = VirtualPath::data(relative)?;
-        Ok(plan
-            .delta()
+    .filter_map(|path| {
+        plan.delta()
             .actions()
             .iter()
             .find(|action| action.path() == &path)
             // Each of these paths is a file, so an absent preimage means it is created.
             .is_some_and(|action| *action.expected() == ExpectedPreimage::Absent)
-            .then(|| reported.to_string()))
+            .then(|| path.repository_relative())
     })
-    .collect::<Result<Vec<_>>>()?
-    .into_iter()
-    .flatten()
     .collect::<Vec<_>>();
     let mut modified = Vec::new();
 
