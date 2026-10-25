@@ -5,7 +5,8 @@
 //! dependencies loaded for them — and settles the graph without consulting
 //! the filesystem or choosing a winner from selector order.
 
-use super::{ProfileId, ProfilePackage};
+use super::ProfilePackage;
+use crate::domain::identity::ProfileId;
 use semver::{Version, VersionReq};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 

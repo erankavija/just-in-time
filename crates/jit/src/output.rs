@@ -21,9 +21,7 @@ use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
     Priority, State,
 };
-use crate::errors::{
-    gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
-};
+use crate::errors::{short_id, state_name, TransitionBlockedError, TransitionBlocker};
 
 /// Render the complete schema-v1 archive plan without introducing a second
 /// decision model. Every action, fact, edge, relink, deletion, warning, and
@@ -1452,7 +1450,7 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         } => serde_json::json!({
             "type": "gate",
             "key": gate_key,
-            "status": gate_status_name(*status),
+            "status": status.as_str(),
             "mode": mode.as_str(),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
