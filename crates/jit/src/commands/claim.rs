@@ -107,7 +107,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
     // Load config for policy limits
-    let coord_config = JitConfig::load(&paths.local_jit)?.coordination();
+    let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
 
     // Create file locker with the default lock-acquisition timeout
     let locker = FileLocker::with_configured_timeout();

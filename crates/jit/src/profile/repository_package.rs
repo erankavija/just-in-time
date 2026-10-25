@@ -864,7 +864,10 @@ mod tests {
 
     #[test]
     fn test_managed_regions_match_every_declared_source_tree_consumer() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
         let (_workspace, package) = assembled_package();
 
         // Each managed region's packaged source matches the live region body, modulo
@@ -902,8 +905,13 @@ mod tests {
             render_template_registry, splice_template_region, TEMPLATE_REGION_GENERATOR,
             TEMPLATE_REGISTRY_PATH,
         };
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let existing = fs::read(root.join(TEMPLATE_REGISTRY_PATH)).unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+        let layout = crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap();
+        let existing = fs::read(layout.resolve(&TEMPLATE_REGISTRY_PATH).unwrap()).unwrap();
+        let registry_path = TEMPLATE_REGISTRY_PATH.repository_relative();
         let (_workspace, package) = assembled_package();
         let block = render_template_block(&packaged_templates(&package).unwrap()).unwrap();
         // The render the generator publishes, so the two cannot disagree about
@@ -915,7 +923,7 @@ mod tests {
         assert_eq!(
             String::from_utf8(rendered.clone()).unwrap(),
             String::from_utf8(existing.clone()).unwrap(),
-            "{TEMPLATE_REGISTRY_PATH} no longer carries the packaged template \
+            "{registry_path} no longer carries the packaged template \
              declarations. The block between the region delimiters is \
              generated from profiles/jit-dogfood/manifest.toml: edit the \
              packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
@@ -1451,7 +1459,13 @@ mod tests {
     /// This repository's committed template registry.
     fn committed_template_registry() -> Vec<u8> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        fs::read(root.join(crate::profile::template_region::TEMPLATE_REGISTRY_PATH)).unwrap()
+        let layout = crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap();
+        fs::read(
+            layout
+                .resolve(&crate::profile::template_region::TEMPLATE_REGISTRY_PATH)
+                .unwrap(),
+        )
+        .unwrap()
     }
 
     /// The declarations a template registry's text carries, as the registry
@@ -1753,7 +1767,7 @@ mod tests {
         .unwrap();
         std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
         let rules = crate::storage::ruleset_store::load_ruleset(
-            temp.path(),
+            &crate::test_utils::repository_layout_for_data_root(temp.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();

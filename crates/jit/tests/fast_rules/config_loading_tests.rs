@@ -47,7 +47,10 @@ fn test_handle_missing_config_file() {
     let storage = JsonFileStorage::new(temp_dir.path());
 
     // Config file doesn't exist - should fall back to defaults
-    let config = JitConfig::load(storage.root()).unwrap();
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ))
+    .unwrap();
 
     // Should be None (uses defaults)
     assert!(config.type_hierarchy.is_none());
@@ -71,7 +74,10 @@ feature = "epic"
     std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
     // Load config
-    let config = JitConfig::load(storage.root()).unwrap();
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ))
+    .unwrap();
     let hierarchy = config.type_hierarchy.unwrap();
 
     assert_eq!(hierarchy.types.get("theme"), Some(&1));
@@ -133,6 +139,8 @@ types = { broken syntax
     std::fs::write(storage.root().join("config.toml"), bad_toml).unwrap();
 
     // Should return error
-    let result = JitConfig::load(storage.root());
+    let result = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ));
     assert!(result.is_err());
 }

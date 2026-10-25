@@ -535,7 +535,7 @@ mod tests {
         }
         std::fs::write(dir.path().join("rules.toml"), &out.rules_toml).unwrap();
         let reloaded = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .expect("serialized rules.toml must reload");
@@ -949,7 +949,7 @@ assert = { json-schema = "schemas/second.json" }
         std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let set = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
@@ -1031,7 +1031,7 @@ assert = { json-schema = "schemas/second.json" }
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
         let reloaded = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
