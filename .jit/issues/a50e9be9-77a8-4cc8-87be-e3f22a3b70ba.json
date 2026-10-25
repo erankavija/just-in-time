@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e2232086-b57d-4113-97bc-865628c20ca7",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:42:24.014990417Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b362238b-b0a3-4770-aed4-5d1b87180566",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:43:51.198029250Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolved agent identity is an Assignee",
-  "updated_at": "2026-10-25T01:45:24.571891407Z"
+  "updated_at": "2026-10-25T02:43:51.198029250Z"
 }
