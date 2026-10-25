@@ -50,7 +50,7 @@ pub(crate) use difference::{ensure_publishable_targets, profile_plan_entry};
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
     profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,
-    ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
+    ProfileDependencyRequirement, ProfileIncompatibility, ProfilePackageModel,
     ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionId, RegionPlacement,
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
