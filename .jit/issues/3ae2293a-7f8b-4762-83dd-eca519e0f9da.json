@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "24691a28-4bd2-4474-b769-f6ce8b5bb611",
+      "run_id": "2ccec317-d186-4c17-9b7c-70d860188463",
       "status": "passed",
-      "updated_at": "2026-10-25T00:22:50.322190655Z",
+      "updated_at": "2026-10-25T00:31:26.741237859Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate stage and mode tokens come from one declaration",
-  "updated_at": "2026-10-25T00:26:14.375616280Z"
+  "updated_at": "2026-10-25T00:31:26.741237859Z"
 }
