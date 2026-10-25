@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "0f79a9ff-619d-42ee-90ec-65c10aba596e",
+      "run_id": "0033bca9-c632-4e49-b2b1-3209d170b32c",
       "status": "passed",
-      "updated_at": "2026-10-25T06:07:42.356336423Z",
+      "updated_at": "2026-10-25T06:15:01.729758155Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Priority tokens come from one declaration",
-  "updated_at": "2026-10-25T06:10:28.074709497Z"
+  "updated_at": "2026-10-25T06:15:01.729758155Z"
 }
