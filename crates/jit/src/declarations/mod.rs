@@ -136,8 +136,8 @@ target = "docs/reference.md"
         let config = parsed.materialization_config(invariants::InvariantRegistry::empty());
         assert_eq!(config.version.unwrap().schema, 7);
         assert_eq!(
-            config.validation.unwrap().content_format.as_deref(),
-            Some("html")
+            config.validation.unwrap().content_format,
+            Some(crate::domain::ContentFormat::Html)
         );
         assert_eq!(
             config.projection.unwrap()["reference"].target.as_deref(),

@@ -27,14 +27,11 @@
 //! context); the evaluation itself is a pure function of the issue set, so it is
 //! trivially testable with constructed [`Issue`] lists.
 //!
-//! # Config interpretation
+//! # Configuration
 //!
-//! Each graph [`Assertion`] carries a raw, unvalidated [`toml::value::Table`].
-//! This module interprets the keys each kind expects and DOCUMENTS them on the
-//! per-kind evaluators below. Malformed or missing required config never panics:
-//! it surfaces as a `config-error` [`Finding`] (attributed to the rule) so the
-//! problem is visible rather than silently swallowed. Optional keys fall back to
-//! documented defaults.
+//! Assertion options are typed and validated at rule load. Unusable runtime
+//! context, such as an unresolved container pointer or an unavailable content
+//! parser, surfaces as a `config-error` finding attributed to the rule.
 //!
 //! # Purity & layering (DR §12)
 //!
@@ -59,18 +56,11 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
-    DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, ChildLink, DependencyShapeConfig, LabelCoverageConfig, LabelReferenceConfig,
+    LabelReferenceScope, Rule, RuleScope, Severity, TypeHierarchyKind,
 };
 use crate::domain::id_pattern::IdPattern;
 use crate::validation::engine::Finding;
-
-/// Default label namespace whose values name the criterion a child claims to
-/// satisfy (e.g. `satisfies:<container-short-id>/REQ-01`).
-const DEFAULT_SATISFIES_NAMESPACE: &str = "satisfies";
-
-/// Default projection slug of the section holding success criteria.
-const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
 
 /// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
 /// a label value in `crates/jit/src` (excluding tests) falls into one of three
@@ -161,13 +151,7 @@ pub fn coverage_credit_namespaces<'a>(
         .into_iter()
         .filter(|rule| rule.severity != Severity::Off)
         .filter_map(|rule| match &rule.assert {
-            Assertion::LabelCoverage { config } => Some(
-                config
-                    .get("satisfies-namespace")
-                    .and_then(toml::Value::as_str)
-                    .unwrap_or(DEFAULT_SATISFIES_NAMESPACE)
-                    .to_string(),
-            ),
+            Assertion::LabelCoverage { config } => Some(config.satisfies_namespace().to_string()),
             Assertion::CriteriaToCheck {
                 check_namespace, ..
             } => check_namespace.clone(),
@@ -197,19 +181,6 @@ pub fn issue_credit_namespaces<'a>(
 /// can be recognized as a config error structurally.
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
 
-/// How a "child" issue relates to the source issue in `label-coverage`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChildLink {
-    /// Children are issues that depend on the source (the source is in their
-    /// `dependencies`). This is the default.
-    Dependents,
-    /// Children are issues the source depends on (in the source's
-    /// `dependencies`).
-    Dependencies,
-    /// Any issue in the set is a candidate child, regardless of dependency edges.
-    Any,
-}
-
 /// A graph-rule [`Finding`] paired with the issue it pertains to.
 ///
 /// Graph rules are inherently cross-issue, so per-issue reporting needs to know
@@ -220,7 +191,7 @@ pub enum ChildLink {
 /// - `issue_id` is `Some(full_id)` for a violation attributable to one specific
 ///   issue (e.g. the source issue whose criterion is uncovered, or whose
 ///   dependency shape is wrong).
-/// - `issue_id` is `None` for a `config-error` finding: a malformed rule config
+/// - `issue_id` is `None` for a `config-error` finding: unusable runtime context
 ///   pertains to the rule itself, not a single issue, and must never be silently
 ///   dropped from a per-issue view.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,7 +201,7 @@ pub struct GraphFinding {
     pub issue_id: Option<String>,
     /// The underlying engine finding (rule name, severity, message).
     pub finding: Finding,
-    /// Whether this finding represents a malformed rule configuration. Set only
+    /// Whether this finding represents unusable runtime context. Set only
     /// by the module-internal `config_error()` constructor; never set by
     /// `for_issue()` or `unattributed()`. Guards read this field directly rather
     /// than scanning `finding.message` for a prefix.
@@ -259,7 +230,7 @@ impl GraphFinding {
         }
     }
 
-    /// Whether this finding is a `config-error` (a malformed rule config).
+    /// Whether this finding is a `config-error` (unusable runtime context).
     ///
     /// Config errors are produced by the module-internal `config_error()`
     /// constructor, which sets the typed `is_config_error` field. Guards read
@@ -271,23 +242,8 @@ impl GraphFinding {
     }
 }
 
-impl ChildLink {
-    /// Parse a `child-link` config value into a [`ChildLink`].
-    ///
-    /// Returns `None` for an unrecognized value so the caller can emit a clear
-    /// config-error finding rather than silently defaulting.
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "dependents" => Some(Self::Dependents),
-            "dependencies" => Some(Self::Dependencies),
-            "any" => Some(Self::Any),
-            _ => None,
-        }
-    }
-}
-
 /// Evaluate all graph rules over the given issue set, returning one [`Finding`]
-/// per violation (and a `config-error` finding per malformed rule config).
+/// per violation (and a `config-error` finding for unusable runtime context).
 ///
 /// Only rules whose [`Rule::scope`] is [`RuleScope::Graph`] are evaluated; any
 /// non-graph rule passed in is ignored (so callers may hand the full rule set).
@@ -470,7 +426,7 @@ pub fn graph_rule_plan_source_ids(
 ) -> Vec<String> {
     let mut source_ids = vec![issue.id.clone()];
     if let Assertion::LabelCoverage { config } = &rule.assert {
-        if let Some(toml::Value::String(namespace)) = config.get("container-from-label") {
+        if let Some(namespace) = &config.container_from_label {
             let prefix = format!("{namespace}:");
             if let Some(value) = issue
                 .labels
@@ -708,9 +664,7 @@ fn issue_finding(rule: &Rule, issue_id: &str, message: String) -> GraphFinding {
     GraphFinding::for_issue(issue_id, finding(rule, message))
 }
 
-/// Build a `config-error` [`GraphFinding`]: a malformed/missing config key is
-/// always reported (never swallowed, never a panic), attributed to the rule (not
-/// a single issue, so `issue_id` is `None`).
+/// Attribute unusable runtime context to the rule rather than a single issue.
 ///
 /// This is the only constructor that sets `is_config_error: true` on the result;
 /// guards read that typed field rather than scanning `finding.message` for a
@@ -720,34 +674,6 @@ fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
         issue_id: None,
         finding: finding(rule, format!("{CONFIG_ERROR_PREFIX}{}", message.into())),
         is_config_error: true,
-    }
-}
-
-/// Read a required string key from a config table, or `Err(GraphFinding)`.
-fn require_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
-        None => Err(config_error(rule, format!("missing required key '{key}'"))),
-    }
-}
-
-/// Read an optional string key, defaulting when absent. A present non-string is
-/// a config error.
-fn optional_str<'a>(
-    rule: &Rule,
-    config: &'a toml::value::Table,
-    key: &str,
-    default: &'a str,
-) -> Result<&'a str, GraphFinding> {
-    match config.get(key) {
-        None => Ok(default),
-        Some(toml::Value::String(s)) => Ok(s.as_str()),
-        Some(_) => Err(config_error(rule, format!("key '{key}' must be a string"))),
     }
 }
 
@@ -777,7 +703,7 @@ fn optional_str<'a>(
 ///   projection slug of the section whose list items hold the criteria.
 /// - `marker` (string, optional): when set, only items whose text begins with
 ///   this marker (e.g. `"[hard]"`) are required; others are ignored.
-/// - `id-pattern` (string, optional, default [`DEFAULT_CRITERION_ID_PATTERN`]):
+/// - `id-pattern` (string, optional, default [`crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN`]):
 ///   regex that extracts the criterion id from an item's text.
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
 ///   namespace on children whose value names the satisfied criterion (see
@@ -796,9 +722,9 @@ fn optional_str<'a>(
 ///   firing issue names the criteria-bearing container, so a rule keyed on one
 ///   issue type can evaluate another issue's criteria (container indirection).
 ///
-/// One finding is produced per uncovered criterion id per container. A malformed
-/// config — including a firing issue whose `container-from-label` pointer resolves
-/// to no issue in `resolution_index` — yields a single `config-error` finding.
+/// One finding is produced per uncovered criterion id per container. An unresolved
+/// `container-from-label` pointer yields a single `config-error` finding.
+/// Malformed assertion configuration is rejected at rule load.
 ///
 /// `resolution_index` is the issue set a `container-from-label` pointer resolves
 /// against; it is the complete repository index even when `issues` is a partial
@@ -809,119 +735,33 @@ fn optional_str<'a>(
 /// container is in-slice and nothing is skipped.
 fn evaluate_label_coverage(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelCoverageConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
     resolution_index: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
-    // --- Interpret config (any error short-circuits to one config-error). ---
-    let section_slug =
-        match optional_str(rule, config, "criteria-section", DEFAULT_CRITERIA_SECTION) {
-            Ok(v) => v,
-            Err(f) => return vec![f],
-        };
-    let marker = match config.get("marker") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => return vec![config_error(rule, "key 'marker' must be a string")],
-    };
-    let id_pattern_src =
-        match optional_str(rule, config, "id-pattern", DEFAULT_CRITERION_ID_PATTERN) {
-            Ok(v) => v,
-            Err(f) => return vec![f],
-        };
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-    let satisfies_ns = match optional_str(
-        rule,
-        config,
-        "satisfies-namespace",
-        DEFAULT_SATISFIES_NAMESPACE,
-    ) {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let child_state = match config.get("child-state") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => return vec![config_error(rule, "key 'child-state' must be a string")],
-    };
-    let child_link_src = match optional_str(rule, config, "child-link", "dependents") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let child_link = match ChildLink::parse(child_link_src) {
-        Some(c) => c,
-        None => {
-            return vec![config_error(
-                rule,
-                format!(
-                    "key 'child-link' must be one of 'dependents', 'dependencies', 'any', \
-                     got '{child_link_src}'"
-                ),
-            )]
-        }
-    };
-    // `child-type-exclude` (optional, default empty): bare type names dropped
-    // from coverage candidates AND used as the transitive-walk boundary.
-    let exclude_types = match config.get("child-type-exclude") {
-        None => BTreeSet::new(),
-        Some(toml::Value::Array(arr)) => {
-            let mut set = BTreeSet::new();
-            for v in arr {
-                match v {
-                    toml::Value::String(s) => {
-                        set.insert(s.clone());
-                    }
-                    _ => {
-                        return vec![config_error(
-                            rule,
-                            "key 'child-type-exclude' must be an array of strings",
-                        )]
-                    }
-                }
-            }
-            set
-        }
-        Some(_) => {
-            return vec![config_error(
-                rule,
-                "key 'child-type-exclude' must be an array of strings",
-            )]
-        }
-    };
-    // `container-from-label` (optional): when set, the criteria-bearing container
-    // is not the matched (firing) issue itself but the issue named by the firing
-    // issue's `<namespace>:<id>` label. This lets a rule keyed on the breakdown
-    // node evaluate its container's criteria (D13 container indirection).
-    let container_ns = match config.get("container-from-label") {
-        None => None,
-        Some(toml::Value::String(s)) => Some(s.as_str()),
-        Some(_) => {
-            return vec![config_error(
-                rule,
-                "key 'container-from-label' must be a string",
-            )]
-        }
-    };
+    let section_slug = config.criteria_section();
+    let marker = config.marker.as_deref();
+    let id_pattern = config.id_pattern().regex();
+    let satisfies_ns = config.satisfies_namespace();
+    let child_state = config.child_state;
+    let child_link = config.child_link();
+    let exclude_types = config
+        .child_type_exclude
+        .iter()
+        .flatten()
+        .cloned()
+        .collect();
+    let container_ns = config.container_from_label.as_deref();
 
-    // A child satisfies criterion `id` if it carries a `satisfies-ns` label
-    // naming `id` of the container `container_short_id` and (when configured) is
-    // in `child-state`.
-    let state_matcher = child_state.map(|s| Selector {
-        state: Some(StatePredicate::single(s)),
-        ..Selector::default()
-    });
     let satisfied_id = |child: &Issue, id: &str, container_short_id: &str| -> bool {
         let claims = child
             .labels
             .iter()
             .any(|l| label_credits_id(l, satisfies_ns, id, container_short_id));
-        let state_ok = state_matcher.as_ref().is_none_or(|sel| sel.matches(child));
+        let state_ok = child_state.is_none_or(|state| child.state == state);
         claims && state_ok
     };
 
@@ -989,7 +829,7 @@ fn evaluate_label_coverage(
                 container,
                 section_slug,
                 marker,
-                &id_pattern,
+                id_pattern,
                 repo_default_format,
                 plan_content,
             ) {
@@ -1176,48 +1016,15 @@ fn children_of<'a>(
 ///
 /// Every issue matching the rule's selector and carrying a `from`-namespace
 /// reference label must have each referenced value declared as a `to`-namespace
-/// source within the configured scope.
-///
-/// # Config keys
-///
-/// - `from` (string, required): namespace of the reference label whose values
-///   must resolve (e.g. `"satisfies"`).
-/// - `to` (string, required): namespace that DECLARES valid source ids (e.g.
-///   `"req"`).
-/// - `scope` (string, optional, default `"global"`): where a declaration may
-///   live — `"global"` (any issue in the set) or `"linked"` (only issues this
-///   issue depends on, or that depend on it).
-///
-/// One finding is produced per dangling reference. A malformed config yields a
-/// single `config-error` finding.
+/// source within the configured scope. One finding is produced per dangling
+/// reference.
 fn evaluate_label_reference(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &LabelReferenceConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    let from_ns = match require_str(rule, config, "from") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let to_ns = match require_str(rule, config, "to") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let scope = match optional_str(rule, config, "scope", "global") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    let linked = match scope {
-        "global" => false,
-        "linked" => true,
-        other => {
-            return vec![config_error(
-                rule,
-                format!("key 'scope' must be 'global' or 'linked', got '{other}'"),
-            )]
-        }
-    };
+    let (from_ns, to_ns, scope) = (&config.from, &config.to, config.scope());
 
     // Globally declared source ids (the `to` namespace values across all issues).
     let global_sources: BTreeSet<&str> = graph_context
@@ -1229,7 +1036,7 @@ fn evaluate_label_reference(
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if linked {
+            let allowed: BTreeSet<&str> = if scope == LabelReferenceScope::Linked {
                 linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
@@ -1312,54 +1119,17 @@ fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
 /// ought to) depend — directly or transitively, over the dependency DAG — on at
 /// least one issue matching the `target` selector.
 ///
-/// # Config keys
-///
-/// - `target` (table, required): a [`Selector`]-shaped table (`type`/`label`/
-///   `state`/`has_doc_type`) identifying the issues the source must depend on.
-/// - `mode` (string, optional, default `"must"`): `"must"` or `"should"`. This
-///   only shapes the finding message; the finding's blocking weight comes from
-///   the rule's own [`Severity`].
-/// - `transitive` (boolean, optional, default `false`): when `true`, a
-///   transitive dependency satisfies the rule; otherwise only a direct
-///   dependency does.
-///
-/// One finding is produced per source issue lacking a qualifying dependency. A
-/// malformed config yields a single `config-error` finding.
+/// `mode` only shapes the finding message; the finding's blocking weight comes
+/// from the rule's own [`Severity`]. One finding is produced per source issue
+/// lacking a qualifying dependency.
 fn evaluate_dependency_shape(
     rule: &Rule,
-    config: &toml::value::Table,
+    config: &DependencyShapeConfig,
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    // `target` must be a table we can deserialize into a Selector.
-    let target = match config.get("target") {
-        Some(value @ toml::Value::Table(_)) => match value.clone().try_into::<Selector>() {
-            Ok(sel) => sel,
-            Err(e) => {
-                return vec![config_error(
-                    rule,
-                    format!("invalid 'target' selector: {e}"),
-                )]
-            }
-        },
-        Some(_) => return vec![config_error(rule, "key 'target' must be a table")],
-        None => return vec![config_error(rule, "missing required key 'target'")],
-    };
-    let mode = match optional_str(rule, config, "mode", "must") {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
-    if mode != "must" && mode != "should" {
-        return vec![config_error(
-            rule,
-            format!("key 'mode' must be 'must' or 'should', got '{mode}'"),
-        )];
-    }
-    let transitive = match config.get("transitive") {
-        None => false,
-        Some(toml::Value::Boolean(b)) => *b,
-        Some(_) => return vec![config_error(rule, "key 'transitive' must be a boolean")],
-    };
+    let target = &config.target;
+    let transitive = config.is_transitive();
 
     // Set of issue ids matching the target selector.
     let target_ids: BTreeSet<&str> = graph_context
@@ -1382,7 +1152,7 @@ fn evaluate_dependency_shape(
                 format!(
                     "issue {} {} depend on an issue matching the target selector but does not",
                     source.short_id(),
-                    mode
+                    config.mode().as_str()
                 ),
             )
         })
@@ -1533,7 +1303,7 @@ fn evaluate_gate_recency(
 ///   section whose list items hold the criteria.
 /// - `marker` (optional): when set, only items starting with this marker
 ///   contribute criterion ids.
-/// - `id_pattern` (default [`DEFAULT_CRITERION_ID_PATTERN`]): extracts the
+/// - `id_pattern` (default [`crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN`]): extracts the
 ///   criterion id from an item's text.
 /// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
 ///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
@@ -2126,7 +1896,7 @@ source-of-truth = "markdown-first"
                 id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(crate::config::KindScopeConfig::Issue),
+                scope: Some(crate::domain::item::KindScope::Issue),
                 source: None,
                 source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2359,24 +2129,6 @@ source-of-truth = "markdown-first"
         assert!(findings.is_empty(), "any link covers regardless of edges");
     }
 
-    #[test]
-    fn test_label_coverage_malformed_config_is_config_error() {
-        let rule = coverage_rule("child-link = \"bogus\"");
-        let initiative = initiative_with_criteria(&["REQ-01"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("child-link"));
-    }
-
     // --- label-coverage: transitive closure (T3) ---------------------------
 
     /// Build a strategic-container issue with `[hard]` criteria but no other labels, so
@@ -2526,31 +2278,6 @@ source-of-truth = "markdown-first"
             findings.is_empty(),
             "impl interior covers; only the breakdown boundary is excluded: {findings:?}"
         );
-    }
-
-    #[test]
-    fn test_child_type_exclude_must_be_array_of_strings() {
-        // Loading rejects the mistyped value; a directly built payload reaches the evaluator.
-        let mut rule = coverage_rule("");
-        if let Assertion::LabelCoverage { config } = &mut rule.assert {
-            config.insert(
-                "child-type-exclude".to_string(),
-                toml::Value::String("breakdown".to_string()),
-            );
-        }
-        let initiative = initiative_chain_head(&["REQ-01"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("child-type-exclude"));
     }
 
     // --- label-coverage: container indirection via brackets: (T3/D13) ------
@@ -2987,27 +2714,6 @@ source-of-truth = "markdown-first"
         assert!(findings.is_empty(), "linked edge resolves: {findings:?}");
     }
 
-    #[test]
-    fn test_label_reference_missing_key_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = reference_rule("from = \"implements\", to = \"req\"");
-        if let Assertion::LabelReference { config } = &mut rule.assert {
-            config.remove("to");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[issue("x", &["implements:REQ-01"])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("'to'"));
-    }
-
     // --- dependency-shape --------------------------------------------------
 
     fn shape_rule(extra: &str) -> Rule {
@@ -3093,27 +2799,6 @@ source-of-truth = "markdown-first"
             findings.is_empty(),
             "transitive dep satisfies: {findings:?}"
         );
-    }
-
-    #[test]
-    fn test_dependency_shape_missing_target_is_config_error() {
-        // Loading rejects a missing key; a directly built payload reaches the evaluator.
-        let mut rule = shape_rule("target = { type = \"design\" }");
-        if let Assertion::DependencyShape { config } = &mut rule.assert {
-            config.remove("target");
-        }
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[typed_issue(&test_type(4), 4, &[])],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("config error"));
-        assert!(findings[0].finding.message.contains("target"));
     }
 
     // --- gate-recency ------------------------------------------------------
@@ -4247,8 +3932,9 @@ source-of-truth = "markdown-first"
         //
         // The same assertion is then repeated for `criteria-label-match`.
 
-        use crate::config::{ItemKindConfig, KindScopeConfig};
+        use crate::config::ItemKindConfig;
         use crate::domain::item::expand_kind_triple;
+        use crate::domain::item::KindScope;
         use std::collections::HashMap;
 
         // Declare `requirement` in a registry with its full six-tuple, exactly as
@@ -4261,7 +3947,7 @@ source-of-truth = "markdown-first"
                 id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -4380,12 +4066,12 @@ source-of-truth = "markdown-first"
     }
 
     /// The `config_error()` constructor (exercised via `evaluate_graph` with a
-    /// malformed rule) produces a finding where `is_config_error()` returns
+    /// missing container pointer) produces a finding where `is_config_error()` returns
     /// `true`. The typed field, not the message prefix, drives this.
     #[test]
     fn test_config_error_constructor_sets_typed_field() {
-        // A coverage rule with an unrecognized `child-link` forces `config_error()`.
-        let rule = coverage_rule("child-link = \"bogus\"");
+        // A missing container pointer forces `config_error()`.
+        let rule = coverage_rule("container-from-label = \"brackets\"");
         let initiative = initiative_with_criteria(&["REQ-01"]);
         let findings = evaluate_graph(
             &[&rule],
@@ -4398,7 +4084,7 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1);
         assert!(
             findings[0].is_config_error(),
-            "malformed config must produce is_config_error() == true via the typed field"
+            "missing container pointer must produce a typed config error"
         );
         // Verify the typed field is not just re-deriving from the message prefix.
         assert!(

@@ -35,7 +35,8 @@
 
 use super::VirtualPath;
 use crate::declarations::rules::{
-    Assertion, Rule, RuleSet, Selector, TypeHierarchyKind, DEFAULT_CRITERION_ID_PATTERN,
+    Assertion, LabelCoverageConfig, LabelUniquenessScope, Rule, RuleSet, Selector,
+    DEFAULT_CRITERION_ID_PATTERN,
 };
 use std::collections::HashSet;
 
@@ -270,13 +271,33 @@ fn render_assertion(
             format!("{{ checker-command = {} }}", toml_basic_string(cmd))
         }
         Assertion::LabelCoverage { config } => {
-            format!("{{ label-coverage = {} }}", render_config_table(config))
+            format!("{{ label-coverage = {} }}", render_label_coverage(config))
         }
         Assertion::LabelReference { config } => {
-            format!("{{ label-reference = {} }}", render_config_table(config))
+            // Emit `scope` only when authored, so the keys round-trip as written.
+            let mut parts = vec![
+                format!("from = {}", toml_basic_string(&config.from)),
+                format!("to = {}", toml_basic_string(&config.to)),
+            ];
+            if let Some(scope) = config.authored_scope {
+                parts.push(format!("scope = {}", toml_basic_string(scope.as_str())));
+            }
+            format!("{{ label-reference = {{ {} }} }}", parts.join(", "))
         }
         Assertion::DependencyShape { config } => {
-            format!("{{ dependency-shape = {} }}", render_config_table(config))
+            // Emit `mode` and `transitive` only when authored, so the keys
+            // round-trip as written.
+            let mut parts = vec![format!(
+                "target = {}",
+                render_selector(&config.target).unwrap_or_else(|| "{}".to_string())
+            )];
+            if let Some(mode) = config.authored_mode {
+                parts.push(format!("mode = {}", toml_basic_string(mode.as_str())));
+            }
+            if let Some(transitive) = config.authored_transitive {
+                parts.push(format!("transitive = {transitive}"));
+            }
+            format!("{{ dependency-shape = {{ {} }} }}", parts.join(", "))
         }
         Assertion::GateRecency {
             max_age_hours,
@@ -292,13 +313,9 @@ fn render_assertion(
             format!("{{ gate-recency = {{ {} }} }}", parts.join(", "))
         }
         Assertion::TypeHierarchy { kind } => {
-            let kind_token = match kind {
-                TypeHierarchyKind::OrphanLeaf => "orphan-leaf",
-                TypeHierarchyKind::StrategicConsistency => "strategic-consistency",
-            };
             format!(
                 "{{ type-hierarchy = {{ kind = {} }} }}",
-                toml_basic_string(kind_token)
+                toml_basic_string(kind.as_str())
             )
         }
         Assertion::CriteriaLabelMatch {
@@ -362,48 +379,62 @@ fn render_assertion(
             format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
         Assertion::LabelUniqueness { namespace } => {
-            // scope = "all" is the only valid value; round-trip it explicitly
-            // so the reloaded rule is identical to the original.
+            // Round-trip the required scope explicitly so the reload is identical.
             format!(
-                "{{ label-uniqueness = {{ namespace = {}, scope = \"all\" }} }}",
-                toml_basic_string(namespace)
+                "{{ label-uniqueness = {{ namespace = {}, scope = {} }} }}",
+                toml_basic_string(namespace),
+                toml_basic_string(LabelUniquenessScope::All.as_str())
             )
         }
     })
 }
 
-/// Render a graph rule's `toml::value::Table` as an inline TOML table, reusing
-/// `toml_edit` so nested tables/arrays/escaping are handled correctly.
-fn render_config_table(table: &toml::value::Table) -> String {
-    let value = toml::Value::Table(table.clone());
-    let edit = toml_value_to_edit(&value);
-    edit.to_string()
-}
-
-/// Convert a `toml::Value` into a `toml_edit::Value`, rendering tables as INLINE
-/// tables (so the result fits inside an `assert = { … }` line).
-fn toml_value_to_edit(value: &toml::Value) -> toml_edit::Value {
-    match value {
-        toml::Value::String(s) => toml_edit::Value::from(s.clone()),
-        toml::Value::Integer(i) => toml_edit::Value::from(*i),
-        toml::Value::Float(f) => toml_edit::Value::from(*f),
-        toml::Value::Boolean(b) => toml_edit::Value::from(*b),
-        toml::Value::Datetime(dt) => toml_edit::Value::from(dt.to_string()),
-        toml::Value::Array(items) => {
-            let mut arr = toml_edit::Array::new();
-            for item in items {
-                arr.push(toml_value_to_edit(item));
-            }
-            toml_edit::Value::Array(arr)
-        }
-        toml::Value::Table(map) => {
-            let mut inline = toml_edit::InlineTable::new();
-            for (k, v) in map {
-                inline.insert(k, toml_value_to_edit(v));
-            }
-            toml_edit::Value::InlineTable(inline)
-        }
-    }
+/// Preserve authored keys and their historical alphabetical ordering.
+fn render_label_coverage(config: &LabelCoverageConfig) -> String {
+    let string = |value: &Option<String>| value.as_deref().map(toml_edit::Value::from);
+    let fields = [
+        (
+            "child-link",
+            config
+                .authored_child_link
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        (
+            "child-state",
+            config
+                .child_state
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        (
+            "child-type-exclude",
+            config
+                .child_type_exclude
+                .as_ref()
+                .map(|values| toml_edit::Value::Array(values.iter().map(String::as_str).collect())),
+        ),
+        ("container-from-label", string(&config.container_from_label)),
+        (
+            "criteria-section",
+            string(&config.authored_criteria_section),
+        ),
+        (
+            "id-pattern",
+            config
+                .authored_id_pattern
+                .as_ref()
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        ("marker", string(&config.marker)),
+        (
+            "satisfies-namespace",
+            string(&config.authored_satisfies_namespace),
+        ),
+    ];
+    let table: toml_edit::InlineTable = fields
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+        .collect();
+    table.to_string()
 }
 
 /// Sanitize a schema identity into a safe schema file stem: lowercase
@@ -743,7 +774,7 @@ assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-
 
     #[test]
     fn test_round_trip_graph_config_kinds() {
-        // The three graph config-table kinds round-trip their config tables.
+        // Graph configs retain explicit defaults distinctly from absent keys.
         let toml = test_toml(
             r#"
 [[rules]]
@@ -753,19 +784,61 @@ severity = "error"
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", child-state = "done" } }
 
 [[rules]]
+name = "coverage-defaults"
+assert = { label-coverage = {} }
+
+[[rules]]
+name = "coverage-all-options"
+assert = { label-coverage = { child-link = "dependents", child-state = "rejected", child-type-exclude = ["story", "task", "story"], container-from-label = "brackets", criteria-section = "success_criteria", id-pattern = '[A-Z][A-Z0-9]*-[0-9]+', marker = "[hard]", satisfies-namespace = "satisfies" } }
+
+[[rules]]
 name = "reference"
 severity = "warn"
 assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
+
+[[rules]]
+name = "reference-explicit-global"
+severity = "warn"
+assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }
+
+[[rules]]
+name = "reference-default-scope"
+severity = "warn"
+assert = { label-reference = { from = "satisfies", to = "req" } }
 
 [[rules]]
 name = "shape"
 when = { type = "__leaf_type__" }
 severity = "error"
 assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
+
+[[rules]]
+name = "shape-default-keys"
+severity = "warn"
+assert = { dependency-shape = { target = { type = "design", state = ["ready", "done"] } } }
+
+[[rules]]
+name = "shape-should"
+severity = "warn"
+assert = { dependency-shape = { target = { label = "area:*" }, mode = "should", transitive = false } }
 "#,
         );
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
+        let serialized = serialize_ruleset(&set).unwrap();
+        let source: toml::Table = toml::from_str(&toml).unwrap();
+        let rendered: toml::Table = toml::from_str(&serialized.rules_toml).unwrap();
+        for (source, rendered) in source["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(rendered["rules"].as_array().unwrap())
+        {
+            assert_eq!(
+                source["assert"], rendered["assert"],
+                "authored assertion keys and values"
+            );
+        }
     }
 
     #[test]

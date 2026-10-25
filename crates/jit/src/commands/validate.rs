@@ -1050,7 +1050,7 @@ pub(super) fn rule_validation_outcome(
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.as_str()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let rule = match crate::validation::graph::select_graph_rule(
         &declarations.rules.rules,
         rule_name,

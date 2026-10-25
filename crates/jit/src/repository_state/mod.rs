@@ -225,11 +225,6 @@ pub enum ProducerError {
     /// A selected content parser is not available in this build.
     #[error(transparent)]
     ContentParser(#[from] crate::document::ContentParserError),
-    /// The repository-level content format is invalid.
-    #[error(
-        "invalid [validation].content_format in .jit/config.toml: '{0}': Invalid content format: '{0}' (expected markdown, html, or xml)"
-    )]
-    InvalidContentFormat(String),
     /// A rules document could not be parsed or safely spliced.
     #[error(transparent)]
     RulesDocument(#[from] RulesDocumentError),

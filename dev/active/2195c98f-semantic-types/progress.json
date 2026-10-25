@@ -164,7 +164,7 @@
           "short_id": "72dfc0d7",
           "title": "Built-in gate findings use closed severity and disposition enums",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
@@ -185,7 +185,7 @@
           "short_id": "96bb0941",
           "title": "Validation strictness is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
@@ -199,7 +199,7 @@
           "short_id": "b4fe7887",
           "title": "Item-kind scope has one enum",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
@@ -213,7 +213,7 @@
           "short_id": "bc1955a8",
           "title": "Item kinds hold their id pattern as IdPattern",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
@@ -248,7 +248,7 @@
           "short_id": "faa19def",
           "title": "Gate-run actors are Assignee values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -288,7 +288,7 @@
           "short_id": "42bcaa6e",
           "title": "Content format is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -391,7 +391,7 @@
           "short_id": "a4b94a17",
           "title": "Type-hierarchy and label-uniqueness rule options are typed",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
@@ -412,7 +412,7 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
@@ -466,7 +466,7 @@
           "short_id": "af9c277d",
           "title": "Label-reference assertions are typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
@@ -499,7 +499,7 @@
           "short_id": "5613ef50",
           "title": "Dependency-shape assertions are typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
@@ -525,7 +525,7 @@
           "short_id": "7e8f1525",
           "title": "Label-coverage assertions are typed and compiled at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
@@ -940,6 +940,62 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "One-file convergence on the shared IdPattern."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal sweep in storage and loaders; brief carries the bare-name lesson."
+    },
+    {
+      "issue": "a4b94a17",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Two rule-option enums decoded at load."
+    },
+    {
+      "issue": "42bcaa6e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded content format, same pattern as strictness."
+    },
+    {
+      "issue": "af9c277d",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "First compiled-graph-assertion lowering; sets the pattern two later tasks follow."
+    },
+    {
+      "issue": "b4fe7887",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Fold a config mirror enum into the domain enum."
+    },
+    {
+      "issue": "5613ef50",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Second assertion lowering following af9c277d's pattern."
+    },
+    {
+      "issue": "7e8f1525",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Largest assertion lowering, five files incl. out-of-validation readers."
+    },
+    {
+      "issue": "72dfc0d7",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Closed finding enums with a typed constructor, open wire fields."
     }
   ],
   "surfaced_pitfalls": [
@@ -954,6 +1010,10 @@
     {
       "source": "179dcef9",
       "note": "TargetClaim owners (profile-asset:<target>, profile-region:<id>) remain dynamic strings with an inline InvalidClaimOwner check; they belong to profile ownership code that 3d9a0ce3 (D-8) deletes. Epic REQ-10 names 'repository action owner': reconcile at the epic gate (likely out of scope as profile ownership, per plan DEC-06)."
+    },
+    {
+      "source": "5613ef50",
+      "note": "transition_graph_enforcement_tests' two evaluation-time config-error tests now use a label-coverage rule with a bad child-link; 7e8f1525 (label-coverage typed at load) must re-home them, since that error will move to load."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -963,6 +1023,7 @@
     "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
     "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
     "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way.",
-    "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id)."
+    "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id).",
+    "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision)."
   ]
 }

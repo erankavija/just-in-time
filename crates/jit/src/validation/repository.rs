@@ -563,7 +563,7 @@ fn collect_rule_findings(
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
 ) -> Result<Vec<ReportedFinding>> {
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut reported = Vec::new();
     for issue in issues {
         let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)?;
@@ -704,7 +704,7 @@ fn collect_item_link_findings(
     if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut addresses = HashSet::new();
     let issue_kinds: Vec<_> = kinds
         .iter()

@@ -1049,7 +1049,7 @@ fn derive_write_validation(
     config: &JitConfig,
     force: bool,
 ) -> Result<WriteValidation> {
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
@@ -1171,7 +1171,7 @@ fn derive_state_transition(
             let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
             let hierarchy =
                 crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-            let repo_format = evidence.config.content_format()?;
+            let repo_format = evidence.config.content_format();
             let strictness = evidence.config.strictness();
             let enforcing = rules
                 .iter()
@@ -1413,7 +1413,7 @@ fn derive_field_update(
     }
     let validation = match &request.label_edit {
         Some(CapturedLabelEdit::AppendUnchecked(_)) => {
-            let repo_format = evidence.config.content_format()?;
+            let repo_format = evidence.config.content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
                 &evidence.declarations.rules,
@@ -1442,7 +1442,7 @@ fn derive_field_update(
         )?,
     };
     if request.issue_type.is_some() {
-        let repo_format = evidence.config.content_format()?;
+        let repo_format = evidence.config.content_format();
         let explicit_type = crate::validation::evaluate_local(
             &projected,
             &evidence.declarations.rules,
@@ -2442,7 +2442,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if explicit_type {
-                let repo_format = declarations.config().content_format()?;
+                let repo_format = declarations.config().content_format();
                 let evaluation = crate::validation::evaluate_local(
                     &final_draft,
                     declarations.rules(),
@@ -2620,7 +2620,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Resolve the repository's configured default content format.
     fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        self.cached_config()?.content_format()
+        Ok(self.cached_config()?.content_format())
     }
 
     fn publish_captured_field_update(
@@ -2972,7 +2972,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
                 for result in &precheck_runs {
-                    let (state, by) = gate_check::gate_state_from_run(result)?;
+                    let state = gate_check::gate_state_from_run(result);
+                    let by = result.by.clone();
                     let status = state.status;
                     issue.gates_status.insert(result.gate_key.clone(), state);
                     precheck_events.push((
@@ -3472,7 +3473,7 @@ mod tests {
 
     #[test]
     fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
-        use crate::declarations::rules::{Assertion, Rule, RuleScope, RuleSet, Selector, Severity};
+        use crate::declarations::rules::{Rule, RuleScope, RuleSet, Selector, Severity};
 
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let type_name = taxonomy.type_at_level(4).to_string();
@@ -3494,9 +3495,15 @@ mod tests {
                 },
                 severity: Severity::Error,
                 enforce: false,
-                assert: Assertion::LabelCoverage {
-                    config: Default::default(),
-                },
+                assert: RuleSet::parse(
+                    "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+                    None,
+                    [],
+                )
+                .unwrap()
+                .rules[0]
+                    .assert
+                    .clone(),
                 scope: RuleScope::Graph,
             }],
         };
