@@ -82,7 +82,7 @@
           "short_id": "cccfd407",
           "title": "One VirtualPath predicate recognises reserved application targets",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
@@ -115,14 +115,14 @@
           "short_id": "18dc6e3e",
           "title": "Repository-state code names well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
           "short_id": "256c8eb1",
           "title": "Error codes come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
@@ -281,7 +281,7 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
@@ -623,7 +623,8 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "b3fcd297": 2
+    "b3fcd297": 2,
+    "acb38457": 1
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -867,6 +868,27 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Two new identity types across nine files with fallback error paths."
+    },
+    {
+      "issue": "acb38457",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework R1 to the same worker: EdgeView storage type changed against REQ-02."
+    },
+    {
+      "issue": "18dc6e3e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in one module family."
+    },
+    {
+      "issue": "256c8eb1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-enum macro adoption with a wire-contract check."
     }
   ],
   "surfaced_pitfalls": [

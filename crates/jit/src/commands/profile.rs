@@ -1062,7 +1062,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     continue;
                 }
                 let package = self
-                    .resolve_dependency_package_from(&declaring, dependency.id.as_str())
+                    .resolve_dependency_package_from(&declaring, &dependency.id)
                     .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
@@ -1088,17 +1088,20 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     fn resolve_dependency_package_from(
         &self,
         declaring: &ProfilePackage,
-        dependency: &str,
+        dependency: &ProfileId,
     ) -> Result<ProfilePackage> {
         let ProfilePackageSource::Directory(directory) = declaring.source();
         let not_found = || -> anyhow::Error {
             crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
-        let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
+        let Some(location) = directory
+            .parent()
+            .map(|parent| parent.join(dependency.as_str()))
+        else {
             return Err(not_found());
         };
         match supplied_package(&location, &self.require_layout()?) {
-            Ok(package) if package.model().id.as_str() == dependency => Ok(package),
+            Ok(package) if package.model().id == *dependency => Ok(package),
             Ok(_) => Err(not_found()),
             Err(error) if is_unreadable_location(&error) => Err(not_found()),
             Err(error) => Err(error),
