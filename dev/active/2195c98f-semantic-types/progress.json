@@ -122,7 +122,7 @@
           "short_id": "256c8eb1",
           "title": "Error codes come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
@@ -281,7 +281,7 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
@@ -882,6 +882,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Literal-to-constant sweep in one module family."
+    },
+    {
+      "issue": "256c8eb1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-enum macro adoption with a wire-contract check."
     }
   ],
   "surfaced_pitfalls": [
