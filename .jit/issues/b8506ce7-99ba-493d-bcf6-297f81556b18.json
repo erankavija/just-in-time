@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a8e04de1-ee14-4d0a-bc7c-5a5d3d8ab0ad",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:05:58.289346127Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52f5da35-7283-4772-834a-8cc6d1fd1046",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:38:21.387422978Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Store divergence tokens come from one declaration",
-  "updated_at": "2026-10-24T23:57:16.916948375Z"
+  "updated_at": "2026-10-25T01:05:58.289346127Z"
 }
