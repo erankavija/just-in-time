@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f8e28e29-06cf-4907-819e-e88a0c12fd23",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:17:10.679010081Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52aaf551-9a2e-4fe9-b6a7-8eb514d6dc54",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:19:05.181352297Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Repository-state code names well-known files through VirtualPath constants",
-  "updated_at": "2026-10-25T02:58:12.473490998Z"
+  "updated_at": "2026-10-25T03:19:05.181352297Z"
 }
