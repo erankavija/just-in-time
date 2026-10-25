@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "a6f41080-1561-4f83-8b3f-0f96ca00e972",
+      "run_id": "73715df0-6838-450c-9738-c961e3610e57",
       "status": "passed",
-      "updated_at": "2026-10-25T02:19:51.969989166Z",
+      "updated_at": "2026-10-25T02:26:14.060177562Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The server resolves each issue-id path parameter once",
-  "updated_at": "2026-10-25T02:22:57.981083616Z"
+  "updated_at": "2026-10-25T02:26:14.060177562Z"
 }
