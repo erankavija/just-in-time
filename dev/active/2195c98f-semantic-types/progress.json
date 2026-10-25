@@ -623,7 +623,7 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "b3fcd297": 1
+    "b3fcd297": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -783,6 +783,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Continuation: approved test-assertion update outside footprint; finish checks."
+    },
+    {
+      "issue": "b3fcd297",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R2: route every schema-reference path site through one parser (sweep miss, same tier)."
     }
   ],
   "surfaced_pitfalls": [
