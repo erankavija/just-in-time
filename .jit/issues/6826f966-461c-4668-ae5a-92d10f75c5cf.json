@@ -7,6 +7,7 @@
   ],
   "description": "Declare rule severity and rule scope through the vocabulary macro.\n\n## Background\n\n`Severity::token` and `RuleScope::token` (`crates/jit/src/declarations/rules.rs:180-215`) hand-write the spellings their serde forms already state.\n\n## Success Criteria\n\n- [hard] REQ-01: `Severity` and `RuleScope` are declared through the macro, and both `token` functions are gone.\n- [hard] REQ-02: Rule declarations and rule messages spell severity and scope as before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T01:51:09.323506663Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Rule severity and scope tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T01:51:09.323506663Z"
 }

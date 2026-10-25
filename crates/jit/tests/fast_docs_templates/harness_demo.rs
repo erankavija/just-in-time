@@ -430,7 +430,7 @@ fn test_harness_container_progress_and_children() {
     assert_eq!(rollup.extras.open, 2); // in_progress + ready
     assert_eq!(rollup.extras.percent, 25);
     // Every state present, zero-count states included.
-    assert_eq!(rollup.items.len(), State::all().len());
+    assert_eq!(rollup.items.len(), State::ALL.len());
     let bucket = |s: State| rollup.items.iter().find(|c| c.state == s).unwrap().count;
     assert_eq!(bucket(State::Done), 1);
     assert_eq!(bucket(State::Gated), 0);
@@ -475,7 +475,7 @@ fn test_harness_empty_container_rollup() {
     let rollup = StateRollup::from_issues(&[]);
     assert_eq!(rollup.extras.total, 0);
     assert_eq!(rollup.extras.percent, 0);
-    assert_eq!(rollup.items.len(), State::all().len());
+    assert_eq!(rollup.items.len(), State::ALL.len());
     assert!(rollup.items.iter().all(|c| c.count == 0));
 }
 
