@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "73715df0-6838-450c-9738-c961e3610e57",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:26:14.060177562Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cef82151-2cab-404c-9840-383da43a2bdf",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:22:57.981083616Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The server resolves each issue-id path parameter once",
-  "updated_at": "2026-10-25T01:30:39.220245605Z"
+  "updated_at": "2026-10-25T02:26:14.060177562Z"
 }
