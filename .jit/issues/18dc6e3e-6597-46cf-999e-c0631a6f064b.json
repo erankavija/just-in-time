@@ -8,6 +8,7 @@
   ],
   "description": "Replace literal well-known `.jit` file names in repository-state code with `VirtualPath` constants.\n\n## Background\n\n`VirtualPath` declares well-known data-root files through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:259-310`), and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`). Repository-state code still spells them as literals: `repository_state/profile_apply.rs` (17 lines), `repository_state/materialize.rs` (17), `repository_state/initialize.rs` (7), `repository_state/projection_render.rs` (3) and `repository_state/mod.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal under `crates/jit/src/repository_state/`, outside `path.rs`, builds or matches the path of a well-known `.jit` file; message text that names a file for a reader is not a path site.\n- [hard] REQ-02: Each such site uses a `VirtualPath` constant, and host paths derive through `RepositoryLayout::resolve`.\n",
   "documents": [],
+  "done_at": "2026-10-25T03:21:17.078360556Z",
   "first_ready_at": "2026-10-25T02:13:51.531500208Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Repository-state code names well-known files through VirtualPath constants",
-  "updated_at": "2026-10-25T03:21:09.551981327Z"
+  "updated_at": "2026-10-25T03:21:17.078360556Z"
 }
