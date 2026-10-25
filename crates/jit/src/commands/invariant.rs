@@ -82,6 +82,12 @@ mod tests {
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("invariants.toml"), invariants_toml).unwrap();
         std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+        let layout = storage.repository_layout();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
+        std::fs::write(rules_path, rules_toml).unwrap();
         let mut registry = GateRegistry::default();
         for key in gate_keys {
             registry.gates.insert(
@@ -101,7 +107,7 @@ mod tests {
             );
         }
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        CommandExecutor::new(storage)
+        CommandExecutor::new(storage).with_layout(layout)
     }
 
     #[test]

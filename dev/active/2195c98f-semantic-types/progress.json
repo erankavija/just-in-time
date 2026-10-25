@@ -108,7 +108,7 @@
           "short_id": "179dcef9",
           "title": "Repository action owners are one enum",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
@@ -185,7 +185,7 @@
           "short_id": "96bb0941",
           "title": "Validation strictness is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
@@ -919,6 +919,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Owner enum across ten repository-state files with behaviour branches."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1 dispatched (recorded)."
+    },
+    {
+      "issue": "96bb0941",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded strictness with exact tokens."
     }
   ],
   "surfaced_pitfalls": [
@@ -929,6 +943,10 @@
     {
       "source": "98404e0c",
       "note": "storage/claim_coordinator.rs test_issue_id is a named convention-convergence exception; 0af95f14 (canonical-unit-test-ids, produces test-issue-id-fixture) must replace it. Check at bf87bbdb review."
+    },
+    {
+      "source": "179dcef9",
+      "note": "TargetClaim owners (profile-asset:<target>, profile-region:<id>) remain dynamic strings with an inline InvalidClaimOwner check; they belong to profile ownership code that 3d9a0ce3 (D-8) deletes. Epic REQ-10 names 'repository action owner': reconcile at the epic gate (likely out of scope as profile ownership, per plan DEC-06)."
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",

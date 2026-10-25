@@ -61,6 +61,13 @@ fn configure(h: &TestHarness) {
     std::fs::write(root.join("config.toml"), CONFIG_TOML).unwrap();
     std::fs::write(root.join("templates.toml"), TEMPLATES_TOML).unwrap();
     std::fs::write(root.join("rules.toml"), RULES_TOML).unwrap();
+    let rules_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::RULES)
+        .unwrap();
+    std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
+    std::fs::write(rules_path, RULES_TOML).unwrap();
 }
 
 fn new_issue(
