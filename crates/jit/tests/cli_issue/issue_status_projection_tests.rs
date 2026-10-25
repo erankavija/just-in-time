@@ -10,40 +10,17 @@
 //! - projection flags (`--field`/`--fields`) are not accepted on `issue status`
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
-fn jit_ok(temp: &TempDir, args: &[&str]) -> Vec<u8> {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone()
+fn jit_ok(cli: &JitCli, args: &[&str]) -> Vec<u8> {
+    let output = cli.command(args).output().unwrap();
+    assert!(output.status.success(), "jit failed: {output:?}");
+    output.stdout
 }
 
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let stdout = jit_ok(
-        temp,
-        &["issue", "create", "--title", title, "--description", "Body"],
-    );
-    let stdout = String::from_utf8_lossy(&stdout);
-    stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
+fn create_issue(cli: &JitCli, title: &str) -> String {
+    cli.create_issue(["--title", title, "--description", "Body"])
         .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn setup() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    jit_ok(&temp, &["init"]);
-    temp
 }
 
 fn short(id: &str) -> &str {
@@ -54,7 +31,7 @@ fn short(id: &str) -> &str {
 /// line with the documented field order.
 #[test]
 fn test_status_single_id_text_one_liner() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Solo task");
 
     let out = jit_ok(&temp, &["issue", "status", &id]);
@@ -83,7 +60,7 @@ fn test_status_single_id_text_one_liner() {
 /// The gate section lists each required gate as `key=status` in snake_case.
 #[test]
 fn test_status_text_lists_gate_key_status() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Gated task");
     jit_ok(
         &temp,
@@ -110,7 +87,7 @@ fn test_status_text_lists_gate_key_status() {
 /// Single-id `--json` is a bare compact object with the documented keys.
 #[test]
 fn test_status_single_id_json_small_object() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Solo task");
     jit_ok(
         &temp,
@@ -151,7 +128,7 @@ fn test_status_single_id_json_small_object() {
 /// An issue with no gates emits an empty `gates` array (not null/absent).
 #[test]
 fn test_status_json_no_gates_is_empty_array() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "No gates");
 
     let out = jit_ok(&temp, &["issue", "status", &id, "--json"]);
@@ -164,7 +141,7 @@ fn test_status_json_no_gates_is_empty_array() {
 /// in argument order.
 #[test]
 fn test_status_multi_id_json_envelope() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let a = create_issue(&temp, "First");
     let b = create_issue(&temp, "Second");
 
@@ -186,7 +163,7 @@ fn test_status_multi_id_json_envelope() {
 /// Multi-id text prints one line per id in argument order.
 #[test]
 fn test_status_multi_id_text_one_line_each() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let a = create_issue(&temp, "First");
     let b = create_issue(&temp, "Second");
 
@@ -202,7 +179,7 @@ fn test_status_multi_id_text_one_line_each() {
 /// deps as unmet, and a fully-satisfied issue lists none.
 #[test]
 fn test_status_unmet_follows_readiness_semantics() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let done_dep = create_issue(&temp, "Done dep");
     let open_dep = create_issue(&temp, "Open dep");
     let rejected_dep = create_issue(&temp, "Rejected dep");
@@ -246,7 +223,7 @@ fn test_status_unmet_follows_readiness_semantics() {
 /// When every dependency is terminal, the unmet list is empty.
 #[test]
 fn test_status_all_deps_done_empty_unmet() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let dep = create_issue(&temp, "Prereq");
     let main = create_issue(&temp, "Downstream");
     jit_ok(&temp, &["dep", "add", &main, &dep]);
@@ -264,7 +241,7 @@ fn test_status_all_deps_done_empty_unmet() {
 /// (subset shape of the dependency entries), following readiness semantics.
 #[test]
 fn test_show_json_exposes_unmet_dependencies_objects() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let done_dep = create_issue(&temp, "Done dep");
     let open_dep = create_issue(&temp, "Open dep");
     let main = create_issue(&temp, "Downstream");
@@ -290,7 +267,7 @@ fn test_show_json_exposes_unmet_dependencies_objects() {
 /// array — never null or absent.
 #[test]
 fn test_show_json_unmet_dependencies_empty_array_when_none() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Lonely");
     let out = jit_ok(&temp, &["issue", "show", &id, "--json"]);
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
@@ -303,13 +280,11 @@ fn test_show_json_unmet_dependencies_empty_array_when_none() {
 /// interaction with --field/--fields" decision.
 #[test]
 fn test_status_rejects_field_projection_flags() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "X");
 
     for flag in [["--field", "state"], ["--fields", "state,title"]] {
-        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(temp.path())
-            .args(["issue", "status", &id])
+        temp.command(["issue", "status", &id])
             .args(flag)
             .assert()
             .failure()
@@ -320,10 +295,8 @@ fn test_status_rejects_field_projection_flags() {
 /// An unknown id is reported as a failure (does not silently print an empty row).
 #[test]
 fn test_status_unknown_id_fails() {
-    let temp = setup();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "status", "deadbeef"])
+    let temp = JitCli::initialised().unwrap();
+    temp.command(["issue", "status", "deadbeef"])
         .assert()
         .failure();
 }
@@ -334,10 +307,9 @@ fn test_status_unknown_id_fails() {
 /// not escape to bare human stderr when `--json` is requested.
 #[test]
 fn test_status_unknown_id_json_error_envelope() {
-    let temp = setup();
-    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "status", "deadbeef", "--json"])
+    let temp = JitCli::initialised().unwrap();
+    let assert = temp
+        .command(["issue", "status", "deadbeef", "--json"])
         .assert()
         .failure()
         .code(3);
@@ -352,10 +324,9 @@ fn test_status_unknown_id_json_error_envelope() {
 /// status path exactly as on `issue show`.
 #[test]
 fn test_status_short_prefix_json_error_envelope() {
-    let temp = setup();
-    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "status", "ab", "--json"])
+    let temp = JitCli::initialised().unwrap();
+    let assert = temp
+        .command(["issue", "status", "ab", "--json"])
         .assert()
         .failure()
         .code(2);
@@ -370,12 +341,11 @@ fn test_status_short_prefix_json_error_envelope() {
 /// `issue show`'s multi-id semantics.
 #[test]
 fn test_status_multi_id_one_bad_fails_fast_json() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let good = create_issue(&temp, "Good");
 
-    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "status", &good, "deadbeef", "--json"])
+    let assert = temp
+        .command(["issue", "status", &good, "deadbeef", "--json"])
         .assert()
         .failure()
         .code(3);
@@ -395,11 +365,9 @@ fn test_status_multi_id_one_bad_fails_fast_json() {
 /// stderr path), so text and JSON modes agree on fail-fast.
 #[test]
 fn test_status_multi_id_one_bad_fails_fast_text() {
-    let temp = setup();
+    let temp = JitCli::initialised().unwrap();
     let good = create_issue(&temp, "Good");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "status", &good, "deadbeef"])
+    temp.command(["issue", "status", &good, "deadbeef"])
         .assert()
         .failure();
 }

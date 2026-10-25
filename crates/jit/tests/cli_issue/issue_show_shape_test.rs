@@ -6,46 +6,27 @@
 //! Covered across lifecycle states (backlog and an issue carrying labels +
 //! dependencies) so agents can parse the output without defensive guards.
 
-use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
-fn jit(temp: &TempDir, args: &[&str]) -> Vec<u8> {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone()
+fn jit(cli: &JitCli, args: &[&str]) -> Vec<u8> {
+    let output = cli.command(args).output().unwrap();
+    assert!(output.status.success(), "jit failed: {output:?}");
+    output.stdout
 }
 
-fn create_issue(temp: &TempDir, title: &str) -> String {
-    let stdout = jit(
-        temp,
-        &["issue", "create", "--title", title, "--description", "Body"],
-    );
-    let stdout = String::from_utf8_lossy(&stdout);
-    stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
+fn create_issue(cli: &JitCli, title: &str) -> String {
+    cli.create_issue(["--title", title, "--description", "Body"])
         .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
 }
 
-fn show_json(temp: &TempDir, id: &str) -> serde_json::Value {
-    let output = jit(temp, &["issue", "show", id, "--json"]);
+fn show_json(cli: &JitCli, id: &str) -> serde_json::Value {
+    let output = jit(cli, &["issue", "show", id, "--json"]);
     serde_json::from_slice(&output).unwrap()
 }
 
 #[test]
 fn test_show_root_has_short_id_matching_id_prefix() {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Backlog issue");
 
     let json = show_json(&temp, &id);
@@ -64,8 +45,7 @@ fn test_show_root_has_short_id_matching_id_prefix() {
 
 #[test]
 fn test_show_labels_and_dependencies_are_empty_arrays_when_none() {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Bare issue");
 
     // New issues may carry a default type label; strip it so we can assert the
@@ -109,8 +89,7 @@ fn test_show_labels_and_dependencies_are_empty_arrays_when_none() {
 
 #[test]
 fn test_show_labels_and_dependencies_populated() {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+    let temp = JitCli::initialised().unwrap();
     let dep_id = create_issue(&temp, "Prerequisite");
     let id = create_issue(&temp, "Dependent issue");
 
@@ -138,8 +117,7 @@ fn test_show_labels_and_dependencies_populated() {
 
 #[test]
 fn test_show_short_id_present_across_states() {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+    let temp = JitCli::initialised().unwrap();
     let id = create_issue(&temp, "Lifecycle issue");
 
     // Backlog (just created).
