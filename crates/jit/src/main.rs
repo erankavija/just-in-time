@@ -22,7 +22,7 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::identity::IssueIdPrefix;
+use jit::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
@@ -237,6 +237,17 @@ fn render_gate_pass_error(
     let json_error = gate_pass_json_error(&e, id);
     println!("{}", json_error.to_json_string()?);
     std::process::exit(json_error.exit_code().code());
+}
+
+/// Report a `gate status` failure: under `--json` print its
+/// `GATE_CHECK_ERROR` envelope and exit; otherwise return it.
+fn report_gate_check_error<T>(e: anyhow::Error, json: bool) -> Result<T> {
+    if json {
+        let json_error = command_json_error(&e, ErrorCode::GateCheckError);
+        println!("{}", json_error.to_json_string()?);
+        std::process::exit(json_error.exit_code().code());
+    }
+    Err(e)
 }
 
 /// Build the structured error used by both single-issue and multi-issue gate
@@ -1009,6 +1020,17 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
             print_dependency_tree(&node.children, &new_prefix, false);
         }
     }
+}
+
+/// Parse and resolve one user-supplied issue-id argument: the CLI's single
+/// prefix boundary, applied before any executor call.
+///
+/// # Errors
+///
+/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
+/// any read, then the resolver's not-found or ambiguous-id error.
+fn resolve_issue_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<IssueId> {
+    storage.resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
 }
 
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
@@ -2203,7 +2225,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if ids.len() > 1 && json {
                         let responses = ids
                             .iter()
-                            .map(|id| build_issue_show_response(&executor, id))
+                            .map(|id| {
+                                build_issue_show_response(
+                                    &executor,
+                                    &resolve_issue_arg(&storage, id)?,
+                                )
+                            })
                             .collect::<Result<Vec<_>>>()?;
                         let output = jit::output::JsonOutput::success(serde_json::to_value(
                             jit::output::IssueShowListResponse::new(responses),
@@ -2215,21 +2242,24 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if ids.len() > 1 {
                         // Non-JSON multi-id: print each issue's human view.
                         for id in &ids {
-                            let response = build_issue_show_response(&executor, id)?;
+                            let response = build_issue_show_response(
+                                &executor,
+                                &resolve_issue_arg(&storage, id)?,
+                            )?;
                             print_issue_show_human(&response);
                         }
                         return Ok(());
                     }
 
                     // Single id (guaranteed by clap `required = true`).
-                    let id = ids[0].clone();
+                    let requested = &ids[0];
 
                     // A `<issue>/<self-id>` argument addresses an item, not an
                     // issue (issue ids never contain '/'). Resolve and render the
                     // addressed item through the same item resolver as
                     // `jit item show`, honoring --json (REQ-04 / concept).
-                    if !projecting && !summary && id.contains('/') {
-                        match executor.show_item(&id) {
+                    if !projecting && !summary && requested.contains('/') {
+                        match executor.show_item(requested) {
                             Ok(result) => {
                                 print_item_show(&result, json, quiet)?;
                                 return Ok(());
@@ -2246,7 +2276,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
                     }
 
-                    match executor.issues().show_issue(&id) {
+                    match resolve_issue_arg(&storage, requested)
+                        .and_then(|id| executor.issues().show_issue(&id))
+                    {
                         Ok(issue) => {
                             // Field projection: print the named field(s) and return.
                             if projecting {
@@ -2315,7 +2347,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                             let show_msg = format!(
                                 "Issue {}: {} [{:?}]",
-                                &response.id[..8],
+                                response.id.short_id(),
                                 response.title,
                                 response.state
                             );
@@ -2327,7 +2359,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             handle_json_error!(
                                 json,
                                 e,
-                                jit::output::JsonError::issue_not_found(&id)
+                                jit::output::JsonError::issue_not_found(requested)
                             );
                         }
                     }
@@ -2348,7 +2380,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // multi-id run fails fast on the first bad id.
                     let mut statuses = Vec::with_capacity(ids.len());
                     for id in &ids {
-                        match executor.issues().show_issue(id) {
+                        match resolve_issue_arg(&storage, id)
+                            .and_then(|full_id| executor.issues().show_issue(&full_id))
+                        {
                             Ok(issue) => {
                                 statuses.push(executor.issues().issue_status_response(issue)?);
                             }
@@ -2384,7 +2418,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // lives in `IssueOps::issue_children`; this arm only
                     // dispatches, renders, and routes an id failure through the
                     // JSON error path.
-                    match executor.issues().issue_children(&id) {
+                    match resolve_issue_arg(&storage, &id)
+                        .and_then(|full_id| executor.issues().issue_children(&full_id))
+                    {
                         Ok(response) => {
                             if json {
                                 let output = jit::output::JsonOutput::success(&response);
@@ -2411,7 +2447,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // Orchestration lives in `IssueOps::issue_progress`;
                     // this arm dispatches, renders, and routes an id failure
                     // through the JSON error path.
-                    match executor.issues().issue_progress(&id) {
+                    match resolve_issue_arg(&storage, &id)
+                        .and_then(|full_id| executor.issues().issue_progress(&full_id))
+                    {
                         Ok(response) => {
                             if json {
                                 let output = jit::output::JsonOutput::success(&response);
@@ -2542,24 +2580,26 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 Some(s) => Some(Some(jit::domain::ContentFormat::from_str(s)?)),
                             };
 
-                        match executor.issues().update_issue_resolved(
-                            &id_str,
-                            title,
-                            description_update,
-                            prio,
-                            st,
-                            label,
-                            remove_label,
-                            content_format,
-                            issue_type,
-                            jit::commands::IssueLocalUpdate {
-                                add_gates: add_gate,
-                                remove_gates: remove_gate,
-                                assignee,
-                                unassign,
-                            },
-                            force,
-                        ) {
+                        match resolve_issue_arg(&storage, &id_str).and_then(|id| {
+                            executor.issues().update_issue_resolved(
+                                &id,
+                                title,
+                                description_update,
+                                prio,
+                                st,
+                                label,
+                                remove_label,
+                                content_format,
+                                issue_type,
+                                jit::commands::IssueLocalUpdate {
+                                    add_gates: add_gate,
+                                    remove_gates: remove_gate,
+                                    assignee,
+                                    unassign,
+                                },
+                                force,
+                            )
+                        }) {
                             Ok((full_id, warnings)) => {
                                 // Print warnings to stderr
                                 for warning in &warnings {
@@ -2642,21 +2682,21 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             if !result.warnings.is_empty() {
                                 println!("\nWarnings ({} issue(s)):", result.warnings.len());
                                 for (id, warning) in &result.warnings {
-                                    println!("  • {}: {}", &id[..8.min(id.len())], warning);
+                                    println!("  • {}: {}", id.short_id(), warning);
                                 }
                             }
 
                             if !result.skipped.is_empty() {
                                 println!("\nSkipped {} issue(s):", result.summary.total_skipped);
                                 for (id, reason) in &result.skipped {
-                                    println!("  • {}: {}", &id[..8.min(id.len())], reason);
+                                    println!("  • {}: {}", id.short_id(), reason);
                                 }
                             }
 
                             if !result.errors.is_empty() {
                                 println!("\nFailed {} issue(s):", result.summary.total_errors);
                                 for (id, error) in &result.errors {
-                                    println!("  • {}: {}", &id[..8.min(id.len())], error);
+                                    println!("  • {}: {}", id.short_id(), error);
                                 }
                             }
 
@@ -2685,11 +2725,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // input gathering); the refusal decision itself is
                     // `IssueOps::confirm_deletion_allowed`, so it stays testable
                     // without mutating global process state.
+                    //
+                    // The id is parsed before the refusal and resolved after it,
+                    // so a refused deletion reads no record.
                     let allow_deletion =
                         std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
+                    let prefix = id.parse::<IssueIdPrefix>()?;
                     if let Err(e) = executor
                         .issues()
-                        .confirm_deletion_allowed(&id, allow_deletion)
+                        .confirm_deletion_allowed(prefix.as_str(), allow_deletion)
                     {
                         if json {
                             let json_error = jit::output::JsonError::new(
@@ -2707,6 +2751,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Err(e.into());
                     }
 
+                    let id = storage.resolve_issue_id(&prefix)?;
                     let output_ctx = OutputContext::new(quiet, json);
                     let warnings = executor.issues().delete_issue(&id)?;
                     for warning in warnings {
@@ -2714,12 +2759,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
 
                     if json {
-                        let short = if id.len() >= 8 { &id[..8] } else { &id };
                         let result = serde_json::json!({
                             "id": id,
                             "deleted": true
                         });
-                        let msg = format!("Deleted issue {}", short);
+                        let msg = format!("Deleted issue {}", id.short_id());
                         let output = JsonOutput::success(result).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
@@ -2728,7 +2772,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
+                    let full_id = resolve_issue_arg(&storage, &id)?;
                     let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2756,7 +2800,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     assign_only,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
+                    let full_id = resolve_issue_arg(&storage, &id)?;
 
                     if assign_only {
                         // Assign without transitioning state: reuse the same
@@ -2824,7 +2868,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Unassign { id } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
+                    let full_id = resolve_issue_arg(&storage, &id)?;
                     let warnings = executor.issues().unassign_issue(&full_id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2841,7 +2885,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Reject { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
+                    let full_id = resolve_issue_arg(&storage, &id)?;
 
                     for warning in executor
                         .issues()
@@ -2866,7 +2910,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Release { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
+                    let full_id = resolve_issue_arg(&storage, &id)?;
                     executor.issues().release_issue(&full_id, &reason)?;
 
                     if json {
@@ -2952,9 +2996,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         "malformed --anchor '{pair}'; the role (left of '=') must not be empty"
                     ));
                 }
-                bindings.insert(role.to_string(), id.to_string());
+                bindings.insert(role.to_string(), resolve_issue_arg(&storage, id)?);
             }
 
+            let container = resolve_issue_arg(&storage, &container)?;
             let (result, warnings) =
                 executor.apply_template(&template, &container, &bindings, force)?;
             for warning in &warnings {
@@ -2975,6 +3020,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     RedundancyPolicy::Reject
                 };
                 let output_ctx = OutputContext::new(quiet, json);
+                let from_id = match resolve_issue_arg(&storage, &from_id) {
+                    Ok(id) => id,
+                    Err(e) => handle_json_error!(
+                        json,
+                        e,
+                        command_json_error(&e, jit::output::ErrorCode::DependencyError)
+                    ),
+                };
                 match executor.add_dependencies_with_policy(&from_id, &to_ids, policy) {
                     Ok(result) => {
                         if json {
@@ -3015,8 +3068,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     Err(e) => {
                         // A rejected-batch failure (jit:c8518f2a) names every
-                        // rejected edge; anything else (bad `<from>`, empty
-                        // `dep_ids`) falls through to the generic fallback below.
+                        // rejected edge; anything else (an empty `dep_ids`, say)
+                        // falls through to the generic fallback below.
                         if let Some(batch) =
                             e.downcast_ref::<jit::errors::DependencyBatchRejectedError>()
                         {
@@ -3041,6 +3094,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DepCommands::Rm { from_id, to_ids } => {
                 let output_ctx = OutputContext::new(quiet, json);
+                let from_id = match resolve_issue_arg(&storage, &from_id) {
+                    Ok(id) => id,
+                    Err(e) => handle_json_error!(
+                        json,
+                        e,
+                        command_json_error(&e, jit::output::ErrorCode::DependencyError)
+                    ),
+                };
                 match executor.remove_dependencies(&from_id, &to_ids) {
                     Ok(result) => {
                         if json {
@@ -3523,6 +3584,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // Findings view selects exactly one gate's latest run and
                     // reports only its structured findings + verdict.
                     let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
+                    let id = resolve_issue_arg(&storage, &id)
+                        .or_else(|e| report_gate_check_error(e, json))?;
                     match executor.get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
                             if json {
@@ -3572,14 +3635,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 );
                             }
                         }
-                        Err(e) => {
-                            if json {
-                                let json_error = command_json_error(&e, ErrorCode::GateCheckError);
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            }
-                            return Err(e);
-                        }
+                        Err(e) => return report_gate_check_error(e, json),
                     }
                 } else if history_mode {
                     // Gate key is an optional filter here (positional or --gate).
@@ -3589,17 +3645,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         None => None,
                     };
 
-                    let runs = match executor.list_gate_runs(&id, gate_filter.as_deref()) {
-                        Ok(runs) => runs,
-                        Err(e) => {
-                            if json {
-                                let json_error = command_json_error(&e, ErrorCode::GateCheckError);
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            }
-                            return Err(e);
-                        }
-                    };
+                    let id = resolve_issue_arg(&storage, &id)
+                        .or_else(|e| report_gate_check_error(e, json))?;
+                    let runs = executor
+                        .list_gate_runs(&id, gate_filter.as_deref())
+                        .or_else(|e| report_gate_check_error(e, json))?;
                     // list_gate_runs already returns newest-first; apply the
                     // status filter and the --limit cap on top of that order.
                     let mut runs: Vec<_> = runs
@@ -3636,6 +3686,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // form, where neither stream flag is set) includes stdout.
                     let want_stdout = stdout || !stderr;
                     let want_stderr = stderr;
+                    let id = resolve_issue_arg(&storage, &id)
+                        .or_else(|e| report_gate_check_error(e, json))?;
 
                     match executor.get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
@@ -3687,14 +3739,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 );
                             }
                         }
-                        Err(e) => {
-                            if json {
-                                let json_error = command_json_error(&e, ErrorCode::GateCheckError);
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            }
-                            return Err(e);
-                        }
+                        Err(e) => return report_gate_check_error(e, json),
                     }
                 } else {
                     let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
@@ -3705,43 +3750,41 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // two positionals are almost certainly swapped, so emit an
                     // actionable did-you-mean rather than misparsing into
                     // "issue not found".
-                    let is_issue = |raw: &str| {
-                        IssueIdPrefix::from_str(raw).is_ok_and(|prefix| {
-                            executor.storage().resolve_issue_id(&prefix).is_ok()
-                        })
-                    };
-                    if !is_issue(&id) {
-                        let gate_key_is_issue = is_issue(&gate_key);
-                        let id_is_gate = executor
-                            .list_gates()
-                            .map(|gates| gates.iter().any(|g| g.key == id))
-                            .unwrap_or(false);
-                        if gate_key_is_issue && id_is_gate {
-                            let canonical = format!("jit gate status {} {}", gate_key, id);
-                            let message = format!(
-                                "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
-                            );
-                            if json {
-                                use jit::output::JsonError;
-                                let json_error = JsonError::new(
-                                    jit::output::ErrorCode::InvalidArgument,
-                                    message,
-                                )
-                                .with_details(serde_json::json!({
-                                    "issue_id": gate_key,
-                                    "key": id,
-                                    "transposed": true,
-                                }))
-                                .with_suggestion(format!("Did you mean: {canonical}"));
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            } else {
-                                eprintln!("Error: {message}");
-                                eprintln!("  Did you mean: {canonical}");
-                                std::process::exit(2);
+                    let id = match resolve_issue_arg(&storage, &id) {
+                        Ok(full_id) => full_id,
+                        Err(e) => {
+                            let id_is_gate = executor
+                                .list_gates()
+                                .map(|gates| gates.iter().any(|g| g.key == id))
+                                .unwrap_or(false);
+                            if id_is_gate && resolve_issue_arg(&storage, &gate_key).is_ok() {
+                                let canonical = format!("jit gate status {} {}", gate_key, id);
+                                let message = format!(
+                                    "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
+                                );
+                                if json {
+                                    use jit::output::JsonError;
+                                    let json_error = JsonError::new(
+                                        jit::output::ErrorCode::InvalidArgument,
+                                        message,
+                                    )
+                                    .with_details(serde_json::json!({
+                                        "issue_id": gate_key,
+                                        "key": id,
+                                        "transposed": true,
+                                    }))
+                                    .with_suggestion(format!("Did you mean: {canonical}"));
+                                    println!("{}", json_error.to_json_string()?);
+                                    std::process::exit(json_error.exit_code().code());
+                                } else {
+                                    eprintln!("Error: {message}");
+                                    eprintln!("  Did you mean: {canonical}");
+                                    std::process::exit(2);
+                                }
                             }
+                            return report_gate_check_error(e, json);
                         }
-                    }
+                    };
 
                     match executor.get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
@@ -3777,21 +3820,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 );
                             }
                         }
-                        Err(e) => {
-                            if json {
-                                let json_error = command_json_error(&e, ErrorCode::GateCheckError);
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            } else {
-                                return Err(e);
-                            }
-                        }
+                        Err(e) => return report_gate_check_error(e, json),
                     }
                 }
             }
             GateCommands::StatusAll { id, full } => {
                 use jit::domain::GateStatus;
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
                 // Latest recorded run of each required gate.
                 let (results, _) = executor.get_last_gate_runs_for_issue(&id)?;
                 // Readiness across EVERY required gate (auto + manual).
@@ -3897,7 +3933,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::Add { id, gate_keys } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.add_gates(&id, &gate_keys) {
+                match resolve_issue_arg(&storage, &id)
+                    .and_then(|full_id| executor.add_gates(&full_id, &gate_keys))
+                {
                     Ok((result, warnings)) => {
                         // Print warnings first
                         for warning in warnings {
@@ -3970,7 +4008,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             } => {
                 let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.pass_gate(&id, gate_key.clone(), by, force) {
+                match resolve_issue_arg(&storage, &id)
+                    .and_then(|full_id| executor.pass_gate(&full_id, gate_key.clone(), by, force))
+                {
                     Ok(outcome) => {
                         // Print warnings first
                         for warning in &outcome.warnings {
@@ -4004,7 +4044,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::EvaluateAll { id, by, force } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.pass_all_gates(&id, by, force) {
+                match resolve_issue_arg(&storage, &id)
+                    .and_then(|full_id| executor.pass_all_gates(&full_id, by, force))
+                {
                     Ok(outcome) => {
                         // Surface every gate's warnings first.
                         for entry in &outcome.results {
@@ -4066,12 +4108,35 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 force,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let batch = executor.pass_gate_many(&ids, &gate_key, by, force);
+                // An id that does not resolve fails its own entry, in argument
+                // order, like an evaluation failure.
+                let resolved: Vec<(String, Result<IssueId>)> = ids
+                    .into_iter()
+                    .map(|requested| {
+                        let id = resolve_issue_arg(&storage, &requested);
+                        (requested, id)
+                    })
+                    .collect();
+                let full_ids: Vec<IssueId> = resolved
+                    .iter()
+                    .filter_map(|(_, id)| id.as_ref().ok().cloned())
+                    .collect();
+                let mut evaluated = executor
+                    .pass_gate_many(&full_ids, &gate_key, by, force)
+                    .results
+                    .into_iter();
+                let entries: Vec<_> = resolved
+                    .into_iter()
+                    .filter_map(|(requested, id)| match id {
+                        Ok(_) => evaluated.next().map(|entry| (entry.issue_id, entry.result)),
+                        Err(error) => Some((requested, Err(error))),
+                    })
+                    .collect();
                 let mut exit_code = None;
-                let mut results = Vec::with_capacity(batch.results.len());
+                let mut results = Vec::with_capacity(entries.len());
 
-                for entry in batch.results {
-                    match entry.result {
+                for (issue_id, result) in entries {
+                    match result {
                         Ok(outcome) => {
                             if !json {
                                 for warning in &outcome.warnings {
@@ -4080,11 +4145,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 output_ctx.print_success(jit::output::render_gate_run_status(
                                     jit::output::GateRunLine::Passed,
                                     &gate_key,
-                                    &entry.issue_id,
+                                    &issue_id,
                                 ))?;
                             }
                             results.push(jit::output::GateEvaluateManyResult {
-                                issue_id: entry.issue_id,
+                                issue_id,
                                 key: gate_key.clone(),
                                 status: "passed".to_string(),
                                 verdict: Some("pass".to_string()),
@@ -4093,7 +4158,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             });
                         }
                         Err(error) => {
-                            let json_error = gate_pass_json_error(&error, &entry.issue_id);
+                            let json_error = gate_pass_json_error(&error, &issue_id);
                             exit_code.get_or_insert(json_error.exit_code().code());
                             let warnings = error
                                 .downcast_ref::<jit::commands::GatePassFailed>()
@@ -4105,7 +4170,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 }
                                 eprintln!(
                                     "Failed gate '{}' for issue {}: {}",
-                                    gate_key, entry.issue_id, error
+                                    gate_key, issue_id, error
                                 );
                             }
                             let error_value = serde_json::to_value(&json_error.error)?;
@@ -4117,7 +4182,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 .and_then(serde_json::Value::as_str)
                                 .map(str::to_string);
                             results.push(jit::output::GateEvaluateManyResult {
-                                issue_id: entry.issue_id,
+                                issue_id,
                                 key: gate_key.clone(),
                                 status: "failed".to_string(),
                                 verdict,
@@ -4156,7 +4221,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::Fail { id, gate_key, by } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.fail_gate(&id, gate_key.clone(), by) {
+                match resolve_issue_arg(&storage, &id)
+                    .and_then(|full_id| executor.fail_gate(&full_id, gate_key.clone(), by))
+                {
                     Ok(warnings) => {
                         // Print warnings first
                         for warning in warnings {
@@ -4318,14 +4385,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let mut lock_timed_out = false;
 
                     for id in &ids {
-                        match executor.apply_gate_preset(
-                            id,
-                            &name,
-                            timeout,
-                            no_precheck,
-                            no_postcheck,
-                            &except,
-                        ) {
+                        match resolve_issue_arg(&storage, id).and_then(|full_id| {
+                            executor.apply_gate_preset(
+                                &full_id,
+                                &name,
+                                timeout,
+                                no_precheck,
+                                no_postcheck,
+                                &except,
+                            )
+                        }) {
                             Ok((result, warnings)) => {
                                 // Store warnings with result
                                 results.push((id.clone(), result, warnings));
@@ -4397,7 +4466,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 jit::cli::PresetCommands::Create { from_issue, name } => {
                     use jit::output::JsonOutput;
-                    match executor.create_gate_preset(&name, &from_issue) {
+                    match resolve_issue_arg(&storage, &from_issue)
+                        .and_then(|from_issue| executor.create_gate_preset(&name, &from_issue))
+                    {
                         Ok(path) => {
                             if json {
                                 let msg = format!("Created preset '{}'", name);
@@ -4425,6 +4496,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Deps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
 
                 if json {
                     // For JSON output, use tree structure
@@ -4474,6 +4546,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GraphCommands::Rdeps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
                 let issues = executor.show_rdeps_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
@@ -4523,6 +4596,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GraphCommands::Tree { root } => {
                 let output_ctx = OutputContext::new(quiet, json);
+                let root = root
+                    .map(|root| resolve_issue_arg(&storage, &root))
+                    .transpose()?;
                 let response = executor.resolve_hierarchy_tree(root.as_deref())?;
 
                 if json {
@@ -4532,7 +4608,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 } else {
                     let scope = match &response.extras.root {
-                        Some(id) => format!("subtree of {}", &id[..8.min(id.len())]),
+                        Some(id) => format!("subtree of {}", id.short_id()),
                         None => "repository".to_string(),
                     };
                     let _ = output_ctx.print_info(format!("Resolved hierarchy ({}):", scope));
@@ -4543,8 +4619,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let parent = node
                                 .hierarchy
                                 .parent
-                                .as_deref()
-                                .map(|p| &p[..8.min(p.len())])
+                                .as_ref()
+                                .map(|p| p.short_id())
                                 .unwrap_or("-");
                             println!(
                                 "  {} | parent={} children={} rank={} | {}",
@@ -4670,6 +4746,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 skip_scan,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
                 let (result, warnings) = executor.add_document_reference(
                     &id,
                     &path,
@@ -4712,6 +4789,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
                 let result = executor.list_document_references(&id)?;
 
                 if json {
@@ -4747,6 +4825,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             DocCommands::Remove { id, path } => {
+                let id = resolve_issue_arg(&storage, &id)?;
                 let result = executor.remove_document_reference(&id, &path)?;
 
                 if json {
@@ -4765,6 +4844,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             DocCommands::Show { id, path, at } => {
+                let id = resolve_issue_arg(&storage, &id)?;
                 let result = executor.show_document_content(&id, &path, at.as_deref())?;
 
                 if json {
@@ -4788,7 +4868,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             DocCommands::Dir { id, area } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
-                match executor.resolve_issue_artifact_directory(&id, &area) {
+                match resolve_issue_arg(&storage, &id)
+                    .and_then(|full_id| executor.resolve_issue_artifact_directory(&full_id, &area))
+                {
                     Ok(response) => {
                         if json {
                             use jit::output::JsonOutput;
@@ -4895,6 +4977,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
+                let id = resolve_issue_arg(&storage, &id)?;
                 let result = executor.document_history(&id, &path)?;
 
                 if json {
@@ -4914,6 +4997,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             DocCommands::Diff { id, path, from, to } => {
+                let id = resolve_issue_arg(&storage, &id)?;
                 let result = executor.document_diff(&id, &path, &from, to.as_deref())?;
 
                 if json {
@@ -4931,6 +5015,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     use jit::output::JsonOutput;
 
                     let output_ctx = OutputContext::new(quiet, json);
+                    let id = resolve_issue_arg(&storage, &id)?;
                     let result = executor.list_document_assets(&id, &path, rescan)?;
 
                     // Print warnings first if any
@@ -4948,7 +5033,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         output_ctx.print_data(format!(
                             "Assets for document {} (issue {}):",
                             result.document_path,
-                            &result.issue_id[..8.min(result.issue_id.len())]
+                            result.issue_id.short_id()
                         ))?;
 
                         if result.assets.is_empty() {
@@ -5946,11 +6031,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 ));
             }
 
+            let id = id.map(|id| resolve_issue_arg(&storage, &id)).transpose()?;
+
             // --scope path: evaluate the container's bracket subtree as a
             // deterministic gate checker. Exit 4 (ValidationFailed) on any
             // error-severity finding, 0 when clean.
             if let Some(container) = scope.as_deref() {
-                let report = executor.validate_scope(container)?;
+                let container = resolve_issue_arg(&storage, container)?;
+                let report = executor.validate_scope(&container)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -5986,8 +6074,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // --rule path: evaluate exactly one configured graph rule with the
             // positional issue as its sole firing subject. The command keeps the
             // same report and exit contract as per-issue validation.
-            if let Some(rule_name) = rule.as_deref() {
-                let issue_id = id.as_deref().expect("--rule requires an issue id");
+            if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_deref()) {
                 let report = executor.validate_rule(issue_id, rule_name)?;
                 let exit_nonzero = report.has_errors();
                 if json {
@@ -6027,8 +6114,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
 
             // --explain path: report matched selectors -> rule names -> outcomes.
-            if explain {
-                let issue_id = id.as_deref().expect("checked above");
+            if let (true, Some(issue_id)) = (explain, id.as_deref()) {
                 let report = executor.explain_rules(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
@@ -6709,14 +6795,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::commands::claim::execute_claim_acquire;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_acquire(
-                    &storage,
-                    &worktree_paths,
-                    &issue_id,
-                    ttl,
-                    agent_id.as_deref(),
-                    reason.as_deref(),
-                ) {
+                match resolve_issue_arg(&storage, &issue_id).and_then(|full_id| {
+                    execute_claim_acquire(
+                        &storage,
+                        &worktree_paths,
+                        &full_id,
+                        ttl,
+                        agent_id.as_deref(),
+                        reason.as_deref(),
+                    )
+                }) {
                     Ok((lease_id, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -6753,7 +6841,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_release_by_issue(&storage, &worktree_paths, &issue_id) {
+                match resolve_issue_arg(&storage, &issue_id)
+                    .with_context(|| format!("Failed to resolve issue id {}", issue_id))
+                    .and_then(|full_id| {
+                        execute_claim_release_by_issue(&storage, &worktree_paths, &full_id)
+                    }) {
                     Ok((released, warnings)) => {
                         if json {
                             let response = serde_json::json!({
