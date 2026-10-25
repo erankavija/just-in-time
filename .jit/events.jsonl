@@ -20415,3 +20415,4 @@
 {"gate_key":"code-review","id":"42fc1917-bdcb-4b13-8c6b-9a193d09fdac","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:16:29.069917007Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"51758dd6-2beb-432f-8098-989b670c772a","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:30:35.218731460Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"e07b4db2-8c20-4a91-a1ab-a06552a84472","issue_id":"d72bf093-a36d-4cc7-8255-36c46bc9bb93","timestamp":"2026-10-25T22:37:02.462384173Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"4667b974-50d6-4e12-bed8-4e050bf667ee","issue_id":"91081bd3-9996-4f81-a405-a06c7cdcae8b","timestamp":"2026-10-25T22:37:56.378811012Z","type":"issue_updated","updated_by":"issue-update"}
