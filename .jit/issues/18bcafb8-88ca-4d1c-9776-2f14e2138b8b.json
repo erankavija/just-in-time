@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2221a639-3740-4565-b7fe-a1cf9be239ea",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:02:16.343379731Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e3d4605d-e457-4380-ad06-f8c7e882d4b4",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:07:07.059479986Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "18bcafb8-88ca-4d1c-9776-2f14e2138b8b",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Production event matchers read events through a body view",
-  "updated_at": "2026-10-25T01:30:38.873465591Z"
+  "updated_at": "2026-10-25T06:07:07.059479986Z"
 }
