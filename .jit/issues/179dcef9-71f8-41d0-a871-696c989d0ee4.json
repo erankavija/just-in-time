@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7f116a50-5adf-4205-bc6a-ad4c72996a42",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:01:30.513561124Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d30bacf-7ae3-4e34-9ef7-80a66b87d486",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:03:46.791769387Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "179dcef9-71f8-41d0-a871-696c989d0ee4",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Repository action owners are one enum",
-  "updated_at": "2026-10-25T03:55:22.451306198Z"
+  "updated_at": "2026-10-25T04:03:46.791769387Z"
 }
