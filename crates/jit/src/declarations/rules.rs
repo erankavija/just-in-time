@@ -517,8 +517,8 @@ pub enum Assertion {
     CheckerCommand(String),
     /// Every source criterion is satisfied by at least one child. Graph scope.
     LabelCoverage {
-        /// Raw configuration table for the coverage rule (evaluated downstream).
-        config: toml::value::Table,
+        /// The coverage rule's configuration, decoded at load.
+        config: LabelCoverageConfig,
     },
     /// A from-reference resolves to a declared source. Graph scope.
     LabelReference {
@@ -648,6 +648,70 @@ wire_vocabulary! {
         OrphanLeaf = "orphan-leaf",
         /// A strategic-type issue (e.g. an epic) is missing its identifying label.
         StrategicConsistency = "strategic-consistency",
+    }
+}
+
+/// The `label-coverage` payload after kind sugar expansion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelCoverageConfig {
+    /// Authored criteria section; defaults through [`Self::criteria_section`].
+    pub authored_criteria_section: Option<String>,
+    /// Only criteria beginning with this marker require coverage.
+    pub marker: Option<String>,
+    /// Authored pattern, retained so serialization preserves its presence.
+    pub authored_id_pattern: Option<IdPattern>,
+    default_id_pattern: IdPattern,
+    /// Authored credit namespace; defaults through [`Self::satisfies_namespace`].
+    pub authored_satisfies_namespace: Option<String>,
+    /// A satisfying child must be in this state, when specified.
+    pub child_state: Option<State>,
+    /// Authored relationship; defaults through [`Self::child_link`].
+    pub authored_child_link: Option<ChildLink>,
+    /// Excluded types are also traversal boundaries. Authored order is preserved.
+    pub child_type_exclude: Option<Vec<String>>,
+    /// Label namespace naming the criteria-bearing container.
+    pub container_from_label: Option<String>,
+}
+
+impl LabelCoverageConfig {
+    /// The authored criteria section, or `success_criteria`.
+    pub fn criteria_section(&self) -> &str {
+        self.authored_criteria_section
+            .as_deref()
+            .unwrap_or("success_criteria")
+    }
+
+    /// The compiled authored pattern, or the default criterion pattern.
+    pub fn id_pattern(&self) -> &IdPattern {
+        self.authored_id_pattern
+            .as_ref()
+            .unwrap_or(&self.default_id_pattern)
+    }
+
+    /// The authored credit namespace, or `satisfies`.
+    pub fn satisfies_namespace(&self) -> &str {
+        self.authored_satisfies_namespace
+            .as_deref()
+            .unwrap_or("satisfies")
+    }
+
+    /// The authored relationship, or dependents.
+    pub fn child_link(&self) -> ChildLink {
+        self.authored_child_link.unwrap_or_default()
+    }
+}
+
+wire_vocabulary! {
+    /// How a coverage child relates to its container.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ChildLink {
+        /// Issues depending on the container, transitively.
+        #[default]
+        Dependents = "dependents",
+        /// Issues the container depends on, transitively.
+        Dependencies = "dependencies",
+        /// Any other issue, regardless of dependency edges.
+        Any = "any",
     }
 }
 
@@ -1156,25 +1220,80 @@ struct RawLabelValuePattern {
     regex: String,
 }
 
-/// The keys and value types of a `label-coverage` payload, checked at load. The
-/// assertion retains the authored table, which the graph evaluator interprets.
+/// The `label-coverage` payload, lowered at load after kind expansion.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawLabelCoverage {
     criteria_section: Option<String>,
     marker: Option<String>,
-    id_pattern: Option<String>,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
+    id_pattern: Option<IdPattern>,
     satisfies_namespace: Option<String>,
-    child_state: Option<String>,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
-    child_link: Option<String>,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
+    child_state: Option<State>,
+    child_link: Option<ChildLink>,
     child_type_exclude: Option<Vec<String>>,
-    #[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
     container_from_label: Option<String>,
     /// An `[item_kinds]` name standing in for the inline criteria triple.
     kind: Option<String>,
+}
+
+impl RawLabelCoverage {
+    fn into_assertion(
+        mut self,
+        rule: &str,
+        loaded_config: Option<&JitConfig>,
+    ) -> Result<Assertion, RuleConfigError> {
+        if let Some(kind) = &self.kind {
+            if self.criteria_section.is_some() || self.marker.is_some() || self.id_pattern.is_some()
+            {
+                return Err(RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: "label-coverage key 'kind' cannot be combined with \
+                              'criteria-section', 'marker' or 'id-pattern'"
+                        .to_string(),
+                });
+            }
+            let registry = loaded_config
+                .ok_or_else(|| RuleConfigError::MissingConfiguration {
+                    rule: rule.to_string(),
+                    purpose: "label-coverage kind expansion",
+                })?
+                .item_kinds
+                .as_ref();
+            let triple = crate::domain::item::expand_kind_triple(registry, kind).map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: e.to_string(),
+                }
+            })?;
+            self.criteria_section = Some(triple.section);
+            self.marker = triple.marker;
+            self.id_pattern = Some(IdPattern::new(triple.id_pattern).map_err(|e| {
+                RuleConfigError::InvalidAssertion {
+                    rule: rule.to_string(),
+                    message: e.to_string(),
+                }
+            })?);
+        }
+        let default_id_pattern = IdPattern::new(DEFAULT_CRITERION_ID_PATTERN).map_err(|e| {
+            RuleConfigError::InvalidAssertion {
+                rule: rule.to_string(),
+                message: e.to_string(),
+            }
+        })?;
+        Ok(Assertion::LabelCoverage {
+            config: LabelCoverageConfig {
+                authored_criteria_section: self.criteria_section,
+                marker: self.marker,
+                authored_id_pattern: self.id_pattern,
+                default_id_pattern,
+                authored_satisfies_namespace: self.satisfies_namespace,
+                child_state: self.child_state,
+                authored_child_link: self.child_link,
+                child_type_exclude: self.child_type_exclude,
+                container_from_label: self.container_from_label,
+            },
+        })
+    }
 }
 
 /// The `label-reference` assert payload, lowered by
@@ -1332,46 +1451,6 @@ impl RawRule {
     }
 }
 
-/// Expand the `kind =` sugar of a `label-coverage` payload: resolve `kind_name`
-/// against the repository's `[item_kinds]` registry and splice its
-/// `(section, marker, id-pattern)` triple into `config` in place of `kind`, so
-/// the engine never sees a kind name. An undeclared kind is an
-/// [`ItemError::UnknownKind`](crate::domain::item::ItemError::UnknownKind)
-/// surfaced as `InvalidAssertion`.
-fn expand_kind_sugar(
-    rule: &str,
-    kind_name: &str,
-    config: &mut toml::value::Table,
-    loaded_config: Option<&JitConfig>,
-) -> Result<(), RuleConfigError> {
-    let registry = loaded_config
-        .ok_or_else(|| RuleConfigError::MissingConfiguration {
-            rule: rule.to_string(),
-            purpose: "label-coverage kind expansion",
-        })?
-        .item_kinds
-        .as_ref();
-    let triple = crate::domain::item::expand_kind_triple(registry, kind_name).map_err(|e| {
-        RuleConfigError::InvalidAssertion {
-            rule: rule.to_string(),
-            message: e.to_string(),
-        }
-    })?;
-    config.insert(
-        "criteria-section".to_string(),
-        toml::Value::String(triple.section),
-    );
-    if let Some(marker) = triple.marker {
-        config.insert("marker".to_string(), toml::Value::String(marker));
-    }
-    config.insert(
-        "id-pattern".to_string(),
-        toml::Value::String(triple.id_pattern),
-    );
-    config.remove("kind");
-    Ok(())
-}
-
 impl RawAssert {
     fn into_assertion(
         self,
@@ -1483,27 +1562,9 @@ impl RawAssert {
         if let Some(cmd) = self.checker_command {
             return Ok(Assertion::CheckerCommand(cmd));
         }
-        if let Some(mut config) = self.label_coverage {
-            let raw: RawLabelCoverage = check_payload(rule, "label-coverage", &config)?;
-            if let Some(kind) = &raw.kind {
-                if raw.criteria_section.is_some()
-                    || raw.marker.is_some()
-                    || raw.id_pattern.is_some()
-                {
-                    return Err(RuleConfigError::InvalidAssertion {
-                        rule: rule.to_string(),
-                        message: "label-coverage key 'kind' cannot be combined with \
-                                  'criteria-section', 'marker' or 'id-pattern'"
-                            .to_string(),
-                    });
-                }
-                expand_kind_sugar(rule, kind, &mut config, loaded_config)?;
-            }
-            // A typo'd `child-state` would otherwise never match any child.
-            if let Some(child_state) = raw.child_state {
-                StatePredicate::single(child_state).validate(rule)?;
-            }
-            return Ok(Assertion::LabelCoverage { config });
+        if let Some(config) = self.label_coverage {
+            return check_payload::<RawLabelCoverage>(rule, "label-coverage", &config)?
+                .into_assertion(rule, loaded_config);
         }
         if let Some(config) = self.label_reference {
             return check_payload::<RawLabelReference>(rule, "label-reference", &config)?
@@ -1841,48 +1902,6 @@ assert = { require-section = { heading = "Plan" } }
             let want = matches!(state, State::Ready | State::InProgress | State::Done);
             assert_eq!(pred.matches(state), want, "mismatch for {state:?}");
         }
-    }
-
-    #[test]
-    fn test_label_coverage_invalid_child_state_rejected_at_load() {
-        // A typo'd `child-state` in a label-coverage config silently never matches
-        // any child, producing spurious "criterion not satisfied" findings.
-        // It must be rejected at load, naming the rule, the bad token, and valid states.
-        let toml = r#"
-[[rules]]
-name = "typo-child-state"
-when = { type = "epic" }
-assert = { label-coverage = { child-state = "don" } }
-"#;
-        let err = parse(toml).unwrap_err();
-        match err {
-            RuleConfigError::InvalidState { rule, value, valid } => {
-                assert_eq!(rule, "typo-child-state");
-                assert_eq!(value, "don");
-                // The valid list names every legal token.
-                for token in State::ALL.map(State::as_str) {
-                    assert!(
-                        valid.contains(token),
-                        "valid list missing '{token}': {valid}"
-                    );
-                }
-            }
-            other => panic!("expected InvalidState, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_label_coverage_valid_child_state_accepted_at_load() {
-        // A correctly spelled `child-state` must load without error.
-        let toml = r#"
-[[rules]]
-name = "coverage"
-when = { type = "epic" }
-assert = { label-coverage = { child-state = "done" } }
-"#;
-        let set = parse(toml).unwrap();
-        assert_eq!(set.rules.len(), 1);
-        assert_eq!(set.rules[0].name, "coverage");
     }
 
     #[test]
@@ -2888,8 +2907,8 @@ source-of-truth = "markdown-first"
         set.rules.into_iter().next().unwrap()
     }
 
-    /// Extract the resolved `label-coverage` config table from a rule.
-    fn coverage_config(rule: &Rule) -> &toml::value::Table {
+    /// Extract the resolved coverage configuration.
+    fn coverage_config(rule: &Rule) -> &LabelCoverageConfig {
         match &rule.assert {
             Assertion::LabelCoverage { config } => config,
             other => panic!("expected LabelCoverage, got {other:?}"),
@@ -2898,7 +2917,7 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_coverage_kind_sugar_expands_to_inline_triple() {
-        // REQ-02: a `kind = "requirement"` rule lowers to exactly the table an
+        // A `kind = "requirement"` rule lowers to the configuration an
         // equivalent inline `(section, marker, id-pattern)` rule carries.
         let sugared = rule_from_config(
             r#"
@@ -2916,8 +2935,7 @@ when = { type = "epic" }
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "[A-Z][A-Z0-9]*-[0-9]+", child-state = "done" } }
 "#,
         );
-        // The `kind` key is gone and the triple is spliced in identically.
-        assert!(!coverage_config(&sugared).contains_key("kind"));
+        // Kind sugar and inline criteria have identical effective configuration.
         assert_eq!(coverage_config(&sugared), coverage_config(&inline));
     }
 
@@ -2970,18 +2988,8 @@ assert = { label-coverage = { kind = "requirement", child-state = "done" } }
 "#,
         );
         let cfg = coverage_config(&sugared);
-        assert!(
-            !cfg.contains_key("kind"),
-            "kind key removed after expansion"
-        );
-        assert_eq!(
-            cfg.get("criteria-section"),
-            Some(&toml::Value::String("success_criteria".to_string()))
-        );
-        assert_eq!(
-            cfg.get("marker"),
-            Some(&toml::Value::String("[hard]".to_string()))
-        );
+        assert_eq!(cfg.criteria_section(), "success_criteria");
+        assert_eq!(cfg.marker.as_deref(), Some("[hard]"));
     }
 
     #[test]
@@ -3050,6 +3058,62 @@ assert = { label-coverage = { kind = 42 } }
         )
         .unwrap_err();
         assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
+    }
+
+    #[test]
+    fn test_parse_label_coverage_lowers_authored_options_and_compiles_defaults() {
+        let parse_coverage = |payload: &str| {
+            parse(&format!(
+                "[[rules]]\nname = \"coverage\"\nassert = {{ label-coverage = {{ {payload} }} }}\n"
+            ))
+            .unwrap()
+        };
+        let defaults = parse_coverage("");
+        let defaults = coverage_config(&defaults.rules[0]);
+        assert_eq!(defaults.criteria_section(), "success_criteria");
+        assert_eq!(defaults.satisfies_namespace(), "satisfies");
+        assert_eq!(defaults.child_link(), ChildLink::Dependents);
+        assert_eq!(defaults.child_state, None);
+        assert!(defaults.id_pattern().regex().is_match("REQ-01"));
+
+        let authored = parse_coverage(
+            r#"criteria-section = "requirements", satisfies-namespace = "covers", child-link = "dependencies", child-state = "done", id-pattern = 'C[0-9]+'"#,
+        );
+        let authored = coverage_config(&authored.rules[0]);
+        assert_eq!(authored.criteria_section(), "requirements");
+        assert_eq!(authored.satisfies_namespace(), "covers");
+        assert_eq!(authored.child_link(), ChildLink::Dependencies);
+        assert_eq!(authored.child_state, Some(State::Done));
+        assert_eq!(
+            authored.id_pattern().regex().find("C12").unwrap().as_str(),
+            "C12"
+        );
+    }
+
+    #[test]
+    fn test_parse_label_coverage_rejects_malformed_options_naming_rule() {
+        for payload in [
+            "child-link = \"bogus\"",
+            "child-link = 1",
+            "child-state = \"don\"",
+            "id-pattern = \"(\"",
+            "id-pattern = 1",
+            "child-type-exclude = \"breakdown\"",
+            "child-type-exclude = [1]",
+            "satisfies-namespace = 1",
+            "container-from-label = 1",
+            "marker = 1",
+            "criteria-section = 1",
+        ] {
+            let err = parse(&format!(
+                "[[rules]]\nname = \"broken-coverage\"\nassert = {{ label-coverage = {{ {payload} }} }}\n"
+            ))
+            .unwrap_err();
+            assert!(
+                matches!(&err, RuleConfigError::InvalidAssertion { rule, .. } if rule == "broken-coverage"),
+                "{payload}: {err}"
+            );
+        }
     }
 
     // --- unknown keys and aliases ------------------------------------------
