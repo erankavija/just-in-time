@@ -115,7 +115,7 @@ fn rule_display_text(rule: &crate::declarations::rules::Rule) -> &str {
 /// `enforced` (blocks writes) or `advisory` (never blocks).
 fn rule_metadata_suffix(rule: &crate::declarations::rules::Rule) -> String {
     let enforcement = if rule.enforce { "enforced" } else { "advisory" };
-    format!("({}, {})", rule.severity.token(), enforcement)
+    format!("({}, {})", rule.severity.as_str(), enforcement)
 }
 
 /// Gate `(key, gate)` pairs in ascending key order (deterministic).

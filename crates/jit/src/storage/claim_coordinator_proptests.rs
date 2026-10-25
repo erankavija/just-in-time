@@ -32,7 +32,7 @@ fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
         paths,
         locker,
         "wt:proptest".to_string(),
-        "agent:proptest".to_string(),
+        "agent:proptest".parse().unwrap(),
     )
     .with_fsync(false);
 
@@ -335,7 +335,7 @@ proptest! {
         let lease = Lease {
             lease_id: uuid::Uuid::new_v4().to_string(),
             issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
+            agent_id: "agent:test".parse().unwrap(),
             worktree_id: "wt:test".to_string(),
             branch: None,
             ttl_secs: 0, // Indefinite
@@ -365,7 +365,7 @@ proptest! {
         let lease = Lease {
             lease_id: uuid::Uuid::new_v4().to_string(),
             issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
+            agent_id: "agent:test".parse().unwrap(),
             worktree_id: "wt:test".to_string(),
             branch: None,
             ttl_secs: ttl,

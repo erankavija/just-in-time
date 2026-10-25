@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::JitConfig;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{Issue, State};
 use crate::labels as label_utils;
 use crate::repository_state::VirtualPath;
@@ -160,58 +161,36 @@ pub enum RuleConfigError {
     },
 }
 
-/// Severity of a rule finding.
-///
-/// `off` disables the rule entirely; `warn` reports without blocking; `error`
-/// reports and (when `enforce` is set) can block a write.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Severity {
-    /// Rule is disabled.
-    Off,
-    /// Rule reports a warning but never blocks.
-    #[default]
-    Warn,
-    /// Rule reports an error (blocks writes when `enforce` is true).
-    Error,
-}
-
-impl Severity {
-    /// Stable snake_case token for this severity, matching the TOML grammar.
+wire_vocabulary! {
+    /// Severity of a rule finding.
     ///
-    /// Used to render severities consistently in both human and `--json`
-    /// validation output.
-    pub fn token(self) -> &'static str {
-        match self {
-            Severity::Off => "off",
-            Severity::Warn => "warn",
-            Severity::Error => "error",
-        }
+    /// `off` disables the rule entirely; `warn` reports without blocking; `error`
+    /// reports and (when `enforce` is set) can block a write.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+    pub enum Severity {
+        /// Rule is disabled.
+        Off = "off",
+        /// Rule reports a warning but never blocks.
+        #[default]
+        Warn = "warn",
+        /// Rule reports an error (blocks writes when `enforce` is true).
+        Error = "error",
     }
 }
 
-/// Evaluation scope of a rule, derived from its assertion kind.
-///
-/// `Local` rules are pure predicates over a single projected issue and run on
-/// write. `Graph` rules need cross-issue context and run in `jit validate`,
-/// gate checkers, and at state transitions (where an enforcing failure blocks
-/// the transition); they never run on plain field writes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RuleScope {
-    /// Per-issue, runs on write.
-    Local,
-    /// Aggregate/graph, runs only on demand.
-    Graph,
-}
-
-impl RuleScope {
-    /// Stable snake_case token for this scope, matching the TOML grammar.
-    pub fn token(self) -> &'static str {
-        match self {
-            RuleScope::Local => "local",
-            RuleScope::Graph => "graph",
-        }
+wire_vocabulary! {
+    /// Evaluation scope of a rule, derived from its assertion kind.
+    ///
+    /// `Local` rules are pure predicates over a single projected issue and run
+    /// on write. `Graph` rules need cross-issue context and run in `jit validate`,
+    /// gate checkers, and at state transitions (where an enforcing failure
+    /// blocks the transition); they never run on plain field writes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum RuleScope {
+        /// Per-issue, runs on write.
+        Local = "local",
+        /// Aggregate/graph, runs only on demand.
+        Graph = "graph",
     }
 }
 

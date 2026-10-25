@@ -6054,8 +6054,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             "  [{}] {} ({}, {}) selector: {}",
                             status,
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector
                         );
                         for message in &outcome.messages {
@@ -6075,8 +6075,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!(
                             "  [SKIP] {} ({}, {}) selector: {} — {}",
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector,
                             reason
                         );
