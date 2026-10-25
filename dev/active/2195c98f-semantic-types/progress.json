@@ -661,7 +661,7 @@
     "98404e0c": 2,
     "945f65f3": 1,
     "e1a6c8c2": 3,
-    "91081bd3": 1,
+    "91081bd3": 2,
     "d72bf093": 1,
     "f265e748": 2
   },
@@ -1202,6 +1202,13 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Rework 2 (final) via the same agent: typed issue ids in EventTag::sample; alternation slot is Claude after the Codex 91081bd3 rework."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 2 (final) of the widened scope: close the raw-literal issue-id class in family test modules using a scratch alias flip plus a lexical sweep."
     }
   ],
   "surfaced_pitfalls": [
