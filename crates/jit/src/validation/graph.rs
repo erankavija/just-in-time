@@ -1171,11 +1171,7 @@ fn evaluate_label_reference(
     firing_issues: &[Issue],
     graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
-    let LabelReferenceConfig {
-        from: from_ns,
-        to: to_ns,
-        scope,
-    } = config;
+    let (from_ns, to_ns, scope) = (&config.from, &config.to, config.scope());
 
     // Globally declared source ids (the `to` namespace values across all issues).
     let global_sources: BTreeSet<&str> = graph_context
@@ -1187,7 +1183,7 @@ fn evaluate_label_reference(
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if *scope == LabelReferenceScope::Linked {
+            let allowed: BTreeSet<&str> = if scope == LabelReferenceScope::Linked {
                 linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))

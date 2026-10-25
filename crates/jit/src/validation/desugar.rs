@@ -634,7 +634,7 @@ mod tests {
             config: LabelReferenceConfig {
                 from: "satisfies".to_string(),
                 to: "req".to_string(),
-                scope: LabelReferenceScope::Global,
+                authored_scope: Some(LabelReferenceScope::Global),
             }
         })
         .is_none());

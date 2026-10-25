@@ -661,9 +661,17 @@ pub struct LabelReferenceConfig {
     pub from: String,
     /// Namespace that declares the valid sources (e.g. `"req"`).
     pub to: String,
-    /// Where a declaration may live; authored as `scope`, default
-    /// [`LabelReferenceScope::Global`].
-    pub scope: LabelReferenceScope,
+    /// The authored `scope`, kept as written so serialization emits the
+    /// authored keys; read the effective scope through [`Self::scope`].
+    pub authored_scope: Option<LabelReferenceScope>,
+}
+
+impl LabelReferenceConfig {
+    /// Where a declaration may live: the authored scope, or
+    /// [`LabelReferenceScope::Global`] when none was authored.
+    pub fn scope(&self) -> LabelReferenceScope {
+        self.authored_scope.unwrap_or_default()
+    }
 }
 
 wire_vocabulary! {
@@ -730,7 +738,7 @@ impl Assertion {
             Assertion::LabelUniqueness { .. } => true,
             // A label-reference rule is repo-wide unless explicitly scoped to
             // linked issues (which the neighborhood slice fully contains).
-            Assertion::LabelReference { config } => config.scope != LabelReferenceScope::Linked,
+            Assertion::LabelReference { config } => config.scope() != LabelReferenceScope::Linked,
             // Type-hierarchy checks reason over the whole set's relations.
             Assertion::TypeHierarchy { .. } => true,
             // The remaining graph kinds are per-issue / neighborhood-local.
@@ -1140,7 +1148,7 @@ struct RawLabelReference {
 impl RawLabelReference {
     /// Lower into an [`Assertion::LabelReference`], rejecting an unknown scope.
     fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
-        let scope = self
+        let authored_scope = self
             .scope
             .map(|scope| {
                 scope.parse::<LabelReferenceScope>().map_err(|e| {
@@ -1150,13 +1158,12 @@ impl RawLabelReference {
                     }
                 })
             })
-            .transpose()?
-            .unwrap_or_default();
+            .transpose()?;
         Ok(Assertion::LabelReference {
             config: LabelReferenceConfig {
                 from: self.from,
                 to: self.to,
-                scope,
+                authored_scope,
             },
         })
     }
@@ -3047,7 +3054,7 @@ assert = { dependency-shape = { target = { state = "don" } } }
         ] {
             let set = parse_reference(extra).unwrap();
             match &set.rules[0].assert {
-                Assertion::LabelReference { config } => assert_eq!(config.scope, expected),
+                Assertion::LabelReference { config } => assert_eq!(config.scope(), expected),
                 other => panic!("expected LabelReference, got {other:?}"),
             }
         }
