@@ -662,7 +662,8 @@
     "945f65f3": 1,
     "e1a6c8c2": 3,
     "91081bd3": 1,
-    "d72bf093": 1
+    "d72bf093": 1,
+    "f265e748": 1
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -1187,6 +1188,13 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Rework 1 of the widened scope: typed anchor map in main.rs and newtype-safe id construction in unit tests; same tier as the implementation."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lead-review rework 1 via the same agent: Option-keyed event identity instead of unwrap_or_default; canonical ids in the new test."
     }
   ],
   "surfaced_pitfalls": [
