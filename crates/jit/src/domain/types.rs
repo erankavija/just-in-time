@@ -836,8 +836,8 @@ impl crate::graph::GraphNode for Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 }
 
