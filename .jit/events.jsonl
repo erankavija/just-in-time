@@ -20259,3 +20259,5 @@
 {"gate_key":"holistic-review","id":"68e07201-c425-4dc1-871d-e940b8dbd19e","issue_id":"0461a6f7-cd92-4432-b835-d7d3dd2d9a8f","timestamp":"2026-10-25T05:40:03.961670193Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"8f78b402-fd10-4042-8e07-f2c9d8af6248","issue_id":"0461a6f7-cd92-4432-b835-d7d3dd2d9a8f","timestamp":"2026-10-25T05:40:04.342253751Z","to":"done","type":"issue_state_changed"}
 {"id":"7b0d3a82-515c-497e-9248-292bce94378e","issue_id":"0461a6f7-cd92-4432-b835-d7d3dd2d9a8f","timestamp":"2026-10-25T05:40:04.342253751Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"bb15396b-1131-4196-b126-3756d384d4c6","issue_id":"e1a6c8c2-bace-4c0c-8d01-1842dfac7f80","timestamp":"2026-10-25T05:54:23.351621909Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"c3bc44f0-3b79-436e-89b7-8e9243f62559","issue_id":"e1a6c8c2-bace-4c0c-8d01-1842dfac7f80","timestamp":"2026-10-25T05:58:36.539316020Z","type":"gate_failed","updated_by":"auto:executor"}
