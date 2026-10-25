@@ -60,7 +60,9 @@ use std::str::FromStr;
 
 use crate::declarations::rules::{
     Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+    DEFAULT_CRITERION_ID_PATTERN,
 };
+use crate::domain::id_pattern::IdPattern;
 use crate::validation::engine::Finding;
 
 /// Default label namespace whose values name the criterion a child claims to
@@ -69,9 +71,6 @@ const DEFAULT_SATISFIES_NAMESPACE: &str = "satisfies";
 
 /// Default projection slug of the section holding success criteria.
 const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
-
-/// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
-const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
 /// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
 /// a label value in `crates/jit/src` (excluding tests) falls into one of three
@@ -778,8 +777,8 @@ fn optional_str<'a>(
 ///   projection slug of the section whose list items hold the criteria.
 /// - `marker` (string, optional): when set, only items whose text begins with
 ///   this marker (e.g. `"[hard]"`) are required; others are ignored.
-/// - `id-pattern` (string, optional, default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex
-///   that extracts the criterion id from an item's text.
+/// - `id-pattern` (string, optional, default [`DEFAULT_CRITERION_ID_PATTERN`]):
+///   regex that extracts the criterion id from an item's text.
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
 ///   namespace on children whose value names the satisfied criterion (see
 ///   [`label_credits_id`]).
@@ -828,10 +827,11 @@ fn evaluate_label_coverage(
         Some(toml::Value::String(s)) => Some(s.as_str()),
         Some(_) => return vec![config_error(rule, "key 'marker' must be a string")],
     };
-    let id_pattern_src = match optional_str(rule, config, "id-pattern", DEFAULT_ID_PATTERN) {
-        Ok(v) => v,
-        Err(f) => return vec![f],
-    };
+    let id_pattern_src =
+        match optional_str(rule, config, "id-pattern", DEFAULT_CRITERION_ID_PATTERN) {
+            Ok(v) => v,
+            Err(f) => return vec![f],
+        };
     let id_pattern = match regex::Regex::new(id_pattern_src) {
         Ok(re) => re,
         Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
@@ -1533,7 +1533,7 @@ fn evaluate_gate_recency(
 ///   section whose list items hold the criteria.
 /// - `marker` (optional): when set, only items starting with this marker
 ///   contribute criterion ids.
-/// - `id_pattern` (default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex extracting the
+/// - `id_pattern` (default [`DEFAULT_CRITERION_ID_PATTERN`]): extracts the
 ///   criterion id from an item's text.
 /// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
 ///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
@@ -1551,20 +1551,13 @@ fn evaluate_criteria_to_check(
     rule: &Rule,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
+    id_pattern: &IdPattern,
     gate_prefix: Option<&str>,
     check_namespace: Option<&str>,
     issues: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
-    // Compile the id pattern (already validated at load for user-authored rules;
-    // this compile step is a pure guard for programmatic callers).
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     issues
         .iter()
         .filter(|issue| rule.when.matches(issue))
@@ -1573,7 +1566,7 @@ fn evaluate_criteria_to_check(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {
@@ -1713,10 +1706,9 @@ fn evaluate_type_hierarchy(
 ///
 /// # Config
 ///
-/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields;
-/// this evaluator receives the resolved values directly, so it never produces a
-/// `config-error` finding from missing keys (only from an invalid `id-pattern`
-/// regex, caught at load).
+/// Parsed and validated at load into [`Assertion::CriteriaLabelMatch`] fields,
+/// with `id-pattern` compiled; this evaluator receives the resolved values, so
+/// its only `config-error` finding is an unparsable criteria source.
 ///
 /// # Finding text
 ///
@@ -1728,16 +1720,11 @@ fn evaluate_criteria_label_match(
     namespace: &str,
     criteria_section: &str,
     marker: Option<&str>,
-    id_pattern_src: &str,
+    id_pattern: &IdPattern,
     issues: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
-    let id_pattern = match regex::Regex::new(id_pattern_src) {
-        Ok(re) => re,
-        Err(e) => return vec![config_error(rule, format!("invalid 'id-pattern': {e}"))],
-    };
-
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
     // `success_criteria` renders as `Success Criteria` in the message. This is
@@ -1755,7 +1742,7 @@ fn evaluate_criteria_label_match(
                 issue,
                 criteria_section,
                 marker,
-                &id_pattern,
+                id_pattern.regex(),
                 repo_default_format,
                 plan_content,
             ) {

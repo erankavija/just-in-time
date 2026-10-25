@@ -75,7 +75,7 @@
           "short_id": "b48d7b2a",
           "title": "Rule patterns compile at declaration load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
@@ -213,7 +213,7 @@
           "short_id": "bc1955a8",
           "title": "Item kinds hold their id pattern as IdPattern",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
@@ -323,7 +323,7 @@
           "short_id": "945f65f3",
           "title": "Commands name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
@@ -933,6 +933,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Serde-decoded strictness with exact tokens."
+    },
+    {
+      "issue": "bc1955a8",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "One-file convergence on the shared IdPattern."
     }
   ],
   "surfaced_pitfalls": [
