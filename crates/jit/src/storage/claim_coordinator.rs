@@ -1395,7 +1395,7 @@ fn acquire_claim_when_reached(
 
 /// A canonical issue id derived deterministically from a readable `label`.
 /// Named exception to `@/inv/convention-convergence`: replaced by the shared
-/// fixture from bf87bbdb.
+/// fixture from 0af95f14.
 #[cfg(test)]
 pub(crate) fn test_issue_id(label: &str) -> IssueId {
     let hash = label.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
