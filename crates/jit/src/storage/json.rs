@@ -2069,7 +2069,10 @@ mod tests {
         std::os::unix::fs::symlink(outside_run.path(), &original_run).unwrap();
         fs::rename(
             data.join(VirtualPath::GATE_RUNS.relative().as_path()),
-            data.join("gate-runs-held"),
+            data.join(format!(
+                "{}-held",
+                VirtualPath::GATE_RUNS.relative().as_str()
+            )),
         )
         .unwrap();
         std::os::unix::fs::symlink(

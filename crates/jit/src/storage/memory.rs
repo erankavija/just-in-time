@@ -1031,7 +1031,11 @@ mod tests {
     #[test]
     fn test_gate_run_readers_match_only_exact_result_shape_and_name_malformed_path() {
         let storage = InMemoryStorage::new();
-        let nested = VirtualPath::data("gate-runs/outer/nested/result.json").unwrap();
+        let nested = VirtualPath::data(format!(
+            "{}/outer/nested/result.json",
+            VirtualPath::GATE_RUNS.relative().as_str()
+        ))
+        .unwrap();
         let canonical = InMemoryStorage::gate_run_vpath("corrupt-run").unwrap();
         let mut state = storage.repository_state();
         InMemoryStorage::put_data_entry(&mut state, nested, b"{ nested".to_vec());
@@ -1046,9 +1050,13 @@ mod tests {
         drop(state);
 
         let load_error = storage.load_gate_run_result("corrupt-run").unwrap_err();
-        assert!(format!("{load_error:#}").contains("gate-runs/corrupt-run/result.json"));
+        let record_path = format!(
+            "{}/corrupt-run/result.json",
+            VirtualPath::GATE_RUNS.relative().as_str()
+        );
+        assert!(format!("{load_error:#}").contains(&record_path));
         let list_error = storage.list_gate_runs_for_issue("any-issue").unwrap_err();
-        assert!(format!("{list_error:#}").contains("gate-runs/corrupt-run/result.json"));
+        assert!(format!("{list_error:#}").contains(&record_path));
     }
 
     #[test]
@@ -1386,6 +1394,15 @@ mod record_tests {
         VirtualPath::data(relative).unwrap()
     }
 
+    fn issue_data(relative: &str) -> VirtualPath {
+        VirtualPath::data(format!(
+            "{}/{}",
+            VirtualPath::ISSUES.relative().as_str(),
+            relative
+        ))
+        .unwrap()
+    }
+
     fn worktree(relative: &str) -> VirtualPath {
         VirtualPath::worktree(relative).unwrap()
     }
@@ -1500,7 +1517,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_creates_the_directories_a_put_needs() {
         let storage = seeded(&[], false);
-        let nested = data("issues/2026/a.json");
+        let nested = issue_data("2026/a.json");
         let record = RedoRecord::new(
             Vec::new(),
             vec![put(nested.clone(), b"published")],
@@ -1517,7 +1534,7 @@ mod record_tests {
         );
         assert!(
             matches!(
-                storage.repository_state().entries.get(&data("issues/2026")),
+                storage.repository_state().entries.get(&issue_data("2026")),
                 Some(RepositoryEntry::Directory { .. })
             ),
             "the put reached its path without the directories it needs"
@@ -1686,7 +1703,7 @@ mod record_tests {
         );
         let record = RedoRecord::new(
             Vec::new(),
-            vec![put(data("issues/a.json"), b"published")],
+            vec![put(issue_data("a.json"), b"published")],
             Vec::new(),
             None,
         )
@@ -1708,7 +1725,7 @@ mod record_tests {
             !storage
                 .repository_state()
                 .entries
-                .contains_key(&data("issues/a.json")),
+                .contains_key(&issue_data("a.json")),
             "the refused put reached its path anyway"
         );
         assert_eq!(
@@ -1728,7 +1745,10 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
-        storage.add_data_file("issues/existing.json", "residual");
+        storage.add_data_file(
+            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
+            "residual",
+        );
         let record = RedoRecord::new(
             Vec::new(),
             vec![put(VirtualPath::ISSUES, b"occupier")],
@@ -1753,7 +1773,7 @@ mod record_tests {
             "the refused put overwrote the directory at its target"
         );
         assert_eq!(
-            file_bytes(&storage, &data("issues/existing.json")).as_deref(),
+            file_bytes(&storage, &issue_data("existing.json")).as_deref(),
             Some(b"residual".as_slice()),
             "the refusal disturbed a file the record never named"
         );
@@ -1773,7 +1793,10 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
         let storage = seeded(&[], false);
-        storage.add_data_file("issues/existing.json", "residual");
+        storage.add_data_file(
+            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
+            "residual",
+        );
         let record = RedoRecord::new(
             Vec::new(),
             vec![
@@ -1810,9 +1833,9 @@ mod record_tests {
     /// children.
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_delete_of_a_directory() {
-        let storage = seeded(&[data("issues/2026/a.json")], false);
+        let storage = seeded(&[issue_data("2026/a.json")], false);
         let record =
-            RedoRecord::new(Vec::new(), Vec::new(), vec![data("issues/2026")], None).unwrap();
+            RedoRecord::new(Vec::new(), Vec::new(), vec![issue_data("2026")], None).unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
@@ -1824,13 +1847,13 @@ mod record_tests {
         );
         assert!(
             matches!(
-                storage.repository_state().entries.get(&data("issues/2026")),
+                storage.repository_state().entries.get(&issue_data("2026")),
                 Some(RepositoryEntry::Directory { .. })
             ),
             "the refused delete removed the directory anyway"
         );
         assert!(
-            file_bytes(&storage, &data("issues/2026/a.json")).is_some(),
+            file_bytes(&storage, &issue_data("2026/a.json")).is_some(),
             "the refused delete orphaned the directory's child"
         );
         assert_eq!(semantic_state(&storage).2, Some(record));

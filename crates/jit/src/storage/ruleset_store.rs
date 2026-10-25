@@ -60,6 +60,21 @@ pub fn load_ruleset(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::{Path, PathBuf};
+
+    fn data_path(data_root: &Path, path: &VirtualPath) -> PathBuf {
+        crate::test_utils::repository_layout_for_data_root(data_root)
+            .resolve(path)
+            .unwrap()
+    }
+
+    fn schema_reference(name: &str) -> String {
+        VirtualPath::schema(name)
+            .unwrap()
+            .relative()
+            .as_str()
+            .to_owned()
+    }
 
     fn empty_config() -> JitConfig {
         toml::from_str("").unwrap()
@@ -81,15 +96,17 @@ mod tests {
     #[test]
     fn test_load_ruleset_reads_referenced_schema_from_same_root() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join(VirtualPath::SCHEMAS.relative().as_path()))
-            .unwrap();
+        std::fs::create_dir_all(data_path(dir.path(), &VirtualPath::SCHEMAS)).unwrap();
         std::fs::write(
-            dir.path().join(VirtualPath::RULES.relative().as_path()),
-            "[[rules]]\nname = \"schema\"\nassert = { json-schema = \"schemas/body.json\" }\n",
+            data_path(dir.path(), &VirtualPath::RULES),
+            format!(
+                "[[rules]]\nname = \"schema\"\nassert = {{ json-schema = \"{}\" }}\n",
+                schema_reference("body.json")
+            ),
         )
         .unwrap();
         std::fs::write(
-            dir.path().join("schemas/body.json"),
+            data_path(dir.path(), &VirtualPath::schema("body.json").unwrap()),
             br#"{"type":"object"}"#,
         )
         .unwrap();
@@ -109,8 +126,11 @@ mod tests {
     fn test_load_ruleset_required_schema_missing_or_invalid_errors() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
-            dir.path().join(VirtualPath::RULES.relative().as_path()),
-            "[[rules]]\nname = \"schema\"\nassert = { json-schema = \"schemas/body.json\" }\n",
+            data_path(dir.path(), &VirtualPath::RULES),
+            format!(
+                "[[rules]]\nname = \"schema\"\nassert = {{ json-schema = \"{}\" }}\n",
+                schema_reference("body.json")
+            ),
         )
         .unwrap();
         assert!(matches!(
@@ -121,9 +141,12 @@ mod tests {
             Err(RuleConfigError::SchemaIo { .. })
         ));
 
-        std::fs::create_dir_all(dir.path().join(VirtualPath::SCHEMAS.relative().as_path()))
-            .unwrap();
-        std::fs::write(dir.path().join("schemas/body.json"), b"{not json").unwrap();
+        std::fs::create_dir_all(data_path(dir.path(), &VirtualPath::SCHEMAS)).unwrap();
+        std::fs::write(
+            data_path(dir.path(), &VirtualPath::schema("body.json").unwrap()),
+            b"{not json",
+        )
+        .unwrap();
         assert!(matches!(
             load_ruleset(
                 &crate::test_utils::repository_layout_for_data_root(dir.path()),
@@ -138,13 +161,19 @@ mod tests {
         for make_unreadable in [false, true] {
             let dir = tempfile::tempdir().unwrap();
             if make_unreadable {
-                std::fs::create_dir_all(dir.path().join("schemas/default-namespace-registry.json"))
-                    .unwrap();
+                std::fs::create_dir_all(data_path(
+                    dir.path(),
+                    &VirtualPath::schema("default-namespace-registry.json").unwrap(),
+                ))
+                .unwrap();
             }
             std::fs::write(
-                dir.path().join(VirtualPath::RULES.relative().as_path()),
-                "[[rules]]\nname = \"namespace-registry\"\norigin = \"default\"\n\
-                 assert = { json-schema = \"schemas/default-namespace-registry.json\" }\n",
+                data_path(dir.path(), &VirtualPath::RULES),
+                format!(
+                    "[[rules]]\nname = \"namespace-registry\"\norigin = \"default\"\n\
+                     assert = {{ json-schema = \"{}\" }}\n",
+                    schema_reference("default-namespace-registry.json")
+                ),
             )
             .unwrap();
             let set = load_ruleset(

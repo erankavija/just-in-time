@@ -1866,7 +1866,11 @@ enforced-by = "dag-no-cycles"
             no_config.path(),
         ))
         .unwrap_err();
-        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
+        assert!(
+            err.to_string()
+                .contains(VirtualPath::INVARIANTS.relative().as_str()),
+            "{err:#}"
+        );
 
         let with_config = TempDir::new().unwrap();
         std::fs::write(
@@ -1887,7 +1891,11 @@ enforced-by = "dag-no-cycles"
             with_config.path(),
         ))
         .unwrap_err();
-        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
+        assert!(
+            err.to_string()
+                .contains(VirtualPath::INVARIANTS.relative().as_str()),
+            "{err:#}"
+        );
     }
 
     #[test]

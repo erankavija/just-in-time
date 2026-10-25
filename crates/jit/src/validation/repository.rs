@@ -931,6 +931,15 @@ mod tests {
             .unwrap()
     }
 
+    fn issue_path(id: &str) -> VirtualPath {
+        VirtualPath::data(format!(
+            "{}/{}.json",
+            VirtualPath::ISSUES.relative().as_str(),
+            id
+        ))
+        .unwrap()
+    }
+
     /// Read a repo-relative fixture file's bytes, or `None` when absent.
     fn read_fixture(repo: &tempfile::TempDir, repo_rel: &str) -> Option<Vec<u8>> {
         let layout = executor(repo).require_layout().unwrap();
@@ -1145,7 +1154,7 @@ mod tests {
             .all_ids
             .remove(0);
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.dependencies = vec!["missing".to_string()];
@@ -1156,7 +1165,7 @@ mod tests {
             validate_overlaid(
                 &repo,
                 [
-                    (format!(".jit/issues/{id}.json"), Some(bad)),
+                    (issue_path(&id).repository_relative(), Some(bad)),
                     (
                         VirtualPath::GATES.repository_relative().to_string(),
                         Some(b"[[gates]]\nkey = \"planned\"\ntitle = \"p\"\ndescription = \"\"\nstage = \"postcheck\"\nmode = \"manual\"\n".to_vec()),
@@ -1228,7 +1237,7 @@ mod tests {
                     Some(rules.as_bytes().to_vec()),
                 ),
                 (
-                    format!(".jit/issues/{}.json", issue.id),
+                    issue_path(&issue.id).repository_relative(),
                     Some(serde_json::to_vec_pretty(&issue).unwrap()),
                 ),
             ],
@@ -1261,14 +1270,14 @@ mod tests {
         .unwrap();
         let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue
             .labels
             .push("enforces:@/invariant/planned".to_string());
         std::fs::write(
-            repo.path().join(format!(".jit/issues/{id}.json")),
+            data_path(&repo, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
@@ -1302,12 +1311,12 @@ mod tests {
         .unwrap();
         let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.labels.push("enforces:planned".to_string());
         std::fs::write(
-            repo.path().join(format!(".jit/issues/{id}.json")),
+            data_path(&repo, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
