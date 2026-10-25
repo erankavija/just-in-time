@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "51b2088d-3eb3-40e3-a000-ac9f86979f93",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:52:42.966522365Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "583f97e9-cfc3-4f60-a41d-9c40b7cb110a",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:53:40.422073193Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One VirtualPath predicate recognises reserved application targets",
-  "updated_at": "2026-10-25T02:28:02.673539598Z"
+  "updated_at": "2026-10-25T02:53:40.422073193Z"
 }
