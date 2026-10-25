@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "8a51357c-34eb-4dc6-a979-33c7634d31f0",
+      "run_id": "ce12f838-435e-47a9-a2af-13e3d3e35c19",
       "status": "passed",
-      "updated_at": "2026-10-25T01:59:40.465795920Z",
+      "updated_at": "2026-10-25T02:16:18.079777347Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Projection mode and style reach output typed",
-  "updated_at": "2026-10-25T02:02:18.407019458Z"
+  "updated_at": "2026-10-25T02:16:18.079777347Z"
 }
