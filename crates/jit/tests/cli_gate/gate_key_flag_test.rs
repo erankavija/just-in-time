@@ -14,43 +14,35 @@ use predicates::prelude::*;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Define a manual gate and create an issue that requires it.
-/// Returns (JitCli, short_issue_id).
-fn setup_manual_gate_issue(gate_key: &str) -> (JitCli, String) {
-    let temp = JitCli::initialised().unwrap();
-
-    temp.command([
+/// Define manual gate `key` and create an issue requiring it. Returns the issue id.
+fn add_manual_gate_issue(cli: &JitCli, key: &str) -> String {
+    cli.run([
         "gate",
         "define",
-        gate_key,
+        key,
         "--title",
-        "Test Gate",
+        key,
         "--description",
-        "Test gate for REQ-03",
+        "Test",
         "--mode",
         "manual",
     ])
-    .assert()
-    .success();
-
-    let issue_id = temp
-        .create_issue(["--title", "Test issue", "--gate", gate_key])
-        .unwrap();
-    (temp, issue_id)
+    .unwrap();
+    cli.create_issue(["--title", "Test issue", "--gate", key])
+        .unwrap()
 }
 
-/// Define an auto gate (exit 0) and create an issue with it.
-fn setup_auto_gate_issue(gate_key: &str) -> (JitCli, String) {
-    let temp = JitCli::initialised().unwrap();
-
-    temp.command([
+/// Define auto gate `key` (checker `exit 0`) and create an issue requiring it.
+/// Returns the issue id.
+fn add_auto_gate_issue(cli: &JitCli, key: &str) -> String {
+    cli.run([
         "gate",
         "define",
-        gate_key,
+        key,
         "--title",
-        "Auto Gate",
+        key,
         "--description",
-        "Auto gate for REQ-03",
+        "Test",
         "--mode",
         "auto",
         "--checker-command",
@@ -58,13 +50,9 @@ fn setup_auto_gate_issue(gate_key: &str) -> (JitCli, String) {
         "--timeout",
         "10",
     ])
-    .assert()
-    .success();
-
-    let issue_id = temp
-        .create_issue(["--title", "Test issue", "--gate", gate_key])
-        .unwrap();
-    (temp, issue_id)
+    .unwrap();
+    cli.create_issue(["--title", "Test issue", "--gate", key])
+        .unwrap()
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +61,8 @@ fn setup_auto_gate_issue(gate_key: &str) -> (JitCli, String) {
 
 #[test]
 fn test_gate_evaluate_positional_key_still_works() {
-    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_manual_gate_issue(&temp, "code-review");
     temp.command([
         "gate",
         "evaluate",
@@ -93,7 +82,8 @@ fn test_gate_evaluate_positional_key_still_works() {
 
 #[test]
 fn test_gate_evaluate_flag_key_accepted() {
-    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_manual_gate_issue(&temp, "code-review");
     temp.command([
         "gate",
         "evaluate",
@@ -111,7 +101,8 @@ fn test_gate_evaluate_flag_key_accepted() {
 #[test]
 fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
     // Positional form
-    let (temp_pos, id_pos) = setup_manual_gate_issue("code-review");
+    let temp_pos = JitCli::initialised().unwrap();
+    let id_pos = add_manual_gate_issue(&temp_pos, "code-review");
     let out_pos = temp_pos
         .command([
             "gate",
@@ -129,7 +120,8 @@ fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
         .clone();
 
     // Flag form
-    let (temp_flag, id_flag) = setup_manual_gate_issue("code-review");
+    let temp_flag = JitCli::initialised().unwrap();
+    let id_flag = add_manual_gate_issue(&temp_flag, "code-review");
     let out_flag = temp_flag
         .command([
             "gate",
@@ -162,7 +154,8 @@ fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
 
 #[test]
 fn test_gate_evaluate_both_positional_and_flag_errors() {
-    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_manual_gate_issue(&temp, "code-review");
     temp.command([
         "gate",
         "evaluate",
@@ -182,7 +175,8 @@ fn test_gate_evaluate_both_positional_and_flag_errors() {
 
 #[test]
 fn test_gate_evaluate_neither_positional_nor_flag_errors() {
-    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_manual_gate_issue(&temp, "code-review");
     temp.command(["gate", "evaluate", &issue_id])
         .assert()
         .failure()
@@ -195,7 +189,8 @@ fn test_gate_evaluate_neither_positional_nor_flag_errors() {
 
 #[test]
 fn test_gate_status_positional_key_still_works() {
-    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "tests");
 
     // Run gate first so status has something to show
     temp.command(["gate", "evaluate", &issue_id, "tests"])
@@ -214,7 +209,8 @@ fn test_gate_status_positional_key_still_works() {
 
 #[test]
 fn test_gate_status_flag_key_accepted() {
-    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "tests");
 
     temp.command(["gate", "evaluate", &issue_id, "tests"])
         .assert()
@@ -229,7 +225,8 @@ fn test_gate_status_flag_key_accepted() {
 #[test]
 fn test_gate_status_flag_and_positional_produce_identical_outcome() {
     // Positional form
-    let (temp_pos, id_pos) = setup_auto_gate_issue("tests");
+    let temp_pos = JitCli::initialised().unwrap();
+    let id_pos = add_auto_gate_issue(&temp_pos, "tests");
     temp_pos
         .command(["gate", "evaluate", &id_pos, "tests"])
         .assert()
@@ -243,7 +240,8 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
         .clone();
 
     // Flag form
-    let (temp_flag, id_flag) = setup_auto_gate_issue("tests");
+    let temp_flag = JitCli::initialised().unwrap();
+    let id_flag = add_auto_gate_issue(&temp_flag, "tests");
     temp_flag
         .command(["gate", "evaluate", &id_flag, "tests"])
         .assert()
@@ -269,7 +267,8 @@ fn test_gate_status_flag_and_positional_produce_identical_outcome() {
 
 #[test]
 fn test_gate_status_both_positional_and_flag_errors() {
-    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "tests");
     temp.command(["gate", "status", &issue_id, "tests", "--gate", "tests"])
         .assert()
         .failure()
@@ -282,7 +281,8 @@ fn test_gate_status_both_positional_and_flag_errors() {
 
 #[test]
 fn test_gate_status_neither_positional_nor_flag_errors() {
-    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "tests");
     temp.command(["gate", "status", &issue_id])
         .assert()
         .failure()
@@ -296,7 +296,8 @@ fn test_gate_status_neither_positional_nor_flag_errors() {
 
 #[test]
 fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
-    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_manual_gate_issue(&temp, "code-review");
     let out = temp
         .command([
             "gate",
@@ -319,7 +320,8 @@ fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
 
 #[test]
 fn test_gate_status_neither_with_json_emits_machine_readable_error() {
-    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let temp = JitCli::initialised().unwrap();
+    let issue_id = add_auto_gate_issue(&temp, "tests");
     let out = temp
         .command(["gate", "status", &issue_id, "--json"])
         .assert()
@@ -339,7 +341,8 @@ fn test_gate_status_neither_with_json_emits_machine_readable_error() {
 #[test]
 fn test_gate_evaluate_commands_report_passed_gate_with_one_suffixless_line() {
     let passed_stdout = |subcommand_args: &[&str]| {
-        let (temp, issue_id) = setup_manual_gate_issue("code-review");
+        let temp = JitCli::initialised().unwrap();
+        let issue_id = add_manual_gate_issue(&temp, "code-review");
         let mut args = vec!["gate"];
         args.extend_from_slice(subcommand_args);
         let args: Vec<String> = args
