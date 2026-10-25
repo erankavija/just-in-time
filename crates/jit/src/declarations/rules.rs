@@ -522,8 +522,8 @@ pub enum Assertion {
     },
     /// A from-reference resolves to a declared source. Graph scope.
     LabelReference {
-        /// Raw configuration table for the reference rule (evaluated downstream).
-        config: toml::value::Table,
+        /// The reference rule's configuration, decoded at load.
+        config: LabelReferenceConfig,
     },
     /// A selector must/should depend on a target selector. Graph scope.
     DependencyShape {
@@ -651,6 +651,42 @@ wire_vocabulary! {
     }
 }
 
+/// The `label-reference` assert payload.
+///
+/// Every `from`-namespace label value on a matching issue must be declared as a
+/// `to`-namespace label value within `scope`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelReferenceConfig {
+    /// Namespace of the reference labels (e.g. `"satisfies"`).
+    pub from: String,
+    /// Namespace that declares the valid sources (e.g. `"req"`).
+    pub to: String,
+    /// The authored `scope`, kept as written so serialization emits the
+    /// authored keys; read the effective scope through [`Self::scope`].
+    pub authored_scope: Option<LabelReferenceScope>,
+}
+
+impl LabelReferenceConfig {
+    /// Where a declaration may live: the authored scope, or
+    /// [`LabelReferenceScope::Global`] when none was authored.
+    pub fn scope(&self) -> LabelReferenceScope {
+        self.authored_scope.unwrap_or_default()
+    }
+}
+
+wire_vocabulary! {
+    /// The `scope` of a `label-reference` assert.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LabelReferenceScope {
+        /// Any issue in the evaluated set.
+        #[default]
+        Global = "global",
+        /// Only issues linked to the referencing issue by a dependency edge in
+        /// either direction.
+        Linked = "linked",
+    }
+}
+
 wire_vocabulary! {
     /// The `scope` of a `label-uniqueness` assert. Uniqueness is inherently
     /// repo-wide, so `all` is the only scope.
@@ -702,9 +738,7 @@ impl Assertion {
             Assertion::LabelUniqueness { .. } => true,
             // A label-reference rule is repo-wide unless explicitly scoped to
             // linked issues (which the neighborhood slice fully contains).
-            Assertion::LabelReference { config } => {
-                config.get("scope").and_then(|v| v.as_str()) != Some("linked")
-            }
+            Assertion::LabelReference { config } => config.scope() != LabelReferenceScope::Linked,
             // Type-hierarchy checks reason over the whole set's relations.
             Assertion::TypeHierarchy { .. } => true,
             // The remaining graph kinds are per-issue / neighborhood-local.
@@ -1101,14 +1135,38 @@ struct RawLabelCoverage {
     kind: Option<String>,
 }
 
-/// The keys and value types of a `label-reference` payload, checked at load.
+/// The `label-reference` assert payload, lowered by
+/// [`RawLabelReference::into_assertion`].
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[expect(dead_code, reason = "checked at load; the evaluator reads the table")]
 struct RawLabelReference {
     from: String,
     to: String,
     scope: Option<String>,
+}
+
+impl RawLabelReference {
+    /// Lower into an [`Assertion::LabelReference`], rejecting an unknown scope.
+    fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
+        let authored_scope = self
+            .scope
+            .map(|scope| {
+                scope.parse::<LabelReferenceScope>().map_err(|e| {
+                    RuleConfigError::InvalidAssertion {
+                        rule: rule.to_string(),
+                        message: format!("label-reference 'scope': {e}"),
+                    }
+                })
+            })
+            .transpose()?;
+        Ok(Assertion::LabelReference {
+            config: LabelReferenceConfig {
+                from: self.from,
+                to: self.to,
+                authored_scope,
+            },
+        })
+    }
 }
 
 /// The keys and value types of a `dependency-shape` payload, checked at load.
@@ -1380,8 +1438,8 @@ impl RawAssert {
             return Ok(Assertion::LabelCoverage { config });
         }
         if let Some(config) = self.label_reference {
-            check_payload::<RawLabelReference>(rule, "label-reference", &config)?;
-            return Ok(Assertion::LabelReference { config });
+            return check_payload::<RawLabelReference>(rule, "label-reference", &config)?
+                .into_assertion(rule);
         }
         if let Some(config) = self.dependency_shape {
             let raw: RawDependencyShape = check_payload(rule, "dependency-shape", &config)?;
@@ -2980,6 +3038,33 @@ assert = { dependency-shape = { target = { state = "don" } } }
             matches!(&err, RuleConfigError::InvalidState { value, .. } if value == "don"),
             "target state is validated at load: {err:?}"
         );
+    }
+
+    #[test]
+    fn test_parse_label_reference_lowers_scope_and_rejects_unknown_scope() {
+        let parse_reference = |extra: &str| {
+            parse(&format!(
+                "[[rules]]\nname = \"reference\"\n\
+                 assert = {{ label-reference = {{ from = \"satisfies\", to = \"req\"{extra} }} }}\n"
+            ))
+        };
+        for (extra, expected) in [
+            ("", LabelReferenceScope::Global),
+            (", scope = \"linked\"", LabelReferenceScope::Linked),
+        ] {
+            let set = parse_reference(extra).unwrap();
+            match &set.rules[0].assert {
+                Assertion::LabelReference { config } => assert_eq!(config.scope(), expected),
+                other => panic!("expected LabelReference, got {other:?}"),
+            }
+        }
+        match parse_reference(", scope = \"nearby\"").unwrap_err() {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "reference");
+                assert!(message.contains("nearby"), "message was: {message}");
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
     }
 
     #[test]

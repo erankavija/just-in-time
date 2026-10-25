@@ -273,7 +273,15 @@ fn render_assertion(
             format!("{{ label-coverage = {} }}", render_config_table(config))
         }
         Assertion::LabelReference { config } => {
-            format!("{{ label-reference = {} }}", render_config_table(config))
+            // Emit `scope` only when authored, so the keys round-trip as written.
+            let mut parts = vec![
+                format!("from = {}", toml_basic_string(&config.from)),
+                format!("to = {}", toml_basic_string(&config.to)),
+            ];
+            if let Some(scope) = config.authored_scope {
+                parts.push(format!("scope = {}", toml_basic_string(scope.as_str())));
+            }
+            format!("{{ label-reference = {{ {} }} }}", parts.join(", "))
         }
         Assertion::DependencyShape { config } => {
             format!("{{ dependency-shape = {} }}", render_config_table(config))
@@ -739,7 +747,8 @@ assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-
 
     #[test]
     fn test_round_trip_graph_config_kinds() {
-        // The three graph config-table kinds round-trip their config tables.
+        // The three graph config kinds round-trip their authored keys; label-reference
+        // keeps an explicit default scope distinct from an absent one.
         let toml = test_toml(
             r#"
 [[rules]]
@@ -752,6 +761,16 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 name = "reference"
 severity = "warn"
 assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
+
+[[rules]]
+name = "reference-explicit-global"
+severity = "warn"
+assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }
+
+[[rules]]
+name = "reference-default-scope"
+severity = "warn"
+assert = { label-reference = { from = "satisfies", to = "req" } }
 
 [[rules]]
 name = "shape"
