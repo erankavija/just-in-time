@@ -1271,6 +1271,18 @@
       "category": "unsupported pre-existing REQ-10 contribution credit",
       "status": "coordinator approved narrow metadata correction",
       "decision": "Remove coverage label and corresponding manifest/plan source credit only; retain invariant link, criteria, gates, implementation. Validate actual REQ-10 coverage."
+    },
+    {
+      "session": 2,
+      "issue": "870e8e46",
+      "category": "shared test infrastructure change (escalation policy 7) / footprint expansion",
+      "status": "open: awaiting user decision next session",
+      "question": "JitCli (crates/jit/src/test_cli.rs) can init git but cannot stage and commit. gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) need a repository with one commit so HEAD resolves. REQ-01/02 of 870e8e46 cannot be met without a fixture capability.",
+      "options": [
+        "A (recommended): add JitCli::commit_all(message) to the shared fixture, with one owning test in cli_process_fixture_tests.rs, as a new leaf task that 870e8e46 and any later migration needing commits depend on; footprint test_cli.rs + fixture test",
+        "B: permit a local git add/commit helper in those two files as a named convention-convergence exception"
+      ],
+      "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here"
     }
   ],
   "rework_counts": {
@@ -1278,7 +1290,10 @@
     "0bf97911": 1,
     "4a82ed46": 2,
     "22355a56": 1,
-    "871df4b0": 1
+    "871df4b0": 1,
+    "870e8e46": 2,
+    "eaf543c7": 2,
+    "5353463c": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1944,6 +1959,14 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "mechanical test migration batch in one integration target"
+    },
+    {
+      "session": 2,
+      "issue": "fec9b43b,b5faab2f,9c3b9da2,e7764cb1,5f4daf6b,7bf48536",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical spawn-migration batch in cli_issue; lead commits per footprint"
     }
   ]
 }
