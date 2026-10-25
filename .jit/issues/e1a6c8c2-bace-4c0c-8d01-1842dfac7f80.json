@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ad8d272a-7ad7-4593-9715-d715a354e6c4",
+      "run_id": "7efca736-ca96-414a-8866-976c32a08a84",
       "status": "passed",
-      "updated_at": "2026-10-25T05:54:23.351621909Z",
+      "updated_at": "2026-10-25T06:51:40.213290273Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "a0026568-05de-42b3-b69e-3c4cfbed63be",
+      "run_id": "f9bbb0ca-deaa-4790-a1ef-39ad5afd8e95",
       "status": "failed",
-      "updated_at": "2026-10-25T05:58:36.539316020Z",
+      "updated_at": "2026-10-25T06:53:23.837325380Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Storage and configuration code name well-known files through VirtualPath constants",
-  "updated_at": "2026-10-25T05:58:36.539316020Z"
+  "updated_at": "2026-10-25T06:53:23.837325380Z"
 }
