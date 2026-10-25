@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "df1aaf65-6621-4a51-98c0-65b74bba5c2b",
+      "run_id": "3f65f1ac-8b6e-4f7a-a07d-babc13b8cfdb",
       "status": "passed",
-      "updated_at": "2026-10-25T01:46:40.674327246Z",
+      "updated_at": "2026-10-25T01:54:36.061759666Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Hierarchy callers propagate the constructor's error",
-  "updated_at": "2026-10-25T01:49:27.358761522Z"
+  "updated_at": "2026-10-25T01:54:36.061759666Z"
 }
