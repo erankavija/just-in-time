@@ -217,6 +217,7 @@ fn normalise(id: &str) -> String {
         .filter(|c| *c != '-')
         .flat_map(char::to_lowercase)
         .collect()
+}
 
 /// Error raised when a profile id is not a lowercase-kebab token.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
