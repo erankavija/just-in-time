@@ -2,7 +2,9 @@
 
 use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
-use crate::domain::gate_findings::{GateFinding, GateFindings};
+use crate::domain::gate_findings::{
+    FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
+};
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
@@ -52,7 +54,7 @@ fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> 
         stdout: String::new(),
         stderr: String::new(),
         command: source.command.clone(),
-        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR),
         message: None,
         findings: source.findings.clone(),
         inputs_digest: source.inputs_digest.clone(),
@@ -221,28 +223,18 @@ fn required_automated_gate<'a>(
     Ok(gate)
 }
 
-pub(super) fn gate_state_from_run(
-    result: &GateRunResult,
-) -> Result<(GateState, Option<crate::domain::Assignee>)> {
-    let by = result
-        .by
-        .as_deref()
-        .map(str::parse::<crate::domain::Assignee>)
-        .transpose()?;
+pub(super) fn gate_state_from_run(result: &GateRunResult) -> GateState {
     let status = match result.status {
         GateRunStatus::Passed => GateStatus::Passed,
         GateRunStatus::Failed | GateRunStatus::Error => GateStatus::Failed,
         _ => GateStatus::Pending,
     };
-    Ok((
-        GateState {
-            status,
-            updated_by: by.clone(),
-            updated_at: chrono::DateTime::default(),
-            run_id: Some(result.run_id.clone()),
-        },
-        by,
-    ))
+    GateState {
+        status,
+        updated_by: result.by.clone(),
+        updated_at: chrono::DateTime::default(),
+        run_id: Some(result.run_id.clone()),
+    }
 }
 
 /// Select and sanitize the run `state` was projected from, the gate's latest
@@ -460,7 +452,7 @@ fn captured_issue_rule_report(
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let local = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("Local rule evaluation failed: {error}"))?;
     let mut findings = local
@@ -534,7 +526,7 @@ fn captured_scope_rule_report(
         .filter(|issue| scope_ids.contains(&issue.id))
         .cloned()
         .collect::<Vec<_>>();
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut findings = Vec::new();
     for issue in &slice {
         let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
@@ -599,22 +591,19 @@ fn gate_findings_from_rule_report(
         .findings
         .iter()
         .filter(|finding| finding.severity != Severity::Off)
-        .map(|finding| GateFinding {
-            id: String::new(),
-            severity: if finding.is_error() { "high" } else { "low" }.to_string(),
-            disposition: Some(
-                if finding.is_error() {
-                    "blocking"
-                } else {
-                    "advisory"
-                }
-                .to_string(),
-            ),
-            origin: Some("issue-impact".to_string()),
-            summary: format!("[{}] {}", finding.rule, finding.message),
-            file: None,
-            line: None,
-            references: Vec::new(),
+        .map(|finding| {
+            let (severity, disposition) = if finding.is_error() {
+                (FindingSeverity::High, FindingDisposition::Blocking)
+            } else {
+                (FindingSeverity::Low, FindingDisposition::Advisory)
+            };
+            GateFinding::builtin(
+                "",
+                severity,
+                disposition,
+                FindingOrigin::IssueImpact,
+                format!("[{}] {}", finding.rule, finding.message),
+            )
         })
         .collect()
 }
@@ -716,7 +705,7 @@ fn builtin_fault_run(
         stdout: String::new(),
         stderr: summary,
         command: command.to_string(),
-        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR),
         message: None,
         findings: None,
         inputs_digest: None,
@@ -1013,7 +1002,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 GateEvaluationStability::InputsMoved
             };
-            let (state, by) = gate_state_from_run(&result)?;
+            let state = gate_state_from_run(&result);
+            let by = result.by.clone();
             final_issue.gates_status.insert(gate_key.to_string(), state);
             let event = if result.status == GateRunStatus::Passed {
                 Event::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
@@ -1118,16 +1108,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
             }
             GateChecker::ReviewPlaceholder => Ok((
-                vec![GateFinding {
-                    id: "review-placeholder".to_string(),
-                    severity: "high".to_string(),
-                    disposition: Some("advisory".to_string()),
-                    origin: Some("pre-existing".to_string()),
-                    summary: REVIEW_PLACEHOLDER_WARNING.to_string(),
-                    file: None,
-                    line: None,
-                    references: Vec::new(),
-                }],
+                vec![GateFinding::builtin(
+                    "review-placeholder",
+                    FindingSeverity::High,
+                    FindingDisposition::Advisory,
+                    FindingOrigin::PreExisting,
+                    REVIEW_PLACEHOLDER_WARNING,
+                )],
                 false,
             )),
             GateChecker::Exec { .. } => unreachable!("exec checker is dispatched separately"),
@@ -1168,7 +1155,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         } else {
             std::iter::once(summary.clone())
                 .chain(findings.iter().map(|finding| {
-                    let label = if finding.disposition.as_deref() == Some("blocking") {
+                    let label = if finding.is_blocking() {
                         "ERROR"
                     } else {
                         "WARNING"
@@ -1204,7 +1191,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             stdout,
             stderr: String::new(),
             command: command.to_string(),
-            by: Some(Assignee::AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR),
             message,
             findings: Some(GateFindings {
                 verdict: if status == GateRunStatus::Passed {
@@ -1503,7 +1490,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                     projected_issue
                         .gates_status
-                        .insert(gate_key.clone(), gate_state_from_run(&result)?.0);
+                        .insert(gate_key.clone(), gate_state_from_run(&result));
                     history.push(result.clone());
                     runs.push(result);
                 }
@@ -1769,7 +1756,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             stdout: format!("stdout-{run_id}"),
             stderr: format!("stderr-{run_id}"),
             command: "review".to_string(),
-            by: Some("agent:reviewer".to_string()),
+            by: Some("agent:reviewer".parse().unwrap()),
             message: Some("review complete".to_string()),
             findings,
             inputs_digest: None,
@@ -1791,7 +1778,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         let compact = compact_run_history_for_context(
             &runs,
             "review",
-            Some(&super::gate_state_from_run(&named).unwrap().0),
+            Some(&super::gate_state_from_run(&named)),
         );
 
         assert_eq!(compact.len(), 1);
@@ -1813,7 +1800,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         let compact = compact_run_history_for_context(
             std::slice::from_ref(&source),
             "review",
-            Some(&super::gate_state_from_run(&source).unwrap().0),
+            Some(&super::gate_state_from_run(&source)),
         );
 
         assert_eq!(compact.len(), 1);
@@ -1827,7 +1814,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
     #[test]
     fn test_compact_run_history_is_empty_without_matching_runs() {
         let run = prior_run("cargo", "cargo-ci", 10, None);
-        let state = super::gate_state_from_run(&run).unwrap().0;
+        let state = super::gate_state_from_run(&run);
 
         assert!(compact_run_history_for_context(&[run], "review", Some(&state)).is_empty());
     }
@@ -1860,7 +1847,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         run.status = GateRunStatus::Passed;
         issue
             .gates_status
-            .insert("first".into(), super::gate_state_from_run(&run).unwrap().0);
+            .insert("first".into(), super::gate_state_from_run(&run));
 
         let second = issue.gates_status.get("second").cloned();
         let mut view = serde_json::to_value(crate::output::IssueShowResponse::from_issue(
@@ -3451,7 +3438,10 @@ source-of-truth = "markdown-first"
             .unwrap()
             .expect("an attestation is a recorded gate run");
         assert_eq!(run.status, GateRunStatus::Passed);
-        assert_eq!(run.by.as_deref(), Some("human:me"));
+        assert_eq!(
+            run.by.as_ref().map(ToString::to_string).as_deref(),
+            Some("human:me")
+        );
         assert_eq!(run.origin, crate::domain::GateVerdictOrigin::Attested);
         assert!(run.started_at >= before && run.started_at <= Utc::now());
         assert_eq!(
@@ -3536,7 +3526,7 @@ source-of-truth = "markdown-first"
         assert_eq!(readiness.len(), gates.len());
         for (key, status) in readiness {
             let from_run = match latest.get(&key) {
-                Some(run) => super::gate_state_from_run(run).unwrap().0.status,
+                Some(run) => super::gate_state_from_run(run).status,
                 None => {
                     assert!(not_run.contains(&key), "{key} is neither run nor not-run");
                     crate::domain::GateStatus::Pending
@@ -3629,7 +3619,7 @@ source-of-truth = "markdown-first"
         let latest_status = latest
             .iter()
             .map(|run| {
-                let (state, _) = super::gate_state_from_run(run).unwrap();
+                let state = super::gate_state_from_run(run);
                 (run.gate_key.clone(), state.status)
             })
             .collect::<Vec<_>>();

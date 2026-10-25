@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:32:47.624869631Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Decode the configured content format into its enum once, with exact tokens only.\n\n## Background\n\n`ValidationConfig.content_format` is `Option<String>` (`crates/jit/src/config.rs:274`), re-parsed by `content_format()` (`:283`). `ContentFormat::from_str` accepts `md` and any case (`domain/types.rs:224-237`). CLI parse sites are `main.rs:3011,3611`. The configuration reference lists only the canonical tokens.\n\n## Success Criteria\n\n- [hard] REQ-01: `ContentFormat` is declared through the macro, and `ValidationConfig.content_format` is `Option<ContentFormat>` decoded by serde.\n- [hard] REQ-02: The `md` alias and case folding are gone, and an unknown format fails configuration loading or CLI parsing with an error naming the value.\n- [hard] REQ-03: The re-parse in `content_format()` is gone.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:45:47.872477426Z",
+  "first_ready_at": "2026-10-25T04:22:44.876996962Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2d41dca7-80f2-4f3e-b790-1595b874d0d6",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:43:10.041770562Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "97b494c4-719a-4339-b39d-cf84eff49173",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:45:46.973514231Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Content format is typed at load",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:45:47.872477426Z"
 }

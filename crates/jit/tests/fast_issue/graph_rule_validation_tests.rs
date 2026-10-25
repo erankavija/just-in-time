@@ -183,8 +183,7 @@ assert = { label-coverage = { } }
 
 #[test]
 fn test_validate_surfaces_malformed_graph_rule_as_failure() {
-    // A graph rule with a bad `child-link` value yields a config-error finding
-    // (error severity) and must therefore fail validation rather than be ignored.
+    // Validation propagates a rule load error naming the malformed rule.
     let bad_rules = r#"
 [[rules]]
 name = "bad-coverage"
@@ -202,15 +201,15 @@ assert = { label-coverage = { child-link = "bogus" } }
     jit::test_harness::seed_memory_issue(&storage, &epic);
 
     let executor = executor_for(storage.clone());
-    // Initialization refuses a registry that yields a config error, so the
+    // Initialization refuses a malformed registry, so the
     // malformed rule is declared over the initialized repository.
     let rules = storage.read_repo_file(".jit/rules.toml").unwrap().unwrap();
     storage.add_data_file("rules.toml", &format!("{rules}{bad_rules}"));
     let result = executor.validate_silent();
 
-    assert!(result.is_err(), "config-error finding must fail validation");
+    assert!(result.is_err(), "rule load error must fail validation");
     assert!(
-        result.unwrap_err().to_string().contains("config error"),
-        "message should mention the config error"
+        result.unwrap_err().to_string().contains("bad-coverage"),
+        "message should name the broken rule"
     );
 }

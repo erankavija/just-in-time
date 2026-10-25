@@ -251,8 +251,10 @@ fn desugar_require_doc_type(doc_type: &str) -> Value {
 mod tests {
     use super::*;
     use crate::declarations::rules::{
-        Assertion, Rule, RuleScope, SchemaSource, Selector, Severity,
+        Assertion, DependencyShapeConfig, LabelReferenceConfig, LabelReferenceScope, Rule,
+        RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_CRITERION_ID_PATTERN,
     };
+    use crate::domain::id_pattern::IdPattern;
     use crate::validation::engine::SchemaEngine;
     use serde_json::Value;
     use std::path::PathBuf;
@@ -624,16 +626,27 @@ mod tests {
         }))
         .is_none());
         assert!(desugar(&Assertion::CheckerCommand("./c.sh".to_string())).is_none());
-        assert!(desugar(&Assertion::LabelCoverage {
-            config: toml::value::Table::new()
-        })
-        .is_none());
+        let coverage = RuleSet::parse(
+            "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+            None,
+            [],
+        )
+        .unwrap();
+        assert!(desugar(&coverage.rules[0].assert).is_none());
         assert!(desugar(&Assertion::LabelReference {
-            config: toml::value::Table::new()
+            config: LabelReferenceConfig {
+                from: "satisfies".to_string(),
+                to: "req".to_string(),
+                authored_scope: Some(LabelReferenceScope::Global),
+            }
         })
         .is_none());
         assert!(desugar(&Assertion::DependencyShape {
-            config: toml::value::Table::new()
+            config: DependencyShapeConfig {
+                target: Selector::default(),
+                authored_mode: None,
+                authored_transitive: None,
+            }
         })
         .is_none());
         assert!(desugar(&Assertion::GateRecency {
@@ -644,7 +657,7 @@ mod tests {
         assert!(desugar(&Assertion::CriteriaToCheck {
             criteria_section: "success_criteria".to_string(),
             marker: None,
-            id_pattern: "[A-Z][A-Z0-9]*-[0-9]+".to_string(),
+            id_pattern: IdPattern::new(DEFAULT_CRITERION_ID_PATTERN).unwrap(),
             gate_prefix: Some("verify:".to_string()),
             check_namespace: None,
         })

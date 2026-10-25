@@ -47,7 +47,7 @@ pub trait GraphNode {
     fn id(&self) -> &str;
 
     /// IDs of nodes this node depends on
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
 }
 
 /// Errors that can occur during graph operations
@@ -92,12 +92,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             Direction::Dependencies => self
                 .nodes
                 .values()
-                .map(|node| {
-                    (
-                        node.id(),
-                        node.dependencies().iter().map(String::as_str).collect(),
-                    )
-                })
+                .map(|node| (node.id(), node.dependencies().collect()))
                 .collect(),
             Direction::Dependents => {
                 let mut index: HashMap<&'a str, Vec<&'a str>> = self
@@ -107,7 +102,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                     .collect();
                 for node in self.nodes.values() {
                     for dep in node.dependencies() {
-                        if let Some(dependents) = index.get_mut(dep.as_str()) {
+                        if let Some(dependents) = index.get_mut(dep) {
                             dependents.push(node.id());
                         }
                     }
@@ -248,7 +243,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
             if let Some(node) = self.nodes.get(current) {
                 for dep in node.dependencies() {
-                    stack.push(dep.as_str());
+                    stack.push(dep);
                 }
             }
         }
@@ -267,7 +262,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     pub fn get_roots(&self) -> Vec<&'a T> {
         self.nodes
             .values()
-            .filter(|node| node.dependencies().is_empty())
+            .filter(|node| node.dependencies().next().is_none())
             .copied()
             .collect()
     }
@@ -276,7 +271,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     pub fn get_dependents(&self, node_id: &str) -> Vec<&'a T> {
         self.nodes
             .values()
-            .filter(|node| node.dependencies().contains(&node_id.to_string()))
+            .filter(|node| node.dependencies().any(|dep| dep == node_id))
             .copied()
             .collect()
     }
@@ -324,8 +319,8 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             }
             if let Some(node) = self.nodes.get(current) {
                 for dep in node.dependencies() {
-                    result.insert(dep.as_str());
-                    stack.push(dep.as_str());
+                    result.insert(dep);
+                    stack.push(dep);
                 }
             }
         }
@@ -346,7 +341,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .values()
             .filter(|node| {
                 // No dependencies (no outgoing edges)
-                let has_no_dependencies = node.dependencies().is_empty();
+                let has_no_dependencies = node.dependencies().next().is_none();
                 // No dependents (no incoming edges)
                 let has_no_dependents = self.get_dependents(node.id()).is_empty();
                 has_no_dependencies && has_no_dependents
@@ -383,11 +378,11 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
         if let Some(graph_node) = self.nodes.get(node) {
             for dep in graph_node.dependencies() {
-                if !visited.contains(dep.as_str()) {
+                if !visited.contains(dep) {
                     if self.has_cycle_dfs(dep, visited, rec_stack) {
                         return true;
                     }
-                } else if rec_stack.contains(dep.as_str()) {
+                } else if rec_stack.contains(dep) {
                     return true;
                 }
             }
@@ -427,7 +422,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                     if current == start && dep == target {
                         continue;
                     }
-                    stack.push(dep.as_str());
+                    stack.push(dep);
                 }
             }
         }
@@ -444,25 +439,22 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             return HashSet::new();
         };
 
-        let deps = node.dependencies();
+        let deps: Vec<&str> = node.dependencies().collect();
         if deps.is_empty() {
             return HashSet::new();
         }
 
         // Keep only dependencies that are NOT reachable through other dependencies
         deps.iter()
+            .copied()
             .filter(|dep| {
                 // Check if this dep is reachable through other deps
-                let other_deps: Vec<&str> = deps
-                    .iter()
-                    .filter(|d| d != dep)
-                    .map(String::as_str)
-                    .collect();
+                let other_deps: Vec<&str> = deps.iter().filter(|d| *d != dep).copied().collect();
 
                 // If dep is reachable from any other dep, it's redundant
                 !other_deps.iter().any(|other| self.is_reachable(other, dep))
             })
-            .cloned()
+            .map(str::to_string)
             .collect()
     }
 
@@ -498,8 +490,8 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                     }
 
                     let mut new_path = path.clone();
-                    new_path.push(dep.clone());
-                    queue.push_back((dep.as_str(), new_path));
+                    new_path.push(dep.to_string());
+                    queue.push_back((dep, new_path));
                 }
             }
         }
@@ -523,7 +515,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             let reduced = self.compute_transitive_reduction(id);
             for dep in node.dependencies() {
                 if !reduced.contains(dep) {
-                    redundant.push((id.to_string(), dep.clone()));
+                    redundant.push((id.to_string(), dep.to_string()));
                 }
             }
         }
@@ -587,8 +579,8 @@ mod tests {
             &self.id
         }
 
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
     }
 

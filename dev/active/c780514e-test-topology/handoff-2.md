@@ -67,7 +67,7 @@
   - Commit per issue by file footprint (see the "This entry covers" line in each issue).
 - [ ] Commit main's pending epic tracker changes, then land in this order with `scratchpad/land.sh` (run it from a clean main; it refuses non-tracker dirt, including `progress.json`):
   1. 5353463c on main (branch argument `main`), then `review.sh 5353463c`. This is its rework 2 of 2; a further FAIL escalates.
-  2. Slot B: `land.sh worktree-agent-w2-crw1 "<msg>" e230e621 c9442f7f 37218dff 8e69776c`, then reviews for the first three.
+  2. Slot B: `land.sh worktree-agent-w2-crw1 "<msg>" e230e621 c9442f7f 37218dff 8e69776c`, then reviews for the first three. If 2195c98f's e1a6c8c2 has landed (config writes now resolve `VirtualPath::CONFIG` via `RepositoryLayout`), first merge main into the branch: e230e621 (`f147f4d11`) edits `cli_repo_workflow/project_config_tests.rs`, which e1a6c8c2 also changes. e1a6c8c2 also touches `test_utils.rs` (new `repository_layout_for_data_root` block), `test_harness.rs`, `fast_docs_templates/`, `fast_rules/` and `cli_item_validate/invariant_registry_story_tests.rs`; check these before dispatching 07f4b1d4, b93687b3 and 717f9c2f.
   3. Slot A: the three reviewed issues plus any accepted follow-up issues.
 - [ ] Close passing issues with `scratchpad/close.sh "<msg>" <ids>`, then update `progress.json` (`prog.py status/review`).
 - [ ] Remaining ready wave-2 work, dispatched to the two worktrees, alternating Claude and Codex (next dispatch: Claude):
