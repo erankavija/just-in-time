@@ -4190,16 +4190,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::Preset(preset_cmd) => match preset_cmd {
                 jit::cli::PresetCommands::List => {
-                    use jit::output::JsonOutput;
+                    use jit::output::{GatePresetListResponse, JsonOutput};
                     match executor.list_gate_presets() {
                         Ok(presets) => {
                             if json {
                                 let msg = format!("{} preset(s)", presets.len());
-                                let output = JsonOutput::success(serde_json::json!({
-                                    "count": presets.len(),
-                                    "presets": presets,
-                                }))
-                                .with_message(msg);
+                                let output =
+                                    JsonOutput::success(GatePresetListResponse::new(presets))
+                                        .with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else if presets.is_empty() {
                                 println!("No gate presets available");
@@ -4629,12 +4627,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             EventCommands::Tail { n } => {
                 let events = executor.tail_events(n)?;
                 if json {
-                    use jit::output::JsonOutput;
-                    let output = JsonOutput::success(serde_json::json!({
-                        "count": events.len(),
-                        "events": events,
-                    }))
-                    .with_message(format!("{} event(s)", events.len()));
+                    use jit::output::{EventListResponse, JsonOutput};
+                    let msg = format!("{} event(s)", events.len());
+                    let output =
+                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     for event in events {
@@ -4649,12 +4645,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             } => {
                 let events = executor.query_events(event_type, issue_id, limit)?;
                 if json {
-                    use jit::output::JsonOutput;
-                    let output = JsonOutput::success(serde_json::json!({
-                        "count": events.len(),
-                        "events": events,
-                    }))
-                    .with_message(format!("{} event(s)", events.len()));
+                    use jit::output::{EventListResponse, JsonOutput};
+                    let msg = format!("{} event(s)", events.len());
+                    let output =
+                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
                     for event in events {
@@ -5491,13 +5485,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let output_ctx = OutputContext::new(quiet, json);
                 let values = executor.list_label_values(&namespace)?;
                 if json {
-                    use jit::output::JsonOutput;
+                    use jit::output::{JsonOutput, LabelValuesResponse, LabelValuesScope};
                     let msg = format!("{} value(s)", values.len());
-                    let output = JsonOutput::success(serde_json::json!({
-                        "namespace": namespace,
-                        "values": values,
-                        "count": values.len()
-                    }))
+                    let output = JsonOutput::success(LabelValuesResponse::with_extras(
+                        values,
+                        LabelValuesScope { namespace },
+                    ))
                     .with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -6874,7 +6867,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             ClaimCommands::Status { issue, agent } => {
                 use jit::commands::claim::execute_claim_status;
-                use jit::output::{JsonOutput, OutputContext};
+                use jit::output::{
+                    JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
+                };
 
                 match execute_claim_status(
                     &storage,
@@ -6885,11 +6880,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
-                            let response = serde_json::json!({
-                                "leases": leases,
-                                "count": leases.len(),
-                                "warnings": warnings,
-                            });
+                            let response = LeaseListResponse::with_extras(
+                                leases,
+                                LeaseListWarnings {
+                                    warnings: warnings.clone(),
+                                },
+                            );
                             let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
@@ -6964,17 +6960,20 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             ClaimCommands::List => {
                 use jit::commands::claim::execute_claim_list;
-                use jit::output::{JsonOutput, OutputContext};
+                use jit::output::{
+                    JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
+                };
 
                 match execute_claim_list(&worktree_paths) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} lease(s) found", leases.len());
-                            let response = serde_json::json!({
-                                "leases": leases,
-                                "count": leases.len(),
-                                "warnings": warnings,
-                            });
+                            let response = LeaseListResponse::with_extras(
+                                leases,
+                                LeaseListWarnings {
+                                    warnings: warnings.clone(),
+                                },
+                            );
                             let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {

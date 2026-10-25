@@ -16,6 +16,7 @@ use crate::storage::clock::{Clock, SystemClock};
 use crate::storage::StorageWarning;
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -28,7 +29,7 @@ use super::worktree_paths::WorktreePaths;
 use crate::errors;
 
 /// A lease granting exclusive write access to an issue
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct Lease {
     /// Unique lease identifier (UUID)
     pub lease_id: String,

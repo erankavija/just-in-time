@@ -1,7 +1,7 @@
 {
   "epic_id": "c780514e-8491-40a7-8844-3974bba91257",
   "epic_short_id": "c780514e",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -148,7 +148,7 @@
           "key": "inline-list-output-types",
           "title": "Inline list bodies in main.rs become typed list envelopes",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "9bb30f15-a995-4b63-924a-13c27e9fa61c",
@@ -1873,6 +1873,15 @@
       "stale_narrative": "planning-history sentences removed from gate descriptions and projection; dev/workflow-contract.md updated",
       "deferred_items": "no linked documents",
       "holistic": "gate declarations converge on direct script execution; no SKIP wrapper remains"
+    },
+    "df505379": {
+      "verdict": "PASS",
+      "session": 2,
+      "gates": "cargo-ci, mcp-ci, code-review passed on merge 1a8ef7fe6",
+      "criteria": "REQ-01 six commands emit ListEnvelope aliases registered in schema.rs, no count json! in main.rs; REQ-02 graph_rdeps key; REQ-03 one wire test per distinct shape incl. explicit null lease options; REQ-04 mcp-ci with merged binary first on PATH",
+      "lead_fix": "removed count==len re-assertion from per-shape tests (owned by ListEnvelope)",
+      "stale_narrative": "no graph_downstream schema key remains",
+      "deferred_items": "no linked documents"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",

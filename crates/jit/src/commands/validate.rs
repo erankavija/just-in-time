@@ -664,10 +664,7 @@ fn captured_divergences(
 
     let issues = captured_active_issues(image)?;
     let namespaces = crate::config_manager::namespaces_from_config(config);
-    let hierarchy = HierarchyConfig::new(
-        namespaces.declared_type_hierarchy(),
-        namespaces.label_associations.unwrap_or_default(),
-    )?;
+    let hierarchy = HierarchyConfig::from_declarations(&namespaces)?;
     let issue_refs = issues.iter().collect::<Vec<_>>();
     let divergences =
         crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &hierarchy);

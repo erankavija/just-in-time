@@ -944,7 +944,7 @@ impl fmt::Display for TransitionBlocker {
             Self::Gate {
                 gate_key, status, ..
             } => {
-                write!(f, "{} [{}]", gate_key, gate_status_name(*status))
+                write!(f, "{} [{}]", gate_key, status)
             }
             Self::GraphRule { rule, message } => {
                 write!(f, "[{}] {}", rule, message)
@@ -969,14 +969,6 @@ pub(crate) fn state_name(state: State) -> &'static str {
         State::Done => "done",
         State::Rejected => "rejected",
         State::Archived => "archived",
-    }
-}
-
-pub(crate) fn gate_status_name(status: GateStatus) -> &'static str {
-    match status {
-        GateStatus::Pending => "pending",
-        GateStatus::Passed => "passed",
-        GateStatus::Failed => "failed",
     }
 }
 
