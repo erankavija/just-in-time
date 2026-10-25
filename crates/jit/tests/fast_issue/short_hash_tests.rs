@@ -202,6 +202,41 @@ fn test_cli_dep_rm_targets_resolve_short_prefixes() {
     assert_rejects_too_short_prefix(&cli, &["dep", "rm", &from, "{short}"]);
 }
 
+/// `dep rm` resolves a target prefix against the source's own stored edges, so
+/// an edge whose target names no issue is removable by short prefix.
+#[test]
+fn test_cli_dep_rm_removes_a_dangling_dependency_by_short_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = "abcdef12-0000-4000-8000-000000000001";
+    let record = cli.root().join(format!(".jit/issues/{from}.json"));
+    let mut issue: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    issue["dependencies"] = serde_json::json!([to]);
+    std::fs::write(&record, serde_json::to_vec(&issue).unwrap()).unwrap();
+
+    let removed = cli.run_json(["dep", "rm", &from, &short(to)]).unwrap();
+    assert_eq!(removed["removed"], serde_json::json!([to]));
+    let shown = cli.run_json(["issue", "show", &from]).unwrap();
+    assert_eq!(shown["dependencies"], serde_json::json!([]));
+}
+
+/// A `dep rm` target matches only the edges no earlier target named, so a
+/// second spelling of a removed edge is reported as not found.
+#[test]
+fn test_cli_dep_rm_reports_a_repeated_target_as_not_found() {
+    let cli = JitCli::initialised().unwrap();
+    let from = cli.create_issue(["From"]).unwrap();
+    let to = cli.create_issue(["To"]).unwrap();
+    cli.run(["dep", "add", &from, &to]).unwrap();
+
+    let removed = cli
+        .run_json(["dep", "rm", &from, &to, &short(&to)])
+        .unwrap();
+    assert_eq!(removed["removed"], serde_json::json!([to]));
+    assert_eq!(removed["not_found"], serde_json::json!([short(&to)]));
+}
+
 /// The event-query issue filter resolves a short prefix or any spelling of a
 /// live issue's id to that issue's events.
 #[test]

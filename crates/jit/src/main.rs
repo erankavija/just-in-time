@@ -1059,6 +1059,45 @@ fn resolve_dependency_args<S: IssueStore>(
     }
 }
 
+/// Resolve `jit dep rm` targets against `from_id`'s own stored dependencies,
+/// so an edge whose target was deleted stays removable (jit:f847df3f). Returns
+/// the ids the targets name, in order, and the targets naming none; each target
+/// matches only the edges no earlier target named.
+///
+/// # Errors
+///
+/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
+/// any read, or [`AmbiguousIdError`](jit::storage::AmbiguousIdError).
+fn resolve_dependency_removal_args<S: IssueStore>(
+    storage: &S,
+    from_id: &IssueId,
+    requested: &[String],
+) -> Result<(Vec<IssueId>, Vec<String>)> {
+    let prefixes = requested
+        .iter()
+        .map(|id| id.parse::<IssueIdPrefix>())
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let stored = storage.load_issue(from_id)?.dependencies;
+    prefixes.into_iter().try_fold(
+        (Vec::new(), Vec::new()),
+        |(mut matched, mut unmatched): (Vec<IssueId>, Vec<String>), prefix| {
+            let remaining = stored
+                .iter()
+                .filter(|id| !matched.contains(id))
+                .cloned()
+                .collect::<Vec<_>>();
+            match jit::storage::resolve_dependency_id(&prefix, &remaining) {
+                Ok(id) => matched.push(id),
+                Err(error) if error.is::<jit::storage::IssueNotFoundError>() => {
+                    unmatched.push(prefix.as_str().to_string())
+                }
+                Err(error) => return Err(error),
+            }
+            Ok((matched, unmatched))
+        },
+    )
+}
+
 /// Parse an issue-id filter into the prefix that matches stored ids: the
 /// canonical id it resolves to or, when it names no live issue, the parsed
 /// input itself, so records of a deleted issue still match.
@@ -3143,12 +3182,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         command_json_error(&e, jit::output::ErrorCode::DependencyError)
                     ),
                 };
-                match to_ids
-                    .iter()
-                    .map(|id| id.parse::<IssueIdPrefix>().map_err(anyhow::Error::from))
-                    .collect::<Result<Vec<_>>>()
-                    .and_then(|to_ids| executor.remove_dependencies(&from_id, &to_ids))
-                {
+                match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
+                    |(to_ids, unmatched)| {
+                        let mut result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        result.not_found.extend(unmatched);
+                        Ok(result)
+                    },
+                ) {
                     Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;

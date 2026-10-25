@@ -4,7 +4,7 @@ use super::*;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
-use crate::storage::{AmbiguousIdError, IssueNotFoundError};
+use crate::storage::IssueNotFoundError;
 use std::collections::HashSet;
 
 /// A dependency mutation over requested ids, or, with `Id = String`, over the
@@ -29,8 +29,8 @@ enum CapturedDependencyMutation<Id = IssueIdPrefix> {
         dependency_id: Id,
     },
     RemoveBatch {
-        issue_id: Id,
-        dependency_ids: Vec<IssueIdPrefix>,
+        issue_id: IssueId,
+        dependency_ids: Vec<IssueId>,
     },
 }
 
@@ -71,7 +71,7 @@ pub struct DependenciesAddResult {
 }
 
 /// Result of removing multiple dependencies
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct DependenciesRemoveResult {
     pub removed: Vec<String>,
     pub not_found: Vec<String>,
@@ -362,7 +362,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue_id,
                     dependency_ids,
                 } => CapturedDependencyMutation::RemoveBatch {
-                    issue_id: super::resolve_issue_from_capture(&issues, issue_id)?,
+                    issue_id: issue_id.clone(),
                     dependency_ids: dependency_ids.clone(),
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
@@ -419,31 +419,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Remove multiple dependencies from an issue.
+    /// Remove the stored dependencies `dep_ids` from `issue_id`.
     ///
-    /// This is what `jit dep rm <from> <id>...` calls. Each `dep_id` is
-    /// matched by [`IssueIdPrefix`] directly against `issue`'s OWN stored
-    /// `dependencies` — NOT resolved through the repo-wide index first. A
-    /// dependency whose target issue was deleted no longer resolves there,
-    /// which previously made a dangling edge permanently unremovable via the
-    /// CLI (jit:f847df3f); matching the raw stored id sidesteps that
-    /// resolution step entirely and works whether the target is alive or gone. A prefix that matches more
-    /// than one stored dependency is rejected as ambiguous rather than
-    /// removing an arbitrary one.
+    /// Each id is compared exactly with `issue_id`'s own stored dependencies,
+    /// so an edge whose target was deleted is removable (jit:f847df3f). An id
+    /// not stored, or repeated after its removal, is reported as not found.
     pub fn remove_dependencies(
         &self,
-        issue_id: &str,
-        dep_ids: &[IssueIdPrefix],
+        issue_id: &IssueId,
+        dep_ids: &[IssueId],
     ) -> Result<DependenciesRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
         if dep_ids.is_empty() {
-            return Err(anyhow!("Must provide at least one dependency"));
+            return Ok(DependenciesRemoveResult::default());
         }
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
-                issue_id: IssueIdPrefix::from(&issue_id.to_owned()),
+                issue_id: issue_id.clone(),
                 dependency_ids: dep_ids.to_vec(),
             },
         )? {
@@ -514,38 +508,18 @@ fn derive_dependency_removal(
             dependency_ids,
         } => {
             let issue = captured_issue(issues, issue_id)?;
-            let mut removed = Vec::new();
-            let mut reported_removed = Vec::new();
-            let mut not_found = Vec::new();
-            for prefix in dependency_ids {
-                let requested = prefix.as_str();
-                let matches = issue
-                    .dependencies
-                    .iter()
-                    .filter(|stored| !removed.contains(*stored))
-                    .filter(|stored| prefix.matches(stored))
-                    .cloned()
-                    .collect::<Vec<_>>();
-                let matched = match matches.as_slice() {
-                    [] => None,
-                    [only] => Some(only.clone()),
-                    _ => return Err(AmbiguousIdError::dependency(requested, matches).into()),
-                };
-                match matched {
-                    Some(id) => {
-                        removed.push(id);
-                        reported_removed.push(requested.to_string());
-                    }
-                    None => not_found.push(requested.to_string()),
+            let mut result = DependenciesRemoveResult::default();
+            for id in dependency_ids {
+                if issue.dependencies.contains(id) && !result.removed.contains(id) {
+                    result.removed.push(id.clone());
+                } else {
+                    result.not_found.push(id.clone());
                 }
             }
             (
                 issue_id.clone(),
-                removed,
-                CapturedDependencyOutcome::RemovedBatch(DependenciesRemoveResult {
-                    removed: reported_removed,
-                    not_found,
-                }),
+                result.removed.clone(),
+                CapturedDependencyOutcome::RemovedBatch(result),
             )
         }
         _ => unreachable!("removal derivation receives only removals"),
@@ -1069,7 +1043,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
         assert!(executor
-            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .is_err());
 
         drop(recovered.open_mutation_session(layout.clone()).unwrap());
@@ -1080,7 +1054,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
         executor
-            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .unwrap();
         let updated = recovered.load_issue(&source_id).unwrap();
         assert_eq!(updated.state, State::Ready);
@@ -1124,7 +1098,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let error = executor
-            .remove_dependencies(&source_id, &[dependency_id.parse().unwrap()])
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .expect_err("the ready graph rule blocks only the automatic transition");
         assert!(error
             .downcast_ref::<crate::errors::TransitionBlockedError>()
@@ -1143,7 +1117,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_dependency_removal_duplicate_alias_is_not_found_after_first_match() {
+    fn test_dependency_removal_repeated_id_is_not_found_after_its_removal() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "");
         let layout = storage.repository_layout();
@@ -1154,17 +1128,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         source.dependencies = vec![dependency_id.clone()];
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source);
-        let prefix = dependency_id[..8].to_string();
 
         let executor = CommandExecutor::new(storage).with_layout(layout);
         let result = executor
-            .remove_dependencies(
-                &source_id,
-                &[dependency_id.parse().unwrap(), prefix.parse().unwrap()],
-            )
+            .remove_dependencies(&source_id, &[dependency_id.clone(), dependency_id.clone()])
             .unwrap();
-        assert_eq!(result.removed, vec![dependency_id]);
-        assert_eq!(result.not_found, vec![prefix]);
+        assert_eq!(result.removed, vec![dependency_id.clone()]);
+        assert_eq!(result.not_found, vec![dependency_id]);
     }
 
     /// The removal resolves its prefix against the issues the session captured,

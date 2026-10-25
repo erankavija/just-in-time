@@ -2412,7 +2412,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let events_before = executor.storage.read_events().unwrap().len();
         executor
-            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 
         let logged = executor
@@ -2451,7 +2451,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor.remove_dependency(&a_id, &b_id).unwrap();
         executor
-            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 
         assert_eq!(
@@ -2597,7 +2597,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
 
         let result = executor
-            .remove_dependencies(&a_id, &[b_id.parse().unwrap()])
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 
         assert_eq!(result.removed, vec![b_id.clone()]);
@@ -2610,60 +2610,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert!(
             !issue.dependencies.contains(&b_id),
             "the dangling edge must actually be gone from A's dependencies"
-        );
-    }
-
-    #[test]
-    fn test_remove_dependencies_removes_dangling_edge_by_short_prefix() {
-        // Same as above but the CLI caller supplies a short prefix of the
-        // dangling id (as `jit dep rm` accepts for live ids); matching must
-        // work against the raw stored id, not via global resolution.
-        let executor = setup();
-
-        let b_id = crate::domain::fixture_issue("B".to_string(), "Test".to_string()).id;
-        let mut a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
-        a.dependencies.push(b_id.clone());
-        let a_id = a.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, a);
-
-        let prefix = b_id[..8].to_string();
-        let result = executor
-            .remove_dependencies(&a_id, &[prefix.parse().unwrap()])
-            .unwrap();
-
-        assert_eq!(result.removed, vec![prefix]);
-        let issue = executor.storage.load_issue(&a_id).unwrap();
-        assert!(!issue.dependencies.contains(&b_id));
-    }
-
-    #[test]
-    fn test_remove_dependencies_ambiguous_prefix_errors_and_removes_nothing() {
-        // Two stored dependency ids share a normalized prefix. `jit dep rm`
-        // with that prefix must error (mirroring resolve_issue_id's ambiguity
-        // rejection) instead of silently removing whichever appears first, and
-        // neither edge is removed (jit:f847df3f review).
-        let executor = setup();
-
-        let mut a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
-        let dep1 = "abcd1234-0000-0000-0000-000000000001".to_string();
-        let dep2 = "abcd1234-0000-0000-0000-000000000002".to_string();
-        a.dependencies = vec![dep1.clone(), dep2.clone()];
-        let a_id = a.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, a);
-
-        let prefix = "abcd1234".to_string();
-        let err = executor
-            .remove_dependencies(&a_id, &[prefix.parse().unwrap()])
-            .unwrap_err();
-        assert!(
-            err.to_string().to_lowercase().contains("ambiguous"),
-            "expected an ambiguity error, got: {err}"
-        );
-
-        let issue = executor.storage.load_issue(&a_id).unwrap();
-        assert!(
-            issue.dependencies.contains(&dep1) && issue.dependencies.contains(&dep2),
-            "an ambiguous dep rm must remove nothing"
         );
     }
 
