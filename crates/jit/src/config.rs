@@ -1487,8 +1487,9 @@ mod tests {
         // A repo with `.jit/templates.toml` but NO `.jit/config.toml` must still
         // load the registry (the absent-config path), not silently return empty.
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::TEMPLATES.relative().as_path()),
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
             r#"
 [[template]]
 name = "plan"
@@ -1505,10 +1506,7 @@ depends_on = ["planning"]
         )
         .unwrap();
 
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         let plan = config
             .templates
             .get("plan")
@@ -1524,9 +1522,9 @@ depends_on = ["planning"]
         // A repo with `.jit/invariants.toml` but NO `.jit/config.toml` must still
         // load the registry (the config-absent early-return path).
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             r#"
 [[invariants]]
 id = "sample-invariant"
@@ -1537,10 +1535,7 @@ enforced-by = "dag-no-cycles"
         )
         .unwrap();
 
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert_eq!(config.invariants.invariants.len(), 1);
         let inv = &config.invariants.invariants[0];
         assert_eq!(inv.id, "sample-invariant");
@@ -1556,22 +1551,19 @@ enforced-by = "dag-no-cycles"
         // With BOTH `.jit/config.toml` and `.jit/invariants.toml`, the
         // config-present path also chain-loads the invariant registry.
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
         std::fs::write(
-            dir.path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             "[[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
         )
         .unwrap();
 
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.invariants.invariants.len(), 1);
         assert_eq!(config.invariants.invariants[0].id, "second-invariant");
@@ -1592,22 +1584,18 @@ enforced-by = "dag-no-cycles"
         );
 
         let with_config = TempDir::new().unwrap();
+        let with_config_layout =
+            crate::test_utils::repository_layout_for_data_root(with_config.path());
         std::fs::write(
-            with_config
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
+            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
-        assert!(
-            JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-                with_config.path()
-            ))
+        assert!(JitConfig::load(&with_config_layout)
             .unwrap()
             .invariants
             .invariants
-            .is_empty()
-        );
+            .is_empty());
     }
 
     #[test]
@@ -1855,17 +1843,13 @@ enforced-by = "dag-no-cycles"
         let bad = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n"; // missing statement
 
         let no_config = TempDir::new().unwrap();
+        let no_config_layout = crate::test_utils::repository_layout_for_data_root(no_config.path());
         std::fs::write(
-            no_config
-                .path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            no_config_layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             bad,
         )
         .unwrap();
-        let err = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            no_config.path(),
-        ))
-        .unwrap_err();
+        let err = JitConfig::load(&no_config_layout).unwrap_err();
         assert!(
             err.to_string()
                 .contains(VirtualPath::INVARIANTS.relative().as_str()),
@@ -1873,24 +1857,21 @@ enforced-by = "dag-no-cycles"
         );
 
         let with_config = TempDir::new().unwrap();
+        let with_config_layout =
+            crate::test_utils::repository_layout_for_data_root(with_config.path());
         std::fs::write(
-            with_config
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
+            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
         std::fs::write(
-            with_config
-                .path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            with_config_layout
+                .resolve(&VirtualPath::INVARIANTS)
+                .unwrap(),
             bad,
         )
         .unwrap();
-        let err = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            with_config.path(),
-        ))
-        .unwrap_err();
+        let err = JitConfig::load(&with_config_layout).unwrap_err();
         assert!(
             err.to_string()
                 .contains(VirtualPath::INVARIANTS.relative().as_str()),
@@ -1971,17 +1952,13 @@ default_type = "task"
         // The eager rejection also fires through the on-disk load path, so a
         // committed config.toml with a bad strictness never resolves silently.
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[validation]\nstrictness = \"banana\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ))
-        .unwrap_err();
+        let err = JitConfig::load(&layout).unwrap_err();
         // The load path wraps the deserialize error with context, so inspect the
         // full chain for the offending value.
         let chain = format!("{err:#}");
@@ -2010,18 +1987,11 @@ default_type = "task"
             format!("[coordination]\n{key} = 1\n"),
         ] {
             let temp_dir = TempDir::new().unwrap();
-            std::fs::write(
-                temp_dir
-                    .path()
-                    .join(VirtualPath::CONFIG.relative().as_path()),
-                &fragment,
-            )
-            .unwrap();
-            let loaded = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-                temp_dir.path(),
-            ))
-            .expect_err("an unknown key must fail to load")
-            .to_string();
+            let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &fragment).unwrap();
+            let loaded = JitConfig::load(&layout)
+                .expect_err("an unknown key must fail to load")
+                .to_string();
             let declared = crate::declarations::parse_configuration(fragment.as_bytes())
                 .expect_err("an unknown key must fail to parse")
                 .to_string();
@@ -2050,23 +2020,15 @@ default_type = "task"
     #[test]
     fn test_load_existing_config() {
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
 
         let config_toml = r#"
 [type_hierarchy]
 types = { epic = 1, task = 2 }
 "#;
-        std::fs::write(
-            temp_dir
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
-            config_toml,
-        )
-        .unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), config_toml).unwrap();
 
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ))
-        .unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.type_hierarchy.unwrap().types.len(), 2);
     }
@@ -2074,19 +2036,12 @@ types = { epic = 1, task = 2 }
     #[test]
     fn test_malformed_toml_returns_error() {
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
 
         let bad_toml = "[broken syntax";
-        std::fs::write(
-            temp_dir
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
-            bad_toml,
-        )
-        .unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), bad_toml).unwrap();
 
-        let result = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ));
+        let result = JitConfig::load(&layout);
         assert!(result.is_err());
     }
 
@@ -2301,17 +2256,13 @@ section = "success_criteria"
     fn test_item_kinds_load_rejects_partial_declaration() {
         // The required-six rule fires through the real `JitConfig::load` path.
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[item_kinds.decision]\nsection = \"decisions\"\nid-pattern = \"D-\\\\d+\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ))
-        .expect_err("load must reject partial kind");
+        let err = JitConfig::load(&layout).expect_err("load must reject partial kind");
         let msg = format!("{err:#}");
         assert!(msg.contains("decision"), "error names the kind: {msg}");
         assert!(
@@ -2408,17 +2359,13 @@ section = "success_criteria"
         // the same path that rejects a partial `[item_kinds]` declaration.
         let body = complete_kind_body();
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir
-                .path()
-                .join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             format!("[item_kinds.requirement]\n{body}aliases = [\"requirement\"]\n"),
         )
         .unwrap();
-        let err = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ))
-        .expect_err("load must reject colliding alias");
+        let err = JitConfig::load(&layout).expect_err("load must reject colliding alias");
         let msg = format!("{err:#}");
         assert!(msg.contains("requirement"), "error names the token: {msg}");
     }
@@ -2793,28 +2740,20 @@ max_indefinite_leases_per_agent = 3
         let mut env = EnvGuard::acquire();
         for repo in &states {
             let repo_dir = TempDir::new().unwrap();
-            std::fs::write(
-                repo_dir
-                    .path()
-                    .join(VirtualPath::CONFIG.relative().as_path()),
-                repo,
-            )
-            .unwrap();
+            let repo_dir_layout =
+                crate::test_utils::repository_layout_for_data_root(repo_dir.path());
+            std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
             for env_value in [None, Some("strict"), Some("warn"), Some("off")] {
                 match env_value {
                     Some(value) => env.set("JIT_ENFORCE_LEASES", value),
                     None => env.remove("JIT_ENFORCE_LEASES"),
                 };
-                let enforced = JitConfig::load(
-                    &crate::test_utils::repository_layout_for_data_root(repo_dir.path()),
-                )
-                .unwrap()
-                .enforcement_mode();
-                let reported = EffectiveConfig::load(
-                    &crate::test_utils::repository_layout_for_data_root(repo_dir.path()),
-                )
-                .unwrap()
-                .enforcement_mode();
+                let enforced = JitConfig::load(&repo_dir_layout)
+                    .unwrap()
+                    .enforcement_mode();
+                let reported = EffectiveConfig::load(&repo_dir_layout)
+                    .unwrap()
+                    .enforcement_mode();
                 assert_eq!(
                     reported, enforced,
                     "repo {repo:?}, JIT_ENFORCE_LEASES {env_value:?}"
@@ -2844,21 +2783,10 @@ max_indefinite_leases_per_agent = 3
         ];
         for (repo, agent, repo_limit) in states {
             let dir = TempDir::new().unwrap();
-            std::fs::write(
-                dir.path().join(VirtualPath::CONFIG.relative().as_path()),
-                &repo,
-            )
-            .unwrap();
-            let enforced = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-                dir.path(),
-            ))
-            .unwrap()
-            .coordination();
-            let reported = EffectiveConfig::load(
-                &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            )
-            .unwrap()
-            .coordination();
+            let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &repo).unwrap();
+            let enforced = JitConfig::load(&layout).unwrap().coordination();
+            let reported = EffectiveConfig::load(&layout).unwrap().coordination();
             assert_eq!(reported, enforced, "repo {repo:?}");
             assert_eq!(
                 enforced,
@@ -2953,16 +2881,14 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_parses_valid_project_table() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[project]\nname = \"just-in-time\"\n",
         )
         .unwrap();
 
-        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert_eq!(
             config
                 .project
@@ -2979,15 +2905,14 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_rejects_invalid_project_name() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::CONFIG.relative().as_path()),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[project]\nname = \"Bad_Name\"\n",
         )
         .unwrap();
 
-        let result = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ));
+        let result = JitConfig::load(&layout);
         assert!(result.is_err());
         let msg = format!("{:#}", result.unwrap_err());
         assert!(

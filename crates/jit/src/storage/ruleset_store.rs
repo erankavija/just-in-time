@@ -194,8 +194,9 @@ mod tests {
     #[test]
     fn test_load_ruleset_kind_expansion_uses_explicit_config() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::RULES.relative().as_path()),
+            layout.resolve(&VirtualPath::RULES).unwrap(),
             "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\nseverity = \"error\"\n\
              assert = { label-coverage = { kind = \"requirement\", child-state = \"done\" } }\n",
         )
@@ -212,20 +213,7 @@ source-of-truth = "markdown-first"
 "#,
         )
         .unwrap();
-        assert_eq!(
-            load_ruleset(
-                &crate::test_utils::repository_layout_for_data_root(dir.path()),
-                &config
-            )
-            .unwrap()
-            .rules
-            .len(),
-            1
-        );
-        assert!(load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &empty_config()
-        )
-        .is_err());
+        assert_eq!(load_ruleset(&layout, &config).unwrap().rules.len(), 1);
+        assert!(load_ruleset(&layout, &empty_config()).is_err());
     }
 }

@@ -822,16 +822,13 @@ applies_to  = ["epic"]
     #[test]
     fn test_load_valid_file_from_disk() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::TEMPLATES.relative().as_path()),
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
             plan_template_toml(),
         )
         .unwrap();
-        let reg = TemplateRegistry::load(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &HIERARCHY,
-        )
-        .unwrap();
+        let reg = TemplateRegistry::load(&layout, &HIERARCHY).unwrap();
         assert_eq!(reg.templates.len(), 1);
         assert_eq!(reg.templates[0].name, "plan");
     }
@@ -839,16 +836,13 @@ applies_to  = ["epic"]
     #[test]
     fn test_malformed_toml_errors() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::TEMPLATES.relative().as_path()),
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
             "[[template",
         )
         .unwrap();
-        let err = TemplateRegistry::load(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &HIERARCHY,
-        )
-        .unwrap_err();
+        let err = TemplateRegistry::load(&layout, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::Toml(_)));
     }
 

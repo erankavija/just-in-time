@@ -324,16 +324,13 @@ kind = "advisory"
     #[test]
     fn test_load_reads_present_file() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             "[[invariants]]\nid = \"ninth-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n",
         )
         .unwrap();
-        let reg = InvariantRegistry::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
+        let reg = InvariantRegistry::load(&layout).unwrap();
         assert_eq!(reg.invariants.len(), 1);
         assert_eq!(reg.invariants[0].id, "ninth-invariant");
         assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
@@ -342,16 +339,13 @@ kind = "advisory"
     #[test]
     fn test_load_malformed_file_is_typed_error() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path()
-                .join(VirtualPath::INVARIANTS.relative().as_path()),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             "not = valid = toml",
         )
         .unwrap();
-        let err = InvariantRegistry::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap_err();
+        let err = InvariantRegistry::load(&layout).unwrap_err();
         assert!(matches!(err, InvariantConfigError::Toml(_)));
     }
 }

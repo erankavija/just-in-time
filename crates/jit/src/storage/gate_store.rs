@@ -45,6 +45,7 @@ mod tests {
     #[test]
     fn test_load_gate_registry_rejects_duplicate_keys() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         let registry_toml = "\
 [[gates]]
 version = 1
@@ -64,16 +65,9 @@ stage = \"postcheck\"
 mode = \"manual\"
 priority = 100
 ";
-        std::fs::write(
-            dir.path().join(VirtualPath::GATES.relative().as_path()),
-            registry_toml,
-        )
-        .unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::GATES).unwrap(), registry_toml).unwrap();
 
-        let err = load_gate_registry(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap_err();
+        let err = load_gate_registry(&layout).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("duplicate gate key 'cargo-ci'"),
@@ -84,17 +78,15 @@ priority = 100
     #[test]
     fn test_load_gate_registry_unknown_key_is_named_parse_error() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join(VirtualPath::GATES.relative().as_path()),
+            layout.resolve(&VirtualPath::GATES).unwrap(),
             "[[gates]]\nkey = \"review\"\ntitle = \"Review\"\ndescription = \"Review\"\n\
              stage = \"postcheck\"\nmode = \"auto\"\nundeclared_key = true\n",
         )
         .unwrap();
 
-        let err = load_gate_registry(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap_err();
+        let err = load_gate_registry(&layout).unwrap_err();
         assert!(
             err.to_string().contains("unknown field `undeclared_key`"),
             "error names the unknown key: {err}"

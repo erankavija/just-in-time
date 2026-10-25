@@ -1831,10 +1831,11 @@ mod tests {
         let worktree = TempDir::new().unwrap();
         let external = TempDir::new().unwrap();
         let data = external.path().join("selected-data");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
         fs::create_dir(&data).unwrap();
         fs::create_dir(worktree.path().join("docs")).unwrap();
         fs::write(worktree.path().join("docs/guide.md"), "worktree").unwrap();
-        fs::write(data.join(VirtualPath::CONFIG.relative().as_path()), "data").unwrap();
+        fs::write(data_layout.resolve(&VirtualPath::CONFIG).unwrap(), "data").unwrap();
 
         let storage = JsonFileStorage::new(&data);
         configure_test_layout(&storage, worktree.path(), &data);
@@ -1864,8 +1865,10 @@ mod tests {
         let (_temp, storage) = setup_storage();
 
         let run_dir = storage
-            .root
-            .join(VirtualPath::GATE_RUNS.relative().as_path())
+            .path_layout()
+            .unwrap()
+            .resolve(&VirtualPath::GATE_RUNS)
+            .unwrap()
             .join("corrupt-run");
         fs::create_dir_all(&run_dir).unwrap();
         let result_path = run_dir.join("result.json");
@@ -1899,15 +1902,19 @@ mod tests {
     fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
         let (_temp, storage) = setup_storage();
         let nested = storage
-            .root
-            .join(VirtualPath::GATE_RUNS.relative().as_path())
+            .path_layout()
+            .unwrap()
+            .resolve(&VirtualPath::GATE_RUNS)
+            .unwrap()
             .join("outer/nested/result.json");
         fs::create_dir_all(nested.parent().unwrap()).unwrap();
         fs::write(nested, "{ not valid json").unwrap();
         fs::write(
             storage
-                .root
-                .join(VirtualPath::GATE_RUNS.relative().as_path())
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
                 .join("direct-file"),
             "root clutter",
         )
@@ -1928,9 +1935,10 @@ mod tests {
     fn test_gate_run_readers_reject_non_directory_gate_runs_root() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
         fs::create_dir(&data).unwrap();
         fs::write(
-            data.join(VirtualPath::GATE_RUNS.relative().as_path()),
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
             "not a directory",
         )
         .unwrap();
@@ -1949,8 +1957,10 @@ mod tests {
         let (_temp, storage) = setup_storage();
         fs::create_dir_all(
             storage
-                .root
-                .join(VirtualPath::GATE_RUNS.relative().as_path())
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
                 .join("directory-run/result.json"),
         )
         .unwrap();
@@ -1970,8 +1980,10 @@ mod tests {
     fn test_gate_run_readers_reject_symlinked_result_object() {
         let (_temp, storage) = setup_storage();
         let run_dir = storage
-            .root
-            .join(VirtualPath::GATE_RUNS.relative().as_path())
+            .path_layout()
+            .unwrap()
+            .resolve(&VirtualPath::GATE_RUNS)
+            .unwrap()
             .join("symlink-run");
         fs::create_dir_all(&run_dir).unwrap();
         let target = storage.root.join("target.json");
@@ -1987,13 +1999,14 @@ mod tests {
     fn test_load_gate_run_rejects_symlinked_gate_runs_root() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
         let outside = TempDir::new().unwrap();
         fs::create_dir(&data).unwrap();
         fs::create_dir_all(outside.path().join("escaped-run")).unwrap();
         fs::write(outside.path().join("escaped-run/result.json"), "{}").unwrap();
         std::os::unix::fs::symlink(
             outside.path(),
-            data.join(VirtualPath::GATE_RUNS.relative().as_path()),
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
         )
         .unwrap();
         let storage = JsonFileStorage::new(data);
@@ -2007,12 +2020,15 @@ mod tests {
     fn test_gate_run_readers_reject_targeted_symlinked_run_directory_but_list_ignores_it() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
         let outside = TempDir::new().unwrap();
-        fs::create_dir_all(data.join(VirtualPath::GATE_RUNS.relative().as_path())).unwrap();
+        fs::create_dir_all(data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap()).unwrap();
         fs::write(outside.path().join("result.json"), "{}").unwrap();
         std::os::unix::fs::symlink(
             outside.path(),
-            data.join(VirtualPath::GATE_RUNS.relative().as_path())
+            data_layout
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
                 .join("escaped-run"),
         )
         .unwrap();
@@ -2031,8 +2047,10 @@ mod tests {
     fn test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
-        let original_run = data
-            .join(VirtualPath::GATE_RUNS.relative().as_path())
+        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+        let original_run = data_layout
+            .resolve(&VirtualPath::GATE_RUNS)
+            .unwrap()
             .join("run-one");
         fs::create_dir_all(&original_run).unwrap();
         fs::write(original_run.join("result.json"), b"inside").unwrap();
@@ -2062,28 +2080,32 @@ mod tests {
 
         fs::rename(
             &original_run,
-            data.join(VirtualPath::GATE_RUNS.relative().as_path())
+            data_layout
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
                 .join("run-held"),
         )
         .unwrap();
         std::os::unix::fs::symlink(outside_run.path(), &original_run).unwrap();
         fs::rename(
-            data.join(VirtualPath::GATE_RUNS.relative().as_path()),
-            data.join(format!(
-                "{}-held",
-                VirtualPath::GATE_RUNS.relative().as_str()
-            )),
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
+            data_layout
+                .resolve(&VirtualPath::GATE_RUNS)
+                .unwrap()
+                .with_extension("held"),
         )
         .unwrap();
         std::os::unix::fs::symlink(
             outside_root.path(),
-            data.join(VirtualPath::GATE_RUNS.relative().as_path()),
+            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
         )
         .unwrap();
 
         assert_eq!(
             fs::read(
-                data.join(VirtualPath::GATE_RUNS.relative().as_path())
+                data_layout
+                    .resolve(&VirtualPath::GATE_RUNS)
+                    .unwrap()
                     .join("run-one/result.json")
             )
             .unwrap(),
@@ -2159,14 +2181,22 @@ mod tests {
 
         fn seed_index_preimage(storage: &JsonFileStorage, index: &Index) {
             fs::write(
-                storage.root.join(VirtualPath::INDEX.relative().as_str()),
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::INDEX)
+                    .unwrap(),
                 index.to_pretty_bytes().unwrap(),
             )
             .unwrap();
         }
 
         fn seed_issue_preimage(storage: &JsonFileStorage, issue: &Issue) {
-            let issue_dir = storage.root.join(VirtualPath::ISSUES.relative().as_str());
+            let issue_dir = storage
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap();
             fs::create_dir_all(&issue_dir).unwrap();
             fs::write(
                 issue_dir.join(format!("{}.json", issue.id)),
@@ -2236,6 +2266,8 @@ mod tests {
 
             let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
             let secondary_data = secondary_path.join(".jit");
+            let secondary_data_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_data);
             let secondary_storage = JsonFileStorage::new(&secondary_data);
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_data);
 
@@ -2248,11 +2280,12 @@ mod tests {
                 "Only in linked".to_string(),
                 "The exact linked read must return this physical record".to_string(),
             );
-            fs::create_dir_all(secondary_data.join(VirtualPath::ISSUES.relative().as_str()))
+            fs::create_dir_all(secondary_data_layout.resolve(&VirtualPath::ISSUES).unwrap())
                 .unwrap();
             fs::write(
-                secondary_data
-                    .join(VirtualPath::ISSUES.relative().as_str())
+                secondary_data_layout
+                    .resolve(&VirtualPath::ISSUES)
+                    .unwrap()
                     .join(format!("{}.json", linked_only.id)),
                 crate::repository_state::serialize_issue(&linked_only).unwrap(),
             )
@@ -2263,9 +2296,9 @@ mod tests {
                 chrono::Utc::now(),
             );
             fs::write(
-                repo_path
-                    .join(".jit")
-                    .join(VirtualPath::EVENTS.relative().as_str()),
+                crate::test_utils::repository_layout_for_data_root(&repo_path.join(".jit"))
+                    .resolve(&VirtualPath::EVENTS)
+                    .unwrap(),
                 format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
             )
             .unwrap();
@@ -2278,7 +2311,7 @@ mod tests {
                 chrono::Utc::now(),
             );
             fs::write(
-                secondary_data.join(VirtualPath::EVENTS.relative().as_str()),
+                secondary_data_layout.resolve(&VirtualPath::EVENTS).unwrap(),
                 format!("{}\n", serde_json::to_string(&linked_event).unwrap()),
             )
             .unwrap();
@@ -2354,8 +2387,10 @@ mod tests {
             let _ = storage.load_issue(&issue_id).unwrap();
 
             let sidecar = storage
-                .root
-                .join(VirtualPath::ISSUES.relative().as_str())
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap()
                 .join(format!("{issue_id}.lock"));
             assert!(
                 !sidecar.exists(),
@@ -2419,6 +2454,7 @@ mod tests {
             // Setup: Create git repo with committed issue
             let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
+            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
             // Create an issue and commit it
             let issue =
@@ -2440,8 +2476,9 @@ mod tests {
                 .unwrap();
 
             // Remove from local .jit (simulate reading from different worktree)
-            let issue_path = jit_dir
-                .join(VirtualPath::ISSUES.relative().as_path())
+            let issue_path = jit_dir_layout
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap()
                 .join(format!("{}.json", issue_id));
             fs::remove_file(&issue_path).unwrap();
 
@@ -2490,7 +2527,9 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(secondary_jit.join(VirtualPath::ISSUES.relative().as_path()))
+            let secondary_jit_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_jit);
+            fs::create_dir_all(secondary_jit_layout.resolve(&VirtualPath::ISSUES).unwrap())
                 .unwrap();
 
             // Initialize secondary storage
@@ -2508,6 +2547,7 @@ mod tests {
             // Setup: Create git repo with committed issue
             let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
+            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
             // Create and commit issue
             let issue =
@@ -2528,8 +2568,9 @@ mod tests {
                 .unwrap();
 
             // Remove from local index and storage (simulate fresh worktree)
-            let issue_path = jit_dir
-                .join(VirtualPath::ISSUES.relative().as_path())
+            let issue_path = jit_dir_layout
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap()
                 .join(format!("{}.json", issue_id));
             fs::remove_file(&issue_path).unwrap();
 
@@ -2549,9 +2590,10 @@ mod tests {
         fn test_load_aggregated_index_rejects_invalid_git_index() {
             let (_temp_dir, repo_path, storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
+            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
             fs::write(
-                jit_dir.join(VirtualPath::INDEX.relative().as_str()),
+                jit_dir_layout.resolve(&VirtualPath::INDEX).unwrap(),
                 b"{ invalid json",
             )
             .unwrap();
@@ -2639,9 +2681,9 @@ mod tests {
 
             let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
             fs::remove_file(
-                secondary_path
-                    .join(".jit")
-                    .join(VirtualPath::INDEX.relative().as_path()),
+                crate::test_utils::repository_layout_for_data_root(&secondary_path.join(".jit"))
+                    .resolve(&VirtualPath::INDEX)
+                    .unwrap(),
             )
             .unwrap();
             seed_index_preimage(
@@ -2696,7 +2738,9 @@ mod tests {
 
             let secondary_path = repo_path.parent().unwrap().join(&worktree_name);
             let secondary_jit = secondary_path.join(".jit");
-            fs::create_dir_all(secondary_jit.join(VirtualPath::ISSUES.relative().as_path()))
+            let secondary_jit_layout =
+                crate::test_utils::repository_layout_for_data_root(&secondary_jit);
+            fs::create_dir_all(secondary_jit_layout.resolve(&VirtualPath::ISSUES).unwrap())
                 .unwrap();
 
             let secondary_storage = JsonFileStorage::new(&secondary_jit);
@@ -2712,6 +2756,7 @@ mod tests {
         fn test_aggregated_index_propagates_main_worktree_failures() {
             let (_temp_dir, repo_path, _main_storage) = setup_git_repo();
             let main_jit = repo_path.join(".jit");
+            let main_jit_layout = crate::test_utils::repository_layout_for_data_root(&main_jit);
             let add = Command::new("git")
                 .args(["add", VirtualPath::INDEX.repository_relative().as_str()])
                 .current_dir(&repo_path)
@@ -2734,7 +2779,7 @@ mod tests {
             );
 
             fs::write(
-                main_jit.join(VirtualPath::INDEX.relative().as_str()),
+                main_jit_layout.resolve(&VirtualPath::INDEX).unwrap(),
                 b"{ invalid json",
             )
             .unwrap();
@@ -2743,8 +2788,8 @@ mod tests {
                 .expect_err("a malformed main-worktree index must abort aggregation");
             assert!(malformed.to_string().contains("failed to parse index"));
 
-            fs::remove_file(main_jit.join(VirtualPath::INDEX.relative().as_str())).unwrap();
-            fs::create_dir(main_jit.join(VirtualPath::INDEX.relative().as_str())).unwrap();
+            fs::remove_file(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
+            fs::create_dir(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
             let unreadable = secondary_storage
                 .load_aggregated_index()
                 .expect_err("an unreadable main-worktree index must abort aggregation");
@@ -2836,12 +2881,14 @@ mod tests {
             // Setup: Create git repo with invalid JSON committed
             let (_temp_dir, repo_path, _storage) = setup_git_repo();
             let jit_dir = repo_path.join(".jit");
+            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
             let storage = JsonFileStorage::new(&jit_dir);
 
             // Create invalid JSON file
             let issue_id = "11111111-1111-1111-1111-111111111111";
-            let issue_path = jit_dir
-                .join(VirtualPath::ISSUES.relative().as_path())
+            let issue_path = jit_dir_layout
+                .resolve(&VirtualPath::ISSUES)
+                .unwrap()
                 .join(format!("{}.json", issue_id));
             fs::write(&issue_path, "{ invalid json }").unwrap();
 
@@ -2893,7 +2940,11 @@ mod tests {
             };
 
             fs::write(
-                storage.root.join(VirtualPath::INDEX.relative().as_str()),
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::INDEX)
+                    .unwrap(),
                 index.to_pretty_bytes().unwrap(),
             )
             .unwrap();
@@ -3114,10 +3165,11 @@ mod tests {
         /// freshly-created `.jit`, returning the storage handle.
         fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
             let data = temp.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
             fs::create_dir(&data).unwrap();
             let storage = JsonFileStorage::new(&data);
             configure_test_layout(&storage, temp.path(), &data);
-            let index_path = data.join(VirtualPath::INDEX.relative().as_str());
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
             let raw = format!(
                 "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
             );
@@ -3206,10 +3258,11 @@ mod tests {
             for (raw, expected) in cases {
                 let temp_dir = TempDir::new().unwrap();
                 let data = temp_dir.path().join(".jit");
+                let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
                 fs::create_dir(&data).unwrap();
                 let storage = JsonFileStorage::new(&data);
                 configure_test_layout(&storage, temp_dir.path(), &data);
-                fs::write(data.join(VirtualPath::INDEX.relative().as_str()), raw).unwrap();
+                fs::write(data_layout.resolve(&VirtualPath::INDEX).unwrap(), raw).unwrap();
                 let error = storage
                     .load_aggregated_index()
                     .expect_err("invalid local index must abort aggregation");
