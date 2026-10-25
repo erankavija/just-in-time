@@ -3,6 +3,7 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::domain::item::KindScope;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
@@ -419,7 +420,8 @@ pub struct NamespaceConfig {
 /// kinds):
 ///
 /// ```
-/// use jit::config::{JitConfig, KindScopeConfig};
+/// use jit::config::JitConfig;
+/// use jit::domain::item::KindScope;
 ///
 /// let config: JitConfig = toml::from_str(
 ///     r#"
@@ -435,7 +437,7 @@ pub struct NamespaceConfig {
 /// )
 /// .unwrap();
 /// let gloss = &config.item_kinds.unwrap()["glossary"];
-/// assert_eq!(gloss.scope, Some(KindScopeConfig::Project));
+/// assert_eq!(gloss.scope, Some(KindScope::Project));
 /// assert_eq!(gloss.source.as_ref().and_then(|s| s.path()), Some("project-items.md"));
 /// assert!(gloss.missing_required_fields().is_empty());
 /// ```
@@ -463,13 +465,13 @@ pub struct ItemKindConfig {
     /// (e.g. `["satisfies"]`). Required in an explicit declaration.
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
-    /// Addressing scope: [`KindScopeConfig::Issue`] for items projected from issue
+    /// Addressing scope: [`KindScope::Issue`] for items projected from issue
     /// descriptions (qualified id `@/issue/<short-id>/<kind>/<self-id>`), or
-    /// [`KindScopeConfig::Project`] for items projected from a repository-local
+    /// [`KindScope::Project`] for items projected from a repository-local
     /// `source` file (qualified id `@/<kind>/<self-id>`). Required in an explicit
     /// declaration; an unrecognised token is a TOML parse error, not a silent
     /// fallback.
-    pub scope: Option<KindScopeConfig>,
+    pub scope: Option<KindScope>,
     /// For a `scope = "project"` kind, where its items are sourced from. Two
     /// shapes are accepted (resolved by [`ItemKindSource`]):
     /// - a bare path STRING (`source = "glossary.md"`) for a markdown-first kind,
@@ -679,76 +681,6 @@ pub struct TomlSourceDescriptor {
     /// [`BTreeMap`]: std::collections::BTreeMap
     #[serde(rename = "link-fields", default)]
     pub link_fields: std::collections::BTreeMap<String, String>,
-}
-
-/// Parse error for [`KindScopeConfig`].
-///
-/// Returned by [`KindScopeConfig::from_str`] and (via serde) by TOML
-/// deserialization when the `scope` value is not one of the recognised tokens.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum KindScopeConfigError {
-    /// The value is not one of `"issue"` or `"project"`.
-    #[error("invalid scope '{value}'; expected 'issue' or 'project'")]
-    Invalid {
-        /// The unrecognised value.
-        value: String,
-    },
-}
-
-/// Addressing scope of an item kind: `"issue"` or `"project"`.
-///
-/// This is the fifth field of the item-kind six-tuple `(section, id-pattern,
-/// markers, link-namespaces, scope, source-of-truth)`. It mirrors
-/// [`KindScope`](crate::domain::item::KindScope) from the domain layer but
-/// lives in this config module so unrecognised tokens fail at TOML parse time
-/// rather than at projection time.
-///
-/// Parsed (case-insensitively) from the tokens `"issue"` / `"project"` by both
-/// TOML deserialization and [`KindScopeConfig::from_str`]; an unknown token is a
-/// descriptive error, not a silent fallback.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KindScopeConfig {
-    /// Items are projected from issue descriptions
-    /// (`@/issue/<short-id>/<kind>/<self-id>`).
-    Issue,
-    /// Items are projected from a config-declared source file
-    /// (`@/<kind>/<self-id>`).
-    Project,
-}
-
-impl std::str::FromStr for KindScopeConfig {
-    type Err = KindScopeConfigError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "issue" => Ok(KindScopeConfig::Issue),
-            "project" => Ok(KindScopeConfig::Project),
-            _ => Err(KindScopeConfigError::Invalid {
-                value: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for KindScopeConfig {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse::<KindScopeConfig>()
-            .map_err(serde::de::Error::custom)
-    }
-}
-
-impl Serialize for KindScopeConfig {
-    /// Serializes to the same `"issue"` / `"project"` token [`FromStr`](std::str::FromStr)
-    /// and [`Deserialize`] accept, so `jit config get` renders the value a
-    /// hand-authored `config.toml` would use.
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let token = match self {
-            KindScopeConfig::Issue => "issue",
-            KindScopeConfig::Project => "project",
-        };
-        serializer.serialize_str(token)
-    }
 }
 
 /// The authoring DIRECTION of an item kind: which substrate is the canonical
@@ -2232,7 +2164,7 @@ source-of-truth = "markdown-first"
         assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
         assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
         assert_eq!(req.link_namespaces, Some(vec!["satisfies".to_string()]));
-        assert_eq!(req.scope, Some(KindScopeConfig::Issue));
+        assert_eq!(req.scope, Some(KindScope::Issue));
         assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
         assert!(req.missing_required_fields().is_empty());
 
@@ -2490,17 +2422,17 @@ types = { task = 1 }
     }
 
     #[test]
-    fn test_kind_scope_config_parses_both_tokens() {
-        // The typed KindScopeConfig field deserializes both valid tokens.
+    fn test_item_kind_scope_parses_both_tokens() {
+        // The typed scope field deserializes both valid tokens.
         let issue: ItemKindConfig = toml::from_str("scope = \"issue\"").unwrap();
-        assert_eq!(issue.scope, Some(KindScopeConfig::Issue));
+        assert_eq!(issue.scope, Some(KindScope::Issue));
 
         let project: ItemKindConfig = toml::from_str("scope = \"project\"").unwrap();
-        assert_eq!(project.scope, Some(KindScopeConfig::Project));
+        assert_eq!(project.scope, Some(KindScope::Project));
     }
 
     #[test]
-    fn test_kind_scope_config_invalid_token_is_parse_error() {
+    fn test_item_kind_scope_invalid_token_is_parse_error() {
         // REQ: an unrecognised scope token is a TOML parse/deserialize error,
         // not a silent fallback to issue scope.
         let err =
@@ -2510,20 +2442,6 @@ types = { task = 1 }
             msg.contains("global"),
             "error must mention the bad token: {msg}"
         );
-    }
-
-    #[test]
-    fn test_kind_scope_config_from_str_case_insensitive() {
-        // FromStr normalises case so "ISSUE" and "PROJECT" are accepted.
-        assert_eq!(
-            "ISSUE".parse::<KindScopeConfig>().unwrap(),
-            KindScopeConfig::Issue
-        );
-        assert_eq!(
-            "Project".parse::<KindScopeConfig>().unwrap(),
-            KindScopeConfig::Project
-        );
-        assert!("unknown".parse::<KindScopeConfig>().is_err());
     }
 
     #[test]
