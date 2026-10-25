@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dc624c95-1990-42f2-a312-7096793d44d8",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:13:18.543944057Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f7126a33-6dbc-4c7c-b39f-917023da917c",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:09:22.763636919Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "faa19def-4484-4706-becf-dab559f0f3d4",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate-run actors are Assignee values",
-  "updated_at": "2026-10-25T01:45:22.892238915Z"
+  "updated_at": "2026-10-25T05:13:18.543944057Z"
 }

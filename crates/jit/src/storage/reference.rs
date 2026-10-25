@@ -319,7 +319,7 @@ fn sample_gate_run() -> GateRunResult {
         stdout: "test result: ok. 812 passed; 0 failed".to_string(),
         stderr: String::new(),
         command: "cargo test --workspace".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: Some("all suites green".to_string()),
         findings: Some(GateFindings {
             verdict: "pass".to_string(),

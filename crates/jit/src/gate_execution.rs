@@ -154,7 +154,7 @@ pub fn execute_gate_checker_with_context(
         stdout: execution_result.stdout,
         stderr: execution_result.stderr,
         command: execution_result.command,
-        by: Some(Assignee::AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR),
         message: None,
         findings,
         // Stamped by the evaluator, which holds the gate declaration the
@@ -1437,7 +1437,7 @@ mod tests {
             stdout: "Previous review feedback".to_string(),
             stderr: String::new(),
             command: "review-checker".to_string(),
-            by: Some(Assignee::AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR),
             message: None,
             findings: None,
             inputs_digest: None,
