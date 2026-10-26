@@ -224,7 +224,14 @@ repository as working directory, test mode on and every inherited `JIT_*` variab
 assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
 `create_issue` returns the created id from `--json`, and `init_git` (backed by
 `init_git_repository`, which in-process tests also call) initialises git with a fixed author
-identity and no dependence on global git configuration. A test that uses the fixture names no binary path,
+identity and no dependence on global git configuration. `git(args)` runs git under that same
+isolation and returns stdout, and `commit(message)` stages the working tree and commits it so
+`HEAD` resolves. `program_command(program, args)` spawns another program, such as a copy of
+the binary `jit_binary()` locates, under the environment `command` gives `jit`.
+`JitCli::linked_checkouts()` answers a `(primary, linked)` pair: a primary checkout
+initialised by git and `jit init` with one base commit and machine-local `.jit/` runtime
+state git-ignored, and a `git worktree add` checkout of it; both share one temporary
+directory, removed when the last of them drops. A test that uses the fixture names no binary path,
 `CARGO_BIN_EXE_jit` or `cargo_bin!`, and scrapes no human-readable output for ids.
 
 ```rust
