@@ -212,7 +212,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -238,7 +238,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::issue_id::IssueIdPrefix,
+        prefix: &crate::domain::identity::IssueIdPrefix,
         needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
@@ -337,7 +337,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
         mutation: bool,
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
@@ -380,13 +380,21 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
         // proposed absence) when present, otherwise the captured base bytes.
-        let effective = |image: &RepositoryImage, repo_rel: &str| -> Result<Option<Vec<u8>>> {
-            let vpath = image.layout().classify_repository_relative(repo_rel)?;
-            match overrides.get(&vpath) {
-                Some(value) => Ok(value.clone()),
-                None => super::image_repo_bytes(image, repo_rel),
-            }
-        };
+        let effective_repo_path =
+            |image: &RepositoryImage, repo_rel: &str| -> Result<Option<Vec<u8>>> {
+                let vpath = image.layout().classify_repository_relative(repo_rel)?;
+                match overrides.get(&vpath) {
+                    Some(value) => Ok(value.clone()),
+                    None => super::image_repo_bytes(image, repo_rel),
+                }
+            };
+        let effective_virtual_path =
+            |image: &RepositoryImage, path: &VirtualPath| -> Result<Option<Vec<u8>>> {
+                match overrides.get(path) {
+                    Some(value) => Ok(value.clone()),
+                    None => super::image_virtual_bytes(image, path),
+                }
+            };
         let mut issues = None::<Vec<Issue>>;
         let mut capture_precheck_history = false;
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
@@ -400,10 +408,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent `validate_repository` pass surfaces the parse
             // error as a finding.
-            let config = effective_config(image, &effective)
+            let config = effective_config(image, &effective_virtual_path)
                 .unwrap_or_else(|_| empty_materialization_config());
-            let all_ids = effective_index_ids(image, &effective).unwrap_or_default();
-            let rules_text = effective(image, ".jit/rules.toml")?
+            let all_ids = effective_index_ids(image, &effective_virtual_path).unwrap_or_default();
+            let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
                 .transpose()?;
             let schema_rules = rules_text.as_deref().filter(|content| {
@@ -437,14 +445,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 let parsed = if mutation && image.file_bytes(&VirtualPath::INDEX)?.is_some() {
                     super::captured_active_issues(image)?
                 } else {
-                    effective_issues(image, &all_ids, &effective)?
+                    effective_issues(image, &all_ids, &effective_repo_path)?
                 };
                 capture_precheck_history = discover_issue_closure(
                     image,
                     spec,
                     &parsed,
                     &config,
-                    &effective,
+                    &effective_virtual_path,
                     precheck_target,
                 )?;
                 issues = Some(parsed);
@@ -690,19 +698,24 @@ fn captured_divergences(
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.
-type Effective<'a> =
+type EffectiveRepoPath<'a> =
     dyn Fn(&crate::repository_state::RepositoryImage, &str) -> Result<Option<Vec<u8>>> + 'a;
+type EffectiveVirtualPath<'a> = dyn Fn(
+        &crate::repository_state::RepositoryImage,
+        &crate::repository_state::VirtualPath,
+    ) -> Result<Option<Vec<u8>>>
+    + 'a;
 
 /// Parse the (possibly overlaid) configuration and invariant registry.
 fn effective_config(
     image: &crate::repository_state::RepositoryImage,
-    effective: &Effective<'_>,
+    effective: &EffectiveVirtualPath<'_>,
 ) -> Result<JitConfig> {
-    let config_bytes = effective(image, ".jit/config.toml")?
+    let config_bytes = effective(image, &crate::repository_state::VirtualPath::CONFIG)?
         .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
     let declarations = crate::declarations::parse_configuration(&config_bytes)
         .context("invalid .jit/config.toml")?;
-    let invariants = match effective(image, ".jit/invariants.toml")? {
+    let invariants = match effective(image, &crate::repository_state::VirtualPath::INVARIANTS)? {
         Some(bytes) => crate::declarations::invariants::InvariantRegistry::from_toml_str(
             &String::from_utf8(bytes)?,
         )?,
@@ -722,14 +735,14 @@ fn empty_materialization_config() -> JitConfig {
 /// Parse the (possibly overlaid) repository index's live issue ids.
 fn effective_index_ids(
     image: &crate::repository_state::RepositoryImage,
-    effective: &Effective<'_>,
+    effective: &EffectiveVirtualPath<'_>,
 ) -> Result<Vec<String>> {
     #[derive(serde::Deserialize)]
     struct IndexIds {
         #[serde(default)]
         all_ids: Vec<String>,
     }
-    let bytes = effective(image, ".jit/index.json")?
+    let bytes = effective(image, &crate::repository_state::VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
     Ok(serde_json::from_slice::<IndexIds>(&bytes)?.all_ids)
 }
@@ -738,7 +751,7 @@ fn effective_index_ids(
 fn effective_issues(
     image: &crate::repository_state::RepositoryImage,
     all_ids: &[String],
-    effective: &Effective<'_>,
+    effective: &EffectiveRepoPath<'_>,
 ) -> Result<Vec<Issue>> {
     all_ids
         .iter()
@@ -759,22 +772,24 @@ fn effective_issues(
 fn effective_templates(
     image: &crate::repository_state::RepositoryImage,
     config: &JitConfig,
-    effective: &Effective<'_>,
+    effective: &EffectiveVirtualPath<'_>,
 ) -> Result<crate::templates::TemplateRegistry> {
     let hierarchy_types: Vec<&str> = config
         .type_hierarchy
         .as_ref()
         .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
         .unwrap_or_default();
-    Ok(match effective(image, ".jit/templates.toml")? {
-        Some(bytes) => String::from_utf8(bytes)
-            .ok()
-            .and_then(|text| {
-                crate::templates::TemplateRegistry::from_toml_str(&text, &hierarchy_types).ok()
-            })
-            .unwrap_or_else(crate::templates::TemplateRegistry::empty),
-        None => crate::templates::TemplateRegistry::empty(),
-    })
+    Ok(
+        match effective(image, &crate::repository_state::VirtualPath::TEMPLATES)? {
+            Some(bytes) => String::from_utf8(bytes)
+                .ok()
+                .and_then(|text| {
+                    crate::templates::TemplateRegistry::from_toml_str(&text, &hierarchy_types).ok()
+                })
+                .unwrap_or_else(crate::templates::TemplateRegistry::empty),
+            None => crate::templates::TemplateRegistry::empty(),
+        },
+    )
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and a
@@ -788,8 +803,8 @@ fn discover_issue_closure(
     spec: &mut crate::repository_state::CaptureSpec,
     issues: &[Issue],
     config: &JitConfig,
-    effective: &Effective<'_>,
-    precheck_target: Option<&crate::domain::issue_id::IssueIdPrefix>,
+    effective: &EffectiveVirtualPath<'_>,
+    precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -802,7 +817,7 @@ fn discover_issue_closure(
                 .iter()
                 .find(|issue| issue.id == target)
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
-            let gates = match effective(image, ".jit/gates.toml")? {
+            let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
             };
@@ -936,10 +951,16 @@ pub(crate) fn plan_content_from_image(
     image: &crate::repository_state::RepositoryImage,
     emit_for: &[Issue],
 ) -> Result<std::collections::HashMap<String, String>> {
-    let effective = |img: &crate::repository_state::RepositoryImage,
-                     repo_rel: &str|
-     -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
-    let effective: &Effective<'_> = &effective;
+    let effective_repo_path =
+        |img: &crate::repository_state::RepositoryImage,
+         repo_rel: &str|
+         -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
+    let effective_virtual_path =
+        |img: &crate::repository_state::RepositoryImage,
+         path: &crate::repository_state::VirtualPath|
+         -> Result<Option<Vec<u8>>> { super::image_virtual_bytes(img, path) };
+    let effective_repo_path: &EffectiveRepoPath<'_> = &effective_repo_path;
+    let effective_virtual_path: &EffectiveVirtualPath<'_> = &effective_virtual_path;
 
     // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
     // missing or malformed config (parsed in `plan_content_with_issues`),
@@ -947,8 +968,8 @@ pub(crate) fn plan_content_from_image(
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
-    let all_ids = effective_index_ids(image, effective).unwrap_or_default();
-    let all_issues = effective_issues(image, &all_ids, effective).unwrap_or_default();
+    let all_ids = effective_index_ids(image, effective_virtual_path).unwrap_or_default();
+    let all_issues = effective_issues(image, &all_ids, effective_repo_path).unwrap_or_default();
     plan_content_with_issues(image, &all_issues, emit_for)
 }
 
@@ -959,13 +980,14 @@ pub(crate) fn plan_content_with_issues(
     all_issues: &[Issue],
     emit_for: &[Issue],
 ) -> Result<std::collections::HashMap<String, String>> {
-    let effective = |img: &crate::repository_state::RepositoryImage,
-                     repo_rel: &str|
-     -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
-    let effective: &Effective<'_> = &effective;
-    let mut config =
-        effective_config(image, effective).unwrap_or_else(|_| empty_materialization_config());
-    config.templates = effective_templates(image, &config, effective)?;
+    let effective_virtual_path =
+        |img: &crate::repository_state::RepositoryImage,
+         path: &crate::repository_state::VirtualPath|
+         -> Result<Option<Vec<u8>>> { super::image_virtual_bytes(img, path) };
+    let effective_virtual_path: &EffectiveVirtualPath<'_> = &effective_virtual_path;
+    let mut config = effective_config(image, effective_virtual_path)
+        .unwrap_or_else(|_| empty_materialization_config());
+    config.templates = effective_templates(image, &config, effective_virtual_path)?;
 
     let templates = &config.templates;
     let breakable: std::collections::HashSet<String> =
@@ -1015,7 +1037,7 @@ pub(crate) fn plan_content_with_issues(
 /// reporting: the CLI an error finding, the gate checker an `error` run.
 pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &crate::domain::issue_id::IssueIdPrefix,
+    requested_issue_id: &crate::domain::identity::IssueIdPrefix,
     rule_name: &str,
 ) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
@@ -1025,10 +1047,10 @@ pub(super) fn rule_validation_outcome(
     let issue = issues
         .iter()
         .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.requested()))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.as_str()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let rule = match crate::validation::graph::select_graph_rule(
         &declarations.rules.rules,
         rule_name,
@@ -1056,9 +1078,8 @@ pub(super) fn rule_validation_outcome(
         })
         .collect::<Vec<_>>();
     let plan_content = plan_content_from_image(image, &plan_sources)?;
-    let hierarchy = crate::repository_state::hierarchy_config(
-        &crate::config_manager::namespaces_from_config(&config),
-    );
+    let namespaces = crate::config_manager::namespaces_from_config(&config);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
     let context = crate::validation::graph::GraphEvaluationContext {
         graph_context: &issues,
         resolution_index: &issues,
@@ -1182,7 +1203,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((fixes_applied, messages))
     }
 
-    fn apply_type_fix(&self, issue_id: &str, old_type: &str, new_type: &str) -> Result<()>
+    fn apply_type_fix(&self, issue_id: &IssueId, old_type: &str, new_type: &str) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1191,7 +1212,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let new_label = label_utils::type_label(new_type);
 
         self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
-            crate::domain::issue_id::IssueIdPrefix::of_stored(issue_id),
+            crate::domain::identity::IssueIdPrefix::from(issue_id),
             CapturedLabelEdit::ReplaceExact {
                 old: old_label,
                 new: new_label,
@@ -1416,7 +1437,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// registry) yields `None` (unloadable). Used only by the enforcement-drift
     /// pass, which must not crash when the ruleset fails to parse.
     pub fn loadable_rule_names(&self) -> Option<Vec<String>> {
-        let rules_path = self.storage.root().join("rules.toml");
+        let layout = self.require_layout().ok()?;
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .ok()?;
         if rules_path.exists() {
             // Present: parse it directly (do NOT go through the cached
             // `effective_rules`, which `?`-errors). A parse failure -> unloadable.
@@ -1424,7 +1448,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .load()
                 .ok()
                 .and_then(|config| {
-                    crate::storage::ruleset_store::load_ruleset(self.storage.root(), &config).ok()
+                    crate::storage::ruleset_store::load_ruleset(&layout, &config).ok()
                 })
                 .map(|set| set.rules.into_iter().map(|r| r.name).collect())
         } else {
@@ -1473,9 +1497,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // The repo HierarchyConfig is injected into `type-hierarchy` rules at
         // evaluation time (D1); it is no longer stored in the parsed rule. Build
-        // it from the same namespace registry the default rules derive from.
+        // it from the same namespace registry as the rule declarations.
         let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
         let repo_format = self.repo_content_format()?;
 
         // Resolve any external plan documents from the captured validation image
@@ -1546,7 +1571,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         let id = id
-            .map(crate::domain::issue_id::IssueIdPrefix::parse)
+            .map(crate::domain::identity::IssueIdPrefix::from_str)
             .transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
@@ -1744,7 +1769,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let container_id = crate::domain::issue_id::IssueIdPrefix::parse(container_id)?;
+        let container_id = crate::domain::identity::IssueIdPrefix::from_str(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
 
@@ -1813,7 +1838,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if !graph_rules.is_empty() {
             let namespaces = self.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-            let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
             // Resolve external plan docs for the in-scope issues from the captured
             // validation image so a container whose criteria live in an external
             // file validates against the FILE (closed-read, no live filesystem).
@@ -1870,7 +1896,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issue_id = crate::domain::issue_id::IssueIdPrefix::parse(issue_id)?;
+        let issue_id = crate::domain::identity::IssueIdPrefix::from_str(issue_id)?;
         let image = self.capture_validation_image()?;
         rule_validation_outcome(&image, &issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
@@ -1904,7 +1930,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
-        let id = crate::domain::issue_id::IssueIdPrefix::parse(id)?;
+        let id = crate::domain::identity::IssueIdPrefix::from_str(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
         // `load_issue` keys on the FULL id; resolve a short-id prefix first.
@@ -2376,7 +2402,10 @@ fn format_duration(duration: chrono::Duration) -> String {
 }
 
 /// Check if a worktree with the given ID still exists
-fn check_worktree_exists(repository_root: &std::path::Path, worktree_id: &str) -> Result<bool> {
+fn check_worktree_exists(
+    repository_root: &std::path::Path,
+    worktree_id: &crate::domain::identity::WorktreeId,
+) -> Result<bool> {
     use std::path::PathBuf;
     use std::process::Command;
 
@@ -2410,7 +2439,7 @@ fn check_worktree_exists(repository_root: &std::path::Path, worktree_id: &str) -
         if let Some(id) =
             crate::storage::worktree_identity::read_worktree_id(&worktree_path).unwrap_or(None)
         {
-            if id == worktree_id {
+            if &id == worktree_id {
                 return Ok(true);
             }
         }
@@ -2545,6 +2574,23 @@ depends_on = ["planning"]
         let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
 
         assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .evaluate_graph_rules(&[])
+            .expect_err("invalid hierarchy must fail graph-rule evaluation");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     #[test]
@@ -2749,11 +2795,8 @@ depends_on = ["planning"]
              [type_hierarchy.types]\ntask = 4\n\
              [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n";
         storage.add_data_file("config.toml", config);
-        // The type-repair path reads the declared hierarchy through a
-        // `ConfigManager` rooted at the store, so the fixture declares it there
-        // as well as in the memory image.
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        // The shared memory-executor setup mirrors this declaration through the
+        // selected layout for the filesystem loader.
         let mut executor = memory_executor(storage.clone());
         let id = executor
             .issues()
@@ -2919,8 +2962,6 @@ source-of-truth = \"registry-first\"
     /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_data_file("config.toml", CANONICAL_ITEM_KINDS);
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
@@ -2938,9 +2979,8 @@ source-of-truth = \"registry-first\"
     /// isolating the dangling-item-link pass as the validation failure.
     fn dangling_exec_with_namespaces(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
         // Invariant registry through the storage boundary (descriptor path); the
-        // `config.toml` is parsed from the real `.jit` root by `cached_config`.
+        // `config.toml` is mirrored to the selected data root for `cached_config`.
         storage.add_data_file("invariants.toml", REGISTRY_TOML);
         let config = format!(
             "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
@@ -2948,7 +2988,6 @@ source-of-truth = \"registry-first\"
              [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
              {CANONICAL_ITEM_KINDS}"
         );
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
         storage.add_data_file("config.toml", &config);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -3005,12 +3044,18 @@ source-of-truth = \"registry-first\"
     const ONE_RULE: &str = "\
 [[rules]]
 name = \"label-format\"
+assert = { require-section = { heading = \"Success Criteria\" } }
 ";
 
     const ONE_GATE: &str = "\
 [[gates]]
+version = 1
 key = \"cargo-ci\"
+title = \"Cargo CI\"
 description = \"Full Rust CI pipeline must pass.\"
+stage = \"postcheck\"
+mode = \"manual\"
+priority = 100
 ";
 
     /// Like [`dangling_exec`] but ALSO declares `rule` and `gate` item kinds and
@@ -3018,16 +3063,15 @@ description = \"Full Rust CI pipeline must pass.\"
     /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
     fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
         let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        storage.add_data_file("config.toml", &config);
         storage.add_data_file("invariants.toml", REGISTRY_TOML);
         storage.add_data_file("rules.toml", ONE_RULE);
         storage.add_data_file("gates.toml", ONE_GATE);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        CommandExecutor::new(storage)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     #[test]
@@ -3393,8 +3437,8 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
 
-    fn prefix(id: &str) -> crate::domain::issue_id::IssueIdPrefix {
-        crate::domain::issue_id::IssueIdPrefix::parse(id).unwrap()
+    fn prefix(id: &str) -> crate::domain::identity::IssueIdPrefix {
+        crate::domain::identity::IssueIdPrefix::from_str(id).unwrap()
     }
 
     /// A session counting the capture rounds it opens.

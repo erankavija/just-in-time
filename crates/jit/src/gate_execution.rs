@@ -9,7 +9,7 @@
 use crate::declarations::{GateChecker, GateStage};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
-    DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
+    Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
 };
 use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
@@ -17,12 +17,6 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-
-/// Actor stamped on the `by` field of a gate run recorded by the automated
-/// executor (as opposed to a human or agent attestation). A recorded pass whose
-/// `updated_by` equals this value is an auto-era pass with no human attestation
-/// behind it, which matters when a gate is later redefined to manual mode.
-pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
 
 /// One entry in the `JIT_ISSUE_DOCS` env var: the fields a checker needs to
 /// inline a linked document into a review prompt.
@@ -160,7 +154,7 @@ pub fn execute_gate_checker_with_context(
         stdout: execution_result.stdout,
         stderr: execution_result.stderr,
         command: execution_result.command,
-        by: Some(AUTO_EXECUTOR.to_string()),
+        by: Some(Assignee::AUTO_EXECUTOR),
         message: None,
         findings,
         // Stamped by the evaluator, which holds the gate declaration the
@@ -572,7 +566,7 @@ mod tests {
     use crate::repository_state::{
         gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
-        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
+        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
     };
     use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
@@ -998,7 +992,6 @@ mod tests {
     /// Append to every path jit writes during a mutation, each named through
     /// the storage layout.
     fn write_tracker_paths(layout: &RepositoryLayout) {
-        let data = layout.data_root();
         let records = [
             VirtualPath::EVENTS,
             VirtualPath::data(
@@ -1018,16 +1011,22 @@ mod tests {
                     INDEX_LOCK_FILE,
                     GATES_LOCK_FILE,
                     EVENTS_LOCK_FILE,
-                    WORKTREE_IDENTITY_FILE,
                 ]
-                .map(|file| data.join(file)),
+                .map(|file| layout.data_root().join(file)),
             )
+            .chain(std::iter::once(
+                layout
+                    .resolve(&VirtualPath::WORKTREE_IDENTITY)
+                    .expect("the worktree identity path"),
+            ))
             .chain([
                 layout
                     .resolve(&VirtualPath::ISSUES)
                     .expect("the issue directory")
                     .join("0f0e0d0c-0000-4000-8000-000000000000.json"),
-                data.join(RECORD_SCRATCH_DIR)
+                layout
+                    .data_root()
+                    .join(RECORD_SCRATCH_DIR)
                     .join(crate::storage::RECORD_FILE_NAME),
                 layout.worktree_root().join(BOOTSTRAP_LOCK_FILE),
             ]);
@@ -1443,7 +1442,7 @@ mod tests {
             stdout: "Previous review feedback".to_string(),
             stderr: String::new(),
             command: "review-checker".to_string(),
-            by: Some(AUTO_EXECUTOR.to_string()),
+            by: Some(Assignee::AUTO_EXECUTOR),
             message: None,
             findings: None,
             inputs_digest: None,

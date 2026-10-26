@@ -1,11 +1,10 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T21:55:40.063473761Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
-    "91081bd3-9996-4f81-a405-a06c7cdcae8b",
-    "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
-    "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1"
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b"
   ],
   "description": "Retype issue ids in the gate commands and gate execution.\n\n## Background\n\n`commands/gate.rs` holds 59 production issue-id references and 12 raw-id signatures, `commands/gate_check.rs` 47 references and 13 signatures, and `gate_execution.rs` 5 references. `commands/gate_check.rs:722,739` matches ids inline. `commands/gate_cli_tests.rs` is the gate family's test module.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter in `commands/gate.rs`, `commands/gate_check.rs` or `gate_execution.rs` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Executor methods in this family take `&IssueId` and resolve no prefixes; callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-03: No inline id-prefix match remains in this family.\n- [hard] REQ-04: No production `IssueIdPrefix` parse and no production `resolve_issue_id` call remains in this family's files.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
@@ -24,10 +23,11 @@
     "satisfies:2195c98f/REQ-01",
     "satisfies:2195c98f/REQ-17",
     "per:@/charter/D-18",
-    "enforces:@/invariant/semantic-types"
+    "enforces:@/invariant/semantic-types",
+    "resolution:absorbed-into-91081bd3"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Gate commands carry typed issue ids",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T21:56:12.459590260Z"
 }

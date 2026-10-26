@@ -2,7 +2,7 @@
 //!
 //! Builds an abstract syntax tree (AST) from tokens.
 
-use super::error::{state_values, QueryParseError, PRIORITY_VALUES};
+use super::error::{priority_values, state_values, QueryParseError};
 use super::lexer::{FilterField, Token};
 use crate::domain::{Assignee, Priority, State};
 use std::str::FromStr;
@@ -198,7 +198,7 @@ fn parse_state(value: &str) -> Result<State> {
 fn parse_priority(value: &str) -> Result<Priority> {
     Priority::from_str(value).map_err(|_| QueryParseError::InvalidPriority {
         value: value.to_string(),
-        valid: PRIORITY_VALUES.to_string(),
+        valid: priority_values(),
     })
 }
 
@@ -280,7 +280,7 @@ mod tests {
             QueryParseError::InvalidState { value, .. } if value == "notastate"
         ));
         let message = err.to_string();
-        for state in crate::domain::State::all() {
+        for state in crate::domain::State::ALL {
             assert!(
                 message.contains(state.as_str()),
                 "missing {state:?}: {message}"
@@ -297,7 +297,7 @@ mod tests {
             result.unwrap_err(),
             QueryParseError::InvalidPriority {
                 value: "nope".to_string(),
-                valid: PRIORITY_VALUES.to_string(),
+                valid: priority_values(),
             }
         );
     }

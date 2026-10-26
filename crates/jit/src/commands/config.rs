@@ -246,8 +246,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let current =
-                super::image_repo_bytes(&config_image, ".jit/config.toml")?.unwrap_or_default();
+            let current = super::image_virtual_bytes(&config_image, &VirtualPath::CONFIG)?
+                .unwrap_or_default();
             let mut doc = String::from_utf8(current)
                 .context("existing .jit/config.toml is not UTF-8")?
                 .parse::<toml_edit::DocumentMut>()
@@ -294,7 +294,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
     /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
-        EffectiveConfig::load(self.storage.root())?.full_snapshot()
+        EffectiveConfig::load(self.repository_layout()?)?.full_snapshot()
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
@@ -418,7 +418,9 @@ mod tests {
     fn test_get_config_covers_whole_surface_on_fresh_repo() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
         // No config.toml at all: every top-level section still resolves
         // (empty object), it's just not an unknown key.
@@ -456,7 +458,11 @@ mod tests {
     fn test_get_config_reads_whole_surface_from_repo_config_toml() {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::write(
-            dir.path().join("config.toml"),
+            dir.path().join(
+                crate::repository_state::VirtualPath::CONFIG
+                    .relative()
+                    .as_path(),
+            ),
             r#"
 [type_hierarchy]
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
@@ -483,7 +489,9 @@ schema = 1
         )
         .unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
         assert_eq!(
             executor
@@ -564,7 +572,9 @@ schema = 1
     fn test_get_config_unknown_top_level_key_is_invalid_argument() {
         let dir = tempfile::TempDir::new().unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(
+            crate::test_utils::repository_layout_for_data_root(dir.path()),
+        );
 
         let err = executor.get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());

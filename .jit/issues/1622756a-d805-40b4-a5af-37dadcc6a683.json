@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T06:17:04.678868586Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Render closed vocabularies in human output through their wire tokens instead of lowercased `Debug` names.\n\n## Background\n\nHuman output formats vocabularies through `Debug`, for example `format!(\"{:?}\").to_lowercase()`, which prints `inprogress` for the `in_progress` state: `crates/jit/src/main.rs:2068,2069,2091,4472,4820,6422,6466,6507,6555,6600,6754,6755`, `commands/bulk_update.rs:490` and `commands/gate.rs:13` (`{status:?}`).\n\n## Success Criteria\n\n- [hard] REQ-01: No human render in `main.rs`, `commands/bulk_update.rs` or `commands/gate.rs` formats a closed vocabulary through `Debug`; each uses `as_str` or `Display`.\n- [hard] REQ-02: Human output shows the same tokens as JSON output.\n",
   "documents": [],
+  "done_at": "2026-10-25T08:34:12.763143225Z",
+  "first_ready_at": "2026-10-25T06:15:02.735308844Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "aa646503-fcdc-4dfb-8f4a-4b653c4b6b97",
+      "status": "passed",
+      "updated_at": "2026-10-25T08:31:12.170778310Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c98a4781-529f-4133-a4d2-5c664a8ce0f6",
+      "status": "passed",
+      "updated_at": "2026-10-25T08:33:49.139839252Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1622756a-d805-40b4-a5af-37dadcc6a683",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Human output renders vocabulary tokens, not Debug names",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T08:34:12.763143225Z"
 }

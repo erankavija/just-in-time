@@ -5,8 +5,8 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::issue_id::IssueIdPrefix;
-use crate::domain::{Event, Issue};
+use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::{Event, EventBody, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -101,16 +101,16 @@ pub(crate) fn resolve_unique_issue_id<'a>(
     prefix: &IssueIdPrefix,
     ids: impl IntoIterator<Item = &'a str>,
     describe: impl Fn(&str) -> Option<String>,
-) -> Result<String> {
+) -> Result<IssueId> {
     let matches = ids
         .into_iter()
         .filter(|id| prefix.matches(id))
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(prefix.requested()).into()),
+        [] => Err(IssueNotFoundError::new(prefix.as_str()).into()),
         [id] => Ok(id.to_string()),
         _ => Err(AmbiguousIdError::issue(
-            prefix.requested(),
+            prefix.as_str(),
             matches.iter().filter_map(|id| describe(id)),
         )
         .into()),
@@ -122,7 +122,7 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 /// # Errors
 ///
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
-pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<String> {
+pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<IssueId> {
     resolve_unique_issue_id(prefix, issues.iter().map(|issue| issue.id.as_str()), |id| {
         issues
             .iter()
@@ -230,7 +230,7 @@ pub trait IssueStore: Clone {
     ///
     /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
     /// several.
-    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String>;
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<IssueId>;
 
     /// List all issues in the repository.
     ///
@@ -266,7 +266,7 @@ pub trait IssueStore: Clone {
         Ok(self
             .read_events()?
             .into_iter()
-            .filter(|event| matches!(event, Event::ArtifactArchiveExecuted { .. }))
+            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted { .. }))
             .collect())
     }
 

@@ -159,10 +159,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let container_id = &IssueIdPrefix::parse(container_id)?;
+        let container_id = &IssueIdPrefix::from_str(container_id)?;
         let anchor_bindings = &anchor_bindings
             .iter()
-            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::parse(id)?)))
+            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::from_str(id)?)))
             .collect::<Result<BTreeMap<_, _>>>()?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
@@ -437,15 +437,12 @@ fn template_operation_capture_paths(
     let issues = parse_template_issues(image)?;
     let full_container_id = super::resolve_issue_from_capture(&issues, container_id)?;
     let container = template_issue(&issues, &full_container_id)?;
-    let mut paths = template_document_paths(
-        &template,
-        &config.templates.roles,
-        container,
-        &DocumentDeclarations::from_config(&config),
-    )?
-    .into_iter()
-    .map(|document| VirtualPath::worktree(document).map_err(Into::into))
-    .collect::<Result<Vec<_>>>()?;
+    let declarations = DocumentDeclarations::from_config(&config)?;
+    let mut paths =
+        template_document_paths(&template, &config.templates.roles, container, &declarations)?
+            .into_iter()
+            .map(|document| VirtualPath::worktree(document).map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
     let already_applied =
         find_captured_breakdown(&template, &config.templates.roles, container, &issues)?.is_some();
     if !already_applied {
@@ -481,13 +478,18 @@ struct DocumentDeclarations {
 impl DocumentDeclarations {
     /// The declarations `config` carries: its documentation section (defaulted
     /// when absent) and the taxonomy its namespace registry defines.
-    fn from_config(config: &crate::config::JitConfig) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns the hierarchy constructor's error for malformed declarations.
+    fn from_config(config: &crate::config::JitConfig) -> Result<Self> {
+        let namespaces = crate::config_manager::namespaces_from_config(config);
+        Ok(Self {
             documentation: config.documentation.clone().unwrap_or_default(),
-            hierarchy: crate::repository_state::hierarchy_config(
-                &crate::config_manager::namespaces_from_config(config),
-            ),
-        }
+            hierarchy: crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
+                &namespaces,
+            )?,
+        })
     }
 }
 
@@ -585,7 +587,7 @@ fn template_declarations_from_image(
             let schemas: Vec<_> = crate::declarations::rules::RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         anyhow!("captured rule schema '{}' is absent", request.reference)
                     })?;
@@ -753,7 +755,7 @@ fn derive_template_apply(
             let full = super::resolve_issue_from_capture(issues, bound).with_context(|| {
                 format!(
                     "template '{}' anchor '{}' is bound to '{}', which does not resolve to an existing issue",
-                    template.name, anchor.name, bound.requested()
+                    template.name, anchor.name, bound.as_str()
                 )
             })?;
             Ok((anchor.name.clone(), full))
@@ -795,7 +797,7 @@ fn derive_template_apply(
     // The declarations a node's document area is resolved against, read from the
     // same captured configuration as the rest of the derivation, so a fresh
     // application and a refresh resolve one declaration to one path.
-    let declarations = DocumentDeclarations::from_config(config);
+    let declarations = DocumentDeclarations::from_config(config)?;
     let mut events = Vec::new();
     let FreshTemplateDerivation {
         created: created_node_ids_by_role,
@@ -947,7 +949,7 @@ fn derive_template_refresh(
     container: &Issue,
     issues: &[Issue],
     declarations: &DocumentDeclarations,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
 ) -> Result<(BTreeMap<String, String>, BTreeMap<String, Issue>)> {
     let mut mapping =
         BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.to_string())]);
@@ -1003,7 +1005,7 @@ fn derive_template_refresh(
         updates.insert(id.clone(), issue);
         events.push((
             1,
-            Event::draft_issue_updated(
+            EventBody::draft_issue_updated(
                 id.clone(),
                 APPLY_ACTOR.to_string(),
                 vec!["description".to_string()],
@@ -1023,7 +1025,7 @@ fn derive_fresh_template(
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     context: &MutationContext,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
 ) -> Result<FreshTemplateDerivation> {
     let created_order = (0..delta.creates.len())
         .map(|index| context.identifier_at(index as u64))
@@ -1120,8 +1122,8 @@ fn validate_captured_issue_write(
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
 ) -> Result<()> {
-    let format = config.content_format()?;
-    let strictness = config.strictness()?;
+    let format = config.content_format();
+    let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, rules, format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
         .with_strictness(strictness);
@@ -1158,7 +1160,7 @@ fn attach_captured_gates(
     issue: &mut Issue,
     registry: &mut crate::declarations::GateRegistry,
     presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<String>,
 ) -> Result<()> {
     for name in names {
@@ -1173,8 +1175,10 @@ fn attach_captured_gates(
                     .map(|template| {
                         let gate = template.to_gate();
                         if !registry.gates.contains_key(&gate.key) {
-                            events
-                                .push((0, Event::draft_gate_definition_created(gate.key.clone())));
+                            events.push((
+                                0,
+                                EventBody::draft_gate_definition_created(gate.key.clone()),
+                            ));
                             registry.gates.insert(gate.key.clone(), gate.clone());
                         }
                         gate.key
@@ -1200,7 +1204,7 @@ fn attach_captured_gates(
                     run_id: None,
                 },
             );
-            events.push((1, Event::draft_gate_added(issue.id.clone(), key)));
+            events.push((1, EventBody::draft_gate_added(issue.id.clone(), key)));
         }
     }
     Ok(())
@@ -1210,7 +1214,7 @@ fn add_captured_template_edge(
     issues: &mut BTreeMap<String, Issue>,
     from: &str,
     to: &str,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<String>,
 ) -> Result<()> {
     lease_targets.push(from.to_string());
@@ -1237,7 +1241,14 @@ fn add_captured_template_edge(
         let graph = DependencyGraph::new(&refs);
         issues
             .keys()
-            .map(|id| (id.clone(), graph.compute_transitive_reduction(id)))
+            .map(|id| {
+                let reduced = graph
+                    .compute_transitive_reduction(id)
+                    .into_iter()
+                    .map(|node| node.id.clone())
+                    .collect::<HashSet<_>>();
+                (id.clone(), reduced)
+            })
             .collect::<BTreeMap<_, _>>()
     };
     // Publish the reduced dependency set of every issue the new edge reshaped.
@@ -1260,7 +1271,7 @@ fn add_captured_template_edge(
         if id != from {
             events.push((
                 3,
-                Event::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
+                EventBody::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
             ));
         }
     }
@@ -1288,12 +1299,12 @@ fn add_captured_template_edge(
         issue.state = State::Backlog;
         events.push((
             1,
-            Event::draft_issue_state_changed(from.to_string(), State::Ready, State::Backlog),
+            EventBody::draft_issue_state_changed(from.to_string(), State::Ready, State::Backlog),
         ));
     }
     events.push((
         2,
-        Event::draft_issue_updated(
+        EventBody::draft_issue_updated(
             from.to_string(),
             "dependency-add".to_string(),
             vec!["dependencies".to_string()],
@@ -1306,7 +1317,7 @@ fn remove_captured_template_edge(
     issues: &mut BTreeMap<String, Issue>,
     from: &str,
     to: &str,
-    events: &mut Vec<(u8, Event)>,
+    events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<String>,
 ) -> Result<()> {
     lease_targets.push(from.to_string());
@@ -1322,7 +1333,7 @@ fn remove_captured_template_edge(
     }
     events.push((
         2,
-        Event::draft_issue_updated(
+        EventBody::draft_issue_updated(
             from.to_string(),
             "dependency-remove".to_string(),
             vec!["dependencies".to_string()],
@@ -1349,7 +1360,7 @@ fn remove_captured_template_edge(
             .state = State::Ready;
         events.push((
             3,
-            Event::draft_issue_state_changed(from.to_string(), State::Backlog, State::Ready),
+            EventBody::draft_issue_state_changed(from.to_string(), State::Backlog, State::Ready),
         ));
     }
     Ok(())
@@ -1413,6 +1424,21 @@ mod tests {
             documentation: declared::documentation(),
             hierarchy: declared::hierarchy(),
         }
+    }
+
+    #[test]
+    fn test_document_declarations_preserve_invalid_hierarchy_error() {
+        let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        let config: crate::config::JitConfig = toml::from_str(&config_text).unwrap();
+
+        let error = DocumentDeclarations::from_config(&config)
+            .err()
+            .expect("invalid hierarchy must fail declaration construction");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
     }
 
     /// The document path a fresh apply writes for `declaration` resolved in

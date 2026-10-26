@@ -8,12 +8,14 @@
 /// The canonical lifecycle state tokens accepted in a `state:` filter, listed
 /// in an [`QueryParseError::InvalidState`] message.
 pub(super) fn state_values() -> String {
-    crate::domain::State::all().map(|s| s.as_str()).join(", ")
+    crate::domain::State::ALL.map(|s| s.as_str()).join(", ")
 }
 
 /// The set of priority tokens accepted in a `priority:` filter, listed in an
 /// [`QueryParseError::InvalidPriority`] message.
-pub(super) const PRIORITY_VALUES: &str = "low, normal, high, critical";
+pub(super) fn priority_values() -> String {
+    crate::domain::Priority::ALL.map(|p| p.as_str()).join(", ")
+}
 
 /// A typed failure produced while lexing or parsing a query string.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

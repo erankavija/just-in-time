@@ -7,7 +7,6 @@ use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::ProfileId;
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::errors::InvalidArgumentError;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
 // identity here keeps the domain layer pure while leaving one canonical type
@@ -17,6 +16,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str::FromStr;
 #[cfg(test)]
@@ -25,30 +25,31 @@ use uuid::Uuid;
 /// Length of short issue ID (git-style short hash)
 pub const SHORT_ID_LENGTH: usize = 8;
 
-/// Issue lifecycle state
-///
-/// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
-/// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
-/// lets states be stored in ordered collections such as `BTreeSet<State>`.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum State {
-    /// Created but not actionable yet (blocked by dependencies)
-    Backlog,
-    /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
-    Ready,
-    /// Currently being worked on
-    InProgress,
-    /// Work complete, awaiting quality gate approval
-    Gated,
-    /// Completed successfully
-    Done,
-    /// Won't implement (bypasses gates)
-    Rejected,
-    /// No longer relevant
-    Archived,
+wire_vocabulary! {
+    /// Issue lifecycle state
+    ///
+    /// `PartialOrd`/`Ord` follow the declaration order, which is the lifecycle order
+    /// (`Backlog < Ready < InProgress < Gated < Done < Rejected < Archived`); this
+    /// lets states be stored in ordered collections such as `BTreeSet<State>`.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+    )]
+    pub enum State {
+        /// Created but not actionable yet (blocked by dependencies)
+        Backlog = "backlog",
+        /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
+        Ready = "ready",
+        /// Currently being worked on
+        InProgress = "in_progress",
+        /// Work complete, awaiting quality gate approval
+        Gated = "gated",
+        /// Completed successfully
+        Done = "done",
+        /// Won't implement (bypasses gates)
+        Rejected = "rejected",
+        /// No longer relevant
+        Archived = "archived",
+    }
 }
 
 impl State {
@@ -58,41 +59,6 @@ impl State {
     /// or decision not to implement (Rejected). Both unblock dependent issues.
     pub fn is_terminal(self) -> bool {
         matches!(self, State::Done | State::Rejected)
-    }
-
-    /// The canonical snake_case string for this state.
-    ///
-    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
-    /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
-    /// is needed (e.g. a compact one-line status render) without allocating.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            State::Backlog => "backlog",
-            State::Ready => "ready",
-            State::InProgress => "in_progress",
-            State::Gated => "gated",
-            State::Done => "done",
-            State::Rejected => "rejected",
-            State::Archived => "archived",
-        }
-    }
-
-    /// Every `State` variant, in canonical lifecycle order.
-    ///
-    /// Use this to enumerate the state space exhaustively instead of hardcoding
-    /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
-    /// rollup, for instance, must list every state so its shape stays stable
-    /// and complete as the enum evolves.
-    pub const fn all() -> [State; 7] {
-        [
-            State::Backlog,
-            State::Ready,
-            State::InProgress,
-            State::Gated,
-            State::Done,
-            State::Rejected,
-            State::Archived,
-        ]
     }
 }
 
@@ -147,105 +113,49 @@ pub fn is_dependency_met(state: State, archived_from: Option<State>) -> bool {
     is_effectively_terminal(state, archived_from)
 }
 
-impl FromStr for State {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        State::all()
-            .into_iter()
-            .find(|state| state.as_str() == s)
-            .ok_or_else(|| InvalidArgumentError::new(format!("Invalid state: {s}")).into())
+wire_vocabulary! {
+    /// Issue priority level
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+    pub enum Priority {
+        /// Low priority
+        Low = "low",
+        /// Normal priority (default)
+        Normal = "normal",
+        /// High priority
+        High = "high",
+        /// Critical priority
+        Critical = "critical",
     }
 }
 
-/// Issue priority level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Priority {
-    /// Low priority
-    Low,
-    /// Normal priority (default)
-    Normal,
-    /// High priority
-    High,
-    /// Critical priority
-    Critical,
-}
-
-impl FromStr for Priority {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "low" => Ok(Priority::Low),
-            "normal" => Ok(Priority::Normal),
-            "high" => Ok(Priority::High),
-            "critical" => Ok(Priority::Critical),
-            _ => Err(InvalidArgumentError::new(format!("Invalid priority: {s}")).into()),
-        }
+wire_vocabulary! {
+    /// The content format of an issue body, selecting which [`ContentParser`] the
+    /// validation projection uses to extract `sections`.
+    ///
+    /// When absent on an issue the repo default (`[validation].content_format`)
+    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. HTML/XML are
+    /// only usable when the `html`/`xml` cargo features are built (see
+    /// [`content_parser_for`](crate::document::content_parser_for)).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum ContentFormat {
+        /// Markdown body (always available).
+        Markdown = "markdown",
+        /// HTML body (requires the `html` cargo feature to parse).
+        Html = "html",
+        /// XML body (requires the `xml` cargo feature to parse).
+        Xml = "xml",
     }
-}
-
-/// The content format of an issue body, selecting which [`ContentParser`] the
-/// validation projection uses to extract `sections`.
-///
-/// Serialized lowercase (`"markdown"`, `"html"`, `"xml"`) so issue JSON stays
-/// human-readable. When absent on an issue the repo default
-/// (`[validation].content_format`) applies; the final fallback is
-/// [`ContentFormat::DEFAULT`]. HTML/XML are only usable when the `html`/`xml`
-/// cargo features are built (see
-/// [`content_parser_for`](crate::document::content_parser_for)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ContentFormat {
-    /// Markdown body (always available).
-    Markdown,
-    /// HTML body (requires the `html` cargo feature to parse).
-    Html,
-    /// XML body (requires the `xml` cargo feature to parse).
-    Xml,
 }
 
 impl ContentFormat {
     /// Format applied when neither the issue nor `[validation]` declares one.
     /// It must be a format that is always compiled in.
     pub const DEFAULT: Self = Self::Markdown;
-
-    /// The token naming this format, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ContentFormat::Markdown => "markdown",
-            ContentFormat::Html => "html",
-            ContentFormat::Xml => "xml",
-        }
-    }
 }
 
 impl Default for ContentFormat {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for ContentFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
-    }
-}
-
-impl FromStr for ContentFormat {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "markdown" | "md" => Ok(ContentFormat::Markdown),
-            "html" => Ok(ContentFormat::Html),
-            "xml" => Ok(ContentFormat::Xml),
-            _ => Err(InvalidArgumentError::new(format!(
-                "Invalid content format: '{s}' (expected markdown, html, or xml)"
-            ))
-            .into()),
-        }
     }
 }
 
@@ -272,17 +182,45 @@ wire_vocabulary! {
 /// via deserialization), so a raw, unvalidated string can never reach storage.
 ///
 /// The fields are private; construct an `Assignee` by parsing (`str::parse` /
-/// [`FromStr`]) and read the parts via [`Assignee::kind`] /
-/// [`Assignee::identifier`]. It serializes transparently as the
-/// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
-/// issue JSON is unchanged.
+/// [`FromStr`]) or take an engine-owned actor from its associated constant, and
+/// read the parts via [`Assignee::kind`] / [`Assignee::identifier`]. It
+/// serializes transparently as the `kind:identifier` string (through
+/// [`Display`] / [`FromStr`]), so on-disk issue JSON is unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
-    kind: String,
-    identifier: String,
+    kind: Cow<'static, str>,
+    identifier: Cow<'static, str>,
 }
 
 impl Assignee {
+    /// Coordinator actor for listing active leases.
+    pub const SYSTEM_LIST: Self = Self::engine_actor("system", "list");
+    /// Coordinator actor for checking a lease.
+    pub const SYSTEM_CHECK: Self = Self::engine_actor("system", "check");
+    /// Coordinator actor for force-evicting a lease.
+    pub const SYSTEM_ADMIN: Self = Self::engine_actor("system", "admin");
+    /// Coordinator actor for claims and lease recovery.
+    pub const SYSTEM_RECOVERY: Self = Self::engine_actor("system", "recovery");
+    /// Coordinator actor guarding a repository mutation when no agent identity
+    /// resolves.
+    pub const SYSTEM_LEASE_CHECK: Self = Self::engine_actor("system", "lease-check");
+    /// Actor stamped on the `by` field of a gate run recorded by the automated
+    /// executor (as opposed to a human or agent attestation). A recorded pass
+    /// whose `updated_by` equals this value is an auto-era pass with no human
+    /// attestation behind it, which matters when a gate is later redefined to
+    /// manual mode.
+    pub const AUTO_EXECUTOR: Self = Self::engine_actor("auto", "executor");
+
+    /// Builds an engine-owned actor without parsing. Private so that only the
+    /// constants above use it; each must equal the parse of its spelling: a
+    /// non-empty, colon-free `kind` and a non-empty `identifier`.
+    const fn engine_actor(kind: &'static str, identifier: &'static str) -> Self {
+        Self {
+            kind: Cow::Borrowed(kind),
+            identifier: Cow::Borrowed(identifier),
+        }
+    }
+
     /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
     pub fn kind(&self) -> &str {
         &self.kind
@@ -339,8 +277,8 @@ impl FromStr for Assignee {
             return Err(AssigneeParseError::EmptyIdentifier(s.to_string()));
         }
         Ok(Assignee {
-            kind: kind.to_string(),
-            identifier: identifier.to_string(),
+            kind: Cow::Owned(kind.to_string()),
+            identifier: Cow::Owned(identifier.to_string()),
         })
     }
 }
@@ -884,8 +822,8 @@ impl crate::graph::GraphNode for Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 }
 
@@ -982,7 +920,7 @@ pub struct GateRunResult {
     /// Command that was executed
     pub command: String,
     /// Who triggered this execution
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     /// Optional message
     pub message: Option<String>,
     /// Structured findings parsed from the checker's machine-readable block, if
@@ -1067,7 +1005,7 @@ impl GateRunResult {
             stdout: String::new(),
             stderr: String::new(),
             command: String::new(),
-            by: by.map(ToString::to_string),
+            by: by.cloned(),
             message: None,
             findings: None,
             inputs_digest: None,
@@ -1148,18 +1086,19 @@ impl GateVerdictOrigin {
     }
 }
 
-/// Gate run status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum GateRunStatus {
-    /// Check succeeded
-    Passed,
-    /// Check failed (expected failure, e.g., tests failed)
-    Failed,
-    /// Unexpected error (timeout, command not found, crash)
-    Error,
-    /// Not yet run (for manual gates)
-    Pending,
+wire_vocabulary! {
+    /// Gate run status
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum GateRunStatus {
+        /// Check succeeded
+        Passed = "passed",
+        /// Check failed (expected failure, e.g., tests failed)
+        Failed = "failed",
+        /// Unexpected error (timeout, command not found, crash)
+        Error = "error",
+        /// Not yet run (for manual gates)
+        Pending = "pending",
+    }
 }
 
 /// Origin vocabulary persisted for an installed profile package.
@@ -1311,7 +1250,7 @@ impl std::fmt::Display for LinkedCheckoutWriteStance {
     }
 }
 
-/// System event types for audit log
+/// The tagged body of an [`Event`]: its variant and payload fields.
 ///
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
 /// serde `type` tag of every variant off the derived schema
@@ -1319,15 +1258,11 @@ impl std::fmt::Display for LinkedCheckoutWriteStance {
 /// variant appears there whether or not it was given a distinct [`EventTag`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Event {
+pub enum EventBody {
     /// A new issue was created
     IssueCreated {
-        /// Event ID
-        id: String,
         /// Issue that was created
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Issue title
         title: String,
         /// Issue priority
@@ -1335,23 +1270,15 @@ pub enum Event {
     },
     /// An issue was claimed by an agent
     IssueClaimed {
-        /// Event ID
-        id: String,
         /// Issue that was claimed
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Who claimed it (format: "type:identifier")
         assignee: Assignee,
     },
     /// Issue state transitioned
     IssueStateChanged {
-        /// Event ID
-        id: String,
         /// Issue that changed
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Previous state
         from: State,
         /// New state
@@ -1359,12 +1286,8 @@ pub enum Event {
     },
     /// A quality gate passed
     GatePassed {
-        /// Event ID
-        id: String,
         /// Issue with the gate
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Gate that passed
         gate_key: String,
         /// Who marked it as passed (format: "type:identifier")
@@ -1372,12 +1295,8 @@ pub enum Event {
     },
     /// A quality gate failed
     GateFailed {
-        /// Event ID
-        id: String,
         /// Issue with the gate
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Gate that failed
         gate_key: String,
         /// Who marked it as failed (format: "type:identifier")
@@ -1385,52 +1304,32 @@ pub enum Event {
     },
     /// A quality gate was added to an issue
     GateAdded {
-        /// Event ID
-        id: String,
         /// Issue to which gate was added
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Gate that was added
         gate_key: String,
     },
     /// A quality gate was removed from an issue
     GateRemoved {
-        /// Event ID
-        id: String,
         /// Issue from which gate was removed
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Gate that was removed
         gate_key: String,
     },
     /// Issue was completed
     IssueCompleted {
-        /// Event ID
-        id: String,
         /// Issue that completed
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
     },
     /// Issue was permanently deleted
     IssueDeleted {
-        /// Event ID
-        id: String,
         /// Issue that was deleted
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
     },
     /// Issue was released from assignee
     IssueReleased {
-        /// Event ID
-        id: String,
         /// Issue that was released
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Previous assignee (format: "type:identifier")
         assignee: Assignee,
         /// Reason for release
@@ -1438,10 +1337,6 @@ pub enum Event {
     },
     /// A dependency-aware archive execution reached its durable commit point.
     ArtifactArchiveExecuted {
-        /// Event ID.
-        id: String,
-        /// When the commit point was recorded.
-        timestamp: DateTime<Utc>,
         /// Container or document selected for archival.
         target: crate::domain::artifact_plan::PlanTarget,
         /// Repository-relative mirror root used by the operation.
@@ -1457,12 +1352,8 @@ pub enum Event {
     },
     /// Issue was updated (labels, priority, assignee, etc.)
     IssueUpdated {
-        /// Event ID
-        id: String,
         /// Issue that was updated
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Who updated it (e.g., "bulk-update", "human:alice", "agent:copilot")
         updated_by: String,
         /// Fields that changed
@@ -1470,12 +1361,8 @@ pub enum Event {
     },
     /// Redundant dependencies were removed by transitive reduction during validate --fix
     DependencyReduced {
-        /// Event ID
-        id: String,
         /// Issue whose dependencies were reduced
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Number of dependencies before reduction
         old_count: usize,
         /// Number of dependencies after reduction
@@ -1490,12 +1377,8 @@ pub enum Event {
     /// audit-sensitive override (DR §7.6): ordinary rule rejections and
     /// read-only `jit validate` runs are NOT logged, only the deliberate bypass.
     LocalRuleBypassed {
-        /// Event ID
-        id: String,
         /// Issue whose write bypassed the rule
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Name of the enforce rule that was bypassed
         rule: String,
     },
@@ -1507,12 +1390,8 @@ pub enum Event {
     /// true` produced an `error` finding attributed to the issue in its target
     /// state, so the transition into `target` was refused.
     TransitionBlocked {
-        /// Event ID
-        id: String,
         /// Issue whose transition was blocked
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// State the issue was attempting to enter
         target: State,
         /// Name of the enforcing graph rule that blocked the transition
@@ -1521,7 +1400,7 @@ pub enum Event {
     /// An enforcing graph rule was bypassed via `--force` at a state transition
     /// (CC-2).
     ///
-    /// The transition-path counterpart of [`Event::LocalRuleBypassed`]: emitted
+    /// The transition-path counterpart of [`EventBody::LocalRuleBypassed`]: emitted
     /// once per enforce graph rule whose `error` finding was overridden by
     /// `--force` during a `--state` transition. Unlike `LocalRuleBypassed` (which
     /// the write path emits AFTER its save commits), this event is appended inside
@@ -1531,12 +1410,8 @@ pub enum Event {
     /// bypass so the audit log can tell apart a forced write from a forced
     /// transition.
     GraphRuleBypassed {
-        /// Event ID
-        id: String,
         /// Issue whose transition bypassed the rule
         issue_id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// State the issue transitioned into
         target: State,
         /// Name of the enforce graph rule that was bypassed
@@ -1547,36 +1422,24 @@ pub enum Event {
     /// Registry-scoped: it carries no issue id
     /// because it mutates the shared gate registry rather than a single issue.
     GateDefinitionUpdated {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was updated
         gate_key: String,
     },
     /// A gate definition was added to the registry (`jit gate define`).
     ///
-    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// Registry-scoped, like [`EventBody::GateDefinitionUpdated`]: it carries no
     /// issue id because it mutates the shared gate registry rather than a
     /// single issue.
     GateDefinitionCreated {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was created
         gate_key: String,
     },
     /// A gate definition was removed from the registry (`jit gate remove`).
     ///
-    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// Registry-scoped, like [`EventBody::GateDefinitionUpdated`]: it carries no
     /// issue id because it mutates the shared gate registry rather than a
     /// single issue.
     GateDefinitionRemoved {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Registry key of the gate that was removed
         gate_key: String,
     },
@@ -1586,10 +1449,6 @@ pub enum Event {
     /// dependency-first aggregate, with each package's id, version and applied
     /// variable values.
     ProfileLifecycle {
-        /// Event ID.
-        id: String,
-        /// When the lifecycle operation was recorded.
-        timestamp: DateTime<Utc>,
         /// Requested lifecycle operation.
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
@@ -1601,7 +1460,7 @@ pub enum Event {
     /// An explicit per-invocation override permitted a state-mutating command
     /// inside a linked non-primary checkout.
     ///
-    /// Repository-scoped, like [`Event::ProfileLifecycle`]: the override is
+    /// Repository-scoped, like [`EventBody::ProfileLifecycle`]: the override is
     /// decided for the whole invocation before any issue is known, so the record
     /// carries no issue id. It exists because an ordinary mutation record cannot
     /// show that the invocation was permitted by an override rather than by a
@@ -1612,10 +1471,6 @@ pub enum Event {
     /// invocation-scoped annotation the dispatch site installs, so the record and
     /// the mutation it explains become durable together or not at all.
     LinkedCheckoutWriteOverridden {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
         /// Root of the linked checkout whose store the invocation mutated.
         checkout: std::path::PathBuf,
         /// The stance declared for the repository, which would have refused the
@@ -1627,77 +1482,82 @@ pub enum Event {
     },
 }
 
+/// One event-log record: an id and a timestamp around a tagged [`EventBody`].
+///
+/// The body is flattened, so a record is the body's tagged object plus `id`
+/// and `timestamp`; flattening rules out `deny_unknown_fields`. Only the
+/// mutation finalizer, event decoding and
+/// [`EventTag::sample`](crate::domain::event_catalog::EventTag::sample) build
+/// one; everything else drafts an [`EventBody`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct Event {
+    /// Finalizer-assigned event id.
+    id: String,
+    /// The single timestamp of the mutation that recorded this event.
+    timestamp: DateTime<Utc>,
+    /// What this event records.
+    #[serde(flatten)]
+    body: EventBody,
+}
+
 impl Event {
-    /// This event's identity, as assigned by [`Self::assign_identity`].
-    ///
-    /// A drafted event that has not reached the mutation finalizer carries an
-    /// empty id.
-    pub fn id(&self) -> &str {
-        match self {
-            Event::IssueCreated { id, .. }
-            | Event::IssueClaimed { id, .. }
-            | Event::IssueStateChanged { id, .. }
-            | Event::GatePassed { id, .. }
-            | Event::GateFailed { id, .. }
-            | Event::GateAdded { id, .. }
-            | Event::GateRemoved { id, .. }
-            | Event::IssueCompleted { id, .. }
-            | Event::IssueDeleted { id, .. }
-            | Event::IssueReleased { id, .. }
-            | Event::ArtifactArchiveExecuted { id, .. }
-            | Event::IssueUpdated { id, .. }
-            | Event::DependencyReduced { id, .. }
-            | Event::LocalRuleBypassed { id, .. }
-            | Event::TransitionBlocked { id, .. }
-            | Event::GraphRuleBypassed { id, .. }
-            | Event::GateDefinitionUpdated { id, .. }
-            | Event::GateDefinitionCreated { id, .. }
-            | Event::GateDefinitionRemoved { id, .. }
-            | Event::ProfileLifecycle { id, .. }
-            | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
+    /// Stamp `body` with the identity the mutation finalizer assigns.
+    pub(crate) fn new(id: String, timestamp: DateTime<Utc>, body: EventBody) -> Self {
+        Self {
+            id,
+            timestamp,
+            body,
         }
     }
 
-    /// Overwrite this event's id and timestamp with finalizer-assigned values.
-    ///
-    /// The `repository_state` mutation finalizer is the sole authority over event
-    /// identity and time: it assigns a deterministic id and stamps the single
-    /// mutation timestamp, overriding whatever an intermediate constructor set.
-    pub fn assign_identity(&mut self, new_id: String, new_timestamp: DateTime<Utc>) {
+    /// The tagged body this event records.
+    pub fn body(&self) -> &EventBody {
+        &self.body
+    }
+
+    /// This event's id.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// When this event occurred.
+    pub fn timestamp(&self) -> DateTime<Utc> {
+        self.timestamp
+    }
+
+    /// The issue this event names; see [`EventBody::get_issue_id`].
+    pub fn get_issue_id(&self) -> &str {
+        self.body.get_issue_id()
+    }
+
+    /// This event's `type` tag; see [`EventBody::get_type`].
+    pub fn get_type(&self) -> &str {
+        self.body.get_type()
+    }
+}
+
+impl EventBody {
+    /// Record whether this profile lifecycle marker certifies the torn tail it
+    /// follows; any other body is returned unchanged.
+    pub fn with_isolated_torn_tail(self, torn_tail: bool) -> Self {
         match self {
-            Event::IssueCreated { id, timestamp, .. }
-            | Event::IssueClaimed { id, timestamp, .. }
-            | Event::IssueStateChanged { id, timestamp, .. }
-            | Event::GatePassed { id, timestamp, .. }
-            | Event::GateFailed { id, timestamp, .. }
-            | Event::GateAdded { id, timestamp, .. }
-            | Event::GateRemoved { id, timestamp, .. }
-            | Event::IssueCompleted { id, timestamp, .. }
-            | Event::IssueDeleted { id, timestamp, .. }
-            | Event::IssueReleased { id, timestamp, .. }
-            | Event::ArtifactArchiveExecuted { id, timestamp, .. }
-            | Event::IssueUpdated { id, timestamp, .. }
-            | Event::DependencyReduced { id, timestamp, .. }
-            | Event::LocalRuleBypassed { id, timestamp, .. }
-            | Event::TransitionBlocked { id, timestamp, .. }
-            | Event::GraphRuleBypassed { id, timestamp, .. }
-            | Event::GateDefinitionUpdated { id, timestamp, .. }
-            | Event::GateDefinitionCreated { id, timestamp, .. }
-            | Event::GateDefinitionRemoved { id, timestamp, .. }
-            | Event::ProfileLifecycle { id, timestamp, .. }
-            | Event::LinkedCheckoutWriteOverridden { id, timestamp, .. } => {
-                *id = new_id;
-                *timestamp = new_timestamp;
-            }
+            EventBody::ProfileLifecycle {
+                operation,
+                profiles,
+                ..
+            } => EventBody::ProfileLifecycle {
+                operation,
+                profiles,
+                isolated_torn_tail: torn_tail,
+            },
+            other => other,
         }
     }
 
     /// Create an issue created event
     pub fn draft_issue_created(issue: &Issue) -> Self {
-        Event::IssueCreated {
-            id: String::new(),
+        EventBody::IssueCreated {
             issue_id: issue.id.clone(),
-            timestamp: DateTime::UNIX_EPOCH,
             title: issue.title.clone(),
             priority: issue.priority,
         }
@@ -1709,23 +1569,12 @@ impl Event {
     /// caller parses (and thereby validates) the actor before constructing the
     /// event.
     pub fn draft_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
-        Event::IssueClaimed {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            assignee,
-        }
+        EventBody::IssueClaimed { issue_id, assignee }
     }
 
     /// Create an issue state changed event
     pub fn draft_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
-        Event::IssueStateChanged {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            from,
-            to,
-        }
+        EventBody::IssueStateChanged { issue_id, from, to }
     }
 
     /// Create a gate passed event.
@@ -1737,10 +1586,8 @@ impl Event {
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
-        Event::GatePassed {
-            id: String::new(),
+        EventBody::GatePassed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
@@ -1755,10 +1602,8 @@ impl Event {
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
-        Event::GateFailed {
-            id: String::new(),
+        EventBody::GateFailed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             gate_key,
             updated_by,
         }
@@ -1766,31 +1611,17 @@ impl Event {
 
     /// Create a gate added event
     pub fn draft_gate_added(issue_id: String, gate_key: String) -> Self {
-        Event::GateAdded {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+        EventBody::GateAdded { issue_id, gate_key }
     }
 
     /// Create a gate removed event
     pub fn draft_gate_removed(issue_id: String, gate_key: String) -> Self {
-        Event::GateRemoved {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+        EventBody::GateRemoved { issue_id, gate_key }
     }
 
     /// Create an issue completed event
     pub fn draft_issue_completed(issue_id: String) -> Self {
-        Event::IssueCompleted {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-        }
+        EventBody::IssueCompleted { issue_id }
     }
 
     /// Create an issue released event.
@@ -1799,10 +1630,8 @@ impl Event {
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
     pub fn draft_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
-        Event::IssueReleased {
-            id: String::new(),
+        EventBody::IssueReleased {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             assignee,
             reason,
         }
@@ -1817,9 +1646,7 @@ impl Event {
         planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
         reconciling: bool,
     ) -> Self {
-        Event::ArtifactArchiveExecuted {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
+        EventBody::ArtifactArchiveExecuted {
             target,
             destination_root,
             publications,
@@ -1836,10 +1663,8 @@ impl Event {
         new_count: usize,
         removed_deps: Vec<String>,
     ) -> Self {
-        Event::DependencyReduced {
-            id: String::new(),
+        EventBody::DependencyReduced {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             old_count,
             new_count,
             removed_deps,
@@ -1848,10 +1673,8 @@ impl Event {
 
     /// Create an issue updated event
     pub fn draft_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
-        Event::IssueUpdated {
-            id: String::new(),
+        EventBody::IssueUpdated {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             updated_by,
             fields,
         }
@@ -1862,11 +1685,7 @@ impl Event {
     /// Records that an issue was permanently deleted, preserving an audit trail
     /// of the removal in the event log (the issue file itself is gone).
     pub fn draft_issue_deleted(issue_id: String) -> Self {
-        Event::IssueDeleted {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-        }
+        EventBody::IssueDeleted { issue_id }
     }
 
     /// Create a local-rule-bypassed event.
@@ -1874,12 +1693,7 @@ impl Event {
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
     /// whose `error` finding would otherwise have blocked the write (DR §7.6).
     pub fn draft_local_rule_bypassed(issue_id: String, rule: String) -> Self {
-        Event::LocalRuleBypassed {
-            id: String::new(),
-            issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
-            rule,
-        }
+        EventBody::LocalRuleBypassed { issue_id, rule }
     }
 
     /// Create a transition-blocked event.
@@ -1888,10 +1702,8 @@ impl Event {
     /// `target` (CC-2). Appended before the blocking error is returned, one per
     /// blocking rule.
     pub fn draft_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
-        Event::TransitionBlocked {
-            id: String::new(),
+        EventBody::TransitionBlocked {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1903,10 +1715,8 @@ impl Event {
     /// graph rule whose `error` finding would otherwise have blocked the
     /// transition into `target` (CC-2).
     pub fn draft_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
-        Event::GraphRuleBypassed {
-            id: String::new(),
+        EventBody::GraphRuleBypassed {
             issue_id,
-            timestamp: DateTime::UNIX_EPOCH,
             target,
             rule,
         }
@@ -1917,11 +1727,7 @@ impl Event {
     /// Registry-scoped (issue-less): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
     pub fn draft_gate_definition_updated(gate_key: String) -> Self {
-        Event::GateDefinitionUpdated {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+        EventBody::GateDefinitionUpdated { gate_key }
     }
 
     /// Create a gate-definition-created event.
@@ -1931,11 +1737,7 @@ impl Event {
     /// records that `gate_key` was added to the gate registry via `jit gate
     /// define`.
     pub fn draft_gate_definition_created(gate_key: String) -> Self {
-        Event::GateDefinitionCreated {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+        EventBody::GateDefinitionCreated { gate_key }
     }
 
     /// Create a gate-definition-removed event.
@@ -1945,11 +1747,7 @@ impl Event {
     /// records that `gate_key` was removed from the gate registry via `jit
     /// gate remove`.
     pub fn draft_gate_definition_removed(gate_key: String) -> Self {
-        Event::GateDefinitionRemoved {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            gate_key,
-        }
+        EventBody::GateDefinitionRemoved { gate_key }
     }
 
     /// Create the aggregate profile lifecycle audit event.
@@ -1957,9 +1755,7 @@ impl Event {
         operation: ProfileLifecycleOperation,
         profiles: Vec<ProfileLifecycleProfile>,
     ) -> Self {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
+        EventBody::ProfileLifecycle {
             operation,
             profiles,
             isolated_torn_tail: false,
@@ -1978,9 +1774,7 @@ impl Event {
         declared_stance: LinkedCheckoutWriteStance,
         invocation_override: LinkedCheckoutWriteStance,
     ) -> Self {
-        Event::LinkedCheckoutWriteOverridden {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
+        EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
@@ -1990,27 +1784,27 @@ impl Event {
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
-            Event::IssueCreated { issue_id, .. } => issue_id,
-            Event::IssueClaimed { issue_id, .. } => issue_id,
-            Event::IssueStateChanged { issue_id, .. } => issue_id,
-            Event::GatePassed { issue_id, .. } => issue_id,
-            Event::GateFailed { issue_id, .. } => issue_id,
-            Event::GateAdded { issue_id, .. } => issue_id,
-            Event::GateRemoved { issue_id, .. } => issue_id,
-            Event::IssueCompleted { issue_id, .. } => issue_id,
-            Event::IssueDeleted { issue_id, .. } => issue_id,
-            Event::IssueReleased { issue_id, .. } => issue_id,
-            Event::IssueUpdated { issue_id, .. } => issue_id,
-            Event::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
-            Event::DependencyReduced { issue_id, .. } => issue_id,
-            Event::LocalRuleBypassed { issue_id, .. } => issue_id,
-            Event::TransitionBlocked { issue_id, .. } => issue_id,
-            Event::GraphRuleBypassed { issue_id, .. } => issue_id,
-            Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
-            Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
-            Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
-            Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
-            Event::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
+            EventBody::IssueCreated { issue_id, .. } => issue_id,
+            EventBody::IssueClaimed { issue_id, .. } => issue_id,
+            EventBody::IssueStateChanged { issue_id, .. } => issue_id,
+            EventBody::GatePassed { issue_id, .. } => issue_id,
+            EventBody::GateFailed { issue_id, .. } => issue_id,
+            EventBody::GateAdded { issue_id, .. } => issue_id,
+            EventBody::GateRemoved { issue_id, .. } => issue_id,
+            EventBody::IssueCompleted { issue_id, .. } => issue_id,
+            EventBody::IssueDeleted { issue_id, .. } => issue_id,
+            EventBody::IssueReleased { issue_id, .. } => issue_id,
+            EventBody::IssueUpdated { issue_id, .. } => issue_id,
+            EventBody::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
+            EventBody::DependencyReduced { issue_id, .. } => issue_id,
+            EventBody::LocalRuleBypassed { issue_id, .. } => issue_id,
+            EventBody::TransitionBlocked { issue_id, .. } => issue_id,
+            EventBody::GraphRuleBypassed { issue_id, .. } => issue_id,
+            EventBody::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
+            EventBody::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
+            EventBody::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
+            EventBody::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
+            EventBody::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
         }
     }
 
@@ -2019,7 +1813,7 @@ impl Event {
     /// The string is the value serde writes into the record's `type` field, and
     /// the value `jit events query --event-type` matches against. It is supplied
     /// by [`EventTag::as_str`](crate::domain::event_catalog::EventTag::as_str), the single
-    /// definition of the tag vocabulary, via [`Event::tag`].
+    /// definition of the tag vocabulary, via [`EventBody::tag`].
     pub fn get_type(&self) -> &str {
         self.tag().as_str()
     }
@@ -2030,11 +1824,39 @@ mod tests {
     use super::*;
     use crate::test_utils::{document_reference, document_reference_at, document_reference_typed};
 
+    #[test]
+    fn test_priority_ord_follows_rank() {
+        let mut priorities = Priority::ALL;
+        priorities.sort();
+
+        assert_eq!(
+            priorities,
+            [
+                Priority::Low,
+                Priority::Normal,
+                Priority::High,
+                Priority::Critical,
+            ]
+        );
+    }
+
     fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
         let mut issue = fixture_issue("Archived".to_string(), String::new());
         issue.state = state;
         issue.archived_from = archived_from;
         serde_json::to_value(&issue).unwrap()
+    }
+
+    #[test]
+    fn test_stamped_event_reads_back_its_body_and_identity() {
+        let body = EventBody::draft_gate_added("issue".to_string(), "tests".to_string());
+        let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+
+        let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
+
+        assert_eq!(event.id(), "event");
+        assert_eq!(event.timestamp(), timestamp);
+        assert_eq!(event.body(), &body);
     }
 
     #[test]
@@ -2072,6 +1894,24 @@ mod tests {
         attested.inputs_digest = Some(digest.clone());
 
         assert!(!attested.is_reusable_for("review", &digest));
+    }
+
+    #[test]
+    fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
+        let mut run = GateRunResult::attestation(
+            "issue",
+            "review",
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.by = Some(Assignee::AUTO_EXECUTOR);
+
+        let encoded = serde_json::to_string(&run).unwrap();
+        let decoded: GateRunResult = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.by, run.by);
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
     }
 
     #[test]
@@ -2595,23 +2435,18 @@ mod tests {
     }
 
     #[test]
-    fn test_state_serialization_backlog() {
-        let state = State::Backlog;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"backlog\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
-    }
-
-    #[test]
-    fn test_state_serialization_gated() {
-        let state = State::Gated;
-        let json = serde_json::to_string(&state).unwrap();
-        assert_eq!(json, "\"gated\"");
-
-        let deserialized: State = serde_json::from_str(&json).unwrap();
-        assert_eq!(state, deserialized);
+    fn test_state_enumeration_preserves_lifecycle_order() {
+        let lifecycle = [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ];
+        assert_eq!(State::ALL, lifecycle);
+        assert!(lifecycle.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
@@ -2886,80 +2721,6 @@ mod tests {
         use crate::declarations::GateMode;
         use std::str::FromStr;
 
-        #[test]
-        fn test_state_from_str_accepts_only_serde_tokens() {
-            for state in State::all() {
-                let token = state.as_str();
-                assert_eq!(serde_json::to_value(state).unwrap(), token);
-                let letters: Vec<usize> = token
-                    .char_indices()
-                    .filter(|(_, c)| c.is_ascii_alphabetic())
-                    .map(|(i, _)| i)
-                    .collect();
-                // Every case assignment of the token's letters; mask 0 is canonical.
-                (0u32..1 << letters.len()).for_each(|mask| {
-                    let variant: String = token
-                        .char_indices()
-                        .map(|(i, c)| match letters.iter().position(|&l| l == i) {
-                            Some(bit) if mask & (1 << bit) != 0 => c.to_ascii_uppercase(),
-                            _ => c,
-                        })
-                        .collect();
-                    match mask {
-                        0 => assert_eq!(State::from_str(&variant).unwrap(), state),
-                        _ => assert!(State::from_str(&variant).is_err(), "accepted {variant:?}"),
-                    }
-                });
-                assert!(State::from_str(&format!(" {token}")).is_err());
-            }
-            for token in ["open", "inprogress", "invalid", "pending", ""] {
-                assert!(State::from_str(token).is_err(), "accepted {token:?}");
-            }
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_lowercase() {
-            assert_eq!(Priority::from_str("low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("normal").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("high").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("critical").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_uppercase() {
-            assert_eq!(Priority::from_str("LOW").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("NORMAL").unwrap(), Priority::Normal);
-            assert_eq!(Priority::from_str("HIGH").unwrap(), Priority::High);
-            assert_eq!(Priority::from_str("CRITICAL").unwrap(), Priority::Critical);
-        }
-
-        #[test]
-        fn test_priority_from_str_valid_mixedcase() {
-            assert_eq!(Priority::from_str("Low").unwrap(), Priority::Low);
-            assert_eq!(Priority::from_str("Normal").unwrap(), Priority::Normal);
-        }
-
-        #[test]
-        fn test_priority_from_str_invalid() {
-            assert!(Priority::from_str("invalid").is_err());
-            assert!(Priority::from_str("").is_err());
-            assert!(Priority::from_str("medium").is_err());
-        }
-
-        #[test]
-        fn test_state_parse_method() {
-            // Test using str::parse() method
-            let state: State = "ready".parse().unwrap();
-            assert_eq!(state, State::Ready);
-        }
-
-        #[test]
-        fn test_priority_parse_method() {
-            // Test using str::parse() method
-            let priority: Priority = "high".parse().unwrap();
-            assert_eq!(priority, Priority::High);
-        }
-
         // GateStage FromStr/Display/as_str
 
         #[test]
@@ -3089,6 +2850,20 @@ mod tests {
         }
 
         #[test]
+        fn test_assignee_system_actor_constants_equal_parsed_spelling() {
+            for (constant, spelling) in [
+                (Assignee::SYSTEM_LIST, "system:list"),
+                (Assignee::SYSTEM_CHECK, "system:check"),
+                (Assignee::SYSTEM_ADMIN, "system:admin"),
+                (Assignee::SYSTEM_RECOVERY, "system:recovery"),
+                (Assignee::SYSTEM_LEASE_CHECK, "system:lease-check"),
+                (Assignee::AUTO_EXECUTOR, "auto:executor"),
+            ] {
+                assert_eq!(Assignee::from_str(spelling).unwrap(), constant);
+            }
+        }
+
+        #[test]
         fn test_assignee_partial_eq_str() {
             let a = Assignee::from_str("agent:copilot").unwrap();
             assert!(a == *"agent:copilot");
@@ -3172,12 +2947,12 @@ mod tests {
         #[test]
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
-            let event = Event::draft_issue_claimed("issue-1".to_string(), actor);
+            let event = EventBody::draft_issue_claimed("issue-1".to_string(), actor);
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"agent:copilot\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
         }
 
@@ -3185,12 +2960,12 @@ mod tests {
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
             let event =
-                Event::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+                EventBody::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"copilot:session-1\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
         }
 
@@ -3198,12 +2973,12 @@ mod tests {
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
             let event =
-                Event::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+                EventBody::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"updated_by\":\"ci:runner\""));
 
-            let back: Event = serde_json::from_str(&json).unwrap();
+            let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
         }
 

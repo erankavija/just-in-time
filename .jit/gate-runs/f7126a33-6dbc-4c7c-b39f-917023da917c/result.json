@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-faa19def",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8960b0bfd09b662eb77c1734e4b6d8fcf225ab8b",
+  "completed_at": "2026-10-25T05:09:22.547074307Z",
+  "duration_ms": 244513,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes meet the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "faa19def-4484-4706-becf-dab559f0f3d4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f7126a33-6dbc-4c7c-b39f-917023da917c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T05:05:18.033653007Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `1fa0257eb6dc925cf91e35fc9b0f89135cf19951` (`jit:faa19def`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`\nResolved items: `@/issue/2195c98f/requirement/REQ-11` (`.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json`); `@/charter/D-18` (`dev/vision/9db27a3a-charter.md`); `@/invariant/semantic-types`, `@/invariant/assignee-format`, `@/invariant/architecture-dependency-direction`, `@/invariant/semantic-test-assertions`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose` (`.jit/invariants.toml`)\nGate evidence: `cargo-ci` passed (exit 0; run `71d7f569-03c1-49ed-a4e7-17b00525bd31`, covering `8960b0bfd` which contains the tagged commit); `code-review` pending\nTruncation recovery: Read per-file patches, current serialization/construction paths, and the complete stored gate-run `by`-value inventory separately.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes meet the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

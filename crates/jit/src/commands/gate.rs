@@ -10,7 +10,7 @@ use crate::domain::{GateRunResult, GateRunStatus};
 /// without disagreeing with the persisted `gates_status` value.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
@@ -223,7 +223,7 @@ enum CapturedGateRegistryOutcome {
 
 struct DerivedGateRegistryMutation {
     registry: crate::declarations::GateRegistry,
-    event: Event,
+    event: EventBody,
     outcome: CapturedGateRegistryOutcome,
 }
 
@@ -319,9 +319,10 @@ fn capture_gate_preset_image(
             .collect::<Result<Vec<_>>>()?;
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
-            let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
+            let rules_text =
+                super::image_virtual_bytes(image, &crate::repository_state::VirtualPath::RULES)?
+                    .map(String::from_utf8)
+                    .transpose()?;
             render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
         } else {
             Vec::new()
@@ -445,9 +446,9 @@ fn derive_gate_preset_application(
             intents.push(MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(if existed {
-                    Event::draft_gate_definition_updated(gate.key)
+                    EventBody::draft_gate_definition_updated(gate.key)
                 } else {
-                    Event::draft_gate_definition_created(gate.key)
+                    EventBody::draft_gate_definition_created(gate.key)
                 }),
             });
         }
@@ -639,7 +640,7 @@ fn derive_gate_registry_mutation(
                 .gates
                 .insert(definition.key.clone(), definition.clone());
             (
-                Event::draft_gate_definition_created(definition.key.clone()),
+                EventBody::draft_gate_definition_created(definition.key.clone()),
                 CapturedGateRegistryOutcome::Defined,
             )
         }
@@ -652,7 +653,7 @@ fn derive_gate_registry_mutation(
             let updated = updated_gate_definition(current, update.clone())?;
             registry.gates.insert(key.clone(), updated.clone());
             (
-                Event::draft_gate_definition_updated(key.clone()),
+                EventBody::draft_gate_definition_updated(key.clone()),
                 CapturedGateRegistryOutcome::Updated(Box::new(updated)),
             )
         }
@@ -661,7 +662,7 @@ fn derive_gate_registry_mutation(
                 return Err(crate::storage::GateNotFoundError::by_key(key).into());
             }
             (
-                Event::draft_gate_definition_removed(key.clone()),
+                EventBody::draft_gate_definition_removed(key.clone()),
                 CapturedGateRegistryOutcome::Removed,
             )
         }
@@ -708,7 +709,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -754,7 +755,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -800,7 +801,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .transpose()?;
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -898,7 +899,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
 
         // Fail-fast: pass each required gate in order, stopping at the first that
@@ -965,7 +966,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .transpose()?;
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -1046,9 +1047,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let spec = CaptureSpec::new(registries()?, budget)?;
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
-                    let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                        .map(String::from_utf8)
-                        .transpose()?;
+                    let rules_text = super::image_virtual_bytes(
+                        image,
+                        &crate::repository_state::VirtualPath::RULES,
+                    )?
+                    .map(String::from_utf8)
+                    .transpose()?;
                     Ok(spec.discover_paths(render_capture_closure(
                         image.layout(),
                         &config,
@@ -1267,7 +1271,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
-        let issue_id = &IssueIdPrefix::parse(issue_id)?;
+        let issue_id = &IssueIdPrefix::from_str(issue_id)?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
@@ -1299,7 +1303,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             let warnings = super::captured_lease_warnings(
                 mode,
                 std::slice::from_ref(&target),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let preset = parse_captured_gate_presets(&image)?
@@ -1345,7 +1348,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<crate::domain::GateRunResult>> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
 
         if let Some(key) = gate_key_filter {
@@ -1373,7 +1376,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        let from_issue_id = &IssueIdPrefix::parse(from_issue_id)?;
+        let from_issue_id = &IssueIdPrefix::from_str(from_issue_id)?;
 
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
@@ -1440,6 +1443,7 @@ mod tests {
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
@@ -1877,8 +1881,8 @@ enforce_leases = "off"
                 .unwrap()
                 .iter()
                 .any(|event| matches!(
-                    event,
-                    Event::GatePassed { gate_key, .. } if gate_key == "manual-gate"
+                    event.body(),
+                    EventBody::GatePassed { gate_key, .. } if gate_key == "manual-gate"
                 )),
             "a failed attestation must log no gate-passed event"
         );
@@ -2080,10 +2084,10 @@ style = "full"
             .expect("configured projection is materialized");
         assert!(projection.contains("projected-review"));
         let event = executor.storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
@@ -2202,10 +2206,10 @@ style = "full"
         assert!(registry.gates.contains_key("ours"));
         assert!(registry.gates.contains_key("theirs"));
         let event = storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }

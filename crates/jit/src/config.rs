@@ -3,11 +3,13 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::domain::item::KindScope;
+use crate::domain::vocabulary::wire_vocabulary;
+use crate::repository_state::{RepositoryLayout, VirtualPath};
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
 
 /// Root configuration structure loaded from `.jit/config.toml`.
 #[derive(Debug, Clone, Deserialize)]
@@ -226,26 +228,6 @@ pub struct IconConfigToml {
     pub custom: Option<HashMap<String, String>>,
 }
 
-/// Deserialize and eagerly validate `[validation].strictness`.
-///
-/// Accepts an absent key (yielding `None`) or one of the three levels
-/// (`strict`/`loose`/`permissive`, case-insensitively); any other value is
-/// rejected at deserialize time via [`Strictness`](crate::validation::Strictness)
-/// so a `config.toml` carrying an unrecognized strictness fails to load instead
-/// of persisting a silently-inert value. The validated raw string is preserved
-/// so `jit config get`/`show` round-trips the author's spelling.
-fn deserialize_strictness<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = Option::<String>::deserialize(deserializer)?;
-    if let Some(raw) = value.as_deref() {
-        raw.parse::<crate::validation::Strictness>()
-            .map_err(serde::de::Error::custom)?;
-    }
-    Ok(value)
-}
-
 /// Validation behavior configuration.
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
@@ -253,52 +235,34 @@ where
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
-    /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
-    /// `"permissive"`. It modulates which rule violations block a write or
-    /// transition, layered on top of each rule's `enforce`/severity, without
-    /// changing either. Resolved via [`ValidationConfig::strictness`].
-    ///
-    /// Validated at deserialize time (like [`ProjectName`]): loading a
-    /// `config.toml` whose `strictness` is not one of the three levels fails
-    /// eagerly rather than deferring the error to the next validation call, so an
-    /// unrecognized value can never persist and sit silently.
-    #[serde(default, deserialize_with = "deserialize_strictness")]
-    pub strictness: Option<String>,
+    /// Repo-wide enforcement strictness. It modulates which rule violations block
+    /// a write or transition, layered on top of each rule's `enforce`/severity, without
+    /// changing either. Decoded as [`Strictness`](crate::validation::Strictness)
+    /// so configuration access and serialization use its canonical token.
+    #[serde(default)]
+    pub strictness: Option<crate::validation::Strictness>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
-    /// Repo-level default content format for issue bodies ("markdown", "html",
-    /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
-    /// to extract `sections` for issues that carry no per-issue `content_format`.
-    pub content_format: Option<String>,
+    /// Repo-level default content format for issue bodies. Selects the
+    /// [`ContentParser`](crate::document::ContentParser) used to extract
+    /// `sections` for issues that carry no per-issue `content_format`.
+    #[serde(default)]
+    pub content_format: Option<crate::domain::ContentFormat>,
 }
 
 impl ValidationConfig {
-    /// Resolve the repo-level default content format, defaulting to
+    /// Return the repo-level default content format, defaulting to
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) when
-    /// unset. An invalid value is surfaced as an error rather than silently
-    /// defaulting, so a misconfigured `config.toml` cannot quietly pick the wrong
-    /// parser.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
-        use std::str::FromStr;
-        match self.content_format.as_deref() {
-            None => Ok(crate::domain::ContentFormat::DEFAULT),
-            Some(value) => crate::domain::ContentFormat::from_str(value).with_context(|| {
-                format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
-            }),
-        }
+    /// unset. Serde rejects values outside the exact wire vocabulary while
+    /// loading configuration.
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
+        self.content_format.unwrap_or_default()
     }
 
-    /// Resolve the repo-wide validation
-    /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
-    /// to [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
-    ///
-    /// The value is already validated at deserialize time (see
-    /// [`deserialize_strictness`]), so a loaded config resolves infallibly; the
-    /// `Result` guards a `ValidationConfig` constructed by hand with an invalid
-    /// string, which is still surfaced as an error rather than silently
-    /// defaulting.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
-        crate::validation::Strictness::from_config_value(self.strictness.as_deref())
+    /// Resolve the repo-wide validation strictness, defaulting to
+    /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
+    pub fn strictness(&self) -> crate::validation::Strictness {
+        self.strictness.unwrap_or_default()
     }
 }
 
@@ -456,7 +420,8 @@ pub struct NamespaceConfig {
 /// kinds):
 ///
 /// ```
-/// use jit::config::{JitConfig, KindScopeConfig};
+/// use jit::config::JitConfig;
+/// use jit::domain::item::KindScope;
 ///
 /// let config: JitConfig = toml::from_str(
 ///     r#"
@@ -472,7 +437,7 @@ pub struct NamespaceConfig {
 /// )
 /// .unwrap();
 /// let gloss = &config.item_kinds.unwrap()["glossary"];
-/// assert_eq!(gloss.scope, Some(KindScopeConfig::Project));
+/// assert_eq!(gloss.scope, Some(KindScope::Project));
 /// assert_eq!(gloss.source.as_ref().and_then(|s| s.path()), Some("project-items.md"));
 /// assert!(gloss.missing_required_fields().is_empty());
 /// ```
@@ -500,13 +465,13 @@ pub struct ItemKindConfig {
     /// (e.g. `["satisfies"]`). Required in an explicit declaration.
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
-    /// Addressing scope: [`KindScopeConfig::Issue`] for items projected from issue
+    /// Addressing scope: [`KindScope::Issue`] for items projected from issue
     /// descriptions (qualified id `@/issue/<short-id>/<kind>/<self-id>`), or
-    /// [`KindScopeConfig::Project`] for items projected from a repository-local
+    /// [`KindScope::Project`] for items projected from a repository-local
     /// `source` file (qualified id `@/<kind>/<self-id>`). Required in an explicit
     /// declaration; an unrecognised token is a TOML parse error, not a silent
     /// fallback.
-    pub scope: Option<KindScopeConfig>,
+    pub scope: Option<KindScope>,
     /// For a `scope = "project"` kind, where its items are sourced from. Two
     /// shapes are accepted (resolved by [`ItemKindSource`]):
     /// - a bare path STRING (`source = "glossary.md"`) for a markdown-first kind,
@@ -716,76 +681,6 @@ pub struct TomlSourceDescriptor {
     /// [`BTreeMap`]: std::collections::BTreeMap
     #[serde(rename = "link-fields", default)]
     pub link_fields: std::collections::BTreeMap<String, String>,
-}
-
-/// Parse error for [`KindScopeConfig`].
-///
-/// Returned by [`KindScopeConfig::from_str`] and (via serde) by TOML
-/// deserialization when the `scope` value is not one of the recognised tokens.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum KindScopeConfigError {
-    /// The value is not one of `"issue"` or `"project"`.
-    #[error("invalid scope '{value}'; expected 'issue' or 'project'")]
-    Invalid {
-        /// The unrecognised value.
-        value: String,
-    },
-}
-
-/// Addressing scope of an item kind: `"issue"` or `"project"`.
-///
-/// This is the fifth field of the item-kind six-tuple `(section, id-pattern,
-/// markers, link-namespaces, scope, source-of-truth)`. It mirrors
-/// [`KindScope`](crate::domain::item::KindScope) from the domain layer but
-/// lives in this config module so unrecognised tokens fail at TOML parse time
-/// rather than at projection time.
-///
-/// Parsed (case-insensitively) from the tokens `"issue"` / `"project"` by both
-/// TOML deserialization and [`KindScopeConfig::from_str`]; an unknown token is a
-/// descriptive error, not a silent fallback.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KindScopeConfig {
-    /// Items are projected from issue descriptions
-    /// (`@/issue/<short-id>/<kind>/<self-id>`).
-    Issue,
-    /// Items are projected from a config-declared source file
-    /// (`@/<kind>/<self-id>`).
-    Project,
-}
-
-impl std::str::FromStr for KindScopeConfig {
-    type Err = KindScopeConfigError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "issue" => Ok(KindScopeConfig::Issue),
-            "project" => Ok(KindScopeConfig::Project),
-            _ => Err(KindScopeConfigError::Invalid {
-                value: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for KindScopeConfig {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse::<KindScopeConfig>()
-            .map_err(serde::de::Error::custom)
-    }
-}
-
-impl Serialize for KindScopeConfig {
-    /// Serializes to the same `"issue"` / `"project"` token [`FromStr`](std::str::FromStr)
-    /// and [`Deserialize`] accept, so `jit config get` renders the value a
-    /// hand-authored `config.toml` would use.
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let token = match self {
-            KindScopeConfig::Issue => "issue",
-            KindScopeConfig::Project => "project",
-        };
-        serializer.serialize_str(token)
-    }
 }
 
 /// The authoring DIRECTION of an item kind: which substrate is the canonical
@@ -1040,33 +935,25 @@ impl ProjectionConfig {
     }
 }
 
-/// How a registry is projected into its documentation target.
-///
-/// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
-/// serde rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionMode {
-    /// Write the rendered block to a separate whole file.
-    #[serde(rename = "separate-file")]
-    SeparateFile,
-    /// Replace only a delimited region within an existing file, byte-preserving
-    /// everything outside the delimiters.
-    #[serde(rename = "region")]
-    Region,
+wire_vocabulary! {
+    /// How a registry is projected into its documentation target.
+    ///
+    /// Deserialized from the kebab-case tokens `separate-file` and `region`;
+    /// an unrecognized value is a descriptive parse error rather than a silent
+    /// default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionMode {
+        /// Write the rendered block to a separate whole file.
+        SeparateFile = "separate-file",
+        /// Replace only a delimited region within an existing file, byte-preserving
+        /// everything outside the delimiters.
+        Region = "region",
+    }
 }
 
 impl ProjectionMode {
     /// Mode applied when a projection omits `mode`.
     pub const DEFAULT: Self = Self::SeparateFile;
-
-    /// The config token naming this mode, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionMode::SeparateFile => "separate-file",
-            ProjectionMode::Region => "region",
-        }
-    }
 }
 
 impl Default for ProjectionMode {
@@ -1075,61 +962,38 @@ impl Default for ProjectionMode {
     }
 }
 
-impl std::fmt::Display for ProjectionMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
+wire_vocabulary! {
+    /// How a projected registry is rendered into the markdown block.
+    ///
+    /// Deserialized from the tokens `full` and `id-anchor`; an unrecognized
+    /// value is a descriptive parse error rather than a silent default. The
+    /// default (no `style` field) is [`ProjectionStyle::DEFAULT`].
+    ///
+    /// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet
+    ///   list of `- **{self-id}** — {text}` rows from any addressable item kind.
+    /// - [`ProjectionStyle::Full`] renders the built-in rich registry views,
+    ///   with typed metadata absent from a generic addressable row.
+    #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
+    pub enum ProjectionStyle {
+        /// Render the built-in rich registry view for the projection's kind(s): the
+        /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
+        /// registries' `## Rules` / `## Gates` sections with metadata.
+        Full = "full",
+        /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
+        /// rows from the kind's addressable items, for embedding beneath a
+        /// hand-authored heading. Kind-agnostic: any item kind renders this way.
+        IdAnchor = "id-anchor",
     }
-}
-
-/// How a projected registry is rendered into the markdown block.
-///
-/// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
-/// rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `style` field) is [`ProjectionStyle::DEFAULT`].
-///
-/// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet list of
-///   `- **{self-id}** — {text}` rows from a kind's addressable items — the
-///   kind-agnostic style any item kind can use with no dedicated code.
-/// - [`ProjectionStyle::Full`] renders the built-in rich registry views (the
-///   invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-///   registries' `## Rules` / `## Gates` sections with severity/enforce metadata),
-///   which carry typed fields absent from a generic addressable row.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-pub enum ProjectionStyle {
-    /// Render the built-in rich registry view for the projection's kind(s): the
-    /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
-    /// registries' `## Rules` / `## Gates` sections with metadata.
-    #[serde(rename = "full")]
-    Full,
-    /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
-    /// rows from the kind's addressable items, for embedding beneath a
-    /// hand-authored heading. Kind-agnostic: any item kind renders this way.
-    #[serde(rename = "id-anchor")]
-    IdAnchor,
 }
 
 impl ProjectionStyle {
     /// Style applied when a projection omits `style`.
     pub const DEFAULT: Self = Self::Full;
-
-    /// The config token naming this style, matching its serialized form.
-    pub const fn as_token(self) -> &'static str {
-        match self {
-            ProjectionStyle::Full => "full",
-            ProjectionStyle::IdAnchor => "id-anchor",
-        }
-    }
 }
 
 impl Default for ProjectionStyle {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for ProjectionStyle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_token())
     }
 }
 
@@ -1336,9 +1200,9 @@ impl JitConfig {
     /// [`ValidationConfig::content_format`], or
     /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) without
     /// the section.
-    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
+    pub fn content_format(&self) -> crate::domain::ContentFormat {
         self.validation.as_ref().map_or(
-            Ok(crate::domain::ContentFormat::DEFAULT),
+            crate::domain::ContentFormat::DEFAULT,
             ValidationConfig::content_format,
         )
     }
@@ -1347,9 +1211,9 @@ impl JitConfig {
     /// [`ValidationConfig::strictness`], or
     /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) without the
     /// section.
-    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
+    pub fn strictness(&self) -> crate::validation::Strictness {
         self.validation.as_ref().map_or(
-            Ok(crate::validation::Strictness::DEFAULT),
+            crate::validation::Strictness::DEFAULT,
             ValidationConfig::strictness,
         )
     }
@@ -1358,8 +1222,8 @@ impl JitConfig {
     ///
     /// Returns an empty config (all fields None) if the file doesn't exist.
     /// Returns an error if the file exists but is malformed.
-    pub fn load(jit_root: &Path) -> Result<Self> {
-        let config_path = jit_root.join("config.toml");
+    pub fn load(layout: &RepositoryLayout) -> Result<Self> {
+        let config_path = layout.resolve(&VirtualPath::CONFIG)?;
 
         if !config_path.exists() {
             // No config file - return empty config (will use defaults)
@@ -1378,13 +1242,13 @@ impl JitConfig {
                 // are skipped (empty slice); a sibling `templates.toml` is still
                 // loaded and validated, and a load/validation error propagates
                 // exactly as on the config-present path below.
-                templates: crate::templates::TemplateRegistry::load(jit_root, &[] as &[&str])
+                templates: crate::templates::TemplateRegistry::load(layout, &[] as &[&str])
                     .context("invalid .jit/templates.toml")?,
                 // The invariant registry is independent of `config.toml`, so it
                 // loads on this config-absent path too (absent file → empty
                 // registry; a malformed/invalid entry fails config load with a
                 // typed, descriptive error).
-                invariants: crate::declarations::invariants::InvariantRegistry::load(jit_root)
+                invariants: crate::declarations::invariants::InvariantRegistry::load(layout)
                     .context("invalid .jit/invariants.toml")?,
             });
         }
@@ -1409,7 +1273,7 @@ impl JitConfig {
             .as_ref()
             .map(|h| h.types.keys().map(|s| s.as_str()).collect())
             .unwrap_or_default();
-        config.templates = crate::templates::TemplateRegistry::load(jit_root, &hierarchy_types)
+        config.templates = crate::templates::TemplateRegistry::load(layout, &hierarchy_types)
             .context("invalid .jit/templates.toml")?;
 
         // Every EXPLICITLY-declared `[item_kinds.X]` table must set all six
@@ -1423,7 +1287,7 @@ impl JitConfig {
         // Chain-load `.jit/invariants.toml` on the config-present path too, with
         // the same graceful-absent / typed-error contract as the early return
         // above, so both load paths populate the registry identically.
-        config.invariants = crate::declarations::invariants::InvariantRegistry::load(jit_root)
+        config.invariants = crate::declarations::invariants::InvariantRegistry::load(layout)
             .context("invalid .jit/invariants.toml")?;
 
         Ok(config)
@@ -1498,11 +1362,11 @@ pub struct EffectiveConfig {
 }
 
 impl EffectiveConfig {
-    /// Load the effective configuration for `jit_root`. Owns the filesystem
+    /// Load the effective configuration for `layout`. Owns the filesystem
     /// interaction so callers in the `commands` layer never touch `std::fs`.
-    pub fn load(jit_root: &Path) -> Result<Self> {
+    pub fn load(layout: &RepositoryLayout) -> Result<Self> {
         Ok(Self {
-            repo_config: Some(JitConfig::load(jit_root)?),
+            repo_config: Some(JitConfig::load(layout)?),
         })
     }
 
@@ -1623,8 +1487,9 @@ mod tests {
         // A repo with `.jit/templates.toml` but NO `.jit/config.toml` must still
         // load the registry (the absent-config path), not silently return empty.
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("templates.toml"),
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
             r#"
 [[template]]
 name = "plan"
@@ -1641,7 +1506,7 @@ depends_on = ["planning"]
         )
         .unwrap();
 
-        let config = JitConfig::load(dir.path()).unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         let plan = config
             .templates
             .get("plan")
@@ -1657,8 +1522,9 @@ depends_on = ["planning"]
         // A repo with `.jit/invariants.toml` but NO `.jit/config.toml` must still
         // load the registry (the config-absent early-return path).
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("invariants.toml"),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             r#"
 [[invariants]]
 id = "sample-invariant"
@@ -1669,7 +1535,7 @@ enforced-by = "dag-no-cycles"
         )
         .unwrap();
 
-        let config = JitConfig::load(dir.path()).unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert_eq!(config.invariants.invariants.len(), 1);
         let inv = &config.invariants.invariants[0];
         assert_eq!(inv.id, "sample-invariant");
@@ -1685,18 +1551,19 @@ enforced-by = "dag-no-cycles"
         // With BOTH `.jit/config.toml` and `.jit/invariants.toml`, the
         // config-present path also chain-loads the invariant registry.
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
         std::fs::write(
-            dir.path().join("invariants.toml"),
+            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
             "[[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
         )
         .unwrap();
 
-        let config = JitConfig::load(dir.path()).unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.invariants.invariants.len(), 1);
         assert_eq!(config.invariants.invariants[0].id, "second-invariant");
@@ -1706,19 +1573,25 @@ enforced-by = "dag-no-cycles"
     fn test_load_invariants_absent_file_is_empty_on_both_paths() {
         // No `invariants.toml` → empty registry, whether or not config.toml exists.
         let no_config = TempDir::new().unwrap();
-        assert!(JitConfig::load(no_config.path())
+        assert!(
+            JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+                no_config.path()
+            ))
             .unwrap()
             .invariants
             .invariants
-            .is_empty());
+            .is_empty()
+        );
 
         let with_config = TempDir::new().unwrap();
+        let with_config_layout =
+            crate::test_utils::repository_layout_for_data_root(with_config.path());
         std::fs::write(
-            with_config.path().join("config.toml"),
+            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
-        assert!(JitConfig::load(with_config.path())
+        assert!(JitConfig::load(&with_config_layout)
             .unwrap()
             .invariants
             .invariants
@@ -1970,19 +1843,40 @@ enforced-by = "dag-no-cycles"
         let bad = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n"; // missing statement
 
         let no_config = TempDir::new().unwrap();
-        std::fs::write(no_config.path().join("invariants.toml"), bad).unwrap();
-        let err = JitConfig::load(no_config.path()).unwrap_err();
-        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
+        let no_config_layout = crate::test_utils::repository_layout_for_data_root(no_config.path());
+        std::fs::write(
+            no_config_layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
+            bad,
+        )
+        .unwrap();
+        let err = JitConfig::load(&no_config_layout).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains(VirtualPath::INVARIANTS.relative().as_str()),
+            "{err:#}"
+        );
 
         let with_config = TempDir::new().unwrap();
+        let with_config_layout =
+            crate::test_utils::repository_layout_for_data_root(with_config.path());
         std::fs::write(
-            with_config.path().join("config.toml"),
+            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[type_hierarchy]\ntypes = { task = 1 }\n",
         )
         .unwrap();
-        std::fs::write(with_config.path().join("invariants.toml"), bad).unwrap();
-        let err = JitConfig::load(with_config.path()).unwrap_err();
-        assert!(err.to_string().contains("invariants.toml"), "{err:#}");
+        std::fs::write(
+            with_config_layout
+                .resolve(&VirtualPath::INVARIANTS)
+                .unwrap(),
+            bad,
+        )
+        .unwrap();
+        let err = JitConfig::load(&with_config_layout).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains(VirtualPath::INVARIANTS.relative().as_str()),
+            "{err:#}"
+        );
     }
 
     #[test]
@@ -2017,36 +1911,40 @@ default_type = "task"
         assert_eq!(hierarchy.label_associations.as_ref().unwrap().len(), 2);
 
         let validation = config.validation.unwrap();
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
         assert_eq!(validation.default_type, Some("task".to_string()));
     }
 
     #[test]
     fn test_each_strictness_level_deserializes() {
-        for level in ["strict", "loose", "permissive", "STRICT"] {
+        for (level, expected) in [
+            ("strict", crate::validation::Strictness::Strict),
+            ("loose", crate::validation::Strictness::Loose),
+            ("permissive", crate::validation::Strictness::Permissive),
+        ] {
             let toml = format!("[validation]\nstrictness = \"{level}\"\n");
             let config: JitConfig =
                 toml::from_str(&toml).unwrap_or_else(|e| panic!("'{level}' must deserialize: {e}"));
-            // The validated raw spelling is preserved for round-tripping.
-            assert_eq!(
-                config.validation.unwrap().strictness,
-                Some(level.to_string())
-            );
+            assert_eq!(config.validation.unwrap().strictness, Some(expected));
         }
     }
 
     #[test]
     fn test_invalid_strictness_is_rejected_at_deserialize() {
-        // An unrecognized level must fail config load eagerly, not defer the
-        // error to a later validation call (F1). The message names the bad value.
-        let toml = "[validation]\nstrictness = \"banana\"\n";
-        let err = toml::from_str::<JitConfig>(toml).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("banana"), "names the bad value: {msg}");
-        assert!(
-            msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
-            "lists the accepted values: {msg}"
-        );
+        for token in ["banana", "STRICT"] {
+            let config_toml = format!("[validation]\nstrictness = \"{token}\"\n");
+            let err = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+            let msg = err.to_string();
+            assert!(msg.contains(token), "names the bad value: {msg}");
+            assert!(msg.contains("strictness"), "names the key: {msg}");
+            assert!(
+                msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
+                "lists the accepted values: {msg}"
+            );
+        }
     }
 
     #[test]
@@ -2054,12 +1952,13 @@ default_type = "task"
         // The eager rejection also fires through the on-disk load path, so a
         // committed config.toml with a bad strictness never resolves silently.
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[validation]\nstrictness = \"banana\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(temp_dir.path()).unwrap_err();
+        let err = JitConfig::load(&layout).unwrap_err();
         // The load path wraps the deserialize error with context, so inspect the
         // full chain for the offending value.
         let chain = format!("{err:#}");
@@ -2088,8 +1987,9 @@ default_type = "task"
             format!("[coordination]\n{key} = 1\n"),
         ] {
             let temp_dir = TempDir::new().unwrap();
-            std::fs::write(temp_dir.path().join("config.toml"), &fragment).unwrap();
-            let loaded = JitConfig::load(temp_dir.path())
+            let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &fragment).unwrap();
+            let loaded = JitConfig::load(&layout)
                 .expect_err("an unknown key must fail to load")
                 .to_string();
             let declared = crate::declarations::parse_configuration(fragment.as_bytes())
@@ -2107,7 +2007,10 @@ default_type = "task"
     #[test]
     fn test_load_missing_config() {
         let temp_dir = TempDir::new().unwrap();
-        let config = JitConfig::load(temp_dir.path()).unwrap();
+        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+            temp_dir.path(),
+        ))
+        .unwrap();
 
         // Empty config when file doesn't exist
         assert!(config.type_hierarchy.is_none());
@@ -2117,14 +2020,15 @@ default_type = "task"
     #[test]
     fn test_load_existing_config() {
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
 
         let config_toml = r#"
 [type_hierarchy]
 types = { epic = 1, task = 2 }
 "#;
-        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), config_toml).unwrap();
 
-        let config = JitConfig::load(temp_dir.path()).unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.type_hierarchy.unwrap().types.len(), 2);
     }
@@ -2132,11 +2036,12 @@ types = { epic = 1, task = 2 }
     #[test]
     fn test_malformed_toml_returns_error() {
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
 
         let bad_toml = "[broken syntax";
-        std::fs::write(temp_dir.path().join("config.toml"), bad_toml).unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), bad_toml).unwrap();
 
-        let result = JitConfig::load(temp_dir.path());
+        let result = JitConfig::load(&layout);
         assert!(result.is_err());
     }
 
@@ -2179,8 +2084,29 @@ content_format = "html"
 
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
-        assert_eq!(validation.content_format, Some("html".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
+        assert_eq!(
+            validation.content_format,
+            Some(crate::domain::ContentFormat::Html)
+        );
+    }
+
+    #[test]
+    fn test_parse_validation_rejects_noncanonical_content_format_tokens() {
+        ["md", "HTML", "unknown-format"]
+            .into_iter()
+            .for_each(|value| {
+                let config_toml = format!("[validation]\ncontent_format = \"{value}\"\n");
+                let error = toml::from_str::<JitConfig>(&config_toml).unwrap_err();
+
+                assert!(
+                    error.to_string().contains(value),
+                    "the error must name rejected token {value}: {error}"
+                );
+            });
     }
 
     #[test]
@@ -2275,7 +2201,7 @@ source-of-truth = "markdown-first"
         assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
         assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
         assert_eq!(req.link_namespaces, Some(vec!["satisfies".to_string()]));
-        assert_eq!(req.scope, Some(KindScopeConfig::Issue));
+        assert_eq!(req.scope, Some(KindScope::Issue));
         assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
         assert!(req.missing_required_fields().is_empty());
 
@@ -2330,12 +2256,13 @@ section = "success_criteria"
     fn test_item_kinds_load_rejects_partial_declaration() {
         // The required-six rule fires through the real `JitConfig::load` path.
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[item_kinds.decision]\nsection = \"decisions\"\nid-pattern = \"D-\\\\d+\"\n",
         )
         .unwrap();
-        let err = JitConfig::load(temp_dir.path()).expect_err("load must reject partial kind");
+        let err = JitConfig::load(&layout).expect_err("load must reject partial kind");
         let msg = format!("{err:#}");
         assert!(msg.contains("decision"), "error names the kind: {msg}");
         assert!(
@@ -2432,12 +2359,13 @@ section = "success_criteria"
         // the same path that rejects a partial `[item_kinds]` declaration.
         let body = complete_kind_body();
         let temp_dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
-            temp_dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             format!("[item_kinds.requirement]\n{body}aliases = [\"requirement\"]\n"),
         )
         .unwrap();
-        let err = JitConfig::load(temp_dir.path()).expect_err("load must reject colliding alias");
+        let err = JitConfig::load(&layout).expect_err("load must reject colliding alias");
         let msg = format!("{err:#}");
         assert!(msg.contains("requirement"), "error names the token: {msg}");
     }
@@ -2533,17 +2461,17 @@ types = { task = 1 }
     }
 
     #[test]
-    fn test_kind_scope_config_parses_both_tokens() {
-        // The typed KindScopeConfig field deserializes both valid tokens.
+    fn test_item_kind_scope_parses_both_tokens() {
+        // The typed scope field deserializes both valid tokens.
         let issue: ItemKindConfig = toml::from_str("scope = \"issue\"").unwrap();
-        assert_eq!(issue.scope, Some(KindScopeConfig::Issue));
+        assert_eq!(issue.scope, Some(KindScope::Issue));
 
         let project: ItemKindConfig = toml::from_str("scope = \"project\"").unwrap();
-        assert_eq!(project.scope, Some(KindScopeConfig::Project));
+        assert_eq!(project.scope, Some(KindScope::Project));
     }
 
     #[test]
-    fn test_kind_scope_config_invalid_token_is_parse_error() {
+    fn test_item_kind_scope_invalid_token_is_parse_error() {
         // REQ: an unrecognised scope token is a TOML parse/deserialize error,
         // not a silent fallback to issue scope.
         let err =
@@ -2553,20 +2481,6 @@ types = { task = 1 }
             msg.contains("global"),
             "error must mention the bad token: {msg}"
         );
-    }
-
-    #[test]
-    fn test_kind_scope_config_from_str_case_insensitive() {
-        // FromStr normalises case so "ISSUE" and "PROJECT" are accepted.
-        assert_eq!(
-            "ISSUE".parse::<KindScopeConfig>().unwrap(),
-            KindScopeConfig::Issue
-        );
-        assert_eq!(
-            "Project".parse::<KindScopeConfig>().unwrap(),
-            KindScopeConfig::Project
-        );
-        assert!("unknown".parse::<KindScopeConfig>().is_err());
     }
 
     #[test]
@@ -2628,7 +2542,10 @@ unique = false
         // Validation
         let validation = config.validation.unwrap();
         assert_eq!(validation.default_type, Some("task".to_string()));
-        assert_eq!(validation.strictness, Some("loose".to_string()));
+        assert_eq!(
+            validation.strictness,
+            Some(crate::validation::Strictness::Loose)
+        );
 
         // Namespaces
         let namespaces = config.namespaces.unwrap();
@@ -2823,14 +2740,18 @@ max_indefinite_leases_per_agent = 3
         let mut env = EnvGuard::acquire();
         for repo in &states {
             let repo_dir = TempDir::new().unwrap();
-            std::fs::write(repo_dir.path().join("config.toml"), repo).unwrap();
+            let repo_dir_layout =
+                crate::test_utils::repository_layout_for_data_root(repo_dir.path());
+            std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
             for env_value in [None, Some("strict"), Some("warn"), Some("off")] {
                 match env_value {
                     Some(value) => env.set("JIT_ENFORCE_LEASES", value),
                     None => env.remove("JIT_ENFORCE_LEASES"),
                 };
-                let enforced = JitConfig::load(repo_dir.path()).unwrap().enforcement_mode();
-                let reported = EffectiveConfig::load(repo_dir.path())
+                let enforced = JitConfig::load(&repo_dir_layout)
+                    .unwrap()
+                    .enforcement_mode();
+                let reported = EffectiveConfig::load(&repo_dir_layout)
                     .unwrap()
                     .enforcement_mode();
                 assert_eq!(
@@ -2862,9 +2783,10 @@ max_indefinite_leases_per_agent = 3
         ];
         for (repo, agent, repo_limit) in states {
             let dir = TempDir::new().unwrap();
-            std::fs::write(dir.path().join("config.toml"), &repo).unwrap();
-            let enforced = JitConfig::load(dir.path()).unwrap().coordination();
-            let reported = EffectiveConfig::load(dir.path()).unwrap().coordination();
+            let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &repo).unwrap();
+            let enforced = JitConfig::load(&layout).unwrap().coordination();
+            let reported = EffectiveConfig::load(&layout).unwrap().coordination();
             assert_eq!(reported, enforced, "repo {repo:?}");
             assert_eq!(
                 enforced,
@@ -2959,13 +2881,14 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_parses_valid_project_table() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[project]\nname = \"just-in-time\"\n",
         )
         .unwrap();
 
-        let config = JitConfig::load(dir.path()).unwrap();
+        let config = JitConfig::load(&layout).unwrap();
         assert_eq!(
             config
                 .project
@@ -2982,13 +2905,14 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_rejects_invalid_project_name() {
         let dir = TempDir::new().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("config.toml"),
+            layout.resolve(&VirtualPath::CONFIG).unwrap(),
             "[project]\nname = \"Bad_Name\"\n",
         )
         .unwrap();
 
-        let result = JitConfig::load(dir.path());
+        let result = JitConfig::load(&layout);
         assert!(result.is_err());
         let msg = format!("{:#}", result.unwrap_err());
         assert!(
@@ -3000,7 +2924,10 @@ max_indefinite_leases_per_agent = 3
     #[test]
     fn test_jitconfig_load_project_absent_is_none() {
         let dir = TempDir::new().unwrap();
-        let config = JitConfig::load(dir.path()).unwrap();
+        let config = JitConfig::load(&crate::test_utils::repository_layout_for_data_root(
+            dir.path(),
+        ))
+        .unwrap();
         assert!(config.project.is_none());
     }
 }

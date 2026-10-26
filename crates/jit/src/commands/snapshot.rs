@@ -446,7 +446,9 @@ This is a read-only export. Future versions may support:
     /// Copy .jit state files to snapshot
     fn copy_jit_state(&self, base: &Path, issues: &[Issue]) -> Result<()> {
         let jit_dir = base.join(".jit");
-        std::fs::create_dir_all(jit_dir.join("issues"))?;
+        std::fs::create_dir_all(
+            base.join(crate::repository_state::VirtualPath::ISSUES.repository_relative()),
+        )?;
 
         // Copy issue files
         for issue in issues {
@@ -459,15 +461,18 @@ This is a read-only export. Future versions may support:
             std::fs::write(issue_path, issue_json)?;
         }
 
-        for name in ["config.toml", "gates.toml"] {
-            let relative = crate::repository_state::RootRelativePath::parse(name)?;
+        for path in [
+            crate::repository_state::VirtualPath::CONFIG,
+            crate::repository_state::VirtualPath::GATES,
+        ] {
+            let relative = path.relative();
             if let Some(bytes) =
                 crate::storage::repository_state_store::read_repository_file_nofollow(
                     &self.data_root,
-                    &relative,
+                    relative,
                 )?
             {
-                std::fs::write(jit_dir.join(name), bytes)?;
+                std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
             }
         }
 

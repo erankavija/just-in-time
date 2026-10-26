@@ -3,7 +3,8 @@
 //! This module provides deterministic worktree ID generation and persistence
 //! to support parallel multi-agent work with git worktrees.
 
-use crate::repository_state::WORKTREE_IDENTITY_FILE;
+use crate::domain::identity::WorktreeId;
+use crate::repository_state::VirtualPath;
 use crate::storage::atomic_write::{sync_directory, write_file_synced};
 use crate::storage::{RepositoryNotFoundError, StorageWarning};
 use anyhow::{Context, Result};
@@ -13,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Worktree identity persisted in `<worktree>/.jit/worktree.json`.
+/// Worktree identity persisted at [`VirtualPath::WORKTREE_IDENTITY`].
 ///
 /// The worktree ID is stable across relocations to support lease continuity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -21,8 +22,8 @@ pub struct WorktreeIdentity {
     /// Schema version for future compatibility
     pub schema_version: u32,
 
-    /// Stable worktree identifier (format: "wt:{8-hex-chars}")
-    pub worktree_id: String,
+    /// Stable worktree identifier (generated as "wt:{8-hex-chars}")
+    pub worktree_id: WorktreeId,
 
     /// Current git branch
     pub branch: String,
@@ -46,19 +47,22 @@ pub struct WorktreeIdentity {
 /// # Format
 ///
 /// `wt:{8-hex-chars}` (e.g., `wt:abc123ef`)
-pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
+pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> Result<WorktreeId> {
     let mut hasher = Sha256::new();
     hasher.update(path.to_string_lossy().as_bytes());
     hasher.update(created_at.to_rfc3339().as_bytes());
     let hash = hasher.finalize();
 
     // Truncate to first 4 bytes (8 hex chars)
-    format!("wt:{}", hex::encode(&hash[..4]))
+    Ok(WorktreeId::try_from(format!(
+        "wt:{}",
+        hex::encode(&hash[..4])
+    ))?)
 }
 
 /// Load or create worktree identity.
 ///
-/// If `worktree.json` exists, load it and check for relocation.
+/// If the identity record exists, load it and check for relocation.
 /// If it doesn't exist, generate a new identity and persist it. An absent data
 /// root fails with [`RepositoryNotFoundError`]; only initialization creates it.
 ///
@@ -105,13 +109,15 @@ pub fn load_or_create_worktree_identity_with_warnings(
     }
     let mut warnings = Vec::new();
 
-    let wt_file = paths.local_jit.join(WORKTREE_IDENTITY_FILE);
+    let layout =
+        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    let wt_file = layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?;
 
     if wt_file.exists() {
         // Load existing identity
-        let content = fs::read_to_string(&wt_file).context("Failed to read worktree.json")?;
+        let content = fs::read_to_string(&wt_file).context("Failed to read worktree identity")?;
         let mut identity: WorktreeIdentity =
-            serde_json::from_str(&content).context("Failed to parse worktree.json")?;
+            serde_json::from_str(&content).context("Failed to parse worktree identity")?;
 
         // Check for path mismatch
         let current_root = paths.worktree_root.to_string_lossy().to_string();
@@ -121,9 +127,14 @@ pub fn load_or_create_worktree_identity_with_warnings(
                 // In a git worktree with wrong path - could be copied OR moved
                 // Check if old path still exists with the same ID
                 let old_path = PathBuf::from(&identity.root);
-                let old_wt_file = old_path.join(".jit").join(WORKTREE_IDENTITY_FILE);
+                let old_data_root = old_path.join(".jit");
+                let old_wt_file =
+                    crate::storage::discover_repository_layout(&old_path, &old_data_root)
+                        .ok()
+                        .and_then(|layout| layout.resolve(&VirtualPath::WORKTREE_IDENTITY).ok())
+                        .filter(|path| path.exists());
 
-                let is_copy = if old_wt_file.exists() {
+                let is_copy = if let Some(old_wt_file) = old_wt_file {
                     // Old path exists - check if it has the same ID
                     if let Ok(old_content) = fs::read_to_string(&old_wt_file) {
                         if let Ok(old_identity) =
@@ -147,7 +158,8 @@ pub fn load_or_create_worktree_identity_with_warnings(
                 if is_copy {
                     // This is a copied file from git worktree add
                     // Delete it and create a new identity with unique ID
-                    fs::remove_file(&wt_file).context("Failed to remove copied worktree.json")?;
+                    fs::remove_file(&wt_file)
+                        .context("Failed to remove copied worktree identity")?;
                     // Fall through to create new identity
                 } else {
                     // This is a moved worktree (e.g., git worktree move)
@@ -187,7 +199,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
 
     // Create new identity (either no file existed, or we deleted a copied one)
     let now = Utc::now();
-    let worktree_id = generate_worktree_id(&paths.worktree_root, now);
+    let worktree_id = generate_worktree_id(&paths.worktree_root, now)?;
 
     let identity = WorktreeIdentity {
         schema_version: 1,
@@ -204,10 +216,10 @@ pub fn load_or_create_worktree_identity_with_warnings(
     Ok((identity, warnings))
 }
 
-/// Read the stable worktree id recorded in `<worktree_root>/.jit/worktree.json`.
+/// Read the stable worktree id recorded in the selected worktree's identity file.
 ///
 /// Read-only: unlike [`load_or_create_worktree_identity`] this never creates or
-/// rewrites the identity file. It owns the `.jit/worktree.json` layout and the
+/// rewrites the identity file. It owns the identity-file layout and the
 /// deserialization into [`WorktreeIdentity`], so callers (e.g. lease validation
 /// scanning sibling worktrees) never construct that path or parse the file
 /// inline.
@@ -215,14 +227,19 @@ pub fn load_or_create_worktree_identity_with_warnings(
 /// Returns `Ok(None)` when the file is absent (the worktree has no recorded
 /// identity yet), `Ok(Some(id))` when present and parseable, and an error only
 /// when the file exists but cannot be read or parsed.
-pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
-    let wt_file = worktree_root.join(".jit").join(WORKTREE_IDENTITY_FILE);
+pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<WorktreeId>> {
+    let data_root = worktree_root.join(".jit");
+    if !data_root.exists() {
+        return Ok(None);
+    }
+    let layout = crate::storage::discover_repository_layout(worktree_root, &data_root)?;
+    let wt_file = layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?;
     if !wt_file.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(&wt_file).context("Failed to read worktree.json")?;
+    let content = fs::read_to_string(&wt_file).context("Failed to read worktree identity")?;
     let identity: WorktreeIdentity =
-        serde_json::from_str(&content).context("Failed to parse worktree.json")?;
+        serde_json::from_str(&content).context("Failed to parse worktree identity")?;
     Ok(Some(identity.worktree_id))
 }
 
@@ -267,10 +284,10 @@ mod tests {
         let path = PathBuf::from("/test/path");
         let timestamp = Utc::now();
 
-        let id = generate_worktree_id(&path, timestamp);
+        let id = generate_worktree_id(&path, timestamp).unwrap();
 
-        assert!(id.starts_with("wt:"));
-        assert_eq!(id.len(), 11); // "wt:" + 8 hex chars
+        assert!(id.as_str().starts_with("wt:"));
+        assert_eq!(id.as_str().len(), 11); // "wt:" + 8 hex chars
     }
 
     #[test]
@@ -280,8 +297,8 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
 
-        let id1 = generate_worktree_id(&path, timestamp);
-        let id2 = generate_worktree_id(&path, timestamp);
+        let id1 = generate_worktree_id(&path, timestamp).unwrap();
+        let id2 = generate_worktree_id(&path, timestamp).unwrap();
 
         assert_eq!(id1, id2);
     }
@@ -332,13 +349,15 @@ mod tests {
         // deterministic.
         let stored = WorktreeIdentity {
             schema_version: 1,
-            worktree_id: "wt:deadbeef".to_string(),
+            worktree_id: "wt:deadbeef".parse().unwrap(),
             branch: "main".to_string(),
             root: "/nonexistent/old/worktree/path".to_string(),
             created_at: Utc::now(),
             relocated_at: None,
         };
-        write_identity_atomic(&jit_dir.join(WORKTREE_IDENTITY_FILE), &stored).unwrap();
+        let layout = crate::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
+        let identity_path = layout.resolve(&VirtualPath::WORKTREE_IDENTITY).unwrap();
+        write_identity_atomic(&identity_path, &stored).unwrap();
 
         let new_root = temp.path().to_path_buf();
         let paths = crate::storage::worktree_paths::WorktreePaths::detect_for_data_root(
@@ -349,7 +368,7 @@ mod tests {
             load_or_create_worktree_identity_with_warnings(&paths, "main").unwrap();
 
         // The stable worktree_id is preserved across the relocation.
-        assert_eq!(identity.worktree_id, "wt:deadbeef");
+        assert_eq!(identity.worktree_id.as_str(), "wt:deadbeef");
         assert_eq!(
             warnings,
             vec![StorageWarning::WorktreeRelocated {
@@ -361,6 +380,6 @@ mod tests {
 
         // The convenience wrapper drops the warning but yields the same identity.
         let plain = load_or_create_worktree_identity(&paths, "main").unwrap();
-        assert_eq!(plain.worktree_id, "wt:deadbeef");
+        assert_eq!(plain.worktree_id.as_str(), "wt:deadbeef");
     }
 }

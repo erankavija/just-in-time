@@ -107,7 +107,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
@@ -240,7 +240,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::commands::DocumentListResult> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documents = self
             .with_issue_documents(vec![issue])?
@@ -279,7 +279,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documentation = self
             .config_manager
@@ -383,7 +383,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         self.publish_document_remove(&full_id, path)
     }
 
@@ -505,7 +505,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
@@ -563,7 +563,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -590,7 +590,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -643,7 +643,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
         use crate::storage::{AmbiguousIdError, IssueNotFoundError, PathReadError};
 
-        let prefix = IssueIdPrefix::parse(issue_id)
+        let prefix = IssueIdPrefix::from_str(issue_id)
             .map_err(|error| PathReadError::NotFound(error.to_string()))?;
         let full_id = self.storage.resolve_issue_id(&prefix).map_err(|error| {
             if error.is::<IssueNotFoundError>() || error.is::<AmbiguousIdError>() {
@@ -930,7 +930,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
@@ -1045,7 +1045,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 MutationIntent::RecordEvent {
                     phase: 1,
-                    event: Box::new(crate::domain::Event::draft_issue_updated(
+                    event: Box::new(crate::domain::EventBody::draft_issue_updated(
                         issue_id.to_string(),
                         "doc-rescan".to_string(),
                         vec!["documents.assets".to_string()],
@@ -1114,7 +1114,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             DocumentScope::Issue(issue_id) => {
                 let full_id = self
                     .storage
-                    .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+                    .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
                 let issue = self.storage.load_issue(&full_id)?;
                 vec![issue]
             }
@@ -1842,7 +1842,7 @@ fn derive_document_add(
         Some(index) => issue.documents[index] = document,
         None => issue.documents.push(document),
     }
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         if updated { "doc-update" } else { "doc-add" }.to_string(),
         vec!["documents".to_string()],
@@ -1879,7 +1879,7 @@ fn derive_document_remove(
         issue_id: issue.id.clone(),
         path: path.to_string(),
     };
-    let event = crate::domain::Event::draft_issue_updated(
+    let event = crate::domain::EventBody::draft_issue_updated(
         issue.id.clone(),
         "doc-remove".to_string(),
         vec!["documents".to_string()],
@@ -1925,6 +1925,23 @@ mod tests {
     };
     use crate::test_utils::document_reference;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn test_report_artifact_conformance_propagates_invalid_hierarchy_error() {
+        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
+
+        let error = executor
+            .report_artifact_conformance()
+            .expect_err("invalid hierarchy must fail artifact conformance reporting");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     fn capture_spec(paths: impl IntoIterator<Item = VirtualPath>) -> CaptureSpec {
         document_capture_spec(paths.into_iter().collect::<BTreeSet<_>>()).unwrap()

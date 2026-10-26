@@ -22,7 +22,7 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::issue_id::IssueIdPrefix;
+use jit::domain::identity::IssueIdPrefix;
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
@@ -32,6 +32,7 @@ use jit::output::{
     JsonOutput, OutputContext, OutputMode,
 };
 use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
+use jit::repository_state::VirtualPath;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::PathBuf;
@@ -77,7 +78,7 @@ fn dep_add_batch_json_error(
         {
             ErrorCode::IssueNotFound.as_str()
         } else if err
-            .downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
+            .downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
             .is_some()
         {
             ErrorCode::InvalidIdPrefix.as_str()
@@ -942,7 +943,10 @@ fn print_gate_run_details(result: &GateRunResult) {
     if result.origin == jit::domain::GateVerdictOrigin::Attested {
         println!(
             "  Attested by {} at {}",
-            result.by.as_deref().unwrap_or("an unnamed attestor"),
+            result
+                .by
+                .as_ref()
+                .map_or_else(|| "an unnamed attestor".to_string(), ToString::to_string),
             result.started_at.to_rfc3339()
         );
     }
@@ -1328,8 +1332,8 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
     println!("ID: {}", response.id);
     println!("Title: {}", response.title);
     println!("Description: {}", response.description);
-    println!("State: {:?}", response.state);
-    println!("Priority: {:?}", response.priority);
+    println!("State: {}", response.state);
+    println!("Priority: {}", response.priority);
     println!("Assignee: {:?}", response.assignee);
 
     if response.dependencies.is_empty() {
@@ -1346,12 +1350,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
             response.dependencies.len()
         );
         for dep in &response.dependencies {
-            println!(
-                "  {} - {} [{}]",
-                dep.short_id(),
-                dep.title,
-                format!("{:?}", dep.state).to_lowercase()
-            );
+            println!("  {} - {} [{}]", dep.short_id(), dep.title, dep.state);
         }
     }
 
@@ -1362,7 +1361,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         for gate in &response.gates {
             let last_run = gate.last_run_at.as_deref().unwrap_or("never run");
             println!(
-                "  - {} [{:?}] (last run: {})",
+                "  - {} [{}] (last run: {})",
                 gate.key, gate.status, last_run
             );
         }
@@ -1702,10 +1701,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
         // plan when absent; the applied plan is the sole preimage
         // authority for whether this run created it.
+        let rules_path = VirtualPath::RULES.repository_relative();
         let scaffolded = init_result
             .created_paths
             .iter()
-            .any(|path| path == ".jit/rules.toml");
+            .any(|path| path == &rules_path);
         if scaffolded {
             let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
         }
@@ -1725,7 +1725,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let payload = InitResponse {
                 repository_root: current_dir.display().to_string(),
                 data_dir: jit_dir.display().to_string(),
-                repository_id: worktree_identity.map(|identity| identity.worktree_id),
+                repository_id: worktree_identity.map(|identity| identity.worktree_id.to_string()),
                 gitattributes_status: gitattributes_outcome,
                 created_paths: init_result.created_paths,
                 modified_paths: init_result.modified_paths,
@@ -2289,7 +2289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 let summary_response =
                                     jit::output::IssueShowSummaryResponse::from(&issue);
                                 let msg = format!(
-                                    "Issue {}: {} [{:?}]",
+                                    "Issue {}: {} [{}]",
                                     summary_response.short_id,
                                     summary_response.title,
                                     summary_response.state
@@ -2311,7 +2311,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             );
 
                             let show_msg = format!(
-                                "Issue {}: {} [{:?}]",
+                                "Issue {}: {} [{}]",
                                 &response.id[..8],
                                 response.title,
                                 response.state
@@ -2566,7 +2566,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 if json {
                                     let issue = storage.load_issue(&full_id)?;
                                     let msg = format!(
-                                        "Updated issue {} to {:?}",
+                                        "Updated issue {} to {}",
                                         issue.short_id(),
                                         issue.state
                                     );
@@ -2725,7 +2725,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2753,7 +2753,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     assign_only,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
 
                     if assign_only {
                         // Assign without transitioning state: reuse the same
@@ -2821,7 +2821,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Unassign { id } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     let warnings = executor.issues().unassign_issue(&full_id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -2838,7 +2838,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Reject { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
 
                     for warning in executor
                         .issues()
@@ -2863,7 +2863,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Release { id, reason } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::from_str(&id)?)?;
                     executor.issues().release_issue(&full_id, &reason)?;
 
                     if json {
@@ -3358,7 +3358,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let _ = output_ctx.print_info("Gates:");
                             for gate in gates {
                                 println!(
-                                    "  {} - {} ({:?}, {:?})",
+                                    "  {} - {} ({}, {})",
                                     gate.key, gate.title, gate.stage, gate.mode
                                 );
                             }
@@ -3386,8 +3386,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!("Gate: {}", gate.key);
                         println!("  Title: {}", gate.title);
                         println!("  Description: {}", gate.description);
-                        println!("  Stage: {:?}", gate.stage);
-                        println!("  Mode: {:?}", gate.mode);
+                        println!("  Stage: {}", gate.stage);
+                        println!("  Mode: {}", gate.mode);
                         if let Some(checker) = gate.checker {
                             match checker {
                                 jit::declarations::GateChecker::Exec {
@@ -3703,7 +3703,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // actionable did-you-mean rather than misparsing into
                     // "issue not found".
                     let is_issue = |raw: &str| {
-                        IssueIdPrefix::parse(raw).is_ok_and(|prefix| {
+                        IssueIdPrefix::from_str(raw).is_ok_and(|prefix| {
                             executor.storage().resolve_issue_id(&prefix).is_ok()
                         })
                     };
@@ -3744,7 +3744,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Ok(Some(result)) => {
                             if json {
                                 use jit::output::{GateRunSummary, JsonOutput};
-                                let msg = format!("Gate '{}': {:?}", gate_key, result.status);
+                                let msg = format!("Gate '{}': {}", gate_key, result.status);
                                 let summary = GateRunSummary::full(&result);
                                 let output = JsonOutput::success(summary).with_message(msg);
                                 println!("{}", output.to_json_string()?);
@@ -4820,7 +4820,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
                             || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::domain::issue_id::InvalidIdPrefixError>()
+                            || e.downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
                                 .is_some()
                         {
                             JsonError::issue_not_found(&id)
@@ -5281,7 +5281,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Dependency,
                                                         detail: format!(
-                                                            "{} ({}:{:?})",
+                                                            "{} ({}:{})",
                                                             id, title, state
                                                         ),
                                                     }
@@ -5289,7 +5289,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                                 BlockingReason::Gate { key, status } => {
                                                     BlockedReason {
                                                         reason_type: BlockedReasonType::Gate,
-                                                        detail: format!("{} ({:?})", key, status),
+                                                        detail: format!("{} ({})", key, status),
                                                     }
                                                 }
                                             })
@@ -5461,7 +5461,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::LabelCommands::Namespaces => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 if json {
                     use jit::output::{JsonOutput, NamespacesResponse};
@@ -5601,9 +5601,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 // Check repo config — invalid enforcement and write-policy tokens are
                 // caught at TOML parse time, so a successful load implies valid values.
-                let repo_config_path = jit_dir.join("config.toml");
+                let repo_config_path = executor
+                    .storage()
+                    .repository_layout()?
+                    .resolve(&VirtualPath::CONFIG)?;
                 if repo_config_path.exists() {
-                    if let Err(e) = JitConfig::load(&jit_dir) {
+                    if let Err(e) = JitConfig::load(&executor.storage().repository_layout()?) {
                         result.errors.push(format!("repo config: {}", e));
                     }
                 }
@@ -5659,7 +5662,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::ConfigCommands::ShowHierarchy => {
                 let output_ctx = OutputContext::new(quiet, json);
                 use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(&jit_dir);
+                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
                 let namespaces = config_mgr.get_namespaces()?;
                 let hierarchy = namespaces.declared_type_hierarchy();
 
@@ -6054,8 +6057,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             "  [{}] {} ({}, {}) selector: {}",
                             status,
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector
                         );
                         for message in &outcome.messages {
@@ -6075,8 +6078,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!(
                             "  [SKIP] {} ({}, {}) selector: {} — {}",
                             outcome.rule,
-                            outcome.scope.token(),
-                            outcome.severity.token(),
+                            outcome.scope.as_str(),
+                            outcome.severity.as_str(),
                             outcome.selector,
                             reason
                         );
@@ -6464,7 +6467,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             let log_file = log.map(|l| jit_dir.join(l));
 
             if stop {
-                match stop_server(&jit_dir) {
+                match stop_server(&executor_layout) {
                     Ok(StopOutcome::Stopped { pid, port: p }) => {
                         if json {
                             println!(
@@ -6502,7 +6505,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             } else if status {
-                match server_status(&jit_dir) {
+                match server_status(&executor_layout) {
                     Ok(Some(pf)) => {
                         let url = format!("http://localhost:{}", pf.port);
                         if json {
@@ -6566,7 +6569,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     };
 
                     let opts = ForegroundOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
                         server_binary: None,
@@ -6624,7 +6627,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         .filter(|d| d.is_dir())
                         .map(|d| d.display().to_string());
                     let opts = ServeOptions {
-                        data_dir: jit_dir.clone(),
+                        layout: executor_layout.clone(),
                         preferred_port: port,
                         log_file,
                         web_dir: resolved_web_dir,

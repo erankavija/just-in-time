@@ -145,7 +145,7 @@ fn derive_issue_deletion(
         });
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_issue_updated(
+            event: Box::new(EventBody::draft_issue_updated(
                 dependent_id,
                 "dependency-cascade-delete".to_string(),
                 vec!["dependencies".to_string()],
@@ -154,7 +154,7 @@ fn derive_issue_deletion(
     }
     intents.push(MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_deleted(target_id.to_string())),
+        event: Box::new(EventBody::draft_issue_deleted(target_id.to_string())),
     });
     Ok(DerivedIssueDeletion {
         intents,
@@ -280,7 +280,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = self
             .exec
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
         self.exec.storage.load_issue(&full_id)
     }
 
@@ -536,7 +536,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let outcome = self
             .exec
             .publish_captured_field_update(CapturedFieldUpdate {
-                issue_id: IssueIdPrefix::parse(id)?,
+                issue_id: IssueIdPrefix::from_str(id)?,
                 title,
                 description,
                 priority,
@@ -615,7 +615,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     {
         use crate::repository_state::finalize;
 
-        let id = &IssueIdPrefix::parse(id)?;
+        let id = &IssueIdPrefix::from_str(id)?;
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
@@ -652,7 +652,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             let warnings = captured_lease_warnings(
                 current_mode,
                 std::slice::from_ref(&target_id),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
@@ -688,7 +687,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let outcome = self.exec.publish_captured_state_transition(
-            IssueIdPrefix::parse(id)?,
+            IssueIdPrefix::from_str(id)?,
             new_state,
             false,
             new_state == State::Done,
@@ -712,7 +711,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             return self.update_issue_state(id, State::Rejected);
         };
         let mut request = CapturedFieldUpdate::label_edit(
-            IssueIdPrefix::parse(id)?,
+            IssueIdPrefix::from_str(id)?,
             CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
         );
         request.state = Some(State::Rejected);
@@ -730,7 +729,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = self
             .exec
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -763,7 +762,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
         self.exec
-            .publish_captured_claim(IssueIdPrefix::parse(id)?, claimant)
+            .publish_captured_claim(IssueIdPrefix::from_str(id)?, claimant)
     }
 
     /// Unassign an issue.
@@ -776,7 +775,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = self
             .exec
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -798,9 +797,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = self
             .exec
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+            .resolve_issue_id(&IssueIdPrefix::from_str(id)?)?;
         self.exec
-            .publish_captured_release(IssueIdPrefix::of_stored(&full_id), reason.to_string())
+            .publish_captured_release(IssueIdPrefix::from(&full_id), reason.to_string())
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -849,8 +848,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Ready)
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Ready)
     }
 
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
@@ -866,8 +865,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Backlog)
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Backlog)
     }
 
     pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
@@ -876,8 +875,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = self
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        if self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Done)? {
+            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        if self.publish_captured_auto_transition(IssueIdPrefix::from(&full_id), State::Done)? {
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
             Ok(true)
@@ -911,6 +910,7 @@ mod tests {
     use super::*;
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::domain::State;
     use crate::storage::{InMemoryStorage, MutationPoint};
     use std::collections::HashMap;
@@ -1381,7 +1381,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let error = executor
             .publish_captured_claim(
-                IssueIdPrefix::parse(&issue_id).unwrap(),
+                IssueIdPrefix::from_str(&issue_id).unwrap(),
                 "agent:test".parse().unwrap(),
             )
             .expect_err("the graph rule must block the claim");
@@ -1417,7 +1417,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let outcome = executor
             .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id: IssueIdPrefix::parse(&issue_id).unwrap(),
+                issue_id: IssueIdPrefix::from_str(&issue_id).unwrap(),
                 assignee: "agent:test".parse().unwrap(),
             })
             .unwrap();
@@ -1461,7 +1461,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let error = executor
             .publish_captured_claim(
-                IssueIdPrefix::parse(&issue_id).unwrap(),
+                IssueIdPrefix::from_str(&issue_id).unwrap(),
                 "agent:test".parse().unwrap(),
             )
             .expect_err("the newly required manual precheck must block the claim");
@@ -1485,7 +1485,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let outcome = executor
             .publish_captured_state_transition(
-                IssueIdPrefix::parse("abcd").unwrap(),
+                IssueIdPrefix::from_str("abcd").unwrap(),
                 State::Gated,
                 false,
                 false,
@@ -1498,7 +1498,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert!(executor
             .storage
-            .resolve_issue_id(&IssueIdPrefix::parse("abcd").unwrap())
+            .resolve_issue_id(&IssueIdPrefix::from_str("abcd").unwrap())
             .is_err());
         executor.run_postchecks(&outcome.target_id).unwrap();
         assert_eq!(outcome.target_id, issue.id);
@@ -1851,8 +1851,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
             .expect("a gate-blocked field edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "title"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -2041,8 +2041,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
             .expect("description edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "description"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -2095,7 +2095,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .iter()
             .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == issue_id)
             .expect("deletion must log an issue_deleted event");
-        assert!(matches!(logged, Event::IssueDeleted { .. }));
+        assert!(matches!(logged.body(), EventBody::IssueDeleted { .. }));
     }
 
     #[test]
@@ -2341,8 +2341,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("dependency addition must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2387,8 +2387,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2423,8 +2423,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("CLI dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2506,8 +2506,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
             .expect("the cascade cleanup of A's dependencies must be event-logged");
-        match cascade_event {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match cascade_event.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "cascade event must record the dependencies edit, got: {fields:?}"
             ),
@@ -2518,7 +2518,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .skip(events_before)
             .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == b_id)
             .expect("deleting B must still log its own issue_deleted event");
-        assert!(matches!(delete_event, Event::IssueDeleted { .. }));
+        assert!(matches!(
+            delete_event.body(),
+            EventBody::IssueDeleted { .. }
+        ));
     }
 
     #[test]
@@ -2588,7 +2591,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert!(
             executor
                 .storage
-                .resolve_issue_id(&IssueIdPrefix::parse(&b_id).unwrap())
+                .resolve_issue_id(&IssueIdPrefix::from_str(&b_id).unwrap())
                 .is_err(),
             "the missing dependency must not resolve, matching the reported bug"
         );

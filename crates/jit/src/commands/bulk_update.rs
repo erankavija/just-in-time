@@ -382,7 +382,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .filter_map(|candidate| {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
                         let request = CapturedFieldUpdate::bulk(
-                            IssueIdPrefix::of_stored(&fresh.id),
+                            IssueIdPrefix::from(&fresh.id),
                             operations,
                             force,
                         )
@@ -501,7 +501,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // State change
         if let Some(new_state) = operations.state {
             if issue.state != new_state {
-                changes.push(format!("state: {:?} → {:?}", issue.state, new_state));
+                changes.push(format!("state: {} → {}", issue.state, new_state));
             }
         }
 
@@ -553,10 +553,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Priority change
         if let Some(new_priority) = operations.priority {
             if issue.priority != new_priority {
-                changes.push(format!(
-                    "priority: {:?} → {:?}",
-                    issue.priority, new_priority
-                ));
+                changes.push(format!("priority: {} → {}", issue.priority, new_priority));
             }
         }
 
@@ -622,7 +619,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let projected = Self::projected_after_update(issue, operations);
         let repo_format = self.repo_content_format()?;
-        let strictness = self.cached_config()?.strictness()?;
+        let strictness = self.cached_config()?.strictness();
         let evaluation =
             crate::validation::evaluate_local(&projected, self.effective_rules()?, repo_format)?
                 .with_strictness(strictness);
@@ -636,6 +633,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::EventBody;
     use crate::domain::{Issue, Priority, State};
 
     /// Fails the FIRST session open at the moment `SessionOpenCounter` also
@@ -754,8 +752,8 @@ mod tests {
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
-        assert!(changes[0].contains("Ready"));
-        assert!(changes[0].contains("Done"));
+        assert!(changes[0].contains("ready"));
+        assert!(changes[0].contains("done"));
     }
 
     #[test]
@@ -826,7 +824,7 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+            .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
             .count();
         assert_eq!(claimed, 1);
 

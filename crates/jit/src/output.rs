@@ -4,8 +4,9 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
+use crate::domain::Assignee;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
@@ -17,11 +18,12 @@ use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::store_divergence::StoreDivergence;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
     Priority, State,
 };
-use crate::errors::{short_id, state_name, TransitionBlockedError, TransitionBlocker};
+use crate::errors::{short_id, TransitionBlockedError, TransitionBlocker};
 
 /// Render the complete schema-v1 archive plan without introducing a second
 /// decision model. Every action, fact, edge, relink, deletion, warning, and
@@ -853,220 +855,111 @@ impl ExitCode {
 // Error Codes (JSON responses)
 // ============================================================================
 
-/// Standard error-code vocabulary for JIT's machine-readable responses.
-///
-/// The serialized names are the strings carried in JSON error envelopes.
-/// [`ErrorCode::ALL`] is checked against this enum's derived schema, keeping
-/// enumeration consumers in lockstep with the type's variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ErrorCode {
-    /// The requested issue does not exist.
-    IssueNotFound,
-    /// The requested gate does not exist.
-    GateNotFound,
-    /// The requested dependency would make the graph cyclic.
-    CycleDetected,
-    /// An argument or invocation is invalid.
-    InvalidArgument,
-    /// A label query filter is not in the accepted namespace/value form.
-    InvalidLabelPattern,
-    /// Repository or domain validation failed.
-    ValidationFailed,
-    /// The requested resource already exists.
-    AlreadyExists,
-    /// A requested lifecycle state or transition is invalid.
-    InvalidState,
-    /// Unfinished dependencies block the requested operation.
-    Blocked,
-    /// A quality-gate checker completed without passing.
-    GateFailed,
-    /// An input/output or external-system operation failed.
-    IoError,
-    /// An operation was denied by filesystem or operating-system permissions.
-    PermissionDenied,
-    /// Input data could not be parsed.
-    ParseError,
-    /// A claim or lease command requires a Git repository.
-    ClaimRequiresGit,
-    /// An ID prefix matched more than one candidate.
-    AmbiguousId,
-    /// An ID prefix was shorter than the accepted minimum.
-    InvalidIdPrefix,
-    /// No `.jit` repository exists at the resolved data directory.
-    RepositoryNotFound,
-    /// The repository format is newer than this binary supports.
-    RepositoryFormatTooNew,
-    /// Issue deletion was refused because operator confirmation was absent.
-    DeletionNotConfirmed,
-    /// A state-mutating command was refused because it ran inside a linked
-    /// non-primary checkout whose write stance refuses one.
-    LinkedCheckoutWriteRefused,
-    /// No resolution route found the requested profile.
-    ProfileNotFound,
-    /// Profile planning or final-state validation rejected the operation.
-    ProfileConflict,
-    /// A dependency command failed.
-    DependencyError,
-    /// A gate command failed.
-    GateError,
-    /// A gate-status check failed.
-    GateCheckError,
-    /// A gate-preset command failed.
-    PresetError,
-    /// An issue item-address lookup failed before resolving an item.
-    ItemNotFound,
-    /// An item command failed without a more specific public classification.
-    ItemCommandFailed,
-    /// An invariant command failed without a more specific public classification.
-    InvariantCommandFailed,
-    /// A project command failed without a more specific public classification.
-    ProjectCommandFailed,
-    /// A profile command failed without a more specific public classification.
-    ProfileError,
-    /// The search backend failed while executing a query.
-    SearchFailed,
-    /// The external ripgrep search tool could not be found.
-    RipgrepNotFound,
-    /// Worktree identity inspection failed.
-    WorktreeInfoError,
-    /// Worktree enumeration failed.
-    WorktreeListError,
-    /// Cross-checkout store comparison failed.
-    WorktreeStoreDivergenceError,
-    /// Repository hook installation failed.
-    HooksInstallError,
-    /// A command failed without a more specific public classification.
-    GenericError,
-    /// Repository recovery failed.
-    #[serde(rename = "recovery_failed")]
-    RecoveryFailed,
-    /// Claim acquisition failed.
-    ClaimAcquireError,
-    /// Claim release failed.
-    ClaimReleaseError,
-    /// Claim renewal failed.
-    ClaimRenewError,
-    /// Claim heartbeat failed.
-    ClaimHeartbeatError,
-    /// Claim status inspection failed without a more specific classification.
-    ClaimStatusError,
-    /// Claim enumeration failed without a more specific classification.
-    ClaimListError,
-    /// Forced claim eviction failed.
-    ClaimForceEvictError,
-    /// A lock wait expired while another jit process held the lock.
-    LockTimeout,
+wire_vocabulary! {
+    /// Standard error-code vocabulary for JIT's machine-readable responses.
+    ///
+    /// The declared names are the strings carried in JSON error envelopes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum ErrorCode {
+        /// The requested issue does not exist.
+        IssueNotFound = "ISSUE_NOT_FOUND",
+        /// The requested gate does not exist.
+        GateNotFound = "GATE_NOT_FOUND",
+        /// The requested dependency would make the graph cyclic.
+        CycleDetected = "CYCLE_DETECTED",
+        /// An argument or invocation is invalid.
+        InvalidArgument = "INVALID_ARGUMENT",
+        /// A label query filter is not in the accepted namespace/value form.
+        InvalidLabelPattern = "INVALID_LABEL_PATTERN",
+        /// Repository or domain validation failed.
+        ValidationFailed = "VALIDATION_FAILED",
+        /// The requested resource already exists.
+        AlreadyExists = "ALREADY_EXISTS",
+        /// A requested lifecycle state or transition is invalid.
+        InvalidState = "INVALID_STATE",
+        /// Unfinished dependencies block the requested operation.
+        Blocked = "BLOCKED",
+        /// A quality-gate checker completed without passing.
+        GateFailed = "GATE_FAILED",
+        /// An input/output or external-system operation failed.
+        IoError = "IO_ERROR",
+        /// An operation was denied by filesystem or operating-system permissions.
+        PermissionDenied = "PERMISSION_DENIED",
+        /// Input data could not be parsed.
+        ParseError = "PARSE_ERROR",
+        /// A claim or lease command requires a Git repository.
+        ClaimRequiresGit = "CLAIM_REQUIRES_GIT",
+        /// An ID prefix matched more than one candidate.
+        AmbiguousId = "AMBIGUOUS_ID",
+        /// An ID prefix was shorter than the accepted minimum.
+        InvalidIdPrefix = "INVALID_ID_PREFIX",
+        /// No `.jit` repository exists at the resolved data directory.
+        RepositoryNotFound = "REPOSITORY_NOT_FOUND",
+        /// The repository format is newer than this binary supports.
+        RepositoryFormatTooNew = "REPOSITORY_FORMAT_TOO_NEW",
+        /// Issue deletion was refused because operator confirmation was absent.
+        DeletionNotConfirmed = "DELETION_NOT_CONFIRMED",
+        /// A state-mutating command was refused because it ran inside a linked
+        /// non-primary checkout whose write stance refuses one.
+        LinkedCheckoutWriteRefused = "LINKED_CHECKOUT_WRITE_REFUSED",
+        /// No resolution route found the requested profile.
+        ProfileNotFound = "PROFILE_NOT_FOUND",
+        /// Profile planning or final-state validation rejected the operation.
+        ProfileConflict = "PROFILE_CONFLICT",
+        /// A dependency command failed.
+        DependencyError = "DEPENDENCY_ERROR",
+        /// A gate command failed.
+        GateError = "GATE_ERROR",
+        /// A gate-status check failed.
+        GateCheckError = "GATE_CHECK_ERROR",
+        /// A gate-preset command failed.
+        PresetError = "PRESET_ERROR",
+        /// An issue item-address lookup failed before resolving an item.
+        ItemNotFound = "ITEM_NOT_FOUND",
+        /// An item command failed without a more specific public classification.
+        ItemCommandFailed = "ITEM_COMMAND_FAILED",
+        /// An invariant command failed without a more specific public classification.
+        InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
+        /// A project command failed without a more specific public classification.
+        ProjectCommandFailed = "PROJECT_COMMAND_FAILED",
+        /// A profile command failed without a more specific public classification.
+        ProfileError = "PROFILE_ERROR",
+        /// The search backend failed while executing a query.
+        SearchFailed = "SEARCH_FAILED",
+        /// The external ripgrep search tool could not be found.
+        RipgrepNotFound = "RIPGREP_NOT_FOUND",
+        /// Worktree identity inspection failed.
+        WorktreeInfoError = "WORKTREE_INFO_ERROR",
+        /// Worktree enumeration failed.
+        WorktreeListError = "WORKTREE_LIST_ERROR",
+        /// Cross-checkout store comparison failed.
+        WorktreeStoreDivergenceError = "WORKTREE_STORE_DIVERGENCE_ERROR",
+        /// Repository hook installation failed.
+        HooksInstallError = "HOOKS_INSTALL_ERROR",
+        /// A command failed without a more specific public classification.
+        GenericError = "GENERIC_ERROR",
+        /// Repository recovery failed.
+        RecoveryFailed = "recovery_failed",
+        /// Claim acquisition failed.
+        ClaimAcquireError = "CLAIM_ACQUIRE_ERROR",
+        /// Claim release failed.
+        ClaimReleaseError = "CLAIM_RELEASE_ERROR",
+        /// Claim renewal failed.
+        ClaimRenewError = "CLAIM_RENEW_ERROR",
+        /// Claim heartbeat failed.
+        ClaimHeartbeatError = "CLAIM_HEARTBEAT_ERROR",
+        /// Claim status inspection failed without a more specific classification.
+        ClaimStatusError = "CLAIM_STATUS_ERROR",
+        /// Claim enumeration failed without a more specific classification.
+        ClaimListError = "CLAIM_LIST_ERROR",
+        /// Forced claim eviction failed.
+        ClaimForceEvictError = "CLAIM_FORCE_EVICT_ERROR",
+        /// A lock wait expired while another jit process held the lock.
+        LockTimeout = "LOCK_TIMEOUT",
+    }
 }
 
 impl ErrorCode {
-    /// Every registered error code, in declaration order.
-    ///
-    /// A conformance test compares this list with the variants schemars derives
-    /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 47] = [
-        ErrorCode::IssueNotFound,
-        ErrorCode::GateNotFound,
-        ErrorCode::CycleDetected,
-        ErrorCode::InvalidArgument,
-        ErrorCode::InvalidLabelPattern,
-        ErrorCode::ValidationFailed,
-        ErrorCode::AlreadyExists,
-        ErrorCode::InvalidState,
-        ErrorCode::Blocked,
-        ErrorCode::GateFailed,
-        ErrorCode::IoError,
-        ErrorCode::PermissionDenied,
-        ErrorCode::ParseError,
-        ErrorCode::ClaimRequiresGit,
-        ErrorCode::AmbiguousId,
-        ErrorCode::InvalidIdPrefix,
-        ErrorCode::RepositoryNotFound,
-        ErrorCode::RepositoryFormatTooNew,
-        ErrorCode::DeletionNotConfirmed,
-        ErrorCode::LinkedCheckoutWriteRefused,
-        ErrorCode::ProfileNotFound,
-        ErrorCode::ProfileConflict,
-        ErrorCode::DependencyError,
-        ErrorCode::GateError,
-        ErrorCode::GateCheckError,
-        ErrorCode::PresetError,
-        ErrorCode::ItemNotFound,
-        ErrorCode::ItemCommandFailed,
-        ErrorCode::InvariantCommandFailed,
-        ErrorCode::ProjectCommandFailed,
-        ErrorCode::ProfileError,
-        ErrorCode::SearchFailed,
-        ErrorCode::RipgrepNotFound,
-        ErrorCode::WorktreeInfoError,
-        ErrorCode::WorktreeListError,
-        ErrorCode::WorktreeStoreDivergenceError,
-        ErrorCode::HooksInstallError,
-        ErrorCode::GenericError,
-        ErrorCode::RecoveryFailed,
-        ErrorCode::ClaimAcquireError,
-        ErrorCode::ClaimReleaseError,
-        ErrorCode::ClaimRenewError,
-        ErrorCode::ClaimHeartbeatError,
-        ErrorCode::ClaimStatusError,
-        ErrorCode::ClaimListError,
-        ErrorCode::ClaimForceEvictError,
-        ErrorCode::LockTimeout,
-    ];
-
-    /// Return the byte-exact code written to a JSON error envelope.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            ErrorCode::IssueNotFound => "ISSUE_NOT_FOUND",
-            ErrorCode::GateNotFound => "GATE_NOT_FOUND",
-            ErrorCode::CycleDetected => "CYCLE_DETECTED",
-            ErrorCode::InvalidArgument => "INVALID_ARGUMENT",
-            ErrorCode::InvalidLabelPattern => "INVALID_LABEL_PATTERN",
-            ErrorCode::ValidationFailed => "VALIDATION_FAILED",
-            ErrorCode::AlreadyExists => "ALREADY_EXISTS",
-            ErrorCode::InvalidState => "INVALID_STATE",
-            ErrorCode::Blocked => "BLOCKED",
-            ErrorCode::GateFailed => "GATE_FAILED",
-            ErrorCode::IoError => "IO_ERROR",
-            ErrorCode::PermissionDenied => "PERMISSION_DENIED",
-            ErrorCode::ParseError => "PARSE_ERROR",
-            ErrorCode::ClaimRequiresGit => "CLAIM_REQUIRES_GIT",
-            ErrorCode::AmbiguousId => "AMBIGUOUS_ID",
-            ErrorCode::InvalidIdPrefix => "INVALID_ID_PREFIX",
-            ErrorCode::RepositoryNotFound => "REPOSITORY_NOT_FOUND",
-            ErrorCode::RepositoryFormatTooNew => "REPOSITORY_FORMAT_TOO_NEW",
-            ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
-            ErrorCode::LinkedCheckoutWriteRefused => "LINKED_CHECKOUT_WRITE_REFUSED",
-            ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
-            ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
-            ErrorCode::DependencyError => "DEPENDENCY_ERROR",
-            ErrorCode::GateError => "GATE_ERROR",
-            ErrorCode::GateCheckError => "GATE_CHECK_ERROR",
-            ErrorCode::PresetError => "PRESET_ERROR",
-            ErrorCode::ItemNotFound => "ITEM_NOT_FOUND",
-            ErrorCode::ItemCommandFailed => "ITEM_COMMAND_FAILED",
-            ErrorCode::InvariantCommandFailed => "INVARIANT_COMMAND_FAILED",
-            ErrorCode::ProjectCommandFailed => "PROJECT_COMMAND_FAILED",
-            ErrorCode::ProfileError => "PROFILE_ERROR",
-            ErrorCode::SearchFailed => "SEARCH_FAILED",
-            ErrorCode::RipgrepNotFound => "RIPGREP_NOT_FOUND",
-            ErrorCode::WorktreeInfoError => "WORKTREE_INFO_ERROR",
-            ErrorCode::WorktreeListError => "WORKTREE_LIST_ERROR",
-            ErrorCode::WorktreeStoreDivergenceError => "WORKTREE_STORE_DIVERGENCE_ERROR",
-            ErrorCode::HooksInstallError => "HOOKS_INSTALL_ERROR",
-            ErrorCode::GenericError => "GENERIC_ERROR",
-            ErrorCode::RecoveryFailed => "recovery_failed",
-            ErrorCode::ClaimAcquireError => "CLAIM_ACQUIRE_ERROR",
-            ErrorCode::ClaimReleaseError => "CLAIM_RELEASE_ERROR",
-            ErrorCode::ClaimRenewError => "CLAIM_RENEW_ERROR",
-            ErrorCode::ClaimHeartbeatError => "CLAIM_HEARTBEAT_ERROR",
-            ErrorCode::ClaimStatusError => "CLAIM_STATUS_ERROR",
-            ErrorCode::ClaimListError => "CLAIM_LIST_ERROR",
-            ErrorCode::ClaimForceEvictError => "CLAIM_FORCE_EVICT_ERROR",
-            ErrorCode::LockTimeout => "LOCK_TIMEOUT",
-        }
-    }
-
     /// Return the process exit status associated with this error code.
     ///
     /// The match is exhaustive so adding a member requires choosing its status.
@@ -1225,8 +1118,7 @@ pub(crate) mod test_support {
 /// Each row reads its wire spelling, meaning, and numeric exit status from
 /// [`ErrorCode::as_str`], [`ErrorCode::description`], and
 /// [`ErrorCode::exit_code`] respectively. Iterating [`ErrorCode::ALL`] keeps the
-/// page coupled to the same derive-checked member list used by the runtime's
-/// vocabulary conformance tests.
+/// page coupled to the runtime vocabulary declaration.
 #[cfg(any(test, feature = "test-support"))]
 pub fn render_error_code_reference() -> String {
     let rows = ErrorCode::ALL
@@ -1260,85 +1152,6 @@ pub fn render_error_code_reference() -> String {
     )
 }
 
-/// An input string that is not a member of the registered error-code vocabulary.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("unknown error code `{code}`")]
-pub struct UnknownErrorCode {
-    code: String,
-}
-
-impl UnknownErrorCode {
-    /// Return the unresolved input string.
-    pub fn as_str(&self) -> &str {
-        &self.code
-    }
-}
-
-impl std::str::FromStr for ErrorCode {
-    type Err = UnknownErrorCode;
-
-    fn from_str(code: &str) -> Result<Self, Self::Err> {
-        match code {
-            "ISSUE_NOT_FOUND" => Ok(ErrorCode::IssueNotFound),
-            "GATE_NOT_FOUND" => Ok(ErrorCode::GateNotFound),
-            "CYCLE_DETECTED" => Ok(ErrorCode::CycleDetected),
-            "INVALID_ARGUMENT" => Ok(ErrorCode::InvalidArgument),
-            "INVALID_LABEL_PATTERN" => Ok(ErrorCode::InvalidLabelPattern),
-            "VALIDATION_FAILED" => Ok(ErrorCode::ValidationFailed),
-            "ALREADY_EXISTS" => Ok(ErrorCode::AlreadyExists),
-            "INVALID_STATE" => Ok(ErrorCode::InvalidState),
-            "BLOCKED" => Ok(ErrorCode::Blocked),
-            "GATE_FAILED" => Ok(ErrorCode::GateFailed),
-            "IO_ERROR" => Ok(ErrorCode::IoError),
-            "PERMISSION_DENIED" => Ok(ErrorCode::PermissionDenied),
-            "PARSE_ERROR" => Ok(ErrorCode::ParseError),
-            "CLAIM_REQUIRES_GIT" => Ok(ErrorCode::ClaimRequiresGit),
-            "AMBIGUOUS_ID" => Ok(ErrorCode::AmbiguousId),
-            "INVALID_ID_PREFIX" => Ok(ErrorCode::InvalidIdPrefix),
-            "REPOSITORY_NOT_FOUND" => Ok(ErrorCode::RepositoryNotFound),
-            "REPOSITORY_FORMAT_TOO_NEW" => Ok(ErrorCode::RepositoryFormatTooNew),
-            "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
-            "LINKED_CHECKOUT_WRITE_REFUSED" => Ok(ErrorCode::LinkedCheckoutWriteRefused),
-            "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
-            "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
-            "DEPENDENCY_ERROR" => Ok(ErrorCode::DependencyError),
-            "GATE_ERROR" => Ok(ErrorCode::GateError),
-            "GATE_CHECK_ERROR" => Ok(ErrorCode::GateCheckError),
-            "PRESET_ERROR" => Ok(ErrorCode::PresetError),
-            "ITEM_NOT_FOUND" => Ok(ErrorCode::ItemNotFound),
-            "ITEM_COMMAND_FAILED" => Ok(ErrorCode::ItemCommandFailed),
-            "INVARIANT_COMMAND_FAILED" => Ok(ErrorCode::InvariantCommandFailed),
-            "PROJECT_COMMAND_FAILED" => Ok(ErrorCode::ProjectCommandFailed),
-            "PROFILE_ERROR" => Ok(ErrorCode::ProfileError),
-            "SEARCH_FAILED" => Ok(ErrorCode::SearchFailed),
-            "RIPGREP_NOT_FOUND" => Ok(ErrorCode::RipgrepNotFound),
-            "WORKTREE_INFO_ERROR" => Ok(ErrorCode::WorktreeInfoError),
-            "WORKTREE_LIST_ERROR" => Ok(ErrorCode::WorktreeListError),
-            "WORKTREE_STORE_DIVERGENCE_ERROR" => Ok(ErrorCode::WorktreeStoreDivergenceError),
-            "HOOKS_INSTALL_ERROR" => Ok(ErrorCode::HooksInstallError),
-            "GENERIC_ERROR" => Ok(ErrorCode::GenericError),
-            "recovery_failed" => Ok(ErrorCode::RecoveryFailed),
-            "CLAIM_ACQUIRE_ERROR" => Ok(ErrorCode::ClaimAcquireError),
-            "CLAIM_RELEASE_ERROR" => Ok(ErrorCode::ClaimReleaseError),
-            "CLAIM_RENEW_ERROR" => Ok(ErrorCode::ClaimRenewError),
-            "CLAIM_HEARTBEAT_ERROR" => Ok(ErrorCode::ClaimHeartbeatError),
-            "CLAIM_STATUS_ERROR" => Ok(ErrorCode::ClaimStatusError),
-            "CLAIM_LIST_ERROR" => Ok(ErrorCode::ClaimListError),
-            "CLAIM_FORCE_EVICT_ERROR" => Ok(ErrorCode::ClaimForceEvictError),
-            "LOCK_TIMEOUT" => Ok(ErrorCode::LockTimeout),
-            code => Err(UnknownErrorCode {
-                code: code.to_string(),
-            }),
-        }
-    }
-}
-
-impl Display for ErrorCode {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
 impl From<ErrorCode> for String {
     fn from(code: ErrorCode) -> Self {
         code.as_str().to_string()
@@ -1357,7 +1170,7 @@ impl From<ErrorCode> for String {
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) =
-        error.downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
     {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
@@ -1413,8 +1226,8 @@ impl JsonError {
         Self::new(blocked.error_code(), blocked.summary())
             .with_details(serde_json::json!({
                 "issue_id": blocked.issue_id(),
-                "requested_state": state_name(blocked.requested_state()),
-                "actual_state": state_name(blocked.actual_state()),
+                "requested_state": blocked.requested_state().as_str(),
+                "actual_state": blocked.actual_state().as_str(),
                 "blockers": blocked.blockers().iter().map(transition_blocker_json).collect::<Vec<_>>(),
                 "warnings": blocked.warnings(),
                 "remediation": blocked.remediation_commands(),
@@ -1434,7 +1247,7 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "issue_id": issue_id,
             "short_id": short_id(issue_id),
             "title": title,
-            "state": state_name(*state),
+            "state": state.as_str(),
         }),
         TransitionBlocker::MissingDependency { issue_id } => serde_json::json!({
             "type": "dependency",
@@ -1460,10 +1273,10 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         }),
         TransitionBlocker::ArchivedRevive { origin } => serde_json::json!({
             "type": "archived_revive",
-            "origin": state_name(*origin),
+            "origin": origin.as_str(),
             "message": format!(
                 "an archived issue only revives to its pre-archive state '{}'",
-                state_name(*origin)
+                origin.as_str()
             ),
         }),
     }
@@ -2168,7 +1981,7 @@ pub struct StateCount {
 /// issues, shared by `jit issue progress` (over a container's direct children)
 /// and `jit query count --by state` (over a label bucket or the whole repo).
 ///
-/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
+/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::ALL`]
 /// order, zero-count states included, so the shape is stable and complete
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (one entry per state).
@@ -2588,7 +2401,7 @@ pub struct GateRunSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3660,21 +3473,6 @@ mod tests {
     }
 
     #[test]
-    fn test_error_code_all_lists_every_derived_variant() {
-        let schema = serde_json::to_value(schema_for!(ErrorCode))
-            .expect("ErrorCode schema should serialize");
-        let derived = schema_accepted_strings(&schema);
-        assert!(!derived.is_empty(), "derived schema should list variants");
-
-        let listed: BTreeSet<String> = ErrorCode::ALL
-            .iter()
-            .map(|code| code.as_str().to_string())
-            .collect();
-
-        assert_eq!(listed, derived, "ErrorCode::ALL must list every variant");
-    }
-
-    #[test]
     fn test_error_code_wire_strings_and_exit_statuses_match_contract() {
         let expected = [
             (
@@ -3910,21 +3708,6 @@ mod tests {
     }
 
     #[test]
-    fn test_error_code_strings_round_trip_and_unknown_is_unresolved() {
-        for code in ErrorCode::ALL {
-            assert_eq!(code.as_str().parse::<ErrorCode>(), Ok(code));
-            let error = JsonError::new(code, "failure");
-            assert_eq!(error.error.code, code);
-            assert_eq!(error.exit_code(), code.exit_code());
-        }
-
-        let unresolved = "UNREGISTERED_ERROR"
-            .parse::<ErrorCode>()
-            .expect_err("unknown input should stay unresolved");
-        assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
-    }
-
-    #[test]
     fn test_exit_code_all_lists_every_derived_variant() {
         let schema =
             serde_json::to_value(schema_for!(ExitCode)).expect("ExitCode schema should serialize");
@@ -3983,9 +3766,8 @@ mod tests {
         }
     }
 
-    /// The derive-vs-`ALL` conformance test above rejects an unlisted enum
-    /// member; once listed, that new row changes this projection and fails here
-    /// until the committed page is regenerated.
+    /// The wire-contract test above pins the declaration order; a new member also
+    /// changes this projection until the committed page is regenerated.
     #[test]
     fn test_committed_error_code_reference_matches_projection() {
         let committed = std::fs::read_to_string(error_code_reference_path())
@@ -4190,13 +3972,13 @@ mod tests {
 
     #[test]
     fn test_event_list_response_serializes_events_under_collection_key() {
-        let event = crate::domain::Event::IssueCreated {
-            id: "e".into(),
-            issue_id: "i".into(),
-            timestamp: chrono::Utc::now(),
-            title: "title".into(),
-            priority: crate::domain::Priority::Normal,
-        };
+        let mut issue = crate::domain::Issue::draft("title".to_string(), String::new());
+        issue.id = "i".to_string();
+        let event = crate::test_utils::stamped_event(
+            crate::domain::EventBody::draft_issue_created(&issue),
+            "e",
+            chrono::Utc::now(),
+        );
         let value =
             serde_json::to_value(EventListResponse::new(vec![event.clone(), event])).unwrap();
         assert_envelope_value(&value, "events", 2);
@@ -4220,10 +4002,10 @@ mod tests {
     fn test_lease_list_response_serializes_null_options_and_empty_warnings() {
         let now = chrono::Utc::now();
         let lease = crate::storage::claim_coordinator::Lease {
-            lease_id: "l".into(),
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
             issue_id: "i".into(),
-            agent_id: "agent:a".into(),
-            worktree_id: "w".into(),
+            agent_id: "agent:a".parse().unwrap(),
+            worktree_id: "w".parse().unwrap(),
             branch: None,
             ttl_secs: 0,
             acquired_at: now,

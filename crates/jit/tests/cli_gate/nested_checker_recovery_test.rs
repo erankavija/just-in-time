@@ -27,8 +27,6 @@ fn fixture_binary(cli: &JitCli) -> PathBuf {
     PathBuf::from(cli.command(["--version"]).get_program())
 }
 
-/// Define an auto gate running `checker_command` and create an issue requiring
-/// it. Returns the issue id.
 fn define_gate_and_issue(cli: &JitCli, gate: &str, checker_command: &str) -> String {
     cli.run([
         "gate",

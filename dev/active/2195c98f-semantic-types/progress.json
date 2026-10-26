@@ -1,7 +1,7 @@
 {
   "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "epic_short_id": "2195c98f",
-  "current_wave": 1,
+  "current_wave": 4,
   "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
   "waves": [
     {
@@ -19,7 +19,7 @@
           "short_id": "18bcafb8",
           "title": "Production event matchers read events through a body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -54,35 +54,35 @@
           "short_id": "6e8b9f31",
           "title": "System actors are named Assignee constants",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
           "short_id": "acb38457",
           "title": "Graph node traits expose dependency ids as string views",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
           "short_id": "b3fcd297",
           "title": "Schema paths come from a VirtualPath constructor",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "b48d7b2a-74f5-4534-b3eb-944946b08260",
           "short_id": "b48d7b2a",
           "title": "Rule patterns compile at declaration load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
           "short_id": "cccfd407",
           "title": "One VirtualPath predicate recognises reserved application targets",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
@@ -108,35 +108,35 @@
           "short_id": "179dcef9",
           "title": "Repository action owners are one enum",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "18dc6e3e-6597-46cf-999e-c0631a6f064b",
           "short_id": "18dc6e3e",
           "title": "Repository-state code names well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
           "short_id": "256c8eb1",
           "title": "Error codes come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "2ac50581-29cb-4fbf-ad2f-a7c483e63647",
           "short_id": "2ac50581",
           "title": "Lifecycle state tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
           "short_id": "3625b18b",
           "title": "Unit tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
@@ -157,21 +157,21 @@
           "short_id": "6add7ca6",
           "title": "Projection mode and style reach output typed",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
           "short_id": "72dfc0d7",
           "title": "Built-in gate findings use closed severity and disposition enums",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "7383f4ea-39d8-4162-a61c-32d932ec02ee",
           "short_id": "7383f4ea",
           "title": "Template transform kind is typed at load",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
@@ -185,70 +185,70 @@
           "short_id": "96bb0941",
           "title": "Validation strictness is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a50e9be9-77a8-4cc8-87be-e3f22a3b70ba",
           "short_id": "a50e9be9",
           "title": "Resolved agent identity is an Assignee",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
           "short_id": "b4fe7887",
           "title": "Item-kind scope has one enum",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b8506ce7-99ba-493d-bcf6-297f81556b18",
           "short_id": "b8506ce7",
           "title": "Store divergence tokens come from one declaration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
           "short_id": "bc1955a8",
           "title": "Item kinds hold their id pattern as IdPattern",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
           "short_id": "bf87bbdb",
           "title": "Graph queries return nodes rather than id strings",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
           "short_id": "c400730c",
           "title": "Id prefixes parse once into an IssueIdPrefix",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
           "short_id": "e3d06f82",
           "title": "Integration tests match events through the body view",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
           "short_id": "f8f80eea",
           "title": "Hierarchy callers propagate the constructor's error",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "faa19def-4484-4706-becf-dab559f0f3d4",
           "short_id": "faa19def",
           "title": "Gate-run actors are Assignee values",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -267,7 +267,7 @@
           "short_id": "182350ce",
           "title": "Priority tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -281,14 +281,14 @@
           "short_id": "428646c5",
           "title": "Profile dependency resolution compares ProfileId values",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
           "short_id": "42bcaa6e",
           "title": "Content format is typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -302,35 +302,35 @@
           "short_id": "6826f966",
           "title": "Rule severity and scope tokens come from one declaration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "8cfbf19d-dd41-4b56-90f5-d287167173a8",
           "short_id": "8cfbf19d",
           "title": "Lease and worktree ids are dedicated types",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "pending"
+          "status": "awaiting_code_review"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
           "short_id": "945f65f3",
           "title": "Commands name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
           "short_id": "a57c5057",
           "title": "The server resolves each issue-id path parameter once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
@@ -351,7 +351,7 @@
           "short_id": "d72bf093",
           "title": "Event becomes an envelope around a tagged body",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -363,42 +363,42 @@
           "short_id": "1622756a",
           "title": "Human output renders vocabulary tokens, not Debug names",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
           "short_id": "30923ea1",
           "title": "Priority orders by rank through Ord",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
           "short_id": "5d5c5514",
           "title": "Validation projections hold typed state and priority",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "98404e0c-d254-4fb7-8222-8e1077d95f42",
           "short_id": "98404e0c",
           "title": "Lease records name their issue by IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
           "short_id": "a4b94a17",
           "title": "Type-hierarchy and label-uniqueness rule options are typed",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
           "short_id": "c1c86312",
           "title": "Composite arguments carry their issue as a typed id",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1",
@@ -412,21 +412,21 @@
           "short_id": "e1a6c8c2",
           "title": "Storage and configuration code name well-known files through VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
           "short_id": "e98ae5a4",
           "title": "Event tags declare their wire spelling once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "gates_passed_unmerged"
         },
         {
           "id": "f265e748-e350-4ba6-949f-575acf122bd9",
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "awaiting_code_review"
         }
       ]
     },
@@ -438,49 +438,49 @@
           "short_id": "5491edd0",
           "title": "Worktree and server files under .jit have VirtualPath constants",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "75951558-accb-4ee9-be38-e97fee0326ee",
           "short_id": "75951558",
           "title": "Issue lifecycle commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "804a8605-267b-4934-a9ef-08422fc3686d",
           "short_id": "804a8605",
           "title": "Dependency, graph and template commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "8e82fa49-1859-4e29-8972-f2da05e90b0a",
           "short_id": "8e82fa49",
           "title": "Gate commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "af9c277d-a906-460d-9d96-6ae3ae0bf124",
           "short_id": "af9c277d",
           "title": "Label-reference assertions are typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
           "short_id": "cd8adfc1",
           "title": "Executor core carries typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         },
         {
           "id": "d50d6976-f978-4900-a218-6bb9d1b3fa52",
           "short_id": "d50d6976",
           "title": "Document-family commands carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rejected"
         }
       ]
     },
@@ -499,7 +499,7 @@
           "short_id": "5613ef50",
           "title": "Dependency-shape assertions are typed at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
@@ -525,7 +525,7 @@
           "short_id": "7e8f1525",
           "title": "Label-coverage assertions are typed and compiled at load",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
@@ -620,10 +620,56 @@
       ]
     }
   ],
-  "created_during_execution": [],
-  "escalations": [],
+  "created_during_execution": [
+    {
+      "id": "b01208cb-b85f-4705-bd2f-311129e01b56",
+      "short_id": "b01208cb",
+      "title": "This repository's event log is in canonical writer form",
+      "reason": "d72bf093 REQ-03 needs every log line to round-trip; ~8600 legacy lines predate the canonical writer. Lead data rewrite, wired as a d72bf093 dependency.",
+      "status": "done"
+    }
+  ],
+  "escalations": [
+    {
+      "issue": "e1a6c8c2",
+      "reason": "Rework exceeded MAX_REWORK_ATTEMPTS: code-review R3 failed (test fixtures join VirtualPath::X.relative() onto the data root instead of RepositoryLayout::resolve, REQ-02).",
+      "status": "resolved",
+      "resolution": "Invoker granted one final rework (R3) with a whole-file resolve brief."
+    },
+    {
+      "issue": "91081bd3",
+      "reason": "Code-review R3 failed on the same root cause a third time: executor methods re-parse ids main.rs resolved, which the breakdown assigned to five sibling family tasks; and issue delete confirmed before resolving.",
+      "status": "resolved",
+      "resolution": "Invoker: absorb 75951558, 804a8605, 8e82fa49, cd8adfc1, d50d6976 and c1c86312 into 91081bd3 (rejected as absorbed); drop their c797b59b dependency (c797b59b now gates 7abcc22d); delete resolves first and its failure-lever arm seeds the issue. Rework counter reset."
+    },
+    {
+      "issue": "804a8605",
+      "reason": "Sibling criteria contradicted 91081bd3 R2 boundary resolution for dep rm.",
+      "status": "resolved",
+      "resolution": "Invoker approved amending REQ-02/03/04; later superseded by absorption into 91081bd3."
+    },
+    {
+      "issue": "d72bf093",
+      "reason": "Code-review R1: REQ-03 required every log line to round-trip; 8 retired-tag lines are skipped by parse_known_events by design and b01208cb kept them.",
+      "status": "resolved",
+      "resolution": "Invoker approved amending REQ-03 to scope the round trip to current event types and pin the skipped lines to the retired tags."
+    },
+    {
+      "issue": "f265e748",
+      "reason": "Code-review R3 failed after two reworks (String-deref reliance in sort_key).",
+      "status": "resolved",
+      "resolution": "Invoker: lead applies the fix plus an alias-flip compile check. Done in 0b9770767; awaiting code-review."
+    }
+  ],
   "rework_counts": {
-    "b3fcd297": 1
+    "b3fcd297": 2,
+    "acb38457": 1,
+    "98404e0c": 2,
+    "945f65f3": 1,
+    "e1a6c8c2": 3,
+    "91081bd3": 2,
+    "d72bf093": 1,
+    "f265e748": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -632,7 +678,8 @@
       "19d9bd7d",
       "5fac48b8",
       "b45a2865",
-      "b73b3e5a"
+      "b73b3e5a",
+      "c797b59b -> 7abcc22d"
     ]
   },
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -783,18 +830,450 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "Continuation: approved test-assertion update outside footprint; finish checks."
+    },
+    {
+      "issue": "b3fcd297",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R2: route every schema-reference path site through one parser (sweep miss, same tier)."
+    },
+    {
+      "issue": "18bcafb8",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-producing event body view over 20 files."
+    },
+    {
+      "issue": "a57c5057",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-file route boundary with exact criteria."
+    },
+    {
+      "issue": "faa19def",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Field retype to Assignee with writer constant swap."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Identity retype through coordinator and lease with exact criteria."
+    },
+    {
+      "issue": "182350ce",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Macro adoption across five files on the priority chain."
+    },
+    {
+      "issue": "6826f966",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Two-enum macro adoption, two files."
+    },
+    {
+      "issue": "a50e9be9",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation: approved forced fixture edits; finish REQ-03 and checks."
+    },
+    {
+      "issue": "acb38457",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Trait signature change across five files on the identity critical path."
+    },
+    {
+      "issue": "cccfd407",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One predicate plus two call sites with exact criteria."
+    },
+    {
+      "issue": "b48d7b2a",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Produces the shared IdPattern contract the assertion chain consumes."
+    },
+    {
+      "issue": "8cfbf19d",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Two new identity types across nine files with fallback error paths."
+    },
+    {
+      "issue": "acb38457",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework R1 to the same worker: EdgeView storage type changed against REQ-02."
+    },
+    {
+      "issue": "18dc6e3e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in one module family."
+    },
+    {
+      "issue": "256c8eb1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-enum macro adoption with a wire-contract check."
+    },
+    {
+      "issue": "98404e0c",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lease issue retype and tolerance removal over three files."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal-to-constant sweep in commands, same pattern as 18dc6e3e."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: bare-name well-known literals in init_response_paths and sweep."
+    },
+    {
+      "issue": "179dcef9",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Owner enum across ten repository-state files with behaviour branches."
+    },
+    {
+      "issue": "945f65f3",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1 dispatched (recorded)."
+    },
+    {
+      "issue": "96bb0941",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded strictness with exact tokens."
+    },
+    {
+      "issue": "bc1955a8",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "One-file convergence on the shared IdPattern."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Literal sweep in storage and loaders; brief carries the bare-name lesson."
+    },
+    {
+      "issue": "a4b94a17",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Two rule-option enums decoded at load."
+    },
+    {
+      "issue": "42bcaa6e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Serde-decoded content format, same pattern as strictness."
+    },
+    {
+      "issue": "af9c277d",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "First compiled-graph-assertion lowering; sets the pattern two later tasks follow."
+    },
+    {
+      "issue": "b4fe7887",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Fold a config mirror enum into the domain enum."
+    },
+    {
+      "issue": "5613ef50",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Second assertion lowering following af9c277d's pattern."
+    },
+    {
+      "issue": "7e8f1525",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Largest assertion lowering, five files incl. out-of-validation readers."
+    },
+    {
+      "issue": "72dfc0d7",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Closed finding enums with a typed constructor, open wire fields."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R1: server fixtures, issues-dir literal (lead brief error), no-op replace."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Rework R2 (final): literals in test modules of listed files."
+    },
+    {
+      "issue": "bf87bbdb",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Graph query return types across eight files with property tests."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Mechanical unit-test migration onto the body view."
+    },
+    {
+      "issue": "e3d06f82",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Mechanical integration-test migration onto the body view."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Debug-render sweep over three files."
+    },
+    {
+      "issue": "30923ea1",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Ord by rank plus two sort rewrites."
+    },
+    {
+      "issue": "5d5c5514",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Projection field retype with schema contract update."
+    },
+    {
+      "issue": "3625b18b",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Continuation after Claude worker tooling fault (classifier errors); Codex avoids that path."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting CLI prefix boundary across main.rs (88 id sites)."
+    },
+    {
+      "issue": "d72bf093",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Contract-setting event envelope swap (event-envelope contract)."
+    },
+    {
+      "issue": "1622756a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Continuation after session reset interrupted the Claude worker; WIP preserved in 9bac2522a."
+    },
+    {
+      "issue": "e1a6c8c2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Invoker-approved final rework R3; raised tier after two same-class misses at luna."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Rework R1: route remaining CLI issue-id args through resolve_issue_arg and drop downstream parses (same tier; brief had excluded composite scopes)."
+    },
+    {
+      "issue": "5491edd0",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Three constants and a narrow literal sweep with exact criteria."
+    },
+    {
+      "issue": "b01208cb",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "One-time data rewrite of .jit/events.jsonl under the repo-write and event locks; no engine code."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Rework R2 (final): dep rm targets and validate ids resolved at the boundary; same tier, alternation slot is Claude after 5491edd0 (codex)."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Widened scope after invoker-approved absorption: multi-file retype of five executor families plus composite arguments with exact criteria; alternation slot is Codex after the Claude R2."
+    },
+    {
+      "issue": "d72bf093",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework R1: rewrite one repository-log round-trip test to the amended REQ-03; small and exact; alternation slot is Claude after the Codex 91081bd3 dispatch."
+    },
+    {
+      "issue": "e98ae5a4",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Macro adoption plus two narrow retypes with exact criteria; alternation slot is Codex."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Accessor retype with a known caller list; alternation slot is Claude."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 1 of the widened scope: typed anchor map in main.rs and newtype-safe id construction in unit tests; same tier as the implementation."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lead-review rework 1 via the same agent: Option-keyed event identity instead of unwrap_or_default; canonical ids in the new test."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework 2 (final) via the same agent: typed issue ids in EventTag::sample; alternation slot is Claude after the Codex 91081bd3 rework."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 2 (final) of the widened scope: close the raw-literal issue-id class in family test modules using a scratch alias flip plus a lexical sweep."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "Invoker-approved lead fix after rework limit: Option<&IssueId> sort key, as_str() in events filter; alias-flip check run."
     }
   ],
   "surfaced_pitfalls": [
     {
       "source": "c400730c",
       "note": "While IssueId is the String alias, IssueIdPrefix::try_from(&String) picks the infallible From<&IssueId> and skips the length check; staging briefs must say to parse with from_str. Disappears at the flip (7abcc22d)."
+    },
+    {
+      "source": "98404e0c",
+      "note": "storage/claim_coordinator.rs test_issue_id is a named convention-convergence exception; 0af95f14 (canonical-unit-test-ids, produces test-issue-id-fixture) must replace it. Check at bf87bbdb review."
+    },
+    {
+      "source": "179dcef9",
+      "note": "TargetClaim owners (profile-asset:<target>, profile-region:<id>) remain dynamic strings with an inline InvalidClaimOwner check; they belong to profile ownership code that 3d9a0ce3 (D-8) deletes. Epic REQ-10 names 'repository action owner': reconcile at the epic gate (likely out of scope as profile ownership, per plan DEC-06)."
+    },
+    {
+      "source": "5613ef50",
+      "note": "transition_graph_enforcement_tests' two evaluation-time config-error tests now use a label-coverage rule with a bad child-link; 7e8f1525 (label-coverage typed at load) must re-home them, since that error will move to load.",
+      "resolved": "7e8f1525 removed the two evaluation-time config-error transition tests; load rejection is owned by test_parse_label_coverage_rejects_malformed_options_naming_rule."
+    },
+    {
+      "source": "e1a6c8c2",
+      "note": "Code-review read REQ-01 ('no literal ... builds or matches a well-known .jit path') as covering test modules. 18dc6e3e (repository_state/) and 945f65f3 (commands/) passed review but kept such literals in #[cfg(test)] code and doctests. Epic REQ-07 says 'No production format! builds one of these paths' (production only), so likely fine at the epic gate; recheck before the epic holistic review."
+    },
+    {
+      "source": "18bcafb8",
+      "note": "Event::set_isolated_torn_tail(&mut self, bool) was added in domain/types.rs as part of the body-view bridge; the envelope task (d72bf093) must move it onto the body or the envelope and delete the bridge method."
+    },
+    {
+      "source": "lead",
+      "finding": "cargo-ci suite-time budget (30 s) fails under host load from other projects (gf2 gate runs, load ~17); quiet-host suite is ~15 s. Run cargo-ci gates alone with --force once load clears.",
+      "status": "environmental"
+    },
+    {
+      "source": "lead",
+      "finding": "The shared sccache server inherited an ephemeral TMPDIR (/tmp/tmp.*/scratch) from the process that started it; once that directory was removed every compile failed in cargo-ci setup. Fix: sccache --stop-server; the next build restarts it with the default TMPDIR.",
+      "status": "environmental"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
   "lessons": [
     "Brief workers: no expect/unwrap in production paths, even on infallible-by-construction values; the code reviewer fails it (b3fcd297 R1).",
     "cargo-ci exits 75 (infra) when host load1 >= 0.17 x CPUs (4.08 here); many parallel worker builds trigger it. gate.sh now waits for load < 3.8 while holding the exclusive lock, and retries on exit 75.",
-    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed."
-  ]
+    "Never pipe a check into tail before committing (b3fcd297/c400730c merge): the pipe masks the exit status. A conflict merge committed a missing brace; a fix commit followed.",
+    "Landing on drift must hold the exclusive CI lock across merge-main, cargo-ci and the main merge; otherwise other leads' merges cause endless re-gates (c400730c needed 4 cargo-ci runs).",
+    "Never rewrite a lead script in place while a background run uses it (bash reads scripts incrementally): write a new file and mv it over, so running shells keep the old inode. 6e8b9f31's ship broke this way.",
+    "Verify a task id by title before citing it in a brief (98404e0c R1 failed on a lead-supplied wrong id).",
+    "Preserve authored optional keys in typed rule configs (Option + one accessor) so serialization emits the same keys (af9c277d decision).",
+    "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
+    "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
+    "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
+    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
+  ],
+  "session_note": "Session 2 handoff written as handoff.md; see it for next actions."
 }

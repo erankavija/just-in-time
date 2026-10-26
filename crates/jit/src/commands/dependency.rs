@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::{AmbiguousIdError, IssueNotFoundError};
@@ -34,18 +34,6 @@ enum CapturedDependencyMutation<Id = IssueIdPrefix> {
     },
 }
 
-impl CapturedDependencyMutation<String> {
-    fn issue_id(&self) -> &str {
-        match self {
-            Self::Single { issue_id, .. }
-            | Self::Batch { issue_id, .. }
-            | Self::RemoveSingle { issue_id, .. }
-            | Self::RemoveBatch { issue_id, .. } => issue_id,
-            Self::ReduceAll { .. } => "",
-        }
-    }
-}
-
 /// Parse a batch's requested dependency ids, naming every one that is too
 /// short in one batch rejection.
 fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<IssueIdPrefix>> {
@@ -53,7 +41,7 @@ fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<Is
     let parsed = ids
         .iter()
         .filter_map(|id| {
-            IssueIdPrefix::parse(id)
+            IssueIdPrefix::from_str(id)
                 .map_err(|error| rejected.push((id.clone(), error.into())))
                 .ok()
         })
@@ -61,7 +49,7 @@ fn parse_dependency_batch(from: &IssueIdPrefix, ids: &[String]) -> Result<Vec<Is
     if rejected.is_empty() {
         Ok(parsed)
     } else {
-        Err(DependencyBatchRejectedError::new(from.requested(), rejected).into())
+        Err(DependencyBatchRejectedError::new(from.as_str(), rejected).into())
     }
 }
 
@@ -153,8 +141,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Single {
-            issue_id: IssueIdPrefix::parse(issue_id)?,
-            dependency_id: IssueIdPrefix::parse(dep_id)?,
+            issue_id: IssueIdPrefix::from_str(issue_id)?,
+            dependency_id: IssueIdPrefix::from_str(dep_id)?,
             policy,
         })? {
             CapturedDependencyOutcome::Single { result, warning } => {
@@ -173,8 +161,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveSingle {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
-                dependency_id: IssueIdPrefix::parse(dep_id)?,
+                issue_id: IssueIdPrefix::from_str(issue_id)?,
+                dependency_id: IssueIdPrefix::from_str(dep_id)?,
             },
         )? {
             CapturedDependencyOutcome::RemovedSingle { warning } => {
@@ -230,7 +218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let issue_id = IssueIdPrefix::parse(issue_id)?;
+        let issue_id = IssueIdPrefix::from_str(issue_id)?;
         let dependency_ids = parse_dependency_batch(&issue_id, dep_ids)?;
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
             issue_id,
@@ -309,7 +297,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             .as_ref()
                             .ok_or_else(|| anyhow!("missing source"))?,
                     ),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -383,7 +370,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = crate::repository_state::assemble_config(&image)?;
-            let resolved_request: CapturedDependencyMutation<String> = match &request {
+            let resolved_request: CapturedDependencyMutation<IssueId> = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
                     dependency_id,
@@ -402,10 +389,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
+                let (CapturedDependencyMutation::RemoveSingle {
+                    issue_id: resolved_id,
+                    ..
+                }
+                | CapturedDependencyMutation::RemoveBatch {
+                    issue_id: resolved_id,
+                    ..
+                }) = &resolved_request
+                else {
+                    unreachable!("removal coordinator receives only removals");
+                };
                 captured_lease_warnings(
                     config.enforcement_mode(),
-                    &[resolved_request.issue_id().to_string()],
-                    &issues,
+                    std::slice::from_ref(resolved_id),
                     claims_guard.as_ref(),
                 )?
                 .into_iter()
@@ -466,10 +463,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
-                issue_id: IssueIdPrefix::parse(issue_id)?,
+                issue_id: IssueIdPrefix::from_str(issue_id)?,
                 dependency_ids: dep_ids
                     .iter()
-                    .map(|id| IssueIdPrefix::parse(id))
+                    .map(|id| IssueIdPrefix::from_str(id))
                     .collect::<Result<_, _>>()?,
             },
         )? {
@@ -544,7 +541,7 @@ fn derive_dependency_removal(
             let mut reported_removed = Vec::new();
             let mut not_found = Vec::new();
             for prefix in dependency_ids {
-                let requested = prefix.requested();
+                let requested = prefix.as_str();
                 let matches = issue
                     .dependencies
                     .iter()
@@ -596,7 +593,7 @@ fn derive_dependency_removal(
     let resolved = crate::domain::queries::build_issue_map(&candidate);
     let mut intents = vec![MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_updated(
+        event: Box::new(EventBody::draft_issue_updated(
             source_id.clone(),
             "dependency-remove".to_string(),
             vec!["dependencies".to_string()],
@@ -676,14 +673,21 @@ fn derive_single_dependency_add(
 
     let candidate = candidate_issues(issues, &full_issue_id, [&full_dependency_id])?;
     let candidate_graph = dependency_graph(&candidate);
-    let mut redundant = candidate_graph.find_redundant_edges();
-    redundant.sort();
+    let redundant = candidate_graph
+        .find_redundant_edges()
+        .into_iter()
+        .map(|(from, to)| (from.id.clone(), to.id.clone()))
+        .collect::<Vec<_>>();
     if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
         return Err(
             RedundantDependencyError::new((full_issue_id, full_dependency_id), redundant).into(),
         );
     }
-    let reduced = candidate_graph.compute_transitive_reduction(&full_issue_id);
+    let reduced = candidate_graph
+        .compute_transitive_reduction(&full_issue_id)
+        .into_iter()
+        .map(|node| node.id.clone())
+        .collect::<HashSet<_>>();
     let original = dependency_set(from);
     let result = if reduced == original {
         DependencyAddResult::Skipped {
@@ -718,7 +722,7 @@ fn derive_batch_dependency_add(
     let mut seen = HashSet::new();
 
     for (ordinal, prefix) in dependency_ids.iter().enumerate() {
-        let dependency_id = prefix.requested().to_string();
+        let dependency_id = prefix.as_str().to_string();
         match super::resolve_issue_from_capture(issues, prefix) {
             Ok(full_id) if from_deps.contains(&full_id) || !seen.insert(full_id.clone()) => {
                 already_exist.push(dependency_id);
@@ -757,8 +761,11 @@ fn derive_batch_dependency_add(
             valid_edges.iter().map(|(_, _, full_id)| full_id),
         )?;
         let graph = dependency_graph(&acyclic_candidate);
-        let mut redundant = graph.find_redundant_edges();
-        redundant.sort();
+        let redundant = graph
+            .find_redundant_edges()
+            .into_iter()
+            .map(|(from, to)| (from.id.clone(), to.id.clone()))
+            .collect::<Vec<_>>();
         let self_redundant = redundant
             .iter()
             .filter(|(from, to)| {
@@ -793,8 +800,11 @@ fn derive_batch_dependency_add(
                     continue;
                 }
                 let singleton = candidate_issues(issues, &full_issue_id, [full_id])?;
-                let mut singleton_redundant = dependency_graph(&singleton).find_redundant_edges();
-                singleton_redundant.sort();
+                let singleton_redundant = dependency_graph(&singleton)
+                    .find_redundant_edges()
+                    .into_iter()
+                    .map(|(from, to)| (from.id.clone(), to.id.clone()))
+                    .collect::<Vec<_>>();
                 if !singleton_redundant.is_empty() {
                     rejected.push((
                         *ordinal,
@@ -808,7 +818,11 @@ fn derive_batch_dependency_add(
                 }
             }
         }
-        reduced_from = graph.compute_transitive_reduction(&full_issue_id);
+        reduced_from = graph
+            .compute_transitive_reduction(&full_issue_id)
+            .into_iter()
+            .map(|node| node.id.clone())
+            .collect();
     }
 
     if !rejected.is_empty() {
@@ -939,7 +953,11 @@ fn derive_reduced_graph_intents(
             Some((source_id, source_reduced)) if source_id == candidate_issue.id => {
                 source_reduced.clone()
             }
-            _ => graph.compute_transitive_reduction(&candidate_issue.id),
+            _ => graph
+                .compute_transitive_reduction(&candidate_issue.id)
+                .into_iter()
+                .map(|node| node.id.clone())
+                .collect(),
         };
         if reduced == original_deps {
             continue;
@@ -966,7 +984,7 @@ fn derive_reduced_graph_intents(
                 issue.state = State::Backlog;
                 events.push(MutationIntent::RecordEvent {
                     phase: 1,
-                    event: Box::new(Event::draft_issue_state_changed(
+                    event: Box::new(EventBody::draft_issue_state_changed(
                         issue_id.clone(),
                         State::Ready,
                         State::Backlog,
@@ -975,7 +993,7 @@ fn derive_reduced_graph_intents(
             }
             events.push(MutationIntent::RecordEvent {
                 phase: 2,
-                event: Box::new(Event::draft_issue_updated(
+                event: Box::new(EventBody::draft_issue_updated(
                     issue_id,
                     "dependency-add".to_string(),
                     vec!["dependencies".to_string()],
@@ -984,7 +1002,7 @@ fn derive_reduced_graph_intents(
         } else {
             events.push(MutationIntent::RecordEvent {
                 phase: 3,
-                event: Box::new(Event::draft_dependency_reduced(
+                event: Box::new(EventBody::draft_dependency_reduced(
                     issue_id,
                     original_deps.len(),
                     reduced.len(),

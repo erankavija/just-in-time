@@ -1,6 +1,7 @@
 //! Event log operations
 
 use super::*;
+use crate::domain::event_catalog::EventTag;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
@@ -11,7 +12,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn query_events(
         &self,
-        event_type: Option<String>,
+        event_type: Option<EventTag>,
         issue_id: Option<String>,
         limit: usize,
     ) -> Result<Vec<Event>> {
@@ -25,7 +26,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .rev()
             .filter(|e| {
                 if let Some(ref et) = event_type {
-                    if e.get_type() != et {
+                    if e.body().tag() != *et {
                         return false;
                     }
                 }
@@ -47,6 +48,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::EventBody;
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
 
@@ -69,19 +71,15 @@ mod tests {
     fn test_query_events_reports_linked_checkout_write_override_record() {
         let (executor, expected) = seeded_override_executor();
         let events = executor
-            .query_events(
-                Some("linked_checkout_write_overridden".to_string()),
-                None,
-                10,
-            )
+            .query_events(Some(EventTag::LinkedCheckoutWriteOverridden), None, 10)
             .expect("the event query succeeds");
 
         assert_eq!(events, vec![expected]);
-        let Event::LinkedCheckoutWriteOverridden {
+        let EventBody::LinkedCheckoutWriteOverridden {
             declared_stance,
             invocation_override,
             ..
-        } = &events[0]
+        } = events[0].body()
         else {
             panic!("the event query reports the override record");
         };

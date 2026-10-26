@@ -47,7 +47,7 @@ pub trait GraphNode {
     fn id(&self) -> &str;
 
     /// IDs of nodes this node depends on
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
 }
 
 /// Errors that can occur during graph operations
@@ -56,7 +56,7 @@ pub enum GraphError {
     /// A cycle was detected in the dependency graph
     #[error("Cycle detected: adding dependency would create a cycle")]
     CycleDetected,
-    /// Referenced node does not exist
+    /// Display-only name of a reference to an absent node.
     #[error("Node not found: {id}")]
     NodeNotFound { id: String },
 }
@@ -92,12 +92,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             Direction::Dependencies => self
                 .nodes
                 .values()
-                .map(|node| {
-                    (
-                        node.id(),
-                        node.dependencies().iter().map(String::as_str).collect(),
-                    )
-                })
+                .map(|node| (node.id(), node.dependencies().collect()))
                 .collect(),
             Direction::Dependents => {
                 let mut index: HashMap<&'a str, Vec<&'a str>> = self
@@ -107,7 +102,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                     .collect();
                 for node in self.nodes.values() {
                     for dep in node.dependencies() {
-                        if let Some(dependents) = index.get_mut(dep.as_str()) {
+                        if let Some(dependents) = index.get_mut(dep) {
                             dependents.push(node.id());
                         }
                     }
@@ -248,7 +243,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
             if let Some(node) = self.nodes.get(current) {
                 for dep in node.dependencies() {
-                    stack.push(dep.as_str());
+                    stack.push(dep);
                 }
             }
         }
@@ -267,7 +262,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     pub fn get_roots(&self) -> Vec<&'a T> {
         self.nodes
             .values()
-            .filter(|node| node.dependencies().is_empty())
+            .filter(|node| node.dependencies().next().is_none())
             .copied()
             .collect()
     }
@@ -276,7 +271,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     pub fn get_dependents(&self, node_id: &str) -> Vec<&'a T> {
         self.nodes
             .values()
-            .filter(|node| node.dependencies().contains(&node_id.to_string()))
+            .filter(|node| node.dependencies().any(|dep| dep == node_id))
             .copied()
             .collect()
     }
@@ -324,8 +319,8 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             }
             if let Some(node) = self.nodes.get(current) {
                 for dep in node.dependencies() {
-                    result.insert(dep.as_str());
-                    stack.push(dep.as_str());
+                    result.insert(dep);
+                    stack.push(dep);
                 }
             }
         }
@@ -346,7 +341,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .values()
             .filter(|node| {
                 // No dependencies (no outgoing edges)
-                let has_no_dependencies = node.dependencies().is_empty();
+                let has_no_dependencies = node.dependencies().next().is_none();
                 // No dependents (no incoming edges)
                 let has_no_dependents = self.get_dependents(node.id()).is_empty();
                 has_no_dependencies && has_no_dependents
@@ -383,11 +378,11 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
         if let Some(graph_node) = self.nodes.get(node) {
             for dep in graph_node.dependencies() {
-                if !visited.contains(dep.as_str()) {
+                if !visited.contains(dep) {
                     if self.has_cycle_dfs(dep, visited, rec_stack) {
                         return true;
                     }
-                } else if rec_stack.contains(dep.as_str()) {
+                } else if rec_stack.contains(dep) {
                     return true;
                 }
             }
@@ -427,7 +422,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                     if current == start && dep == target {
                         continue;
                     }
-                    stack.push(dep.as_str());
+                    stack.push(dep);
                 }
             }
         }
@@ -439,30 +434,27 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// Returns the minimal set of dependencies that preserves reachability.
     /// An edge is kept only if it's not reachable through other edges.
-    pub fn compute_transitive_reduction(&self, node_id: &str) -> HashSet<String> {
+    /// References to absent nodes are skipped.
+    pub fn compute_transitive_reduction(&self, node_id: &str) -> Vec<&'a T> {
         let Some(node) = self.nodes.get(node_id) else {
-            return HashSet::new();
+            return Vec::new();
         };
 
-        let deps = node.dependencies();
-        if deps.is_empty() {
-            return HashSet::new();
-        }
+        let deps: Vec<&str> = node.dependencies().collect();
+        let mut kept = HashSet::new();
 
         // Keep only dependencies that are NOT reachable through other dependencies
         deps.iter()
+            .copied()
             .filter(|dep| {
                 // Check if this dep is reachable through other deps
-                let other_deps: Vec<&str> = deps
-                    .iter()
-                    .filter(|d| d != dep)
-                    .map(String::as_str)
-                    .collect();
+                let other_deps: Vec<&str> = deps.iter().filter(|d| *d != dep).copied().collect();
 
                 // If dep is reachable from any other dep, it's redundant
                 !other_deps.iter().any(|other| self.is_reachable(other, dep))
             })
-            .cloned()
+            .filter(|dep| kept.insert(*dep))
+            .filter_map(|dep| self.nodes.get(dep).copied())
             .collect()
     }
 
@@ -471,16 +463,21 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// Returns the shortest path that doesn't use the direct edge from `from` to `to`.
     /// Useful for reporting alternative paths when detecting redundant dependencies.
     ///
-    /// Returns a vector of node IDs representing the path, or empty vector if no path exists.
-    pub fn find_shortest_path(&self, from: &str, to: &str) -> Vec<String> {
+    /// Returns nodes along the path, or an empty vector if no path exists.
+    /// References to absent nodes are skipped.
+    pub fn find_shortest_path(&self, from: &str, to: &str) -> Vec<&'a T> {
         use std::collections::VecDeque;
 
+        let Some(start) = self.nodes.get(from).copied() else {
+            return Vec::new();
+        };
         let mut queue = VecDeque::new();
         let mut visited = HashMap::new();
 
-        queue.push_back((from, vec![from.to_string()]));
+        queue.push_back((start, vec![start]));
 
-        while let Some((current, path)) = queue.pop_front() {
+        while let Some((node, path)) = queue.pop_front() {
+            let current = node.id();
             if current == to && path.len() > 1 {
                 return path;
             }
@@ -490,16 +487,16 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             }
             visited.insert(current, ());
 
-            if let Some(node) = self.nodes.get(current) {
-                for dep in node.dependencies() {
-                    // Skip direct edge from start
-                    if current == from && dep == to {
-                        continue;
-                    }
+            for dep in node.dependencies() {
+                // Skip direct edge from start
+                if current == from && dep == to {
+                    continue;
+                }
 
+                if let Some(dependency) = self.nodes.get(dep).copied() {
                     let mut new_path = path.clone();
-                    new_path.push(dep.clone());
-                    queue.push_back((dep.as_str(), new_path));
+                    new_path.push(dependency);
+                    queue.push_back((dependency, new_path));
                 }
             }
         }
@@ -516,18 +513,25 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// exposed as a pure query so the write path can reject a redundant edge
     /// before persisting it instead of surfacing the violation at a later
     /// `jit validate`. The result is sorted for deterministic reporting.
-    pub fn find_redundant_edges(&self) -> Vec<(String, String)> {
-        let mut redundant: Vec<(String, String)> = Vec::new();
+    /// References to absent nodes are skipped.
+    pub fn find_redundant_edges(&self) -> Vec<(&'a T, &'a T)> {
+        let mut redundant = Vec::new();
         for node in self.nodes.values() {
             let id = node.id();
-            let reduced = self.compute_transitive_reduction(id);
+            let reduced: HashSet<&str> = self
+                .compute_transitive_reduction(id)
+                .into_iter()
+                .map(GraphNode::id)
+                .collect();
             for dep in node.dependencies() {
                 if !reduced.contains(dep) {
-                    redundant.push((id.to_string(), dep.clone()));
+                    if let Some(dependency) = self.nodes.get(dep).copied() {
+                        redundant.push((*node, dependency));
+                    }
                 }
             }
         }
-        redundant.sort();
+        redundant.sort_unstable_by(|(a, b), (c, d)| (a.id(), b.id()).cmp(&(c.id(), d.id())));
         redundant
     }
 }
@@ -587,8 +591,8 @@ mod tests {
             &self.id
         }
 
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
     }
 
@@ -909,6 +913,41 @@ mod tests {
     }
 
     #[test]
+    fn test_find_shortest_path_returns_alternative_nodes_in_order() {
+        let a = TestNode::new("A", vec!["C", "B"]);
+        let b = TestNode::new("B", vec!["C"]);
+        let c = TestNode::new("C", vec![]);
+        let graph = DependencyGraph::new(&[&a, &b, &c]);
+
+        let path = graph.find_shortest_path("A", "C");
+
+        assert_eq!(
+            path.iter().map(|node| node.id()).collect::<Vec<_>>(),
+            ["A", "B", "C"]
+        );
+    }
+
+    #[test]
+    fn test_graph_queries_skip_absent_nodes() {
+        let a = TestNode::new("A", vec!["B", "missing"]);
+        let b = TestNode::new("B", vec!["missing"]);
+        let graph = DependencyGraph::new(&[&a, &b]);
+
+        assert_eq!(
+            graph
+                .compute_transitive_reduction("A")
+                .iter()
+                .map(|node| node.id())
+                .collect::<Vec<_>>(),
+            ["B"]
+        );
+        assert!(graph.compute_transitive_reduction("missing").is_empty());
+        assert!(graph.find_shortest_path("A", "missing").is_empty());
+        assert!(graph.find_shortest_path("missing", "A").is_empty());
+        assert!(graph.find_redundant_edges().is_empty());
+    }
+
+    #[test]
     fn test_compute_transitive_reduction_simple() {
         // A→B, A→C, B→C
         // Should keep only A→B and B→C
@@ -917,7 +956,11 @@ mod tests {
         let c = TestNode::new("C", vec![]);
 
         let graph = DependencyGraph::new(&[&a, &b, &c]);
-        let reduced_deps = graph.compute_transitive_reduction("A");
+        let reduced_deps = graph
+            .compute_transitive_reduction("A")
+            .into_iter()
+            .map(GraphNode::id)
+            .collect::<HashSet<_>>();
 
         // A should only depend on B (not C)
         assert_eq!(reduced_deps.len(), 1);
@@ -933,7 +976,11 @@ mod tests {
         let c = TestNode::new("C", vec![]);
 
         let graph = DependencyGraph::new(&[&a, &b, &c]);
-        let reduced_deps = graph.compute_transitive_reduction("A");
+        let reduced_deps = graph
+            .compute_transitive_reduction("A")
+            .into_iter()
+            .map(GraphNode::id)
+            .collect::<HashSet<_>>();
 
         // Both dependencies should remain
         assert_eq!(reduced_deps.len(), 2);
@@ -951,7 +998,11 @@ mod tests {
         let d = TestNode::new("D", vec![]);
 
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
-        let reduced_deps = graph.compute_transitive_reduction("A");
+        let reduced_deps = graph
+            .compute_transitive_reduction("A")
+            .into_iter()
+            .map(GraphNode::id)
+            .collect::<HashSet<_>>();
 
         // A should depend on B and C, but not D
         assert_eq!(reduced_deps.len(), 2);
@@ -1267,6 +1318,31 @@ mod tests {
     }
 
     proptest::proptest! {
+        #[test]
+        fn test_graph_queries_borrow_nodes_from_the_input_set(
+            masks in proptest::collection::vec(0u32..128, 1..8),
+        ) {
+            let nodes = dag_from_masks(&masks);
+            let refs: Vec<&TestNode> = nodes.iter().collect();
+            let graph = DependencyGraph::new(&refs);
+            let belongs_to_input = |node: &TestNode| refs.iter().any(|input| std::ptr::eq(*input, node));
+
+            for node in &nodes {
+                for dependency in graph.compute_transitive_reduction(node.id()) {
+                    proptest::prop_assert!(belongs_to_input(dependency));
+                }
+                for target in &nodes {
+                    for step in graph.find_shortest_path(node.id(), target.id()) {
+                        proptest::prop_assert!(belongs_to_input(step));
+                    }
+                }
+            }
+            for (from, to) in graph.find_redundant_edges() {
+                proptest::prop_assert!(belongs_to_input(from));
+                proptest::prop_assert!(belongs_to_input(to));
+            }
+        }
+
         /// REQ-4: on any DAG, unlimited forward traversal reaches exactly the
         /// nodes `get_transitive_dependencies` reports.
         #[test]

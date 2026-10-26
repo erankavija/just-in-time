@@ -177,6 +177,24 @@ pub fn memory_executor_declaring(
     config: &str,
 ) -> CommandExecutor<InMemoryStorage> {
     let layout = storage.repository_layout();
+    let rules_source = storage.root().join(VirtualPath::RULES.relative().as_path());
+    let rules_target = layout
+        .resolve(&VirtualPath::RULES)
+        .expect("test layout resolves its rules path");
+    match std::fs::read(&rules_source) {
+        Ok(bytes) => {
+            if let Some(parent) = rules_target.parent() {
+                std::fs::create_dir_all(parent).expect("create test rules directory");
+            }
+            std::fs::write(&rules_target, bytes).expect("mirror test rules through the layout");
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if rules_target.exists() {
+                std::fs::remove_file(&rules_target).expect("remove absent test rules mirror");
+            }
+        }
+        Err(error) => panic!("read test rules fixture: {error}"),
+    }
     let pristine = InMemoryStorage::rooted_at(storage.root());
     {
         let held = storage.repository_state();
@@ -214,7 +232,67 @@ pub fn memory_executor_declaring(
             state.entries.entry(path).or_insert(entry);
         }
     }
+    mirror_memory_declarations(&storage, &layout);
     CommandExecutor::new(storage).with_layout(layout)
+}
+
+fn mirror_memory_declarations(
+    storage: &InMemoryStorage,
+    layout: &crate::repository_state::RepositoryLayout,
+) {
+    let state = storage.repository_state();
+    let schema_prefix = format!("{}/", VirtualPath::SCHEMAS.relative().as_str());
+    let paths = state
+        .entries
+        .keys()
+        .filter(|path| {
+            path.root_class() == crate::repository_state::RepositoryRootClass::Data
+                && ([
+                    VirtualPath::CONFIG,
+                    VirtualPath::TEMPLATES,
+                    VirtualPath::INVARIANTS,
+                    VirtualPath::RULES,
+                ]
+                .contains(*path)
+                    || path.relative().as_str().starts_with(&schema_prefix))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    drop(state);
+
+    for virtual_path in [
+        VirtualPath::CONFIG,
+        VirtualPath::TEMPLATES,
+        VirtualPath::INVARIANTS,
+        VirtualPath::RULES,
+    ]
+    .into_iter()
+    .chain(
+        paths
+            .into_iter()
+            .filter(|path| path.relative().as_str().starts_with(&schema_prefix)),
+    ) {
+        let host_path = layout
+            .resolve(&virtual_path)
+            .expect("the memory layout resolves declaration paths");
+        match storage
+            .read_repo_file(&virtual_path.repository_relative())
+            .expect("memory declaration paths are canonical")
+        {
+            Some(contents) => {
+                if let Some(parent) = host_path.parent() {
+                    std::fs::create_dir_all(parent).expect("create declaration fixture directory");
+                }
+                std::fs::write(host_path, contents).expect("mirror memory declaration");
+            }
+            None if host_path.exists()
+                && !virtual_path.relative().as_str().starts_with(&schema_prefix) =>
+            {
+                std::fs::remove_file(host_path).expect("remove absent declaration fixture");
+            }
+            None => {}
+        }
+    }
 }
 
 /// Create an executor with enforcement mode configured.

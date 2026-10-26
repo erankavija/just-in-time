@@ -846,7 +846,7 @@ assert = { json-schema = "schemas/bad.json" }
 "#;
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let rules = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();

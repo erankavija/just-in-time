@@ -142,6 +142,7 @@
 //! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
 //! ```
 
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::graph::{DependencyGraph, GraphNode};
 use schemars::JsonSchema;
@@ -160,7 +161,7 @@ pub trait HierarchyNode {
     fn id(&self) -> &str;
 
     /// IDs of the nodes this node depends on (its outgoing DAG edges).
-    fn dependencies(&self) -> &[String];
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
 
     /// The value of this node's `type:` label (e.g. `"epic"`), or `None` when it
     /// carries no type label. Mapped to a level via the config.
@@ -172,8 +173,8 @@ impl HierarchyNode for crate::domain::Issue {
         &self.id
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(String::as_str)
     }
 
     fn type_name(&self) -> Option<&str> {
@@ -207,12 +208,22 @@ pub struct NodeHierarchy {
 ///
 /// Every input node has an entry (roots and orphans included). Look facts up by
 /// id through the accessors; the map is keyed by node id.
-#[derive(Debug, Clone, Default)]
-pub struct HierarchyResolution {
+#[derive(Debug, Clone)]
+pub struct HierarchyResolution<'a, T> {
     nodes: HashMap<String, NodeHierarchy>,
+    source_nodes: HashMap<&'a str, &'a T>,
 }
 
-impl HierarchyResolution {
+impl<T> Default for HierarchyResolution<'_, T> {
+    fn default() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            source_nodes: HashMap::new(),
+        }
+    }
+}
+
+impl<'a, T> HierarchyResolution<'a, T> {
     /// The full [`NodeHierarchy`] for `id`, if the node was in the input.
     pub fn get(&self, id: &str) -> Option<&NodeHierarchy> {
         self.nodes.get(id)
@@ -265,21 +276,26 @@ impl HierarchyResolution {
     /// This is containment membership, not the raw dependency closure: it
     /// follows the resolved parent/child relation, so a dependency that points
     /// into another container's subtree is *not* pulled in (that edge crosses
-    /// the membership boundary). An unknown `root` yields just `{root}`.
-    pub fn membership_closure(&self, root: &str) -> HashSet<String> {
-        let mut included: HashSet<String> = HashSet::new();
-        included.insert(root.to_string());
+    /// the membership boundary). An unknown `root` yields an empty vector.
+    pub fn membership_closure(&self, root: &str) -> Vec<&'a T> {
+        let Some((&root, &node)) = self.source_nodes.get_key_value(root) else {
+            return Vec::new();
+        };
+        let mut included = HashSet::from([root]);
+        let mut members = vec![node];
 
-        let mut queue: VecDeque<String> = VecDeque::new();
-        queue.push_back(root.to_string());
+        let mut queue = VecDeque::from([root]);
         while let Some(current) = queue.pop_front() {
-            for child in self.children(&current) {
-                if included.insert(child.clone()) {
-                    queue.push_back(child.clone());
+            for child in self.children(current) {
+                if included.insert(child.as_str()) {
+                    if let Some(node) = self.source_nodes.get(child.as_str()) {
+                        members.push(*node);
+                        queue.push_back(child);
+                    }
                 }
             }
         }
-        included
+        members
     }
 }
 
@@ -290,10 +306,10 @@ impl HierarchyResolution {
 /// configured type levels. Pure and deterministic; membership labels are not
 /// consulted and the input is left untouched. See the [module docs](self) for the
 /// resolution rules and edge-case semantics.
-pub fn resolve_hierarchy<T: HierarchyNode>(
-    nodes: &[&T],
+pub fn resolve_hierarchy<'a, T: HierarchyNode>(
+    nodes: &[&'a T],
     config: &HierarchyConfig,
-) -> HierarchyResolution {
+) -> HierarchyResolution<'a, T> {
     let by_id: HashMap<&str, &T> = nodes.iter().map(|n| (n.id(), *n)).collect();
     // Canonical edge set: the transitive reduction, computed once for the whole
     // input and read by every step below. Reducing here makes every fact a
@@ -412,7 +428,10 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
         );
     }
 
-    HierarchyResolution { nodes: resolved }
+    HierarchyResolution {
+        nodes: resolved,
+        source_nodes: by_id,
+    }
 }
 
 /// The transitive reduction of the in-set dependency edges, keyed by node id.
@@ -425,41 +444,28 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
 fn transitively_reduced_edges<'a, T: HierarchyNode>(
     nodes: &[&'a T],
 ) -> HashMap<&'a str, Vec<&'a str>> {
-    /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
-    struct EdgeView<'a> {
-        id: &'a str,
-        deps: &'a [String],
-    }
+    /// The dependency-graph view of a hierarchy node, delegating to the node.
+    struct EdgeView<'a, T>(&'a T);
 
-    impl GraphNode for EdgeView<'_> {
+    impl<T: HierarchyNode> GraphNode for EdgeView<'_, T> {
         fn id(&self) -> &str {
-            self.id
+            self.0.id()
         }
-        fn dependencies(&self) -> &[String] {
-            self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.0.dependencies()
         }
     }
 
-    let views: Vec<EdgeView<'a>> = nodes
-        .iter()
-        .map(|n| EdgeView {
-            id: n.id(),
-            deps: n.dependencies(),
-        })
-        .collect();
-    let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
+    let views: Vec<EdgeView<'a, T>> = nodes.iter().map(|n| EdgeView(*n)).collect();
+    let view_refs: Vec<&EdgeView<'a, T>> = views.iter().collect();
     let graph = DependencyGraph::new(&view_refs);
-    let present: HashSet<&str> = nodes.iter().map(|n| n.id()).collect();
-
     nodes
         .iter()
         .map(|node| {
-            let kept = graph.compute_transitive_reduction(node.id());
-            let deps = node
-                .dependencies()
-                .iter()
-                .map(String::as_str)
-                .filter(|dep| present.contains(dep) && kept.contains(*dep))
+            let deps = graph
+                .compute_transitive_reduction(node.id())
+                .into_iter()
+                .map(|view| view.0.id())
                 .collect();
             (node.id(), deps)
         })
@@ -513,7 +519,7 @@ fn longest_path(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MembershipDivergence {
     /// The id of the issue carrying the unsupported membership label.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The full `namespace:value` label (e.g. `"epic:auth"`).
     pub label: String,
     /// The label namespace (e.g. `"epic"`).
@@ -675,8 +681,8 @@ mod tests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
@@ -736,6 +742,14 @@ mod tests {
     }
 
     #[test]
+    fn test_membership_closure_returns_no_nodes_for_unknown_root() {
+        let node = TestNode::typed("node", 4, &[]);
+        let resolution = resolve_hierarchy(&[&node], &default_config());
+
+        assert!(resolution.membership_closure("missing").is_empty());
+    }
+
+    #[test]
     fn test_membership_closure_descends_whole_subtree() {
         // objective → initiative → deliverable → action
         let m = TestNode::typed("m", 1, &["e"]);
@@ -744,13 +758,21 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
 
-        let from_initiative = r.membership_closure("e");
+        let from_initiative = r
+            .membership_closure("e")
+            .into_iter()
+            .map(|node| node.id().to_string())
+            .collect::<HashSet<_>>();
         assert_eq!(
             from_initiative,
             ["e", "s", "t"].iter().map(|s| s.to_string()).collect()
         );
 
-        let from_objective = r.membership_closure("m");
+        let from_objective = r
+            .membership_closure("m")
+            .into_iter()
+            .map(|node| node.id().to_string())
+            .collect::<HashSet<_>>();
         assert_eq!(
             from_objective,
             ["m", "e", "s", "t"].iter().map(|s| s.to_string()).collect()
@@ -758,7 +780,10 @@ mod tests {
 
         // A leaf's closure is just itself.
         assert_eq!(
-            r.membership_closure("t"),
+            r.membership_closure("t")
+                .into_iter()
+                .map(|node| node.id().to_string())
+                .collect::<HashSet<_>>(),
             ["t"].iter().map(|s| s.to_string()).collect()
         );
     }
@@ -773,8 +798,14 @@ mod tests {
         let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&e1, &e2, &t], &default_config());
 
-        assert!(r.membership_closure("e1").contains("t"));
-        assert!(!r.membership_closure("e2").contains("t"));
+        assert!(r
+            .membership_closure("e1")
+            .iter()
+            .any(|node| node.id() == "t"));
+        assert!(!r
+            .membership_closure("e2")
+            .iter()
+            .any(|node| node.id() == "t"));
     }
 
     #[test]
@@ -1013,8 +1044,8 @@ mod proptests {
         fn id(&self) -> &str {
             &self.id
         }
-        fn dependencies(&self) -> &[String] {
-            &self.deps
+        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+            self.deps.iter().map(String::as_str)
         }
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
@@ -1108,6 +1139,20 @@ mod proptests {
     }
 
     proptest! {
+        #[test]
+        fn test_membership_closure_borrows_nodes_from_the_input_set(spec in arbitrary_dag()) {
+            let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
+            let nodes = build(&spec);
+            let refs: Vec<&PropNode> = nodes.iter().collect();
+            let resolution = resolve_hierarchy(&refs, &config);
+
+            for root in &nodes {
+                for member in resolution.membership_closure(root.id()) {
+                    prop_assert!(refs.iter().any(|input| std::ptr::eq(*input, member)));
+                }
+            }
+        }
+
         /// Resolution never panics on arbitrary acyclic input, and each resolved
         /// fact satisfies its definition: every parent is a container that
         /// transitively depends on the node; children invert parent; and rank

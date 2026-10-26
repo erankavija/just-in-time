@@ -105,9 +105,9 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
-use crate::domain::issue_id::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{
-    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
+    is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
@@ -117,6 +117,7 @@ use crate::storage::IssueStore;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::cell::RefCell;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 thread_local! {
@@ -763,9 +764,20 @@ fn claims_mutation_guard(
         return Ok(None);
     }
     let agent = crate::agent_config::resolve_agent_id(None)
-        .unwrap_or_else(|_| "system:lease-check".to_string());
-    let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
-        .unwrap_or_else(|| paths.worktree_root.display().to_string());
+        .unwrap_or(crate::domain::Assignee::SYSTEM_LEASE_CHECK);
+    let worktree_id =
+        match crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)? {
+            Some(id) => id,
+            None => crate::domain::identity::WorktreeId::try_from(
+                paths.worktree_root.display().to_string(),
+            )
+            .with_context(|| {
+                format!(
+                    "Invalid worktree id fallback from root path '{}'",
+                    paths.worktree_root.display()
+                )
+            })?,
+        };
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         FileLocker::with_configured_timeout(),
@@ -777,8 +789,7 @@ fn claims_mutation_guard(
 
 fn captured_lease_warnings(
     mode: crate::config::EnforcementMode,
-    targets: &[String],
-    issues: &[Issue],
+    targets: &[IssueId],
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
 ) -> Result<Vec<String>> {
     use crate::agent_config::resolve_agent_id;
@@ -790,14 +801,7 @@ fn captured_lease_warnings(
     let agent = resolve_agent_id(None).ok();
     let mut warnings = Vec::new();
     for id in targets {
-        let active = guard
-            .map(|guard| {
-                guard.has_active_lease(id, agent.as_deref(), |raw| {
-                    resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
-                })
-            })
-            .transpose()?
-            .unwrap_or(false);
+        let active = guard.is_some_and(|guard| guard.has_active_lease(id, agent.as_ref()));
         if active {
             continue;
         }
@@ -814,18 +818,10 @@ fn captured_lease_warnings(
 
 fn ensure_claim_available(
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
-    target: &str,
+    target: &IssueId,
     assignee: &crate::domain::Assignee,
-    issues: &[Issue],
 ) -> Result<()> {
-    let Some(lease) = guard
-        .map(|guard| {
-            guard.conflicting_lease(target, Some(&assignee.to_string()), |raw| {
-                resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
-            })
-        })
-        .transpose()?
-        .flatten()
+    let Some(lease) = guard.and_then(|guard| guard.conflicting_lease(target, Some(assignee)))
     else {
         return Ok(());
     };
@@ -1053,8 +1049,8 @@ fn derive_write_validation(
     config: &JitConfig,
     force: bool,
 ) -> Result<WriteValidation> {
-    let repo_format = config.content_format()?;
-    let strictness = config.strictness()?;
+    let repo_format = config.content_format();
+    let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
         .with_strictness(strictness);
@@ -1173,9 +1169,10 @@ fn derive_state_transition(
                 })
                 .collect::<Vec<_>>();
             let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
-            let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
-            let repo_format = evidence.config.content_format()?;
-            let strictness = evidence.config.strictness()?;
+            let hierarchy =
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
+            let repo_format = evidence.config.content_format();
+            let strictness = evidence.config.strictness();
             let enforcing = rules
                 .iter()
                 .filter(|rule| rule.enforce)
@@ -1223,13 +1220,13 @@ fn derive_state_transition(
                         (
                             1,
                             if force {
-                                Event::draft_graph_rule_bypassed(
+                                EventBody::draft_graph_rule_bypassed(
                                     issue.id.clone(),
                                     target,
                                     rule.clone(),
                                 )
                             } else {
-                                Event::draft_transition_blocked(
+                                EventBody::draft_transition_blocked(
                                     issue.id.clone(),
                                     target,
                                     rule.clone(),
@@ -1263,10 +1260,10 @@ fn derive_state_transition(
     }
     bypass_events.push((
         2,
-        Event::draft_issue_state_changed(issue.id.clone(), old_state, target),
+        EventBody::draft_issue_state_changed(issue.id.clone(), old_state, target),
     ));
     if target == State::Done {
-        bypass_events.push((3, Event::draft_issue_completed(issue.id.clone())));
+        bypass_events.push((3, EventBody::draft_issue_completed(issue.id.clone())));
     }
     Ok(DerivedStateTransition::Applied {
         issue: Box::new(issue),
@@ -1416,7 +1413,7 @@ fn derive_field_update(
     }
     let validation = match &request.label_edit {
         Some(CapturedLabelEdit::AppendUnchecked(_)) => {
-            let repo_format = evidence.config.content_format()?;
+            let repo_format = evidence.config.content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
                 &evidence.declarations.rules,
@@ -1445,7 +1442,7 @@ fn derive_field_update(
         )?,
     };
     if request.issue_type.is_some() {
-        let repo_format = evidence.config.content_format()?;
+        let repo_format = evidence.config.content_format();
         let explicit_type = crate::validation::evaluate_local(
             &projected,
             &evidence.declarations.rules,
@@ -1504,13 +1501,16 @@ fn derive_field_update(
     let entered_terminal = !original.state.is_terminal() && issue.state.is_terminal();
     if issue.assignee != original.assignee {
         if let Some(assignee) = issue.assignee.clone() {
-            events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
+            events.push((
+                4,
+                EventBody::draft_issue_claimed(issue.id.clone(), assignee),
+            ));
         }
     }
     if !changed_fields.is_empty() && request.label_edit.is_none() {
         events.push((
             5,
-            Event::draft_issue_updated(
+            EventBody::draft_issue_updated(
                 issue.id.clone(),
                 if request.bulk {
                     "bulk-update".to_string()
@@ -1521,12 +1521,12 @@ fn derive_field_update(
             ),
         ));
     }
-    events.extend(
-        validation
-            .bypassed_rules
-            .into_iter()
-            .map(|rule| (9, Event::draft_local_rule_bypassed(issue.id.clone(), rule))),
-    );
+    events.extend(validation.bypassed_rules.into_iter().map(|rule| {
+        (
+            9,
+            EventBody::draft_local_rule_bypassed(issue.id.clone(), rule),
+        )
+    }));
     let intents = changed
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1598,7 +1598,7 @@ fn derive_captured_issue_mutation(
 struct AppliedIssueMutation {
     issue: Issue,
     outcome: CapturedIssueMutationOutcome,
-    events: Vec<(u8, Event)>,
+    events: Vec<(u8, EventBody)>,
     gate_runs: Vec<crate::domain::GateRunResult>,
     changed: bool,
 }
@@ -1615,7 +1615,7 @@ fn apply_captured_issue_mutation(
                 (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
             } else {
                 issue.assignee = Some(assignee.clone());
-                let event = Event::draft_issue_claimed(issue.id.clone(), assignee.clone());
+                let event = EventBody::draft_issue_claimed(issue.id.clone(), assignee.clone());
                 (
                     CapturedIssueMutationOutcome::Changed,
                     vec![(1, event)],
@@ -1628,7 +1628,7 @@ fn apply_captured_issue_mutation(
                 (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
             } else {
                 issue.assignee = None;
-                let event = Event::draft_issue_updated(
+                let event = EventBody::draft_issue_updated(
                     issue.id.clone(),
                     "issue-unassign".to_string(),
                     vec!["assignee".to_string()],
@@ -1667,7 +1667,12 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .map(|key| (1, Event::draft_gate_added(issue.id.clone(), key.clone())))
+                .map(|key| {
+                    (
+                        1,
+                        EventBody::draft_gate_added(issue.id.clone(), key.clone()),
+                    )
+                })
                 .collect();
             let changed = !added.is_empty();
             (
@@ -1693,7 +1698,12 @@ fn apply_captured_issue_mutation(
             }
             let events = removed
                 .iter()
-                .map(|key| (1, Event::draft_gate_removed(issue.id.clone(), key.clone())))
+                .map(|key| {
+                    (
+                        1,
+                        EventBody::draft_gate_removed(issue.id.clone(), key.clone()),
+                    )
+                })
                 .collect();
             let changed = !removed.is_empty();
             (
@@ -1739,10 +1749,10 @@ fn apply_captured_issue_mutation(
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
                 GateStatus::Passed => {
-                    Event::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
                 }
                 GateStatus::Failed => {
-                    Event::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
                 }
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
@@ -1968,12 +1978,12 @@ pub struct WriteValidation {
     /// findings) to surface to the caller.
     pub warnings: Vec<String>,
     /// Names of `enforce` rules whose blocking findings were overridden by
-    /// `--force`. One [`Event::LocalRuleBypassed`] must be logged per entry,
+    /// `--force`. One [`EventBody::LocalRuleBypassed`] must be logged per entry,
     /// AFTER the write commits.
     pub bypassed_rules: Vec<String>,
 }
 
-type PhasedEvents = Vec<(u8, Event)>;
+type PhasedEvents = Vec<(u8, EventBody)>;
 
 /// Convert repo-relative planned changes into a canonical overlay-override map.
 ///
@@ -2010,6 +2020,14 @@ fn image_repo_bytes(
 ) -> Result<Option<Vec<u8>>> {
     let vpath = image.layout().classify_repository_relative(repo_rel)?;
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
+}
+
+/// Read a known virtual path from the captured image.
+pub(crate) fn image_virtual_bytes(
+    image: &crate::repository_state::RepositoryImage,
+    path: &crate::repository_state::VirtualPath,
+) -> Result<Option<Vec<u8>>> {
+    Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
 }
 
 /// Project a delta finalized over `image` to the file-overlay validation reads
@@ -2080,7 +2098,9 @@ fn discover_gate_run_results(
             listing
                 .names()
                 .iter()
-                .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
+                .map(|run_id| {
+                    VirtualPath::data(VirtualPath::GATE_RUNS.relative().as_path().join(run_id))
+                })
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )?;
     }
@@ -2096,21 +2116,21 @@ fn discover_gate_run_results(
 ///
 /// # Errors
 ///
-/// [`InvalidIdPrefixError`](crate::domain::issue_id::InvalidIdPrefixError) before any
+/// [`InvalidIdPrefixError`](crate::domain::identity::InvalidIdPrefixError) before any
 /// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
 pub(crate) fn resolve_issue_filter<S: IssueStore>(
     storage: &S,
     requested: &str,
 ) -> Result<IssueIdPrefix> {
-    let prefix = IssueIdPrefix::parse(requested)?;
+    let prefix = IssueIdPrefix::from_str(requested)?;
     match storage.resolve_issue_id(&prefix) {
-        Ok(id) => Ok(IssueIdPrefix::of_stored(&id)),
+        Ok(id) => Ok(IssueIdPrefix::from(&id)),
         Err(error) if error.is::<crate::storage::IssueNotFoundError>() => Ok(prefix),
         Err(error) => Err(error),
     }
 }
 
-fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<String> {
+fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<IssueId> {
     crate::storage::resolve_issue_id_among(prefix, issues)
 }
 
@@ -2173,7 +2193,17 @@ pub struct CommandExecutor<S: IssueStore> {
 impl<S: IssueStore> CommandExecutor<S> {
     /// Create a new command executor with the given storage
     pub fn new(storage: S) -> Self {
-        let config_manager = ConfigManager::new(storage.root());
+        let data_root = storage.root();
+        let config_layout = crate::storage::discover_repository_layout(
+            data_root
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new(".")),
+            data_root,
+        )
+        .ok();
+        let config_manager = config_layout
+            .map(ConfigManager::new)
+            .unwrap_or_else(ConfigManager::unbound);
         Self {
             storage,
             config_manager,
@@ -2194,6 +2224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// data root; tests supply a fixture layout over a temporary worktree.
     pub fn with_layout(mut self, layout: crate::repository_state::RepositoryLayout) -> Self {
         self.storage.configure_repository_layout(&layout);
+        self.config_manager.bind_layout(layout.clone());
         self.layout = Some(layout);
         self
     }
@@ -2424,7 +2455,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if explicit_type {
-                let repo_format = declarations.config().content_format()?;
+                let repo_format = declarations.config().content_format();
                 let evaluation = crate::validation::evaluate_local(
                     &final_draft,
                     declarations.rules(),
@@ -2451,7 +2482,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .iter()
                     .map(|rule| MutationIntent::RecordEvent {
                         phase: 9,
-                        event: Box::new(Event::draft_local_rule_bypassed(
+                        event: Box::new(EventBody::draft_local_rule_bypassed(
                             issue_id.clone(),
                             rule.clone(),
                         )),
@@ -2486,7 +2517,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?;
-                crate::storage::ruleset_store::load_ruleset(self.storage.root(), &config)
+                crate::storage::ruleset_store::load_ruleset(
+                    self.repository_layout()
+                        .map_err(|error| RuleConfigError::Configuration {
+                            message: error.to_string(),
+                        })?,
+                    &config,
+                )
             })
             .as_ref()
     }
@@ -2523,7 +2560,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
-                let rules_path = self.storage.root().join("rules.toml");
+                let layout = self.require_layout().map_err(|error| error.to_string())?;
+                let rules_path = layout
+                    .resolve(&crate::repository_state::VirtualPath::RULES)
+                    .map_err(|error| error.to_string())?;
                 if rules_path.exists() {
                     // File present (even empty) supplies the operative rule set.
                     // Its default-origin rules are a config PROJECTION: reconcile
@@ -2593,7 +2633,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Resolve the repository's configured default content format.
     fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        self.cached_config()?.content_format()
+        Ok(self.cached_config()?.content_format())
     }
 
     fn publish_captured_field_update(
@@ -2633,7 +2673,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     config.enforcement_mode(),
                     std::slice::from_ref(&target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2641,7 +2680,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = IssueIdPrefix::of_stored(&target);
+            effective_request.issue_id = IssueIdPrefix::from(&target);
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2692,8 +2731,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let request =
-            CapturedFieldUpdate::bulk(IssueIdPrefix::of_stored(&issue_id), operations, force)?;
+        let request = CapturedFieldUpdate::bulk(IssueIdPrefix::from(&issue_id), operations, force)?;
         self.publish_captured_field_update(request)
     }
 
@@ -2839,23 +2877,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             if let (true, Some(precheck)) = (coordinate_claims, &precheck) {
                 // Refuse before running prechecks; the held guard repeats this.
-                let preflight_issues = captured_active_issues(&precheck.image)?;
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
                     captured_lease_warnings(
                         precheck.lease_mode,
                         std::slice::from_ref(&expected_target),
-                        &preflight_issues,
                         preliminary_guard.as_ref(),
                     )?;
                 }
                 if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                    ensure_claim_available(
-                        preliminary_guard.as_ref(),
-                        &expected_target,
-                        assignee,
-                        &preflight_issues,
-                    )?;
+                    ensure_claim_available(preliminary_guard.as_ref(), &expected_target, assignee)?;
                 }
             }
             let expected_precheck = precheck.as_ref().map(|precheck| &precheck.plan);
@@ -2940,7 +2971,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_lease_warnings(
                     lease_mode,
                     std::slice::from_ref(&expected_target),
-                    &issues,
                     claims_guard.as_ref(),
                 )?
             } else {
@@ -2950,20 +2980,29 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .map_or_else(Vec::new, |guard| guard.warnings());
             if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
-                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee, &issues)?;
+                ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee)?;
             }
             let mut precheck_events = Vec::new();
             if expected_precheck.is_some() {
                 for result in &precheck_runs {
-                    let (state, by) = gate_check::gate_state_from_run(result)?;
+                    let state = gate_check::gate_state_from_run(result);
+                    let by = result.by.clone();
                     let status = state.status;
                     issue.gates_status.insert(result.gate_key.clone(), state);
                     precheck_events.push((
                         1,
                         if status == GateStatus::Passed {
-                            Event::draft_gate_passed(issue.id.clone(), result.gate_key.clone(), by)
+                            EventBody::draft_gate_passed(
+                                issue.id.clone(),
+                                result.gate_key.clone(),
+                                by,
+                            )
                         } else {
-                            Event::draft_gate_failed(issue.id.clone(), result.gate_key.clone(), by)
+                            EventBody::draft_gate_failed(
+                                issue.id.clone(),
+                                result.gate_key.clone(),
+                                by,
+                            )
                         },
                     ));
                 }
@@ -3169,7 +3208,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         record.assignee = Some(assignee.clone());
                         events.push((
                             4,
-                            Event::draft_issue_claimed(record.id.clone(), assignee.clone()),
+                            EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
                         ));
                         if update.is_none() {
                             update = Some(issue);
@@ -3179,7 +3218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         if let Some(assignee) = record.assignee.take() {
                             events.push((
                                 4,
-                                Event::draft_issue_released(
+                                EventBody::draft_issue_released(
                                     record.id.clone(),
                                     assignee,
                                     reason.clone(),
@@ -3340,7 +3379,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
 
-        let prefix = IssueIdPrefix::parse(issue_id)?;
+        let prefix = IssueIdPrefix::from_str(issue_id)?;
         let paths = self.require_worktree_paths()?;
 
         // Load the active-lease index through storage (an absent index yields an
@@ -3433,6 +3472,93 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::EventBody;
+
+    #[test]
+    fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("worktree with spaces");
+        let paths = crate::storage::WorktreePaths {
+            git_repository: true,
+            common_dir: root.join(".git"),
+            local_jit: root.join(".jit"),
+            shared_jit: root.join(".git/jit"),
+            worktree_root: root.clone(),
+        };
+        let error = claims_mutation_guard(&paths).err().unwrap();
+        assert!(error.to_string().contains("root path"));
+        assert!(error.to_string().contains(root.to_str().unwrap()));
+        assert!(error
+            .downcast_ref::<crate::domain::identity::InvalidWorktreeIdError>()
+            .is_some());
+    }
+
+    #[test]
+    fn test_derive_state_transition_preserves_invalid_hierarchy_error() {
+        use crate::declarations::rules::{Rule, RuleScope, RuleSet, Selector, Severity};
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let type_name = taxonomy.type_at_level(4).to_string();
+        let mut issue = crate::domain::fixture_issue("Transition".into(), String::new());
+        issue.labels = vec![format!("type:{type_name}")];
+
+        let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        let config: JitConfig = toml::from_str(&config_text).unwrap();
+        let configuration =
+            crate::declarations::parse_configuration(config_text.as_bytes()).unwrap();
+        let rules = RuleSet {
+            rules: vec![Rule {
+                name: "graph-probe".to_string(),
+                origin: None,
+                description: None,
+                when: Selector {
+                    type_: Some(type_name),
+                    ..Selector::default()
+                },
+                severity: Severity::Error,
+                enforce: false,
+                assert: RuleSet::parse(
+                    "[[rules]]\nname = \"coverage\"\nassert = { label-coverage = {} }",
+                    None,
+                    [],
+                )
+                .unwrap()
+                .rules[0]
+                    .assert
+                    .clone(),
+                scope: RuleScope::Graph,
+            }],
+        };
+        let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
+            configuration,
+            config,
+            crate::declarations::GateRegistry::default(),
+            rules,
+        );
+        let issues = [issue.clone()];
+        let plan_content = std::collections::HashMap::new();
+        let context = production_mutation_context();
+
+        let error = derive_state_transition(
+            issue,
+            crate::domain::State::InProgress,
+            false,
+            CapturedTransitionEvidence {
+                issues: &issues,
+                declarations: &declarations,
+                config: declarations.config(),
+                plan_content: &plan_content,
+                context: &context,
+            },
+        )
+        .err()
+        .expect("invalid hierarchy must abort the transition");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
 
     #[test]
     fn test_production_mutation_context_factory_defaults_to_empty_annotation() {
@@ -3656,7 +3782,7 @@ mod tests {
             .capture_mutation_base(
                 session.as_mut(),
                 &[],
-                Some(&IssueIdPrefix::parse(issue_id).unwrap()),
+                Some(&IssueIdPrefix::from_str(issue_id).unwrap()),
             )
             .unwrap()
             .unwrap();
@@ -3948,30 +4074,18 @@ mod tests {
             assert_eq!(events.len(), 2);
             let evidence = events
                 .iter()
-                .map(|event| match (status, event) {
-                    (
-                        GateStatus::Passed,
-                        Event::GatePassed {
-                            id,
-                            timestamp,
-                            updated_by,
-                            ..
-                        },
-                    )
-                    | (
-                        GateStatus::Failed,
-                        Event::GateFailed {
-                            id,
-                            timestamp,
-                            updated_by,
-                            ..
-                        },
-                    ) if updated_by.as_ref() == Some(&actor) => (id, timestamp),
+                .map(|event| match (status, event.body()) {
+                    (GateStatus::Passed, EventBody::GatePassed { updated_by, .. })
+                    | (GateStatus::Failed, EventBody::GateFailed { updated_by, .. })
+                        if updated_by.as_ref() == Some(&actor) =>
+                    {
+                        (event.id(), event.timestamp())
+                    }
                     _ => panic!("unexpected manual gate evidence: {event:?}"),
                 })
                 .collect::<Vec<_>>();
-            assert_eq!(*evidence[0].1, first_time);
-            assert_eq!(*evidence[1].1, second_time);
+            assert_eq!(evidence[0].1, first_time);
+            assert_eq!(evidence[1].1, second_time);
             assert_ne!(evidence[0].0, evidence[1].0);
             let mut attested_at = storage
                 .list_gate_runs_for_issue(&id)
@@ -4090,9 +4204,11 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-
-        let rules_path = storage.root().join("rules.toml");
+        let layout = storage.repository_layout();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
         std::fs::write(
             &rules_path,
             r#"
@@ -4103,7 +4219,7 @@ assert = { require-section = { heading = "Goals" } }
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         // First access parses and caches the file.
         let first = executor.rules().expect("valid rules");
@@ -4143,9 +4259,11 @@ assert = { require-doc-type = { doc-type = "design" } }
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-
-        let config_path = storage.root().join("config.toml");
+        let layout = storage.repository_layout();
+        let config_path = layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
         std::fs::write(
             &config_path,
             r#"
@@ -4156,7 +4274,7 @@ unique = false
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
 
         // First access parses config.toml and caches the namespace registry.
         let first = executor.cached_namespaces().expect("valid namespaces");
@@ -4193,10 +4311,10 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
+        let layout = storage.repository_layout();
         // No rules.toml written.
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
         let rules = executor.rules().expect("missing file is not an error");
         assert!(rules.rules.is_empty());
     }
@@ -4206,12 +4324,16 @@ unique = false
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
+        let layout = storage.repository_layout();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
 
         // A rule whose assert table has no kind is a genuine config error and
         // must NOT be downgraded to an empty (no-rules) set.
         std::fs::write(
-            storage.root().join("rules.toml"),
+            rules_path,
             r#"
 [[rules]]
 name = "broken"
@@ -4220,7 +4342,7 @@ assert = {}
         )
         .unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let executor = CommandExecutor::new(storage).with_layout(layout);
         assert!(
             executor.rules().is_err(),
             "malformed rules.toml must surface an error, not an empty set"
@@ -4367,6 +4489,7 @@ enforce_leases = "strict"
 
     #[test]
     fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
+        use crate::storage::claim_coordinator::test_issue_id;
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use std::time::Duration;
@@ -4384,17 +4507,15 @@ enforce_leases = "strict"
         let coordinator = ClaimCoordinator::new(
             paths.clone(),
             FileLocker::new(Duration::from_secs(1)),
-            "wt:test".to_string(),
-            "agent:test".to_string(),
+            "wt:test".parse().unwrap(),
+            "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
-        let issue_id = "abcd1111111111111111111111111111";
-        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let issue_id = test_issue_id("guard-probe");
+        coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
-        assert!(guard
-            .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
-            .unwrap());
+        assert!(guard.has_active_lease(&issue_id, None));
     }
 }
 

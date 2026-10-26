@@ -69,7 +69,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::declarations::GateRegistry;
-    use crate::storage::{InMemoryStorage, IssueStore};
+    use crate::storage::InMemoryStorage;
 
     /// Build an executor over an in-memory `.jit` carrying the given
     /// `invariants.toml`, `rules.toml`, and a gate registry with `gate_keys`.
@@ -79,9 +79,20 @@ mod tests {
         gate_keys: &[&str],
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("invariants.toml"), invariants_toml).unwrap();
-        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+        let layout = storage.repository_layout();
+        std::fs::create_dir_all(layout.data_root()).unwrap();
+        std::fs::write(
+            layout
+                .resolve(&crate::repository_state::VirtualPath::INVARIANTS)
+                .unwrap(),
+            invariants_toml,
+        )
+        .unwrap();
+        let rules_path = layout
+            .resolve(&crate::repository_state::VirtualPath::RULES)
+            .unwrap();
+        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
+        std::fs::write(rules_path, rules_toml).unwrap();
         let mut registry = GateRegistry::default();
         for key in gate_keys {
             registry.gates.insert(
@@ -101,7 +112,7 @@ mod tests {
             );
         }
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        CommandExecutor::new(storage)
+        CommandExecutor::new(storage).with_layout(layout)
     }
 
     #[test]

@@ -10,8 +10,8 @@
 //!
 //! - The identifier widths come from the constants that enforce them:
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
-//!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
-//!   [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix) accepts.
+//!   truncates to, and [`IssueIdPrefix::MIN_ID_PREFIX_LENGTH`], the minimum
+//!   [`IssueIdPrefix`] accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded by
 //!   [`serialize_event`] with the newline terminator the finalizer's positioned
 //!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
@@ -31,7 +31,7 @@
 use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
-use crate::domain::issue_id::MIN_ID_PREFIX_LENGTH;
+use crate::domain::identity::IssueIdPrefix;
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
 use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
 use anyhow::Result;
@@ -51,7 +51,7 @@ pub(crate) mod test_support {
 /// prefix. That holds only while the short id is at least as wide as the
 /// resolvable minimum, so the claim is checked at compile time against the two
 /// constants it is drawn from.
-const _: () = assert!(SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH);
+const _: () = assert!(SHORT_ID_LENGTH >= IssueIdPrefix::MIN_ID_PREFIX_LENGTH);
 
 /// The fields of a recorded gate run: one variant per [`GateRunResult`] field.
 ///
@@ -319,7 +319,7 @@ fn sample_gate_run() -> GateRunResult {
         stdout: "test result: ok. 812 passed; 0 failed".to_string(),
         stderr: String::new(),
         command: "cargo test --workspace".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: Some("all suites green".to_string()),
         findings: Some(GateFindings {
             verdict: "pass".to_string(),
@@ -444,10 +444,11 @@ pub fn render_reference_markdown() -> Result<String> {
     let result_path = Path::new(".jit").join(gate_run_result_relative_path("<run-id>")?.as_path());
     let result_path = result_path.display();
 
+    let min_prefix_length = IssueIdPrefix::MIN_ID_PREFIX_LENGTH;
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
     let prefix_rules = [
         format!(
-            "- the normalized input must be at least {MIN_ID_PREFIX_LENGTH} characters; below the \
+            "- the normalized input must be at least {min_prefix_length} characters; below the \
              minimum it is refused as an argument error (exit code 2, see \
              [Exit Codes](exit-codes.md)) before any issue record is read;"
         ),
@@ -505,7 +506,7 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          {prefix_rules}\n\
          \n\
-         A short id is {SHORT_ID_LENGTH} characters and the minimum is {MIN_ID_PREFIX_LENGTH},\n\
+         A short id is {SHORT_ID_LENGTH} characters and the minimum is {min_prefix_length},\n\
          so a short id printed by one command is always long enough to hand back to the next.\n\
          \n\
          ## Event Log Records\n\

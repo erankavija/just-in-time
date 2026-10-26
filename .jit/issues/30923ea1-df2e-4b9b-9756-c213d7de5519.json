@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T06:17:06.925363576Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Give `Priority` its rank order through `Ord`, and delete the copied rank matches.\n\n## Background\n\n`Priority` (`crates/jit/src/domain/types.rs:177`) has no `Ord`, so `commands/query.rs:141-146` and `commands/issue.rs:788-793` each copy a priority-to-rank match to sort critical first. Both sorts rely on stability to keep tie order (`commands/issue.rs:785`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Priority` implements `Ord` with low below normal below high below critical.\n- [hard] REQ-02: Both rank matches are gone, and both sorts order critical first with tie order unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-25T06:54:24.211560789Z",
+  "first_ready_at": "2026-10-25T06:15:02.838208022Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3732128a-4bea-46ec-87e4-0ba20f5908d9",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:54:12.398003837Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4b141b24-608a-4789-bfde-9c7cf3b4a6df",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:44:24.475403390Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "30923ea1-df2e-4b9b-9756-c213d7de5519",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Priority orders by rank through Ord",
-  "updated_at": "2026-10-21T05:32:34.117519436Z"
+  "updated_at": "2026-10-25T06:54:24.211560789Z"
 }

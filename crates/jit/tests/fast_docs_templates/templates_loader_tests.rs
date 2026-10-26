@@ -64,17 +64,27 @@ applies_to  = ["epic"]
 fn test_config_load_succeeds_with_valid_templates() {
     let temp = setup(CONFIG_WITH_HIERARCHY, Some(VALID_PLAN_TEMPLATE));
     // Config load runs template validation; a valid file must not error.
-    JitConfig::load(temp.path()).expect("valid templates.toml must load");
+    JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        temp.path(),
+    ))
+    .expect("valid templates.toml must load");
 
     // And the registry itself loads with the same hierarchy.
-    let reg = TemplateRegistry::load(temp.path(), &["epic", "planning", "breakdown"]).unwrap();
+    let reg = TemplateRegistry::load(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &["epic", "planning", "breakdown"],
+    )
+    .unwrap();
     assert!(reg.get("plan").is_some());
 }
 
 #[test]
 fn test_config_load_succeeds_without_templates_file() {
     let temp = setup(CONFIG_WITH_HIERARCHY, None);
-    JitConfig::load(temp.path()).expect("absent templates.toml is fine");
+    JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        temp.path(),
+    ))
+    .expect("absent templates.toml is fine");
 }
 
 #[test]
@@ -90,7 +100,10 @@ role = "planning"
 type = "bogus"
 "#;
     let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
-    let err = JitConfig::load(temp.path()).unwrap_err();
+    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        temp.path(),
+    ))
+    .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("templates.toml"),
@@ -118,7 +131,10 @@ type = "breakdown"
 depends_on = ["a"]
 "#;
     let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
-    let err = JitConfig::load(temp.path()).unwrap_err();
+    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        temp.path(),
+    ))
+    .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("cycle"),
@@ -143,7 +159,10 @@ kind = "teleport"
 role = "planning"
 "#;
     let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
-    let err = JitConfig::load(temp.path()).unwrap_err();
+    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        temp.path(),
+    ))
+    .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
         msg.contains("weird"),
@@ -158,5 +177,10 @@ role = "planning"
 #[test]
 fn test_config_load_fails_on_malformed_templates_toml() {
     let temp = setup(CONFIG_WITH_HIERARCHY, Some("[[template"));
-    assert!(JitConfig::load(temp.path()).is_err());
+    assert!(
+        JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+            temp.path()
+        ))
+        .is_err()
+    );
 }

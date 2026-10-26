@@ -1,35 +1,18 @@
-//! Catalog of the event-log tag vocabulary and each tag's association scope.
+//! Catalog of the event-log tags and their issue association scope.
 //!
-//! [`Event`] defines the events appended to `.jit/events.jsonl`; its serde
-//! declaration tags every record with a snake-case `type` field. This module
-//! projects that vocabulary into a machine-consumable catalog ([`event_catalog`],
-//! carried by `jit --schema` as its `events` array) and into the committed
-//! markdown reference rendered by `render_event_reference`.
-//!
-//! The catalog is derived from the type, never restated:
-//!
-//! - [`EventTag`] is the fieldless mirror of the `Event` variant set.
-//!   [`Event::tag`] maps a record to its tag with a wildcard-free match, and
-//!   [`Event::get_type`] returns [`EventTag::as_str`] — so a new `Event` variant
-//!   fails to compile until it is given a tag here.
-//! - [`EventTag::sample`] constructs one representative record per tag with a
-//!   wildcard-free match, so a new tag fails to compile until it is sampled.
-//! - A row's `carries_issue_id` follows from its [`EventScope`]: only
-//!   issue-scoped records name an issue. Tests hold that against reality from
-//!   both sides — against the serialized sample (the same `serde_json` encoding
-//!   the repository-state finalizer publishes to `events.jsonl`) and against [`Event::get_issue_id`],
-//!   the accessor every consumer reads an event's issue through.
-//! - Conformance tests compare the catalog against the variant lists schemars
-//!   derives from the enums: every serde `type` tag of [`Event`] must be
-//!   cataloged, and every [`EventTag`] must appear in [`EventTag::ALL`]. A golden
-//!   test asserts the committed reference equals the projection
-//!   (`@/inv/single-source-prose`).
+//! [`EventTag`] and [`EventScope`] declare wire tokens once via
+//! [`wire_vocabulary!`]. A wildcard-free [`EventBody::tag`] map and per-tag
+//! samples bind the catalog to the event variants; tests compare its scope and
+//! `issue_id` claims with serialized events and `Event`, then compare the
+//! committed reference with the projection (`@/inv/single-source-prose`).
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
+use crate::domain::vocabulary::wire_vocabulary;
+
+use super::{Assignee, Event, EventBody, Issue, LinkedCheckoutWriteStance, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -42,141 +25,56 @@ pub(crate) mod test_support {
     pub const REFERENCE_GENERATOR: &str = "./scripts/generate-events-reference.sh";
 }
 
-/// What an event is about: the state it records a change to.
-///
-/// The scope decides whether a record carries an `issue_id`: only
-/// [`EventScope::Issue`] events name a single issue, so registry- and
-/// repository-scoped records omit the field entirely.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EventScope {
-    /// Records a change to one issue; the record carries that issue's `issue_id`.
-    Issue,
-    /// Records a change to a shared registry in `.jit/` (the gate registry).
-    Registry,
-    /// Records a change to the repository as a whole.
-    Repository,
-}
-
-impl EventScope {
-    /// The scope's snake-case name, as it appears in `jit --schema`.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventScope::Issue => "issue",
-            EventScope::Registry => "registry",
-            EventScope::Repository => "repository",
-        }
+wire_vocabulary! {
+    /// What an event is about: the state it records a change to.
+    ///
+    /// The scope decides whether a record carries an `issue_id`: only
+    /// [`EventScope::Issue`] events name a single issue, so registry- and
+    /// repository-scoped records omit the field entirely.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum EventScope {
+        /// Records a change to one issue; the record carries that issue's `issue_id`.
+        Issue = "issue",
+        /// Records a change to a shared registry in `.jit/` (the gate registry).
+        Registry = "registry",
+        /// Records a change to the repository as a whole.
+        Repository = "repository",
     }
 }
 
-/// The event-log tag vocabulary: one variant per [`Event`] variant.
-///
-/// The tag is the value of a record's `type` field. [`Event::tag`] is the
-/// wildcard-free mapping from a record to its tag, and [`Event::get_type`]
-/// renders that tag as the string serde writes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EventTag {
-    /// `issue_created`
-    IssueCreated,
-    /// `issue_claimed`
-    IssueClaimed,
-    /// `issue_state_changed`
-    IssueStateChanged,
-    /// `gate_passed`
-    GatePassed,
-    /// `gate_failed`
-    GateFailed,
-    /// `gate_added`
-    GateAdded,
-    /// `gate_removed`
-    GateRemoved,
-    /// `issue_completed`
-    IssueCompleted,
-    /// `issue_deleted`
-    IssueDeleted,
-    /// `issue_released`
-    IssueReleased,
-    /// `issue_updated`
-    IssueUpdated,
-    /// `artifact_archive_executed`
-    ArtifactArchiveExecuted,
-    /// `dependency_reduced`
-    DependencyReduced,
-    /// `local_rule_bypassed`
-    LocalRuleBypassed,
-    /// `transition_blocked`
-    TransitionBlocked,
-    /// `graph_rule_bypassed`
-    GraphRuleBypassed,
-    /// `gate_definition_updated`
-    GateDefinitionUpdated,
-    /// `gate_definition_created`
-    GateDefinitionCreated,
-    /// `gate_definition_removed`
-    GateDefinitionRemoved,
-    /// `profile_lifecycle`
-    ProfileLifecycle,
-    /// `linked_checkout_write_overridden`
-    LinkedCheckoutWriteOverridden,
+wire_vocabulary! {
+    /// The event-log tag vocabulary: one variant per [`EventBody`] variant.
+    ///
+    /// The tag is the value of a record's `type` field. [`EventBody::tag`] is the
+    /// wildcard-free mapping from a record to its tag, and [`EventBody::get_type`]
+    /// renders that tag as the string serde writes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum EventTag {
+        IssueCreated = "issue_created",
+        IssueClaimed = "issue_claimed",
+        IssueStateChanged = "issue_state_changed",
+        GatePassed = "gate_passed",
+        GateFailed = "gate_failed",
+        GateAdded = "gate_added",
+        GateRemoved = "gate_removed",
+        IssueCompleted = "issue_completed",
+        IssueDeleted = "issue_deleted",
+        IssueReleased = "issue_released",
+        IssueUpdated = "issue_updated",
+        ArtifactArchiveExecuted = "artifact_archive_executed",
+        DependencyReduced = "dependency_reduced",
+        LocalRuleBypassed = "local_rule_bypassed",
+        TransitionBlocked = "transition_blocked",
+        GraphRuleBypassed = "graph_rule_bypassed",
+        GateDefinitionUpdated = "gate_definition_updated",
+        GateDefinitionCreated = "gate_definition_created",
+        GateDefinitionRemoved = "gate_definition_removed",
+        ProfileLifecycle = "profile_lifecycle",
+        LinkedCheckoutWriteOverridden = "linked_checkout_write_overridden",
+    }
 }
 
 impl EventTag {
-    /// Every tag in the vocabulary, in [`Event`] declaration order.
-    ///
-    /// A conformance test compares this list against the variants schemars
-    /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 21] = [
-        EventTag::IssueCreated,
-        EventTag::IssueClaimed,
-        EventTag::IssueStateChanged,
-        EventTag::GatePassed,
-        EventTag::GateFailed,
-        EventTag::GateAdded,
-        EventTag::GateRemoved,
-        EventTag::IssueCompleted,
-        EventTag::IssueDeleted,
-        EventTag::IssueReleased,
-        EventTag::IssueUpdated,
-        EventTag::ArtifactArchiveExecuted,
-        EventTag::DependencyReduced,
-        EventTag::LocalRuleBypassed,
-        EventTag::TransitionBlocked,
-        EventTag::GraphRuleBypassed,
-        EventTag::GateDefinitionUpdated,
-        EventTag::GateDefinitionCreated,
-        EventTag::GateDefinitionRemoved,
-        EventTag::ProfileLifecycle,
-        EventTag::LinkedCheckoutWriteOverridden,
-    ];
-
-    /// The tag as serde writes it into a record's `type` field.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventTag::IssueCreated => "issue_created",
-            EventTag::IssueClaimed => "issue_claimed",
-            EventTag::IssueStateChanged => "issue_state_changed",
-            EventTag::GatePassed => "gate_passed",
-            EventTag::GateFailed => "gate_failed",
-            EventTag::GateAdded => "gate_added",
-            EventTag::GateRemoved => "gate_removed",
-            EventTag::IssueCompleted => "issue_completed",
-            EventTag::IssueDeleted => "issue_deleted",
-            EventTag::IssueReleased => "issue_released",
-            EventTag::IssueUpdated => "issue_updated",
-            EventTag::ArtifactArchiveExecuted => "artifact_archive_executed",
-            EventTag::DependencyReduced => "dependency_reduced",
-            EventTag::LocalRuleBypassed => "local_rule_bypassed",
-            EventTag::TransitionBlocked => "transition_blocked",
-            EventTag::GraphRuleBypassed => "graph_rule_bypassed",
-            EventTag::GateDefinitionUpdated => "gate_definition_updated",
-            EventTag::GateDefinitionCreated => "gate_definition_created",
-            EventTag::GateDefinitionRemoved => "gate_definition_removed",
-            EventTag::ProfileLifecycle => "profile_lifecycle",
-            EventTag::LinkedCheckoutWriteOverridden => "linked_checkout_write_overridden",
-        }
-    }
-
     /// The state this tag's records are about.
     pub fn scope(self) -> EventScope {
         match self {
@@ -269,146 +167,74 @@ impl EventTag {
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
     pub fn sample(self) -> Event {
-        let id = "00000000-0000-0000-0000-000000000000".to_string();
         let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
         let gate_key = "tests".to_string();
-        let timestamp: DateTime<Utc> =
-            DateTime::from_timestamp(0, 0).expect("the Unix epoch is a valid timestamp");
         let assignee: Assignee = "agent:worker-1"
             .parse()
             .expect("`agent:worker-1` is a well-formed assignee");
 
-        match self {
-            EventTag::IssueCreated => Event::IssueCreated {
-                id,
+        let body = match self {
+            EventTag::IssueCreated => EventBody::draft_issue_created(&Issue {
+                id: issue_id,
+                ..Issue::draft("Sample issue".to_string(), String::new())
+            }),
+            EventTag::IssueClaimed => EventBody::draft_issue_claimed(issue_id, assignee),
+            EventTag::IssueStateChanged => {
+                EventBody::draft_issue_state_changed(issue_id, State::Ready, State::InProgress)
+            }
+            EventTag::GatePassed => {
+                EventBody::draft_gate_passed(issue_id, gate_key, Some(assignee))
+            }
+            EventTag::GateFailed => {
+                EventBody::draft_gate_failed(issue_id, gate_key, Some(assignee))
+            }
+            EventTag::GateAdded => EventBody::draft_gate_added(issue_id, gate_key),
+            EventTag::GateRemoved => EventBody::draft_gate_removed(issue_id, gate_key),
+            EventTag::IssueCompleted => EventBody::draft_issue_completed(issue_id),
+            EventTag::IssueDeleted => EventBody::draft_issue_deleted(issue_id),
+            EventTag::IssueReleased => {
+                EventBody::draft_issue_released(issue_id, assignee, "stale lease".to_string())
+            }
+            EventTag::IssueUpdated => EventBody::draft_issue_updated(
                 issue_id,
-                timestamp,
-                title: "Sample issue".to_string(),
-                priority: Priority::Normal,
-            },
-            EventTag::IssueClaimed => Event::IssueClaimed {
-                id,
-                issue_id,
-                timestamp,
-                assignee,
-            },
-            EventTag::IssueStateChanged => Event::IssueStateChanged {
-                id,
-                issue_id,
-                timestamp,
-                from: State::Ready,
-                to: State::InProgress,
-            },
-            EventTag::GatePassed => Event::GatePassed {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-                updated_by: Some(assignee),
-            },
-            EventTag::GateFailed => Event::GateFailed {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-                updated_by: Some(assignee),
-            },
-            EventTag::GateAdded => Event::GateAdded {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateRemoved => Event::GateRemoved {
-                id,
-                issue_id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::IssueCompleted => Event::IssueCompleted {
-                id,
-                issue_id,
-                timestamp,
-            },
-            EventTag::IssueDeleted => Event::IssueDeleted {
-                id,
-                issue_id,
-                timestamp,
-            },
-            EventTag::IssueReleased => Event::IssueReleased {
-                id,
-                issue_id,
-                timestamp,
-                assignee,
-                reason: "stale lease".to_string(),
-            },
-            EventTag::IssueUpdated => Event::IssueUpdated {
-                id,
-                issue_id,
-                timestamp,
-                updated_by: "agent:worker-1".to_string(),
-                fields: vec!["priority".to_string()],
-            },
-            EventTag::ArtifactArchiveExecuted => Event::ArtifactArchiveExecuted {
-                id,
-                timestamp,
-                target: crate::domain::artifact_plan::PlanTarget::Document {
+                "agent:worker-1".to_string(),
+                vec!["priority".to_string()],
+            ),
+            EventTag::ArtifactArchiveExecuted => EventBody::draft_artifact_archive_executed(
+                crate::domain::artifact_plan::PlanTarget::Document {
                     path: "dev/plan.md".to_string(),
                 },
-                destination_root: "dev/archive".to_string(),
-                publications: Vec::new(),
-                reference_changes: Vec::new(),
-                planned_deletions: Vec::new(),
-                reconciling: false,
-            },
-            EventTag::DependencyReduced => Event::DependencyReduced {
-                id,
+                "dev/archive".to_string(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                false,
+            ),
+            EventTag::DependencyReduced => EventBody::draft_dependency_reduced(
                 issue_id,
-                timestamp,
-                old_count: 2,
-                new_count: 1,
-                removed_deps: vec!["00000000-0000-0000-0000-000000000002".to_string()],
-            },
-            EventTag::LocalRuleBypassed => Event::LocalRuleBypassed {
-                id,
+                2,
+                1,
+                vec!["00000000-0000-0000-0000-000000000002".to_string()],
+            ),
+            EventTag::LocalRuleBypassed => {
+                EventBody::draft_local_rule_bypassed(issue_id, "type-required".to_string())
+            }
+            EventTag::TransitionBlocked => EventBody::draft_transition_blocked(
                 issue_id,
-                timestamp,
-                rule: "type-required".to_string(),
-            },
-            EventTag::TransitionBlocked => Event::TransitionBlocked {
-                id,
+                State::Done,
+                "children-complete".to_string(),
+            ),
+            EventTag::GraphRuleBypassed => EventBody::draft_graph_rule_bypassed(
                 issue_id,
-                timestamp,
-                target: State::Done,
-                rule: "children-complete".to_string(),
-            },
-            EventTag::GraphRuleBypassed => Event::GraphRuleBypassed {
-                id,
-                issue_id,
-                timestamp,
-                target: State::Done,
-                rule: "children-complete".to_string(),
-            },
-            EventTag::GateDefinitionUpdated => Event::GateDefinitionUpdated {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateDefinitionCreated => Event::GateDefinitionCreated {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::GateDefinitionRemoved => Event::GateDefinitionRemoved {
-                id,
-                timestamp,
-                gate_key,
-            },
-            EventTag::ProfileLifecycle => Event::ProfileLifecycle {
-                id,
-                timestamp,
-                operation: crate::domain::ProfileLifecycleOperation::Apply,
-                profiles: vec![crate::domain::ProfileLifecycleProfile {
+                State::Done,
+                "children-complete".to_string(),
+            ),
+            EventTag::GateDefinitionUpdated => EventBody::draft_gate_definition_updated(gate_key),
+            EventTag::GateDefinitionCreated => EventBody::draft_gate_definition_created(gate_key),
+            EventTag::GateDefinitionRemoved => EventBody::draft_gate_definition_removed(gate_key),
+            EventTag::ProfileLifecycle => EventBody::draft_profile_lifecycle(
+                crate::domain::ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
                     id: "example"
                         .try_into()
                         .expect("sample profile id is canonical"),
@@ -422,49 +248,55 @@ impl EventTag {
                     )]
                     .into(),
                 }],
-                isolated_torn_tail: false,
-            },
-            EventTag::LinkedCheckoutWriteOverridden => Event::LinkedCheckoutWriteOverridden {
-                id,
-                timestamp,
-                checkout: std::path::PathBuf::from("/repo/.worktrees/feature"),
-                declared_stance: LinkedCheckoutWriteStance::Refuse,
-                invocation_override: LinkedCheckoutWriteStance::Allow,
-            },
-        }
+            ),
+            EventTag::LinkedCheckoutWriteOverridden => {
+                EventBody::draft_linked_checkout_write_overridden(
+                    std::path::PathBuf::from("/repo/.worktrees/feature"),
+                    LinkedCheckoutWriteStance::Refuse,
+                    LinkedCheckoutWriteStance::Allow,
+                )
+            }
+        };
+        Event::new(
+            "00000000-0000-0000-0000-000000000000".to_string(),
+            DateTime::UNIX_EPOCH,
+            body,
+        )
     }
 }
 
-impl Event {
+impl EventBody {
     /// The tag under which this record is stored.
     ///
-    /// The wildcard-free match is what binds the catalog to the `Event` type: a
-    /// new variant fails to compile until it is given a tag, and the tag then
+    /// The wildcard-free match is what binds the catalog to the `EventBody` type:
+    /// a new variant fails to compile until it is given a tag, and the tag then
     /// carries a scope, a sample, and a description with it.
-    /// [`Event::get_type`] renders the returned tag as the string serde writes.
+    /// [`EventBody::get_type`] renders the returned tag as the string serde writes.
     pub fn tag(&self) -> EventTag {
         match self {
-            Event::IssueCreated { .. } => EventTag::IssueCreated,
-            Event::IssueClaimed { .. } => EventTag::IssueClaimed,
-            Event::IssueStateChanged { .. } => EventTag::IssueStateChanged,
-            Event::GatePassed { .. } => EventTag::GatePassed,
-            Event::GateFailed { .. } => EventTag::GateFailed,
-            Event::GateAdded { .. } => EventTag::GateAdded,
-            Event::GateRemoved { .. } => EventTag::GateRemoved,
-            Event::IssueCompleted { .. } => EventTag::IssueCompleted,
-            Event::IssueDeleted { .. } => EventTag::IssueDeleted,
-            Event::IssueReleased { .. } => EventTag::IssueReleased,
-            Event::IssueUpdated { .. } => EventTag::IssueUpdated,
-            Event::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
-            Event::DependencyReduced { .. } => EventTag::DependencyReduced,
-            Event::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
-            Event::TransitionBlocked { .. } => EventTag::TransitionBlocked,
-            Event::GraphRuleBypassed { .. } => EventTag::GraphRuleBypassed,
-            Event::GateDefinitionUpdated { .. } => EventTag::GateDefinitionUpdated,
-            Event::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
-            Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
-            Event::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
-            Event::LinkedCheckoutWriteOverridden { .. } => EventTag::LinkedCheckoutWriteOverridden,
+            EventBody::IssueCreated { .. } => EventTag::IssueCreated,
+            EventBody::IssueClaimed { .. } => EventTag::IssueClaimed,
+            EventBody::IssueStateChanged { .. } => EventTag::IssueStateChanged,
+            EventBody::GatePassed { .. } => EventTag::GatePassed,
+            EventBody::GateFailed { .. } => EventTag::GateFailed,
+            EventBody::GateAdded { .. } => EventTag::GateAdded,
+            EventBody::GateRemoved { .. } => EventTag::GateRemoved,
+            EventBody::IssueCompleted { .. } => EventTag::IssueCompleted,
+            EventBody::IssueDeleted { .. } => EventTag::IssueDeleted,
+            EventBody::IssueReleased { .. } => EventTag::IssueReleased,
+            EventBody::IssueUpdated { .. } => EventTag::IssueUpdated,
+            EventBody::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
+            EventBody::DependencyReduced { .. } => EventTag::DependencyReduced,
+            EventBody::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
+            EventBody::TransitionBlocked { .. } => EventTag::TransitionBlocked,
+            EventBody::GraphRuleBypassed { .. } => EventTag::GraphRuleBypassed,
+            EventBody::GateDefinitionUpdated { .. } => EventTag::GateDefinitionUpdated,
+            EventBody::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
+            EventBody::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
+            EventBody::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
+            EventBody::LinkedCheckoutWriteOverridden { .. } => {
+                EventTag::LinkedCheckoutWriteOverridden
+            }
         }
     }
 }
@@ -479,13 +311,13 @@ pub struct EventTagDoc {
     pub scope: EventScope,
     /// Whether records with this tag carry an `issue_id` field. True exactly for
     /// [`EventScope::Issue`] tags; tests hold this against the serialized record
-    /// and against [`Event::get_issue_id`].
+    /// and against [`EventBody::get_issue_id`].
     pub carries_issue_id: bool,
     /// What appends a record with this tag.
     pub description: String,
 }
 
-/// Project the event-tag catalog: one row per [`Event`] variant.
+/// Project the event-tag catalog: one row per [`EventBody`] variant.
 ///
 /// Carried by `jit --schema` as its `events` array and rendered into the
 /// committed reference by `render_event_reference`. Every row is derived:
@@ -599,30 +431,6 @@ mod tests {
         }
     }
 
-    /// REQ-03 (enumeration): `EventTag::ALL` must list every tag. The expected
-    /// set is the variant list schemars derives from the enum itself, so a tag
-    /// added to `EventTag` — which a new `Event` variant forces, `Event::tag`
-    /// being a wildcard-free match — but left out of `ALL` fails here.
-    #[test]
-    fn test_all_lists_every_tag_variant() {
-        let schema = serde_json::to_value(schema_for!(EventTag)).expect("EventTag schema is JSON");
-        let derived = schema_accepted_strings(&schema);
-        assert!(
-            !derived.is_empty(),
-            "the derived EventTag schema must enumerate its variants"
-        );
-
-        let listed: BTreeSet<String> = EventTag::ALL
-            .iter()
-            .map(|tag| tag.as_str().to_string())
-            .collect();
-
-        assert_eq!(
-            listed, derived,
-            "EventTag::ALL must list every EventTag variant"
-        );
-    }
-
     /// REQ-03 (tag strings): `Event::get_type` — the accessor the event-type
     /// filter and the stored `type` field agree on — must return the tag's
     /// string for every tag's record.
@@ -631,7 +439,7 @@ mod tests {
         for tag in EventTag::ALL {
             let event = tag.sample();
             assert_eq!(event.get_type(), tag.as_str());
-            assert_eq!(event.tag(), tag);
+            assert_eq!(event.body().tag(), tag);
         }
     }
 
@@ -673,14 +481,16 @@ mod tests {
         }
     }
 
-    /// REQ-03: every serde `type` tag the `Event` enum admits is cataloged.
+    /// REQ-03: every serde `type` tag the published `Event` schema admits is
+    /// cataloged.
     ///
-    /// `Event::tag()` being wildcard-free forces a new variant to be *given* a
-    /// tag, but nothing stops it being given an existing one — serde would then
+    /// `EventBody::tag()` being wildcard-free forces a new variant to be *given*
+    /// a tag, but nothing stops it being given an existing one — serde would then
     /// write a `type` string absent from the catalog while the code still
     /// compiles. This reads the tags off the schema schemars derives from `Event`
-    /// itself (each variant contributes its `type` const), so the catalog is bound
-    /// to the serde encoding rather than to `EventTag`'s own variant list.
+    /// itself (each flattened body variant contributes its `type` const), so the
+    /// catalog is bound to the serde encoding rather than to `EventTag`'s own
+    /// variant list.
     #[test]
     fn test_event_variant_tags_are_all_cataloged() {
         let schema = serde_json::to_value(schema_for!(Event)).expect("Event schema is JSON");
@@ -791,7 +601,7 @@ mod tests {
             let encoded = serde_json::to_string(&event).expect("a sample event serializes");
             let decoded: Event = serde_json::from_str(&encoded).expect("a serialized event parses");
             assert_eq!(decoded, event, "`{}` did not round-trip", tag.as_str());
-            assert_eq!(decoded.tag(), tag);
+            assert_eq!(decoded.body().tag(), tag);
         }
     }
 
@@ -803,12 +613,12 @@ mod tests {
     #[test]
     fn test_linked_checkout_write_overridden_names_checkout_stance_and_override() {
         let event = EventTag::LinkedCheckoutWriteOverridden.sample();
-        let Event::LinkedCheckoutWriteOverridden {
+        let EventBody::LinkedCheckoutWriteOverridden {
             checkout,
             declared_stance,
             invocation_override,
             ..
-        } = &event
+        } = event.body()
         else {
             panic!("the tag's sample is the override record");
         };

@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
 use jit::declarations::GateDefinition;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{Issue, Priority, State as IssueState};
 use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::GateRunSummary;
@@ -93,11 +94,28 @@ async fn list_issues<S: IssueStore>(
         })
 }
 
+fn resolve_issue_path_id<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    requested: &str,
+) -> Result<IssueId, StatusCode> {
+    let prefix = requested
+        .parse::<IssueIdPrefix>()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    executor
+        .storage()
+        .resolve_issue_id(&prefix)
+        .map_err(|error| {
+            tracing::debug!("Failed to resolve issue id {}: {:?}", requested, error);
+            StatusCode::NOT_FOUND
+        })
+}
+
 /// Get single issue by ID
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<Issue>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     state
         .executor
         .issues()
@@ -605,6 +623,7 @@ async fn get_document_content<S: IssueStore>(
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let at_commit = query.commit.as_deref();
 
     let (content, commit_hash) = state
@@ -635,6 +654,7 @@ async fn get_document_raw<S: IssueStore>(
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let at_commit = query.commit.as_deref();
 
     let (bytes, _commit_hash) = state
@@ -798,6 +818,7 @@ async fn get_document_history<S: IssueStore>(
     Path((id, path)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let commits = state
         .executor
         .get_document_history(&id, &path)
@@ -844,6 +865,7 @@ async fn get_document_diff<S: IssueStore>(
     Query(query): Query<DocumentDiffQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentDiffResponse>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let to = query.to.as_deref();
 
     let diff = state
@@ -901,6 +923,7 @@ async fn list_gate_runs<S: IssueStore>(
     Query(params): Query<GateRunsQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let runs = state
         .executor
         .list_gate_runs(&id, params.gate_key.as_deref())
@@ -914,9 +937,10 @@ async fn list_gate_runs<S: IssueStore>(
 
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore>(
-    Path((_id, run_id)): Path<(String, String)>,
+    Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
+    let _id = resolve_issue_path_id(&state.executor, &id)?;
     state
         .executor
         .get_gate_run_result(&run_id)
@@ -1061,11 +1085,11 @@ mod tests {
 
     use crate::watcher::ChangeTracker;
 
-    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
+    fn test_repository_layout<S>(storage: &S) -> jit::repository_state::RepositoryLayout
     where
         S: IssueStore + RepositoryStateStore,
     {
-        let layout = if storage.is_file_backed() {
+        if storage.is_file_backed() {
             let data_root = storage.root();
             let worktree_root = data_root
                 .parent()
@@ -1085,13 +1109,27 @@ mod tests {
                 ),
             )
             .unwrap()
-        };
+        }
+    }
+
+    fn write_test_config(storage: &jit::storage::InMemoryStorage, config: &str) {
+        let path = test_repository_layout(storage)
+            .resolve(&jit::repository_state::VirtualPath::CONFIG)
+            .unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, config).unwrap();
+        storage.add_data_file("config.toml", config);
+    }
+
+    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
+    where
+        S: IssueStore + RepositoryStateStore,
+    {
+        let layout = test_repository_layout(&storage);
         Arc::new(CommandExecutor::new(storage).with_layout(layout))
     }
 
     fn test_memory_storage() -> InMemoryStorage {
-        use jit::storage::IssueStore;
-
         let storage = InMemoryStorage::new();
         // The taxonomy the taxonomy-serving routes answer with, declared by this
         // repository. The config-reading routes resolve it through a
@@ -1101,9 +1139,7 @@ mod tests {
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             jit::test_taxonomy::test_taxonomy().config_fragment()
         );
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
-        storage.add_data_file("config.toml", &config);
+        write_test_config(&storage, &config);
         storage.add_data_file(
             "index.json",
             r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
@@ -1163,6 +1199,13 @@ mod tests {
         let server = create_test_app();
         let response = server.get("/issues/nonexistent").await;
         response.assert_status(StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_rejects_too_short_id_prefix() {
+        let server = create_test_app();
+        let response = server.get("/issues/abc").await;
+        response.assert_status(StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -1267,6 +1310,26 @@ mod tests {
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.edges[0].from, id2);
         assert_eq!(graph.edges[0].to, id1);
+    }
+
+    #[tokio::test]
+    async fn test_get_graph_returns_server_error_for_invalid_hierarchy() {
+        let storage = test_memory_storage();
+        let config = jit::test_taxonomy::invalid_hierarchy_config_fragment();
+        write_test_config(&storage, &config);
+
+        let state = AppState {
+            executor: test_executor(storage),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        server
+            .get("/graph")
+            .await
+            .assert_status(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     /// The response body carries the `count` envelope field, and it counts

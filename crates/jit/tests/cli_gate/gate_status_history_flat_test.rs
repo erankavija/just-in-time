@@ -27,7 +27,7 @@ fn test_status_latest_by_default_unchanged() {
     temp.command(["gate", "status", &id, "tests"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
+        .stdout(predicate::str::contains("passed"));
 }
 
 #[test]

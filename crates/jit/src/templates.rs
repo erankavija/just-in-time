@@ -17,7 +17,7 @@
 //! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
 //!   a declared node role / anchor name;
 //! - each node `type` exists in the configured `[type_hierarchy].types`;
-//! - each transform `kind` is a supported [`TransformKind`];
+//! - each transform `kind` decodes to a [`TransformKind`];
 //! - the internal `depends_on` edges form a DAG (no cycle).
 //!
 //! Following the production rules filesystem boundary
@@ -32,14 +32,21 @@
 //! template file plus the type hierarchy alone.
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::domain::vocabulary::wire_vocabulary;
+use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+
 /// Errors that can occur while loading and validating `.jit/templates.toml`.
 #[derive(Debug, Error)]
 pub enum TemplateConfigError {
+    /// The repository layout could not resolve the templates path.
+    #[error(transparent)]
+    Layout(#[from] RepositoryLayoutError),
+
     /// The templates file could not be read from disk.
     #[error("failed to read templates file '{path}': {source}")]
     Io {
@@ -131,18 +138,14 @@ pub enum TemplateConfigError {
         role: String,
     },
 
-    /// A transform declares a `kind` outside the supported set
-    /// ([`TransformKind`]).
-    #[error(
-        "template '{template}': unsupported transform kind '{kind}'; supported kinds: {supported}"
-    )]
-    UnknownTransformKind {
+    /// A template does not match the schema (e.g. a transform declares an
+    /// unknown `kind`).
+    #[error("template '{template}': {source}")]
+    InvalidTemplate {
         /// Name of the offending template.
         template: String,
-        /// The unsupported kind string.
-        kind: String,
-        /// Comma-separated list of the kinds the engine supports.
-        supported: String,
+        /// Underlying schema error.
+        source: toml::de::Error,
     },
 
     /// `applies_to` is empty: a template must name at least one container type.
@@ -153,30 +156,15 @@ pub enum TemplateConfigError {
     },
 }
 
-/// A supported graph-transform kind, parsed from a [`Transform::kind`] string.
-///
-/// The registry loader rejects any other kind ([`TemplateConfigError::UnknownTransformKind`]),
-/// so a template that reaches `jit apply` declares only kinds the engine can
-/// dispatch. Dispatch is by variant, keeping the transform set extensible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransformKind {
-    /// Move the container's pre-apply upstream deps onto a named role's node.
-    MoveUpstreamToRole,
-}
-
-impl TransformKind {
-    /// The `kind` string of [`TransformKind::MoveUpstreamToRole`].
-    pub const MOVE_UPSTREAM_TO_ROLE: &'static str = "move-upstream-to-role";
-
-    /// Every supported `kind` string, for error messages and documentation.
-    pub const SUPPORTED: &'static [&'static str] = &[Self::MOVE_UPSTREAM_TO_ROLE];
-
-    /// Parse a transform `kind` string, or `None` when the kind is unsupported.
-    pub fn from_kind(kind: &str) -> Option<Self> {
-        match kind {
-            Self::MOVE_UPSTREAM_TO_ROLE => Some(Self::MoveUpstreamToRole),
-            _ => None,
-        }
+wire_vocabulary! {
+    /// A graph-transform kind, decoded when the template loads.
+    ///
+    /// An unknown kind fails loading, so a template that reaches `jit apply`
+    /// declares only kinds the engine can dispatch.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TransformKind {
+        /// Move the container's pre-apply upstream deps onto a named role's node.
+        MoveUpstreamToRole = "move-upstream-to-role",
     }
 }
 
@@ -377,13 +365,12 @@ pub struct AnchorEdge {
 
 /// A graph transform applied after nodes are created and edges wired.
 ///
-/// `kind` names a [`TransformKind`]; the loader rejects any other value. The
-/// shipped kind is `move-upstream-to-role`, which moves the container's pre-apply
-/// upstream dependencies onto the node of the named role.
+/// The shipped kind is `move-upstream-to-role`, which moves the container's
+/// pre-apply upstream dependencies onto the node of the named role.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transform {
-    /// Transform kind (e.g. `"move-upstream-to-role"`).
-    pub kind: String,
+    /// Transform kind.
+    pub kind: TransformKind,
     /// Target node role the transform acts on.
     pub role: String,
 }
@@ -430,10 +417,10 @@ impl TemplateRegistry {
     /// `type`s are checked; pass an empty slice to skip the type check (when no
     /// hierarchy is configured).
     pub fn load<S: AsRef<str>>(
-        jit_root: &Path,
+        layout: &RepositoryLayout,
         hierarchy_types: &[S],
     ) -> Result<Self, TemplateConfigError> {
-        let path = jit_root.join("templates.toml");
+        let path = layout.resolve(&VirtualPath::TEMPLATES)?;
         if !path.exists() {
             return Ok(Self::empty());
         }
@@ -452,7 +439,22 @@ impl TemplateRegistry {
         content: &str,
         hierarchy_types: &[S],
     ) -> Result<Self, TemplateConfigError> {
-        let registry: TemplateRegistry = toml::from_str(content)?;
+        let mut table: toml::Table = toml::from_str(content)?;
+        let templates = match table.remove("template") {
+            Some(toml::Value::Array(items)) => items
+                .into_iter()
+                .map(GraphTemplate::from_value)
+                .collect::<Result<Vec<_>, _>>()?,
+            Some(other) => {
+                table.insert("template".to_string(), other);
+                Vec::new()
+            }
+            None => Vec::new(),
+        };
+        let registry = TemplateRegistry {
+            templates,
+            ..table.try_into()?
+        };
 
         // Template names must be unique so `jit apply <name>` is unambiguous.
         let mut seen_templates = HashSet::new();
@@ -479,6 +481,18 @@ impl TemplateRegistry {
 }
 
 impl GraphTemplate {
+    /// Decode one `[[template]]` entry, naming the template on a schema error.
+    fn from_value(value: toml::Value) -> Result<Self, TemplateConfigError> {
+        let name = value
+            .get("name")
+            .and_then(toml::Value::as_str)
+            .map(str::to_owned);
+        value.try_into().map_err(|source| match name {
+            Some(template) => TemplateConfigError::InvalidTemplate { template, source },
+            None => TemplateConfigError::Toml(source),
+        })
+    }
+
     /// The node carrying the given `role`, or `None` if no node declares it.
     pub fn node(&self, role: &str) -> Option<&TemplateNode> {
         self.nodes.iter().find(|n| n.role == role)
@@ -595,18 +609,8 @@ impl GraphTemplate {
             }
         }
 
-        // transforms declare a supported kind and reference a declared node role.
-        // The kind check belongs here, with the other structural checks: an
-        // unsupported kind is a static config error, so `jit` fails at load and
-        // the apply engine only ever dispatches kinds it can execute.
+        // transforms reference a declared node role.
         for transform in &self.transforms {
-            if TransformKind::from_kind(&transform.kind).is_none() {
-                return Err(TemplateConfigError::UnknownTransformKind {
-                    template: self.name.clone(),
-                    kind: transform.kind.clone(),
-                    supported: TransformKind::SUPPORTED.join(", "),
-                });
-            }
             if !roles.contains(transform.role.as_str()) {
                 return Err(TemplateConfigError::UnknownRole {
                     template: self.name.clone(),
@@ -731,7 +735,7 @@ applies_to  = ["epic"]
         assert_eq!(t.anchor_edges[0].to, "breakdown");
 
         assert_eq!(t.transforms.len(), 1);
-        assert_eq!(t.transforms[0].kind, "move-upstream-to-role");
+        assert_eq!(t.transforms[0].kind, TransformKind::MoveUpstreamToRole);
         assert_eq!(t.transforms[0].role, "planning");
     }
 
@@ -807,15 +811,24 @@ applies_to  = ["epic"]
     #[test]
     fn test_load_missing_file_is_empty_registry() {
         let dir = TempDir::new().unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let reg = TemplateRegistry::load(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+            &HIERARCHY,
+        )
+        .unwrap();
         assert!(reg.templates.is_empty());
     }
 
     #[test]
     fn test_load_valid_file_from_disk() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), plan_template_toml()).unwrap();
-        let reg = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            plan_template_toml(),
+        )
+        .unwrap();
+        let reg = TemplateRegistry::load(&layout, &HIERARCHY).unwrap();
         assert_eq!(reg.templates.len(), 1);
         assert_eq!(reg.templates[0].name, "plan");
     }
@@ -823,8 +836,13 @@ applies_to  = ["epic"]
     #[test]
     fn test_malformed_toml_errors() {
         let dir = TempDir::new().unwrap();
-        std::fs::write(dir.path().join("templates.toml"), "[[template").unwrap();
-        let err = TemplateRegistry::load(dir.path(), &HIERARCHY).unwrap_err();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
+        std::fs::write(
+            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
+            "[[template",
+        )
+        .unwrap();
+        let err = TemplateRegistry::load(&layout, &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::Toml(_)));
     }
 
@@ -953,9 +971,7 @@ role = "ghost"
 
     #[test]
     fn test_unknown_transform_kind_rejected() {
-        // A transform kind the engine cannot dispatch is a static config error:
-        // load fails, naming both the template and the offending kind, so the
-        // apply engine never receives it.
+        // An unknown kind fails load, naming both the template and the kind.
         let toml = r#"
 [[template]]
 name = "weird"
@@ -968,18 +984,10 @@ kind = "teleport"
 role = "planning"
 "#;
         let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
-        match &err {
-            TemplateConfigError::UnknownTransformKind {
-                template,
-                kind,
-                supported,
-            } => {
-                assert_eq!(template, "weird");
-                assert_eq!(kind, "teleport");
-                assert!(supported.contains("move-upstream-to-role"), "{supported}");
-            }
-            other => panic!("expected UnknownTransformKind, got {other:?}"),
-        }
+        assert!(matches!(
+            err,
+            TemplateConfigError::InvalidTemplate { ref template, .. } if template == "weird"
+        ));
         let msg = err.to_string();
         assert!(msg.contains("weird"), "{msg}");
         assert!(msg.contains("teleport"), "{msg}");
@@ -989,8 +997,8 @@ role = "planning"
     fn test_supported_transform_kind_accepted() {
         let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
         assert_eq!(
-            TransformKind::from_kind(&reg.templates[0].transforms[0].kind),
-            Some(TransformKind::MoveUpstreamToRole)
+            reg.templates[0].transforms[0].kind,
+            TransformKind::MoveUpstreamToRole
         );
     }
 
@@ -1117,7 +1125,11 @@ depends_on = ["a"]
             .and_then(|p| p.parent())
             .expect("crate is nested two levels under the repo root");
         let jit_dir = repo_root.join(".jit");
-        let reg = TemplateRegistry::load(&jit_dir, &HIERARCHY).unwrap();
+        let reg = TemplateRegistry::load(
+            &crate::test_utils::repository_layout_for_data_root(&jit_dir),
+            &HIERARCHY,
+        )
+        .unwrap();
         let plan = reg
             .get("plan")
             .expect("repo .jit/templates.toml declares a `plan` template");

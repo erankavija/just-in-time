@@ -14,7 +14,6 @@ fn gate_entry<'a>(issue: &'a serde_json::Value, key: &str) -> Option<&'a serde_j
     issue["gates"].as_array()?.iter().find(|g| g["key"] == key)
 }
 
-/// Define each `(key, checker)` auto gate and create an issue requiring all of them.
 fn add_multi_auto_gate_issue(cli: &JitCli, gates: &[(&str, &str)]) -> String {
     gates
         .iter()
@@ -115,7 +114,7 @@ fn test_gate_status_shows_last_run_after_evaluate() {
     temp.command(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")))
+        .stdout(predicate::str::contains("passed"))
         .stdout(predicate::str::contains("exit 0").or(predicate::str::contains("exit_code")));
 }
 
@@ -135,7 +134,7 @@ fn test_gate_status_shows_last_run_after_failure() {
     temp.command(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("failed").or(predicate::str::contains("Failed")));
+        .stdout(predicate::str::contains("failed"));
 
     // Non-mutating: gate status itself didn't change status further
     let output = temp

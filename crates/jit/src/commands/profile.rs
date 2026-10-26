@@ -1062,7 +1062,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     continue;
                 }
                 let package = self
-                    .resolve_dependency_package_from(&declaring, dependency.id.as_str())
+                    .resolve_dependency_package_from(&declaring, &dependency.id)
                     .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
@@ -1088,17 +1088,20 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     fn resolve_dependency_package_from(
         &self,
         declaring: &ProfilePackage,
-        dependency: &str,
+        dependency: &ProfileId,
     ) -> Result<ProfilePackage> {
         let ProfilePackageSource::Directory(directory) = declaring.source();
         let not_found = || -> anyhow::Error {
             crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
-        let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
+        let Some(location) = directory
+            .parent()
+            .map(|parent| parent.join(dependency.as_str()))
+        else {
             return Err(not_found());
         };
         match supplied_package(&location, &self.require_layout()?) {
-            Ok(package) if package.model().id.as_str() == dependency => Ok(package),
+            Ok(package) if package.model().id == *dependency => Ok(package),
             Ok(_) => Err(not_found()),
             Err(error) if is_unreadable_location(&error) => Err(not_found()),
             Err(error) => Err(error),
@@ -1373,11 +1376,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         if packages.len() != resolved.len() {
             anyhow::bail!("profile selection packages and resolved content differ in length");
         }
-        for package in packages {
-            reject_reserved_application_targets(
-                package.hashes().targets.keys().map(String::as_str),
-            )?;
-        }
         let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
 
@@ -1390,6 +1388,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     .map_err(Into::into)
             })
             .collect::<Result<Vec<_>>>()?;
+        reject_reserved_application_targets(content_paths.iter())?;
         content_paths.extend(
             content_paths
                 .clone()
@@ -1867,17 +1866,14 @@ fn profile_application_input(
 }
 
 pub(super) fn reject_reserved_application_targets<'a>(
-    targets: impl IntoIterator<Item = &'a str>,
+    targets: impl IntoIterator<Item = &'a VirtualPath>,
 ) -> Result<()> {
-    if let Some(path) = targets.into_iter().find(|path| {
-        *path == ".jit/events.jsonl"
-            || *path == ".jit/tmp"
-            || path.starts_with(".jit/tmp/")
-            || *path == ".git"
-            || path.starts_with(".git/")
-    }) {
+    if let Some(path) = targets
+        .into_iter()
+        .find(|path| path.is_reserved_application_target())
+    {
         return Err(ProfileApplyError::ReservedApplicationTarget {
-            path: path.to_string(),
+            path: path.repository_relative(),
         }
         .into());
     }
@@ -1887,7 +1883,7 @@ pub(super) fn reject_reserved_application_targets<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Event, ProfileLifecycleOperation, ProfileLifecycleStatus};
+    use crate::domain::{Event, EventBody, ProfileLifecycleOperation, ProfileLifecycleStatus};
     use crate::profile::{ProfileContributionChange, ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
@@ -2088,9 +2084,9 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .flat_map(|event| match event {
-                Event::ProfileLifecycle { profiles, .. } => profiles
-                    .into_iter()
+            .flat_map(|event| match event.body() {
+                EventBody::ProfileLifecycle { profiles, .. } => profiles
+                    .iter()
                     .map(|profile| profile.id.to_string())
                     .collect(),
                 _ => Vec::new(),
@@ -2771,7 +2767,10 @@ mod tests {
         assert!(manifest
             .contributions
             .iter()
-            .all(|contribution| contribution.registry_path() == ".jit/config.toml"));
+            .all(
+                |contribution| contribution.registry_path().repository_relative()
+                    == ".jit/config.toml"
+            ));
     }
 
     #[test]
@@ -3190,6 +3189,36 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_profile_package_rejects_each_reserved_application_target() {
+        let (temp, storage, executor, _package) = fixture();
+
+        for (index, target) in [".jit/events.jsonl", ".jit/profiles", ".git/config"]
+            .into_iter()
+            .enumerate()
+        {
+            let package = package_publishing(
+                &temp,
+                &format!("packages/reserved-{index}"),
+                &format!("reserved-{index}"),
+                target,
+                "reserved target content\n",
+            );
+            let error = executor.apply_profile_package(&package).unwrap_err();
+
+            assert!(
+                matches!(
+                    error.downcast_ref::<ProfileApplyError>(),
+                    Some(ProfileApplyError::ReservedApplicationTarget { path }) if path == target
+                ),
+                "target '{target}' should be refused as application-owned state: {error:#}"
+            );
+        }
+
+        assert!(storage.read_events().unwrap().is_empty());
+        assert!(!temp.path().join(".jit/profiles").exists());
+    }
+
+    #[test]
     fn test_apply_profile_package_reapplies_changed_content() {
         let (temp, _storage, executor, package) = fixture();
         executor.apply_profile_package(&package).unwrap();
@@ -3284,8 +3313,8 @@ template = true
         let events = storage.read_events().unwrap();
         let name: crate::profile::ProfileVariableName = "NAME".try_into().unwrap();
         assert!(matches!(
-            events.as_slice(),
-            [Event::ProfileLifecycle { profiles, .. }]
+            events.iter().map(Event::body).collect::<Vec<_>>().as_slice(),
+            [EventBody::ProfileLifecycle { profiles, .. }]
                 if profiles.len() == 1
                     && profiles[0].variables.get(&name).map(String::as_str)
                         == Some("resolved-value-last")
@@ -3386,8 +3415,12 @@ template = true
         assert_eq!(&image[..torn.len()], torn);
         let events = storage.read_events().unwrap();
         assert!(matches!(
-            events.as_slice(),
-            [Event::ProfileLifecycle {
+            events
+                .iter()
+                .map(Event::body)
+                .collect::<Vec<_>>()
+                .as_slice(),
+            [EventBody::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }]
@@ -3424,8 +3457,8 @@ template = true
         assert!(temp.path().join("docs/workflow.txt").is_file());
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
         assert!(matches!(
-            storage.read_events().unwrap().as_slice(),
-            [Event::ProfileLifecycle {
+            storage.read_events().unwrap().iter().map(Event::body).collect::<Vec<_>>().as_slice(),
+            [EventBody::ProfileLifecycle {
                 operation: ProfileLifecycleOperation::Apply,
                 profiles,
                 ..
@@ -4165,18 +4198,19 @@ template = true
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
-        let prior_event = Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            operation: ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "prior".try_into().unwrap(),
-                version: "1.0.0".to_string(),
-                status: ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail: false,
-        };
+        let prior_event = crate::test_utils::stamped_event(
+            EventBody::draft_profile_lifecycle(
+                ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
+                    id: "prior".try_into().unwrap(),
+                    version: "1.0.0".to_string(),
+                    status: ProfileLifecycleStatus::Installed,
+                    variables: Default::default(),
+                }],
+            ),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        );
         fs::write(
             temp.path().join(".jit/events.jsonl"),
             serde_json::to_vec(&prior_event).unwrap(),
@@ -4188,8 +4222,8 @@ template = true
         let events = storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
         assert!(matches!(
-            events.last().unwrap(),
-            Event::ProfileLifecycle {
+            events.last().unwrap().body(),
+            EventBody::ProfileLifecycle {
                 isolated_torn_tail: false,
                 ..
             }

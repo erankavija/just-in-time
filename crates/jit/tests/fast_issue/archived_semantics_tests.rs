@@ -38,7 +38,7 @@ fn count_state_changes(h: &TestHarness, id: &str) -> usize {
         .unwrap()
         .iter()
         .filter(|event| {
-            matches!(event, jit::domain::Event::IssueStateChanged { issue_id, .. } if issue_id == id)
+            matches!(event.body(), jit::domain::EventBody::IssueStateChanged { issue_id, .. } if issue_id == id)
         })
         .count()
 }
