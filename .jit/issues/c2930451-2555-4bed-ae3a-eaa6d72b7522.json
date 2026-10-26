@@ -27,7 +27,7 @@
     "satisfies:f8a6b298/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Event appends land at the log's committed length",
-  "updated_at": "2026-10-21T10:40:08.101007823Z"
+  "updated_at": "2026-10-26T22:13:47.744079590Z"
 }

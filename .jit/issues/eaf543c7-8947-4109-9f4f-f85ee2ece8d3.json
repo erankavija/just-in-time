@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "da226023-56d1-4a25-a411-2032c34b40f4",
-      "status": "failed",
-      "updated_at": "2026-10-25T00:58:17.577884594Z",
+      "run_id": "4e55e7d2-2021-4392-af74-39e3cbe17947",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:05:43.741120108Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "gate definition tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-25T00:58:17.577884594Z"
+  "updated_at": "2026-10-26T22:05:43.741120108Z"
 }

@@ -22,6 +22,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: each closed vocabulary is one macro-declared enum with exact-token parsing and no restated token.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Each closed vocabulary named by the epic is one enum declared through the vocabulary macro, with exact-token parsing.\n- [hard] REQ-02: No token function, token table or mirror enum restates a declared vocabulary.\n- [hard] REQ-03: `Priority` orders through `Ord`, and projections and query value lists use typed vocabularies.\n",
   "documents": [],
+  "first_ready_at": "2026-10-26T22:13:46.620498838Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -41,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Closed vocabularies state their wire spelling once",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T22:13:46.620498838Z"
 }

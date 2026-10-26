@@ -1320,7 +1320,10 @@
     "871df4b0": 1,
     "870e8e46": 2,
     "eaf543c7": 2,
-    "5353463c": 2
+    "5353463c": 2,
+    "fec9b43b": 1,
+    "5f4daf6b": 1,
+    "7bf48536": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1930,6 +1933,21 @@
       "lead_fix": "removed count==len re-assertion from per-shape tests (owned by ListEnvelope)",
       "stale_narrative": "no graph_downstream schema key remains",
       "deferred_items": "no linked documents"
+    },
+    "fec9b43b-5f4daf6b-s3": {
+      "verdict": "PASS after rework 1",
+      "commits": [
+        "d523871da",
+        "c8d04c4fa"
+      ],
+      "tests": "cli_issue 339/339 (worker, outside sandbox)"
+    },
+    "7bf48536-s3": {
+      "verdict": "FAIL (re-review session 3)",
+      "reason": "run_ok/run_json/jit/jit_ok/show_json/create_issue/set_state/add_dep adapters duplicate JitCli methods (convention-convergence); same class as fec9b43b rework"
+    },
+    "eaf543c7-s3": {
+      "verdict": "code-review PASS run 4e55e7d2 (user-authorized re-run on main)"
     }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
@@ -2015,6 +2033,48 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "follow-up: first run stopped on stdin (not a gap) and the serve sibling-binary gap"
+    },
+    {
+      "session": 3,
+      "slot": "A agent-22355a56",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "fec9b43b",
+        "5f4daf6b"
+      ],
+      "kind": "rework 1: per-file JitCli adapters (5 create_issue variants, show, description_of, description, search_json, json --json filter), setup_repo_with_gated_issue name"
+    },
+    {
+      "session": 3,
+      "slot": "A agent-22355a56",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "7bf48536"
+      ],
+      "kind": "rework 1: inline JitCli adapters in 4 files",
+      "reason": "bounded mechanical rework; alternation"
+    },
+    {
+      "session": 3,
+      "slot": "B agent-de880d9c branch worktree-agent-w3-fixture",
+      "worker": "Claude Opus",
+      "issues": [
+        "1590d056"
+      ],
+      "reason": "contract-setting shared fixture API; strongest Claude tier"
+    },
+    {
+      "session": 3,
+      "slot": "A agent-22355a56 branch worktree-agent-w3-suite-fixture",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "2f95b4f6",
+        "33be0c83",
+        "b90b1660",
+        "d9598a97",
+        "58dbb1a0"
+      ],
+      "reason": "mechanical fixture_issue adoptions; upstream of 2195c98f 0af95f14"
     }
   ],
   "checkpoint": {
@@ -2037,5 +2097,17 @@
     "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
     "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
   },
-  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies."
+  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies.",
+  "coordination": [
+    {
+      "session": 3,
+      "peer": "just-in-time-f4 (2195c98f lead)",
+      "hold": {
+        "19136324": "until 8acca4f4 merges (output.rs, visualization.rs)",
+        "53f78490": "until 8acca4f4 merges (output.rs)",
+        "7995aa5c": "until 1c5da41d merges (validation/)"
+      },
+      "then": "dispatch 7995aa5c and 19136324 first: upstream of 0af95f14"
+    }
+  ]
 }
