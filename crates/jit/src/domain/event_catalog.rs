@@ -1,33 +1,16 @@
-//! Catalog of the event-log tag vocabulary and each tag's association scope.
+//! Catalog of the event-log tags and their issue association scope.
 //!
-//! [`Event`] defines the events appended to `.jit/events.jsonl`; its serde
-//! declaration tags every record with a snake-case `type` field. This module
-//! projects that vocabulary into a machine-consumable catalog ([`event_catalog`],
-//! carried by `jit --schema` as its `events` array) and into the committed
-//! markdown reference rendered by `render_event_reference`.
-//!
-//! The catalog is derived from the type, never restated:
-//!
-//! - [`EventTag`] is the fieldless mirror of the [`EventBody`] variant set.
-//!   [`EventBody::tag`] maps a record to its tag with a wildcard-free match, and
-//!   [`EventBody::get_type`] returns [`EventTag::as_str`] — so a new variant
-//!   fails to compile until it is given a tag here.
-//! - [`EventTag::sample`] constructs one representative record per tag with a
-//!   wildcard-free match, so a new tag fails to compile until it is sampled.
-//! - A row's `carries_issue_id` follows from its [`EventScope`]: only
-//!   issue-scoped records name an issue. Tests hold that against reality from
-//!   both sides — against the serialized sample (the same `serde_json` encoding
-//!   the repository-state finalizer publishes to `events.jsonl`) and against [`EventBody::issue_id`],
-//!   the accessor every consumer reads an event's issue through.
-//! - Conformance tests compare the catalog against the variant lists schemars
-//!   derives from the enums: every serde `type` tag of [`Event`] must be
-//!   cataloged, and every [`EventTag`] must appear in [`EventTag::ALL`]. A golden
-//!   test asserts the committed reference equals the projection
-//!   (`@/inv/single-source-prose`).
+//! [`EventTag`] and [`EventScope`] declare wire tokens once via
+//! [`wire_vocabulary!`]. A wildcard-free [`EventBody::tag`] map and per-tag
+//! samples bind the catalog to the event variants; tests compare its scope and
+//! `issue_id` claims with serialized events and `Event`, then compare the
+//! committed reference with the projection (`@/inv/single-source-prose`).
 
 use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::domain::vocabulary::wire_vocabulary;
 
 use super::{Assignee, Event, EventBody, Issue, LinkedCheckoutWriteStance, State};
 
@@ -42,141 +25,56 @@ pub(crate) mod test_support {
     pub const REFERENCE_GENERATOR: &str = "./scripts/generate-events-reference.sh";
 }
 
-/// What an event is about: the state it records a change to.
-///
-/// The scope decides whether a record carries an `issue_id`: only
-/// [`EventScope::Issue`] events name a single issue, so registry- and
-/// repository-scoped records omit the field entirely.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EventScope {
-    /// Records a change to one issue; the record carries that issue's `issue_id`.
-    Issue,
-    /// Records a change to a shared registry in `.jit/` (the gate registry).
-    Registry,
-    /// Records a change to the repository as a whole.
-    Repository,
-}
-
-impl EventScope {
-    /// The scope's snake-case name, as it appears in `jit --schema`.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventScope::Issue => "issue",
-            EventScope::Registry => "registry",
-            EventScope::Repository => "repository",
-        }
+wire_vocabulary! {
+    /// What an event is about: the state it records a change to.
+    ///
+    /// The scope decides whether a record carries an `issue_id`: only
+    /// [`EventScope::Issue`] events name a single issue, so registry- and
+    /// repository-scoped records omit the field entirely.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum EventScope {
+        /// Records a change to one issue; the record carries that issue's `issue_id`.
+        Issue = "issue",
+        /// Records a change to a shared registry in `.jit/` (the gate registry).
+        Registry = "registry",
+        /// Records a change to the repository as a whole.
+        Repository = "repository",
     }
 }
 
-/// The event-log tag vocabulary: one variant per [`EventBody`] variant.
-///
-/// The tag is the value of a record's `type` field. [`EventBody::tag`] is the
-/// wildcard-free mapping from a record to its tag, and [`EventBody::get_type`]
-/// renders that tag as the string serde writes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EventTag {
-    /// `issue_created`
-    IssueCreated,
-    /// `issue_claimed`
-    IssueClaimed,
-    /// `issue_state_changed`
-    IssueStateChanged,
-    /// `gate_passed`
-    GatePassed,
-    /// `gate_failed`
-    GateFailed,
-    /// `gate_added`
-    GateAdded,
-    /// `gate_removed`
-    GateRemoved,
-    /// `issue_completed`
-    IssueCompleted,
-    /// `issue_deleted`
-    IssueDeleted,
-    /// `issue_released`
-    IssueReleased,
-    /// `issue_updated`
-    IssueUpdated,
-    /// `artifact_archive_executed`
-    ArtifactArchiveExecuted,
-    /// `dependency_reduced`
-    DependencyReduced,
-    /// `local_rule_bypassed`
-    LocalRuleBypassed,
-    /// `transition_blocked`
-    TransitionBlocked,
-    /// `graph_rule_bypassed`
-    GraphRuleBypassed,
-    /// `gate_definition_updated`
-    GateDefinitionUpdated,
-    /// `gate_definition_created`
-    GateDefinitionCreated,
-    /// `gate_definition_removed`
-    GateDefinitionRemoved,
-    /// `profile_lifecycle`
-    ProfileLifecycle,
-    /// `linked_checkout_write_overridden`
-    LinkedCheckoutWriteOverridden,
+wire_vocabulary! {
+    /// The event-log tag vocabulary: one variant per [`EventBody`] variant.
+    ///
+    /// The tag is the value of a record's `type` field. [`EventBody::tag`] is the
+    /// wildcard-free mapping from a record to its tag, and [`EventBody::get_type`]
+    /// renders that tag as the string serde writes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum EventTag {
+        IssueCreated = "issue_created",
+        IssueClaimed = "issue_claimed",
+        IssueStateChanged = "issue_state_changed",
+        GatePassed = "gate_passed",
+        GateFailed = "gate_failed",
+        GateAdded = "gate_added",
+        GateRemoved = "gate_removed",
+        IssueCompleted = "issue_completed",
+        IssueDeleted = "issue_deleted",
+        IssueReleased = "issue_released",
+        IssueUpdated = "issue_updated",
+        ArtifactArchiveExecuted = "artifact_archive_executed",
+        DependencyReduced = "dependency_reduced",
+        LocalRuleBypassed = "local_rule_bypassed",
+        TransitionBlocked = "transition_blocked",
+        GraphRuleBypassed = "graph_rule_bypassed",
+        GateDefinitionUpdated = "gate_definition_updated",
+        GateDefinitionCreated = "gate_definition_created",
+        GateDefinitionRemoved = "gate_definition_removed",
+        ProfileLifecycle = "profile_lifecycle",
+        LinkedCheckoutWriteOverridden = "linked_checkout_write_overridden",
+    }
 }
 
 impl EventTag {
-    /// Every tag in the vocabulary, in [`EventBody`] declaration order.
-    ///
-    /// A conformance test compares this list against the variants schemars
-    /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 21] = [
-        EventTag::IssueCreated,
-        EventTag::IssueClaimed,
-        EventTag::IssueStateChanged,
-        EventTag::GatePassed,
-        EventTag::GateFailed,
-        EventTag::GateAdded,
-        EventTag::GateRemoved,
-        EventTag::IssueCompleted,
-        EventTag::IssueDeleted,
-        EventTag::IssueReleased,
-        EventTag::IssueUpdated,
-        EventTag::ArtifactArchiveExecuted,
-        EventTag::DependencyReduced,
-        EventTag::LocalRuleBypassed,
-        EventTag::TransitionBlocked,
-        EventTag::GraphRuleBypassed,
-        EventTag::GateDefinitionUpdated,
-        EventTag::GateDefinitionCreated,
-        EventTag::GateDefinitionRemoved,
-        EventTag::ProfileLifecycle,
-        EventTag::LinkedCheckoutWriteOverridden,
-    ];
-
-    /// The tag as serde writes it into a record's `type` field.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventTag::IssueCreated => "issue_created",
-            EventTag::IssueClaimed => "issue_claimed",
-            EventTag::IssueStateChanged => "issue_state_changed",
-            EventTag::GatePassed => "gate_passed",
-            EventTag::GateFailed => "gate_failed",
-            EventTag::GateAdded => "gate_added",
-            EventTag::GateRemoved => "gate_removed",
-            EventTag::IssueCompleted => "issue_completed",
-            EventTag::IssueDeleted => "issue_deleted",
-            EventTag::IssueReleased => "issue_released",
-            EventTag::IssueUpdated => "issue_updated",
-            EventTag::ArtifactArchiveExecuted => "artifact_archive_executed",
-            EventTag::DependencyReduced => "dependency_reduced",
-            EventTag::LocalRuleBypassed => "local_rule_bypassed",
-            EventTag::TransitionBlocked => "transition_blocked",
-            EventTag::GraphRuleBypassed => "graph_rule_bypassed",
-            EventTag::GateDefinitionUpdated => "gate_definition_updated",
-            EventTag::GateDefinitionCreated => "gate_definition_created",
-            EventTag::GateDefinitionRemoved => "gate_definition_removed",
-            EventTag::ProfileLifecycle => "profile_lifecycle",
-            EventTag::LinkedCheckoutWriteOverridden => "linked_checkout_write_overridden",
-        }
-    }
-
     /// The state this tag's records are about.
     pub fn scope(self) -> EventScope {
         match self {
@@ -535,30 +433,6 @@ mod tests {
             }
             _ => BTreeSet::new(),
         }
-    }
-
-    /// REQ-03 (enumeration): `EventTag::ALL` must list every tag. The expected
-    /// set is the variant list schemars derives from the enum itself, so a tag
-    /// added to `EventTag` — which a new `EventBody` variant forces, `EventBody::tag`
-    /// being a wildcard-free match — but left out of `ALL` fails here.
-    #[test]
-    fn test_all_lists_every_tag_variant() {
-        let schema = serde_json::to_value(schema_for!(EventTag)).expect("EventTag schema is JSON");
-        let derived = schema_accepted_strings(&schema);
-        assert!(
-            !derived.is_empty(),
-            "the derived EventTag schema must enumerate its variants"
-        );
-
-        let listed: BTreeSet<String> = EventTag::ALL
-            .iter()
-            .map(|tag| tag.as_str().to_string())
-            .collect();
-
-        assert_eq!(
-            listed, derived,
-            "EventTag::ALL must list every EventTag variant"
-        );
     }
 
     /// REQ-03 (tag strings): `Event::get_type` — the accessor the event-type

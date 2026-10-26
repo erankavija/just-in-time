@@ -1,7 +1,7 @@
 {
   "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "epic_short_id": "2195c98f",
-  "current_wave": 3,
+  "current_wave": 4,
   "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
   "waves": [
     {
@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "awaiting_code_review"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -419,14 +419,14 @@
           "short_id": "e98ae5a4",
           "title": "Event tags declare their wire spelling once",
           "classification": "implementation",
-          "status": "pending"
+          "status": "gates_passed_unmerged"
         },
         {
           "id": "f265e748-e350-4ba6-949f-575acf122bd9",
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "awaiting_code_review"
         }
       ]
     },
@@ -653,6 +653,12 @@
       "reason": "Code-review R1: REQ-03 required every log line to round-trip; 8 retired-tag lines are skipped by parse_known_events by design and b01208cb kept them.",
       "status": "resolved",
       "resolution": "Invoker approved amending REQ-03 to scope the round trip to current event types and pin the skipped lines to the retired tags."
+    },
+    {
+      "issue": "f265e748",
+      "reason": "Code-review R3 failed after two reworks (String-deref reliance in sort_key).",
+      "status": "resolved",
+      "resolution": "Invoker: lead applies the fix plus an alias-flip compile check. Done in 0b9770767; awaiting code-review."
     }
   ],
   "rework_counts": {
@@ -661,8 +667,9 @@
     "98404e0c": 2,
     "945f65f3": 1,
     "e1a6c8c2": 3,
-    "91081bd3": 0,
-    "d72bf093": 1
+    "91081bd3": 2,
+    "d72bf093": 1,
+    "f265e748": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -1166,6 +1173,55 @@
       "model": "sonnet",
       "effort": "-",
       "reason": "Rework R1: rewrite one repository-log round-trip test to the amended REQ-03; small and exact; alternation slot is Claude after the Codex 91081bd3 dispatch."
+    },
+    {
+      "issue": "e98ae5a4",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Macro adoption plus two narrow retypes with exact criteria; alternation slot is Codex."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Accessor retype with a known caller list; alternation slot is Claude."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 1 of the widened scope: typed anchor map in main.rs and newtype-safe id construction in unit tests; same tier as the implementation."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Lead-review rework 1 via the same agent: Option-keyed event identity instead of unwrap_or_default; canonical ids in the new test."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "Rework 2 (final) via the same agent: typed issue ids in EventTag::sample; alternation slot is Claude after the Codex 91081bd3 rework."
+    },
+    {
+      "issue": "91081bd3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Rework 2 (final) of the widened scope: close the raw-literal issue-id class in family test modules using a scratch alias flip plus a lexical sweep."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "Invoker-approved lead fix after rework limit: Option<&IssueId> sort key, as_str() in events filter; alias-flip check run."
     }
   ],
   "surfaced_pitfalls": [
@@ -1198,6 +1254,11 @@
       "source": "lead",
       "finding": "cargo-ci suite-time budget (30 s) fails under host load from other projects (gf2 gate runs, load ~17); quiet-host suite is ~15 s. Run cargo-ci gates alone with --force once load clears.",
       "status": "environmental"
+    },
+    {
+      "source": "lead",
+      "finding": "The shared sccache server inherited an ephemeral TMPDIR (/tmp/tmp.*/scratch) from the process that started it; once that directory was removed every compile failed in cargo-ci setup. Fix: sccache --stop-server; the next build restarts it with the default TMPDIR.",
+      "status": "environmental"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1213,5 +1274,6 @@
     "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
     "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
     "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
-  ]
+  ],
+  "session_note": "Session 2 handoff written as handoff.md; see it for next actions."
 }

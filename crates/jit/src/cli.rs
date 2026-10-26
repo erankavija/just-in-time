@@ -3,6 +3,7 @@
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
+use crate::domain::event_catalog::EventTag;
 
 /// Just-In-Time Issue Tracker
 ///
@@ -2015,7 +2016,7 @@ pub enum EventCommands {
     /// JSON output uses the list envelope `{"count": N, "events": [...]}`.
     Query {
         #[arg(short, long)]
-        event_type: Option<String>,
+        event_type: Option<EventTag>,
 
         #[arg(short, long)]
         issue_id: Option<String>,
@@ -3301,6 +3302,26 @@ mod recovery_dispatch_tests {
 
     fn parsed_command(args: &[&str]) -> Commands {
         Cli::try_parse_from(args).unwrap().command.unwrap()
+    }
+
+    #[test]
+    fn test_events_query_parses_event_type_vocabulary_at_cli_boundary() {
+        let event_type = EventTag::LinkedCheckoutWriteOverridden.as_str();
+        let cli =
+            Cli::try_parse_from(["jit", "events", "query", "--event-type", event_type]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Events(EventCommands::Query {
+                event_type: Some(EventTag::LinkedCheckoutWriteOverridden),
+                ..
+            }))
+        ));
+
+        let error =
+            Cli::try_parse_from(["jit", "events", "query", "--event-type", "unknown_event"])
+                .err()
+                .expect("an unknown event type is rejected during argument parsing");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
     }
 
     #[test]

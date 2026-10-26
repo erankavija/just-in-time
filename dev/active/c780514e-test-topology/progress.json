@@ -562,6 +562,14 @@
           "title": "Command unit tests take shipped item kinds from the default package",
           "classification": "implementation",
           "status": "pending"
+        },
+        {
+          "id": "1590d056-0fa7-4e13-9a5c-759371fc1826",
+          "short_id": "1590d056",
+          "key": "cli-fixture-commit-binary-linked-checkout",
+          "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
+          "classification": "implementation",
+          "status": "pending"
         }
       ]
     },
@@ -1252,6 +1260,12 @@
       "title": "Preserve infrastructure status through the CI build lock",
       "reason": "Coordinator-approved scope addition: de880d9c run 448d0665 misclassified child infrastructure75 as flock timeout; scripts/cargo-ci.sh uses same status for both.",
       "wired": "cargo-ci-selftest task aa28fe5f depends on this bug; bug follows completed breakdown"
+    },
+    {
+      "id": "1590d056-0fa7-4e13-9a5c-759371fc1826",
+      "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
+      "reason": "user-approved option A for the session-2 JitCli capability escalation",
+      "wired": "depends on 2b49f95b; 870e8e46, 9c3b9da2, 8e69776c depend on it"
     }
   ],
   "escalations": [
@@ -1276,24 +1290,26 @@
       "session": 2,
       "issue": "870e8e46, 9c3b9da2, 8e69776c",
       "category": "shared test infrastructure change (escalation policy 7) / footprint expansion",
-      "status": "open: awaiting user decision next session",
+      "status": "resolved: option A (user decision relayed 2026-10-26 by the 2195c98f execution lead (session just-in-time-f4))",
       "question": "The shared JitCli fixture (crates/jit/src/test_cli.rs) lacks two capabilities that migrated tests need: (1) staging and committing in its repository, needed by cli_gate gate_evaluate_all_test.rs (8 tests) and gate_evaluate_rerun_test.rs (2 tests) so HEAD resolves; (2) spawning an alternate program (a copied jit binary beside a stub jit-server) under the same environment scrub, needed by cli_issue command_exit_code_projection_tests.rs::test_command_exit_codes_serve_foreground_passthrough_is_dual_form. REQ-01/02 of 870e8e46 and 9c3b9da2 cannot be met without them. (3) 8e69776c: cli_repo_workflow divergence_recovery_journey_tests.rs needs commits and linked checkouts; its helpers (linked_checkout_fixture, create_issue_in, store_divergence_output) live in files outside the batch, so it stays unmigrated under the same commit gap.",
       "options": [
         "A (recommended): one new leaf task in this epic, 'The shared CLI fixture commits its repository and spawns an alternate binary on request', footprint test_cli.rs + cli_process_fixture_tests.rs, each capability with one owning test; 870e8e46 and 9c3b9da2 depend on it",
         "B: permit named local exceptions in those files under @/inv/convention-convergence with a tracked convergence condition"
       ],
-      "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here"
+      "impact": "870e8e46 stays in_progress with its other four files landed; later spawn/git-fixture migrations that need commits will skip those tests and record them here",
+      "decision": "New leaf task 1590d056 gives test_cli.rs JitCli commit, alternate-binary spawn under the same scrub, and linked-checkout setup; one owning test each in cli_process_fixture_tests.rs. 870e8e46, 9c3b9da2, 8e69776c depend on it."
     },
     {
       "session": 2,
       "issue": "eaf543c7",
       "category": "rework exceeded MAX_REWORK_ATTEMPTS (escalation policy 5)",
-      "status": "open: awaiting user decision next session",
+      "status": "resolved: option A (user decision relayed 2026-10-26 by the 2195c98f execution lead (session just-in-time-f4))",
       "detail": "Two lead-review reworks (repository-setup helpers) then code-review run da226023 failed F1: restating helper rustdoc in cli_gate main.rs. The fix landed in commit attributed to 5353463c (same finding, same lines). No third rework or gate rerun performed for eaf543c7.",
       "options": [
         "A (recommended): authorize re-running eaf543c7 code-review on current main, where the finding is fixed",
         "B: provide guidance / reject"
-      ]
+      ],
+      "decision": "Re-run eaf543c7 code-review on current main (cited rustdoc removed in da0df2152). A further FAIL escalates."
     }
   ],
   "rework_counts": {
@@ -2020,5 +2036,6 @@
     },
     "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
     "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
-  }
+  },
+  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies."
 }

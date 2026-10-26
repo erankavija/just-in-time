@@ -20,6 +20,7 @@ use super::{
     RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
+use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::IssueId;
 use crate::domain::{
     Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
@@ -415,7 +416,7 @@ pub enum MutationIntent {
 /// One pending event awaiting deterministic ordering and identity assignment.
 struct PendingEvent {
     phase: u8,
-    tag: String,
+    tag: EventTag,
     primary: Option<IssueId>,
     secondary: String,
     ordinal: usize,
@@ -763,7 +764,7 @@ pub(super) fn finalize_delta(
             index_creations.push(id.clone());
             pending_events.push(PendingEvent {
                 phase: 0,
-                tag: "issue_created".to_string(),
+                tag: EventTag::IssueCreated,
                 primary: Some(id.clone()),
                 secondary: String::new(),
                 ordinal: pending_events.len(),
@@ -804,7 +805,7 @@ pub(super) fn finalize_delta(
                 index_creations.push(issue.id.clone());
                 pending_events.push(PendingEvent {
                     phase: 0,
-                    tag: "issue_created".to_string(),
+                    tag: EventTag::IssueCreated,
                     primary: Some(issue.id.clone()),
                     secondary: String::new(),
                     ordinal: pending_events.len(),
@@ -813,7 +814,7 @@ pub(super) fn finalize_delta(
                 if !issue.dependencies.is_empty() {
                     pending_events.push(PendingEvent {
                         phase: 1,
-                        tag: "issue_updated".to_string(),
+                        tag: EventTag::IssueUpdated,
                         primary: Some(issue.id.clone()),
                         secondary: String::new(),
                         ordinal: pending_events.len(),
@@ -869,7 +870,7 @@ pub(super) fn finalize_delta(
             if !event_reflects {
                 pending_events.push(PendingEvent {
                     phase: 1,
-                    tag: "issue_claimed".to_string(),
+                    tag: EventTag::IssueClaimed,
                     primary: Some(issue_id.clone()),
                     secondary: agent.to_string(),
                     ordinal: pending_events.len(),
@@ -1077,7 +1078,7 @@ pub(super) fn finalize_delta(
             let (primary, secondary) = event_identities(event);
             pending_events.push(PendingEvent {
                 phase: *phase,
-                tag: event.get_type().to_string(),
+                tag: event.tag(),
                 primary,
                 secondary,
                 ordinal: pending_events.len(),
@@ -1135,7 +1136,7 @@ fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Optio
     let (primary, secondary) = event_identities(&body);
     Some(PendingEvent {
         phase: ANNOTATION_PHASE,
-        tag: body.get_type().to_string(),
+        tag: body.tag(),
         primary,
         secondary,
         ordinal,
@@ -1249,7 +1250,7 @@ pub(crate) fn finalize_audit_append(
             let (primary, secondary) = event_identities(&body);
             PendingEvent {
                 phase,
-                tag: body.get_type().to_string(),
+                tag: body.tag(),
                 primary,
                 secondary,
                 ordinal,
