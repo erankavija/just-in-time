@@ -1849,7 +1849,12 @@ mod tests {
 
     #[test]
     fn test_stamped_event_reads_back_its_body_and_identity() {
-        let body = EventBody::draft_gate_added("issue".to_string(), "tests".to_string());
+        let body = EventBody::draft_gate_added(
+            "00000000-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
+            "tests".to_string(),
+        );
         let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
 
         let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
@@ -2947,7 +2952,12 @@ mod tests {
         #[test]
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
-            let event = EventBody::draft_issue_claimed("issue-1".to_string(), actor);
+            let event = EventBody::draft_issue_claimed(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                actor,
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"agent:copilot\""));
@@ -2959,8 +2969,13 @@ mod tests {
         #[test]
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
-            let event =
-                EventBody::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+            let event = EventBody::draft_issue_released(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                prev,
+                "timeout".to_string(),
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"copilot:session-1\""));
@@ -2972,8 +2987,13 @@ mod tests {
         #[test]
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
-            let event =
-                EventBody::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+            let event = EventBody::draft_gate_passed(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                "tests".to_string(),
+                Some(by),
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"updated_by\":\"ci:runner\""));
@@ -2994,7 +3014,7 @@ mod tests {
 
         #[test]
         fn test_event_deserialize_rejects_malformed_assignee() {
-            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"i1","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
+            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"00000000-0000-4000-8000-000000000001","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
             assert!(serde_json::from_str::<Event>(json).is_err());
         }
     }
