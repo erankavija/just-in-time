@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e1940fcf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e87bd74f354b6fcc77be6ae5f5c4d3eb3b10cdb5",
+  "completed_at": "2026-10-26T23:51:56.977050110Z",
+  "duration_ms": 119719,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable test change derives Priority schema tokens from the canonical vocabulary and leaves no handwritten priority-token list in validation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fcdecdb2-53db-4361-89b9-6c768342073a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:49:57.257257677Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 33be8aef96b16e75e8846e55cf21bb90842b91ba (`test(jit:e1940fcf): derive the schema test's priority tokens from Priority::ALL`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 — dev/vision/9db27a3a-charter.md; @/invariant/semantic-types — .jit/invariants.toml; @/issue/2195c98f/requirement/REQ-10 — issue description\nGate evidence: cargo-ci — pending, no recorded exit code\nTruncation recovery: Narrow reads of item-kind configuration, invariant registry, parent requirement, and affected source lines after broad output truncation\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable test change derives Priority schema tokens from the canonical vocabulary and leaves no handwritten priority-token list in validation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
