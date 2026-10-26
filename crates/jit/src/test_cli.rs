@@ -1,13 +1,19 @@
 //! Shared fixture for tests that spawn the `jit` binary.
 //!
 //! A [`JitCli`] owns a temporary repository and builds every `Command` through
-//! one convention: the binary of the calling test target, working directory at
-//! the repository, test mode on, and no inherited `JIT_*` variable.
+//! one convention: working directory at the repository, test mode on, and no
+//! inherited `JIT_*` variable.
 
+use crate::repository_state::{
+    repository_relative_path, RepositoryRootClass, RootRelativePath, VirtualPath,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
+    REPO_WRITE_LOCK_FILE,
+};
 use anyhow::{anyhow, bail, ensure, Context, Result};
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Prefix of every environment variable the product reads.
@@ -21,16 +27,19 @@ pub const GIT_AUTHOR_NAME: &str = "Test User";
 pub const GIT_AUTHOR_EMAIL: &str = "test@example.com";
 
 /// A temporary repository and the `jit` processes spawned over it.
+///
+/// The temporary directory is removed when the last fixture sharing it drops.
 pub struct JitCli {
-    dir: TempDir,
+    _dir: Arc<TempDir>,
+    root: PathBuf,
 }
 
 impl JitCli {
     /// An empty directory with no `.jit/`.
     pub fn uninitialised() -> Result<Self> {
-        Ok(Self {
-            dir: TempDir::new().context("create temporary repository")?,
-        })
+        Ok(Self::with_repository(
+            TempDir::new().context("create temporary repository")?,
+        ))
     }
 
     /// A repository initialised by `jit init`.
@@ -42,17 +51,64 @@ impl JitCli {
 
     /// A repository built by shared test support; the fixture removes it on drop.
     pub fn with_repository(dir: TempDir) -> Self {
-        Self { dir }
+        let root = dir.path().to_path_buf();
+        Self {
+            _dir: Arc::new(dir),
+            root,
+        }
+    }
+
+    /// A primary checkout initialised by git and `jit init` with one base
+    /// commit, and a linked checkout of it, answered as `(primary, linked)`.
+    ///
+    /// Machine-local `.jit/` runtime state is git-ignored in both checkouts.
+    pub fn linked_checkouts() -> Result<(Self, Self)> {
+        let dir = Arc::new(TempDir::new().context("create temporary checkouts")?);
+        let checkout = |name: &str| Self {
+            _dir: Arc::clone(&dir),
+            root: dir.path().join(name),
+        };
+        let (primary, linked) = (checkout("main"), checkout("feature"));
+        std::fs::create_dir(primary.root()).context("create the primary checkout")?;
+        primary.init_git()?.run(["init"])?;
+        std::fs::write(
+            primary.root().join(".gitignore"),
+            machine_local_ignores()?.join("\n") + "\n",
+        )
+        .context("ignore machine-local runtime state")?;
+        let linked_root = linked.root().to_str().context("utf-8 checkout path")?;
+        primary
+            .commit("track with jit")?
+            .git(["worktree", "add", "-q", linked_root])?;
+        Ok((primary, linked))
     }
 
     pub fn root(&self) -> &Path {
-        self.dir.path()
+        &self.root
     }
 
     /// Initialise git in the repository (see [`init_git_repository`]).
     pub fn init_git(&self) -> Result<&Self> {
         init_git_repository(self.root())?;
         Ok(self)
+    }
+
+    /// Stage the whole working tree and commit it, empty or not, under the
+    /// identity [`init_git_repository`] configures.
+    pub fn commit(&self, message: &str) -> Result<&Self> {
+        self.git(["add", "-A"])?;
+        self.git(["commit", "-q", "--allow-empty", "-m", message])?;
+        Ok(self)
+    }
+
+    /// Run `git args` in the repository, isolated from the developer's git
+    /// configuration, and return its stdout.
+    pub fn git<I, S>(&self, args: I) -> Result<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        git(self.root(), args)
     }
 
     /// A `jit` command in the repository with `args` and no `JIT_*` variable.
@@ -76,12 +132,24 @@ impl JitCli {
         K: AsRef<std::ffi::OsStr>,
         V: AsRef<std::ffi::OsStr>,
     {
-        let mut command = Command::new(jit_binary());
+        let mut command = self.program_command(jit_binary(), args);
+        command.envs(env);
+        command
+    }
+
+    /// A command running `program` under the environment [`Self::command`]
+    /// gives `jit`.
+    pub fn program_command<I, S>(&self, program: impl AsRef<OsStr>, args: I) -> Command
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        let mut command = Command::new(program);
         command.current_dir(self.root()).args(args);
         inherited_product_vars().for_each(|name| {
             command.env_remove(name);
         });
-        command.env("JIT_TEST_MODE", "1").envs(env);
+        command.env("JIT_TEST_MODE", "1");
         command
     }
 
@@ -141,29 +209,68 @@ pub fn created_issue_id(output: &serde_json::Value) -> Result<String> {
 /// Initialise git in `path` with a fixed author identity and unsigned commits,
 /// ignoring the developer's global and system git configuration.
 pub fn init_git_repository(path: &Path) -> Result<()> {
-    let git = |args: &[&str]| -> Result<()> {
-        let mut command = Command::new("git");
-        command
-            .current_dir(path)
-            .args(args)
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null");
-        GIT_REDIRECTS.iter().for_each(|name| {
-            command.env_remove(name);
-        });
-        let output = command.output().context("spawn git")?;
-        if !output.status.success() {
-            bail!(
-                "git {args:?} failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-        Ok(())
-    };
-    git(&["init", "--initial-branch=main"])?;
-    git(&["config", "user.name", GIT_AUTHOR_NAME])?;
-    git(&["config", "user.email", GIT_AUTHOR_EMAIL])?;
-    git(&["config", "commit.gpgsign", "false"])
+    git(path, ["init", "--initial-branch=main"])?;
+    git(path, ["config", "user.name", GIT_AUTHOR_NAME])?;
+    git(path, ["config", "user.email", GIT_AUTHOR_EMAIL])?;
+    git(path, ["config", "commit.gpgsign", "false"]).map(drop)
+}
+
+fn git<I, S>(path: &Path, args: I) -> Result<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let args: Vec<OsString> = args
+        .into_iter()
+        .map(|arg| arg.as_ref().to_os_string())
+        .collect();
+    let mut command = Command::new("git");
+    command
+        .current_dir(path)
+        .args(&args)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null");
+    GIT_REDIRECTS.iter().for_each(|name| {
+        command.env_remove(name);
+    });
+    let output = command.output().context("spawn git")?;
+    if !output.status.success() {
+        bail!(
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Repository-relative ignore patterns for the machine-local runtime state a
+/// live store writes, named through the storage layout.
+fn machine_local_ignores() -> Result<Vec<String>> {
+    let data_locks = [
+        REPO_WRITE_LOCK_FILE,
+        INDEX_LOCK_FILE,
+        GATES_LOCK_FILE,
+        EVENTS_LOCK_FILE,
+        RECORD_SCRATCH_DIR,
+    ]
+    .into_iter()
+    .map(|name| {
+        Ok(repository_relative_path(
+            RepositoryRootClass::Data,
+            &RootRelativePath::parse(name)?,
+        ))
+    });
+    let data_records = [
+        VirtualPath::WORKTREE_IDENTITY,
+        VirtualPath::SERVER_LOG,
+        VirtualPath::SERVER_PID,
+    ]
+    .into_iter()
+    .map(|path| Ok(path.repository_relative()));
+    data_locks
+        .chain(data_records)
+        .chain(std::iter::once(Ok(BOOTSTRAP_LOCK_FILE.to_owned())))
+        .collect()
 }
 
 fn inherited_product_vars() -> impl Iterator<Item = OsString> {
@@ -174,7 +281,7 @@ fn inherited_product_vars() -> impl Iterator<Item = OsString> {
 
 /// The `jit` binary of the running test target: Cargo's per-target
 /// `CARGO_BIN_EXE_jit`, else the binary beside the test executable's `deps/`.
-fn jit_binary() -> PathBuf {
+pub fn jit_binary() -> PathBuf {
     std::env::var_os("CARGO_BIN_EXE_jit")
         .map(PathBuf::from)
         .or_else(|| {
