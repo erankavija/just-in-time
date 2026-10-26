@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-e98ae5a4",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "4e82ac04fa9875ad3b7ee2ee065f0fdec834b541",
+  "completed_at": "2026-10-25T23:11:19.610581755Z",
+  "duration_ms": 235997,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "1653ef2f6591a6a8ae80fb9ea2f65c6d24bddea17cce7e925544b691b94fe7cb",
+  "issue_id": "e98ae5a4-595a-4d49-9c88-2d2422198e9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fa7722a3-c64d-4559-b1f3-1a8f2a6094dd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T23:07:23.613291072Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\n     Summary [  78.292s] 0/4645 tests run: 0 passed, 0 skipped\ninfo: experimental features enabled: setup-scripts\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n────────────\n Nextest run ID ee594b77-46d1-47f8-87c0-a5fc33a5f872 with nextest profile: default\n    Starting 4645 tests across 14 binaries\n       SETUP [      1/3] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-default\n  SETUP SLOW [> 15.000s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-default\n  SETUP PASS [  18.097s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-default\n       SETUP [      2/3] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n  SETUP SLOW [> 15.000s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n  SETUP SLOW [> 30.000s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n  SETUP SLOW [> 45.000s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n TERMINATING [> 60.000s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n   SETUP TMT [  60.175s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e98ae5a4/target/debug/jit __test-fixture-setup jit-dogfood\n\n    (script timed out)\n\n  Cancelling due to setup script failure: \n────────────\n     Summary [  78.292s] 0/4645 tests run: 0 passed, 0 skipped\nerror: setup script failed\n--- excluded-tests output ---\ncargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement\n--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 97934 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 97934 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 104696 ms, warmed 17 executables (1996751936 bytes) in 212 ms.\n  ✓ fmt: ok (1543 ms)\n  ✓ clippy: ok (31177 ms)\n  ✓ suite-build: built in 104696 ms, warmed 17 executables (1996751936 bytes) in 212 ms (104911 ms)\n  ✗ test: FAILED (exit 105) (78981 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (18940 ms)\n  ✓ suite-clock: 97934 ms\n  ✗ excluded-tests: FAILED (exit 1) (4 ms)\n  ✗ budget: FAILED (exit 1) (83 ms)\n\ncargo-ci: verdict (exit 1): step 'test' failed on repository content\n"
+}
