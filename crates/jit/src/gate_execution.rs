@@ -1308,10 +1308,12 @@ mod tests {
     fn test_context_file_written_when_context_provided() {
         use crate::domain::GateContext;
 
+        let issue_id = fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77");
+
         let context = GateContext {
             schema_version: 1,
             prompt: Some("Review the code".to_string()),
-            issue: serde_json::json!({"id": "issue-123", "title": "Test issue"}),
+            issue: serde_json::json!({"id": issue_id, "title": "Test issue"}),
             gate: serde_json::json!({"key": "review", "title": "Code Review"}),
             run_history: vec![],
         };
@@ -1330,7 +1332,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "review",
-            &fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            &issue_id,
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1346,7 +1348,7 @@ mod tests {
             serde_json::from_str(&result.stdout).expect("Context file should contain valid JSON");
         assert_eq!(parsed["schema_version"], 1);
         assert_eq!(parsed["prompt"], "Review the code");
-        assert_eq!(parsed["issue"]["id"], "issue-123");
+        assert_eq!(parsed["issue"]["id"], serde_json::json!(issue_id));
         assert_eq!(parsed["gate"]["key"], "review");
         assert!(parsed["run_history"].as_array().unwrap().is_empty());
     }
@@ -1430,12 +1432,14 @@ mod tests {
     fn test_context_includes_run_history() {
         use crate::domain::{GateContext, GateRunResult, GateRunStatus as RS};
 
+        let issue_id = fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77");
+
         let previous_run = GateRunResult {
             schema_version: 1,
             run_id: "prev-run-1".to_string(),
             gate_key: "review".to_string(),
             stage: GateStage::Postcheck,
-            issue_id: fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            issue_id: issue_id.clone(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: RS::Failed,
@@ -1457,7 +1461,7 @@ mod tests {
         let context = GateContext {
             schema_version: 1,
             prompt: Some("Review again".to_string()),
-            issue: serde_json::json!({"id": "issue-123"}),
+            issue: serde_json::json!({"id": issue_id}),
             gate: serde_json::json!({"key": "review"}),
             run_history: vec![previous_run],
         };
@@ -1475,7 +1479,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "review",
-            &fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            &issue_id,
             GateStage::Postcheck,
             &checker,
             &temp_dir,

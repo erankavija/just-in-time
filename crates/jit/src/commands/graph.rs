@@ -507,7 +507,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .into_iter()
                 .map(|i| i.id.clone())
                 .collect();
-            set.insert(root_id.to_string());
+            set.insert(root_id.clone());
             set
         });
         let in_scope = |id: &IssueId| -> bool { scope.as_ref().is_none_or(|set| set.contains(id)) };
@@ -517,7 +517,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|issue| in_scope(&issue.id))
             .map(|issue| HierarchyNodeView {
                 short_id: issue.short_id(),
-                id: issue.id.to_string(),
+                id: issue.id.clone(),
                 title: issue.title.clone(),
                 type_name: crate::labels::type_label_value(&issue.labels).map(str::to_string),
                 hierarchy: resolution
@@ -530,9 +530,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(GraphTreeResponse::with_extras(
             nodes,
-            crate::output::TreeRoot {
-                root: root_id.map(|id| id.to_string()),
-            },
+            crate::output::TreeRoot { root: root_id },
         ))
     }
 
@@ -661,7 +659,7 @@ mod tests {
 
     fn make_node(id: &IssueId, state: State) -> DependencyTreeNode {
         DependencyTreeNode {
-            id: id.to_string(),
+            id: id.clone(),
             short_id: id.short_id().to_string(),
             title: format!("Node {}", id),
             state,

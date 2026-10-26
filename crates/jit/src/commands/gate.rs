@@ -388,7 +388,7 @@ fn captured_gate_preset_issue(
                 .with_context(|| format!("failed to parse captured issue {issue_id}"))?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(issue_id.to_string()).into())
+            return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };

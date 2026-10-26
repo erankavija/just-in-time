@@ -149,10 +149,10 @@ fn captured_bound_issue(
 ) -> Result<Issue> {
     let index = captured_repository_index(image)?;
     if !index.all_ids.iter().any(|id| id == issue_id) {
-        return Err(crate::storage::IssueNotFoundError::new(issue_id.to_string()).into());
+        return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into());
     }
     captured_issue_record(image, issue_id)?
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.to_string()).into())
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
 }
 
 fn captured_gate_registry(
@@ -449,7 +449,7 @@ fn captured_issue_rule_report(
     let issue = issues
         .iter()
         .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.to_string()))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format();
@@ -651,7 +651,7 @@ fn label_target_report(
     let issue = issues
         .iter()
         .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.to_string()))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let prefix = format!("{label_namespace}:");
     let targets: Vec<&str> = issue
         .labels
@@ -789,7 +789,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(|id| {
                 captured_issue_record(&bound, id)?
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.to_string()).into())
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
             })
             .collect::<Result<Vec<_>>>()?;
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
@@ -1577,7 +1577,7 @@ mod tests {
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
-    use crate::domain::identity::{IssueId, IssueIdStaging};
+    use crate::domain::identity::IssueId;
     use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
@@ -1623,7 +1623,7 @@ mod tests {
         gate_key: &str,
         checker: GateChecker,
         labels: Vec<String>,
-    ) -> String {
+    ) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             gate_key.to_string(),
@@ -2068,7 +2068,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
     }
 
-    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, String) {
+    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, IssueId) {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = crate::test_taxonomy::test_taxonomy();
@@ -2234,7 +2234,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }
 
         /// A new issue requiring the gate under test.
-        fn issue(&self) -> String {
+        fn issue(&self) -> IssueId {
             let taxonomy = crate::test_taxonomy::test_taxonomy();
             let (issue_id, _) = self
                 .executor
@@ -2648,7 +2648,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "true".to_string(),
             Some("../../outside".to_string()),
         );
-        let unrelated = "00000000-0000-4000-8000-000000000001";
+        let unrelated = fixture_id("00000000-0000-4000-8000-000000000001");
         std::fs::write(
             repo.path().join(format!(".jit/issues/{unrelated}.json")),
             [],
@@ -3399,7 +3399,7 @@ source-of-truth = "markdown-first"
 
     /// An issue requiring the manual gate `review`, whose registry also declares
     /// the automated gate `tests`.
-    fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> String {
+    fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry
             .gates
@@ -4630,11 +4630,26 @@ source-of-truth = "markdown-first"
     #[cfg(unix)]
     #[test]
     fn test_check_gate_never_retargets_resolved_id_after_replacement() {
-        let (repo, executor, issue_id) = setup_file_repository();
-        let replacement_id = fixture_id(&format!(
-            "{}-ffff-4fff-8fff-ffffffffffff",
-            issue_id.short_id()
-        ));
+        let (repo, executor, created_id) = setup_file_repository();
+        let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
+        let replacement_id = fixture_id("0f0e0d0c-ffff-4fff-8fff-ffffffffffff");
+        let mut original = executor.storage.load_issue(&created_id).unwrap();
+        original.id = issue_id.clone();
+        std::fs::remove_file(repo.path().join(format!(".jit/issues/{created_id}.json"))).unwrap();
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{issue_id}.json")),
+            crate::repository_state::serialize_issue(&original).unwrap(),
+        )
+        .unwrap();
+        let index = crate::repository_state::RepositoryIndex {
+            all_ids: vec![issue_id.clone()],
+            ..Default::default()
+        };
+        std::fs::write(
+            repo.path().join(".jit/index.json"),
+            index.to_pretty_bytes().unwrap(),
+        )
+        .unwrap();
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4721,7 +4736,7 @@ source-of-truth = "markdown-first"
         );
 
         let (repo, executor, issue_id) = setup_file_repository();
-        concurrent.issue_id = "unrelated-issue".to_string();
+        concurrent.issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000002");
         std::fs::write(
             repo.path().join("concurrent-run.json"),
             serde_json::to_vec_pretty(&concurrent).unwrap(),

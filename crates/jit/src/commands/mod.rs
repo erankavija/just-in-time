@@ -1093,7 +1093,7 @@ fn derive_state_transition(
     if old_state == State::Archived {
         if let Some(origin) = issue.archived_from.filter(|origin| target != *origin) {
             return Err(crate::errors::TransitionBlockedError::archived_revive(
-                issue.id.to_string(),
+                issue.id.clone(),
                 target,
                 origin,
             )
@@ -1108,7 +1108,7 @@ fn derive_state_transition(
         );
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
-                issue.id.to_string(),
+                issue.id.clone(),
                 target,
                 old_state,
                 blockers,
@@ -1117,7 +1117,7 @@ fn derive_state_transition(
         }
         if target == State::Done && issue.has_unpassed_gates() {
             return Err(crate::errors::TransitionBlockedError::gates(
-                issue.id.to_string(),
+                issue.id.clone(),
                 target,
                 old_state,
                 unpassed_gate_blockers(&issue, &evidence.declarations.gates),
@@ -1238,7 +1238,7 @@ fn derive_state_transition(
                 } else {
                     return Ok(DerivedStateTransition::GraphBlocked {
                         error: crate::errors::TransitionBlockedError::graph_rules(
-                            issue.id.to_string(),
+                            issue.id.clone(),
                             target,
                             old_state,
                             blocking,
@@ -1387,7 +1387,7 @@ fn derive_field_update(
             );
             if !blockers.is_empty() {
                 return Err(crate::errors::TransitionBlockedError::dependencies(
-                    issue.id.to_string(),
+                    issue.id.clone(),
                     State::Done,
                     original.state,
                     blockers,
@@ -1395,7 +1395,7 @@ fn derive_field_update(
                 .into());
             }
             gate_error = Some(crate::errors::TransitionBlockedError::gates(
-                issue.id.to_string(),
+                issue.id.clone(),
                 State::Done,
                 State::Gated,
                 unpassed_gate_blockers(&issue, &evidence.declarations.gates),
@@ -2059,7 +2059,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
             let bytes = match image.entry(&path)? {
                 RepositoryEntry::File { content, .. } => content.bytes(),
                 RepositoryEntry::Absent => {
-                    return Err(crate::storage::IssueNotFoundError::new(id.to_string()).into())
+                    return Err(crate::storage::IssueNotFoundError::new(id.clone()).into())
                 }
                 _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
             };
@@ -2113,7 +2113,7 @@ fn require_issue_in_capture(issues: &[Issue], id: &IssueId) -> Result<IssueId> {
         .iter()
         .find(|issue| &issue.id == id)
         .map(|issue| issue.id.clone())
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.to_string()).into())
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
 }
 
 /// Executes CLI commands with business logic and validation.
@@ -2359,7 +2359,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                     RepositoryEntry::Absent => {
                         return Err(crate::storage::IssueNotFoundError::new(
-                            request.issue_id().to_string(),
+                            request.issue_id().clone(),
                         )
                         .into())
                     }
@@ -2649,7 +2649,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .iter()
                 .find(|issue| issue.id == target)
                 .cloned()
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.to_string()))?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
             let lease_warnings = if request.enforce_lease {
@@ -2830,7 +2830,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .into_iter()
                         .find(|issue| issue.id == light.target.id)
                         .ok_or_else(|| {
-                            crate::storage::IssueNotFoundError::new(light.target.id.to_string())
+                            crate::storage::IssueNotFoundError::new(light.target.id.clone())
                         })?;
                     let declarations = crate::repository_state::declarations_from_image(&image)?;
                     let lease_mode = declarations.config().enforcement_mode();
@@ -2927,9 +2927,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .iter()
                 .find(|issue| issue.id == expected_target)
                 .cloned()
-                .ok_or_else(|| {
-                    crate::storage::IssueNotFoundError::new(expected_target.to_string())
-                })?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(expected_target.clone()))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let lease_mode = declarations.config().enforcement_mode();
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
@@ -3064,7 +3062,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         );
                         if !blockers.is_empty() {
                             return Err(crate::errors::TransitionBlockedError::dependencies(
-                                issue.id.to_string(),
+                                issue.id.clone(),
                                 State::InProgress,
                                 issue.state,
                                 blockers,
@@ -3140,7 +3138,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 );
                 if !blockers.is_empty() {
                     return Err(crate::errors::TransitionBlockedError::dependencies(
-                        issue.id.to_string(),
+                        issue.id.clone(),
                         target,
                         issue.state,
                         blockers,
@@ -3148,7 +3146,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .into());
                 }
                 after_apply_error = Some(crate::errors::TransitionBlockedError::gates(
-                    issue.id.to_string(),
+                    issue.id.clone(),
                     State::Done,
                     State::Gated,
                     unpassed_gate_blockers(&issue, &declarations.gates),
@@ -3293,7 +3291,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let blockers = issue::blocking_dependencies(issue, &resolved);
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
-                issue.id.to_string(),
+                issue.id.clone(),
                 target,
                 issue.state,
                 blockers,
@@ -3304,7 +3302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if target == State::Done && issue.has_unpassed_gates() {
             let registry = self.storage.load_gate_registry()?;
             return Err(crate::errors::TransitionBlockedError::gates(
-                issue.id.to_string(),
+                issue.id.clone(),
                 State::Done,
                 issue.state,
                 unpassed_gate_blockers(issue, &registry),
@@ -3690,7 +3688,7 @@ mod tests {
     fn precheck_evidence_fixture() -> (
         crate::storage::InMemoryStorage,
         CommandExecutor<crate::storage::InMemoryStorage>,
-        String,
+        IssueId,
     ) {
         use crate::declarations::{GateChecker, GateDefinition, GateRegistry, GateStage};
         use std::collections::HashMap;
@@ -4473,7 +4471,7 @@ enforce_leases = "strict"
 
     #[test]
     fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
-        use crate::storage::claim_coordinator::test_issue_id;
+        use crate::commands::test_helpers::fixture_id;
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use std::time::Duration;
@@ -4495,7 +4493,7 @@ enforce_leases = "strict"
             "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
-        let issue_id = test_issue_id("guard-probe");
+        let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
         coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 

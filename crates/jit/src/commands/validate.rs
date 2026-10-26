@@ -270,7 +270,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let target = issues
             .into_iter()
             .find(|issue| issue.id == target_id)
-            .ok_or_else(|| crate::storage::IssueNotFoundError::new(target_id.to_string()))?;
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(target_id.clone()))?;
         if !needs_base(&target) {
             return Ok(Some(MutationPreflight {
                 image,
@@ -810,7 +810,7 @@ fn discover_issue_closure(
             let issue = issues
                 .iter()
                 .find(|issue| issue.id == target)
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.to_string()))?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
             let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
@@ -1036,7 +1036,7 @@ pub(super) fn rule_validation_outcome(
     let issue = issues
         .iter()
         .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.as_str().to_string()))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format();
@@ -1764,9 +1764,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let container = all
             .iter()
             .find(|i| &i.id == container_full_id)
-            .ok_or_else(|| {
-                crate::storage::IssueNotFoundError::new(container_full_id.as_str().to_string())
-            })?;
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(container_full_id.clone()))?;
         let container_type = label_utils::type_label_value(&container.labels).map(str::to_string);
         let templates = &self.cached_config()?.templates;
         let breakdown_type = container_type

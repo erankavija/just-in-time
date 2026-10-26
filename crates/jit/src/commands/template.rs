@@ -658,7 +658,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
             let path = VirtualPath::data(format!("issues/{id}.json"))?;
             let bytes = image
                 .file_bytes(&path)?
-                .ok_or_else(|| IssueNotFoundError::new(id.to_string()))?;
+                .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
             let issue: Issue = serde_json::from_slice(bytes)
                 .with_context(|| format!("failed to parse captured issue {id}"))?;
             if issue.id != *id {
@@ -898,7 +898,7 @@ fn template_issue<'a>(issues: &'a [Issue], id: &IssueId) -> Result<&'a Issue> {
     issues
         .iter()
         .find(|issue| &issue.id == id)
-        .ok_or_else(|| IssueNotFoundError::new(id.to_string()).into())
+        .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
 }
 
 fn find_captured_breakdown(
@@ -1086,7 +1086,7 @@ fn derive_fresh_template(
     for attachment in &delta.anchor_gates {
         let issue = candidate
             .get_mut(&attachment.anchor_issue_id)
-            .ok_or_else(|| IssueNotFoundError::new(attachment.anchor_issue_id.to_string()))?;
+            .ok_or_else(|| IssueNotFoundError::new(attachment.anchor_issue_id.clone()))?;
         attach_captured_gates(
             &attachment.gates,
             issue,
@@ -1216,7 +1216,7 @@ fn add_captured_template_edge(
     DependencyGraph::new(&refs).validate_add_dependency(from.as_str(), to.as_str())?;
     let before = issues
         .get(from)
-        .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
         .dependencies
         .iter()
         .cloned()
@@ -1226,7 +1226,7 @@ fn add_captured_template_edge(
     }
     issues
         .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
         .dependencies
         .push(to.clone());
 
@@ -1253,7 +1253,7 @@ fn add_captured_template_edge(
     for (id, reduced) in reductions {
         let issue = issues
             .get_mut(&id)
-            .ok_or_else(|| IssueNotFoundError::new(id.to_string()))?;
+            .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
         let old = issue.dependencies.iter().cloned().collect::<HashSet<_>>();
         if old == reduced {
             continue;
@@ -1282,13 +1282,13 @@ fn add_captured_template_edge(
             .collect::<HashMap<_, _>>();
         issues
             .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .derive_readiness_correction(&resolved)
             == Some(ReadinessCorrection::Demote)
     };
     let issue = issues
         .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?;
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
     if demoted {
         issue.state = State::Backlog;
         events.push((
@@ -1318,7 +1318,7 @@ fn remove_captured_template_edge(
     {
         let issue = issues
             .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?;
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
         let before = issue.dependencies.len();
         issue.dependencies.retain(|dependency| dependency != to);
         if issue.dependencies.len() == before {
@@ -1343,14 +1343,14 @@ fn remove_captured_template_edge(
             .collect::<HashMap<_, _>>();
         issues
             .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .derive_readiness_correction(&resolved)
             == Some(ReadinessCorrection::Promote)
     };
     if promoted {
         issues
             .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.to_string()))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .state = State::Ready;
         events.push((
             3,

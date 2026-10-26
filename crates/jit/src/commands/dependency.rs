@@ -450,7 +450,7 @@ fn captured_issue<'a>(issues: &'a [Issue], id: &IssueId) -> Result<&'a Issue> {
     issues
         .iter()
         .find(|issue| &issue.id == id)
-        .ok_or_else(|| IssueNotFoundError::new(id.to_string()).into())
+        .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
 }
 
 fn derive_dependency_mutation(
@@ -539,7 +539,7 @@ fn derive_dependency_removal(
     *candidate
         .iter_mut()
         .find(|candidate| candidate.id == source_id)
-        .ok_or_else(|| IssueNotFoundError::new(source_id.to_string()))? = issue.clone();
+        .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))? = issue.clone();
     let resolved = crate::domain::queries::build_issue_map(&candidate);
     let mut intents = vec![MutationIntent::RecordEvent {
         phase: 1,
@@ -630,11 +630,8 @@ fn derive_single_dependency_add(
         .collect::<Vec<_>>();
     if !redundant.is_empty() && policy == RedundancyPolicy::Reject {
         return Err(RedundantDependencyError::new(
-            (full_issue_id.to_string(), full_dependency_id.to_string()),
-            redundant
-                .into_iter()
-                .map(|(from, to)| (from.to_string(), to.to_string()))
-                .collect(),
+            (full_issue_id.clone(), full_dependency_id.clone()),
+            redundant,
         )
         .into());
     }
@@ -785,10 +782,10 @@ fn derive_batch_dependency_add(
     if !rejected.is_empty() {
         rejected.sort_by_key(|(ordinal, _, _)| *ordinal);
         return Err(DependencyBatchRejectedError::new(
-            full_issue_id.to_string(),
+            full_issue_id.clone(),
             rejected
                 .into_iter()
-                .map(|(_, dependency_id, error)| (dependency_id.to_string(), error))
+                .map(|(_, dependency_id, error)| (dependency_id.clone(), error))
                 .collect(),
         )
         .into());
@@ -873,7 +870,7 @@ fn candidate_issues<'a>(
     let source = candidate
         .iter_mut()
         .find(|issue| &issue.id == source_id)
-        .ok_or_else(|| IssueNotFoundError::new(source_id.to_string()))?;
+        .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))?;
     source
         .dependencies
         .extend(dependencies.into_iter().cloned());

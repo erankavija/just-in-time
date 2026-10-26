@@ -52,7 +52,7 @@ pub(super) fn blocking_dependencies(
                 None
             }
             Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
-            None => Some(TransitionBlocker::missing_dependency(dep_id.to_string())),
+            None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
         })
         .collect()
 }
@@ -580,7 +580,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         if allowed {
             Ok(())
         } else {
-            Err(DeletionNotConfirmedError::new(id.to_string()))
+            Err(DeletionNotConfirmedError::new(id.clone()))
         }
     }
 

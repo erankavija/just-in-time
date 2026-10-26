@@ -1394,7 +1394,7 @@ fn local_asset_paths(
 /// discovered by scanning pinned content.
 fn link_check_capture_spec(
     documents: &[(IssueId, &crate::domain::DocumentReference)],
-    link_targets: &std::collections::BTreeSet<(IssueId, String)>,
+    link_targets: &std::collections::BTreeSet<(String, String)>,
 ) -> Result<crate::repository_state::CaptureSpec> {
     use crate::document::DocumentReferenceRequests;
     use crate::repository_state::CaptureSpec;
@@ -1476,7 +1476,7 @@ fn pinned_link_targets(
     image: &crate::repository_state::RepositoryImage,
     documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
-) -> std::collections::BTreeSet<(IssueId, String)> {
+) -> std::collections::BTreeSet<(String, String)> {
     documents
         .iter()
         .filter_map(|(_, document)| {
@@ -1599,7 +1599,7 @@ fn captured_issue(
                 .with_context(|| format!("failed to parse captured issue {expected_id}"))?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(expected_id.to_string()).into())
+            return Err(crate::storage::IssueNotFoundError::new(expected_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };

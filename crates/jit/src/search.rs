@@ -342,10 +342,27 @@ mod tests {
 
     #[test]
     fn test_parse_ripgrep_json_respects_max_results() {
-        let json = r#"{"type":"match","data":{"path":{"text":"issues/1.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-{"type":"match","data":{"path":{"text":"issues/2.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-{"type":"match","data":{"path":{"text":"issues/3.json"},"lines":{"text":"test\n"},"line_number":1,"submatches":[]}}
-"#;
+        let json = [
+            "0f0e0d0c-0000-4000-8000-000000000001",
+            "0f0e0d0c-0000-4000-8000-000000000002",
+            "0f0e0d0c-0000-4000-8000-000000000003",
+        ]
+        .map(|literal| literal.parse::<IssueId>().unwrap())
+        .iter()
+        .map(|id| {
+            serde_json::json!({
+                "type": "match",
+                "data": {
+                    "path": {"text": format!("issues/{id}.json")},
+                    "lines": {"text": "test\n"},
+                    "line_number": 1,
+                    "submatches": [],
+                },
+            })
+            .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
         let results = parse_ripgrep_json(json.as_bytes(), Some(2)).unwrap();
         assert_eq!(results.len(), 2);
