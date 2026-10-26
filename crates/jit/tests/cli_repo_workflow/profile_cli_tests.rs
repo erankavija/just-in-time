@@ -1,15 +1,12 @@
+use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 use tempfile::TempDir;
 
-pub(super) fn jit(dir: &std::path::Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("failed to run jit")
+pub(super) fn jit(cli: &JitCli, args: &[&str]) -> Output {
+    cli.command(args).output().expect("failed to run jit")
 }
 
 /// The id the checked-in fixture package declares.
@@ -161,11 +158,11 @@ pub(super) fn json(output: &Output) -> Value {
 
 #[test]
 fn test_profile_show_works_without_repository() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
 
-    let location = crate::repository_package_at(repo.path(), "jit-dogfood");
+    let location = crate::repository_package_at(repo.root(), "jit-dogfood");
     let show = jit(
-        repo.path(),
+        &repo,
         &["profile", "show", "--profile", &location, "--json"],
     );
     assert!(show.status.success(), "{show:?}");
@@ -178,22 +175,22 @@ fn test_profile_show_works_without_repository() {
         serde_json::json!({ "source": "directory", "location": location })
     );
     assert!(show["profiles"][0]["package_hash"].as_str().unwrap().len() >= 64);
-    assert!(!repo.path().join(".jit").exists());
+    assert!(!repo.root().join(".jit").exists());
 }
 
 #[test]
 fn test_profile_apply_preserves_interleaved_selector_order() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    package_with_id(repo.path(), "packages/first", "first");
-    package_with_id(repo.path(), "packages/second", "second");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    package_with_id(repo.root(), "packages/first", "first");
+    package_with_id(repo.root(), "packages/second", "second");
     let seeded = jit(
-        repo.path(),
+        &repo,
         &["profile", "apply", "--profile", "packages/first", "--json"],
     );
     assert!(seeded.status.success(), "{seeded:?}");
     let output = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -221,22 +218,22 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
         ("packages/base", "packages/workflow"),
         ("packages/workflow", "packages/base"),
     ] {
-        let repo = TempDir::new().unwrap();
-        assert!(jit(repo.path(), &["init"]).status.success());
-        package_with_shared_namespace(repo.path(), "packages/base", "base", "Base definition");
+        let repo = JitCli::uninitialised().unwrap();
+        assert!(jit(&repo, &["init"]).status.success());
+        package_with_shared_namespace(repo.root(), "packages/base", "base", "Base definition");
         package_with_shared_namespace(
-            repo.path(),
+            repo.root(),
             "packages/workflow",
             "workflow",
             "Workflow definition",
         );
 
-        let config_path = repo.path().join(".jit/config.toml");
-        let events_path = repo.path().join(".jit/events.jsonl");
+        let config_path = repo.root().join(".jit/config.toml");
+        let events_path = repo.root().join(".jit/events.jsonl");
         let config_before = fs::read(&config_path).unwrap();
         let events_before = fs::read(&events_path).unwrap();
         let output = jit(
-            repo.path(),
+            &repo,
             &[
                 "profile",
                 "apply",
@@ -257,10 +254,10 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
 
 #[test]
 fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_surface() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
 
     let positional = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -273,7 +270,7 @@ fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_sur
     assert!(String::from_utf8_lossy(&positional.stderr).contains("unexpected argument"));
 
     let apply = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -286,19 +283,19 @@ fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_sur
     assert!(!apply.status.success());
     assert!(String::from_utf8_lossy(&apply.stderr).contains("unexpected argument"));
 
-    let show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE]);
+    let show = jit(&repo, &["profile", "show", FIXTURE_PROFILE]);
     assert!(!show.status.success());
     assert!(String::from_utf8_lossy(&show.stderr).contains("unexpected argument"));
 }
 
 #[test]
 fn test_profile_commands_refuse_a_tagged_selector_naming_the_bare_path_form() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
     for command in ["show", "diff", "apply"] {
         for selector in ["id:planner", "path:packages/planner"] {
             let refused = jit(
-                repo.path(),
+                &repo,
                 &["profile", command, "--profile", selector, "--json"],
             );
 
@@ -314,14 +311,11 @@ fn test_profile_commands_refuse_a_tagged_selector_naming_the_bare_path_form() {
 
 #[test]
 fn test_profile_show_reads_the_package_a_supplied_location_holds() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), "vendor/planner");
 
-    let show = jit(
-        repo.path(),
-        &["profile", "show", "--profile", location, "--json"],
-    );
+    let show = jit(&repo, &["profile", "show", "--profile", location, "--json"]);
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
@@ -337,13 +331,13 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
 #[test]
 fn test_profile_show_json_preserves_repeated_selectors_in_order() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), "vendor/planner");
     let selector = location;
 
     let show = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "show",
@@ -371,13 +365,13 @@ fn test_profile_show_json_preserves_repeated_selectors_in_order() {
 
 #[test]
 fn test_profile_show_human_renders_each_selected_occurrence() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), "vendor/planner");
     let selector = location;
 
     let show = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "show",
@@ -399,15 +393,15 @@ fn test_profile_show_human_renders_each_selected_occurrence() {
 
 #[test]
 fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
     // A package beside the repository rather than inside it, so it has no
     // worktree-relative location.
     let elsewhere = TempDir::new().unwrap();
     package_at(elsewhere.path(), "planner");
 
     let show = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "show",
@@ -430,14 +424,11 @@ fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
 
 #[test]
 fn test_profile_show_refuses_a_supplied_location_under_the_data_root() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), ".jit/vendored");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), ".jit/vendored");
 
-    let show = jit(
-        repo.path(),
-        &["profile", "show", "--profile", location, "--json"],
-    );
+    let show = jit(&repo, &["profile", "show", "--profile", location, "--json"]);
 
     assert!(!show.status.success(), "{show:?}");
     let show = json(&show);
@@ -452,12 +443,12 @@ fn test_profile_show_refuses_a_supplied_location_under_the_data_root() {
 
 #[test]
 fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), "vendor/planner");
 
     let preview = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -482,14 +473,14 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
         "{preview}"
     );
     // A preview writes nothing.
-    assert!(!repo.path().join("docs/profile.txt").exists());
+    assert!(!repo.root().join("docs/profile.txt").exists());
 }
 
 #[test]
 fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_precedence() {
-    let init_repo = TempDir::new().unwrap();
+    let init_repo = JitCli::uninitialised().unwrap();
     write_variable_package(
-        init_repo.path(),
+        init_repo.root(),
         "packages/init-vars",
         VariablePackageSpec {
             id: "init-vars",
@@ -501,11 +492,11 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
             dependency: None,
         },
     );
-    let init_values = init_repo.path().join("values.toml");
+    let init_values = init_repo.root().join("values.toml");
     fs::write(&init_values, "[variables]\nNAME = \"from-file\"\n").unwrap();
     let init_values = init_values.to_str().unwrap();
     let init = jit(
-        init_repo.path(),
+        &init_repo,
         &[
             "init",
             "--profile",
@@ -521,13 +512,13 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
     );
     assert!(init.status.success(), "{init:?}");
     assert_eq!(
-        fs::read_to_string(init_repo.path().join("docs/init-vars.txt")).unwrap(),
+        fs::read_to_string(init_repo.root().join("docs/init-vars.txt")).unwrap(),
         "NAME=last\n"
     );
 
-    let apply_repo = TempDir::new().unwrap();
+    let apply_repo = JitCli::uninitialised().unwrap();
     write_variable_package(
-        apply_repo.path(),
+        apply_repo.root(),
         "packages/dependency-vars",
         VariablePackageSpec {
             id: "dependency-vars",
@@ -540,7 +531,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         },
     );
     write_variable_package(
-        apply_repo.path(),
+        apply_repo.root(),
         "packages/root-vars",
         VariablePackageSpec {
             id: "root-vars",
@@ -552,13 +543,13 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
             dependency: Some("dependency-vars"),
         },
     );
-    assert!(jit(apply_repo.path(), &["init"]).status.success());
-    let values = apply_repo.path().join("values.toml");
+    assert!(jit(&apply_repo, &["init"]).status.success());
+    let values = apply_repo.root().join("values.toml");
     fs::write(&values, "[variables]\nNAME = \"from-file\"\n").unwrap();
     let values = values.to_str().unwrap();
     let selector = "packages/root-vars";
     let preview = jit(
-        apply_repo.path(),
+        &apply_repo,
         &[
             "profile",
             "apply",
@@ -579,11 +570,11 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
     assert!(preview.status.success(), "{preview:?}");
     let preview = json(&preview);
     assert_eq!(preview["profiles"][0]["status"], "would_apply");
-    assert!(!apply_repo.path().join("docs/root-vars.txt").exists());
-    assert!(!apply_repo.path().join("docs/dependency-vars.txt").exists());
+    assert!(!apply_repo.root().join("docs/root-vars.txt").exists());
+    assert!(!apply_repo.root().join("docs/dependency-vars.txt").exists());
 
     let applied = jit(
-        apply_repo.path(),
+        &apply_repo,
         &[
             "profile",
             "apply",
@@ -602,21 +593,21 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
     );
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(
-        fs::read_to_string(apply_repo.path().join("docs/root-vars.txt")).unwrap(),
+        fs::read_to_string(apply_repo.root().join("docs/root-vars.txt")).unwrap(),
         "NAME=last\n"
     );
     assert_eq!(
-        fs::read_to_string(apply_repo.path().join("docs/dependency-vars.txt")).unwrap(),
+        fs::read_to_string(apply_repo.root().join("docs/dependency-vars.txt")).unwrap(),
         "TOKEN=dependency-value\n"
     );
 }
 
 #[test]
 fn test_profile_variable_records_the_resolved_value_in_the_event_and_validates() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
     write_variable_package(
-        repo.path(),
+        repo.root(),
         "packages/resolved-vars",
         VariablePackageSpec {
             id: "resolved-vars",
@@ -629,27 +620,28 @@ fn test_profile_variable_records_the_resolved_value_in_the_event_and_validates()
         },
     );
     let resolved_value = "persisted-public-value";
-    let applied = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args([
-            "profile",
-            "apply",
-            "--profile",
-            "packages/resolved-vars",
-            "--set",
-            &format!("NAME={resolved_value}"),
-            "--json",
-        ])
-        .env("JIT_PROFILE_RESOLVED_NAME", "environment-at-apply")
-        .current_dir(repo.path())
+    let applied = repo
+        .command_with_env(
+            [
+                "profile",
+                "apply",
+                "--profile",
+                "packages/resolved-vars",
+                "--set",
+                &format!("NAME={resolved_value}"),
+                "--json",
+            ],
+            [("JIT_PROFILE_RESOLVED_NAME", "environment-at-apply")],
+        )
         .output()
         .unwrap();
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(
-        fs::read_to_string(repo.path().join("docs/resolved-vars.txt")).unwrap(),
+        fs::read_to_string(repo.root().join("docs/resolved-vars.txt")).unwrap(),
         format!("NAME={resolved_value}\n")
     );
 
-    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
+    let events = fs::read_to_string(repo.root().join(".jit/events.jsonl")).unwrap();
     let lifecycle = events
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -660,10 +652,11 @@ fn test_profile_variable_records_the_resolved_value_in_the_event_and_validates()
     assert_eq!(recorded["version"], "1.0.0");
     assert_eq!(recorded["variables"]["NAME"], resolved_value);
 
-    let validate = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(["validate", "--json"])
-        .env("JIT_PROFILE_RESOLVED_NAME", "different-current-environment")
-        .current_dir(repo.path())
+    let validate = repo
+        .command_with_env(
+            ["validate", "--json"],
+            [("JIT_PROFILE_RESOLVED_NAME", "different-current-environment")],
+        )
         .output()
         .unwrap();
     assert!(validate.status.success(), "{validate:?}");
@@ -672,22 +665,19 @@ fn test_profile_variable_records_the_resolved_value_in_the_event_and_validates()
 
 #[test]
 fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let first = package_with_id(repo.path(), "packages/first", "first");
-    let second = package_with_id(repo.path(), "packages/second", "second");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let first = package_with_id(repo.root(), "packages/first", "first");
+    let second = package_with_id(repo.root(), "packages/second", "second");
 
-    let seeded = jit(
-        repo.path(),
-        &["profile", "apply", "--profile", first, "--json"],
-    );
+    let seeded = jit(&repo, &["profile", "apply", "--profile", first, "--json"]);
     assert!(seeded.status.success(), "{seeded:?}");
-    let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    let events_before = fs::read(repo.root().join(".jit/events.jsonl")).unwrap();
 
     let second_selector = second;
     let first_selector = first;
     let output = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -726,14 +716,14 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
         vec!["would_apply", "unchanged", "unchanged", "unchanged"]
     );
     assert_eq!(
-        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+        fs::read(repo.root().join(".jit/events.jsonl")).unwrap(),
         events_before,
         "dry-run must not append events"
     );
-    assert!(!repo.path().join("docs/second.txt").exists());
+    assert!(!repo.root().join("docs/second.txt").exists());
 
     let human = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
@@ -765,17 +755,17 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
 
 #[test]
 fn test_init_profile_applies_the_package_a_supplied_location_holds() {
-    let repo = TempDir::new().unwrap();
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    let location = package_at(repo.root(), "vendor/planner");
 
-    let init = jit(repo.path(), &["init", "--profile", location, "--json"]);
+    let init = jit(&repo, &["init", "--profile", location, "--json"]);
 
     assert!(init.status.success(), "{init:?}");
     assert_eq!(
         requested_profile(&json(&init)["profile"])["status"],
         "applied"
     );
-    assert!(repo.path().join("docs/profile.txt").is_file());
+    assert!(repo.root().join("docs/profile.txt").is_file());
     assert_eq!(
         requested_profile(&json(&init)["profile"])["origin"],
         serde_json::json!({ "source": "directory", "location": location })
@@ -784,12 +774,12 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
 
 #[test]
 fn test_init_profile_json_preserves_repeated_root_occurrences_in_order() {
-    let repo = TempDir::new().unwrap();
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    let location = package_at(repo.root(), "vendor/planner");
     let selector = location;
 
     let init = jit(
-        repo.path(),
+        &repo,
         &[
             "init",
             "--profile",
@@ -821,17 +811,17 @@ fn test_init_profile_json_preserves_repeated_root_occurrences_in_order() {
 
 #[test]
 fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package() {
-    let repo = TempDir::new().unwrap();
-    let location = package_at(repo.path(), "vendor/planner");
-    declare_dependency(repo.path(), location, "jit-default");
+    let repo = JitCli::uninitialised().unwrap();
+    let location = package_at(repo.root(), "vendor/planner");
+    declare_dependency(repo.root(), location, "jit-default");
     // The dependency is named and no location is supplied for it, so it is
     // resolved from the directory named after it beside the package declaring
     // it — the shape an obtained set of packages arrives in.
     let dependency = "vendor/jit-default";
-    jit::test_utils::capture_repository_package("jit-default", &repo.path().join(dependency))
+    jit::test_utils::capture_repository_package("jit-default", &repo.root().join(dependency))
         .expect("this repository's jit-default package captures");
 
-    let init = jit(repo.path(), &["init", "--profile", location, "--json"]);
+    let init = jit(&repo, &["init", "--profile", location, "--json"]);
 
     assert!(
         init.status.success(),
@@ -853,23 +843,23 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
         requested_profile(applied)["origin"],
         serde_json::json!({ "source": "directory", "location": location })
     );
-    assert!(repo.path().join("docs/profile.txt").is_file());
+    assert!(repo.root().join("docs/profile.txt").is_file());
 
     // A clean report is both applications having landed whole.
-    let validate = jit(repo.path(), &["validate", "--json"]);
+    let validate = jit(&repo, &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
 }
 
 #[test]
 fn test_init_from_without_a_profile_is_a_usage_error() {
-    let repo = TempDir::new().unwrap();
-    let location = package_at(repo.path(), "vendor/planner");
+    let repo = JitCli::uninitialised().unwrap();
+    let location = package_at(repo.root(), "vendor/planner");
 
-    let init = jit(repo.path(), &["init", "--from", location, "--json"]);
+    let init = jit(&repo, &["init", "--from", location, "--json"]);
 
     assert_eq!(init.status.code(), Some(2), "{init:?}");
-    assert!(!repo.path().join(".jit").exists());
+    assert!(!repo.root().join(".jit").exists());
 }
 
 /// The inspection output carries the roots the package's live assets are drawn
@@ -878,15 +868,15 @@ fn test_init_from_without_a_profile_is_a_usage_error() {
 /// which root any packaged live asset came from.
 #[test]
 fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
 
     let show = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "show",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -957,26 +947,26 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
 
 #[test]
 fn test_profile_missing_package_directory_has_typed_json_error_without_mutation() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let output = jit(
-        repo.path(),
+        &repo,
         &["init", "--profile", "packages/missing-profile", "--json"],
     );
 
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(json(&output)["error"]["code"], "PROFILE_ERROR");
-    assert!(!repo.path().join(".jit").exists());
+    assert!(!repo.root().join(".jit").exists());
 }
 
 #[test]
 fn test_profiled_init_publishes_a_valid_repo() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let init = jit(
-        repo.path(),
+        &repo,
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -989,10 +979,10 @@ fn test_profiled_init_publishes_a_valid_repo() {
     let init = json(&init);
     assert_eq!(requested_profile(&init["profile"])["status"], "applied");
     assert!(repo
-        .path()
+        .root()
         .join(".agents/skills/jit-manage/SKILL.md")
         .is_file());
-    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+    let events = fs::read_to_string(repo.root().join(".jit/events.jsonl"))
         .unwrap()
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -1005,36 +995,36 @@ fn test_profiled_init_publishes_a_valid_repo() {
     assert_eq!(events[0]["type"], "profile_lifecycle");
     assert_eq!(events[0]["operation"], "initialize");
 
-    let validate = jit(repo.path(), &["validate", "--json"]);
+    let validate = jit(&repo, &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
 }
 
 #[test]
 fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     // A preview is derived over one package against the repository in front of
     // it, so a delta package is previewed with its declared dependency already
     // applied — the order the composed application uses.
     assert!(jit(
-        repo.path(),
+        &repo,
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-default"),
+            &crate::repository_package_at(repo.root(), "jit-default"),
         ]
     )
     .status
     .success());
-    let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    let events_before = fs::read(repo.root().join(".jit/events.jsonl")).unwrap();
 
     let preview = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1050,75 +1040,75 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         "the rehearsal attributes the repair to the package that owns it"
     );
     assert_eq!(
-        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+        fs::read(repo.root().join(".jit/events.jsonl")).unwrap(),
         events_before
     );
 
     let applied = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(requested_profile(&json(&applied))["status"], "applied");
-    let events_after = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    let events_after = fs::read(repo.root().join(".jit/events.jsonl")).unwrap();
 
     let unchanged = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
     assert!(unchanged.status.success(), "{unchanged:?}");
     assert_eq!(requested_profile(&json(&unchanged))["status"], "unchanged");
     assert_eq!(
-        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+        fs::read(repo.root().join(".jit/events.jsonl")).unwrap(),
         events_after
     );
 }
 
 #[test]
 fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let initialized = jit(
-        repo.path(),
+        &repo,
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
     assert!(initialized.status.success(), "{initialized:?}");
 
     let namespace_schema = repo
-        .path()
+        .root()
         .join(".jit/schemas/default-namespace-registry.json");
     let type_schema = repo
-        .path()
+        .root()
         .join(".jit/schemas/default-type-hierarchy-known.json");
     let expected_namespace = fs::read(&namespace_schema).unwrap();
     let expected_types = fs::read(&type_schema).unwrap();
-    let events_path = repo.path().join(".jit/events.jsonl");
+    let events_path = repo.root().join(".jit/events.jsonl");
     let event_count_before = fs::read_to_string(&events_path).unwrap().lines().count();
 
     fs::remove_file(&namespace_schema).unwrap();
     let preview = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--dry-run",
             "--json",
         ],
@@ -1136,12 +1126,12 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     assert!(!namespace_schema.exists(), "dry-run must remain read-only");
 
     let repaired_missing = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1161,12 +1151,12 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 
     fs::write(&type_schema, b"stale\n").unwrap();
     let repaired_stale = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1193,12 +1183,12 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         event_count_before + 2
     );
     let unchanged = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "apply",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1209,17 +1199,17 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 
 #[test]
 fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
-    let repo = TempDir::new().unwrap();
-    fs::create_dir_all(repo.path().join(".jit")).unwrap();
+    let repo = JitCli::uninitialised().unwrap();
+    fs::create_dir_all(repo.root().join(".jit")).unwrap();
     let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
-    fs::write(repo.path().join(".jit/index.json"), index).unwrap();
+    fs::write(repo.root().join(".jit/index.json"), index).unwrap();
 
     let output = jit(
-        repo.path(),
+        &repo,
         &[
             "init",
             "--profile",
-            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            &crate::repository_package_at(repo.root(), "jit-dogfood"),
             "--json",
         ],
     );
@@ -1238,16 +1228,16 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
         "issues",
     ] {
         assert!(
-            repo.path().join(".jit").join(path).exists(),
+            repo.root().join(".jit").join(path).exists(),
             "missing {path}"
         );
     }
     assert_eq!(
-        fs::read(repo.path().join(".jit/index.json")).unwrap(),
+        fs::read(repo.root().join(".jit/index.json")).unwrap(),
         index,
         "existing neutral bytes must be preserved"
     );
-    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+    let events = fs::read_to_string(repo.root().join(".jit/events.jsonl"))
         .unwrap()
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
@@ -1255,7 +1245,7 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
     assert_eq!(events.len(), 1, "completion appends one aggregate event");
     assert_eq!(events[0]["type"], "profile_lifecycle");
     assert_eq!(events[0]["operation"], "initialize");
-    assert!(jit(repo.path(), &["validate", "--json"]).status.success());
+    assert!(jit(&repo, &["validate", "--json"]).status.success());
 }
 
 /// Write a versioned package whose one templated asset and one fixed asset
@@ -1345,13 +1335,13 @@ pub(super) fn live_asset_package(repo: &Path, location: &str) -> String {
 
 #[test]
 fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writing() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let external = TempDir::new().unwrap();
     let external_archive = external.path().join("synthetic.tar");
     let pack = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "pack",
@@ -1370,7 +1360,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     assert_eq!(packed["targets"][0]["action"], "create");
     assert!(!external_archive.exists());
     let pack_human = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "pack",
@@ -1390,7 +1380,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     );
 
     let packed = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "pack",
@@ -1403,7 +1393,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     );
     assert!(packed.status.success(), "{packed:?}");
     let add = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "add",
@@ -1424,9 +1414,9 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
         .as_array()
         .is_some_and(|targets| !targets.is_empty()
             && targets.iter().all(|target| target["action"] == "create")));
-    assert!(!repo.path().join("packages/added").exists());
+    assert!(!repo.root().join("packages/added").exists());
     let add_human = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "add",
@@ -1518,13 +1508,13 @@ fn worktree_directories(root: &Path) -> std::collections::BTreeSet<String> {
 /// package directory write the same file.
 #[test]
 fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
 
     for output in ["first.tar", "second.tar"] {
         let packed = jit(
-            repo.path(),
+            &repo,
             &[
                 "profile", "pack", "--source", package, "--output", output, "--json",
             ],
@@ -1532,11 +1522,11 @@ fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
         assert!(packed.status.success(), "{packed:?}");
     }
 
-    let first = fs::read(repo.path().join("first.tar")).unwrap();
+    let first = fs::read(repo.root().join("first.tar")).unwrap();
     assert!(!first.is_empty(), "a packed archive has content");
     assert_eq!(
         first,
-        fs::read(repo.path().join("second.tar")).unwrap(),
+        fs::read(repo.root().join("second.tar")).unwrap(),
         "two packs of one package directory wrote different archives"
     );
 }
@@ -1546,14 +1536,14 @@ fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
 #[test]
 fn test_profile_pack_packs_every_shipped_package_from_the_checkout() {
     let exchange = TempDir::new().unwrap();
+    let cli = JitCli::uninitialised().unwrap();
     let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 
     for id in jit::test_utils::published_package_ids() {
         let output = exchange.path().join(format!("{id}.tar"));
         let output = output.to_str().unwrap();
-        let packed = jit(
-            &checkout,
-            &[
+        let packed = cli
+            .command([
                 "profile",
                 "pack",
                 "--source",
@@ -1561,8 +1551,10 @@ fn test_profile_pack_packs_every_shipped_package_from_the_checkout() {
                 "--output",
                 output,
                 "--json",
-            ],
-        );
+            ])
+            .current_dir(&checkout)
+            .output()
+            .expect("failed to run jit");
         assert!(
             packed.status.success(),
             "packing shipped package {id} failed\nstdout={}\nstderr={}",
@@ -1591,18 +1583,18 @@ fn output_path_exists(path: &str) -> bool {
 /// arrives whole, and the added package applies.
 #[test]
 fn test_profile_pack_and_add_carry_one_package_between_repositories() {
-    let source_repo = TempDir::new().unwrap();
-    let target_repo = TempDir::new().unwrap();
+    let source_repo = JitCli::uninitialised().unwrap();
+    let target_repo = JitCli::uninitialised().unwrap();
     let exchange = TempDir::new().unwrap();
-    assert!(jit(source_repo.path(), &["init"]).status.success());
-    assert!(jit(target_repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(source_repo.path(), "packages/synthetic");
+    assert!(jit(&source_repo, &["init"]).status.success());
+    assert!(jit(&target_repo, &["init"]).status.success());
+    let package = synthetic_package_at(source_repo.root(), "packages/synthetic");
     let archive = exchange.path().join("synthetic.tar");
     let archive = archive.to_str().unwrap();
-    let before = worktree_files(target_repo.path());
+    let before = worktree_files(target_repo.root());
 
     let packed = jit(
-        source_repo.path(),
+        &source_repo,
         &[
             "profile", "pack", "--source", package, "--output", archive, "--json",
         ],
@@ -1612,7 +1604,7 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     let packed = only_profile(&packed);
 
     let added = jit(
-        target_repo.path(),
+        &target_repo,
         &[
             "profile",
             "add",
@@ -1638,11 +1630,11 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     // The archive carried the package and nothing else: the target worktree
     // gained exactly the files the source package directory holds, at the
     // destination the invocation named and nowhere else.
-    let published = worktree_files(target_repo.path())
+    let published = worktree_files(target_repo.root())
         .difference(&before)
         .cloned()
         .collect::<Vec<_>>();
-    let expected = worktree_files(&source_repo.path().join(package))
+    let expected = worktree_files(&source_repo.root().join(package))
         .into_iter()
         .map(|relative| format!("{package}/{relative}"))
         .collect::<Vec<_>>();
@@ -1650,8 +1642,8 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     assert_eq!(published, expected, "the add published a different tree");
     for relative in &expected {
         assert_eq!(
-            fs::read(target_repo.path().join(relative)).unwrap(),
-            fs::read(source_repo.path().join(relative)).unwrap(),
+            fs::read(target_repo.root().join(relative)).unwrap(),
+            fs::read(source_repo.root().join(relative)).unwrap(),
             "{relative} arrived with different bytes"
         );
     }
@@ -1659,7 +1651,7 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     // The published tree is a package the receiving repository reads as one,
     // at the identity the archive travelled under.
     let shown = jit(
-        target_repo.path(),
+        &target_repo,
         &[
             "profile",
             "show",
@@ -1680,14 +1672,14 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
 /// refused, and the destination is left absent.
 #[test]
 fn test_profile_add_refuses_a_damaged_archive_without_publishing_a_package() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let exchange = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let archive = exchange.path().join("synthetic.tar");
     let archive = archive.to_str().unwrap();
     assert!(jit(
-        repo.path(),
+        &repo,
         &["profile", "pack", "--source", package, "--output", archive, "--json",],
     )
     .status
@@ -1704,7 +1696,7 @@ fn test_profile_add_refuses_a_damaged_archive_without_publishing_a_package() {
     fs::write(archive, bytes).unwrap();
 
     let added = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "add",
@@ -1725,7 +1717,7 @@ fn test_profile_add_refuses_a_damaged_archive_without_publishing_a_package() {
         "{added:?}"
     );
     assert!(
-        !repo.path().join("packages/arrived").exists(),
+        !repo.root().join("packages/arrived").exists(),
         "a refused add left a partially extracted package behind"
     );
 }
@@ -1734,23 +1726,23 @@ fn test_profile_add_refuses_a_damaged_archive_without_publishing_a_package() {
 /// held survives untouched.
 #[test]
 fn test_profile_add_refuses_an_occupied_destination_without_replacing_it() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let exchange = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let archive = exchange.path().join("synthetic.tar");
     let archive = archive.to_str().unwrap();
     assert!(jit(
-        repo.path(),
+        &repo,
         &["profile", "pack", "--source", package, "--output", archive, "--json",],
     )
     .status
     .success());
-    fs::create_dir_all(repo.path().join("packages/occupied")).unwrap();
-    fs::write(repo.path().join("packages/occupied/mine.txt"), "mine\n").unwrap();
+    fs::create_dir_all(repo.root().join("packages/occupied")).unwrap();
+    fs::write(repo.root().join("packages/occupied/mine.txt"), "mine\n").unwrap();
 
     let added = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "add",
@@ -1771,7 +1763,7 @@ fn test_profile_add_refuses_an_occupied_destination_without_replacing_it() {
         "{added:?}"
     );
     assert_eq!(
-        fs::read_dir(repo.path().join("packages/occupied"))
+        fs::read_dir(repo.root().join("packages/occupied"))
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .collect::<Vec<_>>(),
@@ -1784,14 +1776,14 @@ fn test_profile_add_refuses_an_occupied_destination_without_replacing_it() {
 /// is even read, and nothing is published there.
 #[test]
 fn test_profile_add_refuses_a_destination_outside_the_worktree_without_publishing() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let outside = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let archive = outside.path().join("synthetic.tar");
     let archive = archive.to_str().unwrap();
     assert!(jit(
-        repo.path(),
+        &repo,
         &["profile", "pack", "--source", package, "--output", archive, "--json",],
     )
     .status
@@ -1799,7 +1791,7 @@ fn test_profile_add_refuses_a_destination_outside_the_worktree_without_publishin
     let destination = outside.path().join("arrived");
 
     let added = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "add",
@@ -1826,18 +1818,18 @@ fn test_profile_add_refuses_a_destination_outside_the_worktree_without_publishin
 /// inside the repository or outside it.
 #[test]
 fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let outside = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
-    let inside = repo.path().join("taken.tar");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
+    let inside = repo.root().join("taken.tar");
     let external = outside.path().join("taken.tar");
     fs::write(&inside, "not an archive\n").unwrap();
     fs::write(&external, "not an archive\n").unwrap();
 
     for output in [&inside, &external] {
         let packed = jit(
-            repo.path(),
+            &repo,
             &[
                 "profile",
                 "pack",
@@ -1860,15 +1852,15 @@ fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
 
 #[test]
 fn test_profile_pack_external_dry_run_refuses_a_missing_parent_without_writing() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let outside = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let missing_parent = outside.path().join("missing");
     let output = missing_parent.join("synthetic.tar");
 
     let packed = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "pack",
@@ -1891,10 +1883,10 @@ fn test_profile_pack_external_dry_run_refuses_a_missing_parent_without_writing()
 #[cfg(unix)]
 #[test]
 fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing() {
-    let repo = TempDir::new().unwrap();
+    let repo = JitCli::uninitialised().unwrap();
     let outside = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    assert!(jit(&repo, &["init"]).status.success());
+    let package = synthetic_package_at(repo.root(), "packages/synthetic");
     let actual_parent = outside.path().join("actual");
     let linked_parent = outside.path().join("linked");
     fs::create_dir(&actual_parent).unwrap();
@@ -1902,7 +1894,7 @@ fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing
     let output = linked_parent.join("synthetic.tar");
 
     let packed = jit(
-        repo.path(),
+        &repo,
         &[
             "profile",
             "pack",
@@ -1933,19 +1925,19 @@ fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing
 /// where a small fixture leaves them slack.
 #[test]
 fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
-    let source_repo = TempDir::new().unwrap();
-    let target_repo = TempDir::new().unwrap();
+    let source_repo = JitCli::uninitialised().unwrap();
+    let target_repo = JitCli::uninitialised().unwrap();
     let exchange = TempDir::new().unwrap();
-    assert!(jit(source_repo.path(), &["init"]).status.success());
-    assert!(jit(target_repo.path(), &["init"]).status.success());
+    assert!(jit(&source_repo, &["init"]).status.success());
+    assert!(jit(&target_repo, &["init"]).status.success());
     jit::test_utils::write_package_tree_at_model_limits(
-        &source_repo.path().join("packages/bounded"),
+        &source_repo.root().join("packages/bounded"),
     );
     let archive = exchange.path().join("bounded.tar");
     let archive = archive.to_str().unwrap();
 
     let packed = jit(
-        source_repo.path(),
+        &source_repo,
         &[
             "profile",
             "pack",
@@ -1971,7 +1963,7 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
     );
 
     let added = jit(
-        target_repo.path(),
+        &target_repo,
         &[
             "profile",
             "add",
@@ -1989,7 +1981,7 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
     assert_eq!(added["package_hash"], packed["package_hash"]);
     assert_eq!(added["file_count"], packed["file_count"]);
     assert_eq!(
-        worktree_files(&target_repo.path().join("packages/bounded")).len(),
+        worktree_files(&target_repo.root().join("packages/bounded")).len(),
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the published tree does not hold every file the package carried"
     );
@@ -2005,19 +1997,19 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
 /// its files — the shape the package model leaves unconstrained.
 #[test]
 fn test_profile_add_publishes_a_package_whose_directories_outnumber_its_files() {
-    let source_repo = TempDir::new().unwrap();
-    let target_repo = TempDir::new().unwrap();
+    let source_repo = JitCli::uninitialised().unwrap();
+    let target_repo = JitCli::uninitialised().unwrap();
     let exchange = TempDir::new().unwrap();
-    assert!(jit(source_repo.path(), &["init"]).status.success());
-    assert!(jit(target_repo.path(), &["init"]).status.success());
+    assert!(jit(&source_repo, &["init"]).status.success());
+    assert!(jit(&target_repo, &["init"]).status.success());
     jit::test_utils::write_package_tree_at_model_limits(
-        &source_repo.path().join("packages/bounded"),
+        &source_repo.root().join("packages/bounded"),
     );
     let archive = exchange.path().join("bounded.tar");
     let archive = archive.to_str().unwrap();
 
     let packed = jit(
-        source_repo.path(),
+        &source_repo,
         &[
             "profile",
             "pack",
@@ -2051,7 +2043,7 @@ fn test_profile_add_publishes_a_package_whose_directories_outnumber_its_files() 
     );
 
     let added = jit(
-        target_repo.path(),
+        &target_repo,
         &[
             "profile",
             "add",
@@ -2069,7 +2061,7 @@ fn test_profile_add_publishes_a_package_whose_directories_outnumber_its_files() 
 
     // The directories the publication had to enumerate outnumber the files it
     // published, which is the shape the model does not bound.
-    let published = target_repo.path().join("packages/bounded");
+    let published = target_repo.root().join("packages/bounded");
     assert_eq!(
         worktree_files(&published).len(),
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
