@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "awaiting_code_review"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -419,14 +419,14 @@
           "short_id": "e98ae5a4",
           "title": "Event tags declare their wire spelling once",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "gates_passed_unmerged"
         },
         {
           "id": "f265e748-e350-4ba6-949f-575acf122bd9",
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "awaiting_code_review"
         }
       ]
     },
@@ -653,6 +653,12 @@
       "reason": "Code-review R1: REQ-03 required every log line to round-trip; 8 retired-tag lines are skipped by parse_known_events by design and b01208cb kept them.",
       "status": "resolved",
       "resolution": "Invoker approved amending REQ-03 to scope the round trip to current event types and pin the skipped lines to the retired tags."
+    },
+    {
+      "issue": "f265e748",
+      "reason": "Code-review R3 failed after two reworks (String-deref reliance in sort_key).",
+      "status": "resolved",
+      "resolution": "Invoker: lead applies the fix plus an alias-flip compile check. Done in 0b9770767; awaiting code-review."
     }
   ],
   "rework_counts": {
@@ -1209,6 +1215,13 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Rework 2 (final) of the widened scope: close the raw-literal issue-id class in family test modules using a scratch alias flip plus a lexical sweep."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "Invoker-approved lead fix after rework limit: Option<&IssueId> sort key, as_str() in events filter; alias-flip check run."
     }
   ],
   "surfaced_pitfalls": [
@@ -1261,5 +1274,6 @@
     "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
     "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
     "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
-  ]
+  ],
+  "session_note": "Session 2 handoff written as handoff.md; see it for next actions."
 }
