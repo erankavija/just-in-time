@@ -2,6 +2,8 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+use jit::test_utils::fixture_issue;
+
 mod archived_semantics_tests;
 mod bulk_operations_tests;
 mod dep_add_atomic_tests;
@@ -18,9 +20,3 @@ mod strictness_transition_tests;
 mod test_no_coordinator;
 mod transition_graph_enforcement_tests;
 mod transitive_reduction_validation_tests;
-
-fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
-    let mut issue = jit::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
-}
