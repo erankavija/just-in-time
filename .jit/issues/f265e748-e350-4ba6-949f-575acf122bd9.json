@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "7a4e8708-b741-41da-8817-46efa270f99a",
-      "status": "failed",
-      "updated_at": "2026-10-26T22:55:23.945249818Z",
+      "run_id": "fe466a34-cdfc-44e0-98ff-42b00c1e3899",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:08:35.454977416Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Event issue accessor returns an optional IssueId",
-  "updated_at": "2026-10-26T22:55:23.945249818Z"
+  "updated_at": "2026-10-26T23:08:35.454977416Z"
 }
