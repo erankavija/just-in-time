@@ -147,7 +147,7 @@ fn group_by_identity<'a, T>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::fixture_issue;
+    use crate::test_utils::fixture_issue;
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &str, title: &str) -> Event {

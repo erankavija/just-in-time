@@ -596,11 +596,11 @@ mod tests {
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
     };
-    use crate::domain::fixture_issue;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
         RepositoryLayout, RepositoryRootEvidence,
     };
+    use crate::test_utils::fixture_issue;
     use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::BTreeMap;
 

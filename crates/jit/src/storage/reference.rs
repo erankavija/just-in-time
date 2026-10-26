@@ -665,7 +665,7 @@ mod tests {
     /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = crate::domain::fixture_issue("Probe".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
         let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));

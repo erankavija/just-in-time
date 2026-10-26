@@ -1,30 +1,12 @@
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-    Command::new(jit)
-        .args(["init"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    temp
-}
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_issue_not_found_error_json() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Try to show non-existent issue
-    let output = Command::new(jit)
-        .args(["issue", "show", "nonexistent", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "show", "nonexistent", "--json"])
         .output()
         .unwrap();
 
@@ -43,43 +25,18 @@ fn test_issue_not_found_error_json() {
 
 #[test]
 fn test_cycle_detected_error_json() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create two issues
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task A", "-d", "First"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task B", "-d", "Second"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
+    let id1 = cli.create_issue(["-t", "Task A", "-d", "First"]).unwrap();
+    let id2 = cli.create_issue(["-t", "Task B", "-d", "Second"]).unwrap();
 
     // Add A depends on B
-    Command::new(jit)
-        .args(["dep", "add", &id1, &id2])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command(["dep", "add", &id1, &id2]).output().unwrap();
 
     // Try to add B depends on A (creates cycle)
-    let output = Command::new(jit)
-        .args(["dep", "add", &id2, &id1, "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["dep", "add", &id2, &id1, "--json"])
         .output()
         .unwrap();
 
@@ -98,24 +55,12 @@ fn test_cycle_detected_error_json() {
 
 #[test]
 fn test_deletion_not_confirmed_error_json() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    let created = Command::new(jit)
-        .args(["issue", "create", "-t", "Doomed", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id = serde_json::from_slice::<serde_json::Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Doomed"]).unwrap();
 
     // Delete without JIT_ALLOW_DELETION=1: refused (REQ-02).
-    let output = Command::new(jit)
-        .args(["issue", "delete", &id, "--json"])
-        .env_remove("JIT_ALLOW_DELETION")
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "delete", &id, "--json"])
         .output()
         .unwrap();
 
@@ -142,23 +87,17 @@ fn test_deletion_not_confirmed_error_json() {
     );
 
     // The issue must still exist: the refusal must not have deleted it.
-    let show = Command::new(jit)
-        .args(["issue", "show", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let show = cli.command(["issue", "show", &id]).output().unwrap();
     assert!(show.status.success(), "issue must survive a refused delete");
 }
 
 #[test]
 fn test_invalid_state_error_json() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Try to query with invalid state
-    let output = Command::new(jit)
-        .args(["query", "all", "--state", "invalid_state", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["query", "all", "--state", "invalid_state", "--json"])
         .output()
         .unwrap();
 
@@ -176,25 +115,14 @@ fn test_invalid_state_error_json() {
 
 #[test]
 fn test_gate_operation_error_json() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create an issue
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Test"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
+    let id = cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
 
     // Try to evaluate a gate that wasn't added to the issue
-    let output = Command::new(jit)
-        .args(["gate", "evaluate", &id, "nonexistent-gate", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["gate", "evaluate", &id, "nonexistent-gate", "--json"])
         .output()
         .unwrap();
 

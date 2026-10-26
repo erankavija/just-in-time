@@ -2,6 +2,7 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+use jit::test_utils::fixture_issue;
 use std::ops::Deref;
 use tempfile::TempDir;
 
@@ -63,10 +64,4 @@ pub(crate) fn membership_namespace(taxonomy: &jit::test_taxonomy::TestTaxonomy, 
         .get(type_name)
         .map(String::as_str)
         .expect("every taxonomy container type has a membership namespace")
-}
-
-fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
-    let mut issue = jit::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
 }
