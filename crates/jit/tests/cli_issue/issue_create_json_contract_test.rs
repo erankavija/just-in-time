@@ -7,42 +7,7 @@
 //! - `dependencies` is an array of enriched objects, not raw ID strings
 //! - `labels` is a JSON array
 
-use std::process::Command;
-
-fn jit_bin() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-}
-
-/// Run a jit command in `dir` and return its stdout.
-fn jit(dir: &std::path::Path, args: &[&str]) -> serde_json::Value {
-    let out = jit_bin()
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .expect("jit command failed to spawn");
-    assert!(
-        out.status.success(),
-        "jit {:?} exited non-zero; stderr: {}",
-        args,
-        String::from_utf8_lossy(&out.stderr)
-    );
-    serde_json::from_slice(&out.stdout).unwrap_or_else(|_| {
-        panic!(
-            "stdout was not valid JSON: {}",
-            String::from_utf8_lossy(&out.stdout)
-        )
-    })
-}
-
-fn setup_repo() -> tempfile::TempDir {
-    let tmp = tempfile::TempDir::new().unwrap();
-    jit_bin()
-        .current_dir(tmp.path())
-        .arg("init")
-        .status()
-        .unwrap();
-    tmp
-}
+use jit::test_cli::JitCli;
 
 // ---------------------------------------------------------------------------
 // REQ-14: short_id present, gates array, no legacy fields
@@ -50,32 +15,28 @@ fn setup_repo() -> tempfile::TempDir {
 
 #[test]
 fn test_issue_create_json_has_short_id_and_gates_array() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
     // Define a gate so the created issue carries it.
-    jit_bin()
-        .current_dir(repo.path())
-        .args([
-            "gate",
-            "define",
-            "cargo-ci",
-            "--title",
-            "CI",
-            "--description",
-            "Runs CI",
-            "--mode",
-            "manual",
-        ])
-        .status()
-        .unwrap();
+    repo.run([
+        "gate",
+        "define",
+        "cargo-ci",
+        "--title",
+        "CI",
+        "--description",
+        "Runs CI",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
 
     // Create the issue with that gate.
-    let json = jit(
-        repo.path(),
-        &[
-            "issue", "create", "--title", "My task", "--gate", "cargo-ci", "--json",
-        ],
-    );
+    let json = repo
+        .run_json([
+            "issue", "create", "--title", "My task", "--gate", "cargo-ci",
+        ])
+        .unwrap();
 
     // short_id is present and is the first 8 chars of id.
     let id = json["id"].as_str().expect("id must be a string");
@@ -114,28 +75,22 @@ fn test_issue_create_json_has_short_id_and_gates_array() {
 
 #[test]
 fn test_issue_create_json_dependencies_are_enriched_objects() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
     // Create a prerequisite first.
-    let dep = jit(
-        repo.path(),
-        &["issue", "create", "--title", "Prerequisite", "--json"],
-    );
+    let dep = repo
+        .run_json(["issue", "create", "--title", "Prerequisite"])
+        .unwrap();
     let dep_id = dep["id"].as_str().unwrap();
 
     // Create the dependent issue (no gate, to keep the test focused).
-    let json = jit(
-        repo.path(),
-        &["issue", "create", "--title", "Dependent", "--json"],
-    );
+    let json = repo
+        .run_json(["issue", "create", "--title", "Dependent"])
+        .unwrap();
     let id = json["id"].as_str().unwrap();
 
     // Wire the dependency.
-    jit_bin()
-        .current_dir(repo.path())
-        .args(["dep", "add", id, dep_id])
-        .status()
-        .unwrap();
+    repo.run(["dep", "add", id, dep_id]).unwrap();
 
     // Re-fetch via create is impossible after the fact; use show to confirm
     // the enriched shape is now produced identically by create for new issues
@@ -152,7 +107,7 @@ fn test_issue_create_json_dependencies_are_enriched_objects() {
 
     // Verify show --json produces the same top-level keys so the contract is
     // symmetric.
-    let show = jit(repo.path(), &["issue", "show", id, "--json"]);
+    let show = repo.run_json(["issue", "show", id]).unwrap();
     assert!(json.get("short_id").is_some(), "create has short_id");
     assert!(show.get("short_id").is_some(), "show has short_id");
     assert!(json.get("gates").is_some(), "create has gates");
@@ -169,20 +124,18 @@ fn test_issue_create_json_dependencies_are_enriched_objects() {
 
 #[test]
 fn test_issue_create_json_labels_is_array() {
-    let repo = setup_repo();
+    let repo = JitCli::initialised().unwrap();
 
-    let json = jit(
-        repo.path(),
-        &[
+    let json = repo
+        .run_json([
             "issue",
             "create",
             "--title",
             "Labelled",
             "--label",
             "type:task",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
 
     let labels = json["labels"]
         .as_array()

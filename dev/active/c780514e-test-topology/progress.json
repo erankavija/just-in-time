@@ -241,7 +241,7 @@
           "key": "cli-config-spawn-migration",
           "title": "configuration and CLI-surface tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
@@ -249,7 +249,7 @@
           "key": "cli-gate-definition-spawn-migration",
           "title": "gate definition tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "blocked"
+          "status": "done"
         },
         {
           "id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
@@ -265,7 +265,7 @@
           "key": "cli-gate-status-spawn-migration",
           "title": "gate status and key tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "8e69776c-443e-4842-b818-c6af28fc73c9",
@@ -337,7 +337,7 @@
           "key": "cli-profile-spawn-migration",
           "title": "profile tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "33be0c83-6a02-411f-9565-d73ee99fedd1",
@@ -569,7 +569,7 @@
           "key": "cli-fixture-commit-binary-linked-checkout",
           "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
@@ -2053,6 +2053,28 @@
       ],
       "kind": "rework 1: inline JitCli adapters in 4 files",
       "reason": "bounded mechanical rework; alternation"
+    },
+    {
+      "session": 3,
+      "slot": "B agent-de880d9c branch worktree-agent-w3-fixture",
+      "worker": "Claude Opus",
+      "issues": [
+        "1590d056"
+      ],
+      "reason": "contract-setting shared fixture API; strongest Claude tier"
+    },
+    {
+      "session": 3,
+      "slot": "A agent-22355a56 branch worktree-agent-w3-suite-fixture",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "2f95b4f6",
+        "33be0c83",
+        "b90b1660",
+        "d9598a97",
+        "58dbb1a0"
+      ],
+      "reason": "mechanical fixture_issue adoptions; upstream of 2195c98f 0af95f14"
     }
   ],
   "checkpoint": {
@@ -2075,5 +2097,17 @@
     "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
     "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
   },
-  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies."
+  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies.",
+  "coordination": [
+    {
+      "session": 3,
+      "peer": "just-in-time-f4 (2195c98f lead)",
+      "hold": {
+        "19136324": "until 8acca4f4 merges (output.rs, visualization.rs)",
+        "53f78490": "until 8acca4f4 merges (output.rs)",
+        "7995aa5c": "until 1c5da41d merges (validation/)"
+      },
+      "then": "dispatch 7995aa5c and 19136324 first: upstream of 0af95f14"
+    }
+  ]
 }

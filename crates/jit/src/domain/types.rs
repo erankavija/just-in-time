@@ -5,7 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
-use crate::domain::identity::ProfileId;
+use crate::domain::identity::{IssueId, ProfileId};
 use crate::domain::vocabulary::wire_vocabulary;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -1262,7 +1262,7 @@ pub enum EventBody {
     /// A new issue was created
     IssueCreated {
         /// Issue that was created
-        issue_id: String,
+        issue_id: IssueId,
         /// Issue title
         title: String,
         /// Issue priority
@@ -1271,14 +1271,14 @@ pub enum EventBody {
     /// An issue was claimed by an agent
     IssueClaimed {
         /// Issue that was claimed
-        issue_id: String,
+        issue_id: IssueId,
         /// Who claimed it (format: "type:identifier")
         assignee: Assignee,
     },
     /// Issue state transitioned
     IssueStateChanged {
         /// Issue that changed
-        issue_id: String,
+        issue_id: IssueId,
         /// Previous state
         from: State,
         /// New state
@@ -1287,7 +1287,7 @@ pub enum EventBody {
     /// A quality gate passed
     GatePassed {
         /// Issue with the gate
-        issue_id: String,
+        issue_id: IssueId,
         /// Gate that passed
         gate_key: String,
         /// Who marked it as passed (format: "type:identifier")
@@ -1296,7 +1296,7 @@ pub enum EventBody {
     /// A quality gate failed
     GateFailed {
         /// Issue with the gate
-        issue_id: String,
+        issue_id: IssueId,
         /// Gate that failed
         gate_key: String,
         /// Who marked it as failed (format: "type:identifier")
@@ -1305,31 +1305,31 @@ pub enum EventBody {
     /// A quality gate was added to an issue
     GateAdded {
         /// Issue to which gate was added
-        issue_id: String,
+        issue_id: IssueId,
         /// Gate that was added
         gate_key: String,
     },
     /// A quality gate was removed from an issue
     GateRemoved {
         /// Issue from which gate was removed
-        issue_id: String,
+        issue_id: IssueId,
         /// Gate that was removed
         gate_key: String,
     },
     /// Issue was completed
     IssueCompleted {
         /// Issue that completed
-        issue_id: String,
+        issue_id: IssueId,
     },
     /// Issue was permanently deleted
     IssueDeleted {
         /// Issue that was deleted
-        issue_id: String,
+        issue_id: IssueId,
     },
     /// Issue was released from assignee
     IssueReleased {
         /// Issue that was released
-        issue_id: String,
+        issue_id: IssueId,
         /// Previous assignee (format: "type:identifier")
         assignee: Assignee,
         /// Reason for release
@@ -1353,7 +1353,7 @@ pub enum EventBody {
     /// Issue was updated (labels, priority, assignee, etc.)
     IssueUpdated {
         /// Issue that was updated
-        issue_id: String,
+        issue_id: IssueId,
         /// Who updated it (e.g., "bulk-update", "human:alice", "agent:copilot")
         updated_by: String,
         /// Fields that changed
@@ -1362,13 +1362,13 @@ pub enum EventBody {
     /// Redundant dependencies were removed by transitive reduction during validate --fix
     DependencyReduced {
         /// Issue whose dependencies were reduced
-        issue_id: String,
+        issue_id: IssueId,
         /// Number of dependencies before reduction
         old_count: usize,
         /// Number of dependencies after reduction
         new_count: usize,
         /// IDs of the removed (redundant) dependencies
-        removed_deps: Vec<String>,
+        removed_deps: Vec<IssueId>,
     },
     /// A blocking validation rule was bypassed via `--force` on a write.
     ///
@@ -1378,7 +1378,7 @@ pub enum EventBody {
     /// read-only `jit validate` runs are NOT logged, only the deliberate bypass.
     LocalRuleBypassed {
         /// Issue whose write bypassed the rule
-        issue_id: String,
+        issue_id: IssueId,
         /// Name of the enforce rule that was bypassed
         rule: String,
     },
@@ -1391,7 +1391,7 @@ pub enum EventBody {
     /// state, so the transition into `target` was refused.
     TransitionBlocked {
         /// Issue whose transition was blocked
-        issue_id: String,
+        issue_id: IssueId,
         /// State the issue was attempting to enter
         target: State,
         /// Name of the enforcing graph rule that blocked the transition
@@ -1411,7 +1411,7 @@ pub enum EventBody {
     /// transition.
     GraphRuleBypassed {
         /// Issue whose transition bypassed the rule
-        issue_id: String,
+        issue_id: IssueId,
         /// State the issue transitioned into
         target: State,
         /// Name of the enforce graph rule that was bypassed
@@ -1525,9 +1525,9 @@ impl Event {
         self.timestamp
     }
 
-    /// The issue this event names; see [`EventBody::get_issue_id`].
-    pub fn get_issue_id(&self) -> &str {
-        self.body.get_issue_id()
+    /// The issue this event names; see [`EventBody::issue_id`].
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
+        self.body.issue_id()
     }
 
     /// This event's `type` tag; see [`EventBody::get_type`].
@@ -1568,12 +1568,12 @@ impl EventBody {
     /// Takes a typed [`Assignee`] so a malformed actor can never be logged; the
     /// caller parses (and thereby validates) the actor before constructing the
     /// event.
-    pub fn draft_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
+    pub fn draft_issue_claimed(issue_id: IssueId, assignee: Assignee) -> Self {
         EventBody::IssueClaimed { issue_id, assignee }
     }
 
     /// Create an issue state changed event
-    pub fn draft_issue_state_changed(issue_id: String, from: State, to: State) -> Self {
+    pub fn draft_issue_state_changed(issue_id: IssueId, from: State, to: State) -> Self {
         EventBody::IssueStateChanged { issue_id, from, to }
     }
 
@@ -1582,7 +1582,7 @@ impl EventBody {
     /// `updated_by` is a typed [`Assignee`] (the actor who passed the gate), so
     /// no malformed actor can be logged.
     pub fn draft_gate_passed(
-        issue_id: String,
+        issue_id: IssueId,
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
@@ -1598,7 +1598,7 @@ impl EventBody {
     /// `updated_by` is a typed [`Assignee`] (the actor who failed the gate), so
     /// no malformed actor can be logged.
     pub fn draft_gate_failed(
-        issue_id: String,
+        issue_id: IssueId,
         gate_key: String,
         updated_by: Option<Assignee>,
     ) -> Self {
@@ -1610,17 +1610,17 @@ impl EventBody {
     }
 
     /// Create a gate added event
-    pub fn draft_gate_added(issue_id: String, gate_key: String) -> Self {
+    pub fn draft_gate_added(issue_id: IssueId, gate_key: String) -> Self {
         EventBody::GateAdded { issue_id, gate_key }
     }
 
     /// Create a gate removed event
-    pub fn draft_gate_removed(issue_id: String, gate_key: String) -> Self {
+    pub fn draft_gate_removed(issue_id: IssueId, gate_key: String) -> Self {
         EventBody::GateRemoved { issue_id, gate_key }
     }
 
     /// Create an issue completed event
-    pub fn draft_issue_completed(issue_id: String) -> Self {
+    pub fn draft_issue_completed(issue_id: IssueId) -> Self {
         EventBody::IssueCompleted { issue_id }
     }
 
@@ -1629,7 +1629,7 @@ impl EventBody {
     /// `assignee` is the typed [`Assignee`] being released; callers emit this
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
-    pub fn draft_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
+    pub fn draft_issue_released(issue_id: IssueId, assignee: Assignee, reason: String) -> Self {
         EventBody::IssueReleased {
             issue_id,
             assignee,
@@ -1658,10 +1658,10 @@ impl EventBody {
 
     /// Create a dependency reduced event
     pub fn draft_dependency_reduced(
-        issue_id: String,
+        issue_id: IssueId,
         old_count: usize,
         new_count: usize,
-        removed_deps: Vec<String>,
+        removed_deps: Vec<IssueId>,
     ) -> Self {
         EventBody::DependencyReduced {
             issue_id,
@@ -1672,7 +1672,7 @@ impl EventBody {
     }
 
     /// Create an issue updated event
-    pub fn draft_issue_updated(issue_id: String, updated_by: String, fields: Vec<String>) -> Self {
+    pub fn draft_issue_updated(issue_id: IssueId, updated_by: String, fields: Vec<String>) -> Self {
         EventBody::IssueUpdated {
             issue_id,
             updated_by,
@@ -1684,7 +1684,7 @@ impl EventBody {
     ///
     /// Records that an issue was permanently deleted, preserving an audit trail
     /// of the removal in the event log (the issue file itself is gone).
-    pub fn draft_issue_deleted(issue_id: String) -> Self {
+    pub fn draft_issue_deleted(issue_id: IssueId) -> Self {
         EventBody::IssueDeleted { issue_id }
     }
 
@@ -1692,7 +1692,7 @@ impl EventBody {
     ///
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
     /// whose `error` finding would otherwise have blocked the write (DR §7.6).
-    pub fn draft_local_rule_bypassed(issue_id: String, rule: String) -> Self {
+    pub fn draft_local_rule_bypassed(issue_id: IssueId, rule: String) -> Self {
         EventBody::LocalRuleBypassed { issue_id, rule }
     }
 
@@ -1701,7 +1701,7 @@ impl EventBody {
     /// Records that an enforcing graph rule blocked the issue's transition into
     /// `target` (CC-2). Appended before the blocking error is returned, one per
     /// blocking rule.
-    pub fn draft_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
+    pub fn draft_transition_blocked(issue_id: IssueId, target: State, rule: String) -> Self {
         EventBody::TransitionBlocked {
             issue_id,
             target,
@@ -1714,7 +1714,7 @@ impl EventBody {
     /// Records that a `--force` transition deliberately bypassed an enforcing
     /// graph rule whose `error` finding would otherwise have blocked the
     /// transition into `target` (CC-2).
-    pub fn draft_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
+    pub fn draft_graph_rule_bypassed(issue_id: IssueId, target: State, rule: String) -> Self {
         EventBody::GraphRuleBypassed {
             issue_id,
             target,
@@ -1781,30 +1781,30 @@ impl EventBody {
         }
     }
 
-    /// Get the issue ID associated with this event
-    pub fn get_issue_id(&self) -> &str {
+    /// The issue this event names; `None` for repository- and registry-scoped events.
+    pub fn issue_id(&self) -> Option<&crate::domain::identity::IssueId> {
         match self {
-            EventBody::IssueCreated { issue_id, .. } => issue_id,
-            EventBody::IssueClaimed { issue_id, .. } => issue_id,
-            EventBody::IssueStateChanged { issue_id, .. } => issue_id,
-            EventBody::GatePassed { issue_id, .. } => issue_id,
-            EventBody::GateFailed { issue_id, .. } => issue_id,
-            EventBody::GateAdded { issue_id, .. } => issue_id,
-            EventBody::GateRemoved { issue_id, .. } => issue_id,
-            EventBody::IssueCompleted { issue_id, .. } => issue_id,
-            EventBody::IssueDeleted { issue_id, .. } => issue_id,
-            EventBody::IssueReleased { issue_id, .. } => issue_id,
-            EventBody::IssueUpdated { issue_id, .. } => issue_id,
-            EventBody::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
-            EventBody::DependencyReduced { issue_id, .. } => issue_id,
-            EventBody::LocalRuleBypassed { issue_id, .. } => issue_id,
-            EventBody::TransitionBlocked { issue_id, .. } => issue_id,
-            EventBody::GraphRuleBypassed { issue_id, .. } => issue_id,
-            EventBody::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
-            EventBody::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
-            EventBody::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
-            EventBody::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
-            EventBody::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
+            EventBody::IssueCreated { issue_id, .. } => Some(issue_id),
+            EventBody::IssueClaimed { issue_id, .. } => Some(issue_id),
+            EventBody::IssueStateChanged { issue_id, .. } => Some(issue_id),
+            EventBody::GatePassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateFailed { issue_id, .. } => Some(issue_id),
+            EventBody::GateAdded { issue_id, .. } => Some(issue_id),
+            EventBody::GateRemoved { issue_id, .. } => Some(issue_id),
+            EventBody::IssueCompleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueDeleted { issue_id, .. } => Some(issue_id),
+            EventBody::IssueReleased { issue_id, .. } => Some(issue_id),
+            EventBody::IssueUpdated { issue_id, .. } => Some(issue_id),
+            EventBody::ArtifactArchiveExecuted { .. } => None,
+            EventBody::DependencyReduced { issue_id, .. } => Some(issue_id),
+            EventBody::LocalRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::TransitionBlocked { issue_id, .. } => Some(issue_id),
+            EventBody::GraphRuleBypassed { issue_id, .. } => Some(issue_id),
+            EventBody::GateDefinitionUpdated { .. } => None,
+            EventBody::GateDefinitionCreated { .. } => None,
+            EventBody::GateDefinitionRemoved { .. } => None,
+            EventBody::ProfileLifecycle { .. } => None,
+            EventBody::LinkedCheckoutWriteOverridden { .. } => None,
         }
     }
 
@@ -1849,7 +1849,12 @@ mod tests {
 
     #[test]
     fn test_stamped_event_reads_back_its_body_and_identity() {
-        let body = EventBody::draft_gate_added("issue".to_string(), "tests".to_string());
+        let body = EventBody::draft_gate_added(
+            "00000000-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
+            "tests".to_string(),
+        );
         let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
 
         let event = crate::test_utils::stamped_event(body.clone(), "event", timestamp);
@@ -2947,7 +2952,12 @@ mod tests {
         #[test]
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
-            let event = EventBody::draft_issue_claimed("issue-1".to_string(), actor);
+            let event = EventBody::draft_issue_claimed(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                actor,
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"agent:copilot\""));
@@ -2959,8 +2969,13 @@ mod tests {
         #[test]
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
-            let event =
-                EventBody::draft_issue_released("issue-1".to_string(), prev, "timeout".to_string());
+            let event = EventBody::draft_issue_released(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                prev,
+                "timeout".to_string(),
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"assignee\":\"copilot:session-1\""));
@@ -2972,8 +2987,13 @@ mod tests {
         #[test]
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
-            let event =
-                EventBody::draft_gate_passed("issue-1".to_string(), "tests".to_string(), Some(by));
+            let event = EventBody::draft_gate_passed(
+                "00000000-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                "tests".to_string(),
+                Some(by),
+            );
 
             let json = serde_json::to_string(&event).unwrap();
             assert!(json.contains("\"updated_by\":\"ci:runner\""));
@@ -2994,7 +3014,7 @@ mod tests {
 
         #[test]
         fn test_event_deserialize_rejects_malformed_assignee() {
-            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"i1","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
+            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"00000000-0000-4000-8000-000000000001","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
             assert!(serde_json::from_str::<Event>(json).is_err());
         }
     }

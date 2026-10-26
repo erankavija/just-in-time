@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "55863bfa-574a-4edb-b35c-73a8185f6152",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:57:21.558995656Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8e69776c-443e-4842-b818-c6af28fc73c9",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "init and discovery tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-26T22:00:55.404649017Z"
+  "updated_at": "2026-10-26T22:57:21.558995656Z"
 }

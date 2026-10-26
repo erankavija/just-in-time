@@ -1,25 +1,10 @@
 //! Structural machine-readable failures rendered by the top-level CLI boundary.
 
 use jit::output::ErrorCode;
+use jit::test_cli::{created_issue_id, JitCli};
 use std::fs;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::str::FromStr;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_repository() -> TempDir {
-    let repository = TempDir::new().expect("create temporary repository");
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .arg("init")
-        .output()
-        .expect("initialize repository");
-    assert!(output.status.success(), "init failed: {output:?}");
-    repository
-}
 
 fn parse_single_error(output: &Output) -> (serde_json::Value, ErrorCode) {
     let stdout = std::str::from_utf8(&output.stdout).expect("stdout is UTF-8");
@@ -37,16 +22,15 @@ fn parse_single_error(output: &Output) -> (serde_json::Value, ErrorCode) {
 
 #[test]
 fn test_propagated_config_parse_failure_emits_registered_envelope_and_empty_stderr() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
     fs::write(
-        repository.path().join(".jit/config.toml"),
+        repository.root().join(".jit/config.toml"),
         "this is not valid TOML [[[",
     )
     .expect("corrupt repository config");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["label", "namespaces", "--json"])
+    let output = repository
+        .command(["label", "namespaces", "--json"])
         .output()
         .expect("run propagated failure fixture");
 
@@ -63,16 +47,15 @@ fn test_propagated_config_parse_failure_emits_registered_envelope_and_empty_stde
 
 #[test]
 fn test_propagated_config_parse_failure_without_json_writes_one_stderr_diagnostic() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
     fs::write(
-        repository.path().join(".jit/config.toml"),
+        repository.root().join(".jit/config.toml"),
         "this is not valid TOML [[[",
     )
     .expect("corrupt repository config");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["label", "namespaces"])
+    let output = repository
+        .command(["label", "namespaces"])
         .output()
         .expect("run propagated human-mode failure fixture");
 
@@ -92,13 +75,12 @@ fn test_propagated_config_parse_failure_without_json_writes_one_stderr_diagnosti
 
 #[test]
 fn test_stored_record_parse_failure_uses_typed_registered_code() {
-    let repository = setup_repository();
-    fs::write(repository.path().join(".jit/index.json"), "{")
+    let repository = JitCli::initialised().unwrap();
+    fs::write(repository.root().join(".jit/index.json"), "{")
         .expect("corrupt stored repository index");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["query", "all", "--json"])
+    let output = repository
+        .command(["query", "all", "--json"])
         .output()
         .expect("run stored-record failure fixture");
 
@@ -109,11 +91,10 @@ fn test_stored_record_parse_failure_uses_typed_registered_code() {
 
 #[test]
 fn test_command_specific_error_keeps_one_envelope_and_its_details() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["issue", "show", "missing", "--json"])
+    let output = repository
+        .command(["issue", "show", "missing", "--json"])
         .output()
         .expect("run command-specific failure fixture");
 
@@ -129,11 +110,10 @@ fn test_command_specific_error_keeps_one_envelope_and_its_details() {
 
 #[test]
 fn test_validate_json_success_keeps_the_validation_report() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["validate", "--json"])
+    let output = repository
+        .command(["validate", "--json"])
         .output()
         .expect("run successful validation fixture");
 
@@ -150,18 +130,17 @@ fn test_validate_json_success_keeps_the_validation_report() {
 
 #[test]
 fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
-    let repository = setup_repository();
-    let created = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["issue", "create", "--title", "broken graph", "--json"])
+    let repository = JitCli::initialised().unwrap();
+    let created = repository
+        .command(["issue", "create", "--title", "broken graph", "--json"])
         .output()
         .expect("create validation fixture");
     assert!(created.status.success(), "issue create failed: {created:?}");
     let created_json: serde_json::Value =
         serde_json::from_slice(&created.stdout).expect("created issue is JSON");
-    let issue_id = created_json["id"].as_str().expect("created issue id");
+    let issue_id = created_issue_id(&created_json).expect("created issue id");
     let issue_path = repository
-        .path()
+        .root()
         .join(".jit/issues")
         .join(format!("{issue_id}.json"));
     let mut issue: serde_json::Value =
@@ -174,9 +153,8 @@ fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
     )
     .expect("write broken issue record");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["validate", "--json"])
+    let output = repository
+        .command(["validate", "--json"])
         .output()
         .expect("run handler-owned validation failure fixture");
 
@@ -200,8 +178,8 @@ fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
 
 #[test]
 fn test_validate_json_rule_failure_emits_one_registered_envelope() {
-    let repository = setup_repository();
-    let rules_path = repository.path().join(".jit/rules.toml");
+    let repository = JitCli::initialised().unwrap();
+    let rules_path = repository.root().join(".jit/rules.toml");
     let mut rules = fs::read_to_string(&rules_path).expect("read default rules");
     rules.push_str(
         "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
@@ -209,9 +187,8 @@ fn test_validate_json_rule_failure_emits_one_registered_envelope() {
          assert = { require-label = { label = \"req:*\", min = 1 } }\n",
     );
     fs::write(rules_path, rules).expect("install rule fixture");
-    let created = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args([
+    let created = repository
+        .command([
             "issue",
             "create",
             "--title",
@@ -225,9 +202,8 @@ fn test_validate_json_rule_failure_emits_one_registered_envelope() {
         .expect("create rule failure fixture");
     assert!(created.status.success(), "issue create failed: {created:?}");
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["validate", "--json"])
+    let output = repository
+        .command(["validate", "--json"])
         .output()
         .expect("run rule failure fixture");
 
@@ -250,11 +226,10 @@ fn test_validate_json_rule_failure_emits_one_registered_envelope() {
 
 #[test]
 fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["validate", "--branch-drift", "--json"])
+    let output = repository
+        .command(["validate", "--branch-drift", "--json"])
         .output()
         .expect("run branch-drift failure fixture");
 

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:10:44.955833702Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,25 @@
   ],
   "description": "Aggregate the work that delivers this outcome: events hold id and timestamp once around a tagged body, with a typed optional issue accessor.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` holds `id` and `timestamp` once around a flattened `EventBody`, and the body-view bridge no longer exists.\n- [hard] REQ-02: The event issue accessor returns an optional typed id.\n- [hard] REQ-03: This repository's event log round-trips byte-identically.\n",
   "documents": [],
+  "first_ready_at": "2026-10-26T23:10:20.884158339Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "409a35c4-4d1a-4c4b-97be-63a03ff555c9",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:17:33.164549303Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "f8a0699b-a9d3-496c-9913-d0e82cbd413f",
+      "status": "failed",
+      "updated_at": "2026-10-26T23:11:25.807712066Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8c40d01b-145e-4974-8f22-41676a158aa0",
   "labels": [
     "type:story",
@@ -23,7 +38,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Events are an envelope around a tagged body",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T23:17:33.164549303Z"
 }

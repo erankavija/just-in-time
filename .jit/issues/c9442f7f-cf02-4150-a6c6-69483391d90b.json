@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1c858c3a-6770-412b-ac80-b9160c58ad23",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:57:13.751515613Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e792f0de-fd9c-4d51-9f8f-6582900dbda9",
+      "status": "failed",
+      "updated_at": "2026-10-26T22:58:47.419955623Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c9442f7f-cf02-4150-a6c6-69483391d90b",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "apply, preset and template tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-25T00:55:48.889874709Z"
+  "updated_at": "2026-10-26T22:58:47.419955623Z"
 }

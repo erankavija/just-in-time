@@ -2,52 +2,18 @@
 //! description field, while the default behaviour is unchanged.
 
 use assert_cmd::prelude::*;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn setup_repo_with_issue(description: &str) -> (TempDir, String) {
-    let temp = TempDir::new().unwrap();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
-
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "An issue",
-            "--description",
-            description,
-        ])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let stdout = String::from_utf8_lossy(&output);
-    let id = stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .unwrap()
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-    (temp, id)
-}
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_show_default_still_returns_full_description() {
     let description = "The full description text MUST appear here.";
-    let (temp, id) = setup_repo_with_issue(description);
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "An issue", "--description", description])
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--json"])
+    let output = temp
+        .command(["issue", "show", &id, "--json"])
         .assert()
         .success()
         .get_output()
@@ -66,11 +32,13 @@ fn test_show_default_still_returns_full_description() {
 #[test]
 fn test_show_summary_omits_description() {
     let description = "B".repeat(4000);
-    let (temp, id) = setup_repo_with_issue(&description);
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "An issue", "--description", &description])
+        .unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--summary", "--json"])
+    let output = temp
+        .command(["issue", "show", &id, "--summary", "--json"])
         .assert()
         .success()
         .get_output()
@@ -94,33 +62,31 @@ fn test_show_summary_omits_description() {
 
 #[test]
 fn test_show_summary_exposes_gates_array() {
-    let (temp, id) = setup_repo_with_issue("short");
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "An issue", "--description", "short"])
+        .unwrap();
 
     // Add a gate so the projected `gates` array is non-empty.
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args([
-            "gate",
-            "define",
-            "manual-gate",
-            "--title",
-            "Manual",
-            "--description",
-            "Manual gate",
-            "--mode",
-            "manual",
-        ])
-        .assert()
-        .success();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "update", &id, "--add-gate", "manual-gate"])
+    temp.command([
+        "gate",
+        "define",
+        "manual-gate",
+        "--title",
+        "Manual",
+        "--description",
+        "Manual gate",
+        "--mode",
+        "manual",
+    ])
+    .assert()
+    .success();
+    temp.command(["issue", "update", &id, "--add-gate", "manual-gate"])
         .assert()
         .success();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--summary", "--json"])
+    let output = temp
+        .command(["issue", "show", &id, "--summary", "--json"])
         .assert()
         .success()
         .get_output()

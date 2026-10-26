@@ -316,7 +316,7 @@
           "short_id": "91081bd3",
           "title": "The CLI resolves each issue-id argument once at entry",
           "classification": "implementation",
-          "status": "awaiting_code_review"
+          "status": "done"
         },
         {
           "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
@@ -419,14 +419,14 @@
           "short_id": "e98ae5a4",
           "title": "Event tags declare their wire spelling once",
           "classification": "implementation",
-          "status": "gates_passed_unmerged"
+          "status": "done"
         },
         {
           "id": "f265e748-e350-4ba6-949f-575acf122bd9",
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "awaiting_code_review"
+          "status": "done"
         }
       ]
     },
@@ -492,7 +492,7 @@
           "short_id": "1c5da41d",
           "title": "Validation carries typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "5613ef50-362b-43ef-a268-12afc91f5b52",
@@ -513,7 +513,7 @@
           "short_id": "8acca4f4",
           "title": "Errors and output carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rework"
         }
       ]
     },
@@ -627,6 +627,20 @@
       "title": "This repository's event log is in canonical writer form",
       "reason": "d72bf093 REQ-03 needs every log line to round-trip; ~8600 legacy lines predate the canonical writer. Lead data rewrite, wired as a d72bf093 dependency.",
       "status": "done"
+    },
+    {
+      "id": "f8021e35-cf67-4142-a1f3-5fa810fb7fc8",
+      "short_id": "f8021e35",
+      "title": "The server watcher recognises .jit files through VirtualPath",
+      "reason": "Story 5dd29767 holistic-review F1: watcher.rs raw-matches well-known .jit names (story REQ-01).",
+      "status": "in_progress"
+    },
+    {
+      "id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
+      "short_id": "e1940fcf",
+      "title": "The validation schema test derives priority tokens from the vocabulary",
+      "reason": "Story 83d04069 holistic-review F1: engine.rs test hardcodes Priority tokens (story REQ-02).",
+      "status": "in_progress"
     }
   ],
   "escalations": [
@@ -659,6 +673,28 @@
       "reason": "Code-review R3 failed after two reworks (String-deref reliance in sort_key).",
       "status": "resolved",
       "resolution": "Invoker: lead applies the fix plus an alias-flip compile check. Done in 0b9770767; awaiting code-review."
+    },
+    {
+      "issue": "f265e748",
+      "reason": "Code-review failed after the approved lead fix: EventBody issue_id fields still String (REQ-04).",
+      "status": "resolved",
+      "resolution": "Invoker: lead retypes EventBody issue_id fields, removed_deps and draft constructors to IssueId (67f48c045)."
+    },
+    {
+      "issue": "c780514e blockers",
+      "reason": "0af95f14/5fac48b8 chain waits on test-topology epic c780514e.",
+      "status": "resolved",
+      "resolution": "Invoker: parallel session just-in-time-b4 leads c780514e; it was told to prioritise the upstream closure of 0af95f14 and 5fac48b8 and to message this lead when they are terminal."
+    },
+    {
+      "issue": "8c40d01b",
+      "status": "open",
+      "reason": "Story 'Events are an envelope around a tagged body' holistic-review failed: story REQ-03 ('This repository's event log round-trips byte-identically') is unmet because the 8 retired-tag lines in .jit/events.jsonl are skipped by parse_known_events (mutation.rs:1948). The child d72bf093 REQ-03 was amended by the invoker to scope the round trip to current event types; the story criterion was not.",
+      "options": [
+        "A (recommended): amend story REQ-03 to match the amended d72bf093 REQ-03 (round trip of current event types; retired-tag lines pinned as skipped), then re-run holistic-review",
+        "B: lead rewrites .jit/events.jsonl to drop or convert the 8 retired-tag lines (history rewrite)"
+      ],
+      "gates": "cargo-ci passed; holistic-review failed (run recorded)"
     }
   ],
   "rework_counts": {
@@ -669,7 +705,8 @@
     "e1a6c8c2": 3,
     "91081bd3": 2,
     "d72bf093": 1,
-    "f265e748": 2
+    "f265e748": 2,
+    "8acca4f4": 1
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -1222,6 +1259,48 @@
       "model": "-",
       "effort": "-",
       "reason": "Invoker-approved lead fix after rework limit: Option<&IssueId> sort key, as_str() in events filter; alias-flip check run."
+    },
+    {
+      "issue": "f265e748",
+      "vendor": "lead",
+      "model": "-",
+      "effort": "-",
+      "reason": "Invoker-approved lead retype of EventBody issue ids after code-review F1."
+    },
+    {
+      "issue": "1c5da41d",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "-",
+      "reason": "Validation-family retype; alternation slot Claude; opus because flip-safety criteria failed at lower tiers repeatedly."
+    },
+    {
+      "issue": "8acca4f4",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Errors/output/visualization retype across 45+ sites with byte-identical output; alternation slot Codex."
+    },
+    {
+      "issue": "8acca4f4",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Lead-review rework 1: unresolved request text typed as IssueId; lint suppressions. Same tier (judgment slip)."
+    },
+    {
+      "issue": "f8021e35",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "One-file literal-to-constant swap in the server watcher; alternation slot Claude."
+    },
+    {
+      "issue": "e1940fcf",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One test derives tokens from Priority::ALL; alternation slot Codex."
     }
   ],
   "surfaced_pitfalls": [
@@ -1275,5 +1354,11 @@
     "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
     "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
   ],
-  "session_note": "Session 2 handoff written as handoff.md; see it for next actions."
+  "session_note": "Session 3 in progress.",
+  "decisions": [
+    {
+      "issue": "8acca4f4",
+      "decision": "Error/DTO carriers of unresolved CLI request text (DependencyBatchRejectedError.rejected, JsonError::issue_not_found) hold request text as &str/String, not IssueId; request text is a parsing-boundary value, not an issue id."
+    }
+  ]
 }

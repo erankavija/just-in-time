@@ -34,7 +34,7 @@ fn assert_last_event_is_documents_update(h: &TestHarness, issue_id: &str, expect
     let event = events.last().expect("event log should not be empty");
 
     assert_eq!(event.get_type(), "issue_updated");
-    assert_eq!(event.get_issue_id(), issue_id);
+    assert_eq!(event.issue_id().map(|id| id.as_str()), Some(issue_id));
 
     match event.body() {
         EventBody::IssueUpdated {

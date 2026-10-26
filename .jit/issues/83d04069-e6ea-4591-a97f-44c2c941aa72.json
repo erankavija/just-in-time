@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:33:09.967197297Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -18,15 +19,30 @@
     "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
     "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
     "b8506ce7-99ba-493d-bcf6-297f81556b18",
+    "e1940fcf-c673-4b12-8a68-2c919b6bee42",
     "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
   ],
   "description": "Aggregate the work that delivers this outcome: each closed vocabulary is one macro-declared enum with exact-token parsing and no restated token.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Each closed vocabulary named by the epic is one enum declared through the vocabulary macro, with exact-token parsing.\n- [hard] REQ-02: No token function, token table or mirror enum restates a declared vocabulary.\n- [hard] REQ-03: `Priority` orders through `Ord`, and projections and query value lists use typed vocabularies.\n",
   "documents": [],
+  "first_ready_at": "2026-10-26T22:13:46.620498838Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1b63fe53-ef0c-4efd-ade7-531d6f518588",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:41:04.754599074Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "688386cf-b081-4e83-be5a-cbfe806c301e",
+      "status": "failed",
+      "updated_at": "2026-10-26T23:36:13.281815302Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "83d04069-e6ea-4591-a97f-44c2c941aa72",
   "labels": [
     "type:story",
@@ -43,5 +59,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Closed vocabularies state their wire spelling once",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T23:41:52.512490161Z"
 }

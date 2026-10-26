@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "320a12bba300f4d6a1e9b7f1abe40131f4ef95ed",
+  "completed_at": "2026-10-26T23:01:43.927300742Z",
+  "duration_ms": 252072,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The scoped gate CLI tests now use the shared process fixture while preserving their test behavior; prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5353463c-6517-43ba-b104-b42cf951b4ce",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a1de8894-3e5d-4154-9c71-5af1d0faccf5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:57:31.855199708Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 77b7808ad, 82078a7fd, 5f0e15931, da0df2152 (`jit:5353463c`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-26T22:55:49Z)\nTruncation recovery: narrowed aggregate commit diffs to per-file fixture-migration changes and inspected current fixture and affected test sources\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped gate CLI tests now use the shared process fixture while preserving their test behavior; prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
