@@ -8,28 +8,14 @@
 
 use jit::test_cli::JitCli;
 
-fn jit(cli: &JitCli, args: &[&str]) -> Vec<u8> {
-    let output = cli.command(args).output().unwrap();
-    assert!(output.status.success(), "jit failed: {output:?}");
-    output.stdout
-}
-
-fn create_issue(cli: &JitCli, title: &str) -> String {
-    cli.create_issue(["--title", title, "--description", "Body"])
-        .unwrap()
-}
-
-fn show_json(cli: &JitCli, id: &str) -> serde_json::Value {
-    let output = jit(cli, &["issue", "show", id, "--json"]);
-    serde_json::from_slice(&output).unwrap()
-}
-
 #[test]
 fn test_show_root_has_short_id_matching_id_prefix() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Backlog issue");
+    let id = temp
+        .create_issue(["--title", "Backlog issue", "--description", "Body"])
+        .unwrap();
 
-    let json = show_json(&temp, &id);
+    let json = temp.run_json(["issue", "show", &id]).unwrap();
     let short = json["short_id"]
         .as_str()
         .unwrap_or_else(|| panic!("short_id must be a string at root; got: {}", json));
@@ -46,21 +32,24 @@ fn test_show_root_has_short_id_matching_id_prefix() {
 #[test]
 fn test_show_labels_and_dependencies_are_empty_arrays_when_none() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Bare issue");
+    let id = temp
+        .create_issue(["--title", "Bare issue", "--description", "Body"])
+        .unwrap();
 
     // New issues may carry a default type label; strip it so we can assert the
     // genuinely-empty case still serializes as `[]` rather than being omitted.
-    let labels: Vec<String> = show_json(&temp, &id)["labels"]
+    let labels: Vec<String> = temp.run_json(["issue", "show", &id]).unwrap()["labels"]
         .as_array()
         .unwrap()
         .iter()
         .map(|l| l.as_str().unwrap().to_string())
         .collect();
     for label in &labels {
-        jit(&temp, &["issue", "update", &id, "--remove-label", label]);
+        temp.run(["issue", "update", &id, "--remove-label", label])
+            .unwrap();
     }
 
-    let json = show_json(&temp, &id);
+    let json = temp.run_json(["issue", "show", &id]).unwrap();
 
     assert!(
         json["labels"].is_array(),
@@ -90,13 +79,18 @@ fn test_show_labels_and_dependencies_are_empty_arrays_when_none() {
 #[test]
 fn test_show_labels_and_dependencies_populated() {
     let temp = JitCli::initialised().unwrap();
-    let dep_id = create_issue(&temp, "Prerequisite");
-    let id = create_issue(&temp, "Dependent issue");
+    let dep_id = temp
+        .create_issue(["--title", "Prerequisite", "--description", "Body"])
+        .unwrap();
+    let id = temp
+        .create_issue(["--title", "Dependent issue", "--description", "Body"])
+        .unwrap();
 
-    jit(&temp, &["issue", "update", &id, "--label", "type:task"]);
-    jit(&temp, &["dep", "add", &id, &dep_id]);
+    temp.run(["issue", "update", &id, "--label", "type:task"])
+        .unwrap();
+    temp.run(["dep", "add", &id, &dep_id]).unwrap();
 
-    let json = show_json(&temp, &id);
+    let json = temp.run_json(["issue", "show", &id]).unwrap();
 
     // Still arrays, now non-empty, and short_id still present.
     assert!(json["short_id"].is_string());
@@ -118,14 +112,17 @@ fn test_show_labels_and_dependencies_populated() {
 #[test]
 fn test_show_short_id_present_across_states() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Lifecycle issue");
+    let id = temp
+        .create_issue(["--title", "Lifecycle issue", "--description", "Body"])
+        .unwrap();
 
     // Backlog (just created).
-    assert!(show_json(&temp, &id)["short_id"].is_string());
+    assert!(temp.run_json(["issue", "show", &id]).unwrap()["short_id"].is_string());
 
     // Move to in_progress and re-check the shape holds.
-    jit(&temp, &["issue", "update", &id, "--state", "in_progress"]);
-    let json = show_json(&temp, &id);
+    temp.run(["issue", "update", &id, "--state", "in_progress"])
+        .unwrap();
+    let json = temp.run_json(["issue", "show", &id]).unwrap();
     assert_eq!(json["short_id"].as_str(), Some(&id[0..8]));
     assert!(json["labels"].is_array());
     assert!(json["dependencies"].is_array());

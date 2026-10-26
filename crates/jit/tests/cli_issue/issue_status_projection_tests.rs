@@ -12,17 +12,6 @@
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 
-fn jit_ok(cli: &JitCli, args: &[&str]) -> Vec<u8> {
-    let output = cli.command(args).output().unwrap();
-    assert!(output.status.success(), "jit failed: {output:?}");
-    output.stdout
-}
-
-fn create_issue(cli: &JitCli, title: &str) -> String {
-    cli.create_issue(["--title", title, "--description", "Body"])
-        .unwrap()
-}
-
 fn short(id: &str) -> &str {
     &id[0..8]
 }
@@ -32,9 +21,11 @@ fn short(id: &str) -> &str {
 #[test]
 fn test_status_single_id_text_one_liner() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Solo task");
+    let id = temp
+        .create_issue(["--title", "Solo task", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &id]);
+    let out = temp.run(["issue", "status", &id]).unwrap().into_bytes();
     let text = String::from_utf8_lossy(&out);
     let line = text.trim();
 
@@ -61,22 +52,23 @@ fn test_status_single_id_text_one_liner() {
 #[test]
 fn test_status_text_lists_gate_key_status() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Gated task");
-    jit_ok(
-        &temp,
-        &[
-            "gate",
-            "define",
-            "tests",
-            "--title",
-            "Tests",
-            "--description",
-            "Run tests",
-        ],
-    );
-    jit_ok(&temp, &["issue", "update", &id, "--add-gate", "tests"]);
+    let id = temp
+        .create_issue(["--title", "Gated task", "--description", "Body"])
+        .unwrap();
+    temp.run([
+        "gate",
+        "define",
+        "tests",
+        "--title",
+        "Tests",
+        "--description",
+        "Run tests",
+    ])
+    .unwrap();
+    temp.run(["issue", "update", &id, "--add-gate", "tests"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &id]);
+    let out = temp.run(["issue", "status", &id]).unwrap().into_bytes();
     let line = String::from_utf8_lossy(&out).trim().to_string();
     assert!(
         line.contains("gates: tests=pending"),
@@ -88,22 +80,26 @@ fn test_status_text_lists_gate_key_status() {
 #[test]
 fn test_status_single_id_json_small_object() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Solo task");
-    jit_ok(
-        &temp,
-        &[
-            "gate",
-            "define",
-            "tests",
-            "--title",
-            "Tests",
-            "--description",
-            "Run tests",
-        ],
-    );
-    jit_ok(&temp, &["issue", "update", &id, "--add-gate", "tests"]);
+    let id = temp
+        .create_issue(["--title", "Solo task", "--description", "Body"])
+        .unwrap();
+    temp.run([
+        "gate",
+        "define",
+        "tests",
+        "--title",
+        "Tests",
+        "--description",
+        "Run tests",
+    ])
+    .unwrap();
+    temp.run(["issue", "update", &id, "--add-gate", "tests"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &id, "--json"]);
+    let out = temp
+        .run(["issue", "status", &id, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
 
     assert!(
@@ -129,9 +125,14 @@ fn test_status_single_id_json_small_object() {
 #[test]
 fn test_status_json_no_gates_is_empty_array() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "No gates");
+    let id = temp
+        .create_issue(["--title", "No gates", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &id, "--json"]);
+    let out = temp
+        .run(["issue", "status", &id, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     assert!(json["gates"].is_array());
     assert_eq!(json["gates"].as_array().unwrap().len(), 0);
@@ -142,10 +143,17 @@ fn test_status_json_no_gates_is_empty_array() {
 #[test]
 fn test_status_multi_id_json_envelope() {
     let temp = JitCli::initialised().unwrap();
-    let a = create_issue(&temp, "First");
-    let b = create_issue(&temp, "Second");
+    let a = temp
+        .create_issue(["--title", "First", "--description", "Body"])
+        .unwrap();
+    let b = temp
+        .create_issue(["--title", "Second", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &a, &b, "--json"]);
+    let out = temp
+        .run(["issue", "status", &a, &b, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
 
     assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
@@ -164,10 +172,14 @@ fn test_status_multi_id_json_envelope() {
 #[test]
 fn test_status_multi_id_text_one_line_each() {
     let temp = JitCli::initialised().unwrap();
-    let a = create_issue(&temp, "First");
-    let b = create_issue(&temp, "Second");
+    let a = temp
+        .create_issue(["--title", "First", "--description", "Body"])
+        .unwrap();
+    let b = temp
+        .create_issue(["--title", "Second", "--description", "Body"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &a, &b]);
+    let out = temp.run(["issue", "status", &a, &b]).unwrap().into_bytes();
     let text = String::from_utf8_lossy(&out);
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.len(), 2, "one line per id: {text:?}");
@@ -180,24 +192,34 @@ fn test_status_multi_id_text_one_line_each() {
 #[test]
 fn test_status_unmet_follows_readiness_semantics() {
     let temp = JitCli::initialised().unwrap();
-    let done_dep = create_issue(&temp, "Done dep");
-    let open_dep = create_issue(&temp, "Open dep");
-    let rejected_dep = create_issue(&temp, "Rejected dep");
-    let main = create_issue(&temp, "Downstream");
+    let done_dep = temp
+        .create_issue(["--title", "Done dep", "--description", "Body"])
+        .unwrap();
+    let open_dep = temp
+        .create_issue(["--title", "Open dep", "--description", "Body"])
+        .unwrap();
+    let rejected_dep = temp
+        .create_issue(["--title", "Rejected dep", "--description", "Body"])
+        .unwrap();
+    let main = temp
+        .create_issue(["--title", "Downstream", "--description", "Body"])
+        .unwrap();
 
-    jit_ok(&temp, &["dep", "add", &main, &done_dep]);
-    jit_ok(&temp, &["dep", "add", &main, &open_dep]);
-    jit_ok(&temp, &["dep", "add", &main, &rejected_dep]);
+    temp.run(["dep", "add", &main, &done_dep]).unwrap();
+    temp.run(["dep", "add", &main, &open_dep]).unwrap();
+    temp.run(["dep", "add", &main, &rejected_dep]).unwrap();
 
     // Terminal deps: Done and Rejected both count as *met* (readiness unblocks
     // on either), so only the open dep remains unmet.
-    jit_ok(&temp, &["issue", "update", &done_dep, "--state", "done"]);
-    jit_ok(
-        &temp,
-        &["issue", "update", &rejected_dep, "--state", "rejected"],
-    );
+    temp.run(["issue", "update", &done_dep, "--state", "done"])
+        .unwrap();
+    temp.run(["issue", "update", &rejected_dep, "--state", "rejected"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &main, "--json"]);
+    let out = temp
+        .run(["issue", "status", &main, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     let unmet: Vec<String> = json["unmet_dependencies"]
         .as_array()
@@ -212,7 +234,7 @@ fn test_status_unmet_follows_readiness_semantics() {
     );
 
     // Text form lists the same single short id.
-    let text_out = jit_ok(&temp, &["issue", "status", &main]);
+    let text_out = temp.run(["issue", "status", &main]).unwrap().into_bytes();
     let line = String::from_utf8_lossy(&text_out).trim().to_string();
     assert!(
         line.contains(&format!("unmet: {}", short(&open_dep))),
@@ -224,12 +246,20 @@ fn test_status_unmet_follows_readiness_semantics() {
 #[test]
 fn test_status_all_deps_done_empty_unmet() {
     let temp = JitCli::initialised().unwrap();
-    let dep = create_issue(&temp, "Prereq");
-    let main = create_issue(&temp, "Downstream");
-    jit_ok(&temp, &["dep", "add", &main, &dep]);
-    jit_ok(&temp, &["issue", "update", &dep, "--state", "done"]);
+    let dep = temp
+        .create_issue(["--title", "Prereq", "--description", "Body"])
+        .unwrap();
+    let main = temp
+        .create_issue(["--title", "Downstream", "--description", "Body"])
+        .unwrap();
+    temp.run(["dep", "add", &main, &dep]).unwrap();
+    temp.run(["issue", "update", &dep, "--state", "done"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "status", &main, "--json"]);
+    let out = temp
+        .run(["issue", "status", &main, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     assert!(
         json["unmet_dependencies"].as_array().unwrap().is_empty(),
@@ -242,14 +272,24 @@ fn test_status_all_deps_done_empty_unmet() {
 #[test]
 fn test_show_json_exposes_unmet_dependencies_objects() {
     let temp = JitCli::initialised().unwrap();
-    let done_dep = create_issue(&temp, "Done dep");
-    let open_dep = create_issue(&temp, "Open dep");
-    let main = create_issue(&temp, "Downstream");
-    jit_ok(&temp, &["dep", "add", &main, &done_dep]);
-    jit_ok(&temp, &["dep", "add", &main, &open_dep]);
-    jit_ok(&temp, &["issue", "update", &done_dep, "--state", "done"]);
+    let done_dep = temp
+        .create_issue(["--title", "Done dep", "--description", "Body"])
+        .unwrap();
+    let open_dep = temp
+        .create_issue(["--title", "Open dep", "--description", "Body"])
+        .unwrap();
+    let main = temp
+        .create_issue(["--title", "Downstream", "--description", "Body"])
+        .unwrap();
+    temp.run(["dep", "add", &main, &done_dep]).unwrap();
+    temp.run(["dep", "add", &main, &open_dep]).unwrap();
+    temp.run(["issue", "update", &done_dep, "--state", "done"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &main, "--json"]);
+    let out = temp
+        .run(["issue", "show", &main, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
 
     let unmet = json["unmet_dependencies"]
@@ -268,8 +308,13 @@ fn test_show_json_exposes_unmet_dependencies_objects() {
 #[test]
 fn test_show_json_unmet_dependencies_empty_array_when_none() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "Lonely");
-    let out = jit_ok(&temp, &["issue", "show", &id, "--json"]);
+    let id = temp
+        .create_issue(["--title", "Lonely", "--description", "Body"])
+        .unwrap();
+    let out = temp
+        .run(["issue", "show", &id, "--json"])
+        .unwrap()
+        .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     assert!(json["unmet_dependencies"].is_array());
     assert_eq!(json["unmet_dependencies"].as_array().unwrap().len(), 0);
@@ -281,7 +326,9 @@ fn test_show_json_unmet_dependencies_empty_array_when_none() {
 #[test]
 fn test_status_rejects_field_projection_flags() {
     let temp = JitCli::initialised().unwrap();
-    let id = create_issue(&temp, "X");
+    let id = temp
+        .create_issue(["--title", "X", "--description", "Body"])
+        .unwrap();
 
     for flag in [["--field", "state"], ["--fields", "state,title"]] {
         temp.command(["issue", "status", &id])
@@ -342,7 +389,9 @@ fn test_status_short_prefix_json_error_envelope() {
 #[test]
 fn test_status_multi_id_one_bad_fails_fast_json() {
     let temp = JitCli::initialised().unwrap();
-    let good = create_issue(&temp, "Good");
+    let good = temp
+        .create_issue(["--title", "Good", "--description", "Body"])
+        .unwrap();
 
     let assert = temp
         .command(["issue", "status", &good, "deadbeef", "--json"])
@@ -366,7 +415,9 @@ fn test_status_multi_id_one_bad_fails_fast_json() {
 #[test]
 fn test_status_multi_id_one_bad_fails_fast_text() {
     let temp = JitCli::initialised().unwrap();
-    let good = create_issue(&temp, "Good");
+    let good = temp
+        .create_issue(["--title", "Good", "--description", "Body"])
+        .unwrap();
     temp.command(["issue", "status", &good, "deadbeef"])
         .assert()
         .failure();

@@ -7,22 +7,18 @@
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 
-fn jit_ok(cli: &JitCli, args: &[&str]) -> Vec<u8> {
-    let output = cli.command(args).output().unwrap();
-    assert!(output.status.success(), "jit failed: {output:?}");
-    output.stdout
-}
-
 #[test]
 fn test_field_prints_scalar_as_plain_text() {
     let temp = JitCli::initialised().unwrap();
     let id = temp
         .create_issue(["--title", "Ready issue", "--description", "Body"])
         .unwrap();
-    jit_ok(&temp, &["issue", "update", &id, "--state", "ready"]);
+    temp.run(["issue", "update", &id, "--state", "ready"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "state"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "state"])
+        .unwrap();
     // Plain text, not JSON-quoted.
     assert_eq!(text.trim(), "ready", "got: {text:?}");
     assert!(
@@ -38,8 +34,9 @@ fn test_field_string_is_raw_not_quoted() {
         .create_issue(["--title", "My Title", "--description", "Body"])
         .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "title"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "title"])
+        .unwrap();
     assert_eq!(text.trim(), "My Title", "got: {text:?}");
 }
 
@@ -49,10 +46,12 @@ fn test_field_array_falls_back_to_compact_json() {
     let id = temp
         .create_issue(["--title", "Labeled", "--description", "Body"])
         .unwrap();
-    jit_ok(&temp, &["issue", "update", &id, "--label", "type:task"]);
+    temp.run(["issue", "update", &id, "--label", "type:task"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--field", "labels"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--field", "labels"])
+        .unwrap();
     let trimmed = text.trim();
     // Array field -> compact JSON array.
     assert!(
@@ -69,10 +68,12 @@ fn test_fields_prints_compact_json_object() {
     let id = temp
         .create_issue(["--title", "Both", "--description", "Body"])
         .unwrap();
-    jit_ok(&temp, &["issue", "update", &id, "--state", "ready"]);
+    temp.run(["issue", "update", &id, "--state", "ready"])
+        .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--fields", "state,title"]);
-    let text = String::from_utf8_lossy(&out);
+    let text = temp
+        .run(["issue", "show", &id, "--fields", "state,title"])
+        .unwrap();
     let trimmed = text.trim();
     // Compact (no spaces after separators), single object.
     assert_eq!(
@@ -91,8 +92,8 @@ fn test_two_ids_json_returns_envelope() {
         .create_issue(["--title", "Second", "--description", "Body"])
         .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &a, &b, "--json"]);
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let out = temp.run(["issue", "show", &a, &b, "--json"]).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
     let arr = json["issues"]
         .as_array()
@@ -111,8 +112,8 @@ fn test_single_id_json_stays_object() {
         .create_issue(["--title", "Solo", "--description", "Body"])
         .unwrap();
 
-    let out = jit_ok(&temp, &["issue", "show", &id, "--json"]);
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let out = temp.run(["issue", "show", &id, "--json"]).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert!(json.is_object(), "single-id --json must stay an object");
     assert_eq!(json["id"].as_str(), Some(id.as_str()));
 }
