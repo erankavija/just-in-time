@@ -241,7 +241,7 @@
           "key": "cli-config-spawn-migration",
           "title": "configuration and CLI-surface tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "eaf543c7-8947-4109-9f4f-f85ee2ece8d3",
@@ -249,7 +249,7 @@
           "key": "cli-gate-definition-spawn-migration",
           "title": "gate definition tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "blocked"
+          "status": "done"
         },
         {
           "id": "870e8e46-825b-4bab-a01a-f1cdea845fb5",
@@ -265,7 +265,7 @@
           "key": "cli-gate-status-spawn-migration",
           "title": "gate status and key tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "8e69776c-443e-4842-b818-c6af28fc73c9",
@@ -337,7 +337,7 @@
           "key": "cli-profile-spawn-migration",
           "title": "profile tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "33be0c83-6a02-411f-9565-d73ee99fedd1",
@@ -569,7 +569,7 @@
           "key": "cli-fixture-commit-binary-linked-checkout",
           "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
