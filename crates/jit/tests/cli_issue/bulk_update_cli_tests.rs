@@ -2,68 +2,15 @@
 //!
 //! Tests the `jit issue update` command with --filter flag for batch operations
 
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-
-    assert!(
-        output.status.success(),
-        "jit init failed:\nstdout: {}\nstderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    temp
-}
-
-fn create_issue(temp: &TempDir, title: &str, labels: &[&str]) -> String {
-    let jit = jit_binary();
-    let mut args = vec!["issue", "create", "-t", title];
-
-    for label in labels {
-        args.push("--label");
-        args.push(label);
-    }
-
-    let output = Command::new(jit)
-        .args(&args)
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success(), "Failed to create issue");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Extract ID from "Created issue: <ID>"
-    stdout
-        .lines()
-        .find(|l| l.contains("Created issue:"))
-        .and_then(|l| l.split_whitespace().last())
-        .unwrap()
-        .to_string()
-}
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_bulk_update_requires_id_or_filter() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // No ID and no --filter should fail
-    let output = Command::new(jit)
-        .args(["issue", "update", "--state", "done"])
-        .current_dir(temp.path())
+    let output = temp
+        .command(["issue", "update", "--state", "done"])
         .output()
         .unwrap();
 
@@ -77,14 +24,14 @@ fn test_bulk_update_requires_id_or_filter() {
 
 #[test]
 fn test_bulk_update_rejects_both_id_and_filter() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
-    create_issue(&temp, "Test", &["type:task"]);
+    temp.create_issue(["-t", "Test", "--label", "type:task"])
+        .unwrap();
 
     // Both ID and --filter should fail
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "abc123",
@@ -93,7 +40,6 @@ fn test_bulk_update_rejects_both_id_and_filter() {
             "--state",
             "done",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -108,17 +54,19 @@ fn test_bulk_update_rejects_both_id_and_filter() {
 
 #[test]
 fn test_bulk_update_add_labels() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create multiple issues with type:task
-    create_issue(&temp, "Task 1", &["type:task"]);
-    create_issue(&temp, "Task 2", &["type:task"]);
-    create_issue(&temp, "Epic 1", &["type:epic"]);
+    temp.create_issue(["-t", "Task 1", "--label", "type:task"])
+        .unwrap();
+    temp.create_issue(["-t", "Task 2", "--label", "type:task"])
+        .unwrap();
+    temp.create_issue(["-t", "Epic 1", "--label", "type:epic"])
+        .unwrap();
 
     // Add milestone label to all tasks
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -127,7 +75,6 @@ fn test_bulk_update_add_labels() {
             "milestone:v1.0",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -145,29 +92,28 @@ fn test_bulk_update_add_labels() {
 
 #[test]
 fn test_bulk_update_state_transition() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create ready issues
-    let id1 = create_issue(&temp, "Task 1", &["type:task"]);
-    let id2 = create_issue(&temp, "Task 2", &["type:task"]);
+    let id1 = temp
+        .create_issue(["-t", "Task 1", "--label", "type:task"])
+        .unwrap();
+    let id2 = temp
+        .create_issue(["-t", "Task 2", "--label", "type:task"])
+        .unwrap();
 
     // Transition to ready first
-    Command::new(jit)
-        .args(["issue", "update", &id1, "--state", "ready"])
-        .current_dir(temp.path())
+    temp.command(["issue", "update", &id1, "--state", "ready"])
         .output()
         .unwrap();
 
-    Command::new(jit)
-        .args(["issue", "update", &id2, "--state", "ready"])
-        .current_dir(temp.path())
+    temp.command(["issue", "update", &id2, "--state", "ready"])
         .output()
         .unwrap();
 
     // Bulk update to in_progress
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -176,7 +122,6 @@ fn test_bulk_update_state_transition() {
             "in_progress",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -189,16 +134,17 @@ fn test_bulk_update_state_transition() {
 
 #[test]
 fn test_bulk_update_assignee() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create unassigned issues
-    create_issue(&temp, "Task 1", &["type:task"]);
-    create_issue(&temp, "Task 2", &["type:task"]);
+    temp.create_issue(["-t", "Task 1", "--label", "type:task"])
+        .unwrap();
+    temp.create_issue(["-t", "Task 2", "--label", "type:task"])
+        .unwrap();
 
     // Assign all tasks
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -207,7 +153,6 @@ fn test_bulk_update_assignee() {
             "agent:worker-1",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -220,37 +165,34 @@ fn test_bulk_update_assignee() {
 
 #[test]
 fn test_bulk_update_validation_errors() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create an issue with gates
-    let id = create_issue(&temp, "Task with gates", &["type:task"]);
-
-    // Define a gate
-    Command::new(jit)
-        .args([
-            "gate",
-            "define",
-            "tests",
-            "--title",
-            "Run tests",
-            "--description",
-            "Test gate",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let id = temp
+        .create_issue(["-t", "Task with gates", "--label", "type:task"])
         .unwrap();
 
+    // Define a gate
+    temp.command([
+        "gate",
+        "define",
+        "tests",
+        "--title",
+        "Run tests",
+        "--description",
+        "Test gate",
+    ])
+    .output()
+    .unwrap();
+
     // Add gate to issue
-    Command::new(jit)
-        .args(["gate", "add", &id, "tests"])
-        .current_dir(temp.path())
+    temp.command(["gate", "add", &id, "tests"])
         .output()
         .unwrap();
 
     // Try to transition to done without passing gates
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -259,7 +201,6 @@ fn test_bulk_update_validation_errors() {
             "done",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -273,17 +214,33 @@ fn test_bulk_update_validation_errors() {
 
 #[test]
 fn test_bulk_update_complex_query() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create diverse issues
-    create_issue(&temp, "High priority task", &["type:task", "priority:high"]);
-    create_issue(&temp, "Normal priority task", &["type:task"]);
-    create_issue(&temp, "High priority epic", &["type:epic", "priority:high"]);
+    temp.create_issue([
+        "-t",
+        "High priority task",
+        "--label",
+        "type:task",
+        "--label",
+        "priority:high",
+    ])
+    .unwrap();
+    temp.create_issue(["-t", "Normal priority task", "--label", "type:task"])
+        .unwrap();
+    temp.create_issue([
+        "-t",
+        "High priority epic",
+        "--label",
+        "type:epic",
+        "--label",
+        "priority:high",
+    ])
+    .unwrap();
 
     // Update only high-priority tasks using AND query
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -292,7 +249,6 @@ fn test_bulk_update_complex_query() {
             "milestone:v1.0",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -307,16 +263,31 @@ fn test_bulk_update_complex_query() {
 
 #[test]
 fn test_bulk_update_remove_labels() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
     // Create issues with old label
-    create_issue(&temp, "Task 1", &["type:task", "milestone:v0.9"]);
-    create_issue(&temp, "Task 2", &["type:task", "milestone:v0.9"]);
+    temp.create_issue([
+        "-t",
+        "Task 1",
+        "--label",
+        "type:task",
+        "--label",
+        "milestone:v0.9",
+    ])
+    .unwrap();
+    temp.create_issue([
+        "-t",
+        "Task 2",
+        "--label",
+        "type:task",
+        "--label",
+        "milestone:v0.9",
+    ])
+    .unwrap();
 
     // Remove old milestone label
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -325,7 +296,6 @@ fn test_bulk_update_remove_labels() {
             "milestone:v0.9",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -338,14 +308,14 @@ fn test_bulk_update_remove_labels() {
 
 #[test]
 fn test_bulk_update_no_matches() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
 
-    create_issue(&temp, "Task 1", &["type:task"]);
+    temp.create_issue(["-t", "Task 1", "--label", "type:task"])
+        .unwrap();
 
     // Filter that matches nothing
-    let output = Command::new(jit)
-        .args([
+    let output = temp
+        .command([
             "issue",
             "update",
             "--filter",
@@ -354,7 +324,6 @@ fn test_bulk_update_no_matches() {
             "done",
             "--json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -368,12 +337,11 @@ fn test_bulk_update_no_matches() {
 
 #[test]
 fn test_bulk_update_invalid_non_ascii_filter_errors_without_panic() {
-    let temp = setup_test_repo();
+    let temp = JitCli::initialised().unwrap();
 
     for filter in ["ä:x", "label:ä state:", "é"] {
-        let output = Command::new(jit_binary())
-            .args(["issue", "update", "--filter", filter, "--priority", "low"])
-            .current_dir(temp.path())
+        let output = temp
+            .command(["issue", "update", "--filter", filter, "--priority", "low"])
             .output()
             .unwrap();
 
