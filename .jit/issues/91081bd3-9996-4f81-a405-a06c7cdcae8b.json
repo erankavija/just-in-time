@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ca7ac3f4-ceb5-455e-8c48-22b485916c7c",
+      "run_id": "4db7e680-e084-4fcc-ae3b-dc13e6946e4b",
       "status": "passed",
-      "updated_at": "2026-10-25T16:33:38.668614724Z",
+      "updated_at": "2026-10-26T22:03:48.367521246Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -47,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The CLI resolves each issue-id argument once at entry",
-  "updated_at": "2026-10-26T22:00:39.652804676Z"
+  "updated_at": "2026-10-26T22:03:48.367521246Z"
 }
