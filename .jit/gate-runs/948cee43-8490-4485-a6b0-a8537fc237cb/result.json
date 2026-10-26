@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd77e353920c9459393db00ef5585ec0afdd806b",
+  "completed_at": "2026-10-26T23:41:29.132455603Z",
+  "duration_ms": 222761,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/recover_command_tests.rs",
+        "id": "F1",
+        "line": 10,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "Recovery tests retain duplicated direct Git repository setup outside the shared JitCli fixture."
+      }
+    ],
+    "summary": "One hard shared-fixture migration criterion remains unmet by duplicated recovery-test Git setup.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "948cee43-8490-4485-a6b0-a8537fc237cb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:37:46.371132654Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5511 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a93-c32d-7c81-935e-7ddf5cddd998\n--------\nuser\n--- 5498 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fd77e3539 (merge; no scoped delta against second parent), 66af637ba\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/issue/c780514e/requirement/REQ-09 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/convention-convergence (.jit/invariants.toml)\nGate evidence: cargo-ci: passed, exit code none, 2026-10-26T23:37:29Z (reused)\nTruncation recovery: per-file patch reads for all three changed files; narrowed fixture, policy, and scoped-residual searches\n\n1. **[blocking, issue-impact]** `crates/jit/tests/cli_issue/recover_command_tests.rs:10` retains duplicated repository setup outside `JitCli`: four tests write a README and directly invoke `git add`/`git commit` (for example lines 13–23, repeated at 33–43, 86–96, 121–131, and 177–187). This leaves repository setup in the migrated file rather than the shared fixture, so hard REQ-01/REQ-05 is not met and the shared-fixture convention remains duplicated. References: `@/issue/c780514e/requirement/REQ-05`, `@/invariant/shared-test-contracts`, `@/invariant/convention-convergence`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One hard shared-fixture migration criterion remains unmet by duplicated recovery-test Git setup.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recovery tests retain duplicated direct Git repository setup outside the shared JitCli fixture.\",\"file\":\"crates/jit/tests/cli_issue/recover_command_tests.rs\",\"line\":10,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

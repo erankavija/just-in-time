@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-26T23:37:29.731900920Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "948cee43-8490-4485-a6b0-a8537fc237cb",
+      "status": "failed",
+      "updated_at": "2026-10-26T23:41:29.390671810Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
@@ -36,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "output-mode and export tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-26T23:37:29.731900920Z"
+  "updated_at": "2026-10-26T23:41:29.390671810Z"
 }
