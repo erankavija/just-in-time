@@ -1690,7 +1690,7 @@ fn schema_source_from_bytes(
 mod tests {
     use super::*;
     use crate::domain::{Issue, State};
-    use crate::test_utils::document_reference;
+    use crate::test_utils::{document_reference, fixture_issue};
 
     fn parse(content: &str) -> Result<RuleSet, RuleConfigError> {
         RuleSet::parse(content, None, [])
@@ -1701,7 +1701,7 @@ mod tests {
     }
 
     fn issue_with(labels: &[&str], state: State) -> Issue {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = fixture_issue("t".to_string(), String::new());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
         issue
