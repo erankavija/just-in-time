@@ -27,9 +27,6 @@ pub const GATES_LOCK_FILE: &str = ".gates.lock";
 /// The data root's event-log lock.
 pub const EVENTS_LOCK_FILE: &str = ".events.lock";
 
-/// The data root's machine-local worktree identity record.
-pub const WORKTREE_IDENTITY_FILE: &str = "worktree.json";
-
 /// Whether `path` names the worktree bootstrap lock, or something below it.
 ///
 /// No mutation may target it. Publication writes a file by staging it and
@@ -258,6 +255,11 @@ mod identity {
             &self.relative
         }
 
+        /// Final path component, when this identity is below its selected root.
+        pub fn file_name(&self) -> Option<&str> {
+            self.relative().as_path().file_name()?.to_str()
+        }
+
         /// The data root's scratch directory is the one namespace no semantic
         /// identity may name: what sits there is engine state mid-publication,
         /// which no repository path addresses. The worktree has no such
@@ -329,6 +331,14 @@ mod identity {
         INVARIANTS: Data = "invariants.toml";
         /// Append-only event log under the data root (`.jit/events.jsonl`).
         EVENTS: Data = "events.jsonl";
+        /// Machine-local worktree identity record under the data root.
+        WORKTREE_IDENTITY: Data = "worktree.json";
+        /// Server process record under the data root.
+        SERVER_PID: Data = "server.pid.json";
+        /// Server output log under the data root.
+        SERVER_LOG: Data = "server.log";
+        /// Applied-profile state directory under the data root (`.jit/profiles`).
+        PROFILES: Data = "profiles";
         /// Per-issue record directory under the data root (`.jit/issues`).
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
@@ -355,6 +365,19 @@ impl VirtualPath {
     /// records, and the index listing the issues.
     pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
 
+    /// Whether profile application must refuse this target as application-owned state.
+    pub(crate) fn is_reserved_application_target(&self) -> bool {
+        self == &Self::EVENTS
+            || (self.root_class() == RepositoryRootClass::Data
+                && Self::PROFILES.relative().contains(self.relative().as_str()))
+            || (self.root_class() == RepositoryRootClass::Worktree
+                && self
+                    .relative()
+                    .as_str()
+                    .split('/')
+                    .any(|component| component == ".git"))
+    }
+
     /// Construct a worktree-relative semantic identity.
     pub fn worktree(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
         Self::from_parts(
@@ -366,6 +389,37 @@ impl VirtualPath {
     /// Construct a data-root-relative semantic identity.
     pub fn data(path: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
         Self::from_parts(RepositoryRootClass::Data, RootRelativePath::parse(path)?)
+    }
+
+    /// Construct a schema file path from one validated file-name component.
+    pub fn schema(name: impl AsRef<Path>) -> Result<Self, RepositoryLayoutError> {
+        let name = name.as_ref();
+        let parsed = RootRelativePath::parse(name)?;
+        if parsed.depth() != 1 {
+            return Err(RepositoryLayoutError::LexicalEscape(
+                name.to_string_lossy().into_owned(),
+            ));
+        }
+        Self::from_parts(
+            RepositoryRootClass::Data,
+            Self::SCHEMAS.relative().clone().join(parsed.as_str()),
+        )
+    }
+
+    /// Parse a rule schema reference into its validated data-root path.
+    pub fn schema_reference(reference: &str) -> Result<Self, RepositoryLayoutError> {
+        let reference_path = RootRelativePath::parse(reference)?;
+        let Some(name) = reference_path
+            .as_str()
+            .strip_prefix(Self::SCHEMAS.relative().as_str())
+            .and_then(|suffix| suffix.strip_prefix('/'))
+        else {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        };
+        if !name.ends_with(".json") {
+            return Err(RepositoryLayoutError::LexicalEscape(reference.to_owned()));
+        }
+        Self::schema(name)
     }
 
     /// Construct a virtual identity from an explicit selected-root class.
@@ -538,6 +592,7 @@ impl RepositoryLayout {
     /// the data root is not in the set, so its edits reach a digest.
     pub(crate) fn tracker_written_paths(&self) -> Vec<RootRelativePath> {
         let records = VirtualPath::RECORDS;
+        let worktree_identity = VirtualPath::WORKTREE_IDENTITY;
         let data_entries = records
             .iter()
             .map(|record| record.relative().as_str())
@@ -547,7 +602,7 @@ impl RepositoryLayout {
                 GATES_LOCK_FILE,
                 EVENTS_LOCK_FILE,
                 RECORD_SCRATCH_DIR,
-                WORKTREE_IDENTITY_FILE,
+                worktree_identity.relative().as_str(),
             ]);
         std::iter::once(RootRelativePath::Descendant(Cow::Borrowed(
             BOOTSTRAP_LOCK_FILE,
@@ -943,6 +998,63 @@ mod tests {
     }
 
     #[test]
+    fn test_schema_path_constructor_validates_one_file_name_component() {
+        let path = VirtualPath::schema("body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in ["", "..", "a/b", "a\\b", "/absolute.json"] {
+            assert!(VirtualPath::schema(invalid).is_err(), "{invalid:?}");
+        }
+    }
+
+    #[test]
+    fn test_schema_reference_constructor_validates_rule_reference() {
+        let path = VirtualPath::schema_reference("schemas/body.json").unwrap();
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(path.relative().as_str(), "schemas/body.json");
+
+        for invalid in [
+            "body.json",
+            "schemas/nested/body.json",
+            "schemas//body.json",
+            "schemas/../body.json",
+            "/schemas/body.json",
+        ] {
+            assert!(
+                VirtualPath::schema_reference(invalid).is_err(),
+                "{invalid:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_virtual_path_reserved_application_target_matches_owned_paths_by_component() {
+        let reserved = [
+            VirtualPath::data("events.jsonl").unwrap(),
+            VirtualPath::data("profiles").unwrap(),
+            VirtualPath::data("profiles/installed/package.json").unwrap(),
+            VirtualPath::worktree(".git").unwrap(),
+            VirtualPath::worktree("vendor/.git/config").unwrap(),
+        ];
+        assert!(reserved
+            .iter()
+            .all(VirtualPath::is_reserved_application_target));
+
+        let ordinary = [
+            VirtualPath::data("events.jsonl.old").unwrap(),
+            VirtualPath::data("profiles-old/package.json").unwrap(),
+            VirtualPath::data("events.jsonl/child").unwrap(),
+            VirtualPath::worktree(".gitignore").unwrap(),
+            VirtualPath::worktree("vendor/git/config").unwrap(),
+            VirtualPath::data(".git/config").unwrap(),
+        ];
+        assert!(ordinary
+            .iter()
+            .all(|path| !path.is_reserved_application_target()));
+    }
+
+    #[test]
     fn test_virtual_path_serde_rejects_the_reserved_namespace() {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
         let encoded = serde_json::json!({
@@ -1043,6 +1155,16 @@ mod tests {
             VirtualPath::ALL_KNOWN.len(),
             "the well-known declaration names one repository path twice"
         );
+    }
+
+    #[test]
+    fn test_virtual_path_file_name_returns_the_final_component() {
+        assert_eq!(VirtualPath::SERVER_LOG.file_name(), Some("server.log"));
+        assert_eq!(
+            VirtualPath::data("nested/file").unwrap().file_name(),
+            Some("file")
+        );
+        assert_eq!(VirtualPath::worktree("").unwrap().file_name(), None);
     }
 
     #[test]

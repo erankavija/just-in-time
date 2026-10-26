@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:05:17.798065835Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Decode validation strictness into its enum once, so configuration access no longer re-parses it.\n\n## Background\n\n`ValidationConfig.strictness` is `Option<String>` (`crates/jit/src/config.rs:267`). `deserialize_strictness` (`config.rs:233-243`) parses it and keeps the raw string, and `ValidationConfig::strictness()` (`:302`) parses again. `Strictness` has no serde, a hand-written `token` (`validation/strictness.rs:68-74`) and a case-insensitive `FromStr` (`:92-106`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Strictness` is declared through the macro, and `ValidationConfig.strictness` is `Option<Strictness>` decoded by serde.\n- [hard] REQ-02: `deserialize_strictness`, `Strictness::token` and the re-parse in `strictness()` are gone.\n- [hard] REQ-03: An unknown or differently cased strictness fails configuration loading with an error naming the key.\n- [hard] REQ-04: Configuration lookup reports the canonical token.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:22:44.674914167Z",
+  "first_ready_at": "2026-10-24T23:55:25.796628409Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d7ba27cd-52d9-4417-9718-5b38b99d06e7",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:22:37.810872770Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "975e811f-c7ec-4afa-bfe1-99cebfa73c86",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:20:21.315973002Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "96bb0941-07f3-4f55-bd69-93ad587c5540",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Validation strictness is typed at load",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:22:44.674914167Z"
 }

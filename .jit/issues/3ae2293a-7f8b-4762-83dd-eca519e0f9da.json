@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:57:16.279629442Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare gate stage and gate mode through the vocabulary macro.\n\n## Background\n\n`GateStage` and `GateMode` (`crates/jit/src/declarations/gates.rs:31-90`) hand-write `as_str` and `FromStr` beside their serde forms.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateStage` and `GateMode` are declared through the macro, and their hand-written `as_str` and `FromStr` are gone.\n- [hard] REQ-02: Gate registry files load and serialize byte-identically.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:39:10.294022085Z",
+  "first_ready_at": "2026-10-24T23:55:25.271231512Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cbda5a73-e357-4354-834a-dabed8bf0808",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:35:55.384546166Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "06e25a27-341a-454f-8f96-02036fdeed12",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:26:14.375616280Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate stage and mode tokens come from one declaration",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T00:39:10.294022085Z"
 }

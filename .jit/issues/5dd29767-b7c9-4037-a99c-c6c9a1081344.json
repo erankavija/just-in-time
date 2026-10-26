@@ -9,6 +9,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: well-known files, schema paths and reserved targets go through VirtualPath, and ProfileId lives in the domain.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Well-known `.jit` files and schema paths come only from `VirtualPath` constants and constructors.\n- [hard] REQ-02: Reserved application targets are recognised by one `VirtualPath` predicate after classification.\n- [hard] REQ-03: `ProfileId` is a domain type, and profile dependency resolution compares `ProfileId` values.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T10:59:43.340186138Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Repository paths and profile identity are typed",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T10:59:43.340186138Z"
 }

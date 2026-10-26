@@ -519,9 +519,8 @@ impl RedundantDependencyError {
 /// the transitive-reduction check) both run for every edge first. If any edge
 /// fails either check, this error is returned and NONE of the batch's edges
 /// are applied and no event is logged for any of them (jit:c8518f2a, REQ-01).
-/// Every rejected edge is named, not only the first (REQ-02). Too-short
-/// prefixes are refused before any issue record is read, so a batch carrying
-/// one names only its too-short ids.
+/// Every rejected edge is named, not only the first (REQ-02). The CLI raises
+/// it too, naming every target it cannot resolve before calling the executor.
 ///
 /// Each rejected edge keeps its own originating typed error so a caller (the
 /// CLI) can still classify it individually — by downcast, never by message
@@ -742,7 +741,7 @@ impl TransitionBlockedError {
     }
 
     pub(crate) fn summary(&self) -> String {
-        let requested = state_name(self.requested_state);
+        let requested = self.requested_state.as_str();
         if let Some(TransitionBlocker::ArchivedRevive { origin }) = self
             .blockers
             .iter()
@@ -752,7 +751,7 @@ impl TransitionBlockedError {
                 "Cannot revive archived issue to '{}': an archived issue only revives to its \
                  pre-archive state '{}'",
                 requested,
-                state_name(*origin)
+                origin.as_str()
             )
         } else if self
             .blockers
@@ -795,7 +794,7 @@ impl TransitionBlockedError {
                 format!(
                     "jit issue update {} --state {}  # revive restores the pre-archive state",
                     self.issue_id,
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
             _ => format!("jit graph deps {}", self.issue_id),
@@ -853,7 +852,7 @@ impl TransitionBlockedError {
                     vec![format!(
                         "jit issue update {} --state {}  # the only legal revive target",
                         self.issue_id,
-                        state_name(*origin)
+                        origin.as_str()
                     )]
                 }
             }))
@@ -931,20 +930,14 @@ impl fmt::Display for TransitionBlocker {
                 issue_id,
                 title,
                 state,
-            } => write!(
-                f,
-                "{} {} [{}]",
-                short_id(issue_id),
-                title,
-                state_name(*state)
-            ),
+            } => write!(f, "{} {} [{}]", short_id(issue_id), title, state.as_str()),
             Self::MissingDependency { issue_id } => {
                 write!(f, "{} (missing issue) [missing]", short_id(issue_id))
             }
             Self::Gate {
                 gate_key, status, ..
             } => {
-                write!(f, "{} [{}]", gate_key, gate_status_name(*status))
+                write!(f, "{} [{}]", gate_key, status)
             }
             Self::GraphRule { rule, message } => {
                 write!(f, "[{}] {}", rule, message)
@@ -953,30 +946,10 @@ impl fmt::Display for TransitionBlocker {
                 write!(
                     f,
                     "archived issue only revives to its pre-archive state [{}]",
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
         }
-    }
-}
-
-pub(crate) fn state_name(state: State) -> &'static str {
-    match state {
-        State::Backlog => "backlog",
-        State::Ready => "ready",
-        State::InProgress => "in_progress",
-        State::Gated => "gated",
-        State::Done => "done",
-        State::Rejected => "rejected",
-        State::Archived => "archived",
-    }
-}
-
-pub(crate) fn gate_status_name(status: GateStatus) -> &'static str {
-    match status {
-        GateStatus::Pending => "pending",
-        GateStatus::Passed => "passed",
-        GateStatus::Failed => "failed",
     }
 }
 

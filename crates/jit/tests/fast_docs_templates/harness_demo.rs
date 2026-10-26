@@ -338,7 +338,7 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec!["[hard]".to_string()]),
             link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(jit::config::KindScopeConfig::Issue),
+            scope: Some(jit::domain::item::KindScope::Issue),
             source: None,
             source_of_truth: Some(jit::config::SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -398,7 +398,7 @@ fn test_harness_container_progress_and_children() {
     for child in [&done, &wip, &rejected, &ready] {
         h.executor.add_dependency(&epic, child).unwrap();
     }
-    let set_state = |id: &str, state: State| {
+    let set_state = |id: &jit::domain::identity::IssueId, state: State| {
         h.executor
             .issues()
             .update_issue(
@@ -430,7 +430,7 @@ fn test_harness_container_progress_and_children() {
     assert_eq!(rollup.extras.open, 2); // in_progress + ready
     assert_eq!(rollup.extras.percent, 25);
     // Every state present, zero-count states included.
-    assert_eq!(rollup.items.len(), State::all().len());
+    assert_eq!(rollup.items.len(), State::ALL.len());
     let bucket = |s: State| rollup.items.iter().find(|c| c.state == s).unwrap().count;
     assert_eq!(bucket(State::Done), 1);
     assert_eq!(bucket(State::Gated), 0);
@@ -475,7 +475,7 @@ fn test_harness_empty_container_rollup() {
     let rollup = StateRollup::from_issues(&[]);
     assert_eq!(rollup.extras.total, 0);
     assert_eq!(rollup.extras.percent, 0);
-    assert_eq!(rollup.items.len(), State::all().len());
+    assert_eq!(rollup.items.len(), State::ALL.len());
     assert!(rollup.items.iter().all(|c| c.count == 0));
 }
 
@@ -491,8 +491,14 @@ fn test_harness_archive_candidates_are_complete_and_non_mutating() {
         "{}/archive",
         h.storage.root().file_name().unwrap().to_string_lossy()
     );
+    let config_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
     std::fs::write(
-        h.storage.root().join("config.toml"),
+        config_path,
         format!(
             "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{archive_root}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
         ),

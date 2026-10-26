@@ -96,8 +96,13 @@ const DOCUMENT_AREA: &str = "workspace/notes";
 fn declare_document_area(h: &TestHarness) {
     let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
     h.storage.add_data_file("config.toml", &config);
-    std::fs::create_dir_all(h.storage.root()).unwrap();
-    std::fs::write(h.storage.root().join("config.toml"), &config).unwrap();
+    let config_path = h
+        .storage
+        .repository_layout()
+        .resolve(&jit::repository_state::VirtualPath::CONFIG)
+        .unwrap();
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(config_path, &config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -951,7 +956,15 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
+    std::fs::write(
+        temp.path().join(
+            jit::repository_state::VirtualPath::CONFIG
+                .relative()
+                .as_path(),
+        ),
+        "",
+    )
+    .unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
             .unwrap();
@@ -1405,27 +1418,6 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
 }
 
 #[test]
-fn test_apply_rejects_unknown_transform_kind_and_creates_nothing() {
-    let h = TestHarness::new();
-    // The registry loader rejects an unsupported transform kind, so a template
-    // reaching the engine can only carry one by being hand-built. Expansion is the
-    // engine's defensive gate for that case, and it runs BEFORE any mutation.
-    let mut template = plan_template();
-    template.transforms[0].kind = "teleport".to_string();
-    let epic = create_epic(&h, "Weird epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("teleport"), "{err}");
-    // The unknown kind is caught during expansion, before any mutation:
-    // ZERO new issues (and thus zero edges) were created.
-    assert_eq!(h.all_issues().len(), before);
-}
-
-#[test]
 fn test_template_registry_rejects_unknown_transform_kind_at_load() {
     // The kind is a static config error: `jit` fails at registry load, naming the
     // template and the offending kind, so `jit apply` never sees it.
@@ -1579,8 +1571,8 @@ fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() 
     for demoted in [&container_id, &breakdown_id] {
         assert!(
             events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+                event.body(),
+                jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                     if issue_id == demoted
                         && *from == jit::domain::State::Ready
                         && *to == jit::domain::State::Backlog
@@ -1610,8 +1602,8 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
     for dependent in [&container_id, &breakdown_id] {
         assert!(
             events.iter().any(|event| matches!(
-                event,
-                jit::domain::Event::IssueUpdated { issue_id, updated_by, .. }
+                event.body(),
+                jit::domain::EventBody::IssueUpdated { issue_id, updated_by, .. }
                     if issue_id == dependent && updated_by == "dependency-add"
             )),
             "no dependency-add event recorded for the dependent {dependent}"

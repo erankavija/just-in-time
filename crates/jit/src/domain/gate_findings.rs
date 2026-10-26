@@ -33,6 +33,7 @@
 //! working unchanged. Missing optional fields inside a well-formed block default
 //! to empty strings rather than rejecting the whole block.
 
+use crate::domain::vocabulary::wire_vocabulary;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +41,40 @@ use serde::{Deserialize, Serialize};
 const FINDINGS_BEGIN: &str = "<<<JIT-FINDINGS-JSON";
 /// Line-exact marker that closes the machine-readable findings block.
 const FINDINGS_END: &str = "JIT-FINDINGS-JSON>>>";
+
+wire_vocabulary! {
+    /// Severity of a finding the engine emits itself. External checkers stay
+    /// open on the wire and may use other labels.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FindingSeverity {
+        /// Violates an error-level rule or a pre-existing hazard.
+        High = "high",
+        /// Warning-level rule finding.
+        Low = "low",
+    }
+}
+
+wire_vocabulary! {
+    /// Whether an engine-emitted finding affects the verdict.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FindingDisposition {
+        /// Fails the gate.
+        Blocking = "blocking",
+        /// Reported without failing the gate.
+        Advisory = "advisory",
+    }
+}
+
+wire_vocabulary! {
+    /// How an engine-emitted finding relates to the reviewed work.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FindingOrigin {
+        /// Caused by the issue's own changes.
+        IssueImpact = "issue-impact",
+        /// Present before the issue's work.
+        PreExisting = "pre-existing",
+    }
+}
 
 /// One structured finding emitted by a gate checker.
 ///
@@ -75,6 +110,33 @@ pub struct GateFinding {
     /// Opaque policy or evidence references supplied by the checker.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub references: Vec<String>,
+}
+
+impl GateFinding {
+    /// Build a finding the engine emits, spelling the closed enums as wire strings.
+    pub fn builtin(
+        id: impl Into<String>,
+        severity: FindingSeverity,
+        disposition: FindingDisposition,
+        origin: FindingOrigin,
+        summary: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            severity: severity.to_string(),
+            disposition: Some(disposition.to_string()),
+            origin: Some(origin.to_string()),
+            summary: summary.into(),
+            file: None,
+            line: None,
+            references: Vec::new(),
+        }
+    }
+
+    /// Whether the finding carries the engine's blocking disposition.
+    pub fn is_blocking(&self) -> bool {
+        self.disposition.as_deref() == Some(FindingDisposition::Blocking.as_str())
+    }
 }
 
 /// Structured result parsed from a checker's machine-readable findings block.
@@ -140,6 +202,25 @@ mod tests {
 
     fn block(json: &str) -> String {
         format!("{FINDINGS_BEGIN}\n{json}\n{FINDINGS_END}\n")
+    }
+
+    #[test]
+    fn test_gate_finding_builtin_round_trips_with_checker_defined_label() {
+        let builtin = GateFinding::builtin(
+            "F1",
+            FindingSeverity::High,
+            FindingDisposition::Blocking,
+            FindingOrigin::IssueImpact,
+            "s",
+        );
+        assert!(builtin.is_blocking());
+        let wire = serde_json::to_string(&builtin).unwrap();
+        assert_eq!(serde_json::from_str::<GateFinding>(&wire).unwrap(), builtin);
+
+        let external: GateFinding =
+            serde_json::from_str(r#"{"severity":"medium","disposition":"blocker"}"#).unwrap();
+        assert_eq!(external.severity, "medium");
+        assert!(!external.is_blocking());
     }
 
     #[test]

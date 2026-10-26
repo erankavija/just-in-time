@@ -15,7 +15,6 @@ use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, State};
 use crate::graph::hierarchy::resolve_hierarchy;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
 
 /// One explicit-root inventory target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,30 +109,18 @@ impl ExplicitRootInventory {
 }
 
 /// Failures in deterministic inventory construction itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum InventoryError {
     /// The supplied full container id is absent from the repository-wide input.
+    #[error("container not found: {0}")]
     ContainerNotFound(String),
     /// Captured evidence claimed success with a working-tree or malformed version.
+    #[error("pinned evidence contains a non-pinned version for {revision} at {path}")]
     NonPinnedResolution { revision: String, path: String },
     /// The produced entry violated the artifact-plan model.
+    #[error("{0}")]
     InvalidPlanEntry(PlanError),
 }
-
-impl fmt::Display for InventoryError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ContainerNotFound(id) => write!(formatter, "container not found: {id}"),
-            Self::NonPinnedResolution { revision, path } => write!(
-                formatter,
-                "pinned evidence contains a non-pinned version for {revision} at {path}"
-            ),
-            Self::InvalidPlanEntry(error) => error.fmt(formatter),
-        }
-    }
-}
-
-impl std::error::Error for InventoryError {}
 
 impl From<PlanError> for InventoryError {
     fn from(error: PlanError) -> Self {

@@ -10,11 +10,11 @@ use crate::domain::{GateRunResult, GateRunStatus};
 /// without disagreeing with the persisted `gates_status` value.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that failed.
     pub gate_key: String,
     /// Raw checker status.
@@ -37,7 +37,7 @@ pub struct GatePassFailed {
 #[error("Gate '{gate_key}' is not required for issue {issue_id}")]
 pub struct GateNotRequiredError {
     /// Issue that was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that is not in the issue's required set.
     pub gate_key: String,
 }
@@ -58,7 +58,7 @@ pub struct GateNotRequiredError {
 )]
 pub struct ManualGateAttestationRequiredError {
     /// Issue whose gate was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Manual gate key that was targeted without `--by`.
     pub gate_key: String,
 }
@@ -99,7 +99,7 @@ pub struct PassAllOutcome {
 /// The outcome of evaluating one gate across several issues.
 pub struct GateEvaluateManyEntry {
     /// Issue identifier as supplied to the command.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The per-issue gate result, or the error that prevented a verdict.
     pub result: Result<GatePassOutcome>,
 }
@@ -223,7 +223,7 @@ enum CapturedGateRegistryOutcome {
 
 struct DerivedGateRegistryMutation {
     registry: crate::declarations::GateRegistry,
-    event: Event,
+    event: EventBody,
     outcome: CapturedGateRegistryOutcome,
 }
 
@@ -319,9 +319,10 @@ fn capture_gate_preset_image(
             .collect::<Result<Vec<_>>>()?;
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
-            let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
+            let rules_text =
+                super::image_virtual_bytes(image, &crate::repository_state::VirtualPath::RULES)?
+                    .map(String::from_utf8)
+                    .transpose()?;
             render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
         } else {
             Vec::new()
@@ -377,7 +378,7 @@ fn captured_gate_registry(
 
 fn captured_gate_preset_issue(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
@@ -387,11 +388,11 @@ fn captured_gate_preset_issue(
                 .with_context(|| format!("failed to parse captured issue {issue_id}"))?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(issue_id).into())
+            return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };
-    if issue.id != issue_id {
+    if &issue.id != issue_id {
         return Err(anyhow!(
             "captured issue identity mismatch: requested {issue_id}, found {}",
             issue.id
@@ -445,9 +446,9 @@ fn derive_gate_preset_application(
             intents.push(MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(if existed {
-                    Event::draft_gate_definition_updated(gate.key)
+                    EventBody::draft_gate_definition_updated(gate.key)
                 } else {
-                    Event::draft_gate_definition_created(gate.key)
+                    EventBody::draft_gate_definition_created(gate.key)
                 }),
             });
         }
@@ -639,7 +640,7 @@ fn derive_gate_registry_mutation(
                 .gates
                 .insert(definition.key.clone(), definition.clone());
             (
-                Event::draft_gate_definition_created(definition.key.clone()),
+                EventBody::draft_gate_definition_created(definition.key.clone()),
                 CapturedGateRegistryOutcome::Defined,
             )
         }
@@ -652,7 +653,7 @@ fn derive_gate_registry_mutation(
             let updated = updated_gate_definition(current, update.clone())?;
             registry.gates.insert(key.clone(), updated.clone());
             (
-                Event::draft_gate_definition_updated(key.clone()),
+                EventBody::draft_gate_definition_updated(key.clone()),
                 CapturedGateRegistryOutcome::Updated(Box::new(updated)),
             )
         }
@@ -661,7 +662,7 @@ fn derive_gate_registry_mutation(
                 return Err(crate::storage::GateNotFoundError::by_key(key).into());
             }
             (
-                Event::draft_gate_definition_removed(key.clone()),
+                EventBody::draft_gate_definition_removed(key.clone()),
                 CapturedGateRegistryOutcome::Removed,
             )
         }
@@ -682,7 +683,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Add a single gate to an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>>
+    pub fn add_gate(&self, issue_id: &IssueId, gate_key: String) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -695,7 +696,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn add_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_keys: &[String],
     ) -> Result<(GateAddResult, Vec<String>)>
     where
@@ -706,9 +707,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -741,7 +740,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn remove_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_keys: &[String],
     ) -> Result<(GateRemoveResult, Vec<String>)>
     where
@@ -752,9 +751,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -785,7 +782,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings).
     pub fn pass_gate(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: String,
         by: Option<String>,
         force: bool,
@@ -798,9 +795,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -889,16 +884,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// with an empty result set.
     pub fn pass_all_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         by: Option<String>,
         force: bool,
     ) -> Result<PassAllOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
 
         // Fail-fast: pass each required gate in order, stopping at the first that
@@ -927,7 +920,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// prevent later issue identifiers from being evaluated.
     pub fn pass_gate_many(
         &self,
-        issue_ids: &[String],
+        issue_ids: &[IssueId],
         gate_key: &str,
         by: Option<String>,
         force: bool,
@@ -951,7 +944,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns warnings (e.g., lease warnings) if any.
     pub fn fail_gate(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: String,
         by: Option<String>,
     ) -> Result<Vec<String>>
@@ -963,9 +956,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -1046,9 +1037,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let spec = CaptureSpec::new(registries()?, budget)?;
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
-                    let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
-                        .map(String::from_utf8)
-                        .transpose()?;
+                    let rules_text = super::image_virtual_bytes(
+                        image,
+                        &crate::repository_state::VirtualPath::RULES,
+                    )?
+                    .map(String::from_utf8)
+                    .transpose()?;
                     Ok(spec.discover_paths(render_capture_closure(
                         image.layout(),
                         &config,
@@ -1255,7 +1249,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn apply_gate_preset(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         preset_name: &str,
         timeout_override: Option<u64>,
         skip_precheck: bool,
@@ -1267,7 +1261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
-        let issue_id = &IssueIdPrefix::parse(issue_id)?;
+        let issue_id = &issue_id.clone();
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
@@ -1290,7 +1284,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let target = super::resolve_issue_from_capture(&issues, issue_id)?;
+            let target = super::require_issue_in_capture(&issues, issue_id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let mode = config.enforcement_mode();
             if target != expected_target || mode != expected_mode {
@@ -1299,7 +1293,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             let warnings = super::captured_lease_warnings(
                 mode,
                 std::slice::from_ref(&target),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let preset = parse_captured_gate_presets(&image)?
@@ -1340,12 +1333,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Results are sorted newest-first by `started_at`.
     pub fn list_gate_runs(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key_filter: Option<&str>,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        let full_id = issue_id.clone();
         let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
 
         if let Some(key) = gate_key_filter {
@@ -1364,7 +1355,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn create_gate_preset(
         &self,
         preset_name: &str,
-        from_issue_id: &str,
+        from_issue_id: &IssueId,
     ) -> Result<std::path::PathBuf>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1373,7 +1364,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        let from_issue_id = &IssueIdPrefix::parse(from_issue_id)?;
+        let from_issue_id = &from_issue_id.clone();
 
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
@@ -1382,7 +1373,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(SessionStep::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
+            let full_id = super::require_issue_in_capture(&issues, from_issue_id)?;
             let presets_dir = crate::repository_state::VirtualPath::GATE_PRESETS;
             let target = crate::repository_state::VirtualPath::data(format!(
                 "{}/{preset_name}.json",
@@ -1440,6 +1431,7 @@ mod tests {
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
 
@@ -1877,8 +1869,8 @@ enforce_leases = "off"
                 .unwrap()
                 .iter()
                 .any(|event| matches!(
-                    event,
-                    Event::GatePassed { gate_key, .. } if gate_key == "manual-gate"
+                    event.body(),
+                    EventBody::GatePassed { gate_key, .. } if gate_key == "manual-gate"
                 )),
             "a failed attestation must log no gate-passed event"
         );
@@ -2080,10 +2072,10 @@ style = "full"
             .expect("configured projection is materialized");
         assert!(projection.contains("projected-review"));
         let event = executor.storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
@@ -2202,10 +2194,10 @@ style = "full"
         assert!(registry.gates.contains_key("ours"));
         assert!(registry.gates.contains_key("theirs"));
         let event = storage.read_events().unwrap().pop().unwrap();
-        match event {
-            Event::GateDefinitionCreated { id, timestamp, .. } => {
-                assert!(!id.is_empty());
-                assert_ne!(timestamp, chrono::DateTime::UNIX_EPOCH);
+        match event.body() {
+            EventBody::GateDefinitionCreated { .. } => {
+                assert!(!event.id().is_empty());
+                assert_ne!(event.timestamp(), chrono::DateTime::UNIX_EPOCH);
             }
             other => panic!("unexpected registry event: {other:?}"),
         }

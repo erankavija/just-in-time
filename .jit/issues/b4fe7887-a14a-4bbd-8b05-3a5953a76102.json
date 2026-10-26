@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:47:24.520112680Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Fold the configuration mirror of item-kind scope into the domain enum.\n\n## Background\n\n`KindScopeConfig` (`crates/jit/src/config.rs:811`) mirrors `item::KindScope` (`domain/item.rs:383`) with its own `FromStr`, `Deserialize` and `Serialize` (`config.rs:822-856`), converted at `item.rs:712-713`. `domain/item.rs:42-44` imports it from config. `KindScope::ISSUE_TOKEN` also spells the reserved `@/issue/` address segment (`item.rs:233,252,255,258,912`).\n\n## Success Criteria\n\n- [hard] REQ-01: `KindScope` is declared through the macro, and `ItemKindConfig.scope` (`config.rs:539`) is a `KindScope`.\n- [hard] REQ-02: `KindScopeConfig` and its conversion are gone, and the domain no longer imports it from config.\n- [hard] REQ-03: The `@/issue/` address segment has its own address-grammar constant.\n- [hard] REQ-04: Item-kind declarations in this repository load unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:05:20.728848887Z",
+  "first_ready_at": "2026-10-24T23:55:25.890437205Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c3161730-2937-4060-9ef6-7cd5f381cce2",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:59:06.792581504Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d66e74e4-f43e-46d8-b407-976bb0c8de5b",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:01:05.139002664Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Item-kind scope has one enum",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:05:20.728848887Z"
 }

@@ -3,7 +3,7 @@
 //! `jit doc add` and `jit doc remove` mutate an issue's `documents` field, so
 //! each must append an `issue_updated` event with `fields: ["documents"]`,
 //! mirroring `issue update` / `bulk_update` / dependency commands.
-use jit::domain::Event;
+use jit::domain::EventBody;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -36,8 +36,8 @@ fn assert_last_event_is_documents_update(h: &TestHarness, issue_id: &str, expect
     assert_eq!(event.get_type(), "issue_updated");
     assert_eq!(event.get_issue_id(), issue_id);
 
-    match event {
-        Event::IssueUpdated {
+    match event.body() {
+        EventBody::IssueUpdated {
             updated_by, fields, ..
         } => {
             assert_eq!(updated_by, expected_actor);
@@ -242,8 +242,8 @@ fn test_add_document_reference_new_path_appends() {
     let events = h.storage.read_events().unwrap();
     let add_tags: Vec<_> = events
         .iter()
-        .filter_map(|e| match e {
-            Event::IssueUpdated { updated_by, .. } => Some(updated_by.as_str()),
+        .filter_map(|e| match e.body() {
+            EventBody::IssueUpdated { updated_by, .. } => Some(updated_by.as_str()),
             _ => None,
         })
         .collect();

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T04:57:44.561138542Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Decode dependency-shape assertion configuration, including its target selector, when rules load.\n\n## Background\n\nGraph assertions `LabelCoverage`, `LabelReference` and `DependencyShape` hold raw `toml::value::Table` payloads (`crates/jit/src/declarations/rules.rs:577-590,923-927`), and evaluation reads their keys on each call, so a malformed rule surfaces only during evaluation. Typed `Raw*` structs lowered at load are the existing pattern (`rules.rs:940-1089`), and `RuleConfigError::InvalidAssertion` names the rule. Rule serialization renders the tables with `render_config_table` (`repository_state/rule_serialize.rs:267-275,366-396`). The dependency-shape `target` becomes a `Selector` only at evaluation (`validation/graph.rs:1380-1393`), so an invalid state token in it never meets selector validation, and `test_dependency_shape_missing_target_is_config_error` (`graph.rs:3146`) reaches evaluation.\n\n## Success Criteria\n\n- [hard] REQ-01: `DependencyShape` holds a typed configuration with its mode as an enum and a validated `Selector` parsed at load.\n- [hard] REQ-02: A malformed dependency-shape assertion, including an invalid state token in its target, fails rule loading with an error naming the rule.\n- [hard] REQ-03: Rule serialization emits the same keys for a typed dependency-shape assertion.\n",
   "documents": [],
+  "done_at": "2026-10-25T05:13:22.818470824Z",
+  "first_ready_at": "2026-10-25T04:56:09.180681814Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6fb0238a-f351-4064-a942-e459a881cfdc",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:10:55.384969702Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3590a06e-03c1-45db-ac07-fc98b00fc619",
+      "status": "passed",
+      "updated_at": "2026-10-25T05:11:44.030355418Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5613ef50-362b-43ef-a268-12afc91f5b52",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Dependency-shape assertions are typed at load",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T05:13:22.818470824Z"
 }

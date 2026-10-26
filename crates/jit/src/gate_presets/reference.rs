@@ -194,7 +194,10 @@ mod tests {
         )
         .unwrap();
 
-        let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
+        let registry = crate::storage::gate_store::load_gate_registry(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+        )
+        .unwrap();
         assert_eq!(registry.gates.len(), 5);
         assert!(matches!(
             registry.gates["repository-policy"].checker.as_ref(),
@@ -230,7 +233,10 @@ mod tests {
             PORTABLE_CHECKER_REGISTRY_EXAMPLES,
         )
         .unwrap();
-        let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
+        let registry = crate::storage::gate_store::load_gate_registry(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+        )
+        .unwrap();
         let page = render_reference_markdown();
 
         for gate in registry.gates.values() {

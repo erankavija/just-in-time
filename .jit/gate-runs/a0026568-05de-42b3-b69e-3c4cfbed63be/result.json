@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-e1a6c8c2",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "33678e5ae9c7eddc10888a12f884f2a2a1b744c1",
+  "completed_at": "2026-10-25T05:58:36.316736470Z",
+  "duration_ms": 252483,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/validation/repository.rs",
+        "id": "F1",
+        "line": 1148,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e1a6c8c2/requirement/REQ-01",
+          "@/issue/e1a6c8c2/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Listed files retain literal well-known .jit path construction in test fixtures."
+      }
+    ],
+    "summary": "Listed files retain literal well-known .jit path construction in test fixtures.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e1a6c8c2-bace-4c0c-8d01-1842dfac7f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a0026568-05de-42b3-b69e-3c4cfbed63be",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T05:54:23.833086431Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8952 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-e1a6c8c2\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1719f-da7b-70d3-9b1d-8fc6eed60ece\n--------\nuser\n--- 8939 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 38fcc04d, 30450c18 (records only), 490cc871 (`jit:e1a6c8c2`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e1a6c8c2/requirement/REQ-01 and REQ-02 (issue markdown); @/issue/2195c98f/requirement/REQ-07 (issue markdown); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T05:53:01.762650833Z); prior code-review failed (exit 1), and its two findings were addressed\nTruncation recovery: re-read truncated grouped patch output as bounded per-file diffs for storage, validation, configuration, and test support\n\n1. F1 — blocking, issue-impact, high: The hard literal-elimination criteria remain unmet in listed files’ test paths. `validation/repository.rs` still constructs `.jit/issues/<id>.json` with literals at lines 1148, 1159, 1231, 1264, 1271, 1305, and 1310; `storage/memory.rs` still constructs or matches `issues`/`gate-runs` paths at lines 1034, 1049, 1503, 1689, and 1731; and `storage/ruleset_store.rs` still joins literal `schemas/...` paths at lines 92, 126, and 141. These sites should derive their well-known directory from the corresponding `VirtualPath` constant (and host paths via `RepositoryLayout::resolve`), as REQ-01 and REQ-02 require.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Listed files retain literal well-known .jit path construction in test fixtures.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Listed files retain literal well-known .jit path construction in test fixtures.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":1148,\"references\":[\"@/issue/e1a6c8c2/requirement/REQ-01\",\"@/issue/e1a6c8c2/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

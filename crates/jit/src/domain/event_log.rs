@@ -1,7 +1,7 @@
 //! Pure parsing for the append-only event log.
 
 use super::event_catalog::EventTag;
-use super::Event;
+use super::{Event, EventBody};
 
 /// Structural failure while reading a known event-log record.
 #[derive(Debug, thiserror::Error)]
@@ -36,7 +36,7 @@ pub enum EventLogError {
 /// Parse current-vocabulary events while retaining retired/unknown records.
 ///
 /// Invalid JSON is rejected except for exactly one physical line immediately
-/// followed by a valid [`Event::ProfileLifecycle`] whose
+/// followed by a valid [`EventBody::ProfileLifecycle`] whose
 /// `isolated_torn_tail` flag is true. That marker is written in the same
 /// append that isolates the preserved prefix, making the exception explicit and
 /// auditable rather than broadly accepting malformed history.
@@ -81,8 +81,8 @@ fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
         .and_then(|line| serde_json::from_str::<Event>(line).ok())
         .is_some_and(|event| {
             matches!(
-                event,
-                Event::ProfileLifecycle {
+                event.body(),
+                EventBody::ProfileLifecycle {
                     isolated_torn_tail: true,
                     ..
                 }
@@ -95,20 +95,22 @@ mod tests {
     use super::*;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        Event::ProfileLifecycle {
-            id: String::new(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            operation: crate::domain::ProfileLifecycleOperation::Apply,
-            profiles: vec![crate::domain::ProfileLifecycleProfile {
-                id: "example"
-                    .try_into()
-                    .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
-                status: crate::domain::ProfileLifecycleStatus::Installed,
-                variables: Default::default(),
-            }],
-            isolated_torn_tail,
-        }
+        crate::test_utils::stamped_event(
+            EventBody::draft_profile_lifecycle(
+                crate::domain::ProfileLifecycleOperation::Apply,
+                vec![crate::domain::ProfileLifecycleProfile {
+                    id: "example"
+                        .try_into()
+                        .expect("the profile marker has a canonical identifier"),
+                    version: "1.0.0".to_string(),
+                    status: crate::domain::ProfileLifecycleStatus::Installed,
+                    variables: Default::default(),
+                }],
+            )
+            .with_isolated_torn_tail(isolated_torn_tail),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        )
     }
 
     #[test]

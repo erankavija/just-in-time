@@ -21,6 +21,7 @@ use crate::profile::drift_report::{DriftCarrier, DriftSubject};
 use crate::profile::ProfilePackage;
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
+    VirtualPath,
 };
 use crate::templates::GraphTemplate;
 
@@ -43,8 +44,8 @@ pub const TEMPLATE_REGION_PACKAGE_ID: &str = "jit-dogfood";
 /// way the registry file spells them (`[[template]]`).
 const TEMPLATE_ARRAY_PATH: &str = "template";
 
-/// Repo-relative path of the registry file that carries the generated region.
-pub const TEMPLATE_REGISTRY_PATH: &str = ".jit/templates.toml";
+/// Identity of the registry file that carries the generated region.
+pub const TEMPLATE_REGISTRY_PATH: VirtualPath = VirtualPath::TEMPLATES;
 
 /// The command that brings [`TEMPLATE_REGISTRY_PATH`] back into agreement with
 /// the package, named in the registry file and in the drift assertion's message.
@@ -197,15 +198,16 @@ pub fn template_drift_report(
     let compared = |declarations: &[GraphTemplate]| {
         serde_json::to_value(declarations).map_err(TemplateRegionError::Compare)
     };
+    let registry_path = TEMPLATE_REGISTRY_PATH.repository_relative();
     let subject = DriftSubject {
-        repository: DriftCarrier::new(TEMPLATE_REGISTRY_PATH, "the generated template region"),
+        repository: DriftCarrier::new(registry_path.clone(), "the generated template region"),
         packaged: DriftCarrier::new(
             packaged_manifest_path(TEMPLATE_REGION_PACKAGE_ID),
             "the template contributions",
         ),
         field_root: TEMPLATE_ARRAY_PATH.to_string(),
         remedy: format!(
-            "the generated region of {TEMPLATE_REGISTRY_PATH} holds the packaged \
+            "the generated region of {registry_path} holds the packaged \
              declarations: regenerate it with {TEMPLATE_REGION_GENERATOR}"
         ),
     };

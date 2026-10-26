@@ -86,7 +86,10 @@ fn test_init_seeded_project_name_round_trips_through_jitconfig_load() {
     let out = jit_init(&repo_dir);
     assert!(out.status.success());
 
-    let config = jit::config::JitConfig::load(&repo_dir.join(".jit")).unwrap();
+    let config = jit::config::JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        &repo_dir.join(".jit"),
+    ))
+    .unwrap();
     assert_eq!(
         config
             .project

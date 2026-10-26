@@ -5,6 +5,7 @@
 //! independently of the CLI orchestration layer.
 
 use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 /// Optional restrictions on available work; label patterns are AND-combined.
@@ -21,12 +22,7 @@ pub fn query_available(issues: &[Issue], filter: AvailableFilter<'_>) -> Vec<Iss
     if let Some(priority) = filter.priority {
         matches = query_by_priority(&matches, priority);
     }
-    matches.sort_by_key(|issue| match issue.priority {
-        Priority::Critical => 0,
-        Priority::High => 1,
-        Priority::Normal => 2,
-        Priority::Low => 3,
-    });
+    matches.sort_by_key(|issue| Reverse(issue.priority));
     matches
 }
 
@@ -254,12 +250,12 @@ pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
 /// Count issues by state, enumerating **every** [`State`] variant.
 ///
 /// The result carries one `(state, count)` pair per variant in
-/// [`State::all`] order, so a state with no issues is present with count `0`
+/// [`State::ALL`] order, so a state with no issues is present with count `0`
 /// (never omitted). This keeps the aggregation shape stable and complete
 /// regardless of which states happen to be populated, and derives the state
 /// list from the enum rather than hardcoding it (@/inv/domain-agnostic).
 pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
-    State::all()
+    State::ALL
         .into_iter()
         .map(|state| (state, issues.iter().filter(|i| i.state == state).count()))
         .collect()

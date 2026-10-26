@@ -3,14 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
-    "75951558-accb-4ee9-be38-e97fee0326ee",
-    "804a8605-267b-4934-a9ef-08422fc3686d",
-    "8e82fa49-1859-4e29-8972-f2da05e90b0a",
-    "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
-    "d50d6976-f978-4900-a218-6bb9d1b3fa52"
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b"
   ],
   "description": "Retype issue ids in the validation engine and its reports.\n\n## Background\n\n`validation/graph.rs` holds 16 production issue-id references and 3 raw-id signatures, and `validation/report.rs` carries ids in its report fields (`validation/report.rs:25,120`). `validation/repository.rs:498,506` truncate short ids by length.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter under `crates/jit/src/validation/` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Short ids under `validation/` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "first_ready_at": "2026-10-25T21:55:59.617473382Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -30,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Validation carries typed issue ids",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T22:13:39.637232083Z"
 }

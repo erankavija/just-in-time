@@ -1,0 +1,43 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T10:56:44.181227746Z",
+  "context": {},
+  "created_at": "2026-10-25T10:55:53.042521617Z",
+  "dependencies": [],
+  "description": "Rewrite this repository's event log so every line is in the form the canonical event writer produces, making a decode and re-serialize round trip the identity on every line.\n\n## Background\n\nThe canonical writer sorts object keys and writes compact JSON. About 8,600 of the log's roughly 20,000 lines predate it: they open with `type,id,...` key order and contain spaces, and a few carry timestamp spellings the writer does not emit. Those lines decode correctly, but no writer can reproduce their bytes, so a byte-identity round trip over the log fails on them. The log is repository data versioned with git; this is a one-time data rewrite, with no change to engine code.\n\n## Success Criteria\n\n- [hard] REQ-01: Every line of this repository's event log equals the canonical writer's output for that line: keys sorted, compact separators, and timestamps spelled as the writer spells them.\n- [hard] REQ-02: The rewrite preserves content: the log keeps its line count and order, and each rewritten line decodes to the same JSON value as before, with each timestamp denoting the same instant. Lines of unknown event types are canonicalized and kept.\n- [hard] REQ-03: The rewrite runs while no other mutation of the repository can append to the log, so no concurrently appended event is lost or reordered.",
+  "documents": [],
+  "done_at": "2026-10-25T16:37:08.171965174Z",
+  "first_ready_at": "2026-10-25T10:55:53.042521617Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9fb53557-f59e-4631-a18f-8404b00c5548",
+      "status": "passed",
+      "updated_at": "2026-10-25T16:33:21.004115607Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "300233c7-05a9-4e33-9b87-5bfa25a4e7c3",
+      "status": "passed",
+      "updated_at": "2026-10-25T16:22:15.055080907Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "b01208cb-b85f-4705-bd2f-311129e01b56",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:event-records",
+    "component:core",
+    "satisfies:2195c98f/REQ-05",
+    "enforces:@/invariant/event-log"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "This repository's event log is in canonical writer form",
+  "updated_at": "2026-10-25T16:37:08.171965174Z"
+}

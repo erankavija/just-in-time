@@ -39,7 +39,7 @@ fn example_dir(name: &str) -> PathBuf {
 fn load_example(name: &str) -> RuleSet {
     let dir = example_dir(name);
     jit::storage::ruleset_store::load_ruleset(
-        &dir,
+        &jit::test_utils::repository_layout_for_data_root(&dir),
         &toml::from_str::<jit::config::JitConfig>("").unwrap(),
     )
     .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))

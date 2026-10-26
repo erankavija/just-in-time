@@ -13,6 +13,8 @@ use crate::profile::{
 };
 use crate::repository_state::{Contribution, MapEntryTarget};
 use crate::repository_state::{FileMode, VirtualPath};
+#[cfg(any(test, feature = "test-support"))]
+use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence};
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -29,6 +31,29 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
+
+/// Give a temporary data root a valid repository layout for loader tests.
+#[cfg(any(test, feature = "test-support"))]
+pub fn repository_layout_for_data_root(data_root: &Path) -> RepositoryLayout {
+    let absolute_data_root = std::fs::canonicalize(data_root).unwrap_or_else(|_error| {
+        let parent = data_root.parent().unwrap_or(data_root);
+        let parent = std::fs::canonicalize(parent)
+            .expect("temporary test worktree root has an absolute path");
+        parent.join(
+            data_root
+                .file_name()
+                .expect("temporary data root has a final component"),
+        )
+    });
+    let worktree_root = absolute_data_root
+        .parent()
+        .expect("temporary data root has a parent");
+    RepositoryLayout::new(
+        RepositoryRootEvidence::new(worktree_root, "test-worktree", true),
+        RepositoryRootEvidence::new(&absolute_data_root, "test-data", true),
+    )
+    .expect("temporary test roots form a valid repository layout")
+}
 
 /// A reference to `path` at HEAD with no label, type, format, or assets.
 pub fn document_reference(path: impl Into<String>) -> DocumentReference {
@@ -69,6 +94,16 @@ pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue
     let mut issue = crate::domain::Issue::draft(title, description);
     issue.id = uuid::Uuid::new_v4().to_string();
     issue
+}
+
+/// The event recording `body`, stamped with `id` and `timestamp` as the
+/// mutation finalizer would stamp it.
+pub fn stamped_event(
+    body: crate::domain::EventBody,
+    id: impl Into<String>,
+    timestamp: chrono::DateTime<chrono::Utc>,
+) -> crate::domain::Event {
+    crate::domain::Event::new(id.into(), timestamp, body)
 }
 
 #[cfg(test)]
@@ -1047,13 +1082,14 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     let mut written = fs::metadata(&path)?.len();
     let mut ordinal = 0_u64;
     while written <= bytes {
-        let line = serde_json::to_string(&crate::domain::Event::IssueCreated {
-            id: format!("01J0000000000000000000{ordinal:04}"),
-            issue_id: format!("00000000-0000-4000-8000-{ordinal:012}"),
-            timestamp: chrono::Utc::now(),
-            title: format!("Accumulated history {ordinal}"),
-            priority: crate::domain::Priority::Normal,
-        })?;
+        let mut issue =
+            crate::domain::Issue::draft(format!("Accumulated history {ordinal}"), String::new());
+        issue.id = format!("00000000-0000-4000-8000-{ordinal:012}");
+        let line = serde_json::to_string(&stamped_event(
+            crate::domain::EventBody::draft_issue_created(&issue),
+            format!("01J0000000000000000000{ordinal:04}"),
+            chrono::Utc::now(),
+        ))?;
         writeln!(log, "{line}")?;
         written += line.len() as u64 + 1;
         ordinal += 1;
@@ -2268,7 +2304,7 @@ mod tests {
     #[test]
     fn test_setup_test_repo_with_taxonomy_declares_and_exposes_exact_vocabulary() {
         let (_temp, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::config::JitConfig::load(storage.root()).unwrap();
+        let config = crate::config::JitConfig::load(&storage.repository_layout().unwrap()).unwrap();
         let hierarchy = config
             .type_hierarchy
             .expect("taxonomy fixture must declare a type hierarchy");

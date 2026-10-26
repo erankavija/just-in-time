@@ -1,14 +1,21 @@
 use super::*;
-use crate::repository_state::{CaptureBudget, RepositoryAction, EVENT_LOG_TAIL_WINDOW};
+use crate::domain::SHORT_ID_LENGTH;
+use crate::repository_state::{
+    CaptureBudget, RepositoryAction, RepositoryActionOwner, EVENT_LOG_TAIL_WINDOW,
+};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
     repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
 };
-use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
+use crate::storage::{
+    AmbiguousIdError, EventAppend, IssueNotFoundError, PutFile, RedoPoint, RECORD_FILE_NAME,
+    RECORD_SCRATCH_DIR,
+};
 use crate::test_harness::git::GitStandIn;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::Mutex;
 use tempfile::TempDir;
 
@@ -56,7 +63,7 @@ fn test_json_apply_admits_a_listing_that_changed_since_capture() {
         &layout,
         vec![RepositoryAction::write_file(
             published_path.clone(),
-            "archive",
+            RepositoryActionOwner::ArchiveExecution,
             ExpectedPreimage::Absent,
             b"published".to_vec(),
             FileMode::Regular,
@@ -127,19 +134,19 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("index.json").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("note.txt").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"note".to_vec(),
                 FileMode::Regular,
@@ -167,12 +174,12 @@ fn issue_creation_delta(
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("index.json").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 serde_json::to_vec(&serde_json::json!({
                     "schema_version": 2,
@@ -184,12 +191,12 @@ fn issue_creation_delta(
             ),
             RepositoryAction::create_directory(
                 VirtualPath::data("issues").unwrap(),
-                "issue",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap(),
-                "issue",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 issue_bytes.to_vec(),
                 FileMode::Regular,
@@ -239,7 +246,7 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(
         memory
             .resolve_issue_id(
-                &crate::domain::issue_id::IssueIdPrefix::parse(&issue.short_id()).unwrap()
+                &crate::domain::identity::IssueIdPrefix::from_str(&issue.short_id()).unwrap()
             )
             .unwrap(),
         issue.id
@@ -262,44 +269,117 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(json.list_issues().unwrap(), vec![issue]);
 }
 
-/// Publish `issue` through a mutation session on `storage` rooted at `worktree`.
-fn publish_issue<S: RepositoryStateStore>(storage: &S, worktree: &Path, issue: &Issue) {
+/// Publish `issues` through one mutation session on `storage` rooted at
+/// `worktree`.
+fn publish_issues<S: RepositoryStateStore>(storage: &S, worktree: &Path, issues: &[Issue]) {
     let layout = discover_repository_layout(worktree, worktree.join(".jit")).unwrap();
+    let issue_paths = issues
+        .iter()
+        .map(|issue| VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap())
+        .collect::<Vec<_>>();
+    let roots = ["", "index.json", "issues"].map(|path| VirtualPath::data(path).unwrap());
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(issue_creation_spec(&issue.id)).unwrap();
-    let bytes = serialize_issue(issue).unwrap();
+    let image = session
+        .capture(CaptureSpec::new(roots.iter().chain(&issue_paths).cloned(), budget()).unwrap())
+        .unwrap();
+    let index = serde_json::json!({
+        "schema_version": 2,
+        "all_ids": issues.iter().map(|issue| &issue.id).collect::<Vec<_>>(),
+        "deleted_ids": [],
+    });
+    let [data, index_path, issues_dir] = roots;
+    let actions = [
+        RepositoryAction::create_directory(
+            data,
+            RepositoryActionOwner::RepositoryInit,
+            ExpectedPreimage::Absent,
+        ),
+        RepositoryAction::write_file(
+            index_path,
+            RepositoryActionOwner::RepositoryInit,
+            ExpectedPreimage::Absent,
+            serde_json::to_vec(&index).unwrap(),
+            FileMode::Regular,
+        ),
+        RepositoryAction::create_directory(
+            issues_dir,
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+        ),
+    ]
+    .into_iter()
+    .chain(issues.iter().zip(issue_paths).map(|(issue, path)| {
+        RepositoryAction::write_file(
+            path,
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            serialize_issue(issue).unwrap(),
+            FileMode::Regular,
+        )
+    }))
+    .collect();
     session
         .apply(&test_plan(
             &image,
-            &issue_creation_delta(&layout, issue, &bytes),
+            &RepositoryDelta::new(&layout, actions).unwrap(),
         ))
         .unwrap();
 }
 
-/// Each backend resolves a full id in any case or hyphenation to the issue.
+/// Each backend resolves prefixes through the shared resolver: a unique prefix
+/// or any spelling of a full id names its issue, an unmatched prefix is not
+/// found, and a prefix two ids share is ambiguous.
 #[test]
-fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
-    fn assert_resolution(backend: &str, storage: &impl IssueStore, id: &str) {
-        for requested in [id.to_string(), id.to_uppercase(), id.replace('-', "")] {
-            let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&requested).unwrap();
+fn test_conformance_resolve_issue_id_resolves_prefixes_alike_on_both_backends() {
+    use crate::domain::identity::IssueIdPrefix;
+
+    fn issue_with_id(id: &str) -> Issue {
+        let mut issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
+        issue.id = id.to_string();
+        issue
+    }
+
+    fn assert_resolution(backend: &str, storage: &impl IssueStore, issues: &[Issue]) {
+        let resolve = |requested: &str| {
+            storage.resolve_issue_id(&IssueIdPrefix::from_str(requested).unwrap())
+        };
+        let id = &issues[0].id;
+        for requested in [
+            id.to_string(),
+            id.to_uppercase(),
+            id.replace('-', ""),
+            id[..SHORT_ID_LENGTH + 2].to_string(),
+        ] {
             assert_eq!(
-                storage.resolve_issue_id(&prefix).ok().as_deref(),
+                resolve(&requested).ok().as_ref(),
                 Some(id),
                 "{backend} must resolve {requested}"
             );
         }
+        let unmatched = resolve("ffffffff").unwrap_err();
+        assert!(
+            unmatched.downcast_ref::<IssueNotFoundError>().is_some(),
+            "{backend}: {unmatched}"
+        );
+        let shared = resolve(&id[..SHORT_ID_LENGTH]).unwrap_err();
+        assert!(
+            shared.downcast_ref::<AmbiguousIdError>().is_some(),
+            "{backend}: {shared}"
+        );
     }
 
-    let issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
+    let issues = [
+        issue_with_id("b53beeba-32f2-4671-a407-2d94e4d13d41"),
+        issue_with_id("b53beeba-0000-4000-8000-000000000000"),
+    ];
     let memory = InMemoryStorage::new();
     let memory_tree = TempDir::new().unwrap();
-    publish_issue(&memory, memory_tree.path(), &issue);
-    assert_resolution("memory", &memory, &issue.id);
-
     let json_tree = TempDir::new().unwrap();
     let json = JsonFileStorage::new(json_tree.path().join(".jit"));
-    publish_issue(&json, json_tree.path(), &issue);
-    assert_resolution("json", &json, &issue.id);
+    publish_issues(&memory, memory_tree.path(), &issues);
+    publish_issues(&json, json_tree.path(), &issues);
+    assert_resolution("memory", &memory, &issues);
+    assert_resolution("json", &json, &issues);
 }
 
 #[test]
@@ -345,7 +425,7 @@ fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
         layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("target.txt").unwrap(),
-            "image-binding-test",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"materialized".to_vec(),
             FileMode::Regular,
@@ -452,7 +532,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
         &layout,
         vec![RepositoryAction::set_mode(
             path,
-            "mode",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(
                 image
                     .entry(&VirtualPath::data("mode.txt").unwrap())
@@ -491,7 +571,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
         &stale_layout,
         vec![RepositoryAction::write_file(
             path.clone(),
-            "initialize",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -626,7 +706,7 @@ fn test_memory_set_mode_uses_exact_file_preimage() {
         &layout,
         vec![RepositoryAction::set_mode(
             path.clone(),
-            "mode",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(image.entry(&path).unwrap()),
             FileMode::Executable,
         )],
@@ -692,12 +772,14 @@ fn read_events_for_log<S: IssueStore>(store: &S) -> Option<Vec<Event>> {
 
 #[test]
 fn test_conformance_event_log_skips_retired_tags_and_rejects_malformed_known_records() {
-    let known = |id: &str| Event::IssueCreated {
-        id: id.to_string(),
-        issue_id: "issue-id".to_string(),
-        timestamp: chrono::Utc::now(),
-        title: "Known".to_string(),
-        priority: crate::domain::Priority::Normal,
+    let known = |id: &str| {
+        let mut issue = Issue::draft("Known".to_string(), String::new());
+        issue.id = "issue-id".to_string();
+        crate::test_utils::stamped_event(
+            EventBody::draft_issue_created(&issue),
+            id,
+            chrono::Utc::now(),
+        )
     };
     let (first, second) = (known("first"), known("second"));
     let retired = concat!(
@@ -830,37 +912,37 @@ fn apply_all_action_kinds<S: RepositoryStateStore>(
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("generated").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("generated/new.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"created".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("replace.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("replace.txt"),
                 b"replaced".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("chmod.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("chmod.txt"),
                 FileMode::Executable,
             ),
             RepositoryAction::delete_file(
                 VirtualPath::data("remove.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("remove.txt"),
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("out.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"worktree".to_vec(),
                 FileMode::Regular,
@@ -950,7 +1032,7 @@ fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::worktree("note.txt").unwrap(),
-            "wt",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"note".to_vec(),
             FileMode::Regular,
@@ -1068,7 +1150,7 @@ fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
         &layout,
         vec![RepositoryAction::write_file(
             nested.clone(),
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"x".to_vec(),
             FileMode::Regular,
@@ -1443,13 +1525,13 @@ fn test_conformance_absent_root_data_only_materializes_data_root_dir() {
         if explicit_root_dir {
             actions.push(RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "g",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ));
         }
         actions.push(RepositoryAction::write_file(
             VirtualPath::data("index.json").unwrap(),
-            "g",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1598,7 +1680,7 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("new.txt").unwrap(),
-            "f4",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"new".to_vec(),
             FileMode::Regular,
@@ -1641,7 +1723,7 @@ fn test_absent_data_parent_replacement_before_publication_never_succeeds() {
         &layout,
         vec![RepositoryAction::write_file(
             path,
-            "root-publication",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1691,13 +1773,13 @@ fn test_delta_rejects_captured_cross_root_hard_link_alias() {
         vec![
             RepositoryAction::set_mode(
                 VirtualPath::worktree("shared").unwrap(),
-                "one",
+                RepositoryActionOwner::RepositoryStateMutation,
                 worktree_pre,
                 FileMode::Executable,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("shared").unwrap(),
-                "two",
+                RepositoryActionOwner::ProfileApplication,
                 data_pre,
                 FileMode::Executable,
             ),
@@ -1728,7 +1810,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("x").unwrap(),
-            "a4",
+            RepositoryActionOwner::RepositoryStateMutation,
             expected,
             b"v2".to_vec(),
             FileMode::Regular,
@@ -1762,7 +1844,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
 // byte-identical results regardless of backend. No-op operations sample
 // neither an identifier nor the mutation timestamp.
 
-use crate::domain::{Assignee, Event, GateState, GateStatus, Issue};
+use crate::domain::{Assignee, Event, EventBody, GateState, GateStatus, Issue};
 use crate::repository_state::{
     finalize, serialize_gate_run, serialize_issue, MutationClock, MutationContext, MutationIntent,
 };
@@ -1947,10 +2029,10 @@ fn test_conformance_claim_finalizer_bytes_match_across_backends() {
         crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
             .unwrap();
     assert_eq!(events.len(), 1);
-    let Event::IssueClaimed { timestamp, .. } = &events[0] else {
+    let EventBody::IssueClaimed { .. } = events[0].body() else {
         panic!("expected an issue_claimed event");
     };
-    assert_eq!(*timestamp, req01_instant());
+    assert_eq!(events[0].timestamp(), req01_instant());
 }
 
 #[test]
@@ -1970,12 +2052,11 @@ fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
     let agent: Assignee = "agent:worker-1".parse().unwrap();
     let issue = req01_issue(id, Some(agent.clone()));
     // A committed claim event so both issue and tail already reflect the claim.
-    let claim_event = Event::IssueClaimed {
-        id: "evt".into(),
-        issue_id: id.to_string(),
-        timestamp: req01_instant(),
-        assignee: agent.clone(),
-    };
+    let claim_event = crate::test_utils::stamped_event(
+        EventBody::draft_issue_claimed(id.to_string(), agent.clone()),
+        "evt",
+        req01_instant(),
+    );
     let mut events_bytes: Vec<u8> = crate::repository_state::serialize_event(&claim_event).unwrap();
     events_bytes.push(b'\n');
 
@@ -2027,11 +2108,7 @@ fn test_conformance_identical_full_finalizer_plan_matches_both_backends() {
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
-    let event = Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
+    let event = EventBody::draft_gate_definition_created("cargo-ci".to_string());
     let intents = [MutationIntent::RecordEvent {
         phase: 0,
         event: Box::new(event),
@@ -2160,11 +2237,11 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_plan() {
     let events =
         crate::domain::event_log::parse_known_events(std::str::from_utf8(event_bytes).unwrap())
             .unwrap();
-    let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
+    let EventBody::IssueClaimed { .. } = events[0].body() else {
         panic!("expected allocated claim event");
     };
     assert_eq!(
-        event_id,
+        events[0].id(),
         &crate::repository_state::IdAuthority::from_seed([23u8; 32]).uuid_at(0)
     );
 }
@@ -2231,18 +2308,18 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
         stdout: "ok".to_string(),
         stderr: String::new(),
         command: "cargo test".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: None,
         findings: None,
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
-    let provenance = Event::GateDefinitionCreated {
-        id: "prov-1".into(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
+    let provenance = crate::test_utils::stamped_event(
+        EventBody::draft_gate_definition_created("cargo-ci".to_string()),
+        "prov-1",
+        req01_instant(),
+    );
     let mut event_line = crate::repository_state::serialize_event(&provenance).unwrap();
     event_line.push(b'\n');
     let gate_bytes = serialize_gate_run(&result).unwrap();
@@ -2260,18 +2337,18 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
             vec![
                 RepositoryAction::create_directory(
                     run_dir.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                 ),
                 RepositoryAction::write_file(
                     run_file.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     gate_bytes.clone(),
                     FileMode::Regular,
                 ),
                 RepositoryAction::append_events(
-                    "provenance",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     0,
                     event_line.clone(),
@@ -2389,12 +2466,10 @@ fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
     }
 }
 
-fn lifecycle_event() -> Event {
-    Event::ProfileLifecycle {
-        id: String::new(),
-        timestamp: req01_instant(),
-        operation: crate::domain::ProfileLifecycleOperation::Apply,
-        profiles: vec![crate::domain::ProfileLifecycleProfile {
+fn lifecycle_event() -> EventBody {
+    EventBody::draft_profile_lifecycle(
+        crate::domain::ProfileLifecycleOperation::Apply,
+        vec![crate::domain::ProfileLifecycleProfile {
             id: "example"
                 .try_into()
                 .expect("the conformance profile id is canonical"),
@@ -2402,16 +2477,11 @@ fn lifecycle_event() -> Event {
             status: crate::domain::ProfileLifecycleStatus::Installed,
             variables: Default::default(),
         }],
-        isolated_torn_tail: false,
-    }
+    )
 }
 
-fn gate_def_created(gate_key: &str) -> Event {
-    Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: gate_key.into(),
-    }
+fn gate_def_created(gate_key: &str) -> EventBody {
+    EventBody::draft_gate_definition_created(gate_key.into())
 }
 
 #[test]
@@ -2438,7 +2508,7 @@ fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
         stdout: "ok".to_string(),
         stderr: String::new(),
         command: "cargo test".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: None,
         findings: None,
         inputs_digest: None,
@@ -2573,16 +2643,18 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
         crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
             .unwrap();
     assert_eq!(parsed.len(), 3);
-    let event_id = |event: &Event| match event {
-        Event::IssueCreated { id, .. } | Event::GateDefinitionCreated { id, .. } => id.clone(),
+    let event_id = |event: &Event| match event.body() {
+        EventBody::IssueCreated { .. } | EventBody::GateDefinitionCreated { .. } => {
+            event.id().to_string()
+        }
         other => panic!("unexpected event {other:?}"),
     };
-    assert!(matches!(&parsed[0], Event::IssueCreated { .. }));
+    assert!(matches!(parsed[0].body(), EventBody::IssueCreated { .. }));
     assert!(
-        matches!(&parsed[1], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
+        matches!(parsed[1].body(), EventBody::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
     );
     assert!(
-        matches!(&parsed[2], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
+        matches!(parsed[2].body(), EventBody::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
     );
     assert_eq!(event_id(&parsed[0]), ids.uuid_at(1));
     assert_eq!(event_id(&parsed[1]), ids.uuid_at(2));
@@ -2932,11 +3004,19 @@ fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() 
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![
-            RepositoryAction::create_directory(empty.clone(), "p0", ExpectedPreimage::Absent),
-            RepositoryAction::create_directory(ancestor, "p0", ExpectedPreimage::Absent),
+            RepositoryAction::create_directory(
+                empty.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
+            RepositoryAction::create_directory(
+                ancestor,
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
             RepositoryAction::write_file(
                 written,
-                "p0",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
@@ -2962,7 +3042,7 @@ fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![RepositoryAction::append_events(
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(image.entry(&VirtualPath::EVENTS).unwrap()),
             offset,
             b"{\"tag\":\"next\"}\n".to_vec(),
@@ -3450,7 +3530,7 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
             session.layout(),
             vec![RepositoryAction::write_file(
                 target.clone(),
-                "interrupted-publication",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 LEFTOVER_BYTES.to_vec(),
                 FileMode::Regular,

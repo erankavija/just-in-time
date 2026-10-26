@@ -11,12 +11,12 @@ use jit::commands::CommandExecutor;
 use jit::declarations::{GateChecker, GateMode, GateStage};
 use jit::domain::{GateRunStatus, GateStatus, Priority};
 use jit::storage::{IssueStore, JsonFileStorage};
-use std::process::Command;
+use jit::test_cli::JitCli;
 
 #[test]
 fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains() {
-    let repo = tempfile::TempDir::new().expect("create temporary repository");
-    let jit_dir = repo.path().join(".jit");
+    let repo = JitCli::uninitialised().expect("create temporary repository");
+    let jit_dir = repo.root().join(".jit");
     let taxonomy = jit::test_taxonomy::test_taxonomy();
     std::fs::create_dir_all(&jit_dir).expect("create repository data directory");
     std::fs::write(
@@ -29,11 +29,11 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     .expect("write repository configuration");
 
     let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(repo.path(), storage.root())
+    let layout = jit::storage::discover_repository_layout(repo.root(), storage.root())
         .expect("discover repository layout before initialization");
     let executor = CommandExecutor::new(storage).with_layout(layout);
     executor
-        .initialize_fresh_repository(repo.path(), None)
+        .initialize_fresh_repository(repo.root(), None)
         .expect("initialize fresh repository");
     executor
         .define_gate(
@@ -105,9 +105,8 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     // A separate process reading the same repository reports that same pair.
     // `gate status-all` is the CLI's gate-readiness report; what its exit status
     // says about readiness is its own suite's property.
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(repo.path())
-        .args(["gate", "status-all", &issue_id, "--json"])
+    let output = repo
+        .command(["gate", "status-all", &issue_id, "--json"])
         .output()
         .expect("spawn the jit gate readiness subprocess");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {

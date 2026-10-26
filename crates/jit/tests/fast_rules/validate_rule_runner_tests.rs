@@ -14,15 +14,13 @@
 //! includes default-rule activity.
 
 use jit::domain::Issue;
-use jit::storage::{InMemoryStorage, IssueStore};
+use jit::storage::InMemoryStorage;
 
-/// Build a fresh in-memory store whose on-disk root (used only for `rules.toml`)
-/// holds the supplied rules file contents.
+/// Build a fresh in-memory store whose declaration image holds the supplied rules.
 fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
     jit::test_mode::enable();
     let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
+    storage.add_data_file("rules.toml", rules_toml);
     storage
 }
 

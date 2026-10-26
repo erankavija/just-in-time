@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T03:55:22.257091402Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Replace the string owner of repository actions with one enum, and branch on its variants.\n\n## Background\n\nRepository actions carry `owner: String` (`crates/jit/src/repository_state/image.rs:1096,1229,1235,1245,1252,1257`), read through `owner()` (`:1351`) and checked by `validate_owner` (`:1491-1495`, `DeltaError::InvalidOwner` `:1580`). Behaviour branches on `matches!(action.owner(), \"default-rule-membership\" | \"default-schema\")` (`repository_state/initialize.rs:560`). Production spellings are constants or literals in `mutation.rs:491`, `initialize.rs:47,49,51`, `archive.rs:17`, `package_tree.rs:24`, `export.rs:11`, `materialize.rs:371,383,520,548,599` and `repository_state/mod.rs:903,1056`. No stored record, wire output or document carries the owner.\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryActionOwner` is declared through the macro, and each owner field holds it.\n- [hard] REQ-02: `validate_owner` and `DeltaError::InvalidOwner` are gone.\n- [hard] REQ-03: The coupled-default check in initialization matches owner variants.\n- [hard] REQ-04: Tests name owners by variant.\n",
   "documents": [],
+  "done_at": "2026-10-25T04:03:47.630346572Z",
+  "first_ready_at": "2026-10-24T23:55:24.901834548Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7f116a50-5adf-4205-bc6a-ad4c72996a42",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:01:30.513561124Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d30bacf-7ae3-4e34-9ef7-80a66b87d486",
+      "status": "passed",
+      "updated_at": "2026-10-25T04:03:46.791769387Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "179dcef9-71f8-41d0-a871-696c989d0ee4",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository action owners are one enum",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T04:03:47.630346572Z"
 }

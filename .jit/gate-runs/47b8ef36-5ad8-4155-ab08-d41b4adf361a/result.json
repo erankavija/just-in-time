@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e3d06f82",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0aea0f279f5afc1a8c81d31792951c0b34cc1017",
+  "completed_at": "2026-10-25T06:58:31.801369408Z",
+  "duration_ms": 89355,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue criteria are satisfied by the current integration-test surface and the attributed change.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3d06f82-6f82-48ea-b102-97f6bed674b4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "47b8ef36-5ad8-4155-ab08-d41b4adf361a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T06:57:02.446055479Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: acc25318ab39f67f8103c6c74da65c905e74c0e9 (`jit:e3d06f82`; nine integration-test files)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/2195c98f/requirement/REQ-05 and @/issue/18bcafb8/requirement/REQ-01–REQ-04 (issue descriptions); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/semantic-test-assertions, and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0) on current commit 0aea0f279, which contains the attributed commit\nTruncation recovery: Re-ran narrowed Event-pattern/construction searches and bounded source/test reads after an overbroad scan truncated\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue criteria are satisfied by the current integration-test surface and the attributed change.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

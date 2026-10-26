@@ -172,10 +172,9 @@ mod tests {
     }
 
     /// The serialized `ReportedFinding` shape is byte-identical to the old
-    /// String-field layout. Previously `severity` was stored as
-    /// `finding.severity.token().to_string()`; now it is a typed `Severity`
-    /// that serializes via `#[serde(rename_all="snake_case")]`. The token
-    /// values must be identical.
+    /// String-field layout. `severity` is now a typed `Severity` that serializes
+    /// through the vocabulary's explicit serde spellings. The token values must
+    /// be identical.
     #[test]
     fn test_reported_finding_json_round_trip_byte_identical() {
         let finding = Finding {

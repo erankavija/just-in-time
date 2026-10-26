@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T00:24:42.056557435Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Carry projection mode and style as their enums in the render report, deleting the token functions.\n\n## Background\n\n`mode_token` and `style_token` (`crates/jit/src/commands/project.rs:55-69`) restate serde renames of the enums in `config.rs:1103-1145`, to fill `String` fields (`project.rs:33,35`) at `:211-212`.\n\n## Success Criteria\n\n- [hard] REQ-01: Projection mode and style are declared through the macro, and the render report holds them as enums.\n- [hard] REQ-02: `mode_token` and `style_token` are gone, and the report's JSON is byte-identical.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:16:18.969211777Z",
+  "first_ready_at": "2026-10-24T23:55:25.392124965Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ce12f838-435e-47a9-a2af-13e3d3e35c19",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:16:18.079777347Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "57ae47b9-4f2f-41c8-921a-77262f84061f",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:02:18.407019458Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6add7ca6-542e-402b-b99e-0c2e0984b723",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Projection mode and style reach output typed",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T02:16:18.969211777Z"
 }

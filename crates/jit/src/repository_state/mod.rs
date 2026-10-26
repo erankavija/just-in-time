@@ -5,6 +5,7 @@
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 
+use crate::domain::identity::ProfileId;
 mod archive;
 mod default_rules;
 mod export;
@@ -28,8 +29,8 @@ pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
-    default_ruleset, hierarchy_config, reconcile_default_rules_with_config,
-    type_hierarchy_known_schema, TYPE_HIERARCHY_SCHEMA_FILE,
+    default_ruleset, reconcile_default_rules_with_config, type_hierarchy_known_schema,
+    TYPE_HIERARCHY_SCHEMA_FILE,
 };
 pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
@@ -39,8 +40,8 @@ pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
     EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, PinnedDocumentEvidence,
-    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
+    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
@@ -146,7 +147,6 @@ pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
     GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
-    WORKTREE_IDENTITY_FILE,
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,
@@ -224,11 +224,6 @@ pub enum ProducerError {
     /// A selected content parser is not available in this build.
     #[error(transparent)]
     ContentParser(#[from] crate::document::ContentParserError),
-    /// The repository-level content format is invalid.
-    #[error(
-        "invalid [validation].content_format in .jit/config.toml: '{0}': Invalid content format: '{0}' (expected markdown, html, or xml)"
-    )]
-    InvalidContentFormat(String),
     /// A rules document could not be parsed or safely spliced.
     #[error(transparent)]
     RulesDocument(#[from] RulesDocumentError),
@@ -425,9 +420,9 @@ pub(crate) fn declarations_from_image(
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config_bytes = image
-        .file_bytes(&VirtualPath::CONFIG)?
-        .ok_or_else(|| DeclarationParseError::MissingCapture(".jit/config.toml".to_string()))?;
+    let config_bytes = image.file_bytes(&VirtualPath::CONFIG)?.ok_or_else(|| {
+        DeclarationParseError::MissingCapture(VirtualPath::CONFIG.repository_relative())
+    })?;
     let configuration = crate::declarations::parse_configuration(config_bytes)?;
     let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
     let hierarchy_types = config
@@ -462,7 +457,7 @@ pub(crate) fn validation_declarations_from_image(
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
                 .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::data(&request.reference)?;
+                    let path = VirtualPath::schema_reference(&request.reference)?;
                     let bytes = image.file_bytes(&path)?.ok_or_else(|| {
                         DeclarationParseError::MissingCapture(request.reference.clone())
                     })?;
@@ -498,7 +493,7 @@ pub struct MaterializationPlan {
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 /// What one profile decided about one target it participates in.
@@ -527,7 +522,7 @@ pub(crate) struct ProfileTargetMaterialization {
     /// reader that reports per profile needs each decision to name the profile
     /// that made it. A target two packages both contribute is decided by each
     /// of them and therefore appears once per contributing owner.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,
@@ -542,7 +537,7 @@ pub(crate) struct ProfileTargetMaterialization {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileContributionMaterialization {
     /// Package whose composed claims decided this declaration.
-    pub(crate) owner: crate::profile::ProfileId,
+    pub(crate) owner: ProfileId,
     /// Canonical semantic identity the decision is about.
     pub(crate) identity: ContributionIdentity,
     pub(crate) disposition: ProfileTargetDisposition,
@@ -553,7 +548,7 @@ struct MaterializationDerivation {
     delta: RepositoryDelta,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
-    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    applied_profiles: std::collections::BTreeSet<ProfileId>,
 }
 
 impl MaterializationDerivation {
@@ -580,10 +575,7 @@ impl MaterializationDerivation {
     }
 
     /// Record packages whose candidate derivations have a non-event effect.
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }
@@ -614,9 +606,7 @@ impl MaterializationPlan {
     }
 
     /// Package identities responsible for a non-event effect in this plan.
-    pub(crate) fn applied_profiles(
-        &self,
-    ) -> &std::collections::BTreeSet<crate::profile::ProfileId> {
+    pub(crate) fn applied_profiles(&self) -> &std::collections::BTreeSet<ProfileId> {
         &self.applied_profiles
     }
 
@@ -650,10 +640,7 @@ impl MaterializationPlan {
         self
     }
 
-    fn with_applied_profiles(
-        mut self,
-        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
-    ) -> Self {
+    fn with_applied_profiles(mut self, profiles: std::collections::BTreeSet<ProfileId>) -> Self {
         self.applied_profiles = profiles;
         self
     }
@@ -799,7 +786,7 @@ pub fn finalize_config_edit(
     // preimages, since only `config.toml` is overlaid).
     let mut actions = vec![RepositoryAction::WriteFile {
         path: config_path.clone(),
-        owner: "authored-config".to_string(),
+        owner: RepositoryActionOwner::AuthoredConfig,
         expected: ExpectedPreimage::of(base.entry(&config_path).map_err(ProducerError::from)?),
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
@@ -983,8 +970,8 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config).schema_files {
-            let vpath = VirtualPath::data(format!("schemas/{}", schema.name))?;
+        for schema in materialize::serialized_default_ruleset(&config)?.schema_files {
+            let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);
             }
@@ -1126,19 +1113,19 @@ mod tests {
         let actions = [
             RepositoryAction::CreateDirectory {
                 path: target.clone(),
-                owner: "directory".into(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             },
             RepositoryAction::WriteFile {
                 path: target.clone(),
-                owner: "writer".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: b"expected".to_vec(),
                 mode: FileMode::Regular,
             },
             RepositoryAction::SetMode {
                 path: target.clone(),
-                owner: "mode".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant.clone(),
                     mode: FileMode::Regular,
@@ -1147,7 +1134,7 @@ mod tests {
             },
             RepositoryAction::DeleteFile {
                 path: target.clone(),
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity: occupant,
                     mode: FileMode::Regular,
@@ -1220,12 +1207,12 @@ mod tests {
             vec![
                 RepositoryAction::CreateDirectory {
                     path: create.clone(),
-                    owner: "directory".into(),
+                    owner: RepositoryActionOwner::RepositoryInit,
                     expected: ExpectedPreimage::Absent,
                 },
                 RepositoryAction::DeleteFile {
                     path: delete.clone(),
-                    owner: "delete".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: delete_identity,
                         mode: FileMode::Regular,
@@ -1233,7 +1220,7 @@ mod tests {
                 },
                 RepositoryAction::SetMode {
                     path: set_mode.clone(),
-                    owner: "mode".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: mode_identity,
                         mode: FileMode::Regular,
@@ -1242,7 +1229,7 @@ mod tests {
                 },
                 RepositoryAction::WriteFile {
                     path: write.clone(),
-                    owner: "writer".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"new".to_vec(),
                     mode: FileMode::Regular,

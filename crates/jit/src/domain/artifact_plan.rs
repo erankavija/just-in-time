@@ -8,12 +8,12 @@
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::ArtifactEvidenceError;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::State;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
-use std::fmt;
 
 /// The first archive-plan JSON schema version.
 ///
@@ -367,101 +367,41 @@ pub struct PendingDeletion {
     pub content_identity: ContentIdentity,
 }
 
-/// Stable evidence flags. These constrain action selection but never block it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum EvidenceCode {
-    PermanentPath,
-    OutsideDevelopmentRoot,
-    OutsideOwner,
-    ActiveOwner,
-    UnmanagedPath,
-    ArchivedSource,
-    PinnedHistorical,
-}
-
-impl EvidenceCode {
-    /// Complete schema-v1 evidence vocabulary, in binding contract order.
-    pub const ALL: [Self; 7] = [
-        Self::PermanentPath,
-        Self::OutsideDevelopmentRoot,
-        Self::OutsideOwner,
-        Self::ActiveOwner,
-        Self::UnmanagedPath,
-        Self::ArchivedSource,
-        Self::PinnedHistorical,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PermanentPath => "permanent-path",
-            Self::OutsideDevelopmentRoot => "outside-development-root",
-            Self::OutsideOwner => "outside-owner",
-            Self::ActiveOwner => "active-owner",
-            Self::UnmanagedPath => "unmanaged-path",
-            Self::ArchivedSource => "archived-source",
-            Self::PinnedHistorical => "pinned-historical",
-        }
+wire_vocabulary! {
+    /// Stable evidence flags. These constrain action selection but never block it.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum EvidenceCode {
+        PermanentPath = "permanent-path",
+        OutsideDevelopmentRoot = "outside-development-root",
+        OutsideOwner = "outside-owner",
+        ActiveOwner = "active-owner",
+        UnmanagedPath = "unmanaged-path",
+        ArchivedSource = "archived-source",
+        PinnedHistorical = "pinned-historical",
     }
 }
 
-/// Stable conditions that make a target or artifact ineligible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BlockerCode {
-    PolicyUnconfigured,
-    PolicyIncomplete,
-    UnmanagedSelectedRoot,
-    DestinationConflict,
-    DocumentNonTerminalOwner,
-    PinnedReadFailed,
-    RepositoryEscape,
-    UnresolvableEdge,
-    UnpreservableLayout,
-    NonTerminalTarget,
-    MissingSource,
-    SymlinkArtifact,
-    UnsupportedArtifactType,
+wire_vocabulary! {
+    /// Stable conditions that make a target or artifact ineligible.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum BlockerCode {
+        PolicyUnconfigured = "policy-unconfigured",
+        PolicyIncomplete = "policy-incomplete",
+        UnmanagedSelectedRoot = "unmanaged-selected-root",
+        DestinationConflict = "destination-conflict",
+        DocumentNonTerminalOwner = "document-non-terminal-owner",
+        PinnedReadFailed = "pinned-read-failed",
+        RepositoryEscape = "repository-escape",
+        UnresolvableEdge = "unresolvable-edge",
+        UnpreservableLayout = "unpreservable-layout",
+        NonTerminalTarget = "non-terminal-target",
+        MissingSource = "missing-source",
+        SymlinkArtifact = "symlink-artifact",
+        UnsupportedArtifactType = "unsupported-artifact-type",
+    }
 }
 
 impl BlockerCode {
-    /// Complete schema-v1 blocker vocabulary, in binding contract order.
-    pub const ALL: [Self; 13] = [
-        Self::PolicyUnconfigured,
-        Self::PolicyIncomplete,
-        Self::UnmanagedSelectedRoot,
-        Self::DestinationConflict,
-        Self::DocumentNonTerminalOwner,
-        Self::PinnedReadFailed,
-        Self::RepositoryEscape,
-        Self::UnresolvableEdge,
-        Self::UnpreservableLayout,
-        Self::NonTerminalTarget,
-        Self::MissingSource,
-        Self::SymlinkArtifact,
-        Self::UnsupportedArtifactType,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PolicyUnconfigured => "policy-unconfigured",
-            Self::PolicyIncomplete => "policy-incomplete",
-            Self::UnmanagedSelectedRoot => "unmanaged-selected-root",
-            Self::DestinationConflict => "destination-conflict",
-            Self::DocumentNonTerminalOwner => "document-non-terminal-owner",
-            Self::PinnedReadFailed => "pinned-read-failed",
-            Self::RepositoryEscape => "repository-escape",
-            Self::UnresolvableEdge => "unresolvable-edge",
-            Self::UnpreservableLayout => "unpreservable-layout",
-            Self::NonTerminalTarget => "non-terminal-target",
-            Self::MissingSource => "missing-source",
-            Self::SymlinkArtifact => "symlink-artifact",
-            Self::UnsupportedArtifactType => "unsupported-artifact-type",
-        }
-    }
-
     /// The permitted next action when a blocker is caused by lifecycle state,
     /// or `None` for blockers unrelated to state (`jit:45a140ae`, REQ-05).
     ///
@@ -491,53 +431,24 @@ impl BlockerCode {
     }
 }
 
-/// Stable non-blocking diagnostics emitted by planning or execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum WarningCode {
-    MissingEdgeTarget,
-    ExternalEdge,
-    NoOwner,
-    ResidueSource,
-    DeletionFailed,
-    NotSelectedSibling,
-    DynamicLoadingSuspected,
-    UnsupportedEdgeTarget,
-    /// One citation of a relocating artifact's path in the text of a scanned
-    /// file: an occurrence naming that path whole, rather than one sitting
-    /// inside a longer path such as the destination the relocation publishes.
-    /// Its [`PlanWarning::path`] names the citing file with the citation's
-    /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
-    MovingPathCitation,
-}
-
-impl WarningCode {
-    /// Complete schema-v1 warning vocabulary, in binding contract order.
-    pub const ALL: [Self; 9] = [
-        Self::MissingEdgeTarget,
-        Self::ExternalEdge,
-        Self::NoOwner,
-        Self::ResidueSource,
-        Self::DeletionFailed,
-        Self::NotSelectedSibling,
-        Self::DynamicLoadingSuspected,
-        Self::UnsupportedEdgeTarget,
-        Self::MovingPathCitation,
-    ];
-
-    /// Stable kebab-case wire spelling.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::MissingEdgeTarget => "missing-edge-target",
-            Self::ExternalEdge => "external-edge",
-            Self::NoOwner => "no-owner",
-            Self::ResidueSource => "residue-source",
-            Self::DeletionFailed => "deletion-failed",
-            Self::NotSelectedSibling => "not-selected-sibling",
-            Self::DynamicLoadingSuspected => "dynamic-loading-suspected",
-            Self::UnsupportedEdgeTarget => "unsupported-edge-target",
-            Self::MovingPathCitation => "moving-path-citation",
-        }
+wire_vocabulary! {
+    /// Stable non-blocking diagnostics emitted by planning or execution.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    pub enum WarningCode {
+        MissingEdgeTarget = "missing-edge-target",
+        ExternalEdge = "external-edge",
+        NoOwner = "no-owner",
+        ResidueSource = "residue-source",
+        DeletionFailed = "deletion-failed",
+        NotSelectedSibling = "not-selected-sibling",
+        DynamicLoadingSuspected = "dynamic-loading-suspected",
+        UnsupportedEdgeTarget = "unsupported-edge-target",
+        /// One citation of a relocating artifact's path in the text of a scanned
+        /// file: an occurrence naming that path whole, rather than one sitting
+        /// inside a longer path such as the destination the relocation publishes.
+        /// Its [`PlanWarning::path`] names the citing file with the citation's
+        /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
+        MovingPathCitation = "moving-path-citation",
     }
 }
 
@@ -1111,89 +1022,41 @@ impl ArtifactPlan {
 }
 
 /// Construction and execution-readiness failures for the plan model.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PlanError {
     /// A symbolic, abbreviated, uppercase, or otherwise non-canonical pin.
+    #[error("pinned artifact version is not a canonical full commit OID: {0}")]
     NonCanonicalCommitOid(String),
     /// A recorded digest that is not exactly 64 lowercase hexadecimal characters.
+    #[error("content identity is not a lowercase SHA-256: {0}")]
     InvalidContentHash(String),
     /// A publication or deletion lacks its required source identity.
+    #[error("published or deleted working-tree artifact lacks content identity: {0}")]
     MissingContentIdentity(String),
     /// An operation carrying no publication or deletion supplied an identity.
+    #[error("non-publishing artifact unexpectedly carries content identity: {0}")]
     UnexpectedContentIdentity(String),
     /// A move/copy action lacks its mirror destination.
+    #[error("relocating artifact lacks a destination: {0}")]
     MissingDestination(String),
     /// A retained artifact incorrectly names a relocation destination.
+    #[error("retained artifact unexpectedly has a destination: {0}")]
     UnexpectedDestination(String),
     /// A pinned historical entry attempted a relocating operation.
+    #[error("pinned historical artifact cannot relocate: {0}")]
     RelocatingPinnedArtifact(String),
     /// Execution was asked to consume an unknown wire schema.
+    #[error("unsupported artifact-plan schema version: {0}")]
     UnsupportedSchemaVersion(u32),
     /// Derived fields or ordering do not match the artifact contents.
+    #[error("artifact plan ordering, count, or action counts are not canonical")]
     NonCanonicalEnvelope,
     /// Policy or plan blockers prohibit mutation.
+    #[error("artifact plan is not eligible for execution")]
     Ineligible,
     /// Classification lacked evidence for a path it names.
-    Evidence(ArtifactEvidenceError),
-}
-
-impl fmt::Display for PlanError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NonCanonicalCommitOid(oid) => write!(
-                formatter,
-                "pinned artifact version is not a canonical full commit OID: {oid}"
-            ),
-            Self::InvalidContentHash(hash) => {
-                write!(
-                    formatter,
-                    "content identity is not a lowercase SHA-256: {hash}"
-                )
-            }
-            Self::MissingContentIdentity(path) => write!(
-                formatter,
-                "published or deleted working-tree artifact lacks content identity: {path}"
-            ),
-            Self::UnexpectedContentIdentity(path) => write!(
-                formatter,
-                "non-publishing artifact unexpectedly carries content identity: {path}"
-            ),
-            Self::MissingDestination(path) => {
-                write!(formatter, "relocating artifact lacks a destination: {path}")
-            }
-            Self::UnexpectedDestination(path) => {
-                write!(
-                    formatter,
-                    "retained artifact unexpectedly has a destination: {path}"
-                )
-            }
-            Self::RelocatingPinnedArtifact(path) => {
-                write!(
-                    formatter,
-                    "pinned historical artifact cannot relocate: {path}"
-                )
-            }
-            Self::UnsupportedSchemaVersion(version) => {
-                write!(
-                    formatter,
-                    "unsupported artifact-plan schema version: {version}"
-                )
-            }
-            Self::NonCanonicalEnvelope => formatter
-                .write_str("artifact plan ordering, count, or action counts are not canonical"),
-            Self::Ineligible => formatter.write_str("artifact plan is not eligible for execution"),
-            Self::Evidence(error) => write!(formatter, "{error}"),
-        }
-    }
-}
-
-impl std::error::Error for PlanError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Evidence(error) => Some(error),
-            _ => None,
-        }
-    }
+    #[error("{0}")]
+    Evidence(#[source] ArtifactEvidenceError),
 }
 
 impl From<ArtifactEvidenceError> for PlanError {

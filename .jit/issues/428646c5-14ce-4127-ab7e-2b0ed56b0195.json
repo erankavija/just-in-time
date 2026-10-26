@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T00:18:08.627191071Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Resolve declared profile dependencies by `ProfileId` value instead of by string.\n\n## Background\n\n`resolve_dependency_package_from` takes `dependency: &str` (`crates/jit/src/commands/profile.rs:1757-1762`) although its caller holds a `ProfileId` (`:1731`, `dependency.id.as_str()`). It compares `id.as_str() == dependency` (`:1767`) and `package.model().id.as_str() == dependency` (`:1778`), and rebuilds a selector from the string (`:1771`). The package graph keys packages by `ProfileId` (`profile/graph.rs:36-40`).\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_dependency_package_from` takes `&ProfileId` and compares `ProfileId` values.\n- [hard] REQ-02: Profile dependency resolution and the package graph contain no string comparison of profile ids.\n- [hard] REQ-03: Dependency resolution tests resolve the same packages as before.\n\n## Notes\n\nApplied-record comparisons and graph error payloads are left to the profile apply-once rework, which deletes or replaces that code.\n",
   "documents": [],
+  "done_at": "2026-10-25T03:07:28.362774689Z",
+  "first_ready_at": "2026-10-25T00:16:16.114474941Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5ecebf87-5163-4470-9cec-6a47b80af6e7",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:07:27.563469220Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e1fedc5c-4ec1-4bf6-9c3a-b0cfd2c7edf2",
+      "status": "passed",
+      "updated_at": "2026-10-25T03:05:54.051861493Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "428646c5-14ce-4127-ab7e-2b0ed56b0195",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Profile dependency resolution compares ProfileId values",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T03:07:28.362774689Z"
 }

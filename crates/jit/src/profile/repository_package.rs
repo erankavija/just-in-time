@@ -864,7 +864,10 @@ mod tests {
 
     #[test]
     fn test_managed_regions_match_every_declared_source_tree_consumer() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
         let (_workspace, package) = assembled_package();
 
         // Each managed region's packaged source matches the live region body, modulo
@@ -902,8 +905,13 @@ mod tests {
             render_template_registry, splice_template_region, TEMPLATE_REGION_GENERATOR,
             TEMPLATE_REGISTRY_PATH,
         };
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let existing = fs::read(root.join(TEMPLATE_REGISTRY_PATH)).unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+        let layout = crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap();
+        let existing = fs::read(layout.resolve(&TEMPLATE_REGISTRY_PATH).unwrap()).unwrap();
+        let registry_path = TEMPLATE_REGISTRY_PATH.repository_relative();
         let (_workspace, package) = assembled_package();
         let block = render_template_block(&packaged_templates(&package).unwrap()).unwrap();
         // The render the generator publishes, so the two cannot disagree about
@@ -915,7 +923,7 @@ mod tests {
         assert_eq!(
             String::from_utf8(rendered.clone()).unwrap(),
             String::from_utf8(existing.clone()).unwrap(),
-            "{TEMPLATE_REGISTRY_PATH} no longer carries the packaged template \
+            "{registry_path} no longer carries the packaged template \
              declarations. The block between the region delimiters is \
              generated from profiles/jit-dogfood/manifest.toml: edit the \
              packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
@@ -1077,7 +1085,7 @@ mod tests {
         crate::profile::contribution_drift::contributed_registry_paths(contributions)
             .into_iter()
             .map(|registry| {
-                let text = fs::read_to_string(root.join(registry))
+                let text = fs::read_to_string(root.join(&registry))
                     .unwrap_or_else(|error| panic!("failed to read {registry}: {error}"));
                 (registry.to_string(), text)
             })
@@ -1248,14 +1256,16 @@ mod tests {
     fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
         let (_workspace, package) = assembled_package();
         let contributions = &package.model().contributions;
-        let registry = KeyedArrayTarget::Invariants.registry_path();
+        let registry = KeyedArrayTarget::Invariants
+            .registry_path()
+            .repository_relative();
         let mut registries = contributed_registries(contributions);
         let committed = registries
-            .get(registry)
+            .get(&registry)
             .expect("the invariant registry")
             .clone();
         registries.insert(
-            registry.to_string(),
+            registry.clone(),
             seeded_invariant_statement(&committed, "domain-agnostic"),
         );
 
@@ -1449,7 +1459,13 @@ mod tests {
     /// This repository's committed template registry.
     fn committed_template_registry() -> Vec<u8> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        fs::read(root.join(crate::profile::template_region::TEMPLATE_REGISTRY_PATH)).unwrap()
+        let layout = crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap();
+        fs::read(
+            layout
+                .resolve(&crate::profile::template_region::TEMPLATE_REGISTRY_PATH)
+                .unwrap(),
+        )
+        .unwrap()
     }
 
     /// The declarations a template registry's text carries, as the registry
@@ -1701,15 +1717,15 @@ mod tests {
         let invariants = reloaded.project_render(Some("invariants")).unwrap();
         let invariants = &invariants.projections[0];
         assert_eq!(invariants.target, "AGENTS.md");
-        assert_eq!(invariants.mode, "region");
-        assert_eq!(invariants.style, "id-anchor");
+        assert_eq!(invariants.mode, crate::config::ProjectionMode::Region);
+        assert_eq!(invariants.style, ProjectionStyle::IdAnchor);
         assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, contributed.invariants.len());
         let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
         let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
-        assert_eq!(reference.mode, "separate-file");
-        assert_eq!(reference.style, "full");
+        assert_eq!(reference.mode, crate::config::ProjectionMode::SeparateFile);
+        assert_eq!(reference.style, ProjectionStyle::Full);
         assert_eq!(reference.kinds, ["rule", "gate"]);
         // The separate-file target carries the profile's six gates (registry
         // composition asserted through the rendered `## Gates` section).
@@ -1751,7 +1767,7 @@ mod tests {
         .unwrap();
         std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
         let rules = crate::storage::ruleset_store::load_ruleset(
-            temp.path(),
+            &crate::test_utils::repository_layout_for_data_root(temp.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();

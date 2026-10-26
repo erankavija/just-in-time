@@ -82,20 +82,20 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
     // inferred from the storage parent (`@/charter/D-4`).
     let worktree_paths = WorktreePaths::detect_for_data_root(&data_root, &non_git_worktree_root)
         .context("failed to discover repository worktree layout")?;
+    let layout = discover_repository_layout(&worktree_paths.worktree_root, &data_root)
+        .context("failed to construct repository layout")?;
 
     // Decided strictly before the storage handle exists, so a refusal appends
     // nothing and leaves no residue for recovery to converge.
     let write_override = linked_checkout_write_decision(
         invocation.opens_mutation_session,
         &worktree_paths,
-        &data_root,
+        &layout,
         invocation.write_override,
     )?;
 
     let storage = JsonFileStorage::new(&data_root);
     storage.configure_worktree_paths(&worktree_paths);
-    let layout = discover_repository_layout(&worktree_paths.worktree_root, &data_root)
-        .context("failed to construct repository layout")?;
     // Session opening is the one recovery boundary. Claim-coordinating commands
     // open their operation session only after coordination, so their startup
     // open repairs residue without inverting coordinator -> repository.
@@ -218,13 +218,13 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
 fn linked_checkout_write_decision(
     opens_mutation_session: bool,
     worktree_paths: &WorktreePaths,
-    jit_dir: &Path,
+    layout: &RepositoryLayout,
     invocation_override: Option<LinkedCheckoutWriteStance>,
 ) -> Result<Option<MutationContextAnnotation>> {
     if !opens_mutation_session || !worktree_paths.is_worktree() {
         return Ok(None);
     }
-    let declared = ConfigManager::new(jit_dir).get_write_policy()?;
+    let declared = ConfigManager::new(layout.clone()).get_write_policy()?;
     let effective = LinkedCheckoutWriteStance::resolve(declared, invocation_override);
     match effective {
         LinkedCheckoutWriteStance::Refuse => Err(LinkedCheckoutWriteRefusedError::new(
@@ -358,6 +358,7 @@ mod linked_checkout_write_decision_tests {
     use crate::errors::LinkedCheckoutWriteRefusedError;
     use crate::repository_state::MutationContextAnnotation;
     use crate::storage::worktree_paths::WorktreePaths;
+    use crate::test_utils::repository_layout_for_data_root;
     use std::path::PathBuf;
 
     /// A repository whose `[worktree]` section declares `stance`, or which
@@ -412,8 +413,13 @@ mod linked_checkout_write_decision_tests {
         ];
 
         for (reason, jit_dir, invocation_override) in cases {
-            let error = linked_checkout_write_decision(true, &linked, jit_dir, invocation_override)
-                .expect_err(reason);
+            let error = linked_checkout_write_decision(
+                true,
+                &linked,
+                &repository_layout_for_data_root(jit_dir),
+                invocation_override,
+            )
+            .expect_err(reason);
             let refusal = error
                 .downcast_ref::<LinkedCheckoutWriteRefusedError>()
                 .unwrap_or_else(|| panic!("the refusal is typed, not a message: {error:#}"));
@@ -437,7 +443,7 @@ mod linked_checkout_write_decision_tests {
         let annotation = linked_checkout_write_decision(
             true,
             &checkout_paths(true),
-            refusing.path(),
+            &repository_layout_for_data_root(refusing.path()),
             Some(LinkedCheckoutWriteStance::Allow),
         )
         .expect("an override outranking a refusal permits the invocation")
@@ -497,7 +503,7 @@ mod linked_checkout_write_decision_tests {
                 linked_checkout_write_decision(
                     opens_mutation_session,
                     worktree_paths,
-                    jit_dir,
+                    &repository_layout_for_data_root(jit_dir),
                     Some(LinkedCheckoutWriteStance::Allow)
                 )
                 .expect("the invocation is permitted")

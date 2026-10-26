@@ -1,0 +1,59 @@
+{
+  "branch": "worktree-agent-91081bd3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e773ffd12cdbd0d4355e0fd781184fdd0b337cb4",
+  "completed_at": "2026-10-25T16:38:57.626293974Z",
+  "duration_ms": 103016,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 2307,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91081bd3/requirement/REQ-01",
+          "@/issue/91081bd3/requirement/REQ-02",
+          "@/issue/91081bd3/requirement/REQ-06",
+          "@/issue/2195c98f/requirement/REQ-02",
+          "@/issue/2195c98f/requirement/REQ-17",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Command-layer APIs reparse and re-resolve CLI IDs after main.rs resolves them."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F2",
+        "line": 2811,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91081bd3/requirement/REQ-01",
+          "@/issue/91081bd3/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "Issue deletion invokes an executor method before resolving its CLI issue ID."
+      }
+    ],
+    "summary": "CLI issue IDs are still reparsed or passed raw after the intended boundary.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ee5de642-1826-46a8-87c1-8688985af45d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T16:37:14.609577377Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8810 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a173ec-65e2-72d3-a4e0-5e20f746d39d\n--------\nuser\n--- 8797 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e003ac083, b546c3da, d6301e500, eee7fe3f1, 624404474, 4f6fa08a, 1afad91f, 499127386, e773ffd12 (`jit:91081bd3`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/91081bd3/requirement/REQ-01–REQ-06 (.jit/issues/91081bd3-9996-4f81-a405-a06c7cdcae8b.json); @/issue/2195c98f/requirement/REQ-02, REQ-03, REQ-17 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T16:33:21Z); prior code-review failed (exit 1) and its findings were reassessed against the current tree\nTruncation recovery: reread the initially truncated e003ac083/b546c3da patches with narrower commit/path reads; inspected bounded current-source and test slices\n\n1. [blocking, issue-impact] Resolved CLI IDs are still coerced back to `&str` and parsed/resolved again by command-layer methods. For example, `issue show` resolves at [main.rs:2307](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/main.rs:2307), then `build_issue_show_response` passes a string to `IssueOps::show_issue`, which reparses and resolves it at [issue.rs:279](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/commands/issue.rs:279). The same pattern remains for direct issue operations, document commands, and gate-run loading—for example [main.rs:4841](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/main.rs:4841) to [document.rs:108](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/commands/document.rs:108), and [gate.rs:1349](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/commands/gate.rs:1349). This leaves the required single CLI-boundary parse/resolve contract unmet. References: @/issue/91081bd3/requirement/REQ-01, @/issue/91081bd3/requirement/REQ-02, @/issue/91081bd3/requirement/REQ-06, @/issue/2195c98f/requirement/REQ-02, @/issue/2195c98f/requirement/REQ-17, @/invariant/semantic-types.\n\n2. [blocking, issue-impact] `issue delete` parses the raw argument, calls `confirm_deletion_allowed` with that raw prefix, and only resolves the ID afterward at [main.rs:2811](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/main.rs:2811) and [main.rs:2832](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-91081bd3/crates/jit/src/main.rs:2832). This directly contradicts the criterion that resolution occurs before any executor call. References: @/issue/91081bd3/requirement/REQ-01, @/issue/91081bd3/requirement/REQ-06.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"CLI issue IDs are still reparsed or passed raw after the intended boundary.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Command-layer APIs reparse and re-resolve CLI IDs after main.rs resolves them.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2307,\"references\":[\"@/issue/91081bd3/requirement/REQ-01\",\"@/issue/91081bd3/requirement/REQ-02\",\"@/issue/91081bd3/requirement/REQ-06\",\"@/issue/2195c98f/requirement/REQ-02\",\"@/issue/2195c98f/requirement/REQ-17\",\"@/invariant/semantic-types\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue deletion invokes an executor method before resolving its CLI issue ID.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2811,\"references\":[\"@/issue/91081bd3/requirement/REQ-01\",\"@/issue/91081bd3/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

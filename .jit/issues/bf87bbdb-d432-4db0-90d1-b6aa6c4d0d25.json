@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T06:11:03.009397369Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Make the graph's id-returning queries return references into the node set, so a typed caller reads the id from the node instead of parsing a string.\n\n## Background\n\n`DependencyGraph` returns owned id strings: `compute_transitive_reduction -> HashSet<String>` (`crates/jit/src/graph/mod.rs:442`), `find_shortest_path -> Vec<String>` (`:475`) and `find_redundant_edges -> Vec<(String, String)>` (`:519`). `GraphError::NodeNotFound { id: String }` (`:61`) names a dangling reference. Callers sit in `graph/hierarchy.rs`, `commands/dependency.rs`, `commands/template.rs`, `commands/validate.rs`, `validation/graph.rs`, `validation/repository.rs` and `main.rs`. Once nodes store typed ids, a caller handed a `String` would have to rebuild an id from it.\n\n## Success Criteria\n\n- [hard] REQ-01: `compute_transitive_reduction`, `find_shortest_path` and `find_redundant_edges` return references to nodes of the graph (or ids borrowed from them), not owned strings.\n- [hard] REQ-02: Each caller reads ids from the returned nodes, and no caller rebuilds an id from a string the graph produced.\n- [hard] REQ-03: `GraphError::NodeNotFound` names the missing reference for display only, and no caller converts it into an id.\n- [hard] REQ-04: `HierarchyConfig::membership_closure` (`graph/hierarchy.rs:296`) returns node references, and `MembershipDivergence.issue_id` (`:575`) holds the node's own id type.\n- [hard] REQ-05: Graph property tests pass with unchanged assertions.\n",
   "documents": [],
+  "done_at": "2026-10-25T06:38:48.560385175Z",
+  "first_ready_at": "2026-10-25T06:10:09.823600352Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cedea5f6-597f-4fc2-9891-cb0cd36eac67",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:32:52.582395261Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "534b4214-702a-4350-9c27-63a80171c4e0",
+      "status": "passed",
+      "updated_at": "2026-10-25T06:34:17.704201434Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Graph queries return nodes rather than id strings",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T06:38:48.560385175Z"
 }

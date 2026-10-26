@@ -13,14 +13,15 @@ use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::event_log::parse_known_events;
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
     unqualified_link_message, AddressScope, ProjectSource, RawScopeItem,
 };
-use crate::domain::{Issue, ReadinessCorrection, SHORT_ID_LENGTH};
+use crate::domain::{Issue, ReadinessCorrection};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{RepositoryImage, RepositoryIndex};
+use crate::repository_state::{RepositoryImage, RepositoryIndex, VirtualPath};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
@@ -356,16 +357,20 @@ struct Records {
 }
 
 fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records> {
+    let index_path = VirtualPath::INDEX.repository_relative();
     let index = RepositoryIndex::parse(
-        &read(".jit/index.json")?
-            .ok_or_else(|| anyhow!("required repository file '.jit/index.json' is missing"))?,
+        &read(&index_path)?
+            .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
-    .context("invalid .jit/index.json")?;
+    .context(format!("invalid {index_path}"))?;
     let issues = index
         .all_ids
         .iter()
         .map(|id| {
-            let path = format!(".jit/issues/{id}.json");
+            let mut path = VirtualPath::ISSUES.repository_relative();
+            path.push('/');
+            path.push_str(&id.to_string());
+            path.push_str(".json");
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
             if issue.id != *id {
@@ -403,9 +408,12 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
     }
 
     let mut event_count = 0;
-    if let Some(events) = read_text(read, ".jit/events.jsonl")? {
+    if let Some(events) = read_text(read, &VirtualPath::EVENTS.repository_relative())? {
         event_count = parse_known_events(&events)
-            .context("invalid .jit/events.jsonl")?
+            .context(format!(
+                "invalid {}",
+                VirtualPath::EVENTS.repository_relative()
+            ))?
             .len();
     }
     Ok(Records {
@@ -479,7 +487,7 @@ fn validate_integrity(
     }
     for issue in issues {
         let reduced = graph.compute_transitive_reduction(&issue.id);
-        let reduced_set: HashSet<&String> = reduced.iter().collect();
+        let reduced_set: HashSet<_> = reduced.iter().map(|node| &node.id).collect();
         for dependency in &issue.dependencies {
             if !reduced_set.contains(dependency) {
                 let path = graph.find_shortest_path(&issue.id, dependency);
@@ -487,7 +495,7 @@ fn validate_integrity(
                     "unknown path".to_string()
                 } else {
                     path.iter()
-                        .map(|id| &id[..SHORT_ID_LENGTH.min(id.len())])
+                        .map(|node| node.short_id())
                         .collect::<Vec<_>>()
                         .join(" → ")
                 };
@@ -495,7 +503,7 @@ fn validate_integrity(
                     "Transitive reduction violation: Issue {} has redundant dependency on {} \
                      (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
                     issue.short_id(),
-                    dependency.chars().take(SHORT_ID_LENGTH).collect::<String>(),
+                    dependency.short_id(),
                     path
                 ));
             }
@@ -558,7 +566,7 @@ fn collect_rule_findings(
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
 ) -> Result<Vec<ReportedFinding>> {
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut reported = Vec::new();
     for issue in issues {
         let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)?;
@@ -574,7 +582,7 @@ fn collect_rule_findings(
         .iter()
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
-    let hierarchy = crate::repository_state::hierarchy_config(namespaces);
+    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
     let plan_content = project_plan_content(read, issues, config)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
@@ -656,10 +664,8 @@ fn project_plan_content(
 ) -> Result<HashMap<String, String>> {
     let templates = &config.templates;
     let breakable: HashSet<String> = templates.breakable_types().into_iter().collect();
-    let by_id: HashMap<&str, &Issue> = issues
-        .iter()
-        .map(|issue| (issue.id.as_str(), issue))
-        .collect();
+    let by_id: HashMap<&crate::domain::identity::IssueId, &Issue> =
+        issues.iter().map(|issue| (&issue.id, issue)).collect();
     let mut content = HashMap::new();
     for issue in issues {
         let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
@@ -699,7 +705,7 @@ fn collect_item_link_findings(
     if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
-    let repo_format = config.content_format()?;
+    let repo_format = config.content_format();
     let mut addresses = HashSet::new();
     let issue_kinds: Vec<_> = kinds
         .iter()
@@ -788,20 +794,11 @@ fn collect_item_link_findings(
                         Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
                     AddressScope::Issue(issue_ref) => {
-                        let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&issue_ref).ok();
-                        let matches: Vec<&Issue> = issues
+                        let owner_id = crate::storage::resolve_issue_id_among(&issue_ref, issues)?;
+                        let owner = issues
                             .iter()
-                            .filter(|candidate| {
-                                prefix
-                                    .as_ref()
-                                    .is_some_and(|prefix| prefix.matches(&candidate.id))
-                            })
-                            .collect();
-                        let [owner] = matches.as_slice() else {
-                            return Err(anyhow!(
-                                "has an unresolved or ambiguous issue scope '{issue_ref}'"
-                            ));
-                        };
+                            .find(|issue| issue.id == owner_id)
+                            .ok_or_else(|| anyhow!("missing issue '{owner_id}'"))?;
                         Ok(format!(
                             "@/issue/{}/{}/{}",
                             owner.short_id(),
@@ -867,7 +864,7 @@ mod tests {
         let (repo, _storage, _taxonomy) =
             crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         std::fs::write(
-            repo.path().join(".jit/config.toml"),
+            data_path(&repo, &VirtualPath::CONFIG),
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
@@ -888,12 +885,47 @@ mod tests {
         repo
     }
 
+    #[test]
+    fn test_validate_repository_preserves_invalid_hierarchy_error() {
+        let repo = fixture();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
+
+        let failure = executor(&repo)
+            .validate_repository_report()
+            .unwrap()
+            .unwrap_err();
+        let (error, _report) = failure.into_parts();
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
     /// A file-backed executor with the fixture's canonical layout, used to capture
     /// whole-repository validation images through a mutation session.
     fn executor(repo: &tempfile::TempDir) -> crate::commands::CommandExecutor<JsonFileStorage> {
         let data = repo.path().join(".jit");
         let layout = crate::storage::discover_repository_layout(repo.path(), &data).unwrap();
         crate::commands::CommandExecutor::new(JsonFileStorage::new(&data)).with_layout(layout)
+    }
+
+    fn data_path(repo: &tempfile::TempDir, path: &VirtualPath) -> PathBuf {
+        executor(repo)
+            .require_layout()
+            .unwrap()
+            .resolve(path)
+            .unwrap()
+    }
+
+    fn issue_path(id: &str) -> VirtualPath {
+        VirtualPath::data(format!(
+            "{}/{}.json",
+            VirtualPath::ISSUES.relative().as_str(),
+            id
+        ))
+        .unwrap()
     }
 
     /// Read a repo-relative fixture file's bytes, or `None` when absent.
@@ -959,8 +991,8 @@ mod tests {
     }
 
     /// A string-valued overlay change (create/replace with UTF-8 text).
-    fn put(path: &'static str, text: &str) -> (&'static str, Option<Vec<u8>>) {
-        (path, Some(text.as_bytes().to_vec()))
+    fn put(path: impl Into<String>, text: &str) -> (String, Option<Vec<u8>>) {
+        (path.into(), Some(text.as_bytes().to_vec()))
     }
 
     #[test]
@@ -976,13 +1008,13 @@ mod tests {
     fn test_unloadable_rules_preserve_rules_file_and_enforcement_drift_findings() {
         let repo = fixture();
         std::fs::write(
-            repo.path().join(".jit/rules.toml"),
+            data_path(&repo, &VirtualPath::RULES),
             "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
              assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
         )
         .unwrap();
         std::fs::write(
-            repo.path().join(".jit/invariants.toml"),
+            data_path(&repo, &VirtualPath::INVARIANTS),
             "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
              enforced-by = \"@/rule/bad-rule\"\n",
         )
@@ -1005,10 +1037,10 @@ mod tests {
     #[test]
     fn test_overlay_config_ignores_disagreeing_live_bytes() {
         let repo = fixture();
-        std::fs::write(repo.path().join(".jit/config.toml"), "not toml = [").unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), "not toml = [").unwrap();
         assert!(validate_overlaid(
             &repo,
-            [put(".jit/config.toml", "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n")],
+            [put(VirtualPath::CONFIG.repository_relative(), "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n")],
         )
         .is_ok());
     }
@@ -1016,17 +1048,28 @@ mod tests {
     #[test]
     fn test_overlay_templates_ignore_disagreeing_live_bytes() {
         let repo = fixture();
-        std::fs::write(repo.path().join(".jit/templates.toml"), "not toml = [").unwrap();
-        assert!(validate_overlaid(&repo, [put(".jit/templates.toml", "templates = []\n")]).is_ok());
+        std::fs::write(data_path(&repo, &VirtualPath::TEMPLATES), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &repo,
+            [put(
+                VirtualPath::TEMPLATES.repository_relative(),
+                "templates = []\n"
+            )]
+        )
+        .is_ok());
         assert!(validate_live(&repo).is_err());
     }
 
     #[test]
     fn test_overlay_rules_ignore_disagreeing_live_bytes() {
         let repo = fixture();
-        let rules = read_fixture(&repo, ".jit/rules.toml").unwrap();
-        std::fs::write(repo.path().join(".jit/rules.toml"), "not toml = [").unwrap();
-        assert!(validate_overlaid(&repo, [(".jit/rules.toml", Some(rules))]).is_ok());
+        let rules = read_fixture(&repo, &VirtualPath::RULES.repository_relative()).unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::RULES), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &repo,
+            [(VirtualPath::RULES.repository_relative(), Some(rules))]
+        )
+        .is_ok());
         assert!(validate_live(&repo)
             .unwrap()
             .rule_report
@@ -1038,15 +1081,19 @@ mod tests {
     #[test]
     fn test_overlay_rules_and_referenced_schema_ignore_disagreeing_live_schema() {
         let repo = fixture();
-        let rules = "[[rules]]\nname = \"planned-schema\"\nseverity = \"error\"\nassert = { json-schema = \"schemas/planned.json\" }\n";
-        std::fs::create_dir_all(repo.path().join(".jit/schemas")).unwrap();
-        std::fs::write(repo.path().join(".jit/rules.toml"), rules).unwrap();
-        std::fs::write(repo.path().join(".jit/schemas/planned.json"), "not json").unwrap();
+        let schema_path = VirtualPath::schema("planned.json").unwrap();
+        let rules = format!(
+            "[[rules]]\nname = \"planned-schema\"\nseverity = \"error\"\nassert = {{ json-schema = {:?} }}\n",
+            schema_path.relative().as_str(),
+        );
+        std::fs::create_dir_all(data_path(&repo, &VirtualPath::SCHEMAS)).unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::RULES), &rules).unwrap();
+        std::fs::write(data_path(&repo, &schema_path), "not json").unwrap();
         assert!(validate_materialized_overlaid(
             &repo,
             [
-                put(".jit/rules.toml", rules),
-                put(".jit/schemas/planned.json", "{}"),
+                put(VirtualPath::RULES.repository_relative(), &rules),
+                put(schema_path.repository_relative(), "{}"),
             ],
         )
         .is_ok());
@@ -1062,22 +1109,25 @@ mod tests {
     #[test]
     fn test_overlay_gate_registry_ignores_disagreeing_live_registry() {
         let repo = fixture();
-        std::fs::write(repo.path().join(".jit/gates.toml"), "not toml = [").unwrap();
-        assert!(validate_overlaid(&repo, [put(".jit/gates.toml", "")]).is_ok());
+        std::fs::write(data_path(&repo, &VirtualPath::GATES), "not toml = [").unwrap();
+        assert!(
+            validate_overlaid(&repo, [put(VirtualPath::GATES.repository_relative(), "")]).is_ok()
+        );
     }
 
     #[test]
     fn test_overlay_index_events_and_issue_records_ignore_disagreeing_live_bytes() {
         let repo = fixture();
-        let index = read_fixture(&repo, ".jit/index.json").unwrap();
-        let events = read_fixture(&repo, ".jit/events.jsonl").unwrap_or_default();
-        std::fs::write(repo.path().join(".jit/index.json"), "not json").unwrap();
-        std::fs::write(repo.path().join(".jit/events.jsonl"), "not jsonl").unwrap();
+        let index = read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap();
+        let events =
+            read_fixture(&repo, &VirtualPath::EVENTS.repository_relative()).unwrap_or_default();
+        std::fs::write(data_path(&repo, &VirtualPath::INDEX), "not json").unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::EVENTS), "not jsonl").unwrap();
         assert!(validate_overlaid(
             &repo,
             [
-                (".jit/index.json", Some(index)),
-                (".jit/events.jsonl", Some(events)),
+                (VirtualPath::INDEX.repository_relative(), Some(index)),
+                (VirtualPath::EVENTS.repository_relative(), Some(events)),
             ],
         )
         .is_ok());
@@ -1086,16 +1136,18 @@ mod tests {
     #[test]
     fn test_overlay_records_dag_and_gate_integrity_judge_planned_bytes() {
         let repo = fixture();
-        let index_bytes = read_fixture(&repo, ".jit/index.json").unwrap();
+        let index_bytes = read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap();
         let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
             .unwrap()
             .all_ids
             .remove(0);
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
-        issue.dependencies = vec!["missing".to_string()];
+        issue.dependencies = vec!["9dbccee5-4241-57f2-ba6b-7bb89e05938a"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap()];
         issue.gates_required = vec!["planned".to_string()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
         let error = format!(
@@ -1103,9 +1155,9 @@ mod tests {
             validate_overlaid(
                 &repo,
                 [
-                    (format!(".jit/issues/{id}.json"), Some(bad)),
+                    (issue_path(&id).repository_relative(), Some(bad)),
                     (
-                        ".jit/gates.toml".to_string(),
+                        VirtualPath::GATES.repository_relative().to_string(),
                         Some(b"[[gates]]\nkey = \"planned\"\ntitle = \"p\"\ndescription = \"\"\nstage = \"postcheck\"\nmode = \"manual\"\n".to_vec()),
                     ),
                 ],
@@ -1113,7 +1165,8 @@ mod tests {
             .unwrap_err()
         );
         assert!(
-            error.contains("repository-integrity") && error.contains("missing"),
+            error.contains("repository-integrity")
+                && error.contains("9dbccee5-4241-57f2-ba6b-7bb89e05938a"),
             "{error}"
         );
     }
@@ -1124,7 +1177,7 @@ mod tests {
         let report = validate_materialized_overlaid(
             &repo,
             [put(
-                ".jit/config.toml",
+                VirtualPath::CONFIG.repository_relative(),
                 "[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
             )],
         )
@@ -1143,7 +1196,7 @@ mod tests {
         let report = validate_materialized_overlaid(
             &repo,
             [put(
-                ".jit/rules.toml",
+                VirtualPath::RULES.repository_relative(),
                 "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                  severity = \"error\"\nenforce = false\n\
                  assert = { require-label = { label = \"req:*\", min = 1 } }\n",
@@ -1161,7 +1214,11 @@ mod tests {
         let layout = crate::storage::discover_repository_layout(repo.path(), store.root()).unwrap();
         store.configure_repository_layout(&layout);
         let mut issue = store.list_issues().unwrap().remove(0);
-        issue.dependencies.push("nonexistent".to_string());
+        issue.dependencies.push(
+            "5a1f6645-96bf-59db-932e-7f49ee5cc6bb"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+        );
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
@@ -1171,11 +1228,11 @@ mod tests {
             &repo,
             [
                 (
-                    ".jit/rules.toml".to_string(),
+                    VirtualPath::RULES.repository_relative().to_string(),
                     Some(rules.as_bytes().to_vec()),
                 ),
                 (
-                    format!(".jit/issues/{}.json", issue.id),
+                    issue_path(&issue.id).repository_relative(),
                     Some(serde_json::to_vec_pretty(&issue).unwrap()),
                 ),
             ],
@@ -1193,23 +1250,29 @@ mod tests {
     fn test_overlay_item_links_judge_planned_registry_deletion() {
         let repo = fixture();
         let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
             ";
+        let config = config.replace(
+            "__INVARIANTS_PATH__",
+            &VirtualPath::INVARIANTS.repository_relative(),
+        );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
-        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
-        std::fs::write(repo.path().join(".jit/invariants.toml"), invariants).unwrap();
-        let index: RepositoryIndex =
-            serde_json::from_slice(&read_fixture(&repo, ".jit/index.json").unwrap()).unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::INVARIANTS), invariants).unwrap();
+        let index: RepositoryIndex = serde_json::from_slice(
+            &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
+        )
+        .unwrap();
         let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue
             .labels
             .push("enforces:@/invariant/planned".to_string());
         std::fs::write(
-            repo.path().join(format!(".jit/issues/{id}.json")),
+            data_path(&repo, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
@@ -1217,8 +1280,11 @@ mod tests {
         executor(&repo).validate_with_fix(true, false).unwrap();
         let live = validate_live(&repo).unwrap();
         assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
-        let planned =
-            validate_materialized_overlaid(&repo, [(".jit/invariants.toml", None)]).unwrap();
+        let planned = validate_materialized_overlaid(
+            &repo,
+            [(VirtualPath::INVARIANTS.repository_relative(), None)],
+        )
+        .unwrap();
         assert!(planned
             .rule_report
             .findings
@@ -1230,20 +1296,22 @@ mod tests {
     fn test_validate_live_reports_unqualified_item_link() {
         let repo = fixture();
         let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
             ";
-        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
         executor(&repo).validate_with_fix(true, false).unwrap();
-        let index: RepositoryIndex =
-            serde_json::from_slice(&read_fixture(&repo, ".jit/index.json").unwrap()).unwrap();
+        let index: RepositoryIndex = serde_json::from_slice(
+            &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
+        )
+        .unwrap();
         let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.labels.push("enforces:planned".to_string());
         std::fs::write(
-            repo.path().join(format!(".jit/issues/{id}.json")),
+            data_path(&repo, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
@@ -1270,7 +1338,7 @@ id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
 link-namespaces = [\"enforces\"]
 scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
 [projection.invariants]
 kind = \"invariant\"
@@ -1278,12 +1346,16 @@ target = \"INVARIANTS.md\"
 mode = \"separate-file\"
 style = \"full\"
 ";
+        let config = config.replace(
+            "__INVARIANTS_PATH__",
+            &VirtualPath::INVARIANTS.repository_relative(),
+        );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         let error = validate_overlaid(
             &repo,
             [
-                put(".jit/config.toml", config),
-                put(".jit/invariants.toml", invariants),
+                put(VirtualPath::CONFIG.repository_relative(), &config),
+                put(VirtualPath::INVARIANTS.repository_relative(), invariants),
                 put("INVARIANTS.md", "stale planned projection\n"),
             ],
         )

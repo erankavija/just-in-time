@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use jit::repository_state::VirtualPath;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::broadcast;
 
@@ -64,9 +65,9 @@ const DEBOUNCE_MS: u64 = 200;
 /// High-frequency noise files that never affect the rendered graph are
 /// explicitly excluded:
 ///
-/// * `events.jsonl` — append-only audit log, written on every command
+/// * [`VirtualPath::EVENTS`] — append-only audit log, written on every command
 /// * `claims.jsonl` / `claims/` — lease coordination heartbeats
-/// * `server.pid.json`, `server.log` — server lifecycle metadata
+/// * [`VirtualPath::SERVER_PID`] and [`VirtualPath::SERVER_LOG`] — server lifecycle metadata
 /// * `*.tmp` — atomic-write intermediaries (written then immediately renamed)
 ///
 /// Paths that *do* trigger a refresh:
@@ -84,10 +85,14 @@ pub fn is_graph_relevant(event: &notify::Event) -> bool {
         }
 
         // Ignore known high-frequency noise files.
-        if matches!(
-            filename,
-            "events.jsonl" | "claims.jsonl" | "server.pid.json" | "server.log"
-        ) {
+        let server_noise = [
+            VirtualPath::EVENTS,
+            VirtualPath::SERVER_PID,
+            VirtualPath::SERVER_LOG,
+        ]
+        .iter()
+        .any(|path| path.file_name() == Some(filename));
+        if filename == "claims.jsonl" || server_noise {
             return false;
         }
 
@@ -228,19 +233,20 @@ mod tests {
     #[tokio::test]
     async fn test_start_watching_ignores_events_jsonl() {
         let tmp = tempfile::tempdir().unwrap();
-        let data_dir = tmp.path().to_str().unwrap();
+        let data_dir = tmp.path();
+        let layout = jit::test_utils::repository_layout_for_data_root(data_dir);
 
         let (tracker, _watcher) = start_watching(data_dir).unwrap();
 
-        // Write an events.jsonl entry (should NOT trigger a version bump)
-        std::fs::write(tmp.path().join("events.jsonl"), "{}\n").unwrap();
+        // Write an audit-log entry (should NOT trigger a version bump).
+        std::fs::write(layout.resolve(&VirtualPath::EVENTS).unwrap(), "{}\n").unwrap();
 
         // Wait longer than the debounce window
         tokio::time::sleep(Duration::from_millis(500)).await;
         assert_eq!(
             tracker.current_version(),
             0,
-            "events.jsonl write must not trigger a version bump"
+            "audit-log writes must not trigger a version bump"
         );
     }
 
@@ -281,15 +287,23 @@ mod tests {
 
     // --- is_graph_relevant unit tests ---
 
-    fn make_event(paths: &[&str]) -> notify::Event {
-        use std::path::PathBuf;
+    fn make_event(paths: &[impl AsRef<Path>]) -> notify::Event {
         notify::Event {
             kind: notify::EventKind::Modify(notify::event::ModifyKind::Data(
                 notify::event::DataChange::Any,
             )),
-            paths: paths.iter().map(|p| PathBuf::from(*p)).collect(),
+            paths: paths
+                .iter()
+                .map(|path| path.as_ref().to_path_buf())
+                .collect(),
             attrs: Default::default(),
         }
+    }
+
+    fn make_data_event(path: &VirtualPath) -> notify::Event {
+        let temp = tempfile::tempdir().unwrap();
+        let layout = jit::test_utils::repository_layout_for_data_root(temp.path());
+        make_event(&[layout.resolve(path).unwrap()])
     }
 
     #[test]
@@ -318,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_irrelevant_events_jsonl() {
-        let e = make_event(&["/repo/.jit/events.jsonl"]);
+        let e = make_data_event(&VirtualPath::EVENTS);
         assert!(!is_graph_relevant(&e));
     }
 
@@ -336,13 +350,13 @@ mod tests {
 
     #[test]
     fn test_irrelevant_server_pid() {
-        let e = make_event(&["/repo/.jit/server.pid.json"]);
+        let e = make_data_event(&VirtualPath::SERVER_PID);
         assert!(!is_graph_relevant(&e));
     }
 
     #[test]
     fn test_irrelevant_server_log() {
-        let e = make_event(&["/repo/.jit/server.log"]);
+        let e = make_data_event(&VirtualPath::SERVER_LOG);
         assert!(!is_graph_relevant(&e));
     }
 

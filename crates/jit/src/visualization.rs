@@ -179,7 +179,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     // One class per lifecycle state, named by its canonical token
     output.push('\n');
     output.push_str(
-        &State::all()
+        &State::ALL
             .into_iter()
             .map(|state| {
                 format!(
@@ -262,7 +262,7 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// not keep.
 pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
-    resolution: &crate::graph::hierarchy::HierarchyResolution,
+    resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
 ) -> String {
     let all_nodes = graph.nodes_by_id();
 
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_export_mermaid_declares_one_class_per_state_and_every_node_class() {
-        let issues: Vec<Issue> = State::all()
+        let issues: Vec<Issue> = State::ALL
             .into_iter()
             .enumerate()
             .map(|(i, state)| {
@@ -358,7 +358,7 @@ mod tests {
             .filter_map(|line| line.trim().strip_prefix("classDef "))
             .filter_map(|rest| rest.split_whitespace().next())
             .collect();
-        let mut expected: Vec<&str> = State::all().iter().map(|s| s.as_str()).collect();
+        let mut expected: Vec<&str> = State::ALL.iter().map(|s| s.as_str()).collect();
         declared.sort_unstable();
         expected.sort_unstable();
         assert_eq!(declared, expected);

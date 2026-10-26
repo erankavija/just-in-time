@@ -27,6 +27,7 @@ use anyhow::{anyhow, Result};
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
+use crate::domain::identity::{IssueId, IssueIdStaging};
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, Priority};
 use crate::labels as label_utils;
@@ -39,7 +40,7 @@ pub enum DeltaEndpoint {
     /// A node the delta creates, identified by its template role.
     CreatedRole(String),
     /// An issue already in the store, identified by its full id.
-    ExistingIssue(String),
+    ExistingIssue(IssueId),
 }
 
 /// A dependency edge in a [`TemplateDelta`]: `dependent` depends on `dependency`.
@@ -73,7 +74,7 @@ pub struct PlannedNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchorGates {
     /// Full id of the issue bound to the anchor.
-    pub anchor_issue_id: String,
+    pub anchor_issue_id: IssueId,
     /// Gate names to attach to it.
     pub gates: Vec<String>,
 }
@@ -117,9 +118,9 @@ pub struct TemplateDelta {
 ///
 /// Returns an error when a node declares a document area the configured
 /// registry does not declare (naming the template, the node, and the area), or
-/// when the template references an unbound anchor, a role no node declares, or
-/// an unsupported transform kind (the registry loader rejects the latter three,
-/// so this is the defensive gate for hand-built templates).
+/// when the template references an unbound anchor or a role no node declares
+/// (the registry loader rejects both, so this is the defensive gate for
+/// hand-built templates).
 ///
 /// # Examples
 ///
@@ -169,8 +170,8 @@ pub struct TemplateDelta {
 pub fn expand_template(
     template: &GraphTemplate,
     container: &Issue,
-    resolved_bindings: &BTreeMap<String, String>,
-    anchor_dependency_snapshots: &BTreeMap<String, Vec<String>>,
+    resolved_bindings: &BTreeMap<String, IssueId>,
+    anchor_dependency_snapshots: &BTreeMap<String, Vec<IssueId>>,
     documentation: &DocumentationConfig,
     hierarchy: &HierarchyConfig,
 ) -> Result<TemplateDelta> {
@@ -225,7 +226,7 @@ pub fn expand_template(
             ));
         }
         add_edges.push(DeltaEdge {
-            dependent: DeltaEndpoint::ExistingIssue(anchor_id.to_string()),
+            dependent: DeltaEndpoint::ExistingIssue(anchor_id.clone()),
             dependency: DeltaEndpoint::CreatedRole(edge.to.clone()),
         });
     }
@@ -236,17 +237,9 @@ pub fn expand_template(
     let mut remove_edges: Vec<DeltaEdge> = Vec::new();
     let container_anchor = resolved_bindings
         .iter()
-        .find(|(_, id)| id.as_str() == container.id)
+        .find(|(_, id)| *id == &container.id)
         .map(|(name, _)| name.as_str());
     for transform in &template.transforms {
-        let kind = TransformKind::from_kind(&transform.kind).ok_or_else(|| {
-            anyhow!(
-                "template '{}' declares an unsupported transform kind '{}'; supported kinds: {}",
-                template.name,
-                transform.kind,
-                TransformKind::SUPPORTED.join(", ")
-            )
-        })?;
         if !declared_role(&transform.role) {
             return Err(anyhow!(
                 "template '{}' transform targets role '{}', which no node declares",
@@ -254,7 +247,7 @@ pub fn expand_template(
                 transform.role
             ));
         }
-        match kind {
+        match transform.kind {
             TransformKind::MoveUpstreamToRole => {
                 let upstream = container_anchor
                     .and_then(|name| anchor_dependency_snapshots.get(name))
@@ -281,7 +274,7 @@ pub fn expand_template(
         .filter(|anchor| !anchor.gates.is_empty())
         .map(|anchor| {
             Ok(AnchorGates {
-                anchor_issue_id: binding(resolved_bindings, template, &anchor.name)?.to_string(),
+                anchor_issue_id: binding(resolved_bindings, template, &anchor.name)?.clone(),
                 gates: anchor.gates.clone(),
             })
         })
@@ -361,19 +354,16 @@ pub(super) fn located_document_area_error(
 
 /// The full id bound to `anchor_name`, or an error naming the unbound anchor.
 fn binding<'a>(
-    resolved_bindings: &'a BTreeMap<String, String>,
+    resolved_bindings: &'a BTreeMap<String, IssueId>,
     template: &GraphTemplate,
     anchor_name: &str,
-) -> Result<&'a str> {
-    resolved_bindings
-        .get(anchor_name)
-        .map(String::as_str)
-        .ok_or_else(|| {
-            anyhow!(
-                "template '{}' references anchor '{anchor_name}', which has no resolved binding",
-                template.name
-            )
-        })
+) -> Result<&'a IssueId> {
+    resolved_bindings.get(anchor_name).ok_or_else(|| {
+        anyhow!(
+            "template '{}' references anchor '{anchor_name}', which has no resolved binding",
+            template.name
+        )
+    })
 }
 
 /// Verify that committing `delta` over a store whose edges are `store_deps`
@@ -393,9 +383,19 @@ fn binding<'a>(
 /// acyclic result.
 pub fn validate_delta_acyclic(
     delta: &TemplateDelta,
-    store_deps: BTreeMap<String, Vec<String>>,
+    store_deps: BTreeMap<IssueId, Vec<IssueId>>,
 ) -> Result<()> {
-    let mut deps_by_id = store_deps;
+    let mut deps_by_id = store_deps
+        .into_iter()
+        .map(|(id, deps)| {
+            (
+                ProspectiveId::ExistingIssue(id),
+                deps.into_iter()
+                    .map(ProspectiveId::ExistingIssue)
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
 
     // Every created node enters the graph under a placeholder id, with no deps
     // until `add_edges` supplies them.
@@ -432,15 +432,15 @@ pub fn validate_delta_acyclic(
 
 /// The simulation id of a not-yet-created role node. Prefixed so it cannot
 /// collide with a real (uuid) issue id.
-fn placeholder_id(role: &str) -> String {
-    format!("__apply_placeholder__:{role}")
+fn placeholder_id(role: &str) -> ProspectiveId {
+    ProspectiveId::CreatedRole(format!("__apply_placeholder__:{role}"))
 }
 
 /// The simulation id of a delta endpoint.
-fn endpoint_id(endpoint: &DeltaEndpoint) -> String {
+fn endpoint_id(endpoint: &DeltaEndpoint) -> ProspectiveId {
     match endpoint {
         DeltaEndpoint::CreatedRole(role) => placeholder_id(role),
-        DeltaEndpoint::ExistingIssue(id) => id.clone(),
+        DeltaEndpoint::ExistingIssue(id) => ProspectiveId::ExistingIssue(id.clone()),
     }
 }
 
@@ -449,18 +449,33 @@ fn endpoint_id(endpoint: &DeltaEndpoint) -> String {
 /// placeholders) can be checked with the existing
 /// [`DependencyGraph`](crate::graph::DependencyGraph) without mutating any
 /// stored issue.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum ProspectiveId {
+    CreatedRole(String),
+    ExistingIssue(IssueId),
+}
+
+impl ProspectiveId {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::CreatedRole(role) => role.as_str(),
+            Self::ExistingIssue(id) => id.as_str(),
+        }
+    }
+}
+
 struct ProspectiveNode {
-    id: String,
-    dependencies: Vec<String>,
+    id: ProspectiveId,
+    dependencies: Vec<ProspectiveId>,
 }
 
 impl crate::graph::GraphNode for ProspectiveNode {
     fn id(&self) -> &str {
-        &self.id
+        self.id.as_str()
     }
 
-    fn dependencies(&self) -> &[String] {
-        &self.dependencies
+    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
+        self.dependencies.iter().map(ProspectiveId::as_str)
     }
 }
 
@@ -526,8 +541,7 @@ pub(super) fn node_description(node: &TemplateNode, context: &InterpolationConte
 /// replace over a fixed map, and not a templating language.
 #[derive(Debug, Clone)]
 pub(super) struct InterpolationContext {
-    id: String,
-    short_id: String,
+    id: IssueId,
     title: String,
     hard_criteria: String,
     directory: Option<String>,
@@ -562,7 +576,6 @@ impl InterpolationContext {
     fn for_container(container: &Issue) -> Self {
         Self {
             id: container.id.clone(),
-            short_id: container.short_id(),
             title: container.title.clone(),
             hard_criteria: extract_hard_criteria(&container.description),
             directory: None,
@@ -603,8 +616,8 @@ impl InterpolationContext {
     /// like any unknown `{...}` text.
     fn interpolate(&self, template: &str) -> String {
         let mut out = template
-            .replace("{container.id}", &self.id)
-            .replace("{container.short_id}", &self.short_id)
+            .replace("{container.id}", self.id.as_str())
+            .replace("{container.short_id}", self.id.short_id())
             .replace("{container.title}", &self.title)
             .replace("{container.hard_criteria}", &self.hard_criteria);
         if let Some(directory) = &self.directory {
@@ -708,11 +721,11 @@ pub(crate) mod test_declarations {
     }
 
     /// The container every derivation resolves its declarations for.
-    pub(crate) fn container(id: &str) -> Issue {
+    pub(crate) fn container(id: &IssueId) -> Issue {
         let mut issue =
             crate::domain::fixture_issue("Auth epic".to_string(), "- [hard] REQ-01: x".to_string());
         issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
-        issue.id = id.to_string();
+        issue.id = id.clone();
         issue
     }
 
@@ -774,24 +787,21 @@ applies_to = ["epic"]
     }
 
     /// The anchor bindings a shared template is expanded under.
-    pub(crate) fn bindings(container_id: &str) -> BTreeMap<String, String> {
-        BTreeMap::from([("container".to_string(), container_id.to_string())])
+    pub(crate) fn bindings(container_id: &IssueId) -> BTreeMap<String, IssueId> {
+        BTreeMap::from([("container".to_string(), container_id.clone())])
     }
 
     /// The container anchor's pre-apply dependency snapshot.
-    pub(crate) fn snapshots(container_deps: &[&str]) -> BTreeMap<String, Vec<String>> {
-        BTreeMap::from([(
-            "container".to_string(),
-            container_deps.iter().map(|s| s.to_string()).collect(),
-        )])
+    pub(crate) fn snapshots(container_deps: &[IssueId]) -> BTreeMap<String, Vec<IssueId>> {
+        BTreeMap::from([("container".to_string(), container_deps.to_vec())])
     }
 
     /// Expand `template` against these declarations.
     pub(crate) fn expand(
         template: &GraphTemplate,
         container: &Issue,
-        resolved_bindings: &BTreeMap<String, String>,
-        anchor_dependency_snapshots: &BTreeMap<String, Vec<String>>,
+        resolved_bindings: &BTreeMap<String, IssueId>,
+        anchor_dependency_snapshots: &BTreeMap<String, Vec<IssueId>>,
     ) -> Result<TemplateDelta> {
         expand_template(
             template,
@@ -808,6 +818,7 @@ applies_to = ["epic"]
 mod tests {
     use super::test_declarations::*;
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
 
     fn plan_template() -> GraphTemplate {
         template_from(
@@ -842,12 +853,12 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_produces_creates_edges_and_removals() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings("c1"),
-            &snapshots(&["u1"]),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
 
@@ -856,7 +867,7 @@ applies_to = ["epic"]
         assert_eq!(delta.creates[0].role, "planning");
         assert_eq!(
             delta.creates[0].description,
-            "Plan Auth epic. Doc: dev/active/c1-plan.md."
+            format!("Plan Auth epic. Doc: dev/active/{}-plan.md.", container.id)
         );
         assert_eq!(delta.creates[0].gates, vec!["plan-review".to_string()]);
         assert!(delta.creates[1]
@@ -872,12 +883,16 @@ applies_to = ["epic"]
                     dependency: DeltaEndpoint::CreatedRole("planning".to_string()),
                 },
                 DeltaEdge {
-                    dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
+                    dependent: DeltaEndpoint::ExistingIssue(fixture_id(
+                        "1590ce6c-9129-512f-befc-1e8508dc7963"
+                    )),
                     dependency: DeltaEndpoint::CreatedRole("breakdown".to_string()),
                 },
                 DeltaEdge {
                     dependent: DeltaEndpoint::CreatedRole("planning".to_string()),
-                    dependency: DeltaEndpoint::ExistingIssue("u1".to_string()),
+                    dependency: DeltaEndpoint::ExistingIssue(fixture_id(
+                        "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                    )),
                 },
             ]
         );
@@ -886,8 +901,12 @@ applies_to = ["epic"]
         assert_eq!(
             delta.remove_edges,
             vec![DeltaEdge {
-                dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
-                dependency: DeltaEndpoint::ExistingIssue("u1".to_string()),
+                dependent: DeltaEndpoint::ExistingIssue(fixture_id(
+                    "1590ce6c-9129-512f-befc-1e8508dc7963"
+                )),
+                dependency: DeltaEndpoint::ExistingIssue(fixture_id(
+                    "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                )),
             }]
         );
 
@@ -895,7 +914,7 @@ applies_to = ["epic"]
         assert_eq!(
             delta.anchor_gates,
             vec![AnchorGates {
-                anchor_issue_id: "c1".to_string(),
+                anchor_issue_id: fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
                 gates: vec!["repo-validate".to_string()],
             }]
         );
@@ -905,11 +924,11 @@ applies_to = ["epic"]
     fn test_expand_template_moves_only_pre_apply_upstream_deps() {
         // The transform reads the SNAPSHOT, so an id absent from it is never
         // moved even when the same delta wires an edge to it (APPB-02).
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings("c1"),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -930,7 +949,7 @@ applies_to = ["epic"]
             .expect("plan template declares a breakdown node")
             .labels = vec!["custom-anchor:{container.short_id}".to_string()];
 
-        let container = container("abcdef123456");
+        let container = container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
         let delta = expand(
             &template,
             &container,
@@ -951,7 +970,7 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_unbound_anchor() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let err = expand(
             &plan_template(),
             &container,
@@ -960,20 +979,6 @@ applies_to = ["epic"]
         )
         .unwrap_err();
         assert!(err.to_string().contains("container"), "{err}");
-    }
-
-    #[test]
-    fn test_expand_template_rejects_unsupported_transform_kind() {
-        // The loader rejects an unsupported kind, so this can only be reached with
-        // a hand-built template; expansion is the defensive gate and it still runs
-        // before any write.
-        let mut template = plan_template();
-        template.transforms[0].kind = "teleport".to_string();
-        let container = container("c1");
-        let err = expand(&template, &container, &bindings("c1"), &snapshots(&["u1"])).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("teleport"), "{msg}");
-        assert!(msg.contains("move-upstream-to-role"), "{msg}");
     }
 
     /// A one-node template whose node's description is exactly its interpolated
@@ -1008,10 +1013,16 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_declared_document_area_into_the_document_path() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let template = document_template("{container.dir}/plan.md", Some(AREA));
 
-        let delta = expand(&template, &container, &bindings("c1"), &snapshots(&[])).unwrap();
+        let delta = expand(
+            &template,
+            &container,
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[]),
+        )
+        .unwrap();
 
         // The interpolated directory is the domain resolver's own answer for the
         // declared area, so the composition rule is not derived a second time;
@@ -1027,13 +1038,19 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_a_document_area_the_registry_does_not_declare() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{AREA}-drafts");
         let template = document_template("{container.dir}/plan.md", Some(&undeclared));
 
-        let error = expand(&template, &container, &bindings("c1"), &snapshots(&[])).unwrap_err();
+        let error = expand(
+            &template,
+            &container,
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[]),
+        )
+        .unwrap_err();
 
         match error.downcast_ref::<ArtifactDirectoryError>() {
             Some(ArtifactDirectoryError::UndeclaredArea { area, declared }) => {
@@ -1054,7 +1071,7 @@ applies_to = ["epic"]
         assert!(expand(
             &document_template("{container.dir}/plan.md", Some(AREA)),
             &container,
-            &bindings("c1"),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .is_ok());
@@ -1062,14 +1079,14 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_node_that_declares_no_document_area_without_a_directory() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
 
         // A flat area-plus-prefix declaration resolves from the container tokens
         // alone.
         let flat = expand(
             &document_template("dev/active/{container.short_id}-plan.md", None),
             &container,
-            &bindings("c1"),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1083,7 +1100,7 @@ applies_to = ["epic"]
         let unscoped = expand(
             &document_template("{container.dir}/plan.md", None),
             &container,
-            &bindings("c1"),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1092,17 +1109,20 @@ applies_to = ["epic"]
 
     #[test]
     fn test_validate_delta_acyclic_accepts_the_plan_spine() {
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings("c1"),
-            &snapshots(&["u1"]),
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
         )
         .unwrap();
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec![]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
     }
@@ -1136,15 +1156,30 @@ applies_to = ["epic"]
 "#,
             "cyclic",
         );
-        let container = container("c1");
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let bindings = BTreeMap::from([
-            ("container".to_string(), "c1".to_string()),
-            ("upstream".to_string(), "u1".to_string()),
+            (
+                "container".to_string(),
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+            ),
+            (
+                "upstream".to_string(),
+                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
+            ),
         ]);
-        let delta = expand(&template, &container, &bindings, &snapshots(&["u1"])).unwrap();
+        let delta = expand(
+            &template,
+            &container,
+            &bindings,
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+        )
+        .unwrap();
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec![]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
         ]);
         let err = validate_delta_acyclic(&delta, store).unwrap_err();
         assert!(err.to_string().contains("cycle"), "{err}");
@@ -1171,13 +1206,25 @@ applies_to = ["epic"]
 "#,
             "mover",
         );
-        let container = container("c1");
-        let delta = expand(&template, &container, &bindings("c1"), &snapshots(&["u1"])).unwrap();
+        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let delta = expand(
+            &template,
+            &container,
+            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+        )
+        .unwrap();
         // u1 depends on c1, and c1 depends on u1: the store is already cyclic
         // EXCEPT that the transform removes c1→u1, leaving u1→c1 and P→u1.
         let store = BTreeMap::from([
-            ("c1".to_string(), vec!["u1".to_string()]),
-            ("u1".to_string(), vec!["c1".to_string()]),
+            (
+                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+            ),
+            (
+                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
+                vec![fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")],
+            ),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
     }
@@ -1200,7 +1247,7 @@ applies_to = ["epic"]
     fn test_interpolation_resolves_container_and_doc_tokens() {
         let mut issue =
             crate::domain::fixture_issue("Auth epic".to_string(), "- [hard] REQ-01: x".to_string());
-        issue.id = "abc123def456".to_string();
+        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
         let node = TemplateNode {
             role: "planning".to_string(),
             type_name: "planning".to_string(),
@@ -1218,7 +1265,7 @@ applies_to = ["epic"]
         let rendered = node_description(&node, &ctx);
         assert!(rendered.contains("Auth epic"));
         assert!(rendered.contains("abc123de")); // short id (8 chars)
-        assert!(rendered.contains("dev/active/abc123def456-plan.md")); // {doc}
+        assert!(rendered.contains("dev/active/abc123de-f456-0000-0000-000000000000-plan.md")); // {doc}
         assert!(rendered.contains("[hard] REQ-01: x"));
     }
 
@@ -1270,7 +1317,7 @@ applies_to = ["epic"]
         // templating language: an unsupported `{token}` is left untouched while the
         // known container tokens around it still resolve.
         let mut issue = crate::domain::fixture_issue("Auth epic".to_string(), String::new());
-        issue.id = "abc123def456".to_string();
+        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
         let ctx = InterpolationContext::for_container(&issue);
         let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
         assert_eq!(rendered, "Auth epic then {totally.unknown} end");
@@ -1282,7 +1329,7 @@ applies_to = ["epic"]
         // membership labels (NOT the container's own `type:`), the node's own
         // `type:<node.type>`, and its interpolated `labels`. The `{container.short_id}`
         // token in a node label must resolve to the container's short id.
-        let container = container("abc123def456");
+        let container = container(&fixture_id("abc123de-f456-0000-0000-000000000000"));
         let short = container.short_id();
 
         let node = TemplateNode {

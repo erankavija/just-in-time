@@ -5,8 +5,8 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::issue_id::IssueIdPrefix;
-use crate::domain::{Event, Issue};
+use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::{Event, EventBody, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -95,26 +95,55 @@ pub use memory::MemoryRedoApplier;
 
 pub use memory::InMemoryStorage;
 
+/// The one id among `ids` that `prefix` names, else [`IssueNotFoundError`] or
+/// the error `ambiguous` builds from the several matches.
+fn resolve_unique_id<'a>(
+    prefix: &IssueIdPrefix,
+    ids: impl IntoIterator<Item = &'a str>,
+    ambiguous: impl FnOnce(&[&'a str]) -> AmbiguousIdError,
+) -> Result<IssueId> {
+    let matches = ids
+        .into_iter()
+        .filter(|id| prefix.matches(id))
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [] => Err(IssueNotFoundError::new(prefix.as_str()).into()),
+        [id] => Ok(id.to_string()),
+        _ => Err(ambiguous(&matches).into()),
+    }
+}
+
 /// The one id among `ids` that `prefix` names, else the lookup error naming
 /// it; `describe` renders each candidate of an ambiguous match.
 pub(crate) fn resolve_unique_issue_id<'a>(
     prefix: &IssueIdPrefix,
     ids: impl IntoIterator<Item = &'a str>,
     describe: impl Fn(&str) -> Option<String>,
-) -> Result<String> {
-    let matches = ids
-        .into_iter()
-        .filter(|id| prefix.matches(id))
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(prefix.requested()).into()),
-        [id] => Ok(id.to_string()),
-        _ => Err(AmbiguousIdError::issue(
-            prefix.requested(),
+) -> Result<IssueId> {
+    resolve_unique_id(prefix, ids, |matches| {
+        AmbiguousIdError::issue(
+            prefix.as_str(),
             matches.iter().filter_map(|id| describe(id)),
         )
-        .into()),
-    }
+    })
+}
+
+/// The one of an issue's stored `dependencies` that `prefix` names. Matching
+/// the stored edges rather than the index keeps an edge whose target was
+/// deleted resolvable (jit:f847df3f).
+///
+/// # Errors
+///
+/// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError::Dependency`] for
+/// several.
+pub fn resolve_dependency_id(prefix: &IssueIdPrefix, dependencies: &[IssueId]) -> Result<IssueId> {
+    resolve_unique_id(
+        prefix,
+        dependencies.iter().map(|id| id.as_str()),
+        |matches| {
+            AmbiguousIdError::dependency(prefix.as_str(), matches.iter().map(|id| id.to_string()))
+        },
+    )
 }
 
 /// The id of the one of `issues` that `prefix` names.
@@ -122,7 +151,7 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 /// # Errors
 ///
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
-pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<String> {
+pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<IssueId> {
     resolve_unique_issue_id(prefix, issues.iter().map(|issue| issue.id.as_str()), |id| {
         issues
             .iter()
@@ -230,7 +259,7 @@ pub trait IssueStore: Clone {
     ///
     /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
     /// several.
-    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String>;
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<IssueId>;
 
     /// List all issues in the repository.
     ///
@@ -266,7 +295,7 @@ pub trait IssueStore: Clone {
         Ok(self
             .read_events()?
             .into_iter()
-            .filter(|event| matches!(event, Event::ArtifactArchiveExecuted { .. }))
+            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted { .. }))
             .collect())
     }
 
@@ -398,5 +427,52 @@ pub trait IssueStore: Clone {
     ) -> Result<(String, String), PathReadError> {
         let (bytes, label) = self.read_path_bytes(path, at_commit)?;
         Ok((String::from_utf8_lossy(&bytes).into_owned(), label))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A prefix resolves to the one stored dependency it names, whether or not
+    /// that dependency's issue still exists.
+    #[test]
+    fn test_resolve_dependency_id_matches_the_one_stored_dependency_named() {
+        let dependencies = vec![
+            "abcd1234-0000-0000-0000-000000000001"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+            "ef012345-0000-0000-0000-000000000002"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+        ];
+        let prefix = "ABCD1234".parse::<IssueIdPrefix>().unwrap();
+
+        assert_eq!(
+            resolve_dependency_id(&prefix, &dependencies).unwrap(),
+            dependencies[0]
+        );
+    }
+
+    #[test]
+    fn test_resolve_dependency_id_reports_not_found_and_ambiguous_dependency() {
+        let dependencies = vec![
+            "abcd1234-0000-0000-0000-000000000001"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+            "abcd1234-0000-0000-0000-000000000002"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+        ];
+        let resolve = |prefix: &str| {
+            resolve_dependency_id(&prefix.parse::<IssueIdPrefix>().unwrap(), &dependencies)
+                .unwrap_err()
+        };
+
+        assert!(resolve("ffff").is::<IssueNotFoundError>());
+        assert!(matches!(
+            resolve("abcd1234").downcast_ref::<AmbiguousIdError>(),
+            Some(AmbiguousIdError::Dependency { matches, .. }) if matches.len() == 2
+        ));
     }
 }

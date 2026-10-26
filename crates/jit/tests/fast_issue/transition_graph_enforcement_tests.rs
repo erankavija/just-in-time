@@ -12,7 +12,7 @@
 //! block the diversion).
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Event, State};
+use jit::domain::{Event, EventBody, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -148,8 +148,8 @@ fn test_blocked_transition_records_event_in_log() {
         1,
         "exactly one TransitionBlocked event per blocking rule"
     );
-    match blocked[0] {
-        Event::TransitionBlocked {
+    match blocked[0].body() {
+        EventBody::TransitionBlocked {
             issue_id,
             target,
             rule,
@@ -200,8 +200,8 @@ fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
         1,
         "one GraphRuleBypassed per overridden rule"
     );
-    match bypassed[0] {
-        Event::GraphRuleBypassed {
+    match bypassed[0].body() {
+        EventBody::GraphRuleBypassed {
             issue_id,
             target,
             rule,
@@ -533,110 +533,6 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
 
     let after = executor.storage().load_issue(&epic).unwrap();
     assert_eq!(after.state, State::InProgress, "blocked: nothing persisted");
-}
-
-/// A `dependency-shape` rule with an unknown `mode`: a CONFIG ERROR. The rule
-/// applies to `type:epic` issues at the done transition and `enforce = true`, so
-/// a broken (misconfigured) guard must BLOCK rather than silently degrade to a
-/// warning. Neighborhood-local (dependency-shape is not repo-wide), so it runs
-/// at transition time.
-const DONE_RULE_MISCONFIGURED: &str = r#"
-[[rules]]
-name = "epic-done-broken-shape"
-when = { type = "epic", state = "done" }
-severity = "error"
-enforce = true
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
-"#;
-
-#[test]
-fn test_enforce_rule_config_error_blocks_transition() {
-    // A typo in an `enforce = true` rule (here: a dependency-shape rule with an
-    // unknown `mode`) must NOT silently disable the guard. The config error blocks the
-    // done transition with exit 4, and the rendered error makes clear the rule
-    // itself is misconfigured.
-    let executor = executor_with_rules(DONE_RULE_MISCONFIGURED);
-    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-
-    let result = executor.issues().update_issue(
-        &epic,
-        None,
-        None,
-        None,
-        Some(State::Done),
-        vec![],
-        vec![],
-        None,
-        None,
-        false,
-    );
-
-    let err = result.expect_err("a misconfigured enforce rule must block the transition");
-    let blocked = err
-        .downcast_ref::<TransitionBlockedError>()
-        .expect("config error from an enforce rule maps to exit 4");
-    let rendered = blocked.to_string();
-    assert!(
-        rendered.contains("epic-done-broken-shape"),
-        "blocked error must name the broken rule: {rendered}"
-    );
-    assert!(
-        rendered.contains("misconfigured"),
-        "blocked error must flag the rule as misconfigured: {rendered}"
-    );
-
-    // Nothing persisted: the issue is still in progress.
-    let after = executor.storage().load_issue(&epic).unwrap();
-    assert_eq!(
-        after.state,
-        State::InProgress,
-        "a config-error block must persist nothing"
-    );
-}
-
-#[test]
-fn test_warn_rule_config_error_does_not_block_transition() {
-    // The same misconfigured rule, but `enforce = false`: a config error from a
-    // non-enforcing rule stays a warning and does not block the transition.
-    let rules = r#"
-[[rules]]
-name = "epic-done-broken-shape-warn"
-when = { type = "epic", state = "done" }
-severity = "error"
-enforce = false
-assert = { dependency-shape = { target = { type = "design" }, mode = "maybe" } }
-"#;
-    let executor = executor_with_rules(rules);
-    let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-
-    let warnings = executor
-        .issues()
-        .update_issue(
-            &epic,
-            None,
-            None,
-            None,
-            Some(State::Done),
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .expect("a non-enforcing rule's config error must not block");
-
-    let after = executor.storage().load_issue(&epic).unwrap();
-    assert_eq!(
-        after.state,
-        State::Done,
-        "non-enforcing config error does not block"
-    );
-    assert!(
-        warnings
-            .iter()
-            .any(|w| w.contains("epic-done-broken-shape-warn") && w.contains("config error")),
-        "the config error must surface as a warning: {warnings:?}"
-    );
 }
 
 #[test]

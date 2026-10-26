@@ -15,53 +15,36 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::domain::vocabulary::wire_vocabulary;
+
 use super::{Event, Issue};
 
-/// The kind of record a [`StoreDivergence`] names.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DivergentRecord {
-    /// An issue record, identified by its issue id.
-    Issue,
-    /// An event-log record, identified by its event id.
-    Event,
-}
-
-impl DivergentRecord {
-    /// Return the same token the serialized form carries.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Issue => "issue",
-            Self::Event => "event",
-        }
+wire_vocabulary! {
+    /// The kind of record a [`StoreDivergence`] names.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum DivergentRecord {
+        /// An issue record, identified by its issue id.
+        Issue = "issue",
+        /// An event-log record, identified by its event id.
+        Event = "event",
     }
 }
 
-/// How one record differs between the two compared stores.
-///
-/// The three variants partition every disagreement: a record is held by one
-/// side alone (in one direction or the other), or by both sides with values
-/// that do not match. A record both sides hold with equal values is agreement
-/// and yields no finding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum DivergenceClass {
-    /// Held by the inspected checkout's store, absent from the reference store.
-    LocalOnly,
-    /// Held by the reference store, absent from the inspected checkout's store.
-    ReferenceOnly,
-    /// Held under one identity by both stores, with values that differ.
-    Conflicting,
-}
-
-impl DivergenceClass {
-    /// Return the same token the serialized form carries.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::LocalOnly => "local_only",
-            Self::ReferenceOnly => "reference_only",
-            Self::Conflicting => "conflicting",
-        }
+wire_vocabulary! {
+    /// How one record differs between the two compared stores.
+    ///
+    /// The three variants partition every disagreement: a record is held by one
+    /// side alone (in one direction or the other), or by both sides with values
+    /// that do not match. A record both sides hold with equal values is agreement
+    /// and yields no finding.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+    pub enum DivergenceClass {
+        /// Held by the inspected checkout's store, absent from the reference store.
+        LocalOnly = "local_only",
+        /// Held by the reference store, absent from the inspected checkout's store.
+        ReferenceOnly = "reference_only",
+        /// Held under one identity by both stores, with values that differ.
+        Conflicting = "conflicting",
     }
 }
 
@@ -164,17 +147,17 @@ fn group_by_identity<'a, T>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{fixture_issue, Priority};
+    use crate::domain::fixture_issue;
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &str, title: &str) -> Event {
-        Event::IssueCreated {
-            id: id.to_string(),
-            issue_id: issue_id.to_string(),
-            timestamp: chrono::DateTime::UNIX_EPOCH,
-            title: title.to_string(),
-            priority: Priority::Normal,
-        }
+        let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
+        issue.id = issue_id.to_string();
+        crate::test_utils::stamped_event(
+            crate::domain::EventBody::draft_issue_created(&issue),
+            id,
+            chrono::DateTime::UNIX_EPOCH,
+        )
     }
 
     /// One side of a comparison over the given records.

@@ -3,8 +3,8 @@
 use super::mutation::finalize_delta;
 use super::{
     ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
-    MutationIntent, ProducerError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryStateError, VirtualPath,
+    MutationIntent, ProducerError, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_plan::{
@@ -12,10 +12,8 @@ use crate::domain::artifact_plan::{
     ReferenceChange, WarningCode,
 };
 use crate::domain::event_log::EventLogError;
-use crate::domain::{Event, Issue, State};
+use crate::domain::{Event, EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
-
-const OWNER: &str = "archive-execution";
 
 /// Close a captured archive plan into one materialization plan, which
 /// publishes as one redo record.
@@ -84,7 +82,7 @@ pub fn finalize_archive_execution(
                 )?;
                 actions.push(RepositoryAction::WriteFile {
                     path: destination_path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: source_mode,
@@ -130,7 +128,7 @@ pub fn finalize_archive_execution(
                 create_ancestors(image, &path, &mut created_directories, &mut actions)?;
                 actions.push(RepositoryAction::WriteFile {
                     path,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                     bytes,
                     mode: FileMode::Regular,
@@ -210,7 +208,7 @@ pub fn finalize_archive_execution(
             let from = issue.state;
             issue.archived_from = Some(from);
             issue.state = State::Archived;
-            state_event = Some(Event::draft_issue_state_changed(
+            state_event = Some(EventBody::draft_issue_state_changed(
                 id.clone(),
                 from,
                 State::Archived,
@@ -259,7 +257,7 @@ pub fn finalize_archive_execution(
                 if ContentIdentity::from_bytes(content.bytes()) == deletion.content_identity {
                     actions.push(RepositoryAction::DeleteFile {
                         path,
-                        owner: OWNER.into(),
+                        owner: RepositoryActionOwner::ArchiveExecution,
                         expected: ExpectedPreimage::of(captured_entry(
                             image,
                             &archive_path(image, &deletion.source)?,
@@ -303,7 +301,7 @@ pub fn finalize_archive_execution(
     if event_needed {
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_artifact_archive_executed(
+            event: Box::new(EventBody::draft_artifact_archive_executed(
                 plan.target().clone(),
                 plan.destination_root().into(),
                 publications.clone(),
@@ -391,7 +389,7 @@ fn create_ancestors(
             RepositoryEntry::Absent if created.insert(ancestor.clone()) => {
                 actions.push(RepositoryAction::CreateDirectory {
                     path: ancestor,
-                    owner: OWNER.into(),
+                    owner: RepositoryActionOwner::ArchiveExecution,
                     expected: ExpectedPreimage::Absent,
                 })
             }
@@ -565,8 +563,8 @@ fn archive_coverage(
 ) -> (Vec<(String, ContentIdentity)>, Vec<ReferenceChange>) {
     events
         .iter()
-        .filter_map(|event| match event {
-            Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            EventBody::ArtifactArchiveExecuted {
                 target: found,
                 destination_root,
                 publications,

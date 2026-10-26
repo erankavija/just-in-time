@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-62a0085a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "628e6a00966babaeae29ffba6dde081231baeadf",
+  "completed_at": "2026-10-24T23:41:57.451295508Z",
+  "duration_ms": 50549,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three production declaration call sites use the tested fallible constructor and preserve their error handling.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "62a0085a-a0e4-4877-8dbf-2bd8f4a6e1c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b26f30b7-dd93-4315-a07e-1dbec33fbef0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T23:41:06.901697012Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5fabeb1d0 (`jit:62a0085a`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json\nResolved items: @/issue/2195c98f/requirement/REQ-16 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci — passed, exit 0, 2026-10-24T23:39:43.172658765+00:00\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three production declaration call sites use the tested fallible constructor and preserve their error handling.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
