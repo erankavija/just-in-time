@@ -1,6 +1,7 @@
 //! Event log operations
 
 use super::*;
+use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::IssueIdPrefix;
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -13,7 +14,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Newest-first events matching `event_type` and the `issue` filter.
     pub fn query_events(
         &self,
-        event_type: Option<String>,
+        event_type: Option<EventTag>,
         issue: Option<IssueIdPrefix>,
         limit: usize,
     ) -> Result<Vec<Event>> {
@@ -24,7 +25,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .rev()
             .filter(|e| {
                 if let Some(ref et) = event_type {
-                    if e.get_type() != et {
+                    if e.body().tag() != *et {
                         return false;
                     }
                 }
@@ -70,11 +71,7 @@ mod tests {
     fn test_query_events_reports_linked_checkout_write_override_record() {
         let (executor, expected) = seeded_override_executor();
         let events = executor
-            .query_events(
-                Some("linked_checkout_write_overridden".to_string()),
-                None,
-                10,
-            )
+            .query_events(Some(EventTag::LinkedCheckoutWriteOverridden), None, 10)
             .expect("the event query succeeds");
 
         assert_eq!(events, vec![expected]);
