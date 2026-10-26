@@ -15,6 +15,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "1db1238d-ff52-4e3f-b2fe-c8aacb5f5ec7",
+      "status": "passed",
+      "updated_at": "2026-10-25T23:27:08.617725694Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "1fdbcbd2-2c38-4426-b9c9-8b09e62c4360",
       "status": "passed",
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Event tags declare their wire spelling once",
-  "updated_at": "2026-10-25T23:02:48.898223186Z"
+  "updated_at": "2026-10-25T23:27:08.617725694Z"
 }
