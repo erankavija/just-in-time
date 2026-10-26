@@ -531,7 +531,7 @@ mod tests {
     }
 
     fn issue_with(labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("t".to_string(), String::new());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }
