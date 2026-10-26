@@ -9,6 +9,8 @@
 
 use super::*;
 use crate::config::SourceOfTruth;
+use crate::domain::identity::IssueIdPrefix;
+use crate::domain::item::AddressScope;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias,
@@ -34,7 +36,7 @@ pub struct ItemShowResult {
     /// The resolved addressable item.
     pub item: AddressableItem,
     /// Full id of the owning issue, or `None` for a project-scoped item.
-    pub issue_full_id: Option<String>,
+    pub issue_full_id: Option<IssueId>,
     /// Title of the owning issue, or `None` for a project-scoped item.
     pub issue_title: Option<String>,
 }
@@ -435,17 +437,24 @@ impl<S: IssueStore> CommandExecutor<S> {
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
                 ));
             };
-            let issue_ref = IssueIdPrefix::from_str(issue_ref)?;
             // A self-id whose shape names exactly one issue-scoped kind fixes the
             // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
             // unmatched self-id leaves the kind open and defers to actual-item
             // matching, which still errors on a genuine multi-item collision rather
             // than silently picking one.
             let kinds = self.item_kinds()?;
-            let kind = match expand_sugar_address(qualified, &kinds) {
-                Ok(addr) => Some(addr.kind),
+            let (issue_ref, kind) = match expand_sugar_address(qualified, &kinds) {
+                Ok(addr) => {
+                    let AddressScope::Issue(issue_ref) = addr.scope else {
+                        return Err(anyhow!("sugar requires an issue scope"));
+                    };
+                    (issue_ref, Some(addr.kind))
+                }
                 Err(ItemError::SugarKindNotFound { .. } | ItemError::SugarKindAmbiguous { .. }) => {
-                    None
+                    let Scope::Issue(issue_ref) = Scope::parse(issue_ref)? else {
+                        return Err(anyhow!("sugar requires an issue scope"));
+                    };
+                    (issue_ref, None)
                 }
                 Err(err) => {
                     return Err(anyhow!("cannot resolve item address '{qualified}': {err}"))
@@ -491,7 +500,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         self_id: addr.self_id,
                     }),
                     Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
-                        issue_ref: IssueIdPrefix::from_str(&issue_ref)?,
+                        issue_ref,
                         kind: Some(kind),
                         self_id: addr.self_id,
                     }),
@@ -700,6 +709,7 @@ source-of-truth = \"registry-first\"
     fn test_show_item_resolves_by_qualified_id() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a one\n");
         let short = a.short_id();
+        let a_id = a.id.clone();
         let exec = executor_with(vec![a]);
 
         // The `<short-id>/<self-id>` sugar still resolves as INPUT (D3-A), but the
@@ -712,7 +722,7 @@ source-of-truth = \"registry-first\"
         );
         assert_eq!(shown.issue_title.as_deref(), Some("A"));
         // The owning issue id is the FULL id, resolved from the short-id scope.
-        assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
+        assert_eq!(shown.issue_full_id.as_ref(), Some(&a_id));
     }
 
     /// Build an [`InMemoryStorage`] executor that declares a markdown-first

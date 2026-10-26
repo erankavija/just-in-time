@@ -11,7 +11,7 @@ use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
 /// Reject an issue outright, the way `jit issue update --state rejected` does.
-fn reject(h: &TestHarness, id: &str) {
+fn reject(h: &TestHarness, id: &jit::domain::identity::IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::Rejected)

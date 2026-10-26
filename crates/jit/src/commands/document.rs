@@ -95,7 +95,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)] // CLI command parameters - refactoring would reduce clarity
     pub fn add_document_reference(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         commit: Option<&str>,
         label: Option<&str>,
@@ -105,9 +105,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
@@ -236,11 +234,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// by location under its artifact directories.
     pub fn list_document_references(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<crate::commands::DocumentListResult> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let documents = self
             .with_issue_documents(vec![issue])?
@@ -274,12 +270,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// loaded, or when the repository's configuration cannot be read.
     pub fn resolve_issue_artifact_directory(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         area: &str,
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let documentation = self
             .config_manager
@@ -375,15 +369,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn remove_document_reference(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
     ) -> Result<DocumentRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         self.publish_document_remove(&full_id, path)
     }
 
@@ -393,7 +385,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)]
     fn publish_document_add(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         commit: Option<&str>,
         label: Option<&str>,
@@ -471,7 +463,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Remove one path-selected document reference and its event atomically.
-    fn publish_document_remove(&self, issue_id: &str, path: &str) -> Result<DocumentRemoveResult>
+    fn publish_document_remove(
+        &self,
+        issue_id: &IssueId,
+        path: &str,
+    ) -> Result<DocumentRemoveResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -497,15 +493,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn show_document_content(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<DocumentContentResult> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
@@ -556,14 +550,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn document_history(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
     ) -> Result<crate::commands::DocumentHistory> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -581,16 +573,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn document_diff(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         from: &str,
         to: Option<&str>,
     ) -> Result<DocumentDiffResult> {
         use git2::Repository;
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -639,20 +629,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// file existence structurally, and `InMemoryStorage` checks the HashMap.
     fn load_issue_typed(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        use crate::storage::{AmbiguousIdError, IssueNotFoundError, PathReadError};
-
-        let prefix = IssueIdPrefix::from_str(issue_id)
-            .map_err(|error| PathReadError::NotFound(error.to_string()))?;
-        let full_id = self.storage.resolve_issue_id(&prefix).map_err(|error| {
-            if error.is::<IssueNotFoundError>() || error.is::<AmbiguousIdError>() {
-                PathReadError::NotFound(error.to_string())
-            } else {
-                PathReadError::Other(error)
-            }
-        })?;
-        self.storage.load_issue_or_not_found(&full_id)
+        self.storage.load_issue_or_not_found(issue_id)
     }
 
     /// Read document content from git or filesystem.
@@ -666,7 +645,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn read_document_content(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(String, String), crate::storage::PathReadError> {
@@ -700,7 +679,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn read_document_bytes(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
@@ -731,7 +710,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_document_history(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
     ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
@@ -764,7 +743,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_document_diff(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         from: &str,
         to: Option<&str>,
@@ -916,7 +895,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn list_document_assets(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         rescan: bool,
     ) -> Result<crate::commands::AssetListResult>
@@ -928,9 +907,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut warnings = Vec::new();
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
@@ -987,7 +964,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// inventories are a true no-op: no id, timestamp, event, or issue bytes.
     fn rescan_document_assets(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         path: &str,
         warnings: &mut Vec<String>,
     ) -> Result<Vec<crate::document::Asset>>
@@ -1046,7 +1023,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 MutationIntent::RecordEvent {
                     phase: 1,
                     event: Box::new(crate::domain::EventBody::draft_issue_updated(
-                        issue_id.to_string(),
+                        issue_id.clone(),
                         "doc-rescan".to_string(),
                         vec!["documents.assets".to_string()],
                     )),
@@ -1111,13 +1088,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Resolve the scope to the set of issues whose documents to check.
         let issues = match scope {
             DocumentScope::All => self.storage.list_issues()?,
-            DocumentScope::Issue(issue_id) => {
-                let full_id = self
-                    .storage
-                    .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
-                let issue = self.storage.load_issue(&full_id)?;
-                vec![issue]
-            }
+            DocumentScope::Issue(issue_id) => vec![self.storage.load_issue(issue_id)?],
         };
 
         // Every document in scope, explicit or derived, is checked and tracked.
@@ -1369,7 +1340,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn read_documents_at_named_versions(
         &self,
         layout: &crate::repository_state::RepositoryLayout,
-        documents: &[(String, &crate::domain::DocumentReference)],
+        documents: &[(IssueId, &crate::domain::DocumentReference)],
         link_validator: &crate::document::LinkValidator,
     ) -> Result<Vec<CheckedDocument>>
     where
@@ -1422,7 +1393,7 @@ fn local_asset_paths(
 /// names, a pinned reference's local assets at its commit, and `link_targets`
 /// discovered by scanning pinned content.
 fn link_check_capture_spec(
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_targets: &std::collections::BTreeSet<(String, String)>,
 ) -> Result<crate::repository_state::CaptureSpec> {
     use crate::document::DocumentReferenceRequests;
@@ -1503,7 +1474,7 @@ fn pinned_target_kind(
 /// requests at that document's own commit.
 fn pinned_link_targets(
     image: &crate::repository_state::RepositoryImage,
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
 ) -> std::collections::BTreeSet<(String, String)> {
     documents
@@ -1526,7 +1497,7 @@ fn pinned_link_targets(
 /// Derive each reference's reading from one closed image.
 fn read_documents(
     image: &crate::repository_state::RepositoryImage,
-    documents: &[(String, &crate::domain::DocumentReference)],
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
 ) -> Result<Vec<CheckedDocument>> {
     documents
@@ -1618,7 +1589,7 @@ fn discover_scan_assets(
 fn captured_issue(
     image: &crate::repository_state::RepositoryImage,
     issue_path: &crate::repository_state::VirtualPath,
-    expected_id: &str,
+    expected_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::RepositoryEntry;
 
@@ -1628,11 +1599,11 @@ fn captured_issue(
                 .with_context(|| format!("failed to parse captured issue {expected_id}"))?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(expected_id).into())
+            return Err(crate::storage::IssueNotFoundError::new(expected_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };
-    if issue.id != expected_id {
+    if &issue.id != expected_id {
         return Err(anyhow!(
             "captured issue identity mismatch: requested {expected_id}, found {}",
             issue.id

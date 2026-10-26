@@ -191,12 +191,13 @@ fn assert_projected_exit_status_in_both_forms<F>(
 #[test]
 fn test_command_exit_codes_unknown_apply_template_emits_2() {
     let temp = setup();
+    let container = create_issue(&temp, "Container", &[]);
     assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
         let mut command = Command::new(jit_binary());
         command.current_dir(&temp).args([
             "apply",
             "definitely-missing-template",
-            "0000000000000000",
+            container.as_str(),
         ]);
         if json {
             command.arg("--json");

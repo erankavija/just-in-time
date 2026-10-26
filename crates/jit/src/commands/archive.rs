@@ -24,6 +24,7 @@ use crate::domain::artifact_plan::{
 };
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, EventBody, Issue};
 use crate::storage::{
@@ -33,12 +34,11 @@ use crate::storage::{
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
-use std::str::FromStr;
 
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
-    Container(&'a crate::domain::identity::IssueIdPrefix),
+    Container(&'a IssueId),
 }
 
 /// Ids of configured non-leaf containers that are archive candidates: those that
@@ -50,7 +50,7 @@ enum ArchiveTarget<'a> {
 fn effectively_terminal_container_ids(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
-) -> Vec<String> {
+) -> Vec<IssueId> {
     let leaf_level = hierarchy.types().map(|(_, level)| *level).max();
     let mut ids = issues
         .iter()
@@ -161,11 +161,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = self.storage.list_issues()?;
         let plans = effectively_terminal_container_ids(&issues, &hierarchy)
             .into_iter()
-            .map(|id| {
-                self.plan_archive_target(ArchiveTarget::Container(
-                    &crate::domain::identity::IssueIdPrefix::from(&id),
-                ))
-            })
+            .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
             .collect::<Result<Vec<_>>>()?;
         Ok(ArchiveCandidates::new(plans))
     }
@@ -176,10 +172,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Build a complete non-mutating plan for one resolved container subtree.
-    pub fn preview_archive_container(&self, id: &str) -> Result<ArtifactPlan> {
-        self.plan_archive_target(ArchiveTarget::Container(
-            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
-        ))
+    pub fn preview_archive_container(&self, id: &IssueId) -> Result<ArtifactPlan> {
+        self.plan_archive_target(ArchiveTarget::Container(id))
     }
 
     fn plan_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
@@ -192,7 +186,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let root_container_id = match target {
             ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(self.storage.resolve_issue_id(id)?),
+            ArchiveTarget::Container(id) => Some(id.clone()),
         };
         let policy =
             ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
@@ -202,17 +196,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
             ArchiveTarget::Container(_) => PlanTarget::Container {
                 id: root_container_id
-                    .as_deref()
+                    .as_ref()
                     .context("container id was not resolved")?
-                    .into(),
+                    .clone(),
             },
         };
         let legacy_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
-        let (destination_root, destination_conflicts) = match root_container_id.as_deref() {
+        let (destination_root, destination_conflicts) = match root_container_id.as_ref() {
             Some(container_id) => {
                 let issue = issues
                     .iter()
-                    .find(|issue| issue.id == container_id)
+                    .find(|issue| &issue.id == container_id)
                     .context("resolved archive container is missing from issue inventory")?;
                 let preferred_root =
                     preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
@@ -223,7 +217,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &self.storage,
                         &preferred_root,
                         &legacy_root,
-                        container_id,
+                        container_id.as_str(),
                     )?;
                     (resolved.destination_root, resolved.conflicting_roots)
                 }
@@ -242,8 +236,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
                 root_container_id
-                    .as_deref()
-                    .context("container id was not resolved")?,
+                    .as_ref()
+                    .context("container id was not resolved")?
+                    .as_str(),
             ),
         };
         let pinned = inventory_issues_pinned_evidence(
@@ -269,14 +264,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
         );
 
-        if let Some(container_id) = root_container_id.as_deref() {
+        if let Some(container_id) = root_container_id.as_ref() {
             // Coupled retirement (`jit:45a140ae`): artifact archival requires an
             // effectively terminal container (Done/Rejected, or already Archived
             // from one of those for an idempotent rerun). An Archived container
             // retired from a non-terminal state, or any active state, is blocked.
             if issues
                 .iter()
-                .find(|issue| issue.id == container_id)
+                .find(|issue| &issue.id == container_id)
                 .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
@@ -524,7 +519,7 @@ impl CommandExecutor<JsonFileStorage> {
         let issues = super::captured_active_issues(&image)?;
         let root_id = match target {
             ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(super::resolve_issue_from_capture(&issues, id)?),
+            ArchiveTarget::Container(id) => Some(super::require_issue_in_capture(&issues, id)?),
         };
         let policy =
             ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
@@ -534,17 +529,17 @@ impl CommandExecutor<JsonFileStorage> {
             },
             ArchiveTarget::Container(_) => PlanTarget::Container {
                 id: root_id
-                    .as_deref()
+                    .as_ref()
                     .context("container id was not resolved")?
-                    .into(),
+                    .clone(),
             },
         };
         let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
         let mut conflicts = Vec::new();
-        let destination = if let Some(id) = root_id.as_deref() {
+        let destination = if let Some(id) = root_id.as_ref() {
             let issue = issues
                 .iter()
-                .find(|issue| issue.id == id)
+                .find(|issue| &issue.id == id)
                 .context("captured container missing")?;
             let preferred =
                 preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
@@ -648,7 +643,8 @@ impl CommandExecutor<JsonFileStorage> {
                     }
                     evidence.insert(child, fact);
                 }
-                let resolved = derive_container_destination(&preferred, &legacy, id, &evidence)?;
+                let resolved =
+                    derive_container_destination(&preferred, &legacy, id.as_str(), &evidence)?;
                 conflicts = resolved.conflicting_roots;
                 resolved.destination_root
             }
@@ -665,8 +661,9 @@ impl CommandExecutor<JsonFileStorage> {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
                 root_id
-                    .as_deref()
-                    .context("container id was not resolved")?,
+                    .as_ref()
+                    .context("container id was not resolved")?
+                    .as_str(),
             ),
         };
         let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;
@@ -748,10 +745,10 @@ impl CommandExecutor<JsonFileStorage> {
                 .into_iter()
                 .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
         );
-        if let Some(id) = root_id.as_deref() {
+        if let Some(id) = root_id.as_ref() {
             if issues
                 .iter()
-                .find(|issue| issue.id == id)
+                .find(|issue| &issue.id == id)
                 .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
@@ -840,10 +837,8 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Execute a freshly recomputed container archive plan under one write guard.
-    pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_target(ArchiveTarget::Container(
-            &crate::domain::identity::IssueIdPrefix::from_str(id)?,
-        ))
+    pub fn execute_archive_container(&self, id: &IssueId) -> Result<ArchiveExecutionResult> {
+        self.execute_archive_target(ArchiveTarget::Container(id))
     }
 
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionResult> {
@@ -883,7 +878,9 @@ impl CommandExecutor<JsonFileStorage> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::domain::artifact_plan::EvidenceCode;
+    use crate::domain::identity::{IssueId, IssueIdStaging};
     use crate::domain::State;
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;
@@ -950,9 +947,9 @@ mod tests {
         )
         .unwrap();
         let issue =
-            |id: &str, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
+            |id: &IssueId, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
                 let mut issue = crate::test_utils::fixture_issue(id.to_string(), String::new());
-                issue.id = id.to_string();
+                issue.id = id.clone();
                 issue.state = state;
                 issue.archived_from = archived_from;
                 issue.labels = issue_type
@@ -961,15 +958,20 @@ mod tests {
                 issue
             };
         let issues = vec![
-            issue("done-container", State::Done, None, Some("portfolio")),
             issue(
-                "rejected-container",
+                &fixture_id("3073ec9d-481e-5d93-bcbd-8d3a829604ea"),
+                State::Done,
+                None,
+                Some("portfolio"),
+            ),
+            issue(
+                &fixture_id("c81ca1b2-8274-5bc5-ab45-4bcdc90631e7"),
                 State::Rejected,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                "active-container",
+                &fixture_id("58a2e44c-2115-5819-bd02-0be9e12b79b2"),
                 State::InProgress,
                 None,
                 Some("portfolio"),
@@ -977,7 +979,7 @@ mod tests {
             // Archived from a terminal state is effectively terminal, so it is a
             // reconcilable candidate — same as the direct archive path accepts.
             issue(
-                "archived-from-done",
+                &fixture_id("8f2e6a1f-4078-5d9c-b05c-90bf43cf08c2"),
                 State::Archived,
                 Some(State::Done),
                 Some("portfolio"),
@@ -985,19 +987,40 @@ mod tests {
             // Archived from a non-terminal state is not effectively terminal, so
             // it is excluded.
             issue(
-                "archived-from-active",
+                &fixture_id("ef2490cc-b561-527e-9bdf-3a3c1258a630"),
                 State::Archived,
                 Some(State::InProgress),
                 Some("portfolio"),
             ),
-            issue("done-leaf", State::Done, None, Some("unit")),
-            issue("done-unknown", State::Done, None, Some("epic")),
-            issue("done-untyped", State::Done, None, None),
+            issue(
+                &fixture_id("907a9f01-03f8-54fa-b8d7-66a8b06627fe"),
+                State::Done,
+                None,
+                Some("unit"),
+            ),
+            issue(
+                &fixture_id("64938dc3-1cd3-507f-a34c-91686888506d"),
+                State::Done,
+                None,
+                Some("epic"),
+            ),
+            issue(
+                &fixture_id("748fd8b6-c7e4-5c20-9543-1654446a06ac"),
+                State::Done,
+                None,
+                None,
+            ),
         ];
 
+        let mut expected = vec![
+            issues[0].id.clone(),
+            issues[1].id.clone(),
+            issues[3].id.clone(),
+        ];
+        expected.sort();
         assert_eq!(
             effectively_terminal_container_ids(&issues, &hierarchy),
-            vec!["archived-from-done", "done-container", "rejected-container"]
+            expected
         );
     }
 
@@ -1013,7 +1036,7 @@ mod tests {
     fn executable_document_repo(
         owner_count: usize,
         content: &str,
-    ) -> (TempDir, CommandExecutor<JsonFileStorage>, Vec<String>) {
+    ) -> (TempDir, CommandExecutor<JsonFileStorage>, Vec<IssueId>) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
@@ -1587,7 +1610,7 @@ mod tests {
     fn test_container_execution_creates_marker_and_inverse_mirror_rerun_is_noop() {
         let (repo, executor, id) = configured_repo();
         let first = executor.execute_archive_container(&id).unwrap();
-        let destination_root = format!("archive/{}-archive-fixture", &id[..8]);
+        let destination_root = format!("archive/{}-archive-fixture", id.short_id());
         assert_eq!(
             fs::read_to_string(repo.path().join(&destination_root).join(".jit-container")).unwrap(),
             format!("{id}\n")
@@ -1767,7 +1790,7 @@ mod tests {
 
         let executor = executor(&repo, storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
-        let destination = format!("archive/{}/fixtures/root.md", &container_id[..8]);
+        let destination = format!("archive/{}/fixtures/root.md", container_id.short_id());
         let container = executor.storage.load_issue(&container_id).unwrap();
         let outside = executor.storage.load_issue(&outside_id).unwrap();
         assert_eq!(container.documents[0].path, destination);
@@ -1783,7 +1806,7 @@ mod tests {
     /// A container-bearing repository that, like [`executable_document_repo`],
     /// declares no development-root boundary so its managed and permanent areas
     /// are the whole classification.
-    fn configured_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
+    fn configured_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, IssueId) {
         let repo = TempDir::new().unwrap();
         let jit = repo.path().join(".jit");
         let storage = JsonFileStorage::new(&jit);
@@ -2266,11 +2289,11 @@ mod tests {
         let mut issue = executor.storage.load_issue(&id).unwrap();
         issue.state = State::InProgress;
         seed_archive_issue_precondition(&executor.storage, issue);
-        let destination = repo.path().join("archive").join(&id[..8]);
+        let destination = repo.path().join("archive").join(id.short_id());
         fs::create_dir_all(&destination).unwrap();
         fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
 
-        let plan = executor.preview_archive_container(&id[..8]).unwrap();
+        let plan = executor.preview_archive_container(&id).unwrap();
         assert!(!plan.eligible());
         assert!(plan
             .blockers()
@@ -2422,7 +2445,7 @@ mod tests {
     /// A configured repository whose one terminal container owns a document
     /// linking the sibling path `fixtures/section`. The caller decides what that
     /// path is on disk.
-    fn directory_link_repo() -> (TempDir, JsonFileStorage, String) {
+    fn directory_link_repo() -> (TempDir, JsonFileStorage, IssueId) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
@@ -2520,7 +2543,7 @@ mod tests {
     fn executable_container_repo(
         state: State,
         content: &str,
-    ) -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
+    ) -> (TempDir, CommandExecutor<JsonFileStorage>, IssueId) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
@@ -2548,7 +2571,7 @@ mod tests {
         (repo, executor, id)
     }
 
-    fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> usize {
+    fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &IssueId) -> usize {
         executor
             .storage
             .read_events()

@@ -13,12 +13,13 @@ use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::event_log::parse_known_events;
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
     unqualified_link_message, AddressScope, ProjectSource, RawScopeItem,
 };
-use crate::domain::{Issue, ReadinessCorrection, SHORT_ID_LENGTH};
+use crate::domain::{Issue, ReadinessCorrection};
 use crate::graph::DependencyGraph;
 use crate::repository_state::{RepositoryImage, RepositoryIndex, VirtualPath};
 use crate::validation::engine::Finding;
@@ -26,7 +27,6 @@ use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
-use std::str::FromStr;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -503,7 +503,7 @@ fn validate_integrity(
                     "Transitive reduction violation: Issue {} has redundant dependency on {} \
                      (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
                     issue.short_id(),
-                    dependency.chars().take(SHORT_ID_LENGTH).collect::<String>(),
+                    dependency.short_id(),
                     path
                 ));
             }
@@ -664,10 +664,8 @@ fn project_plan_content(
 ) -> Result<HashMap<String, String>> {
     let templates = &config.templates;
     let breakable: HashSet<String> = templates.breakable_types().into_iter().collect();
-    let by_id: HashMap<&str, &Issue> = issues
-        .iter()
-        .map(|issue| (issue.id.as_str(), issue))
-        .collect();
+    let by_id: HashMap<&crate::domain::identity::IssueId, &Issue> =
+        issues.iter().map(|issue| (&issue.id, issue)).collect();
     let mut content = HashMap::new();
     for issue in issues {
         let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
@@ -796,21 +794,11 @@ fn collect_item_link_findings(
                         Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
                     AddressScope::Issue(issue_ref) => {
-                        let prefix =
-                            crate::domain::identity::IssueIdPrefix::from_str(&issue_ref).ok();
-                        let matches: Vec<&Issue> = issues
+                        let owner_id = crate::storage::resolve_issue_id_among(&issue_ref, issues)?;
+                        let owner = issues
                             .iter()
-                            .filter(|candidate| {
-                                prefix
-                                    .as_ref()
-                                    .is_some_and(|prefix| prefix.matches(&candidate.id))
-                            })
-                            .collect();
-                        let [owner] = matches.as_slice() else {
-                            return Err(anyhow!(
-                                "has an unresolved or ambiguous issue scope '{issue_ref}'"
-                            ));
-                        };
+                            .find(|issue| issue.id == owner_id)
+                            .ok_or_else(|| anyhow!("missing issue '{owner_id}'"))?;
                         Ok(format!(
                             "@/issue/{}/{}/{}",
                             owner.short_id(),
@@ -1157,7 +1145,9 @@ mod tests {
             &read_fixture(&repo, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
-        issue.dependencies = vec!["missing".to_string()];
+        issue.dependencies = vec!["9dbccee5-4241-57f2-ba6b-7bb89e05938a"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap()];
         issue.gates_required = vec!["planned".to_string()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
         let error = format!(
@@ -1175,7 +1165,8 @@ mod tests {
             .unwrap_err()
         );
         assert!(
-            error.contains("repository-integrity") && error.contains("missing"),
+            error.contains("repository-integrity")
+                && error.contains("9dbccee5-4241-57f2-ba6b-7bb89e05938a"),
             "{error}"
         );
     }
@@ -1223,7 +1214,11 @@ mod tests {
         let layout = crate::storage::discover_repository_layout(repo.path(), store.root()).unwrap();
         store.configure_repository_layout(&layout);
         let mut issue = store.list_issues().unwrap().remove(0);
-        issue.dependencies.push("nonexistent".to_string());
+        issue.dependencies.push(
+            "5a1f6645-96bf-59db-932e-7f49ee5cc6bb"
+                .parse::<crate::domain::identity::IssueId>()
+                .unwrap(),
+        );
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";

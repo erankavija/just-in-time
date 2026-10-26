@@ -813,19 +813,6 @@ fn test_scope_dangling_brackets_pointer_still_fails_precisely() {
     );
 }
 
-#[test]
-fn test_scope_resolves_partial_container_id() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
-    let (c, _b) = spine_with_breakdown_criteria(&executor, true);
-
-    // A short prefix of the container id resolves like every other jit command.
-    let short = &c[..8];
-    let report = executor
-        .validate_scope(short)
-        .expect("partial container id resolves");
-    assert!(!report.has_errors(), "{:?}", report.findings);
-}
-
 // ---------------------------------------------------------------------------
 // External plan-doc resolution: a breakable container whose `## Success
 // Criteria` lives ONLY in an external plan file (its `description` has no

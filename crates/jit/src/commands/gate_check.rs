@@ -35,7 +35,7 @@ pub enum VerdictSource {
 /// no exit code is claimed, because no process ran here. The raw report text
 /// stays at the source run, which [`GateVerdictOrigin::Reused`] names, rather
 /// than being copied into every record that carries the verdict.
-fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> GateRunResult {
+fn reused_gate_run(source: &GateRunResult, issue_id: &IssueId, stage: GateStage) -> GateRunResult {
     let started_at = chrono::Utc::now();
     GateRunResult {
         schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
@@ -43,7 +43,7 @@ fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> 
         run_id: String::new(),
         gate_key: source.gate_key.clone(),
         stage,
-        issue_id: issue_id.to_string(),
+        issue_id: issue_id.clone(),
         commit: None,
         branch: None,
         status: source.status,
@@ -121,7 +121,7 @@ fn captured_repository_index(
 
 fn captured_issue_record(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<Option<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
@@ -130,7 +130,7 @@ fn captured_issue_record(
         RepositoryEntry::File { content, .. } => {
             let issue: Issue = serde_json::from_slice(content.bytes())
                 .with_context(|| format!("failed to parse captured issue at {path:?}"))?;
-            if issue.id != issue_id {
+            if &issue.id != issue_id {
                 anyhow::bail!(
                     "captured issue {issue_id} contains mismatched embedded id {}",
                     issue.id
@@ -145,14 +145,14 @@ fn captured_issue_record(
 
 fn captured_bound_issue(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<Issue> {
     let index = captured_repository_index(image)?;
     if !index.all_ids.iter().any(|id| id == issue_id) {
-        return Err(crate::storage::IssueNotFoundError::new(issue_id).into());
+        return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into());
     }
     captured_issue_record(image, issue_id)?
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id).into())
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
 }
 
 fn captured_gate_registry(
@@ -202,7 +202,7 @@ fn required_automated_gate<'a>(
 ) -> Result<&'a crate::declarations::GateDefinition> {
     if !issue.gates_required.iter().any(|key| key == gate_key) {
         return Err(super::gate::GateNotRequiredError {
-            issue_id: issue.id.to_string(),
+            issue_id: issue.id.clone(),
             gate_key: gate_key.to_string(),
         }
         .into());
@@ -264,7 +264,7 @@ fn compact_run_history_for_context(
 
 fn captured_gate_runs(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<CapturedGateRuns> {
     use crate::repository_state::RepositoryEntry;
 
@@ -295,7 +295,7 @@ fn captured_gate_runs(
     let mut results = captured
         .iter()
         .filter_map(|(_, _, result)| result.clone())
-        .filter(|run| run.issue_id == issue_id)
+        .filter(|run| &run.issue_id == issue_id)
         .collect::<Vec<_>>();
     results.sort_by(|left, right| {
         left.started_at
@@ -304,7 +304,7 @@ fn captured_gate_runs(
     });
     let inputs = captured
         .into_iter()
-        .filter(|(_, _, result)| result.as_ref().is_some_and(|run| run.issue_id == issue_id))
+        .filter(|(_, _, result)| result.as_ref().is_some_and(|run| &run.issue_id == issue_id))
         .map(|(path, _, _)| path)
         .collect();
     Ok(CapturedGateRuns { results, inputs })
@@ -441,15 +441,15 @@ fn repository_rule_report(
 
 fn captured_issue_rule_report(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<crate::validation::report::RuleReport> {
     use crate::validation::report::{ReportedFinding, RuleReport};
 
     let issues = super::captured_active_issues(image)?;
     let issue = issues
         .iter()
-        .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
+        .find(|issue| &issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format();
@@ -486,7 +486,7 @@ fn captured_issue_rule_report(
         )
         .into_iter()
         .filter(|finding| {
-            finding.issue_id.as_deref() == Some(issue_id)
+            finding.issue_id.as_ref() == Some(issue_id)
                 || (finding.is_config_error() && applicable.contains(finding.finding.rule.as_str()))
         })
         .map(|finding| ReportedFinding::new(Some(issue.id.clone()), &finding.finding)),
@@ -497,7 +497,7 @@ fn captured_issue_rule_report(
             .into_iter()
             .filter(|finding| {
                 finding.rule == super::DANGLING_LINK_RULE
-                    && finding.issue_id.as_deref() == Some(issue_id)
+                    && finding.issue_id.as_ref() == Some(issue_id)
             }),
     );
     Ok(RuleReport { findings })
@@ -505,7 +505,7 @@ fn captured_issue_rule_report(
 
 fn captured_scope_rule_report(
     image: &crate::repository_state::RepositoryImage,
-    container_id: &str,
+    container_id: &IssueId,
 ) -> Result<crate::validation::report::RuleReport> {
     use crate::declarations::rules::{RuleScope, Severity};
     use crate::validation::report::{ReportedFinding, RuleReport};
@@ -515,7 +515,7 @@ fn captured_scope_rule_report(
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let container_type = all
         .iter()
-        .find(|issue| issue.id == container_id)
+        .find(|issue| &issue.id == container_id)
         .and_then(|issue| label_utils::type_label_value(&issue.labels));
     let breakdown_type = container_type
         .and_then(|kind| config.templates.template_for_container(kind))
@@ -644,14 +644,14 @@ fn gate_findings_from_report(
 /// A missing, repeated, or empty target is a configuration fault.
 fn label_target_report(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
     label_namespace: &str,
 ) -> Result<crate::validation::report::RuleReport> {
     let issues = super::captured_active_issues(image)?;
     let issue = issues
         .iter()
-        .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
+        .find(|issue| &issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let prefix = format!("{label_namespace}:");
     let targets: Vec<&str> = issue
         .labels
@@ -672,7 +672,11 @@ fn label_target_report(
             "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found an empty target"
         );
     }
-    let target = super::resolve_issue_from_capture(&issues, &IssueIdPrefix::from_str(target)?)?;
+    let target = issues
+        .iter()
+        .find(|issue| issue.id.as_str() == target)
+        .map(|issue| issue.id.clone())
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.to_string()))?;
     captured_scope_rule_report(image, &target)
 }
 
@@ -680,7 +684,7 @@ fn label_target_report(
 /// distinct from a `failed` verdict on its content.
 fn builtin_fault_run(
     gate_key: &str,
-    issue_id: &str,
+    issue_id: &IssueId,
     stage: GateStage,
     command: &str,
     started_at: chrono::DateTime<chrono::Utc>,
@@ -694,7 +698,7 @@ fn builtin_fault_run(
         run_id: String::new(),
         gate_key: gate_key.to_string(),
         stage,
-        issue_id: issue_id.to_string(),
+        issue_id: issue_id.clone(),
         commit: None,
         branch: None,
         status: GateRunStatus::Error,
@@ -745,15 +749,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.require_layout().ok()
     }
 
-    /// Capture what evaluating `gate_key` reads, in one round that first
-    /// binds `requested` to its issue, and return the image with the bound id.
+    /// Capture the resolved issue and the inputs `gate_key` evaluates.
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::identity::IssueIdPrefix,
+        issue_id: &IssueId,
         gate_key: &str,
         run_paths: &[crate::repository_state::VirtualPath],
-    ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, IssueId)>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -770,7 +773,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             candidates = captured_repository_index(image)?
                 .all_ids
                 .into_iter()
-                .filter(|id| prefix.matches(id))
+                .filter(|id| id == issue_id)
                 .collect();
             Ok(spec.discover_paths(
                 candidates
@@ -786,10 +789,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .map(|id| {
                 captured_issue_record(&bound, id)?
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
             })
             .collect::<Result<Vec<_>>>()?;
-        let target_id = crate::storage::resolve_issue_id_among(prefix, &issues)?;
+        let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let mut paths = vec![
             VirtualPath::INDEX,
             VirtualPath::data(format!("issues/{target_id}.json"))?,
@@ -870,7 +873,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`VerdictSource::ReuseUnchangedInputs`]: a gate declaring inputs whose
     /// digest a prior run of that gate already recorded takes that run's
     /// verdict instead of executing its checker again.
-    pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult>
+    pub fn check_gate(&self, issue_id: &IssueId, gate_key: &str) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -889,7 +892,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// checker started, with any post-run input drift reported on the record.
     pub fn check_gate_with(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: &str,
         source: VerdictSource,
     ) -> Result<GateRunResult>
@@ -898,7 +901,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, MutationIntent};
 
-        let requested = IssueIdPrefix::from_str(issue_id)?;
+        let requested = issue_id.clone();
         let layout = self.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.identifier_at(0);
@@ -971,7 +974,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some((final_image, _)) = self.capture_gate_evaluation_image(
                 session.as_mut(),
-                &IssueIdPrefix::from(&target_id),
+                &target_id.clone(),
                 gate_key,
                 &run_paths,
             )?
@@ -1096,13 +1099,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             ),
             GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
                 .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
-            GateChecker::RuleValidation { rule } => super::validate::rule_validation_outcome(
-                repository_image,
-                &IssueIdPrefix::from(issue_id),
-                rule,
-            )
-            .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
-            .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
+            GateChecker::RuleValidation { rule } => {
+                super::validate::rule_validation_outcome(repository_image, issue_id, rule)
+                    .and_then(|outcome| outcome.map_err(|fault| anyhow!(fault.message)))
+                    .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
+            }
             GateChecker::LabelTargetValidation { label_namespace } => {
                 label_target_report(repository_image, issue_id, label_namespace)
                     .map(|report| (gate_findings_from_rule_report(&report), report.has_errors()))
@@ -1174,7 +1175,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             run_id: String::new(),
             gate_key: gate_key.to_string(),
             stage,
-            issue_id: issue_id.to_string(),
+            issue_id: issue_id.clone(),
             commit: None,
             branch: None,
             // In-process built-in checker: it stamps no commit, so there is no
@@ -1217,12 +1218,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// required.
     pub fn get_last_gate_run(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: &str,
     ) -> Result<Option<GateRunResult>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         self.projected_gate_run(&issue, gate_key)
     }
@@ -1353,11 +1352,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The second vector contains the gate keys that have no recorded run.
     pub fn get_last_gate_runs_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<(Vec<GateRunResult>, Vec<String>)> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1392,11 +1389,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// folds these statuses into its green/not-green readiness verdict.
     pub fn get_required_gate_statuses_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<Vec<(String, GateStatus)>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1551,13 +1546,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// checker's ordinary failing verdict is a successful [`GateRunResult`] with
     /// [`GateRunStatus::Failed`], so it remains recorded and leaves the issue Gated.
     /// An evaluation or evidence-persistence error is returned to the caller.
-    pub(crate) fn run_postchecks(&self, issue_id: &str) -> Result<()>
+    pub(crate) fn run_postchecks(&self, issue_id: &IssueId) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1579,10 +1572,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::{compact_run_history_for_context, omit_current_gate_projection};
+    use crate::commands::test_helpers::fixture_id;
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
+    use crate::domain::identity::IssueId;
     use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
@@ -1628,7 +1623,7 @@ mod tests {
         gate_key: &str,
         checker: GateChecker,
         labels: Vec<String>,
-    ) -> String {
+    ) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             gate_key.to_string(),
@@ -1744,7 +1739,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             run_id: run_id.to_string(),
             gate_key: gate_key.to_string(),
             stage: GateStage::Postcheck,
-            issue_id: "issue-1".to_string(),
+            issue_id: fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2"),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: GateRunStatus::Failed,
@@ -1840,7 +1835,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
     #[test]
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
         let mut issue = crate::domain::fixture_issue("Test".into(), String::new());
-        issue.id = "issue-1".into();
+        issue.id = fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2");
         issue.gates_required = vec!["first".into(), "second".into()];
         let mut run = prior_run("", "first", 10, None);
         run.status = GateRunStatus::Passed;
@@ -2073,7 +2068,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
     }
 
-    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, String) {
+    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, IssueId) {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = crate::test_taxonomy::test_taxonomy();
@@ -2239,7 +2234,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }
 
         /// A new issue requiring the gate under test.
-        fn issue(&self) -> String {
+        fn issue(&self) -> IssueId {
             let taxonomy = crate::test_taxonomy::test_taxonomy();
             let (issue_id, _) = self
                 .executor
@@ -2261,7 +2256,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             issue_id
         }
 
-        fn evaluate(&self, issue_id: &str) -> GateRunResult {
+        fn evaluate(&self, issue_id: &IssueId) -> GateRunResult {
             self.executor
                 .check_gate(issue_id, &self.gate_key)
                 .expect("the gate evaluates")
@@ -2564,7 +2559,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     fn add_exec_gate<S: IssueStore + crate::storage::RepositoryStateStore>(
         executor: &CommandExecutor<S>,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: &str,
         title: &str,
         command: String,
@@ -2600,7 +2595,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     fn capture_gate_evidence(
         executor: &CommandExecutor<JsonFileStorage>,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: &str,
     ) -> super::GateEvaluationEvidence {
         use crate::storage::RepositoryStateStore;
@@ -2614,14 +2609,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         ];
         let mut session = executor.storage.open_mutation_session(layout).unwrap();
         let image = executor
-            .capture_gate_evaluation_image(
-                session.as_mut(),
-                &issue_id
-                    .parse::<crate::domain::identity::IssueIdPrefix>()
-                    .unwrap(),
-                gate_key,
-                &run_paths,
-            )
+            .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
             .unwrap()
             .unwrap()
             .0;
@@ -2660,7 +2648,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "true".to_string(),
             Some("../../outside".to_string()),
         );
-        let unrelated = "00000000-0000-4000-8000-000000000001";
+        let unrelated = fixture_id("00000000-0000-4000-8000-000000000001");
         std::fs::write(
             repo.path().join(format!(".jit/issues/{unrelated}.json")),
             [],
@@ -2785,7 +2773,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }));
 
         let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
-        planned_issue.dependencies.push("nonexistent".to_string());
+        planned_issue
+            .dependencies
+            .push(fixture_id("5a1f6645-96bf-59db-932e-7f49ee5cc6bb"));
         let overrides = crate::commands::overrides_from_repo_changes(
             live_image.layout(),
             [
@@ -3051,7 +3041,7 @@ source-of-truth = "markdown-first"
             "type:task".to_string(),
             "satisfies:@/requirement/missing".to_string(),
         ];
-        local_failure.dependencies = vec!["missing-dependency".to_string()];
+        local_failure.dependencies = vec![fixture_id("04d64f1d-4c96-5feb-9570-9e34e4c85810")];
         local_failure.gates_required = vec!["unrelated-pending".to_string()];
         seed_issue(&executor.storage, local_failure);
 
@@ -3120,10 +3110,13 @@ source-of-truth = "markdown-first"
 
         let ambiguous_executor = setup();
         seed_rule_validation_rules(&ambiguous_executor);
-        for id in ["deadbeef-a", "deadbeef-b"] {
+        for id in [
+            "deadbeef-0000-4000-8000-000000000001",
+            "deadbeef-0000-4000-8000-000000000002",
+        ] {
             let mut target =
                 crate::domain::fixture_issue(format!("Ambiguous target {id}"), String::new());
-            target.id = id.to_string();
+            target.id = fixture_id(id);
             target.labels = vec!["type:epic".to_string()];
             seed_issue(&ambiguous_executor.storage, target);
         }
@@ -3406,7 +3399,7 @@ source-of-truth = "markdown-first"
 
     /// An issue requiring the manual gate `review`, whose registry also declares
     /// the automated gate `tests`.
-    fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> String {
+    fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry
             .gates
@@ -4636,9 +4629,27 @@ source-of-truth = "markdown-first"
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_never_retargets_bound_short_id_after_replacement() {
-        let (repo, executor, issue_id) = setup_file_repository();
-        let replacement_id = format!("{}-ffff-4fff-8fff-ffffffffffff", &issue_id[..8]);
+    fn test_check_gate_never_retargets_resolved_id_after_replacement() {
+        let (repo, executor, created_id) = setup_file_repository();
+        let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
+        let replacement_id = fixture_id("0f0e0d0c-ffff-4fff-8fff-ffffffffffff");
+        let mut original = executor.storage.load_issue(&created_id).unwrap();
+        original.id = issue_id.clone();
+        std::fs::remove_file(repo.path().join(format!(".jit/issues/{created_id}.json"))).unwrap();
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{issue_id}.json")),
+            crate::repository_state::serialize_issue(&original).unwrap(),
+        )
+        .unwrap();
+        let index = crate::repository_state::RepositoryIndex {
+            all_ids: vec![issue_id.clone()],
+            ..Default::default()
+        };
+        std::fs::write(
+            repo.path().join(".jit/index.json"),
+            index.to_pretty_bytes().unwrap(),
+        )
+        .unwrap();
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4658,9 +4669,7 @@ source-of-truth = "markdown-first"
         )
         .unwrap();
 
-        let error = executor
-            .check_gate(&issue_id[..8], "target-race")
-            .unwrap_err();
+        let error = executor.check_gate(&issue_id, "target-race").unwrap_err();
 
         assert!(
             error
@@ -4677,64 +4686,6 @@ source-of-truth = "markdown-first"
         assert!(executor
             .storage
             .list_gate_runs_for_issue(&replacement_id)
-            .unwrap()
-            .is_empty());
-    }
-
-    #[test]
-    fn test_check_gate_resolves_noncanonical_full_issue_ids() {
-        let (_repo, executor, issue_id) = setup_file_repository();
-        add_exec_gate(
-            &executor,
-            &issue_id,
-            "canonical-id",
-            "Canonical id",
-            "true".to_string(),
-            None,
-        );
-
-        let requests = [issue_id.to_uppercase(), issue_id.replace('-', "")];
-        for requested in &requests {
-            let run = executor.check_gate(requested, "canonical-id").unwrap();
-            assert_eq!(run.issue_id, issue_id, "{requested} must bind the issue");
-        }
-        assert_eq!(
-            executor
-                .storage
-                .list_gate_runs_for_issue(&issue_id)
-                .unwrap()
-                .len(),
-            requests.len()
-        );
-    }
-
-    #[test]
-    fn test_check_gate_rejects_a_prefix_below_the_minimum_length() {
-        let (_repo, executor, issue_id) = setup_file_repository();
-        add_exec_gate(
-            &executor,
-            &issue_id,
-            "short-id",
-            "Short id",
-            "true".to_string(),
-            None,
-        );
-
-        let error = executor
-            .check_gate(
-                &issue_id[..crate::domain::identity::IssueIdPrefix::MIN_ID_PREFIX_LENGTH - 1],
-                "short-id",
-            )
-            .unwrap_err();
-        assert!(
-            error
-                .downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
-                .is_some(),
-            "{error:?}"
-        );
-        assert!(executor
-            .storage
-            .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .is_empty());
     }
@@ -4785,7 +4736,7 @@ source-of-truth = "markdown-first"
         );
 
         let (repo, executor, issue_id) = setup_file_repository();
-        concurrent.issue_id = "unrelated-issue".to_string();
+        concurrent.issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000002");
         std::fs::write(
             repo.path().join("concurrent-run.json"),
             serde_json::to_vec_pretty(&concurrent).unwrap(),

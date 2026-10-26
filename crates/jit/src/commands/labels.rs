@@ -7,7 +7,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: Helper method for label operations, part of public API.
     #[allow(dead_code)]
-    pub fn get_issue(&self, id: &str) -> Result<Issue> {
+    pub fn get_issue(&self, id: &IssueId) -> Result<Issue> {
         self.storage.load_issue(id)
     }
 

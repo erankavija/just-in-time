@@ -18,7 +18,7 @@
 //!   one recoverable repository delta.
 
 use super::*;
-use crate::domain::SHORT_ID_LENGTH;
+use crate::domain::identity::IssueIdStaging;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -189,7 +189,7 @@ impl std::fmt::Display for BatchValidationError {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct BatchCreateOutcome {
     /// `{key: full_id}` pairs in the order the entries appeared in the file.
-    pub key_to_id: Vec<(String, String)>,
+    pub key_to_id: Vec<(String, IssueId)>,
 }
 
 /// Successful validation-only result for `batch-create --dry-run`.
@@ -209,7 +209,7 @@ pub struct BatchDryRunOutcome {
 
 impl BatchCreateOutcome {
     /// Materialize the `{key: id}` pairs as a map for `--json` output and lookup.
-    pub fn as_map(&self) -> HashMap<String, String> {
+    pub fn as_map(&self) -> HashMap<String, IssueId> {
         self.key_to_id.iter().cloned().collect()
     }
 }
@@ -329,7 +329,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let short_id_of = |key: &str| {
                 positions
                     .get(key)
-                    .map(|&index| created_issue_ids[index][..SHORT_ID_LENGTH].to_string())
+                    .map(|&index| created_issue_ids[index].short_id().to_string())
             };
             let drafts = defs
                 .iter()
@@ -394,7 +394,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         //     resolves to a shape-valid placeholder here: ids are allocated only
         //     at creation, and write validation below needs the final label shape.
         let credit = Self::batch_credit_namespaces(declarations)?;
-        let placeholder = "0".repeat(SHORT_ID_LENGTH);
+        let placeholder = Issue::draft(String::new(), String::new())
+            .id
+            .short_id()
+            .to_string();
         let resolved_labels: Vec<Option<Vec<String>>> = defs
             .iter()
             .map(|def| {
@@ -922,10 +925,9 @@ mod tests {
             .as_map();
 
         let task = exec.storage().load_issue(&map["task"]).unwrap();
-        assert!(task.labels.contains(&format!(
-            "satisfies:{}/REQ-01",
-            &map["story"][..SHORT_ID_LENGTH]
-        )));
+        assert!(task
+            .labels
+            .contains(&format!("satisfies:{}/REQ-01", map["story"].short_id())));
         let report = exec.run_rules(None).unwrap();
         assert!(
             !report.findings.iter().any(|f| f.rule == "story-coverage"),
