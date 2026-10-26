@@ -5,24 +5,12 @@ use jit::declarations::parse_configuration;
 use jit::domain::artifact_classifier::contains_path;
 use jit::profile::ProfilePackageModel;
 use jit::repository_state::{Contribution, ScalarTarget, SetStringTarget};
+use jit::test_cli::JitCli;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn jit_init(dir: &std::path::Path, extra_args: &[&str]) -> std::process::Output {
-    Command::new(jit_binary())
-        .arg("init")
-        .args(extra_args)
-        .current_dir(dir)
-        .output()
-        .expect("failed to run jit init")
-}
 
 /// The package carrying the generic domain vocabulary a repository needs to be
 /// usable, including the development-area classification.
@@ -35,14 +23,15 @@ const DEFAULT_PACKAGE: &str = "jit-default";
 /// holds it inside itself — which is where an adopter puts an obtained set.
 const PACKAGE_LOCATION: &str = "packages";
 
-/// Initialize `dir` with this repository's default vocabulary package applied,
-/// assembled from the checkout into `dir`'s own worktree first.
-fn jit_init_with_default_package(dir: &Path) -> std::process::Output {
+/// Initialize `cli`'s repository with this repository's default vocabulary
+/// package applied, assembled from the checkout into its own worktree first.
+fn init_with_default_package(cli: &JitCli) -> std::process::Output {
     let location = format!("{PACKAGE_LOCATION}/{DEFAULT_PACKAGE}");
-    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
+    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &cli.root().join(&location))
         .expect("this repository's default package captures");
-    let selector = location.to_string();
-    jit_init(dir, &["--profile", &selector])
+    cli.command(["init", "--profile", &location])
+        .output()
+        .expect("failed to run jit init")
 }
 
 // ---------------------------------------------------------------------------
@@ -51,11 +40,11 @@ fn jit_init_with_default_package(dir: &Path) -> std::process::Output {
 
 #[test]
 fn test_init_creates_config_toml_carrying_only_repository_derived_declarations() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &[]);
+    let cli = JitCli::uninitialised().unwrap();
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success(), "jit init failed: {:?}", out);
 
-    let config = temp.path().join(".jit/config.toml");
+    let config = cli.root().join(".jit/config.toml");
     assert!(
         config.exists(),
         ".jit/config.toml should be created by init"
@@ -72,7 +61,7 @@ fn test_init_creates_config_toml_carrying_only_repository_derived_declarations()
             .unwrap()
             .project_name()
             .map(|name| name.as_str().to_string()),
-        temp.path()
+        cli.root()
             .file_name()
             .and_then(|name| name.to_str())
             .map(jit::config::slugify_project_name),
@@ -95,11 +84,11 @@ fn test_init_writes_the_rule_set_the_declared_registry_supports() {
     // repository declaring none receives the label grammar alone — the one rule
     // whose assertion names no namespace and no type — and exactly the
     // projection that rule references.
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    assert!(cli.command(["init"]).output().unwrap().status.success());
 
     let rules: toml::Value =
-        toml::from_str(&fs::read_to_string(temp.path().join(".jit/rules.toml")).unwrap()).unwrap();
+        toml::from_str(&fs::read_to_string(cli.root().join(".jit/rules.toml")).unwrap()).unwrap();
     let rules = rules["rules"].as_array().unwrap();
     let references = rules
         .iter()
@@ -108,7 +97,7 @@ fn test_init_writes_the_rule_set_the_declared_registry_supports() {
             Some(reference.rsplit('/').next().unwrap().to_string())
         })
         .collect::<BTreeSet<_>>();
-    let published = fs::read_dir(temp.path().join(".jit/schemas"))
+    let published = fs::read_dir(cli.root().join(".jit/schemas"))
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
         .collect::<BTreeSet<_>>();
@@ -127,18 +116,13 @@ fn test_init_writes_the_rule_set_the_declared_registry_supports() {
 
     // The scaffold is a usable repository even so: it validates, and an issue
     // can be created in it.
-    let validate = Command::new(jit_binary())
-        .args(["validate", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let validate = cli.command(["validate", "--json"]).output().unwrap();
     assert!(
         validate.status.success(),
         "a repository declaring no vocabulary validates: {validate:?}"
     );
-    let created = Command::new(jit_binary())
-        .args(["issue", "create", "--title", "First", "--json"])
-        .current_dir(temp.path())
+    let created = cli
+        .command(["issue", "create", "--title", "First", "--json"])
         .output()
         .unwrap();
     assert!(
@@ -149,11 +133,11 @@ fn test_init_writes_the_rule_set_the_declared_registry_supports() {
 
 #[test]
 fn test_init_creates_required_files() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &[]);
+    let cli = JitCli::uninitialised().unwrap();
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success());
 
-    let jit = temp.path().join(".jit");
+    let jit = cli.root().join(".jit");
     assert!(jit.join("index.json").exists(), "index.json missing");
     assert!(jit.join("gates.toml").exists(), "gates.toml missing");
     assert!(jit.join("events.jsonl").exists(), "events.jsonl missing");
@@ -173,16 +157,16 @@ fn test_init_outside_git_scaffolds_rules_without_creating_dot_git() {
     // `<temp>/.git` exists -- not from the ambient cwd. A fresh TempDir has no
     // `.git` of its own, so the non-git lockless path is taken even when $TMPDIR
     // itself lives inside an unrelated git worktree (as in some CI sandboxes).
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &[]);
+    let cli = JitCli::uninitialised().unwrap();
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success(), "jit init failed: {:?}", out);
 
     assert!(
-        temp.path().join(".jit/rules.toml").exists(),
+        cli.root().join(".jit/rules.toml").exists(),
         "init should scaffold .jit/rules.toml even outside a git repo"
     );
     assert!(
-        !temp.path().join(".git").exists(),
+        !cli.root().join(".git").exists(),
         "init outside a git repo must not create a .git directory"
     );
 }
@@ -193,15 +177,15 @@ fn test_init_outside_git_scaffolds_rules_without_creating_dot_git() {
 
 #[test]
 fn test_init_idempotent_does_not_overwrite_config() {
-    let temp = TempDir::new().unwrap();
+    let cli = JitCli::uninitialised().unwrap();
 
     // First init
-    let out = jit_init(temp.path(), &[]);
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success());
 
     // Mark the scaffolded config with a sentinel, keeping its declarations: a
     // second init must leave the whole authored file alone.
-    let config = temp.path().join(".jit/config.toml");
+    let config = cli.root().join(".jit/config.toml");
     let authored = format!(
         "# CUSTOM SENTINEL\n{}",
         fs::read_to_string(&config).unwrap()
@@ -209,7 +193,7 @@ fn test_init_idempotent_does_not_overwrite_config() {
     fs::write(&config, &authored).unwrap();
 
     // Second init — should succeed and leave config untouched
-    let out = jit_init(temp.path(), &[]);
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success(), "second jit init failed");
 
     let content = fs::read_to_string(&config).unwrap();
@@ -221,23 +205,21 @@ fn test_init_idempotent_does_not_overwrite_config() {
 
 #[test]
 fn test_init_idempotent_does_not_overwrite_index() {
-    let temp = TempDir::new().unwrap();
-    jit_init(temp.path(), &[]);
+    let cli = JitCli::uninitialised().unwrap();
+    cli.command(["init"]).output().unwrap();
 
     // Create an issue so index has real data
-    Command::new(jit_binary())
-        .args(["issue", "create", "-t", "My issue"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "My issue"])
         .output()
         .unwrap();
 
-    let index_before = fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
+    let index_before = fs::read_to_string(cli.root().join(".jit/index.json")).unwrap();
 
     // Second init
-    let out = jit_init(temp.path(), &[]);
+    let out = cli.command(["init"]).output().unwrap();
     assert!(out.status.success());
 
-    let index_after = fs::read_to_string(temp.path().join(".jit/index.json")).unwrap();
+    let index_after = fs::read_to_string(cli.root().join(".jit/index.json")).unwrap();
     assert_eq!(
         index_before, index_after,
         "second init should not reset index.json"
@@ -250,16 +232,16 @@ fn test_init_idempotent_does_not_overwrite_index() {
 
 #[test]
 fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--json"]);
+    let cli = JitCli::uninitialised().unwrap();
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
         json,
         serde_json::json!({
-            "repository_root": temp.path().to_string_lossy(),
-            "data_dir": temp.path().join(".jit").to_string_lossy(),
+            "repository_root": cli.root().to_string_lossy(),
+            "data_dir": cli.root().join(".jit").to_string_lossy(),
             "repository_id": null,
             "gitattributes_status": "not_applicable",
             "created_paths": [
@@ -279,16 +261,10 @@ fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
 
 #[test]
 fn test_init_json_reports_repository_id_inside_git() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -308,16 +284,10 @@ fn test_init_json_reports_repository_id_inside_git() {
 
 #[test]
 fn test_init_json_inside_git_reports_gitattributes_created() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -340,32 +310,24 @@ fn test_init_json_inside_git_reports_gitattributes_created() {
         "a fresh .gitattributes is created, not modified, got: {modified:?}"
     );
 
-    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".gitattributes")).unwrap();
     assert!(content.contains("# JIT merge drivers"));
 }
 
 #[test]
 fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
-    let temp = TempDir::new().unwrap();
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
     let data_dir = r#""lead space/glob*query?[set]"#;
-    fs::create_dir(temp.path().join(r#""lead space"#)).unwrap();
-    let out = Command::new(jit_binary())
-        .arg("init")
-        .env("JIT_DATA_DIR", data_dir)
-        .current_dir(temp.path())
+    fs::create_dir(cli.root().join(r#""lead space"#)).unwrap();
+    let out = cli
+        .command_with_env(["init"], [("JIT_DATA_DIR", data_dir)])
         .output()
         .unwrap();
     assert!(out.status.success(), "jit init failed: {out:?}");
 
-    let attributes = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    let attributes = fs::read_to_string(cli.root().join(".gitattributes")).unwrap();
     assert!(
         attributes.contains(
             "\"\\\"lead space/glob\\\\*query\\\\?\\\\[set\\\\]/events.jsonl\" merge=union"
@@ -376,7 +338,7 @@ fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
     let literal = Command::new("git")
         .args(["check-attr", "merge", "--"])
         .arg(format!("{data_dir}/events.jsonl"))
-        .current_dir(temp.path())
+        .current_dir(cli.root())
         .output()
         .unwrap();
     assert!(literal.status.success());
@@ -387,7 +349,7 @@ fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
     let wildcard_neighbor = Command::new("git")
         .args(["check-attr", "merge", "--"])
         .arg(r#""lead space/glob-neighborqueryXs/events.jsonl"#)
-        .current_dir(temp.path())
+        .current_dir(cli.root())
         .output()
         .unwrap();
     assert!(wildcard_neighbor.status.success());
@@ -402,19 +364,13 @@ fn test_init_nested_glob_data_dir_claims_only_literal_events_path() {
 // `.jit/` data plane that `.gitattributes` covers.
 #[test]
 fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
-    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".gitattributes")).unwrap();
     assert!(
         !content.contains("claims.jsonl"),
         "claim coordination writes its log under .git/jit/, not .jit/, so \
@@ -435,19 +391,13 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
 // `.gitattributes` in neither created nor modified.
 #[test]
 fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
-    let first = jit_init(temp.path(), &["--json"]);
+    let first = cli.command(["init", "--json"]).output().unwrap();
     assert!(first.status.success());
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success());
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -483,23 +433,17 @@ fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
 // path and that Git evidence, not the fresh/existing-root distinction, gates it.
 #[test]
 fn test_init_json_reinit_reclaims_deleted_gitattributes() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
-    let first = jit_init(temp.path(), &["--json"]);
+    let first = cli.command(["init", "--json"]).output().unwrap();
     assert!(first.status.success());
-    let gitattributes = temp.path().join(".gitattributes");
+    let gitattributes = cli.root().join(".gitattributes");
     assert!(gitattributes.is_file(), "fresh init creates .gitattributes");
     fs::remove_file(&gitattributes).unwrap();
 
     // A plain re-init (no template, no profile) over the existing root.
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "re-init failed: {out:?}");
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -523,19 +467,13 @@ fn test_init_json_reinit_reclaims_deleted_gitattributes() {
 
 #[test]
 fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
-    let temp = TempDir::new().unwrap();
-    let status = std::process::Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
 
     // Pre-existing .gitattributes without the jit merge-driver block.
-    fs::write(temp.path().join(".gitattributes"), "*.txt text\n").unwrap();
+    fs::write(cli.root().join(".gitattributes"), "*.txt text\n").unwrap();
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -561,7 +499,7 @@ fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
         "an appended .gitattributes should be reported as modified, got: {modified:?}"
     );
 
-    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".gitattributes")).unwrap();
     assert!(content.contains("*.txt text"), "original content preserved");
     assert!(
         content.contains("# JIT merge drivers"),
@@ -569,7 +507,7 @@ fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
     );
 
     // Atomic-write regression: no stray temp sibling left behind.
-    let stray: Vec<_> = fs::read_dir(temp.path())
+    let stray: Vec<_> = fs::read_dir(cli.root())
         .unwrap()
         .filter_map(|e| e.ok())
         .map(|e| e.file_name().to_string_lossy().into_owned())
@@ -583,11 +521,11 @@ fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
 
 #[test]
 fn test_init_json_idempotent_reports_empty_created_paths() {
-    let temp = TempDir::new().unwrap();
-    let first = jit_init(temp.path(), &["--json"]);
+    let cli = JitCli::uninitialised().unwrap();
+    let first = cli.command(["init", "--json"]).output().unwrap();
     assert!(first.status.success());
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(
         out.status.success(),
         "second jit init --json failed: {:?}",
@@ -601,21 +539,13 @@ fn test_init_json_idempotent_reports_empty_created_paths() {
 
 #[test]
 fn test_init_json_disjoint_data_root_reports_canonical_plan_paths() {
-    let worktree = TempDir::new().unwrap();
+    let cli = JitCli::uninitialised().unwrap();
     let external = TempDir::new().unwrap();
     let data_dir = external.path().join("repository-data");
-    let status = Command::new("git")
-        .arg("init")
-        .arg("-q")
-        .current_dir(worktree.path())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    cli.init_git().unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["init", "--json"])
-        .env("JIT_DATA_DIR", &data_dir)
-        .current_dir(worktree.path())
+    let out = cli
+        .command_with_env(["init", "--json"], [("JIT_DATA_DIR", &data_dir)])
         .output()
         .unwrap();
     assert!(out.status.success(), "disjoint init failed: {out:?}");
@@ -634,18 +564,18 @@ fn test_init_json_disjoint_data_root_reports_canonical_plan_paths() {
             ".jit/rules.toml"
         ])
     );
-    assert!(!worktree.path().join(".gitattributes").exists());
+    assert!(!cli.root().join(".gitattributes").exists());
     assert!(json["modified_paths"].as_array().unwrap().is_empty());
 }
 
 #[test]
 fn test_init_json_reinit_reports_only_file_restored_by_plan() {
-    let temp = TempDir::new().unwrap();
-    let first = jit_init(temp.path(), &["--json"]);
+    let cli = JitCli::uninitialised().unwrap();
+    let first = cli.command(["init", "--json"]).output().unwrap();
     assert!(first.status.success());
-    fs::remove_file(temp.path().join(".jit/gates.toml")).unwrap();
+    fs::remove_file(cli.root().join(".jit/gates.toml")).unwrap();
 
-    let out = jit_init(temp.path(), &["--json"]);
+    let out = cli.command(["init", "--json"]).output().unwrap();
     assert!(out.status.success(), "re-init failed: {out:?}");
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -662,10 +592,10 @@ fn test_init_json_reinit_reports_only_file_restored_by_plan() {
 
 #[test]
 fn test_init_config_is_valid_toml() {
-    let temp = TempDir::new().unwrap();
-    jit_init(temp.path(), &[]);
+    let cli = JitCli::uninitialised().unwrap();
+    cli.command(["init"]).output().unwrap();
 
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     // toml crate can parse it — use the library directly
     let parsed: Result<toml::Value, _> = toml::from_str(&content);
     assert!(
@@ -705,11 +635,11 @@ fn classified_areas(policy: &DocumentationConfig) -> Vec<String> {
 
 #[test]
 fn test_init_with_the_default_package_classifies_every_development_area() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = packaged_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(cli.root());
     let development_root = policy.development_root();
     let managed = policy
         .managed_paths
@@ -750,11 +680,11 @@ fn test_init_with_the_default_package_classifies_every_development_area() {
 
 #[test]
 fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     let scaffolded: toml::Table = content.parse().expect("config.toml should be valid TOML");
     let emitted = scaffolded
         .get("documentation")
@@ -787,11 +717,11 @@ fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys(
 
 #[test]
 fn test_init_with_the_default_package_classifies_root_files_as_exact_path_entries() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = packaged_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(cli.root());
     let development_root = policy.development_root();
     let areas = classified_areas(&policy);
     let root_files = areas
@@ -832,11 +762,11 @@ fn test_init_documentation_policy_is_the_default_package_declaration() {
     // REQ-06: the classification a repository receives is the one the default
     // package declares, compared against that manifest rather than against a
     // second copy of the lists.
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = packaged_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(cli.root());
     let (_workspace, package) = jit::test_utils::temporary_repository_package(DEFAULT_PACKAGE);
     let manifest = package.model();
 
@@ -896,11 +826,11 @@ fn declared_set(manifest: &ProfilePackageModel, target: SetStringTarget) -> Vec<
 
 #[test]
 fn test_init_with_the_default_package_authors_an_issue_scoped_registry_the_query_accepts() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = packaged_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(cli.root());
     // Active configuration, not commented-out guidance: the application writes
     // the registry into the file, so the accessor reads it rather than answering
     // from an absent key.
@@ -931,23 +861,22 @@ fn test_init_with_the_default_package_authors_an_issue_scoped_registry_the_query
 
 #[test]
 fn test_init_with_the_default_package_plans_archival_under_a_configured_policy() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init_with_default_package(temp.path());
+    let cli = JitCli::uninitialised().unwrap();
+    let out = init_with_default_package(&cli);
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = packaged_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(cli.root());
     let area = policy
         .managed_paths()
         .into_iter()
         .next()
         .expect("the applied policy should classify at least one managed area");
-    fs::create_dir_all(temp.path().join(&area)).unwrap();
+    fs::create_dir_all(cli.root().join(&area)).unwrap();
     let document = format!("{area}/note.md");
-    fs::write(temp.path().join(&document), "note").unwrap();
+    fs::write(cli.root().join(&document), "note").unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["archive", "document", &document, "--json"])
-        .current_dir(temp.path())
+    let out = cli
+        .command(["archive", "document", &document, "--json"])
         .output()
         .expect("failed to run jit archive document");
     assert!(out.status.success(), "archive preview failed: {out:?}");
@@ -975,18 +904,12 @@ fn test_init_with_the_default_package_plans_archival_under_a_configured_policy()
 /// file's doing rather than an empty directory's.
 #[test]
 fn test_init_inside_git_leaves_no_untracked_scratch_content_after_a_mutation() {
-    let temp = TempDir::new().unwrap();
-    assert!(Command::new("git")
-        .args(["init", "-q"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap()
-        .success());
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap();
+    assert!(cli.command(["init"]).output().unwrap().status.success());
 
-    let created = Command::new(jit_binary())
-        .args(["issue", "create", "A mutation"])
-        .current_dir(temp.path())
+    let created = cli
+        .command(["issue", "create", "A mutation"])
         .output()
         .unwrap();
     assert!(
@@ -998,7 +921,7 @@ fn test_init_inside_git_leaves_no_untracked_scratch_content_after_a_mutation() {
     let untracked_scratch = |label: &str| {
         let status = Command::new("git")
             .args(["status", "--porcelain", "-uall"])
-            .current_dir(temp.path())
+            .current_dir(cli.root())
             .output()
             .unwrap();
         let rendered = String::from_utf8(status.stdout).unwrap();
@@ -1010,13 +933,13 @@ fn test_init_inside_git_leaves_no_untracked_scratch_content_after_a_mutation() {
     untracked_scratch("after a mutation");
 
     fs::create_dir_all(
-        temp.path()
+        cli.root()
             .join(".jit")
             .join(jit::repository_state::RECORD_SCRATCH_DIR),
     )
     .unwrap();
     fs::write(
-        temp.path()
+        cli.root()
             .join(".jit")
             .join(jit::repository_state::RECORD_SCRATCH_DIR)
             .join("redo.record"),

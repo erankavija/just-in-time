@@ -4,10 +4,10 @@ use super::profile_cli_tests::{
     applied_ids, jit, json, live_asset_package, only_profile, requested_profile,
     write_lifecycle_package,
 };
+use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::path::Path;
 use std::process::Output;
-use tempfile::TempDir;
 
 fn assert_never_has_git(repo: &Path, phase: &str) {
     assert!(
@@ -16,9 +16,9 @@ fn assert_never_has_git(repo: &Path, phase: &str) {
     );
 }
 
-fn successful_lifecycle_json(repo: &Path, phase: &str, args: &[&str]) -> Value {
-    assert_never_has_git(repo, &format!("before {phase}"));
-    let output = jit(repo, args);
+fn successful_lifecycle_json(cli: &JitCli, phase: &str, args: &[&str]) -> Value {
+    assert_never_has_git(cli.root(), &format!("before {phase}"));
+    let output = jit(cli, args);
     assert!(
         output.status.success(),
         "{phase}: jit {args:?} failed\nstatus={}\nstdout={}\nstderr={}",
@@ -27,7 +27,7 @@ fn successful_lifecycle_json(repo: &Path, phase: &str, args: &[&str]) -> Value {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_no_version_control_error(&output, phase);
-    assert_never_has_git(repo, &format!("after {phase}"));
+    assert_never_has_git(cli.root(), &format!("after {phase}"));
     json(&output)
 }
 
@@ -43,11 +43,11 @@ fn assert_no_version_control_error(output: &Output, phase: &str) {
 /// created without `.git` (jit:8021d507).
 #[test]
 fn test_profile_lifecycle_completes_without_git() {
-    let repo = TempDir::new().expect("create repository without git");
-    let repo = repo.path();
+    let cli = JitCli::uninitialised().unwrap();
+    let repo = cli.root();
     assert_never_has_git(repo, "new repository");
 
-    successful_lifecycle_json(repo, "initialize", &["init", "--json"]);
+    successful_lifecycle_json(&cli, "initialize", &["init", "--json"]);
 
     let fixture = jit::test_utils::profile_package_fixture("planner-asset-only");
     jit::test_utils::write_package_declaring(
@@ -64,7 +64,7 @@ fn test_profile_lifecycle_completes_without_git() {
     );
     let workflow_selector = "packages/gitless-workflow";
     let shown = successful_lifecycle_json(
-        repo,
+        &cli,
         "select workflow package",
         &["profile", "show", "--profile", workflow_selector, "--json"],
     );
@@ -72,7 +72,7 @@ fn test_profile_lifecycle_completes_without_git() {
     assert_eq!(shown["profiles"][0]["manifest"]["id"], "gitless-workflow");
 
     let resolved = successful_lifecycle_json(
-        repo,
+        &cli,
         "resolve and apply workflow dependency closure",
         &["profile", "apply", "--profile", workflow_selector, "--json"],
     );
@@ -86,7 +86,7 @@ fn test_profile_lifecycle_completes_without_git() {
     write_lifecycle_package(repo, "packages/lifecycle", lifecycle_id, "1.0.0");
     let lifecycle_selector = "packages/lifecycle";
     let lifecycle = successful_lifecycle_json(
-        repo,
+        &cli,
         "apply lifecycle package",
         &[
             "profile",
@@ -100,7 +100,7 @@ fn test_profile_lifecycle_completes_without_git() {
 
     live_asset_package(repo, "packages/capture-source");
     let packed = successful_lifecycle_json(
-        repo,
+        &cli,
         "pack profile package",
         &[
             "profile",
@@ -115,7 +115,7 @@ fn test_profile_lifecycle_completes_without_git() {
     assert!(repo.join("packages/packed.tar").is_file());
 
     let added = successful_lifecycle_json(
-        repo,
+        &cli,
         "add packed profile package",
         &[
             "profile",
@@ -133,7 +133,7 @@ fn test_profile_lifecycle_completes_without_git() {
     );
     let imported_selector = "packages/imported";
     let imported = successful_lifecycle_json(
-        repo,
+        &cli,
         "select added profile package",
         &["profile", "show", "--profile", imported_selector, "--json"],
     );
@@ -144,12 +144,12 @@ fn test_profile_lifecycle_completes_without_git() {
     );
 
     let difference = successful_lifecycle_json(
-        repo,
+        &cli,
         "report lifecycle package difference",
         &["profile", "diff", "--profile", lifecycle_selector, "--json"],
     );
     assert_eq!(difference["count"], 1);
     assert_eq!(difference["profiles"][0]["id"], lifecycle_id);
 
-    successful_lifecycle_json(repo, "validate repository", &["validate", "--json"]);
+    successful_lifecycle_json(&cli, "validate repository", &["validate", "--json"]);
 }

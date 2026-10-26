@@ -1,27 +1,11 @@
 use super::profile_cli_tests::{applied_ids, requested_profile};
+use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use tempfile::TempDir;
-
-struct TestRepo {
-    _parent: TempDir,
-    path: PathBuf,
-}
-
-impl TestRepo {
-    fn new() -> Self {
-        let parent = TempDir::new().expect("create repository parent");
-        let path = parent.path().join("repo");
-        fs::create_dir(&path).expect("create repository");
-        Self {
-            _parent: parent,
-            path,
-        }
-    }
-}
 
 #[cfg(unix)]
 struct CheckerPath {
@@ -54,19 +38,17 @@ fn checker_path_without_jq() -> CheckerPath {
     }
 }
 
-fn jit_with_path(repo: &Path, args: &[&str], path: Option<&Path>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_jit"));
-    command
-        .args(args)
-        .current_dir(repo)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
-        .env_remove("JIT_DATA_DIR")
-        .env_remove("JIT_SRC")
-        .env("HTTP_PROXY", "http://127.0.0.1:9")
-        .env("HTTPS_PROXY", "http://127.0.0.1:9")
-        .env("ALL_PROXY", "http://127.0.0.1:9")
-        .env("NO_PROXY", "");
+fn jit_with_path(repo: &JitCli, args: &[&str], path: Option<&Path>) -> Output {
+    let mut command = repo.command_with_env(
+        args,
+        [
+            ("HTTP_PROXY", "http://127.0.0.1:9"),
+            ("HTTPS_PROXY", "http://127.0.0.1:9"),
+            ("ALL_PROXY", "http://127.0.0.1:9"),
+            ("NO_PROXY", ""),
+        ],
+    );
+    command.env_remove("GIT_DIR").env_remove("GIT_WORK_TREE");
     if let Some(path) = path {
         command.env("PATH", path);
     }
@@ -86,11 +68,11 @@ fn parse_json(output: &Output) -> Value {
     })
 }
 
-fn success_json(repo: &Path, args: &[&str]) -> Value {
+fn success_json(repo: &JitCli, args: &[&str]) -> Value {
     success_json_with_path(repo, args, None)
 }
 
-fn success_json_with_path(repo: &Path, args: &[&str], path: Option<&Path>) -> Value {
+fn success_json_with_path(repo: &JitCli, args: &[&str], path: Option<&Path>) -> Value {
     let output = jit_with_path(repo, args, path);
     assert!(
         output.status.success(),
@@ -102,7 +84,12 @@ fn success_json_with_path(repo: &Path, args: &[&str], path: Option<&Path>) -> Va
     parse_json(&output)
 }
 
-fn failed_json_with_path(repo: &Path, args: &[&str], exit_code: i32, path: Option<&Path>) -> Value {
+fn failed_json_with_path(
+    repo: &JitCli,
+    args: &[&str],
+    exit_code: i32,
+    path: Option<&Path>,
+) -> Value {
     let output = jit_with_path(repo, args, path);
     assert_eq!(
         output.status.code(),
@@ -228,33 +215,40 @@ fn expected_keys(keys: &[&str]) -> BTreeSet<String> {
 
 #[test]
 fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
-    let fresh = TestRepo::new();
-    let existing = TestRepo::new();
-    assert!(!fresh.path.join(".git").exists());
-    assert!(!existing.path.join(".git").exists());
+    // Both repositories share one basename, which `init` seeds into the
+    // configuration the trees are compared on.
+    let parents = [TempDir::new().unwrap(), TempDir::new().unwrap()];
+    let [fresh, existing] = parents.each_ref().map(|parent| {
+        JitCli::with_repository(
+            tempfile::Builder::new()
+                .prefix("repo")
+                .rand_bytes(0)
+                .tempdir_in(parent.path())
+                .unwrap(),
+        )
+    });
+    assert!(!fresh.root().join(".git").exists());
+    assert!(!existing.root().join(".git").exists());
 
     // Both worktrees carry the same staged packages, so the trees compared at
     // the end differ only in how the profile got there.
-    let fresh_location = crate::repository_package_at(&fresh.path, "jit-dogfood");
-    let existing_location = crate::repository_package_at(&existing.path, "jit-dogfood");
+    let fresh_location = crate::repository_package_at(fresh.root(), "jit-dogfood");
+    let existing_location = crate::repository_package_at(existing.root(), "jit-dogfood");
     let fresh_selector = fresh_location.to_string();
     assert_eq!(fresh_location, existing_location);
-    let fresh_init = success_json(
-        &fresh.path,
-        &["init", "--profile", &fresh_selector, "--json"],
-    );
+    let fresh_init = success_json(&fresh, &["init", "--profile", &fresh_selector, "--json"]);
     assert_eq!(
         requested_profile(&fresh_init["profile"])["status"],
         "applied"
     );
 
-    success_json(&existing.path, &["init", "--json"]);
+    success_json(&existing, &["init", "--json"]);
     // A preview is derived over one package, so the self-contained one is what
     // a repository declaring nothing can be shown. It writes nothing.
-    let existing_default_location = crate::repository_package_at(&existing.path, "jit-default");
+    let existing_default_location = crate::repository_package_at(existing.root(), "jit-default");
     let existing_default_selector = existing_default_location.to_string();
     let preview = success_json(
-        &existing.path,
+        &existing,
         &[
             "profile",
             "apply",
@@ -268,7 +262,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     assert_eq!(preview["profiles"][0]["status"], "would_apply");
 
     let applied = success_json(
-        &existing.path,
+        &existing,
         &[
             "profile",
             "apply",
@@ -279,7 +273,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     );
     assert_eq!(requested_profile(&applied)["status"], "applied");
     let no_op = success_json(
-        &existing.path,
+        &existing,
         &[
             "profile",
             "apply",
@@ -296,9 +290,9 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
         true
     );
 
-    assert_eq!(snapshot_tree(&fresh.path), snapshot_tree(&existing.path));
-    let fresh_events = normalized_events(&fresh.path);
-    let existing_events = normalized_events(&existing.path);
+    assert_eq!(snapshot_tree(fresh.root()), snapshot_tree(existing.root()));
+    let fresh_events = normalized_events(fresh.root());
+    let existing_events = normalized_events(existing.root());
     assert_eq!(fresh_events.len(), 1);
     assert_eq!(existing_events.len(), 1);
     assert_eq!(fresh_events[0]["operation"], "initialize");
@@ -308,17 +302,17 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     fresh_event.as_object_mut().unwrap().remove("operation");
     existing_event.as_object_mut().unwrap().remove("operation");
     assert_eq!(fresh_event, existing_event);
-    assert!(!fresh.path.join(".git").exists());
-    assert!(!existing.path.join(".git").exists());
+    assert!(!fresh.root().join(".git").exists());
+    assert!(!existing.root().join(".git").exists());
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let script_mode = fs::metadata(existing.path.join("contrib/gates/ai-review.sh"))
+        let script_mode = fs::metadata(existing.root().join("contrib/gates/ai-review.sh"))
             .unwrap()
             .permissions()
             .mode();
-        let prompt_mode = fs::metadata(existing.path.join("contrib/gates/code-review-prompt.md"))
+        let prompt_mode = fs::metadata(existing.root().join("contrib/gates/code-review-prompt.md"))
             .unwrap()
             .permissions()
             .mode();
@@ -332,7 +326,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
 
     #[cfg(windows)]
     {
-        let permissions = fs::metadata(existing.path.join("contrib/gates/ai-review.sh"))
+        let permissions = fs::metadata(existing.root().join("contrib/gates/ai-review.sh"))
             .unwrap()
             .permissions();
         assert!(
@@ -350,24 +344,24 @@ fn composition_package() -> std::path::PathBuf {
 
 #[test]
 fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
-    let repo = TestRepo::new();
-    success_json(&repo.path, &["init", "--json"]);
+    let repo = JitCli::uninitialised().unwrap();
+    success_json(&repo, &["init", "--json"]);
     // An obtained set of packages, side by side inside the worktree.
     jit::test_utils::write_package_declaring(
         &composition_package(),
-        &repo.path.join("packages/base"),
+        &repo.root().join("packages/base"),
         "base",
         &[],
     );
     jit::test_utils::write_package_declaring(
         &composition_package(),
-        &repo.path.join("packages/workflow"),
+        &repo.root().join("packages/workflow"),
         "workflow",
         &["base"],
     );
 
     let applied = success_json(
-        &repo.path,
+        &repo,
         &[
             "profile",
             "apply",
@@ -383,7 +377,7 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
     assert_eq!(applied["count"], 2);
     assert_eq!(requested_profile(&applied)["status"], "applied");
     // The selection has one aggregate event.
-    let events = normalized_events(&repo.path);
+    let events = normalized_events(repo.root());
     assert_eq!(events.len(), 1, "one aggregate lifecycle event is appended");
     assert_eq!(events[0]["type"], "profile_lifecycle");
     assert_eq!(events[0]["operation"], "apply");
@@ -399,7 +393,7 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 
     // Re-applying an applied set is no work anywhere in it.
     let reapplied = success_json(
-        &repo.path,
+        &repo,
         &[
             "profile",
             "apply",
@@ -418,16 +412,16 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 
 #[test]
 fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
-    let repo = TestRepo::new();
+    let repo = JitCli::uninitialised().unwrap();
     jit::test_utils::write_package_declaring(
         &composition_package(),
-        &repo.path.join("packages/workflow"),
+        &repo.root().join("packages/workflow"),
         "workflow",
         &["absent-base"],
     );
 
     let failure = failed_json_with_path(
-        &repo.path,
+        &repo,
         &["init", "--profile", "packages/workflow", "--json"],
         1,
         None,
@@ -440,24 +434,24 @@ fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
     assert!(message.contains("workflow"), "{message}");
     assert!(message.contains("absent-base"), "{message}");
     assert!(
-        !repo.path.join(".jit").exists(),
+        !repo.root().join(".jit").exists(),
         "the set is resolved before a repository is created"
     );
 }
 
 #[test]
 fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
-    let repo = TestRepo::new();
-    success_json(&repo.path, &["init", "--json"]);
+    let repo = JitCli::uninitialised().unwrap();
+    success_json(&repo, &["init", "--json"]);
     jit::test_utils::write_package_declaring(
         &composition_package(),
-        &repo.path.join("packages/workflow"),
+        &repo.root().join("packages/workflow"),
         "workflow",
         &["absent-base"],
     );
 
     let failure = failed_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "profile",
             "apply",
@@ -476,27 +470,24 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
         .unwrap_or_else(|| panic!("a failure carries a message: {failure}"));
     assert!(message.contains("workflow"), "{message}");
     assert!(message.contains("absent-base"), "{message}");
-    assert!(normalized_events(&repo.path).is_empty());
+    assert!(normalized_events(repo.root()).is_empty());
 }
 
 #[test]
 fn test_profile_application_contributes_workflow_invariants_to_scaffolded_registry() {
-    let repo = TestRepo::new();
+    let repo = JitCli::uninitialised().unwrap();
 
-    success_json(&repo.path, &["init", "--json"]);
-    let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
+    success_json(&repo, &["init", "--json"]);
+    let dogfood_location = crate::repository_package_at(repo.root(), "jit-dogfood");
     let dogfood_selector = dogfood_location.to_string();
     let applied = success_json(
-        &repo.path,
+        &repo,
         &["profile", "apply", "--profile", &dogfood_selector, "--json"],
     );
     assert_eq!(requested_profile(&applied)["status"], "applied");
-    assert_eq!(
-        success_json(&repo.path, &["validate", "--json"])["valid"],
-        true
-    );
+    assert_eq!(success_json(&repo, &["validate", "--json"])["valid"], true);
 
-    let registry: toml::Value = fs::read_to_string(repo.path.join(".jit/invariants.toml"))
+    let registry: toml::Value = fs::read_to_string(repo.root().join(".jit/invariants.toml"))
         .expect("read contributed invariant registry")
         .parse()
         .expect("parse contributed invariant registry");
@@ -517,26 +508,26 @@ fn test_profile_application_contributes_workflow_invariants_to_scaffolded_regist
 #[test]
 #[cfg(unix)]
 fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
-    let repo = TestRepo::new();
+    let repo = JitCli::uninitialised().unwrap();
     let checker_path = checker_path_without_jq();
     let path = Some(checker_path.value.as_path());
-    let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
+    let dogfood_location = crate::repository_package_at(repo.root(), "jit-dogfood");
     let dogfood_selector = dogfood_location.to_string();
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["init", "--profile", &dogfood_selector, "--json"],
         path,
     );
-    assert!(!repo.path.join(".git").exists());
+    assert!(!repo.root().join(".git").exists());
 
     let invariants = success_json_with_path(
-        &repo.path,
+        &repo,
         &["project", "render", "--name", "invariants", "--json"],
         path,
     );
     assert_eq!(invariants["projections"][0]["target"], "AGENTS.md");
     let references = success_json_with_path(
-        &repo.path,
+        &repo,
         &["project", "render", "--name", "rules-and-gates", "--json"],
         path,
     );
@@ -544,16 +535,16 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         references["projections"][0]["target"],
         ".jit/reference/rules-and-gates.md"
     );
-    let agents = fs::read_to_string(repo.path.join("AGENTS.md")).unwrap();
+    let agents = fs::read_to_string(repo.root().join("AGENTS.md")).unwrap();
     assert!(agents.contains("<!-- jit:invariants:begin -->"));
     assert!(agents.contains("<!-- jit:invariants:end -->"));
     let rules_and_gates =
-        fs::read_to_string(repo.path.join(".jit/reference/rules-and-gates.md")).unwrap();
+        fs::read_to_string(repo.root().join(".jit/reference/rules-and-gates.md")).unwrap();
     assert!(rules_and_gates.contains("## Gates"));
     assert!(rules_and_gates.contains("plan-review"));
 
     let container = success_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "issue",
             "create",
@@ -569,8 +560,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         path,
     );
     let container_id = container["id"].as_str().unwrap();
-    let applied =
-        success_json_with_path(&repo.path, &["apply", "plan", container_id, "--json"], path);
+    let applied = success_json_with_path(&repo, &["apply", "plan", container_id, "--json"], path);
     let planning_id = applied["created_node_ids_by_role"]["planning"]
         .as_str()
         .unwrap();
@@ -579,19 +569,19 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         .unwrap();
 
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "claim", planning_id, "agent:acceptance", "--json"],
         path,
     );
     let blocked_plan = failed_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "update", planning_id, "--state", "done", "--json"],
         4,
         path,
     );
     assert_eq!(blocked_plan["error"]["details"]["actual_state"], "gated");
     let plan_review = success_json_with_path(
-        &repo.path,
+        &repo,
         &["gate", "evaluate", planning_id, "plan-review", "--json"],
         path,
     );
@@ -601,14 +591,14 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         .unwrap()
         .contains("EXTERNAL REVIEW PLACEHOLDER"));
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "update", planning_id, "--state", "done", "--json"],
         path,
     );
 
     let credit = format!("satisfies:{}/REQ-01", &container_id[..8]);
     let implementation = success_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "issue",
             "create",
@@ -627,12 +617,12 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     );
     let implementation_id = implementation["id"].as_str().unwrap();
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["dep", "add", implementation_id, breakdown_id, "--json"],
         path,
     );
     success_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "dep",
             "add",
@@ -645,12 +635,12 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     );
 
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "claim", breakdown_id, "agent:acceptance", "--json"],
         path,
     );
     let blocked_breakdown = failed_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "update", breakdown_id, "--state", "done", "--json"],
         4,
         path,
@@ -660,7 +650,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         "gated"
     );
     let coverage = success_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "gate",
             "evaluate",
@@ -673,7 +663,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     assert_eq!(coverage["status"], "passed");
     assert_eq!(coverage["warnings"], Value::Array(Vec::new()));
     let breakdown_review = success_json_with_path(
-        &repo.path,
+        &repo,
         &[
             "gate",
             "evaluate",
@@ -689,13 +679,13 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         .unwrap()
         .contains("EXTERNAL REVIEW PLACEHOLDER"));
     success_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "update", breakdown_id, "--state", "done", "--json"],
         path,
     );
 
     let statuses = success_json_with_path(
-        &repo.path,
+        &repo,
         &["issue", "status", breakdown_id, implementation_id, "--json"],
         path,
     );
@@ -721,7 +711,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         "implementation leaf must be ready"
     );
 
-    let validation = success_json_with_path(&repo.path, &["validate", "--json"], path);
+    let validation = success_json_with_path(&repo, &["validate", "--json"], path);
     assert_eq!(validation["valid"], true);
     assert_eq!(validation["error_count"], 0);
     assert!(validation["warnings"]
@@ -729,13 +719,13 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         .unwrap()
         .iter()
         .any(|warning| warning["rule"] == "review-placeholder"));
-    assert!(!repo.path.join(".git").exists());
+    assert!(!repo.root().join(".git").exists());
 }
 
 #[test]
 fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
-    let repo = TestRepo::new();
-    let schema = success_json(&repo.path, &["--schema"]);
+    let repo = JitCli::uninitialised().unwrap();
+    let schema = success_json(&repo, &["--schema"]);
     let commands = schema["commands"]["profile"]["subcommands"]
         .as_object()
         .unwrap();
@@ -937,15 +927,14 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
 fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let exchange = TempDir::new().unwrap();
-    let repo = TestRepo::new();
-    assert!(!repo.path.join(".jit").exists());
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(!repo.root().join(".jit").exists());
 
     for id in ["jit-default", "jit-dogfood"] {
         let archive = exchange.path().join(format!("{id}.tar"));
         let archive = archive.to_str().unwrap();
-        let packed = super::profile_cli_tests::jit(
-            &checkout,
-            &[
+        let packed = repo
+            .command([
                 "profile",
                 "pack",
                 "--source",
@@ -953,17 +942,19 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
                 "--output",
                 archive,
                 "--json",
-            ],
-        );
+            ])
+            .current_dir(&checkout)
+            .output()
+            .expect("failed to run jit");
         assert!(packed.status.success(), "packing {id} failed: {packed:?}");
 
-        let initialized = super::profile_cli_tests::jit(&repo.path, &["init", "--json"]);
+        let initialized = super::profile_cli_tests::jit(&repo, &["init", "--json"]);
         assert!(
             initialized.status.success(),
             "plain init failed: {initialized:?}"
         );
         let added = super::profile_cli_tests::jit(
-            &repo.path,
+            &repo,
             &[
                 "profile",
                 "add",
@@ -978,14 +969,14 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     }
 
     let profiled = super::profile_cli_tests::jit(
-        &repo.path,
+        &repo,
         &["init", "--profile", "packages/jit-dogfood", "--json"],
     );
     assert!(
         profiled.status.success(),
         "profiled init failed: {profiled:?}"
     );
-    let lifecycle = normalized_events(&repo.path)
+    let lifecycle = normalized_events(repo.root())
         .into_iter()
         .find(|event| event["type"] == "profile_lifecycle")
         .expect("the profiled init audits its application");
@@ -1011,7 +1002,7 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
 /// The report is the answer whether or not the selection can be published, so
 /// an unpublishable run's report is unwrapped from the shared typed error
 /// envelope rather than read as a different shape.
-fn profile_difference(repo: &Path, selectors: &[&str]) -> (Option<i32>, Value) {
+fn profile_difference(repo: &JitCli, selectors: &[&str]) -> (Option<i32>, Value) {
     let args = ["profile", "diff"]
         .into_iter()
         .chain(
@@ -1062,14 +1053,13 @@ fn decisions(report: &Value, id: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// A repository that has applied nothing, holding the asset-only fixture
+/// Seed `repo` with nothing applied, holding the asset-only fixture
 /// package at `packages/planner` beside the target that package declares.
-fn repository_with_unapplied_planner() -> (TestRepo, String) {
+fn seed_unapplied_planner(repo: &JitCli) -> String {
     const LOCATION: &str = "packages/planner";
 
-    let repo = TestRepo::new();
     let directory =
-        jit::test_utils::copy_package_tree(&composition_package(), &repo.path.join(LOCATION));
+        jit::test_utils::copy_package_tree(&composition_package(), &repo.root().join(LOCATION));
     let target = jit::profile::ProfilePackage::from_directory(&directory)
         .expect("a valid package tree")
         .model()
@@ -1078,19 +1068,20 @@ fn repository_with_unapplied_planner() -> (TestRepo, String) {
         .expect("the fixture package declares one asset")
         .target
         .clone();
-    success_json(&repo.path, &["init", "--json"]);
-    (repo, target)
+    success_json(repo, &["init", "--json"]);
+    target
 }
 
 /// A package this repository has not applied is reported from the location it
 /// was selected at, and reporting it writes nothing (REQ-01, REQ-02, REQ-04).
 #[test]
 fn test_profile_diff_reports_an_unapplied_package_without_writing() {
-    let (repo, target) = repository_with_unapplied_planner();
-    let before = snapshot_tree(&repo.path);
-    let events = normalized_events(&repo.path);
+    let repo = JitCli::uninitialised().unwrap();
+    let target = seed_unapplied_planner(&repo);
+    let before = snapshot_tree(repo.root());
+    let events = normalized_events(repo.root());
 
-    let (status, report) = profile_difference(&repo.path, &["packages/planner"]);
+    let (status, report) = profile_difference(&repo, &["packages/planner"]);
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
@@ -1098,11 +1089,11 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
         "the report states the target the package would publish: {report}"
     );
     assert_eq!(
-        snapshot_tree(&repo.path),
+        snapshot_tree(repo.root()),
         before,
         "the report writes nothing"
     );
-    assert_eq!(normalized_events(&repo.path), events);
+    assert_eq!(normalized_events(repo.root()), events);
 }
 
 /// A target two selected packages define differently cannot be published, and
@@ -1110,8 +1101,9 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
 /// repository-check exit status (REQ-01, REQ-02).
 #[test]
 fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
-    let (repo, target) = repository_with_unapplied_planner();
-    let rival = repo.path.join("packages/rival");
+    let repo = JitCli::uninitialised().unwrap();
+    let target = seed_unapplied_planner(&repo);
+    let rival = repo.root().join("packages/rival");
     jit::test_utils::write_package_declaring(&composition_package(), &rival, "rival", &[]);
     let declared = jit::profile::ProfilePackage::from_directory(&rival)
         .expect("a valid package tree")
@@ -1132,9 +1124,9 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
     .expect("point the rival asset at the planner's target");
     fs::write(rival.join(&declared.source), b"the rival package's bytes\n")
         .expect("rewrite the asset");
-    let before = snapshot_tree(&repo.path);
+    let before = snapshot_tree(repo.root());
 
-    let (status, report) = profile_difference(&repo.path, &["packages/planner", "packages/rival"]);
+    let (status, report) = profile_difference(&repo, &["packages/planner", "packages/rival"]);
 
     assert_eq!(
         status,
@@ -1147,7 +1139,7 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
         "the report states the target it cannot publish: {report}"
     );
     assert_eq!(
-        snapshot_tree(&repo.path),
+        snapshot_tree(repo.root()),
         before,
         "the report writes nothing"
     );
@@ -1186,8 +1178,8 @@ fn declarations(report: &Value, id: &str) -> Vec<(String, String)> {
 /// Contributions are what a package states about a registry rather than about a
 /// file, so a report over one is authored from the same fixture tree the target
 /// cases stage.
-fn package_contributing(repo: &TestRepo, location: &str, id: &str, description: &str) {
-    let directory = repo.path.join(location);
+fn package_contributing(repo: &JitCli, location: &str, id: &str, description: &str) {
+    let directory = repo.root().join(location);
     jit::test_utils::write_package_declaring(&composition_package(), &directory, id, &[]);
     let manifest = directory.join(jit::profile::MANIFEST_FILE_NAME);
     let authored = fs::read_to_string(&manifest).expect("read the staged package manifest");
@@ -1222,8 +1214,8 @@ fn contributed_identity() -> String {
 /// define differently is stated as the conflict it is (REQ-01, REQ-02).
 #[test]
 fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
-    let repo = TestRepo::new();
-    success_json(&repo.path, &["init", "--json"]);
+    let repo = JitCli::uninitialised().unwrap();
+    success_json(&repo, &["init", "--json"]);
     package_contributing(&repo, "packages/base", "base", "The base meaning.");
     package_contributing(
         &repo,
@@ -1232,7 +1224,7 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "The workflow meaning.",
     );
 
-    let (status, report) = profile_difference(&repo.path, &["packages/base"]);
+    let (status, report) = profile_difference(&repo, &["packages/base"]);
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
@@ -1240,9 +1232,9 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "the report states the declaration the package would publish: {report}"
     );
 
-    let before = snapshot_tree(&repo.path);
+    let before = snapshot_tree(repo.root());
 
-    let (status, report) = profile_difference(&repo.path, &["packages/base", "packages/workflow"]);
+    let (status, report) = profile_difference(&repo, &["packages/base", "packages/workflow"]);
 
     assert_eq!(
         status,
@@ -1255,7 +1247,7 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "the report states the declaration it cannot publish: {report}"
     );
     assert_eq!(
-        snapshot_tree(&repo.path),
+        snapshot_tree(repo.root()),
         before,
         "the report writes nothing"
     );
