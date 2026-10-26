@@ -423,11 +423,11 @@ struct PendingEvent {
 }
 
 impl PendingEvent {
-    fn sort_key(&self) -> (u8, &str, Option<&str>, &str, usize) {
+    fn sort_key(&self) -> (u8, &str, Option<&IssueId>, &str, usize) {
         (
             self.phase,
             self.tag.as_str(),
-            self.primary.as_deref(),
+            self.primary.as_ref(),
             self.secondary.as_str(),
             self.ordinal,
         )
