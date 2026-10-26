@@ -788,7 +788,7 @@ pub(crate) const SECTION_HEADING_ANNOTATION: &str = "x-jit-section-heading";
 mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
-    use crate::domain::State;
+    use crate::domain::{Priority, State};
     use tempfile::TempDir;
 
     /// Build a `RuleSet` from a single `json-schema` rule whose schema file holds
@@ -881,6 +881,10 @@ mod tests {
             .iter()
             .map(|s| serde_json::Value::String(s.as_str().to_string()))
             .collect();
+        let priorities: Vec<serde_json::Value> = Priority::ALL
+            .iter()
+            .map(|p| serde_json::Value::String(p.as_str().to_string()))
+            .collect();
         let schema_json = serde_json::json!({
             "type": "object",
             "properties": {
@@ -890,7 +894,7 @@ mod tests {
             "required": ["state", "priority"],
             "$defs": {
                 "State": { "enum": states },
-                "Priority": { "enum": ["low", "normal", "high", "critical"] }
+                "Priority": { "enum": priorities }
             }
         })
         .to_string();
