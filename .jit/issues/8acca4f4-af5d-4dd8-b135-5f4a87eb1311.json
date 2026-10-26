@@ -27,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Errors and output carry typed issue ids",
-  "updated_at": "2026-10-25T21:56:00.829895126Z"
+  "updated_at": "2026-10-26T22:13:41.182044743Z"
 }

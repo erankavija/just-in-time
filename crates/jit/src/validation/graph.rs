@@ -128,7 +128,9 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     if value.starts_with(PROJECT_SCOPE_SENTINEL) {
         return match parse_kind_segmented_address(value) {
             Ok(addr) => match addr.scope {
-                AddressScope::Issue(short_id) => short_id == scope_short_id && addr.self_id == id,
+                AddressScope::Issue(short_id) => {
+                    short_id.matches(scope_short_id) && addr.self_id == id
+                }
                 AddressScope::Project | AddressScope::NamedProject(_) => false,
             },
             Err(_) => false,
@@ -136,9 +138,12 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     }
     // `expand_sugar_address` is not used: it needs the configured kind list and
     // would add kind semantics D10 forbids at this crediting site.
-    value
-        .split_once('/')
-        .is_some_and(|(scope, self_id)| scope == scope_short_id && self_id == id)
+    value.split_once('/').is_some_and(|(scope, self_id)| {
+        scope
+            .parse::<crate::domain::identity::IssueIdPrefix>()
+            .is_ok_and(|prefix| prefix.matches(scope_short_id))
+            && self_id == id
+    })
 }
 
 /// The label namespaces through which `rules` credit criteria: each active
@@ -322,7 +327,7 @@ pub fn evaluate_graph(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     // Whole-repo evaluation: the evaluation slice IS the resolution index, so a
     // `container-from-label` pointer resolves against the same set it evaluates.
@@ -357,7 +362,7 @@ pub fn evaluate_graph_scoped(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     evaluate_graph_indexed(
         rules,
@@ -423,7 +428,7 @@ pub fn graph_rule_plan_source_ids(
     rule: &Rule,
     issue: &Issue,
     resolution_index: &[Issue],
-) -> Vec<String> {
+) -> Vec<crate::domain::identity::IssueId> {
     let mut source_ids = vec![issue.id.clone()];
     if let Assertion::LabelCoverage { config } = &rule.assert {
         if let Some(namespace) = &config.container_from_label {
@@ -500,7 +505,7 @@ fn evaluate_graph_indexed(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     let context = GraphEvaluationContext {
         graph_context: evaluation,
@@ -740,7 +745,7 @@ fn evaluate_label_coverage(
     graph_context: &[Issue],
     resolution_index: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     let section_slug = config.criteria_section();
     let marker = config.marker.as_deref();
@@ -901,7 +906,7 @@ fn criterion_ids(
     marker: Option<&str>,
     id_pattern: &regex::Regex,
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Result<Vec<String>, crate::document::ContentParserError> {
     let parser = content_parser_for(source.content_format, repo_default_format)?;
     // The resolved plan content for this source (external location), else its
@@ -1326,7 +1331,7 @@ fn evaluate_criteria_to_check(
     check_namespace: Option<&str>,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     issues
         .iter()
@@ -1493,7 +1498,7 @@ fn evaluate_criteria_label_match(
     id_pattern: &IdPattern,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<String, String>,
+    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
 ) -> Vec<GraphFinding> {
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
@@ -2573,8 +2578,12 @@ source-of-truth = "markdown-first"
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
-        a.id = "abcd1111-0000-0000-0000-000000000000".to_string();
-        b.id = "abcd2222-0000-0000-0000-000000000000".to_string();
+        a.id = "abcd1111-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        b.id = "abcd2222-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown.labels.push("brackets:abcd".to_string());
 
@@ -2610,8 +2619,12 @@ source-of-truth = "markdown-first"
         let mut a = initiative_with_criteria(&["REQ-01"]);
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
-        a.id = "abcd1234-1111-0000-0000-000000000000".to_string();
-        b.id = "abcd1234-2222-0000-0000-000000000000".to_string();
+        a.id = "abcd1234-1111-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        b.id = "abcd1234-2222-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
         assert_eq!(
             a.short_id(),
             b.short_id(),
@@ -3755,8 +3768,12 @@ source-of-truth = "markdown-first"
         let mut initiative_a = issue("initiative-a", &["req:REQ-42"]);
         let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
-        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
-        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
+        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
+        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(

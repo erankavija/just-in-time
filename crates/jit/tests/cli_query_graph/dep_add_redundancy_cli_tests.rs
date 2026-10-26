@@ -196,13 +196,11 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
     assert_eq!(deps_b, vec![c.as_str()]);
 }
 
-/// jit:c8518f2a: a batch mixing a resolution failure (an id naming no issue)
-/// with a graph-validation failure (a self-redundant edge) exits with the
-/// resolution error's code (3), not the validation error's (4) — resolution
-/// runs before graph validation, so it wins the batch's dominant
-/// classification. Both edges are still named in the error output.
+/// A batch mixing an id naming no issue with a self-redundant edge is rejected
+/// when the CLI resolves its targets, before graph validation: it exits with
+/// the not-found code (3), names only the unresolved id, and writes nothing.
 #[test]
-fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
+fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
     let temp = setup_test_repo();
     let dir = temp.path();
     let a = create_issue(dir, "A");
@@ -213,7 +211,7 @@ fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
     assert!(dep_add(dir, &a, &b, &[]).status.success());
     assert!(dep_add(dir, &b, &c, &[]).status.success());
 
-    // Text mode: exit 3 (not found), not 4 (validation).
+    // Text mode: exit 3 (not found).
     let out = Command::new(jit_binary())
         .args(["dep", "add", &a, &c, "zzzz"])
         .current_dir(dir)
@@ -223,7 +221,7 @@ fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
     assert_eq!(
         out.status.code(),
         Some(3),
-        "an unresolved id must dominate a sibling redundant-edge failure: stdout={} stderr={}",
+        "an unresolved id rejects the batch: stdout={} stderr={}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
@@ -232,13 +230,9 @@ fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
         stderr.contains("zzzz"),
         "must name the unresolved id: {stderr}"
     );
-    assert!(
-        stderr.contains(&c[..8]),
-        "must ALSO name the redundant edge, not only the dominant failure: {stderr}"
-    );
 
-    // JSON mode: same exit code, ISSUE_NOT_FOUND at top level, both edges
-    // present in details.rejected.
+    // JSON mode: same exit code, ISSUE_NOT_FOUND at top level, only the
+    // unresolved id in details.rejected.
     let out_json = Command::new(jit_binary())
         .args(["dep", "add", &a, &c, "zzzz", "--json"])
         .current_dir(dir)
@@ -249,13 +243,11 @@ fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
 
     let rejected = json["error"]["details"]["rejected"].as_array().unwrap();
-    assert_eq!(rejected.len(), 2, "both edges must be named: {rejected:?}");
     let codes: Vec<&str> = rejected
         .iter()
         .map(|r| r["code"].as_str().unwrap())
         .collect();
-    assert!(codes.contains(&"ISSUE_NOT_FOUND"));
-    assert!(codes.contains(&"VALIDATION_FAILED"));
+    assert_eq!(codes, vec!["ISSUE_NOT_FOUND"], "{rejected:?}");
 
     // Nothing was written.
     let show = Command::new(jit_binary())

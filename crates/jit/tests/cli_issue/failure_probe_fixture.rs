@@ -676,6 +676,23 @@ impl FailureFixture {
             SetupStep::UnsetEnvironment(name) => {
                 self.environment.insert(name, None);
             }
+            SetupStep::SeedIssue(id) => {
+                let mut issue = jit::domain::Issue::draft("Failure fixture".into(), String::new());
+                issue.id = id;
+                std::fs::write(
+                    self.root().join(format!(".jit/issues/{}.json", issue.id)),
+                    serde_json::to_vec(&issue).unwrap(),
+                )
+                .unwrap();
+                let index_path = self.root().join(".jit/index.json");
+                let mut index: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(&index_path).unwrap()).unwrap();
+                index["all_ids"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(serde_json::json!(issue.id));
+                std::fs::write(index_path, serde_json::to_vec(&index).unwrap()).unwrap();
+            }
             SetupStep::ActiveClaimIndex => {
                 let created = self.require_setup_jit(&[
                     "issue",
@@ -784,6 +801,7 @@ enum SetupStep {
     SetEnvironment(String, String),
     UnsetEnvironment(String),
     ActiveClaimIndex,
+    SeedIssue(String),
     DuplicateGate(String),
     DanglingInvariant(String),
     MissingFile(String),
@@ -834,6 +852,7 @@ impl SetupStep {
                     prefixed("dangling-invariant-enforcement:").map(Self::DanglingInvariant)
                 })
                 .or_else(|| prefixed("file-absent:").map(Self::MissingFile))
+                .or_else(|| prefixed("seed-issue:").map(Self::SeedIssue))
                 .or_else(|| prefixed("no-issue:").map(Self::MissingIssue))
                 .or_else(|| prefixed("unknown-gate:").map(Self::UnknownGate))
                 .or_else(|| prefixed("unknown-preset:").map(Self::UnknownPreset))
@@ -863,6 +882,7 @@ impl SetupStep {
             }
             Self::SetEnvironment(_, _) | Self::UnsetEnvironment(_) => SetupClass::Environment,
             Self::ActiveClaimIndex
+            | Self::SeedIssue(_)
             | Self::DuplicateGate(_)
             | Self::DanglingInvariant(_)
             | Self::BuiltinPreset(_) => SetupClass::SeededDomainState,

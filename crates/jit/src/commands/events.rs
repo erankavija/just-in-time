@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::domain::event_catalog::EventTag;
+use crate::domain::identity::IssueIdPrefix;
 
 impl<S: IssueStore> CommandExecutor<S> {
     pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
@@ -10,15 +11,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(events[start..].to_vec())
     }
 
+    /// Newest-first events matching `event_type` and the `issue` filter.
     pub fn query_events(
         &self,
         event_type: Option<EventTag>,
-        issue_id: Option<String>,
+        issue: Option<IssueIdPrefix>,
         limit: usize,
     ) -> Result<Vec<Event>> {
-        let issue = issue_id
-            .map(|id| super::resolve_issue_filter(&self.storage, &id))
-            .transpose()?;
         let events = self.storage.read_events()?;
 
         let filtered: Vec<Event> = events
@@ -48,6 +47,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::identity::IssueIdPrefix;
     use crate::domain::EventBody;
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
@@ -104,7 +104,11 @@ mod tests {
             executor
                 .query_events(
                     None,
-                    Some("00000000-0000-0000-0000-000000000001".to_string()),
+                    Some(IssueIdPrefix::from(
+                        &"00000000-0000-0000-0000-000000000001"
+                            .parse::<crate::domain::identity::IssueId>()
+                            .unwrap()
+                    )),
                     10,
                 )
                 .expect("the event query succeeds")

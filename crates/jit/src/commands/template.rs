@@ -82,13 +82,13 @@ pub struct TemplateApplyResult {
     /// The applied template's name (e.g. `"plan"`).
     pub template: String,
     /// Anchor name → bound issue id (full id), in anchor-name order.
-    pub anchor_bindings: BTreeMap<String, String>,
+    pub anchor_bindings: BTreeMap<String, IssueId>,
     /// Template node role → the created (or `--force`-refreshed) issue id.
-    pub created_node_ids_by_role: BTreeMap<String, String>,
+    pub created_node_ids_by_role: BTreeMap<String, IssueId>,
     /// Anchor name → that anchor's `dependencies` as snapshotted BEFORE any
     /// mutation. Consumed by the `move-upstream-to-role` transform and surfaced
     /// for callers inspecting the pre-apply shape.
-    pub anchor_dependency_snapshots: BTreeMap<String, Vec<String>>,
+    pub anchor_dependency_snapshots: BTreeMap<String, Vec<IssueId>>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -109,8 +109,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn apply_template(
         &self,
         template_name: &str,
-        container_id: &str,
-        anchor_bindings: &BTreeMap<String, String>,
+        container_id: &IssueId,
+        anchor_bindings: &BTreeMap<String, IssueId>,
         force: bool,
     ) -> Result<(TemplateApplyResult, Vec<String>)>
     where
@@ -134,8 +134,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn apply_template_with(
         &self,
         template: &GraphTemplate,
-        container_id: &str,
-        anchor_bindings: &BTreeMap<String, String>,
+        container_id: &IssueId,
+        anchor_bindings: &BTreeMap<String, IssueId>,
         force: bool,
     ) -> Result<(TemplateApplyResult, Vec<String>)>
     where
@@ -152,18 +152,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn apply_template_request(
         &self,
         request: TemplateRequest<'_>,
-        container_id: &str,
-        anchor_bindings: &BTreeMap<String, String>,
+        container_id: &IssueId,
+        anchor_bindings: &BTreeMap<String, IssueId>,
         force: bool,
     ) -> Result<(TemplateApplyResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let container_id = &IssueIdPrefix::from_str(container_id)?;
-        let anchor_bindings = &anchor_bindings
-            .iter()
-            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::from_str(id)?)))
-            .collect::<Result<BTreeMap<_, _>>>()?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
@@ -250,9 +245,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 fn captured_anchor_bindings(
     request: &TemplateRequest<'_>,
     config: &crate::config::JitConfig,
-    container_id: &IssueIdPrefix,
-    explicit: &BTreeMap<String, IssueIdPrefix>,
-) -> BTreeMap<String, IssueIdPrefix> {
+    container_id: &IssueId,
+    explicit: &BTreeMap<String, IssueId>,
+) -> BTreeMap<String, IssueId> {
     let mut bindings = explicit.clone();
     if matches!(request, TemplateRequest::Named(_)) {
         bindings
@@ -262,7 +257,7 @@ fn captured_anchor_bindings(
     bindings
 }
 
-fn existing_template_lease_targets(issues: &[Issue], targets: &[String]) -> Vec<String> {
+fn existing_template_lease_targets(issues: &[Issue], targets: &[IssueId]) -> Vec<IssueId> {
     let existing = issues
         .iter()
         .map(|issue| issue.id.as_str())
@@ -277,7 +272,7 @@ fn existing_template_lease_targets(issues: &[Issue], targets: &[String]) -> Vec<
 fn template_lease_warnings(
     paths: &crate::storage::WorktreePaths,
     mode: crate::config::EnforcementMode,
-    targets: &[String],
+    targets: &[IssueId],
 ) -> Result<Vec<String>> {
     use crate::agent_config::resolve_agent_id;
     use crate::config::EnforcementMode;
@@ -317,7 +312,7 @@ struct DerivedTemplateApply {
     result: TemplateApplyResult,
     registry: crate::declarations::GateRegistry,
     intents: Vec<MutationIntent>,
-    lease_targets: Vec<String>,
+    lease_targets: Vec<IssueId>,
 }
 
 struct CapturedTemplateApply {
@@ -330,8 +325,8 @@ struct CapturedTemplateApply {
 fn derive_captured_template_apply(
     image: &RepositoryImage,
     request: &TemplateRequest<'_>,
-    container_id: &IssueIdPrefix,
-    anchor_bindings: &BTreeMap<String, IssueIdPrefix>,
+    container_id: &IssueId,
+    anchor_bindings: &BTreeMap<String, IssueId>,
     force: bool,
     context: &MutationContext,
 ) -> Result<CapturedTemplateApply> {
@@ -364,10 +359,10 @@ fn derive_captured_template_apply(
 }
 
 struct FreshTemplateDerivation {
-    created: BTreeMap<String, String>,
-    candidate: BTreeMap<String, Issue>,
-    created_order: Vec<String>,
-    lease_targets: Vec<String>,
+    created: BTreeMap<String, IssueId>,
+    candidate: BTreeMap<IssueId, Issue>,
+    created_order: Vec<IssueId>,
+    lease_targets: Vec<IssueId>,
 }
 
 fn template_fixed_paths() -> Vec<VirtualPath> {
@@ -388,7 +383,7 @@ fn capture_template_image(
     session: &mut dyn crate::storage::RepositoryMutationSession,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
-    container_id: &IssueIdPrefix,
+    container_id: &IssueId,
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::GATE_PRESETS;
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
@@ -430,12 +425,12 @@ fn template_operation_capture_paths(
     image: &RepositoryImage,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
-    container_id: &IssueIdPrefix,
+    container_id: &IssueId,
 ) -> Result<Vec<VirtualPath>> {
     let config = template_config_from_image(image)?;
     let template = request.resolve(&config)?;
     let issues = parse_template_issues(image)?;
-    let full_container_id = super::resolve_issue_from_capture(&issues, container_id)?;
+    let full_container_id = super::require_issue_in_capture(&issues, container_id)?;
     let container = template_issue(&issues, &full_container_id)?;
     let declarations = DocumentDeclarations::from_config(&config)?;
     let mut paths =
@@ -663,7 +658,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
             let path = VirtualPath::data(format!("issues/{id}.json"))?;
             let bytes = image
                 .file_bytes(&path)?
-                .ok_or_else(|| IssueNotFoundError::new(id))?;
+                .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
             let issue: Issue = serde_json::from_slice(bytes)
                 .with_context(|| format!("failed to parse captured issue {id}"))?;
             if issue.id != *id {
@@ -708,8 +703,8 @@ fn parse_template_presets(
 #[allow(clippy::too_many_arguments)]
 fn derive_template_apply(
     template: &GraphTemplate,
-    container_id: &IssueIdPrefix,
-    anchor_bindings: &BTreeMap<String, IssueIdPrefix>,
+    container_id: &IssueId,
+    anchor_bindings: &BTreeMap<String, IssueId>,
     force: bool,
     roles: &RoleBindings,
     issues: &[Issue],
@@ -720,7 +715,7 @@ fn derive_template_apply(
     context: &MutationContext,
 ) -> Result<DerivedTemplateApply> {
     let original_registry = registry.clone();
-    let full_container_id = super::resolve_issue_from_capture(issues, container_id)?;
+    let full_container_id = super::require_issue_in_capture(issues, container_id)?;
     let container = template_issue(issues, &full_container_id)?.clone();
     match label_utils::type_label_value(&container.labels) {
         Some(ty) if template.applies_to.iter().any(|allowed| allowed == ty) => {}
@@ -752,7 +747,7 @@ fn derive_template_apply(
                     anchor.name
                 )
             })?;
-            let full = super::resolve_issue_from_capture(issues, bound).with_context(|| {
+            let full = super::require_issue_in_capture(issues, bound).with_context(|| {
                 format!(
                     "template '{}' anchor '{}' is bound to '{}', which does not resolve to an existing issue",
                     template.name, anchor.name, bound.as_str()
@@ -899,11 +894,11 @@ fn derive_template_apply(
     })
 }
 
-fn template_issue<'a>(issues: &'a [Issue], id: &str) -> Result<&'a Issue> {
+fn template_issue<'a>(issues: &'a [Issue], id: &IssueId) -> Result<&'a Issue> {
     issues
         .iter()
-        .find(|issue| issue.id == id)
-        .ok_or_else(|| IssueNotFoundError::new(id).into())
+        .find(|issue| &issue.id == id)
+        .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
 }
 
 fn find_captured_breakdown(
@@ -911,7 +906,7 @@ fn find_captured_breakdown(
     roles: &RoleBindings,
     container: &Issue,
     issues: &[Issue],
-) -> Result<Option<String>> {
+) -> Result<Option<IssueId>> {
     let Some(breakdown) = template.breakdown_node(roles) else {
         return Ok(None);
     };
@@ -945,14 +940,13 @@ fn prevalidate_captured_delta(
 fn derive_template_refresh(
     template: &GraphTemplate,
     roles: &RoleBindings,
-    breakdown_id: &str,
+    breakdown_id: &IssueId,
     container: &Issue,
     issues: &[Issue],
     declarations: &DocumentDeclarations,
     events: &mut Vec<(u8, EventBody)>,
-) -> Result<(BTreeMap<String, String>, BTreeMap<String, Issue>)> {
-    let mut mapping =
-        BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.to_string())]);
+) -> Result<(BTreeMap<String, IssueId>, BTreeMap<IssueId, Issue>)> {
+    let mut mapping = BTreeMap::from([(roles.breakdown_role().to_string(), breakdown_id.clone())]);
     if let Some(node) = template.breakdown_node(roles) {
         let breakdown = template_issue(issues, breakdown_id)?;
         for role in &node.depends_on {
@@ -1092,7 +1086,7 @@ fn derive_fresh_template(
     for attachment in &delta.anchor_gates {
         let issue = candidate
             .get_mut(&attachment.anchor_issue_id)
-            .ok_or_else(|| IssueNotFoundError::new(&attachment.anchor_issue_id))?;
+            .ok_or_else(|| IssueNotFoundError::new(attachment.anchor_issue_id.clone()))?;
         attach_captured_gates(
             &attachment.gates,
             issue,
@@ -1161,7 +1155,7 @@ fn attach_captured_gates(
     registry: &mut crate::declarations::GateRegistry,
     presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
     events: &mut Vec<(u8, EventBody)>,
-    lease_targets: &mut Vec<String>,
+    lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
     for name in names {
         let keys = match resolve_captured_gate(name, registry, presets)? {
@@ -1211,18 +1205,18 @@ fn attach_captured_gates(
 }
 
 fn add_captured_template_edge(
-    issues: &mut BTreeMap<String, Issue>,
-    from: &str,
-    to: &str,
+    issues: &mut BTreeMap<IssueId, Issue>,
+    from: &IssueId,
+    to: &IssueId,
     events: &mut Vec<(u8, EventBody)>,
-    lease_targets: &mut Vec<String>,
+    lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
-    lease_targets.push(from.to_string());
+    lease_targets.push(from.clone());
     let refs = issues.values().collect::<Vec<_>>();
-    DependencyGraph::new(&refs).validate_add_dependency(from, to)?;
+    DependencyGraph::new(&refs).validate_add_dependency(from.as_str(), to.as_str())?;
     let before = issues
         .get(from)
-        .ok_or_else(|| IssueNotFoundError::new(from))?
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
         .dependencies
         .iter()
         .cloned()
@@ -1232,9 +1226,9 @@ fn add_captured_template_edge(
     }
     issues
         .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from))?
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
         .dependencies
-        .push(to.to_string());
+        .push(to.clone());
 
     let reductions = {
         let refs = issues.values().collect::<Vec<_>>();
@@ -1243,7 +1237,7 @@ fn add_captured_template_edge(
             .keys()
             .map(|id| {
                 let reduced = graph
-                    .compute_transitive_reduction(id)
+                    .compute_transitive_reduction(id.as_str())
                     .into_iter()
                     .map(|node| node.id.clone())
                     .collect::<HashSet<_>>();
@@ -1259,7 +1253,7 @@ fn add_captured_template_edge(
     for (id, reduced) in reductions {
         let issue = issues
             .get_mut(&id)
-            .ok_or_else(|| IssueNotFoundError::new(&id))?;
+            .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
         let old = issue.dependencies.iter().cloned().collect::<HashSet<_>>();
         if old == reduced {
             continue;
@@ -1268,7 +1262,7 @@ fn add_captured_template_edge(
         removed.sort();
         issue.dependencies = reduced.iter().cloned().collect();
         issue.dependencies.sort();
-        if id != from {
+        if &id != from {
             events.push((
                 3,
                 EventBody::draft_dependency_reduced(id, old.len(), reduced.len(), removed),
@@ -1288,24 +1282,24 @@ fn add_captured_template_edge(
             .collect::<HashMap<_, _>>();
         issues
             .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .derive_readiness_correction(&resolved)
             == Some(ReadinessCorrection::Demote)
     };
     let issue = issues
         .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from))?;
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
     if demoted {
         issue.state = State::Backlog;
         events.push((
             1,
-            EventBody::draft_issue_state_changed(from.to_string(), State::Ready, State::Backlog),
+            EventBody::draft_issue_state_changed(from.clone(), State::Ready, State::Backlog),
         ));
     }
     events.push((
         2,
         EventBody::draft_issue_updated(
-            from.to_string(),
+            from.clone(),
             "dependency-add".to_string(),
             vec!["dependencies".to_string()],
         ),
@@ -1314,17 +1308,17 @@ fn add_captured_template_edge(
 }
 
 fn remove_captured_template_edge(
-    issues: &mut BTreeMap<String, Issue>,
-    from: &str,
-    to: &str,
+    issues: &mut BTreeMap<IssueId, Issue>,
+    from: &IssueId,
+    to: &IssueId,
     events: &mut Vec<(u8, EventBody)>,
-    lease_targets: &mut Vec<String>,
+    lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
-    lease_targets.push(from.to_string());
+    lease_targets.push(from.clone());
     {
         let issue = issues
             .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from))?;
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
         let before = issue.dependencies.len();
         issue.dependencies.retain(|dependency| dependency != to);
         if issue.dependencies.len() == before {
@@ -1334,7 +1328,7 @@ fn remove_captured_template_edge(
     events.push((
         2,
         EventBody::draft_issue_updated(
-            from.to_string(),
+            from.clone(),
             "dependency-remove".to_string(),
             vec!["dependencies".to_string()],
         ),
@@ -1349,18 +1343,18 @@ fn remove_captured_template_edge(
             .collect::<HashMap<_, _>>();
         issues
             .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .derive_readiness_correction(&resolved)
             == Some(ReadinessCorrection::Promote)
     };
     if promoted {
         issues
             .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from))?
+            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
             .state = State::Ready;
         events.push((
             3,
-            EventBody::draft_issue_state_changed(from.to_string(), State::Backlog, State::Ready),
+            EventBody::draft_issue_state_changed(from.clone(), State::Backlog, State::Ready),
         ));
     }
     Ok(())
@@ -1370,8 +1364,8 @@ fn remove_captured_template_edge(
 /// existing id it carries.
 fn resolve_endpoint(
     endpoint: &DeltaEndpoint,
-    created: &BTreeMap<String, String>,
-) -> Result<String> {
+    created: &BTreeMap<String, IssueId>,
+) -> Result<IssueId> {
     match endpoint {
         DeltaEndpoint::CreatedRole(role) => created.get(role).cloned().ok_or_else(|| {
             anyhow!("internal error: no issue was created for template role '{role}'")
@@ -1399,6 +1393,7 @@ fn project_planned_issue(planned: &PlannedNode) -> Issue {
 mod tests {
     use super::*;
     use crate::commands::template_expand::test_declarations as declared;
+    use crate::commands::test_helpers::fixture_id;
     use crate::domain::artifact_directory::ArtifactDirectoryError;
 
     #[test]
@@ -1457,7 +1452,7 @@ mod tests {
     /// An already-applied bracket over `container`: a planning node carrying
     /// stale prose and the breakdown node that brackets the container and
     /// depends on it, with their ids.
-    fn applied_bracket(container: &Issue) -> (Vec<Issue>, String, String) {
+    fn applied_bracket(container: &Issue) -> (Vec<Issue>, IssueId, IssueId) {
         let mut planning = crate::domain::fixture_issue(
             "planning: Auth epic".to_string(),
             "prose from an earlier declaration".to_string(),
@@ -1480,7 +1475,7 @@ mod tests {
 
     #[test]
     fn test_template_document_paths_name_the_documents_the_apply_engine_writes() {
-        let container = declared::container("c1");
+        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         // Declarations spanning what a capture path has to resolve: the artifact
         // directory alone, the directory beside another container field, and a
         // flat declaration naming no area at all.
@@ -1519,7 +1514,7 @@ mod tests {
 
     #[test]
     fn test_template_document_paths_reject_an_area_the_registry_does_not_declare() {
-        let container = declared::container("c1");
+        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{}-drafts", declared::AREA);
@@ -1567,7 +1562,7 @@ mod tests {
 
     #[test]
     fn test_derive_template_refresh_reconciles_prose_to_the_apply_engine_description() {
-        let container = declared::container("c1");
+        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let roles = RoleBindings::default();
 
         for (declaration, area) in [
@@ -1610,7 +1605,7 @@ mod tests {
 
     #[test]
     fn test_derive_template_refresh_rejects_an_area_the_registry_does_not_declare() {
-        let container = declared::container("c1");
+        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
         let undeclared = format!("{}-drafts", declared::AREA);
         let (issues, _planning_id, breakdown_id) = applied_bracket(&container);
 
@@ -1644,7 +1639,7 @@ mod tests {
 
     #[test]
     fn test_find_captured_breakdown_uses_declared_label_namespace() {
-        let container = declared::container("abcdef123456");
+        let container = declared::container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
         let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
         let breakdown_node = template
             .nodes
@@ -1673,7 +1668,7 @@ mod tests {
 
     #[test]
     fn test_find_captured_breakdown_reports_missing_declared_label() {
-        let container = declared::container("abcdef123456");
+        let container = declared::container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
         let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
         let breakdown_node = template
             .nodes
@@ -1713,18 +1708,25 @@ mod tests {
 
     #[test]
     fn test_resolve_endpoint_maps_roles_and_passes_ids_through() {
-        let created = BTreeMap::from([("planning".to_string(), "p1".to_string())]);
+        let created = BTreeMap::from([(
+            "planning".to_string(),
+            fixture_id("6f26f517-7bac-5c4c-b358-eeee73cfc166"),
+        )]);
         assert_eq!(
             resolve_endpoint(
                 &DeltaEndpoint::CreatedRole("planning".to_string()),
                 &created
             )
             .unwrap(),
-            "p1"
+            fixture_id("6f26f517-7bac-5c4c-b358-eeee73cfc166")
         );
         assert_eq!(
-            resolve_endpoint(&DeltaEndpoint::ExistingIssue("c1".to_string()), &created).unwrap(),
-            "c1"
+            resolve_endpoint(
+                &DeltaEndpoint::ExistingIssue(fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+                &created
+            )
+            .unwrap(),
+            fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")
         );
         assert!(
             resolve_endpoint(&DeltaEndpoint::CreatedRole("missing".to_string()), &created).is_err()

@@ -42,6 +42,7 @@
 use crate::config::{ItemKindConfig, ItemKindSource, SourceOfTruth, TomlSourceDescriptor};
 use crate::document::ContentParser;
 use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
+use crate::domain::identity::{InvalidIdPrefixError, IssueIdPrefix};
 use crate::domain::projection::project;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
@@ -76,7 +77,7 @@ pub const ISSUE_ADDRESS_SEGMENT: &str = "issue";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
     /// An issue scope, carrying the issue's short-id (the qualified-id prefix).
-    Issue(String),
+    Issue(IssueIdPrefix),
     /// The project scope, rendered with the [`PROJECT_SCOPE_SENTINEL`] (`@`).
     Project,
 }
@@ -88,11 +89,11 @@ impl Scope {
     /// segment is taken as an issue scope verbatim (resolution of a short-id /
     /// unique prefix to a full id is a storage concern handled by the caller, not
     /// this pure parser).
-    pub fn parse(segment: &str) -> Self {
+    pub fn parse(segment: &str) -> Result<Self, InvalidIdPrefixError> {
         if segment == PROJECT_SCOPE_SENTINEL {
-            Scope::Project
+            Ok(Scope::Project)
         } else {
-            Scope::Issue(segment.to_string())
+            Ok(Scope::Issue(segment.parse()?))
         }
     }
 
@@ -103,7 +104,7 @@ impl Scope {
     pub fn prefix(&self) -> &str {
         match self {
             Scope::Project => PROJECT_SCOPE_SENTINEL,
-            Scope::Issue(short_id) => short_id,
+            Scope::Issue(short_id) => short_id.as_str(),
         }
     }
 
@@ -134,7 +135,7 @@ pub enum AddressScope {
     /// A named-project reference `@<name>`, carrying the unresolved name.
     NamedProject(String),
     /// An issue scope, carrying the issue short-id from `@/issue/<short-id>/...`.
-    Issue(String),
+    Issue(IssueIdPrefix),
 }
 
 impl AddressScope {
@@ -246,7 +247,7 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
             require_non_empty(kind, "kind", address)?;
             require_non_empty(self_id, "self-id", address)?;
             Ok(KindSegmentedAddress {
-                scope: AddressScope::Issue(short_id.to_string()),
+                scope: AddressScope::Issue(short_id.parse()?),
                 kind: kind.to_string(),
                 self_id: self_id.to_string(),
             })
@@ -359,7 +360,7 @@ pub fn expand_sugar_address(
             self_id: self_id.to_string(),
         }),
         [only] => Ok(KindSegmentedAddress {
-            scope: AddressScope::Issue(short_id.to_string()),
+            scope: AddressScope::Issue(short_id.parse()?),
             kind: only.name().to_string(),
             self_id: self_id.to_string(),
         }),
@@ -403,6 +404,8 @@ impl KindScope {
 /// Errors raised while resolving item kinds or indexing items.
 #[derive(Debug, Error)]
 pub enum ItemError {
+    #[error(transparent)]
+    InvalidIssuePrefix(#[from] InvalidIdPrefixError),
     /// A declared item kind omits one or more required configuration fields.
     #[error("item kind '{kind}' is missing required field(s): {missing}")]
     MissingRequiredFields {
@@ -1026,7 +1029,7 @@ pub fn index_items(
     let projection = project(issue).with_sections(&issue.description, parser);
     let sections = projection.sections.unwrap_or_default();
     let raw = extract_raw_items(&sections, kinds);
-    derive_scope_items(&Scope::Issue(issue.short_id()), raw)
+    derive_scope_items(&Scope::parse(&issue.short_id())?, raw)
 }
 
 /// Extract raw item candidates from already-parsed sections across all kinds.
@@ -1619,9 +1622,15 @@ mod tests {
         // REQ-01: qualified id is the uniform kind-segmented address, a pure
         // projection over (scope, kind, self-id).
         let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
-        issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496".to_string();
+        issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496"
+            .parse::<crate::domain::identity::IssueId>()
+            .unwrap();
         assert_eq!(
-            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01"),
+            qualified_id(
+                &Scope::parse(&issue.short_id()).unwrap(),
+                "requirement",
+                "REQ-01"
+            ),
             "@/issue/56ab0224/requirement/REQ-01"
         );
         assert_eq!(
@@ -1644,7 +1653,7 @@ mod tests {
             parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
         assert_eq!(
             issue_addr.scope,
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
         );
         assert_eq!(issue_addr.self_id, "REQ-01");
 
@@ -1667,7 +1676,11 @@ mod tests {
         assert_eq!(items[0].kind, "requirement");
         assert_eq!(
             items[0].qualified_id,
-            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01")
+            qualified_id(
+                &Scope::parse(&issue.short_id()).unwrap(),
+                "requirement",
+                "REQ-01"
+            )
         );
         assert_eq!(
             items[0].qualified_id,
@@ -2404,12 +2417,12 @@ name = \"bare\"
     #[test]
     fn test_scope_parse_and_prefix() {
         // REQ-01: `@` is the project scope sentinel; anything else is an issue scope.
-        assert_eq!(Scope::parse("@"), Scope::Project);
-        assert!(Scope::parse("@").is_project());
+        assert_eq!(Scope::parse("@").unwrap(), Scope::Project);
+        assert!(Scope::parse("@").unwrap().is_project());
         assert_eq!(Scope::Project.prefix(), "@");
 
-        let issue = Scope::parse("56ab0224");
-        assert_eq!(issue, Scope::Issue("56ab0224".to_string()));
+        let issue = Scope::parse("56ab0224").unwrap();
+        assert_eq!(issue, Scope::Issue("56ab0224".parse().unwrap()));
         assert!(!issue.is_project());
         assert_eq!(issue.prefix(), "56ab0224");
     }
@@ -2566,16 +2579,16 @@ name = \"bare\"
         // Issue-scoped addresses carry no project identity, so the binding leaves
         // them untouched regardless of the declared local project name.
         assert_eq!(
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
                 .bind_local(Some("acme"))
                 .unwrap(),
-            Scope::Issue("56ab0224".to_string())
+            Scope::Issue("56ab0224".parse().unwrap())
         );
         assert_eq!(
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
                 .bind_local(None)
                 .unwrap(),
-            Scope::Issue("56ab0224".to_string())
+            Scope::Issue("56ab0224".parse().unwrap())
         );
     }
 
@@ -2584,7 +2597,7 @@ name = \"bare\"
         // REQ-01: `@/issue/<short-id>/<kind>/<self-id>` parses into
         // (Scope::Issue(short_id), kind, self_id); `issue` is a reserved segment.
         let addr = parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "requirement");
         assert_eq!(addr.self_id, "REQ-01");
     }
@@ -2752,7 +2765,7 @@ name = \"bare\"
         // expands to that kind, with the address's short-id carried as
         // AddressScope::Issue and self_id passed through verbatim.
         let addr = expand_sugar_address("56ab0224/D-1", &[decision_kind(), risk_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "decision");
         assert_eq!(addr.self_id, "D-1");
     }
@@ -2762,7 +2775,7 @@ name = \"bare\"
         // REQ-01: a second, distinct issue-scoped kind resolves the same way.
         let addr =
             expand_sugar_address("56ab0224/RISK-1", &[decision_kind(), risk_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "risk");
         assert_eq!(addr.self_id, "RISK-1");
     }
@@ -2836,7 +2849,7 @@ name = \"bare\"
         // pattern match — only the issue-scoped `requirement` kind is selected.
         let addr =
             expand_sugar_address("56ab0224/REQ-01", &[invariant_kind(), req_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "requirement");
         assert_eq!(addr.self_id, "REQ-01");
     }

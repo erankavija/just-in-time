@@ -1,6 +1,7 @@
 //! Validation and status operations
 
 use super::*;
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
@@ -212,7 +213,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
+        precheck_target: Option<&IssueId>,
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -226,19 +227,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
     }
 
-    /// What a mutation decides before taking the claims guard: the
-    /// configuration that sets the lease mode, the index, and the issue
-    /// `prefix` names.
-    ///
-    /// Only issues whose ids match `prefix` are read, and the target is
-    /// resolved among them exactly as a full capture resolves it. When
-    /// `needs_base` holds for the target, the same round grows to the
-    /// [`capture_mutation_base`](Self::capture_mutation_base) read, with
-    /// `prefix` as its precheck target.
+    /// Capture the resolved target and lease policy before taking the claims guard.
+    /// Extend to the mutation base when `needs_base` holds.
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        prefix: &crate::domain::identity::IssueIdPrefix,
+        issue_id: &IssueId,
         needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
@@ -255,7 +249,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             candidates = crate::storage::json::parse_repository_index(index_bytes)?
                 .all_ids
                 .into_iter()
-                .filter(|id| prefix.matches(id))
+                .filter(|id| id == issue_id)
                 .collect();
             Ok(spec.discover_paths(
                 candidates
@@ -272,11 +266,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
              repo_rel: &str|
              -> Result<Option<Vec<u8>>> { super::image_repo_bytes(image, repo_rel) };
         let issues = effective_issues(&image, &candidates, &effective)?;
-        let target_id = crate::storage::resolve_issue_id_among(prefix, &issues)?;
+        let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let target = issues
             .into_iter()
             .find(|issue| issue.id == target_id)
-            .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target_id))?;
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(target_id.clone()))?;
         if !needs_base(&target) {
             return Ok(Some(MutationPreflight {
                 image,
@@ -289,7 +283,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(image),
             &std::collections::BTreeMap::new(),
             &[],
-            Some(prefix),
+            Some(issue_id),
             true,
             false,
         )?;
@@ -337,7 +331,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
+        precheck_target: Option<&IssueId>,
         mutation: bool,
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
@@ -678,14 +672,14 @@ fn captured_divergences(
         crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &hierarchy);
     let by_id = issues
         .iter()
-        .map(|issue| (issue.id.as_str(), issue))
+        .map(|issue| (&issue.id, issue))
         .collect::<std::collections::HashMap<_, _>>();
     let divergences = divergences
         .into_iter()
         .map(|divergence| {
-            let issue = by_id.get(divergence.issue_id.as_str());
+            let issue = by_id.get(&divergence.issue_id);
             DivergenceView {
-                short_id: divergence.issue_id.chars().take(8).collect(),
+                short_id: divergence.issue_id.short_id().to_string(),
                 title: issue.map(|issue| issue.title.clone()).unwrap_or_default(),
                 id: divergence.issue_id,
                 label: divergence.label,
@@ -736,11 +730,11 @@ fn empty_materialization_config() -> JitConfig {
 fn effective_index_ids(
     image: &crate::repository_state::RepositoryImage,
     effective: &EffectiveVirtualPath<'_>,
-) -> Result<Vec<String>> {
+) -> Result<Vec<IssueId>> {
     #[derive(serde::Deserialize)]
     struct IndexIds {
         #[serde(default)]
-        all_ids: Vec<String>,
+        all_ids: Vec<IssueId>,
     }
     let bytes = effective(image, &crate::repository_state::VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
@@ -750,7 +744,7 @@ fn effective_index_ids(
 /// Parse every ordinary issue record named by the index (possibly overlaid).
 fn effective_issues(
     image: &crate::repository_state::RepositoryImage,
-    all_ids: &[String],
+    all_ids: &[IssueId],
     effective: &EffectiveRepoPath<'_>,
 ) -> Result<Vec<Issue>> {
     all_ids
@@ -804,7 +798,7 @@ fn discover_issue_closure(
     issues: &[Issue],
     config: &JitConfig,
     effective: &EffectiveVirtualPath<'_>,
-    precheck_target: Option<&crate::domain::identity::IssueIdPrefix>,
+    precheck_target: Option<&IssueId>,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -812,11 +806,11 @@ fn discover_issue_closure(
     full_config.templates = effective_templates(image, config, effective)?;
     let precheck = match precheck_target {
         Some(raw_target) => {
-            let target = super::resolve_issue_from_capture(issues, raw_target)?;
+            let target = super::require_issue_in_capture(issues, raw_target)?;
             let issue = issues
                 .iter()
                 .find(|issue| issue.id == target)
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
             let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
@@ -917,10 +911,8 @@ fn plan_document_paths(
     let templates = &config.templates;
     let breakable: std::collections::HashSet<String> =
         templates.breakable_types().into_iter().collect();
-    let by_id: std::collections::HashMap<&str, &Issue> = issues
-        .iter()
-        .map(|issue| (issue.id.as_str(), issue))
-        .collect();
+    let by_id: std::collections::HashMap<&crate::domain::identity::IssueId, &Issue> =
+        issues.iter().map(|issue| (&issue.id, issue)).collect();
     issues
         .iter()
         .filter_map(|issue| {
@@ -950,7 +942,7 @@ fn plan_document_paths(
 pub(crate) fn plan_content_from_image(
     image: &crate::repository_state::RepositoryImage,
     emit_for: &[Issue],
-) -> Result<std::collections::HashMap<String, String>> {
+) -> Result<std::collections::HashMap<IssueId, String>> {
     let effective_repo_path =
         |img: &crate::repository_state::RepositoryImage,
          repo_rel: &str|
@@ -979,7 +971,7 @@ pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
     all_issues: &[Issue],
     emit_for: &[Issue],
-) -> Result<std::collections::HashMap<String, String>> {
+) -> Result<std::collections::HashMap<IssueId, String>> {
     let effective_virtual_path =
         |img: &crate::repository_state::RepositoryImage,
          path: &crate::repository_state::VirtualPath|
@@ -992,10 +984,8 @@ pub(crate) fn plan_content_with_issues(
     let templates = &config.templates;
     let breakable: std::collections::HashSet<String> =
         templates.breakable_types().into_iter().collect();
-    let by_id: std::collections::HashMap<&str, &Issue> = all_issues
-        .iter()
-        .map(|issue| (issue.id.as_str(), issue))
-        .collect();
+    let by_id: std::collections::HashMap<&crate::domain::identity::IssueId, &Issue> =
+        all_issues.iter().map(|issue| (&issue.id, issue)).collect();
 
     let mut out = std::collections::HashMap::new();
     for issue in emit_for {
@@ -1037,17 +1027,16 @@ pub(crate) fn plan_content_with_issues(
 /// reporting: the CLI an error finding, the gate checker an `error` run.
 pub(super) fn rule_validation_outcome(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &crate::domain::identity::IssueIdPrefix,
+    issue_id: &IssueId,
     rule_name: &str,
 ) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
     use crate::validation::report::{ReportedFinding, RuleReport};
 
     let issues = super::captured_active_issues(image)?;
-    let issue_id = super::resolve_issue_from_capture(&issues, requested_issue_id)?;
     let issue = issues
         .iter()
-        .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.as_str()))?;
+        .find(|issue| &issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config.content_format();
@@ -1100,7 +1089,7 @@ pub(super) fn rule_validation_outcome(
 
 /// A configured rule that cannot be evaluated against the selected issue.
 pub(super) struct RuleSelectionFault {
-    issue_id: String,
+    issue_id: IssueId,
     rule: String,
     pub(super) message: String,
 }
@@ -1212,7 +1201,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let new_label = label_utils::type_label(new_type);
 
         self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
-            crate::domain::identity::IssueIdPrefix::from(issue_id),
+            issue_id.clone(),
             CapturedLabelEdit::ReplaceExact {
                 old: old_label,
                 new: new_label,
@@ -1537,7 +1526,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub(crate) fn image_plan_content(
         &self,
         emit_for: &[Issue],
-    ) -> Result<std::collections::HashMap<String, String>>
+    ) -> Result<std::collections::HashMap<IssueId, String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1548,8 +1537,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
     /// whole-repo report.
     ///
-    /// When `id` is `Some`, the issue is resolved (partial ids accepted) and its
-    /// matching local rules are evaluated, then graph rules are evaluated across
+    /// When `id` is `Some`, the issue's matching local rules are evaluated, then graph rules are evaluated across
     /// the whole store and filtered to those that pertain to this issue using
     /// structured attribution (each graph finding carries its issue id), plus any
     /// `config-error` finding for a graph rule whose selector applies to this
@@ -1561,18 +1549,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
-    /// resolved, or a matching local rule's schema fails to compile (a
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
+    /// found, or a matching local rule's schema fails to compile (a
     /// misconfigured rule never silently disables enforcement).
-    pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport>
+    pub fn run_rules(&self, id: Option<&IssueId>) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let id = id
-            .map(crate::domain::identity::IssueIdPrefix::from_str)
-            .transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
         // for a binding into the unloadable source (REQ-01), and the parse problem
@@ -1609,11 +1594,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
 
-        match &id {
-            Some(prefix) => {
-                // `load_issue` keys on the FULL id.
-                let full_id = self.storage.resolve_issue_id(prefix)?;
-                let issue = self.storage.load_issue(&full_id)?;
+        match id {
+            Some(full_id) => {
+                let issue = self.storage.load_issue(full_id)?;
 
                 // Local rules for this issue only.
                 let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
@@ -1645,7 +1628,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // a property of one issue. It surfaces in the whole-repo report
                 // (the `None` arm below) and gates `validate_silent` / cargo-ci.
                 findings.extend(graph_findings.iter().filter_map(|gf| {
-                    let pertains = gf.issue_id.as_deref() == Some(issue.id.as_str())
+                    let pertains = gf.issue_id.as_ref() == Some(&issue.id)
                         || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
                     pertains.then(|| ReportedFinding::new(Some(issue.id.clone()), &gf.finding))
                 }));
@@ -1757,11 +1740,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the container id cannot
-    /// be resolved, or a matching local rule's schema fails to compile.
+    /// Returns an error if `.jit/rules.toml` is malformed, the container is not
+    /// found, or a matching local rule's schema fails to compile.
     pub fn validate_scope(
         &self,
-        container_id: &str,
+        container_full_id: &IssueId,
     ) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1769,12 +1752,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
-        let container_id = crate::domain::identity::IssueIdPrefix::from_str(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
-
-        // Resolve the container (partial ids accepted) and build the slice.
-        let container_full_id = self.storage.resolve_issue_id(&container_id)?;
         let all = self.storage.list_issues()?;
 
         // The breakdown boundary type is template-driven: resolve the container's
@@ -1782,10 +1761,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // breakdown-node type. No applicable template (a non-bracketed container)
         // → no boundary, so the scope walk is the full dependency closure (see
         // `bracket_scope_ids`).
-        let container_type = all
+        let container = all
             .iter()
-            .find(|i| i.id == container_full_id)
-            .and_then(|c| label_utils::type_label_value(&c.labels).map(str::to_string));
+            .find(|i| &i.id == container_full_id)
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(container_full_id.clone()))?;
+        let container_type = label_utils::type_label_value(&container.labels).map(str::to_string);
         let templates = &self.cached_config()?.templates;
         let breakdown_type = container_type
             .as_deref()
@@ -1794,7 +1774,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(str::to_string);
 
         let scope_ids = crate::domain::queries::bracket_scope_ids(
-            &container_full_id,
+            container_full_id,
             &all,
             breakdown_type.as_deref(),
         );
@@ -1890,15 +1870,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// rather than an empty passing report.
     pub fn validate_rule(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         rule_name: &str,
     ) -> Result<crate::validation::report::RuleReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let issue_id = crate::domain::identity::IssueIdPrefix::from_str(issue_id)?;
         let image = self.capture_validation_image()?;
-        rule_validation_outcome(&image, &issue_id, rule_name)
+        rule_validation_outcome(&image, issue_id, rule_name)
             .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
     }
 
@@ -1921,21 +1900,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// # Errors
     ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
-    /// resolved, or a matching local rule's schema fails to compile.
-    pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport>
+    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
+    /// found, or a matching local rule's schema fails to compile.
+    pub fn explain_rules(&self, id: &IssueId) -> Result<crate::validation::report::ExplainReport>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
-        let id = crate::domain::identity::IssueIdPrefix::from_str(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
-        // `load_issue` keys on the FULL id; resolve a short-id prefix first.
-        let full_id = self.storage.resolve_issue_id(&id)?;
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.storage.load_issue(id)?;
         let issues = self.storage.list_issues()?;
 
         // Local findings for this issue, grouped by rule name.
@@ -1958,8 +1934,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // skipped with no messages).
         let graph_findings = self.evaluate_graph_rules(&issues)?;
         let graph_messages = group_messages(graph_findings.iter().filter_map(|gf| {
-            let pertains =
-                gf.issue_id.as_deref() == Some(issue.id.as_str()) || gf.is_config_error();
+            let pertains = gf.issue_id.as_ref() == Some(&issue.id) || gf.is_config_error();
             pertains.then(|| (gf.finding.rule.clone(), gf.finding.message.clone()))
         }));
 
@@ -2221,9 +2196,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     invalid_leases.push(format!(
                         "Lease {} (Issue {}): Expired {} ago\n  Fix: jit claim release {}",
                         lease.lease_id,
-                        &lease.issue_id[..8.min(lease.issue_id.len())],
+                        lease.issue_id.short_id(),
                         format_duration(duration),
-                        &lease.issue_id[..8.min(lease.issue_id.len())]
+                        lease.issue_id.short_id()
                     ));
                     continue;
                 }
@@ -2237,7 +2212,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 invalid_leases.push(format!(
                     "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
                     lease.lease_id,
-                    &lease.issue_id[..8.min(lease.issue_id.len())],
+                    lease.issue_id.short_id(),
                     lease.worktree_id,
                     lease.lease_id
                 ));
@@ -2249,8 +2224,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 invalid_leases.push(format!(
                     "Lease {} (Issue {}): Issue no longer exists\n  Fix: jit claim release {}",
                     lease.lease_id,
-                    &lease.issue_id[..8.min(lease.issue_id.len())],
-                    &lease.issue_id[..8.min(lease.issue_id.len())]
+                    lease.issue_id.short_id(),
+                    lease.issue_id.short_id()
                 ));
             }
         }
@@ -2277,7 +2252,7 @@ pub(crate) fn find_planning_node<'a>(
     container: &Issue,
     template: &crate::templates::GraphTemplate,
     roles: &crate::templates::RoleBindings,
-    by_id: &std::collections::HashMap<&str, &'a Issue>,
+    by_id: &std::collections::HashMap<&IssueId, &'a Issue>,
 ) -> Option<&'a Issue> {
     let planning_type = template.planning_type(roles)?;
     let bracket_label =
@@ -2293,7 +2268,7 @@ pub(crate) fn find_planning_node<'a>(
         .find_map(|b| {
             b.dependencies.iter().find_map(|dep_id| {
                 by_id
-                    .get(dep_id.as_str())
+                    .get(dep_id)
                     .copied()
                     .filter(|p| p.labels.contains(&planning_type_label))
             })
@@ -2483,7 +2458,7 @@ fn validate_claims_index_with_paths(
         if !seen_issues.insert(&lease.issue_id) {
             issues.push(format!(
                 "Duplicate lease detected for issue {}: Multiple leases exist for the same issue",
-                &lease.issue_id[..8.min(lease.issue_id.len())]
+                lease.issue_id.short_id()
             ));
         }
     }
@@ -2505,6 +2480,7 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::fixture_id;
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2553,14 +2529,14 @@ depends_on = ["planning"]
         let template = registry.get("custom-plan").unwrap();
 
         let mut container = crate::domain::fixture_issue("container".to_string(), String::new());
-        container.id = "container-12345678".to_string();
+        container.id = fixture_id("69cf16b3-cd81-56d8-b74a-832a97365c98");
 
         let mut planning = crate::domain::fixture_issue("planning".to_string(), String::new());
-        planning.id = "planning-12345678".to_string();
+        planning.id = fixture_id("d8936a00-b4cb-51e2-ab13-a1422f784c62");
         planning.labels = vec!["type:planning".to_string()];
 
         let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
-        breakdown.id = "breakdown-12345678".to_string();
+        breakdown.id = fixture_id("e8f20edc-3573-5a7e-98c3-97b9ba5646af");
         breakdown.labels = vec![
             "type:breakdown".to_string(),
             format!("scaffold:{}", container.short_id()),
@@ -2568,8 +2544,8 @@ depends_on = ["planning"]
         breakdown.dependencies = vec![planning.id.clone()];
 
         let by_id = std::collections::HashMap::from([
-            (planning.id.as_str(), &planning),
-            (breakdown.id.as_str(), &breakdown),
+            (&planning.id, &planning),
+            (&breakdown.id, &breakdown),
         ]);
         let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
 
@@ -3137,7 +3113,7 @@ priority = 100
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].issue_id.as_deref(), Some(node_id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&node_id));
         assert_eq!(findings[0].finding.rule, DANGLING_LINK_RULE);
         assert_eq!(
             findings[0].finding.severity,
@@ -3313,49 +3289,6 @@ priority = 100
         assert!(value.to_string().contains(DANGLING_LINK_RULE));
     }
 
-    /// `jit validate <id>` takes the same short-id prefix every other command
-    /// takes. `load_issue` keys on the full id, so `run_rules` must resolve the
-    /// prefix first; without that it reports the issue as not found.
-    #[test]
-    fn test_run_rules_accepts_short_id_prefix() {
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let full_id = target.id.clone();
-        let short_id = target.short_id();
-        let exec = dangling_exec(vec![target]);
-
-        let by_short = exec
-            .run_rules(Some(&short_id))
-            .expect("short-id prefix must resolve");
-        let by_full = exec
-            .run_rules(Some(&full_id))
-            .expect("full id must resolve");
-
-        assert_eq!(
-            by_short.findings.len(),
-            by_full.findings.len(),
-            "the short-id prefix must select the same issue as the full id"
-        );
-    }
-
-    /// The same resolution holds for `jit validate --explain <id>`.
-    #[test]
-    fn test_explain_rules_accepts_short_id_prefix() {
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let full_id = target.id.clone();
-        let short_id = target.short_id();
-        let exec = dangling_exec(vec![target]);
-
-        let by_short = exec
-            .explain_rules(&short_id)
-            .expect("short-id prefix must resolve");
-        let by_full = exec.explain_rules(&full_id).expect("full id must resolve");
-
-        assert_eq!(by_short.issue_id, by_full.issue_id);
-        assert_eq!(by_short.outcomes.len(), by_full.outcomes.len());
-    }
-
     /// An issue mutation captures no issue document reference, working-tree or
     /// pinned, and reads the log as a tail, while whole-repository validation of
     /// the same repository reads all of them.
@@ -3405,9 +3338,7 @@ priority = 100
         assert_ne!(events(&validation), Some(ReadMode::Tail));
     }
 
-    /// A mutation preflight reads the lease configuration, the index, and the
-    /// requested issue, and resolves a short id exactly as a full capture does,
-    /// without any other registry or issue.
+    /// Preflight reads only the lease configuration, index, and resolved issue.
     #[test]
     fn test_capture_mutation_preflight_reads_lease_inputs_and_target_only() {
         use crate::commands::test_helpers::{seed_issue, setup};
@@ -3424,7 +3355,7 @@ priority = 100
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
 
         let preflight = executor
-            .capture_mutation_preflight(session.as_mut(), &prefix(&target_id[..8]), |_| false)
+            .capture_mutation_preflight(session.as_mut(), &target_id, |_| false)
             .unwrap()
             .expect("a settled capture");
 
@@ -3435,10 +3366,6 @@ priority = 100
         assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
-    }
-
-    fn prefix(id: &str) -> crate::domain::identity::IssueIdPrefix {
-        crate::domain::identity::IssueIdPrefix::from_str(id).unwrap()
     }
 
     /// A session counting the capture rounds it opens.
@@ -3510,7 +3437,7 @@ priority = 100
         let (executor, target_id, mut counter) = counted_session();
 
         let base = executor
-            .capture_mutation_base(&mut counter, &[], Some(&prefix(&target_id)))
+            .capture_mutation_base(&mut counter, &[], Some(&target_id))
             .unwrap()
             .expect("a settled capture");
 
@@ -3523,7 +3450,7 @@ priority = 100
         let (executor, target_id, mut counter) = counted_session();
 
         executor
-            .capture_mutation_preflight(&mut counter, &prefix(&target_id[..8]), |_| false)
+            .capture_mutation_preflight(&mut counter, &target_id, |_| false)
             .unwrap()
             .expect("a settled capture");
 
@@ -3536,7 +3463,7 @@ priority = 100
     fn test_capture_mutation_preflight_precheck_transition_reads_base_in_one_round() {
         let (executor, target_id, mut counter) = counted_session();
         let start = crate::commands::CapturedLifecycleMutation::State {
-            issue_id: prefix(&target_id),
+            issue_id: target_id.clone(),
             target: crate::domain::State::InProgress,
             force: false,
             divert_unpassed_gates: false,
@@ -3544,7 +3471,7 @@ priority = 100
         };
 
         let preflight = executor
-            .capture_mutation_preflight(&mut counter, &prefix(&target_id), |target| {
+            .capture_mutation_preflight(&mut counter, &target_id, |target| {
                 crate::commands::lifecycle_requires_prechecks(&start, target)
             })
             .unwrap()

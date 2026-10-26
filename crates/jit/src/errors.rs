@@ -519,9 +519,8 @@ impl RedundantDependencyError {
 /// the transitive-reduction check) both run for every edge first. If any edge
 /// fails either check, this error is returned and NONE of the batch's edges
 /// are applied and no event is logged for any of them (jit:c8518f2a, REQ-01).
-/// Every rejected edge is named, not only the first (REQ-02). Too-short
-/// prefixes are refused before any issue record is read, so a batch carrying
-/// one names only its too-short ids.
+/// Every rejected edge is named, not only the first (REQ-02). The CLI raises
+/// it too, naming every target it cannot resolve before calling the executor.
 ///
 /// Each rejected edge keeps its own originating typed error so a caller (the
 /// CLI) can still classify it individually — by downcast, never by message
