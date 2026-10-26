@@ -12,6 +12,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "e71ed01e-3943-4b4b-938a-9275ea01c8f1",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:58:23.349615181Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "f59861e9-2469-4c61-bc1a-1a2e2510e3f1",
       "status": "passed",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The server watcher recognises .jit files through VirtualPath",
-  "updated_at": "2026-10-26T23:51:23.792649395Z"
+  "updated_at": "2026-10-26T23:58:23.349615181Z"
 }
