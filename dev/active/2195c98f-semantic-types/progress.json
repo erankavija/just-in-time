@@ -627,6 +627,20 @@
       "title": "This repository's event log is in canonical writer form",
       "reason": "d72bf093 REQ-03 needs every log line to round-trip; ~8600 legacy lines predate the canonical writer. Lead data rewrite, wired as a d72bf093 dependency.",
       "status": "done"
+    },
+    {
+      "id": "f8021e35-cf67-4142-a1f3-5fa810fb7fc8",
+      "short_id": "f8021e35",
+      "title": "The server watcher recognises .jit files through VirtualPath",
+      "reason": "Story 5dd29767 holistic-review F1: watcher.rs raw-matches well-known .jit names (story REQ-01).",
+      "status": "in_progress"
+    },
+    {
+      "id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
+      "short_id": "e1940fcf",
+      "title": "The validation schema test derives priority tokens from the vocabulary",
+      "reason": "Story 83d04069 holistic-review F1: engine.rs test hardcodes Priority tokens (story REQ-02).",
+      "status": "in_progress"
     }
   ],
   "escalations": [
@@ -1273,6 +1287,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Lead-review rework 1: unresolved request text typed as IssueId; lint suppressions. Same tier (judgment slip)."
+    },
+    {
+      "issue": "f8021e35",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "-",
+      "reason": "One-file literal-to-constant swap in the server watcher; alternation slot Claude."
+    },
+    {
+      "issue": "e1940fcf",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One test derives tokens from Priority::ALL; alternation slot Codex."
     }
   ],
   "surfaced_pitfalls": [

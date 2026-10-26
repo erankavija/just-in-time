@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd77e353920c9459393db00ef5585ec0afdd806b",
+  "completed_at": "2026-10-26T23:42:12.653335653Z",
+  "duration_ms": 266596,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/batch_create_tests.rs",
+        "id": "F1",
+        "line": 39,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/fec9b43b/requirement/REQ-01",
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "Repeated manual taxonomy repository setup violates the shared-fixture migration criterion."
+      }
+    ],
+    "summary": "Two taxonomy-dependent files retain repeated per-test repository setup instead of a shared fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fec9b43b-ed6c-4d40-aa6c-b9cf5688501f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8d6fe32b-9032-4e81-bdae-ef5381096dd3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:37:46.056797260Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9133 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a93-c1f2-7881-920e-bbe013c2faba\n--------\nuser\n--- 9120 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d523871da and fd77e3539; merge’s six relevant paths match d523871da, unrelated working-tree metadata ignored\nPolicy sources: AGENTS.md\nResolved items: @/issue/fec9b43b/requirement/REQ-01 (.jit/issues/fec9b43b-ed6c-4d40-aa6c-b9cf5688501f.json); @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/invariant/shared-test-contracts (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (2026-10-26; exit code unavailable); code-review pending with no prior run\nTruncation recovery: narrowed combined diffs to per-file zero-context patches, bounded current-file reads, static scans, and a six-path merge comparison\n\n1. F1 — blocking, issue-impact (high): `batch_create_tests.rs:39` and `issue_create_positional_type_tests.rs:25` each repeat per-test repository setup: `declaration_dir`, manual `TaxonomyRepo` construction, `JitCli::with_repository`, and `jit init` (12 and 9 times respectively). This retains scoped-file setup rather than consuming one shared taxonomy-backed CLI fixture, so hard REQ-01 is not met. Move this setup into shared test support and have both files consume it. References: @/issue/fec9b43b/requirement/REQ-01, @/issue/c780514e/requirement/REQ-05, @/invariant/shared-test-contracts, @/charter/D-18.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two taxonomy-dependent files retain repeated per-test repository setup instead of a shared fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repeated manual taxonomy repository setup violates the shared-fixture migration criterion.\",\"file\":\"crates/jit/tests/cli_issue/batch_create_tests.rs\",\"line\":39,\"references\":[\"@/issue/fec9b43b/requirement/REQ-01\",\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

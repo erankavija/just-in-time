@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd77e353920c9459393db00ef5585ec0afdd806b",
+  "completed_at": "2026-10-26T23:41:03.777835729Z",
+  "duration_ms": 198338,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six migrated CLI tests use the shared JitCli fixture and retain their asserted behavior; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ddbb22a8-f1f4-4855-9a95-ee8ef88801fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:37:45.439263529Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bcbf44664; fd77e3539 (merge tag; no combined-diff resolution)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-26T23:35:57Z); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six migrated CLI tests use the shared JitCli fixture and retain their asserted behavior; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

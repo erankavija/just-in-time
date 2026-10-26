@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-10-26T23:37:30.207711927Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8d6fe32b-9032-4e81-bdae-ef5381096dd3",
+      "status": "failed",
+      "updated_at": "2026-10-26T23:42:12.913285990Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "fec9b43b-ed6c-4d40-aa6c-b9cf5688501f",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "issue create and batch tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-26T23:37:30.207711927Z"
+  "updated_at": "2026-10-26T23:42:12.913285990Z"
 }

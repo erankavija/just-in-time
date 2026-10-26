@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "88734a93f2cc4ac582078cb3111844e357e2bb1e",
+  "completed_at": "2026-10-26T23:36:09.147240745Z",
+  "duration_ms": 179260,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/watcher.rs",
+        "id": "F1",
+        "line": 121,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/5dd29767/requirement/REQ-01",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Server watcher raw-matches index.json and gates.toml instead of VirtualPath constants."
+      }
+    ],
+    "summary": "A server watcher retains raw well-known .jit file names, so VirtualPath is not their sole source.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "5dd29767-b7c9-4037-a99c-c6c9a1081344",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b483297b-a2f4-4837-b419-fcefcdd09d5f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:33:09.886532900Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13453 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a8f-8b27-7220-9c41-1b0e34739e4d\n--------\nuser\n--- 13440 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high, blocking):** `crates/server/src/watcher.rs:121` still matches the well-known `.jit` files `\"index.json\"` and `\"gates.toml\"` as raw literals instead of deriving them from `VirtualPath::INDEX` and `VirtualPath::GATES`. This leaves duplicate path identities and fails REQ-01. References: @/issue/5dd29767/requirement/REQ-01, @/invariant/semantic-types.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A server watcher retains raw well-known .jit file names, so VirtualPath is not their sole source.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"pre-existing\",\"summary\":\"Server watcher raw-matches index.json and gates.toml instead of VirtualPath constants.\",\"file\":\"crates/server/src/watcher.rs\",\"line\":121,\"references\":[\"@/issue/5dd29767/requirement/REQ-01\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
