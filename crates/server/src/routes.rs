@@ -2308,6 +2308,7 @@ unique = false
         use std::process::Command;
 
         let temp = tempfile::tempdir().unwrap();
+        jit::test_cli::init_git_repository(temp.path()).unwrap();
         let git = |args: &[&str]| {
             let status = Command::new("git")
                 .current_dir(temp.path())
@@ -2316,9 +2317,6 @@ unique = false
                 .unwrap();
             assert!(status.success(), "git {args:?}");
         };
-        git(&["init", "-q"]);
-        git(&["config", "user.email", "test@example.com"]);
-        git(&["config", "user.name", "Test"]);
         let jit_dir = temp.path().join(".jit");
         initialize_file_backed_test_repository(temp.path());
         fs::write(
