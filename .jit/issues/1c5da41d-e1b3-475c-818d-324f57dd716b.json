@@ -27,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Validation carries typed issue ids",
-  "updated_at": "2026-10-25T21:55:59.968870913Z"
+  "updated_at": "2026-10-26T22:13:39.637232083Z"
 }
