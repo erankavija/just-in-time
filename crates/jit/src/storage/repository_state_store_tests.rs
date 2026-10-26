@@ -2053,7 +2053,10 @@ fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
     let issue = req01_issue(id, Some(agent.clone()));
     // A committed claim event so both issue and tail already reflect the claim.
     let claim_event = crate::test_utils::stamped_event(
-        EventBody::draft_issue_claimed(id.to_string(), agent.clone()),
+        EventBody::draft_issue_claimed(
+            id.parse::<crate::domain::identity::IssueId>().unwrap(),
+            agent.clone(),
+        ),
         "evt",
         req01_instant(),
     );

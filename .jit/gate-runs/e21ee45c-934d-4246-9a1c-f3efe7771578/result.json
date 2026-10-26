@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f265e748",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3c7f6be181372c86f42ff5d8fddf684068e76047",
+  "completed_at": "2026-10-26T22:42:37.878836895Z",
+  "duration_ms": 100809,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; the prior constructor finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f265e748-e350-4ba6-949f-575acf122bd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e21ee45c-934d-4246-9a1c-f3efe7771578",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:40:57.069229315Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f1aaadc03, 5d83ac6e6, 61400544b, fb3e6f327, 42a9d33e, 0b9770767, 9308cd32, 67f48c045, 0c80291d, c3682fc73, 3c7f6be18 (`jit:f265e748`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f265e748/requirement/REQ-01–REQ-04 and @/issue/2195c98f/requirement/REQ-04 (.jit issue descriptions); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci pending, no exit code; latest prior code-review failed on the constructor test, remedied in c3682fc73\nTruncation recovery: parent-specific merge patches and targeted current event/accessor, ordering, constructor, and call-site reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; the prior constructor finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

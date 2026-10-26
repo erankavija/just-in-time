@@ -358,7 +358,9 @@ fn test_all_valid_batch_applies_everything_with_one_event() {
         updated, 1,
         "one atomic batch add covering two edges should log exactly one issue_updated event, got {new_events:?}"
     );
-    assert!(new_events.iter().all(|e| e.get_issue_id() == a));
+    assert!(new_events
+        .iter()
+        .all(|e| e.issue_id().map(|id| id.as_str()) == Some(a.as_str())));
 }
 
 /// `--reduce` interplay: a batch mixing a valid edge with a self-redundant
@@ -428,9 +430,8 @@ fn test_reduce_policy_drops_shadowed_edge_on_other_issue() {
 
     let events = h.storage.read_events().unwrap();
     assert!(
-        events
-            .iter()
-            .any(|e| e.get_type() == "dependency_reduced" && e.get_issue_id() == x),
+        events.iter().any(|e| e.get_type() == "dependency_reduced"
+            && e.issue_id().map(|id| id.as_str()) == Some(x.as_str())),
         "expected a dependency_reduced event on X"
     );
 
