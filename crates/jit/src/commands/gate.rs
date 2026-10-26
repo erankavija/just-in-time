@@ -14,7 +14,7 @@ use crate::domain::{GateRunResult, GateRunStatus};
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that failed.
     pub gate_key: String,
     /// Raw checker status.
@@ -37,7 +37,7 @@ pub struct GatePassFailed {
 #[error("Gate '{gate_key}' is not required for issue {issue_id}")]
 pub struct GateNotRequiredError {
     /// Issue that was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Gate key that is not in the issue's required set.
     pub gate_key: String,
 }
@@ -58,7 +58,7 @@ pub struct GateNotRequiredError {
 )]
 pub struct ManualGateAttestationRequiredError {
     /// Issue whose gate was targeted.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Manual gate key that was targeted without `--by`.
     pub gate_key: String,
 }
@@ -99,7 +99,7 @@ pub struct PassAllOutcome {
 /// The outcome of evaluating one gate across several issues.
 pub struct GateEvaluateManyEntry {
     /// Issue identifier as supplied to the command.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// The per-issue gate result, or the error that prevented a verdict.
     pub result: Result<GatePassOutcome>,
 }
@@ -378,7 +378,7 @@ fn captured_gate_registry(
 
 fn captured_gate_preset_issue(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &str,
+    issue_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
@@ -388,11 +388,11 @@ fn captured_gate_preset_issue(
                 .with_context(|| format!("failed to parse captured issue {issue_id}"))?
         }
         RepositoryEntry::Absent => {
-            return Err(crate::storage::IssueNotFoundError::new(issue_id).into())
+            return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
         }
         _ => return Err(anyhow!("captured issue path is not an ordinary file")),
     };
-    if issue.id != issue_id {
+    if &issue.id != issue_id {
         return Err(anyhow!(
             "captured issue identity mismatch: requested {issue_id}, found {}",
             issue.id
@@ -683,7 +683,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Add a single gate to an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn add_gate(&self, issue_id: &str, gate_key: String) -> Result<Vec<String>>
+    pub fn add_gate(&self, issue_id: &IssueId, gate_key: String) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -696,7 +696,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn add_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_keys: &[String],
     ) -> Result<(GateAddResult, Vec<String>)>
     where
@@ -707,9 +707,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -742,7 +740,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn remove_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_keys: &[String],
     ) -> Result<(GateRemoveResult, Vec<String>)>
     where
@@ -753,9 +751,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -786,7 +782,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings).
     pub fn pass_gate(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: String,
         by: Option<String>,
         force: bool,
@@ -799,9 +795,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -890,16 +884,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// with an empty result set.
     pub fn pass_all_gates(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         by: Option<String>,
         force: bool,
     ) -> Result<PassAllOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
 
         // Fail-fast: pass each required gate in order, stopping at the first that
@@ -928,7 +920,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// prevent later issue identifiers from being evaluated.
     pub fn pass_gate_many(
         &self,
-        issue_ids: &[String],
+        issue_ids: &[IssueId],
         gate_key: &str,
         by: Option<String>,
         force: bool,
@@ -952,7 +944,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns warnings (e.g., lease warnings) if any.
     pub fn fail_gate(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: String,
         by: Option<String>,
     ) -> Result<Vec<String>>
@@ -964,9 +956,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let by = by
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -1259,7 +1249,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns (result, warnings) where warnings contains lease warnings if any.
     pub fn apply_gate_preset(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         preset_name: &str,
         timeout_override: Option<u64>,
         skip_precheck: bool,
@@ -1271,7 +1261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
-        let issue_id = &IssueIdPrefix::from_str(issue_id)?;
+        let issue_id = &issue_id.clone();
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
@@ -1294,7 +1284,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let target = super::resolve_issue_from_capture(&issues, issue_id)?;
+            let target = super::require_issue_in_capture(&issues, issue_id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let mode = config.enforcement_mode();
             if target != expected_target || mode != expected_mode {
@@ -1343,12 +1333,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Results are sorted newest-first by `started_at`.
     pub fn list_gate_runs(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key_filter: Option<&str>,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::from_str(issue_id)?)?;
+        let full_id = issue_id.clone();
         let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
 
         if let Some(key) = gate_key_filter {
@@ -1367,7 +1355,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn create_gate_preset(
         &self,
         preset_name: &str,
-        from_issue_id: &str,
+        from_issue_id: &IssueId,
     ) -> Result<std::path::PathBuf>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1376,7 +1364,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        let from_issue_id = &IssueIdPrefix::from_str(from_issue_id)?;
+        let from_issue_id = &from_issue_id.clone();
 
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
@@ -1385,7 +1373,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(SessionStep::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let full_id = super::resolve_issue_from_capture(&issues, from_issue_id)?;
+            let full_id = super::require_issue_in_capture(&issues, from_issue_id)?;
             let presets_dir = crate::repository_state::VirtualPath::GATE_PRESETS;
             let target = crate::repository_state::VirtualPath::data(format!(
                 "{}/{preset_name}.json",

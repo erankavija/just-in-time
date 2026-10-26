@@ -42,7 +42,7 @@ confirmation = "invoked"
 path = "claim release"
 argv = ["claim", "release", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
-expected_failure = "ISSUE_NOT_FOUND: Failed to resolve issue id deadbeef"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: deadbeef"
 expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
@@ -525,7 +525,7 @@ confirmation = "invoked"
 [[arms]]
 path = "issue delete"
 argv = ["issue", "delete", "deadbeef", "--json"]
-setup = ["worktree:primary", "init", "env-unset:JIT_ALLOW_DELETION"]
+setup = ["worktree:primary", "init", "seed-issue:deadbeef-0000-4000-8000-000000000001", "env-unset:JIT_ALLOW_DELETION"]
 expected_failure = "The delete arm refuses deletion without explicit confirmation."
 expected_code = "DELETION_NOT_CONFIRMED"
 expected_exit = 2
@@ -885,10 +885,10 @@ confirmation = "invoked"
 [[arms]]
 path = "apply"
 argv = ["apply", "definitely-missing-template", "00000000-0000-0000-0000-000000000000", "--json"]
-setup = ["init", "no-template:definitely-missing-template"]
-expected_failure = "Template lookup reports that `definitely-missing-template` is not declared."
-expected_code = "INVALID_ARGUMENT"
-expected_exit = 2
+setup = ["init", "no-template:definitely-missing-template", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "Container resolution reports that `00000000-0000-0000-0000-000000000000` is not found."
+expected_code = "ISSUE_NOT_FOUND"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]

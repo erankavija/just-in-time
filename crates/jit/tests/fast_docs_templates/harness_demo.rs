@@ -398,7 +398,7 @@ fn test_harness_container_progress_and_children() {
     for child in [&done, &wip, &rejected, &ready] {
         h.executor.add_dependency(&epic, child).unwrap();
     }
-    let set_state = |id: &str, state: State| {
+    let set_state = |id: &jit::domain::identity::IssueId, state: State| {
         h.executor
             .issues()
             .update_issue(
