@@ -222,7 +222,7 @@ fn render_validation_json(
 /// agree.
 fn render_gate_pass_error(
     e: anyhow::Error,
-    id: &str,
+    requested: &str,
     output_ctx: &OutputContext,
     json: bool,
 ) -> Result<()> {
@@ -235,7 +235,7 @@ fn render_gate_pass_error(
         return Err(e);
     }
 
-    let json_error = gate_pass_json_error(&e, id);
+    let json_error = gate_pass_json_error(&e, requested);
     println!("{}", json_error.to_json_string()?);
     std::process::exit(json_error.exit_code().code());
 }
@@ -254,7 +254,7 @@ fn report_gate_check_error<T>(e: anyhow::Error, json: bool) -> Result<T> {
 /// Build the structured error used by both single-issue and multi-issue gate
 /// evaluation. Keeping the classifier shared preserves the `gate evaluate`
 /// taxonomy when a batch contains checker, runner, lookup, or argument errors.
-fn gate_pass_json_error(e: &anyhow::Error, id: &str) -> jit::output::JsonError {
+fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::JsonError {
     use jit::output::{ErrorCode, GateRunSummary, JsonError};
     let json_error = if let Some(gate_failure) = e.downcast_ref::<jit::commands::GatePassFailed>() {
         // Distinguish a checker failure (verdict `fail`, exit 4) from a
@@ -318,7 +318,7 @@ fn gate_pass_json_error(e: &anyhow::Error, id: &str) -> jit::output::JsonError {
         .is_some()
     {
         // Pre-verdict lookup error: issue id did not resolve.
-        JsonError::issue_not_found(id)
+        JsonError::issue_not_found(requested)
     } else {
         command_json_error(e, ErrorCode::GateError)
     };
@@ -1049,7 +1049,7 @@ fn resolve_dependency_args<S: IssueStore>(
         resolved.into_iter().map(|(_, result)| result).collect()
     } else {
         Err(jit::errors::DependencyBatchRejectedError::new(
-            from_id.as_str(),
+            from_id.clone(),
             rejected
                 .into_iter()
                 .filter_map(|(id, result)| result.err().map(|error| (id.clone(), error)))
@@ -4211,14 +4211,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let entries: Vec<_> = resolved
                     .into_iter()
                     .filter_map(|(requested, id)| match id {
-                        Ok(_) => evaluated.next().map(|entry| (entry.issue_id, entry.result)),
+                        Ok(_) => evaluated
+                            .next()
+                            .map(|entry| (entry.issue_id.to_string(), entry.result)),
                         Err(error) => Some((requested, Err(error))),
                     })
                     .collect();
                 let mut exit_code = None;
                 let mut results = Vec::with_capacity(entries.len());
 
-                for (issue_id, result) in entries {
+                for (requested, result) in entries {
                     match result {
                         Ok(outcome) => {
                             if !json {
@@ -4228,11 +4230,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 output_ctx.print_success(jit::output::render_gate_run_status(
                                     jit::output::GateRunLine::Passed,
                                     &gate_key,
-                                    &issue_id,
+                                    &requested,
                                 ))?;
                             }
                             results.push(jit::output::GateEvaluateManyResult {
-                                issue_id,
+                                requested,
                                 key: gate_key.clone(),
                                 status: "passed".to_string(),
                                 verdict: Some("pass".to_string()),
@@ -4241,7 +4243,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             });
                         }
                         Err(error) => {
-                            let json_error = gate_pass_json_error(&error, &issue_id);
+                            let json_error = gate_pass_json_error(&error, &requested);
                             exit_code.get_or_insert(json_error.exit_code().code());
                             let warnings = error
                                 .downcast_ref::<jit::commands::GatePassFailed>()
@@ -4253,7 +4255,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 }
                                 eprintln!(
                                     "Failed gate '{}' for issue {}: {}",
-                                    gate_key, issue_id, error
+                                    gate_key, requested, error
                                 );
                             }
                             let error_value = serde_json::to_value(&json_error.error)?;
@@ -4265,7 +4267,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 .and_then(serde_json::Value::as_str)
                                 .map(str::to_string);
                             results.push(jit::output::GateEvaluateManyResult {
-                                issue_id,
+                                requested,
                                 key: gate_key.clone(),
                                 status: "failed".to_string(),
                                 verdict,

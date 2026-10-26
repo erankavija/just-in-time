@@ -16,6 +16,7 @@ pub mod failure;
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::identity::{IssueId, IssueIdStaging};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::vocabulary::wire_vocabulary;
@@ -23,7 +24,7 @@ use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
     Priority, State,
 };
-use crate::errors::{short_id, TransitionBlockedError, TransitionBlocker};
+use crate::errors::{TransitionBlockedError, TransitionBlocker};
 
 /// Render the complete schema-v1 archive plan without introducing a second
 /// decision model. Every action, fact, edge, relink, deletion, warning, and
@@ -34,7 +35,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
 
     let mut rendered = String::new();
     let target = match plan.target() {
-        PlanTarget::Container { id } => format!("container {}", short_id(id)),
+        PlanTarget::Container { id } => format!("container {}", id.short_id()),
         PlanTarget::Document { path } => format!("document {path}"),
     };
     let counts = plan.action_counts();
@@ -108,7 +109,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
                 let _ = writeln!(
                     rendered,
                     "      - issue={} document-index={} state={} inside-subtree={} pinned={} selected-for-relink={}",
-                    short_id(&owner.issue),
+                    owner.issue.short_id(),
                     owner.document_index,
                     wire_name(&owner.state),
                     owner.inside_subtree,
@@ -136,7 +137,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
                 let _ = writeln!(
                     rendered,
                     "      - issue={} document-index={} {} -> {}",
-                    short_id(&change.issue),
+                    change.issue.short_id(),
                     change.document_index,
                     change.from_path,
                     change.to_path
@@ -290,17 +291,17 @@ pub enum GateRunLine {
     Passed,
 }
 
-/// The human status line for a gate's run, shared by every gate command.
+/// The human status line for a gate's run, preserving the requested text.
 pub fn render_gate_run_status(
     line: GateRunLine,
     gate_key: impl Display,
-    issue_id: impl Display,
+    requested: &str,
 ) -> String {
     match line {
         GateRunLine::NeverRun => format!(
-            "Gate '{gate_key}' has not been run yet for issue {issue_id}. Use 'jit gate evaluate' to run it."
+            "Gate '{gate_key}' has not been run yet for issue {requested}. Use 'jit gate evaluate' to run it."
         ),
-        GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {issue_id}"),
+        GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {requested}"),
     }
 }
 
@@ -415,15 +416,28 @@ fn display_optional(value: &str) -> &str {
 mod issue_list_render_tests {
     use super::*;
 
-    fn issue(id: &str, title: &str) -> Issue {
+    fn issue(id: IssueId, title: &str) -> Issue {
         let mut issue = Issue::draft(title.into(), String::new());
-        issue.id = id.into();
+        issue.id = id.to_string();
         issue
     }
 
     #[test]
     fn test_render_issue_list_indents_rows_and_columns_reasons_and_total_footer() {
-        let issues = [issue("aaaa", "First"), issue("bbbb", "Second")];
+        let issues = [
+            issue(
+                "aaaaaaaa-0000-4000-8000-000000000001"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                "First",
+            ),
+            issue(
+                "bbbbbbbb-0000-4000-8000-000000000002"
+                    .parse::<IssueId>()
+                    .unwrap(),
+                "Second",
+            ),
+        ];
         let rows = vec![
             (&issues[0], vec!["waits on x".to_string()]),
             (&issues[1], Vec::new()),
@@ -438,22 +452,35 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            "Header:\n  aaaa | First | Backlog | Normal\n    - waits on x\n  bbbb | Second | Backlog | Normal\n\nTotal: 2"
+            "Header:\n  aaaaaaaa-0000-4000-8000-000000000001 | First | Backlog | Normal\n    - waits on x\n  bbbbbbbb-0000-4000-8000-000000000002 | Second | Backlog | Normal\n\nTotal: 2"
         );
     }
 
     #[test]
     fn test_render_issue_list_without_columns_prints_id_and_title_only() {
-        let issues = [issue("aaaa", "First")];
+        let issues = [issue(
+            "aaaaaaaa-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
+            "First",
+        )];
 
         let rendered = render_issue_list("H", plain_issue_rows(&issues), &[], false);
 
-        assert_eq!(rendered, "H\n  aaaa | First\n\nTotal: 1");
+        assert_eq!(
+            rendered,
+            "H\n  aaaaaaaa-0000-4000-8000-000000000001 | First\n\nTotal: 1"
+        );
     }
 
     #[test]
     fn test_render_issue_list_quiet_keeps_rows_and_drops_header_and_footer() {
-        let issues = [issue("aaaa", "First")];
+        let issues = [issue(
+            "aaaaaaaa-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
+            "First",
+        )];
 
         let rendered = render_issue_list(
             "H",
@@ -462,7 +489,10 @@ mod issue_list_render_tests {
             true,
         );
 
-        assert_eq!(rendered, "  aaaa | First | Normal");
+        assert_eq!(
+            rendered,
+            "  aaaaaaaa-0000-4000-8000-000000000001 | First | Normal"
+        );
     }
 
     #[test]
@@ -491,7 +521,7 @@ mod archive_render_tests {
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_format("markdown")
         .with_owners(vec![ArtifactOwner {
-            issue: "12345678-1234-1234-1234-123456789abc".into(),
+            issue: "12345678-1234-1234-1234-123456789abc".to_string(),
             document_index: 2,
             state: State::Done,
             archived_from: None,
@@ -1188,12 +1218,13 @@ pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError 
 
 /// Helper to create common error responses
 impl JsonError {
-    pub fn issue_not_found(issue_id: &str) -> Self {
+    /// Preserve unresolved request text in the lookup diagnostic.
+    pub fn issue_not_found(requested: &str) -> Self {
         Self::new(
             ErrorCode::IssueNotFound,
-            format!("Issue not found: {}", issue_id),
+            format!("Issue not found: {}", requested),
         )
-        .with_details(serde_json::json!({"issue_id": issue_id}))
+        .with_details(serde_json::json!({"issue_id": requested}))
         .with_suggestion("Run 'jit query all' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
     }
@@ -1208,12 +1239,16 @@ impl JsonError {
         .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
 
-    pub fn cycle_detected(from: &str, to: &str) -> Self {
+    /// Preserve the rejected target request text alongside the resolved source.
+    pub fn cycle_detected(from: &IssueId, requested: &str) -> Self {
         Self::new(
             ErrorCode::CycleDetected,
-            format!("Adding dependency would create a cycle: {} -> {}", from, to),
+            format!(
+                "Adding dependency would create a cycle: {} -> {}",
+                from, requested
+            ),
         )
-        .with_details(serde_json::json!({"from": from, "to": to}))
+        .with_details(serde_json::json!({"from": from, "to": requested}))
         .with_suggestion("Remove existing dependencies that create the cycle")
         .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
     }
@@ -1245,14 +1280,14 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         } => serde_json::json!({
             "type": "dependency",
             "issue_id": issue_id,
-            "short_id": short_id(issue_id),
+            "short_id": issue_id.short_id(),
             "title": title,
             "state": state.as_str(),
         }),
         TransitionBlocker::MissingDependency { issue_id } => serde_json::json!({
             "type": "dependency",
             "issue_id": issue_id,
-            "short_id": short_id(issue_id),
+            "short_id": issue_id.short_id(),
             "title": "(missing issue)",
             "state": "missing",
         }),
@@ -1408,10 +1443,10 @@ pub struct ClaimResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TemplateApplyResponse {
     pub template: String,
-    pub container: String,
-    pub anchor_bindings: std::collections::BTreeMap<String, String>,
-    pub created_node_ids_by_role: std::collections::BTreeMap<String, String>,
-    pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<String>>,
+    pub container: IssueId,
+    pub anchor_bindings: std::collections::BTreeMap<String, IssueId>,
+    pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
+    pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
 }
 
@@ -1466,14 +1501,14 @@ pub type GraphDownstreamResponse = ListEnvelope<DependentsKey, MinimalIssue, Iss
 /// The issue a graph traversal starts from.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueScope {
-    pub issue_id: String,
+    pub issue_id: IssueId,
 }
 
 /// Tree node for hierarchical dependency display
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 pub struct DependencyTreeNode {
     /// Issue ID
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars)
     pub short_id: String,
     /// Issue title
@@ -1524,7 +1559,7 @@ pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, Depe
 /// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencyTreeScope {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Depth of traversal (1 = immediate, 0 = unlimited)
     pub depth: u32,
     /// Summary statistics
@@ -1554,18 +1589,21 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// # Examples
 ///
 /// ```
+/// use jit::domain::identity::{IssueId, IssueIdStaging};
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::HierarchyNodeView;
 ///
+/// let epic_id = "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap();
+/// let task_id = "87654321-0000-4000-8000-000000000002".parse::<IssueId>().unwrap();
 /// let view = HierarchyNodeView {
-///     id: "epic-1234".into(),
-///     short_id: "epic-123".into(),
+///     id: epic_id.clone(),
+///     short_id: epic_id.short_id().to_string(),
 ///     title: "Auth epic".into(),
 ///     type_name: Some("epic".into()),
 ///     hierarchy: NodeHierarchy {
 ///         parent: None,
-///         children: vec!["task-a".into()],
-///         cluster: Some("epic-1234".into()),
+///         children: vec![task_id.to_string()],
+///         cluster: Some(epic_id.to_string()),
 ///         rank: 1,
 ///     },
 /// };
@@ -1573,14 +1611,14 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// // `type_name` serializes under the `type` key.
 /// assert_eq!(json["type"], "epic");
 /// // The resolution fields sit flat on the node.
-/// assert_eq!(json["children"][0], "task-a");
-/// assert_eq!(json["cluster"], "epic-1234");
+/// assert_eq!(json["children"][0], task_id.as_str());
+/// assert_eq!(json["cluster"], epic_id.as_str());
 /// assert_eq!(json["rank"], 1);
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct HierarchyNodeView {
     /// Full issue id.
-    pub id: String,
+    pub id: IssueId,
     /// Short id (first 8 chars).
     pub short_id: String,
     /// Issue title.
@@ -1602,19 +1640,22 @@ pub struct HierarchyNodeView {
 /// # Examples
 ///
 /// ```
+/// use jit::domain::identity::{IssueId, IssueIdStaging};
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
 ///
+/// let epic_id = "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap();
+/// let task_id = "87654321-0000-4000-8000-000000000002".parse::<IssueId>().unwrap();
 /// let response = GraphTreeResponse::with_extras(
 ///     vec![HierarchyNodeView {
-///         id: "task-1234".into(),
-///         short_id: "task-123".into(),
+///         id: task_id.clone(),
+///         short_id: task_id.short_id().to_string(),
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
 ///         hierarchy: NodeHierarchy {
-///             parent: Some("epic-1".into()),
+///             parent: Some(epic_id.to_string()),
 ///             children: vec![],
-///             cluster: Some("epic-1".into()),
+///             cluster: Some(epic_id.to_string()),
 ///             rank: 0,
 ///         },
 ///     }],
@@ -1623,7 +1664,7 @@ pub struct HierarchyNodeView {
 /// let json = serde_json::to_value(&response).unwrap();
 /// assert_eq!(json["count"], 1);
 /// assert_eq!(json["root"], serde_json::Value::Null);
-/// assert_eq!(json["nodes"][0]["parent"], "epic-1");
+/// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
 /// ```
 pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
 
@@ -1631,14 +1672,14 @@ pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TreeRoot {
     /// The root id the tree was scoped to, or `null` for the whole repository.
-    pub root: Option<String>,
+    pub root: Option<IssueId>,
 }
 
 /// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceView {
     /// Full id of the issue carrying the unsupported membership label.
-    pub id: String,
+    pub id: IssueId,
     /// Short id (first 8 chars).
     pub short_id: String,
     /// Issue title.
@@ -1716,7 +1757,7 @@ impl GateView {
 /// carrying only what an orchestrator needs to see what is still blocking work.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct UnmetDependency {
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars of the full UUID), for human-readable references.
     pub short_id: String,
     pub title: String,
@@ -1737,7 +1778,7 @@ impl From<&MinimalIssue> for UnmetDependency {
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars of the full UUID), for human-readable references.
     pub short_id: String,
     pub title: String,
@@ -1757,7 +1798,7 @@ pub struct IssueShowResponse {
     /// `dependencies`, which silently omits ids it cannot resolve — is not
     /// hidden.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling_dependency_ids: Vec<String>,
+    pub dangling_dependency_ids: Vec<IssueId>,
     /// The subset of `dependencies` that are not yet met (not effectively terminal),
     /// consistent with readiness — see [`UnmetDependency`]. Always an array,
     /// empty when every dependency is effectively terminal (`Done`, `Rejected`,
@@ -1813,12 +1854,12 @@ impl IssueShowResponse {
 
         // See the doc comment above: recover ids `enriched_deps` couldn't
         // resolve so they surface instead of vanishing from the response.
-        let resolved_ids: std::collections::HashSet<&str> =
-            enriched_deps.iter().map(|dep| dep.id.as_str()).collect();
-        let dangling_dependency_ids: Vec<String> = issue
+        let resolved_ids: std::collections::HashSet<&IssueId> =
+            enriched_deps.iter().map(|dep| &dep.id).collect();
+        let dangling_dependency_ids: Vec<IssueId> = issue
             .dependencies
             .iter()
-            .filter(|dep_id| !resolved_ids.contains(dep_id.as_str()))
+            .filter(|dep_id| !resolved_ids.contains(dep_id))
             .cloned()
             .collect();
 
@@ -2134,7 +2175,7 @@ pub struct ChildrenScope {
     /// Dependency ids that resolve to no stored issue (dangling edges), omitted
     /// when empty. `count`/`issues` cover resolvable children only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<String>,
+    pub dangling: Vec<IssueId>,
 }
 
 /// Response for `jit issue progress`: a container header, the counts-by-state
@@ -2158,7 +2199,7 @@ pub struct ContainerProgressResponse {
     /// Dependency ids that resolve to no stored issue (dangling edges), omitted
     /// when empty. The rollup counts resolvable children only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<String>,
+    pub dangling: Vec<IssueId>,
 }
 
 /// Render a single top-level field of a serialized issue value as plain text.
@@ -2271,7 +2312,7 @@ pub fn render_config_snapshot(snapshot: &Value) -> String {
 /// need it can call `jit issue show`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueUpdateResponse {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub state: State,
     pub updated_at: String,
@@ -2298,7 +2339,7 @@ impl From<&Issue> for IssueUpdateResponse {
 /// only needs per-gate status reads it identically on both shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub title: String,
     pub state: State,
@@ -2357,7 +2398,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     run_id: "r1".into(),
 ///     gate_key: "tests".into(),
 ///     stage: GateStage::Postcheck,
-///     issue_id: "i1".into(),
+///     issue_id: "12345678-0000-4000-8000-000000000001".to_string(),
 ///     commit: None,
 ///     branch: None,
 ///     status: GateRunStatus::Passed,
@@ -2526,8 +2567,9 @@ pub struct GateCheckSummary {
 /// One per-issue result from `jit gate evaluate-many`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateEvaluateManyResult {
-    /// Issue identifier as supplied to the command.
-    pub issue_id: String,
+    /// Requested text on lookup failure; resolved id text otherwise.
+    #[serde(rename = "issue_id")]
+    pub requested: String,
     /// Gate key evaluated for this issue.
     pub key: String,
     /// `passed` when a verdict was recorded as passing, otherwise `failed`.
@@ -2662,7 +2704,7 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ArtifactDirectoryResponse {
     /// Full identifier of the issue the directory belongs to.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Short identifier the directory name is built from.
     pub short_id: String,
     /// Issue-scoped area the caller named.
@@ -2712,7 +2754,7 @@ pub struct ArtifactConformanceEntry {
     pub status: String,
     /// Full identifier of the owning issue, for a `nonconforming` entry.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// Repository-relative directory the owner owns in that area, for a
     /// `nonconforming` entry.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2950,7 +2992,7 @@ mod tests {
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
         let issue = crate::domain::MinimalIssue {
-            id: "a".repeat(36),
+            id: "aaaaaaaa-0000-4000-8000-000000000001".to_string(),
             title: "Archived dep".to_string(),
             state: State::Archived,
             priority: Priority::Normal,
@@ -3090,7 +3132,7 @@ mod tests {
 
     #[test]
     fn test_show_response_root_shape_short_id_and_arrays() {
-        // short_id is id[0..8]; labels and dependencies always serialize as arrays.
+        // Labels and dependencies always serialize as arrays.
         let issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
         let expected_short = issue.short_id();
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
@@ -3141,12 +3183,11 @@ mod tests {
         // `enriched_deps` only contains the resolvable ones.
 
         let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
-        issue.dependencies = vec!["resolved-id".to_string(), "dangling-id".to_string()];
-
-        // Simulate what `get_dependencies_enriched` would produce: only the
-        // resolvable dependency's MinimalIssue, the dangling one absent.
-        let mut resolved_dep = crate::domain::fixture_issue("Dep".to_string(), "".to_string());
-        resolved_dep.id = "resolved-id".to_string();
+        let resolved_dep = crate::domain::fixture_issue("Dep".to_string(), String::new());
+        let dangling_id = "22222222-0000-4000-8000-000000000002"
+            .parse::<IssueId>()
+            .unwrap();
+        issue.dependencies = vec![resolved_dep.id.clone(), dangling_id.to_string()];
         let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
 
         let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
@@ -3159,7 +3200,7 @@ mod tests {
         );
         assert_eq!(
             v["dangling_dependency_ids"],
-            serde_json::json!(["dangling-id"]),
+            serde_json::json!([dangling_id]),
             "the dangling id must be reported, not silently dropped"
         );
     }
@@ -3169,14 +3210,11 @@ mod tests {
         use crate::domain::State;
 
         let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
-        issue.dependencies = vec!["rejected-id".to_string(), "pending-id".to_string()];
-
         let mut rejected = crate::domain::fixture_issue("Abandoned".to_string(), String::new());
-        rejected.id = "rejected-id".to_string();
         rejected.state = State::Rejected;
         let mut pending = crate::domain::fixture_issue("Upstream".to_string(), String::new());
-        pending.id = "pending-id".to_string();
         pending.state = State::InProgress;
+        issue.dependencies = vec![rejected.id.clone(), pending.id.clone()];
         let enriched_deps = vec![MinimalIssue::from(&rejected), MinimalIssue::from(&pending)];
 
         let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
@@ -3188,7 +3226,7 @@ mod tests {
             .collect();
         assert_eq!(
             unmet,
-            vec!["pending-id"],
+            vec![pending.id.as_str()],
             "a Rejected dependency is met and must not render as unmet"
         );
     }
@@ -3972,8 +4010,7 @@ mod tests {
 
     #[test]
     fn test_event_list_response_serializes_events_under_collection_key() {
-        let mut issue = crate::domain::Issue::draft("title".to_string(), String::new());
-        issue.id = "i".to_string();
+        let issue = crate::domain::Issue::draft("title".to_string(), String::new());
         let event = crate::test_utils::stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             "e",
@@ -4003,7 +4040,9 @@ mod tests {
         let now = chrono::Utc::now();
         let lease = crate::storage::claim_coordinator::Lease {
             lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
-            issue_id: "i".into(),
+            issue_id: "aaaaaaaa-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
             agent_id: "agent:a".parse().unwrap(),
             worktree_id: "w".parse().unwrap(),
             branch: None,

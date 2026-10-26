@@ -4,6 +4,7 @@
 //! like DOT (Graphviz) and Mermaid. These functions are Issue-specific and access
 //! Issue fields like title and state for rendering.
 
+use crate::domain::identity::{IssueId, IssueIdStaging};
 use crate::domain::{Issue, Priority, State};
 use crate::graph::hierarchy::NodeHierarchy;
 use crate::graph::DependencyGraph;
@@ -15,8 +16,8 @@ use serde::Serialize;
 /// by both the summary and `--full` shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphExportEdge {
-    pub from: String,
-    pub to: String,
+    pub from: IssueId,
+    pub to: IssueId,
 }
 
 /// A node in the default (summary) `jit graph export --format json` shape.
@@ -26,7 +27,7 @@ pub struct GraphExportEdge {
 /// for `--full`, whose node is the complete stored record ([`GraphExportFullNode`]).
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphExportSummaryNode {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub title: String,
     pub state: State,
@@ -75,7 +76,7 @@ fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
             issue
                 .dependencies
                 .iter()
-                .filter(|dep_id| node_ids.contains(dep_id.as_str()))
+                .filter(|dep_id| node_ids.contains(dep_id))
                 .map(|dep_id| GraphExportEdge {
                     from: issue.id.clone(),
                     to: dep_id.clone(),
@@ -91,8 +92,8 @@ fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
 /// out-of-scope issues as dangling edges. Unscoped exports are unaffected —
 /// repository validation keeps every dependency resolvable, so the filter
 /// passes every edge through.
-fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&'a str> {
-    all_nodes.iter().map(|issue| issue.id.as_str()).collect()
+fn exported_node_ids<'a>(all_nodes: &'a [&Issue]) -> std::collections::HashSet<&'a IssueId> {
+    all_nodes.iter().map(|issue| &issue.id).collect()
 }
 
 /// Export Issue dependency graph as DOT format for Graphviz
@@ -132,7 +133,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
     let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            if node_ids.contains(dep.as_str()) {
+            if node_ids.contains(dep) {
                 output.push_str(&format!("  \"{}\" -> \"{}\";\n", issue.id, dep));
             }
         }
@@ -170,7 +171,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     let node_ids = exported_node_ids(&all_nodes);
     for issue in &all_nodes {
         for dep in &issue.dependencies {
-            if node_ids.contains(dep.as_str()) {
+            if node_ids.contains(dep) {
                 output.push_str(&format!("  {} --> {}\n", issue.id, dep));
             }
         }
@@ -223,7 +224,7 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
         .iter()
         .map(|issue| GraphExportSummaryNode {
             id: issue.id.clone(),
-            short_id: issue.id.chars().take(8).collect(),
+            short_id: issue.id.short_id().to_string(),
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
@@ -309,8 +310,8 @@ mod tests {
 
         assert!(dot.contains("digraph issues"));
         assert!(dot.contains("rankdir=LR"));
-        assert!(dot.contains(&issue1.id));
-        assert!(dot.contains(&issue2.id));
+        assert!(dot.contains(issue1.id.as_str()));
+        assert!(dot.contains(issue2.id.as_str()));
         assert!(dot.contains("API Design"));
         assert!(dot.contains("Backend"));
         assert!(dot.contains(&format!("\"{}\" -> \"{}\"", issue2.id, issue1.id)));
@@ -329,8 +330,8 @@ mod tests {
         let mermaid = export_mermaid(&graph);
 
         assert!(mermaid.contains("graph LR"));
-        assert!(mermaid.contains(&issue1.id));
-        assert!(mermaid.contains(&issue2.id));
+        assert!(mermaid.contains(issue1.id.as_str()));
+        assert!(mermaid.contains(issue2.id.as_str()));
         assert!(mermaid.contains("Setup"));
         assert!(mermaid.contains("Deploy"));
         assert!(mermaid.contains(&format!("{} --> {}", issue2.id, issue1.id)));
@@ -493,8 +494,8 @@ mod tests {
         let full: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
         assert_eq!(summary["edges"], full["edges"]);
-        assert_eq!(summary["edges"][0]["from"], issue.id);
-        assert_eq!(summary["edges"][0]["to"], dep.id);
+        assert_eq!(summary["edges"][0]["from"], issue.id.as_str());
+        assert_eq!(summary["edges"][0]["to"], dep.id.as_str());
     }
 
     /// The `--full` node carries the four DAG-resolved hierarchy fields; the
@@ -514,7 +515,7 @@ mod tests {
 
         let full: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
-        let node_by_id = |id: &str| -> serde_json::Value {
+        let node_by_id = |id: &IssueId| -> serde_json::Value {
             full["nodes"]
                 .as_array()
                 .unwrap()
@@ -525,9 +526,9 @@ mod tests {
         };
 
         let action_node = node_by_id(&action.id);
-        assert_eq!(action_node["parent"], initiative.id);
+        assert_eq!(action_node["parent"], initiative.id.as_str());
         // The initiative is a root container, so the whole subtree clusters to it.
-        assert_eq!(action_node["cluster"], initiative.id);
+        assert_eq!(action_node["cluster"], initiative.id.as_str());
         assert_eq!(action_node["children"], serde_json::json!([]));
         assert_eq!(action_node["rank"], 0);
 
@@ -591,7 +592,7 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .find(|n| n["id"] == serde_json::Value::String(action.id.clone()))
+            .find(|n| n["id"] == serde_json::Value::String(action.id.to_string()))
             .unwrap();
         let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&action)
             .unwrap()
@@ -617,12 +618,12 @@ mod tests {
         assert_eq!(export_resolution_keys, expected);
     }
 
-    fn exported_ids(json: &str) -> std::collections::BTreeSet<String> {
+    fn exported_ids(json: &str) -> std::collections::BTreeSet<IssueId> {
         serde_json::from_str::<serde_json::Value>(json).unwrap()["nodes"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|n| n["id"].as_str().unwrap().to_string())
+            .map(|n| serde_json::from_value::<IssueId>(n["id"].clone()).unwrap())
             .collect()
     }
 
@@ -637,7 +638,10 @@ mod tests {
         let scope = vec![&task, &epic];
         let graph = DependencyGraph::new(&scope);
 
-        let expected = [&task, &epic].map(|i| i.id.clone()).into_iter().collect();
+        let expected = [&task, &epic]
+            .map(|i| i.id.as_str().parse::<IssueId>().unwrap())
+            .into_iter()
+            .collect();
         assert_eq!(exported_ids(&export_json(&graph)), expected);
     }
 
@@ -652,11 +656,11 @@ mod tests {
                 .iter()
                 .map(|_| crate::domain::fixture_issue("N".into(), String::new()))
                 .collect();
-            let ids: Vec<String> = issues.iter().map(|i| i.id.clone()).collect();
+            let ids: Vec<IssueId> = issues.iter().map(|i| i.id.as_str().parse::<IssueId>().unwrap()).collect();
             for (index, mask) in masks.iter().enumerate() {
                 issues[index].dependencies = (0..index)
                     .filter(|earlier| mask & (1 << earlier) != 0)
-                    .map(|earlier| ids[earlier].clone())
+                    .map(|earlier| ids[earlier].to_string())
                     .collect();
             }
             let selected: Vec<&Issue> = issues
@@ -665,8 +669,8 @@ mod tests {
                 .filter(|(index, _)| scope_bits & (1 << index) != 0)
                 .map(|(_, issue)| issue)
                 .collect();
-            let expected: std::collections::BTreeSet<String> =
-                selected.iter().map(|i| i.id.clone()).collect();
+            let expected: std::collections::BTreeSet<IssueId> =
+                selected.iter().map(|i| i.id.as_str().parse::<IssueId>().unwrap()).collect();
 
             let graph = DependencyGraph::new(&selected);
             let json = export_json(&graph);
