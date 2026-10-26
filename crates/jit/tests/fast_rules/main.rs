@@ -2,6 +2,8 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+use jit::test_utils::fixture_issue;
+
 mod config_loading_tests;
 mod default_rules_registry_derivation_tests;
 mod effective_rules_tests;
@@ -48,10 +50,4 @@ fn memory_executor(
         );
     }
     jit::commands::test_helpers::memory_executor(storage)
-}
-
-fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
-    let mut issue = jit::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
 }
