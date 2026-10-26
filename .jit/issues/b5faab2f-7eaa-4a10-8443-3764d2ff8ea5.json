@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fc999d79-7c92-4300-acd9-497e486ff82f",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:37:29.492979255Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "error-output tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-24T23:43:44.083142326Z"
+  "updated_at": "2026-10-26T23:37:29.492979255Z"
 }
