@@ -426,7 +426,7 @@
           "short_id": "f265e748",
           "title": "Event issue accessor returns an optional IssueId",
           "classification": "implementation",
-          "status": "awaiting_code_review"
+          "status": "done"
         }
       ]
     },
@@ -671,6 +671,16 @@
       "reason": "0af95f14/5fac48b8 chain waits on test-topology epic c780514e.",
       "status": "resolved",
       "resolution": "Invoker: parallel session just-in-time-b4 leads c780514e; it was told to prioritise the upstream closure of 0af95f14 and 5fac48b8 and to message this lead when they are terminal."
+    },
+    {
+      "issue": "8c40d01b",
+      "status": "open",
+      "reason": "Story 'Events are an envelope around a tagged body' holistic-review failed: story REQ-03 ('This repository's event log round-trips byte-identically') is unmet because the 8 retired-tag lines in .jit/events.jsonl are skipped by parse_known_events (mutation.rs:1948). The child d72bf093 REQ-03 was amended by the invoker to scope the round trip to current event types; the story criterion was not.",
+      "options": [
+        "A (recommended): amend story REQ-03 to match the amended d72bf093 REQ-03 (round trip of current event types; retired-tag lines pinned as skipped), then re-run holistic-review",
+        "B: lead rewrites .jit/events.jsonl to drop or convert the 8 retired-tag lines (history rewrite)"
+      ],
+      "gates": "cargo-ci passed; holistic-review failed (run recorded)"
     }
   ],
   "rework_counts": {
