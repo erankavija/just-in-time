@@ -7,6 +7,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: events hold id and timestamp once around a tagged body, with a typed optional issue accessor.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` holds `id` and `timestamp` once around a flattened `EventBody`, and the body-view bridge no longer exists.\n- [hard] REQ-02: The event issue accessor returns an optional typed id.\n- [hard] REQ-03: This repository's event log round-trips byte-identically.\n",
   "documents": [],
+  "first_ready_at": "2026-10-26T23:10:20.884158339Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -23,7 +24,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Events are an envelope around a tagged body",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-26T23:10:20.884158339Z"
 }
