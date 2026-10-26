@@ -60,6 +60,7 @@ use crate::declarations::rules::{
     LabelReferenceScope, Rule, RuleScope, Severity, TypeHierarchyKind,
 };
 use crate::domain::id_pattern::IdPattern;
+use crate::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
 use crate::validation::engine::Finding;
 
 /// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
@@ -140,7 +141,7 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     // would add kind semantics D10 forbids at this crediting site.
     value.split_once('/').is_some_and(|(scope, self_id)| {
         scope
-            .parse::<crate::domain::identity::IssueIdPrefix>()
+            .parse::<IssueIdPrefix>()
             .is_ok_and(|prefix| prefix.matches(scope_short_id))
             && self_id == id
     })
@@ -203,7 +204,7 @@ const CONFIG_ERROR_PREFIX: &str = "config error: ";
 pub struct GraphFinding {
     /// Full id of the issue this finding concerns, or `None` for a config-error
     /// (which pertains to the rule, not a single issue).
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// The underlying engine finding (rule name, severity, message).
     pub finding: Finding,
     /// Whether this finding represents unusable runtime context. Set only
@@ -215,9 +216,9 @@ pub struct GraphFinding {
 
 impl GraphFinding {
     /// A finding attributed to a specific issue id.
-    pub fn for_issue(issue_id: impl Into<String>, finding: Finding) -> Self {
+    pub fn for_issue(issue_id: IssueId, finding: Finding) -> Self {
         Self {
-            issue_id: Some(issue_id.into()),
+            issue_id: Some(issue_id),
             finding,
             is_config_error: false,
         }
@@ -327,7 +328,7 @@ pub fn evaluate_graph(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     // Whole-repo evaluation: the evaluation slice IS the resolution index, so a
     // `container-from-label` pointer resolves against the same set it evaluates.
@@ -362,7 +363,7 @@ pub fn evaluate_graph_scoped(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     evaluate_graph_indexed(
         rules,
@@ -428,7 +429,7 @@ pub fn graph_rule_plan_source_ids(
     rule: &Rule,
     issue: &Issue,
     resolution_index: &[Issue],
-) -> Vec<crate::domain::identity::IssueId> {
+) -> Vec<IssueId> {
     let mut source_ids = vec![issue.id.clone()];
     if let Assertion::LabelCoverage { config } = &rule.assert {
         if let Some(namespace) = &config.container_from_label {
@@ -468,7 +469,7 @@ pub struct GraphEvaluationContext<'a> {
     /// Clock supplied to recency assertions.
     pub now: DateTime<Utc>,
     /// Captured external plan content keyed by issue id.
-    pub plan_content: &'a HashMap<String, String>,
+    pub plan_content: &'a HashMap<IssueId, String>,
 }
 
 /// Evaluate one graph rule with an explicit firing set and separate context.
@@ -505,7 +506,7 @@ fn evaluate_graph_indexed(
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     let context = GraphEvaluationContext {
         graph_context: evaluation,
@@ -599,7 +600,7 @@ fn evaluate_one(
 /// is produced per colliding value, naming the value and the short-ids of all
 /// colliding issues.
 ///
-/// The evaluation is a single pass: one `HashMap<value, Vec<short_id>>` is
+/// The evaluation is a single pass: one `HashMap<value, Vec<issue id>>` is
 /// built over the matching issue slice, and groups with length >= 2 are
 /// reported. This is O(n * k) in issues and labels per issue — no N² scan.
 ///
@@ -616,30 +617,26 @@ fn evaluate_one(
 /// the value and the short-ids of all declaring issues (space-separated, in
 /// the order they appear in the issue slice). One finding per colliding value.
 fn evaluate_label_uniqueness(rule: &Rule, namespace: &str, issues: &[Issue]) -> Vec<GraphFinding> {
-    // Single pass: collect the short-ids of every matching issue that carries
-    // each value in the namespace. Using HashMap for O(1) insertion; the
-    // entries are collected into a BTreeMap at the end for deterministic order.
-    let mut value_to_ids: HashMap<String, Vec<String>> = HashMap::new();
+    // Single pass: collect the ids of every matching issue that carries each
+    // value in the namespace.
+    let mut value_to_ids: HashMap<&str, Vec<&IssueId>> = HashMap::new();
 
     for issue in issues {
         if !rule.when.matches(issue) {
             continue;
         }
         for value in values_in_namespace(issue, namespace) {
-            value_to_ids
-                .entry(value.to_string())
-                .or_default()
-                .push(issue.short_id().to_string());
+            value_to_ids.entry(value).or_default().push(&issue.id);
         }
     }
 
     // Report one finding per value owned by 2 or more issues. Sort by value
     // for deterministic output regardless of HashMap iteration order.
-    let mut collisions: Vec<(String, Vec<String>)> = value_to_ids
+    let mut collisions: Vec<(&str, Vec<&IssueId>)> = value_to_ids
         .into_iter()
         .filter(|(_, ids)| ids.len() >= 2)
         .collect();
-    collisions.sort_by(|(a, _), (b, _)| a.cmp(b));
+    collisions.sort_by_key(|(value, _)| *value);
 
     collisions
         .into_iter()
@@ -648,7 +645,10 @@ fn evaluate_label_uniqueness(rule: &Rule, namespace: &str, issues: &[Issue]) -> 
                 rule,
                 format!(
                     "label '{namespace}:{value}' is declared by multiple issues: {}",
-                    ids.join(" ")
+                    ids.iter()
+                        .map(|id| id.short_id())
+                        .collect::<Vec<_>>()
+                        .join(" ")
                 ),
             ))
         })
@@ -665,8 +665,8 @@ fn finding(rule: &Rule, message: String) -> Finding {
 }
 
 /// Build a [`GraphFinding`] attributed to `issue_id` for this rule.
-fn issue_finding(rule: &Rule, issue_id: &str, message: String) -> GraphFinding {
-    GraphFinding::for_issue(issue_id, finding(rule, message))
+fn issue_finding(rule: &Rule, issue_id: &IssueId, message: String) -> GraphFinding {
+    GraphFinding::for_issue(issue_id.clone(), finding(rule, message))
 }
 
 /// Attribute unusable runtime context to the rule rather than a single issue.
@@ -745,7 +745,7 @@ fn evaluate_label_coverage(
     graph_context: &[Issue],
     resolution_index: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     let section_slug = config.criteria_section();
     let marker = config.marker.as_deref();
@@ -906,7 +906,7 @@ fn criterion_ids(
     marker: Option<&str>,
     id_pattern: &regex::Regex,
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Result<Vec<String>, crate::document::ContentParserError> {
     let parser = content_parser_for(source.content_format, repo_default_format)?;
     // The resolved plan content for this source (external location), else its
@@ -974,7 +974,7 @@ fn children_of<'a>(
     }
 
     // Index issues by id for O(1) neighbour resolution during the walk.
-    let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+    let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
 
     // Neighbours of `node` in the link's direction.
     let neighbours = |node: &Issue| -> Vec<&'a Issue> {
@@ -986,19 +986,19 @@ fn children_of<'a>(
             ChildLink::Dependencies => node
                 .dependencies
                 .iter()
-                .filter_map(|dep| by_id.get(dep.as_str()).copied())
+                .filter_map(|dep| by_id.get(dep).copied())
                 .collect(),
             ChildLink::Any => Vec::new(), // handled above
         }
     };
 
-    let mut visited: BTreeSet<&str> = BTreeSet::new();
-    visited.insert(source.id.as_str());
+    let mut visited: BTreeSet<&IssueId> = BTreeSet::new();
+    visited.insert(&source.id);
     let mut frontier: Vec<&Issue> = neighbours(source);
     let mut candidates: Vec<&Issue> = Vec::new();
 
     while let Some(node) = frontier.pop() {
-        if !visited.insert(node.id.as_str()) {
+        if !visited.insert(&node.id) {
             continue;
         }
         // An excluded-type node is neither a candidate nor a path to descend
@@ -1082,10 +1082,10 @@ enum ContainerMatch<'a> {
 /// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
 /// a collision, never silently resolve the first match.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
-    let Ok(prefix) = crate::domain::identity::IssueIdPrefix::from_str(value) else {
+    let Ok(prefix) = IssueIdPrefix::from_str(value) else {
         return ContainerMatch::None;
     };
-    let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
+    let mut matches = issues.iter().filter(|i| prefix.matches(i.id.as_str()));
     match (matches.next(), matches.next()) {
         (Some(c), None) => ContainerMatch::Unique(c),
         (Some(_), Some(_)) => ContainerMatch::Ambiguous,
@@ -1137,10 +1137,10 @@ fn evaluate_dependency_shape(
     let transitive = config.is_transitive();
 
     // Set of issue ids matching the target selector.
-    let target_ids: BTreeSet<&str> = graph_context
+    let target_ids: BTreeSet<&IssueId> = graph_context
         .iter()
         .filter(|i| target.matches(i))
-        .map(|i| i.id.as_str())
+        .map(|i| &i.id)
         .collect();
 
     let node_refs: Vec<&Issue> = graph_context.iter().collect();
@@ -1168,15 +1168,11 @@ fn evaluate_dependency_shape(
 /// through the dependency DAG.
 fn depends_on_target(
     source: &Issue,
-    target_ids: &BTreeSet<&str>,
+    target_ids: &BTreeSet<&IssueId>,
     transitive: bool,
     graph: &DependencyGraph<'_, Issue>,
 ) -> bool {
-    if source
-        .dependencies
-        .iter()
-        .any(|d| target_ids.contains(d.as_str()))
-    {
+    if source.dependencies.iter().any(|d| target_ids.contains(d)) {
         return true;
     }
     if !transitive {
@@ -1184,9 +1180,11 @@ fn depends_on_target(
     }
     // A transitive dependency of `source` is, in this graph, an issue for which
     // `source` is a transitive dependent.
-    target_ids
-        .iter()
-        .any(|target| !graph.find_shortest_path(&source.id, target).is_empty())
+    target_ids.iter().any(|target| {
+        !graph
+            .find_shortest_path(source.id.as_str(), target.as_str())
+            .is_empty()
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1331,7 +1329,7 @@ fn evaluate_criteria_to_check(
     check_namespace: Option<&str>,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     issues
         .iter()
@@ -1498,7 +1496,7 @@ fn evaluate_criteria_label_match(
     id_pattern: &IdPattern,
     issues: &[Issue],
     repo_default_format: ContentFormat,
-    plan_content: &HashMap<crate::domain::identity::IssueId, String>,
+    plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
     // The section heading displayed in the finding is the human-readable form of
     // the slug: convert underscores back to spaces and title-case each word so
@@ -1976,7 +1974,7 @@ source-of-truth = "markdown-first"
         story.description = criteria.to_string();
         epic.dependencies = vec![story.id.clone()];
 
-        let uncovered = |label: &str| -> Vec<String> {
+        let uncovered = |label: &str| -> Vec<IssueId> {
             let mut task = typed_issue("task", 4, &[label]);
             task.state = State::Done;
             let mut story = story.clone();
@@ -2579,10 +2577,10 @@ source-of-truth = "markdown-first"
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
         a.id = "abcd1111-0000-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
         b.id = "abcd2222-0000-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown.labels.push("brackets:abcd".to_string());
@@ -2620,10 +2618,10 @@ source-of-truth = "markdown-first"
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
         a.id = "abcd1234-1111-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
         b.id = "abcd1234-2222-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
         assert_eq!(
             a.short_id(),
@@ -2875,7 +2873,7 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&id));
         assert_eq!(
             findings[0].finding.message,
             "gate 'code-review' result is 10 days old (max 7)"
@@ -3248,7 +3246,7 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "one unmapped criterion: {findings:?}");
-        assert_eq!(findings[0].issue_id.as_deref(), Some(id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&id));
         let msg = &findings[0].finding.message;
         assert!(
             msg.contains("REQ-01"),
@@ -3403,10 +3401,7 @@ source-of-truth = "markdown-first"
             1,
             "criteria-to-check is per-issue; a child mapping must not cover: {findings:?}"
         );
-        assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative_id.as_str())
-        );
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&initiative_id));
         assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
@@ -3431,7 +3426,7 @@ source-of-truth = "markdown-first"
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "orphan-leaf-fixture");
-        assert_eq!(findings[0].issue_id.as_deref(), Some(action.id.as_str()));
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&action.id));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
     }
 
@@ -3502,8 +3497,8 @@ source-of-truth = "markdown-first"
         );
         assert_eq!(findings[0].finding.severity, Severity::Error);
         assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative.id.as_str()),
+            findings[0].issue_id.as_ref(),
+            Some(&initiative.id),
             "finding must be attributed to the initiative"
         );
     }
@@ -3661,10 +3656,7 @@ source-of-truth = "markdown-first"
             1,
             "criteria-label-match is per-issue; a child must not affect it: {findings:?}"
         );
-        assert_eq!(
-            findings[0].issue_id.as_deref(),
-            Some(initiative_id.as_str())
-        );
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&initiative_id));
         assert!(findings[0].finding.message.contains("req:REQ-77"));
     }
 
@@ -3680,13 +3672,11 @@ source-of-truth = "markdown-first"
         // Two unlinked initiatives both declaring req:REQ-01 — one finding naming the
         // value and both short-ids.
         let rule = uniqueness_rule("req");
-        let mut initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
+        let initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
         let initiative_b = typed_issue("initiative-b", 2, &["req:REQ-01"]);
         // Deliberately no dependency edge between them.
         let id_a = initiative_a.short_id().to_string();
         let id_b = initiative_b.short_id().to_string();
-        // Set distinct short ids so the message is testable.
-        initiative_a.id = format!("aaa-{}", initiative_a.id);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3769,10 +3759,10 @@ source-of-truth = "markdown-first"
         let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
         initiative_a.id = "aaaa0000-0000-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
         initiative_b.id = "bbbb0000-0000-0000-0000-000000000000"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap();
 
         let rules = vec![&rule];
@@ -4056,7 +4046,10 @@ source-of-truth = "markdown-first"
             severity: Severity::Error,
             message: "criterion uncovered".into(),
         };
-        let gf = GraphFinding::for_issue("abc123", f);
+        let issue_id = "1c5da41d-e1b3-475c-818d-324f57dd716b"
+            .parse::<IssueId>()
+            .unwrap();
+        let gf = GraphFinding::for_issue(issue_id, f);
         assert!(
             !gf.is_config_error(),
             "for_issue must not be a config error"

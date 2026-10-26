@@ -13,7 +13,7 @@ use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::identity::IssueIdStaging;
+use crate::domain::identity::{IssueId, IssueIdStaging};
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
@@ -373,7 +373,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
             path.push_str(".json");
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
-            if issue.id != *id {
+            if issue.id.as_str() != id.as_str() {
                 return Err(anyhow!(
                     "issue file '{path}' contains id '{}' instead of '{id}'",
                     issue.id
@@ -427,10 +427,10 @@ fn validate_integrity(
     issues: &[Issue],
     gates: &GateRegistry,
 ) -> Result<()> {
-    let ids: HashSet<&str> = issues.iter().map(|issue| issue.id.as_str()).collect();
+    let ids: HashSet<&IssueId> = issues.iter().map(|issue| &issue.id).collect();
     for issue in issues {
         for dependency in &issue.dependencies {
-            if !ids.contains(dependency.as_str()) {
+            if !ids.contains(dependency) {
                 return Err(anyhow!(
                     "Invalid dependency: issue '{}' depends on '{}' which does not exist",
                     issue.id,
@@ -486,11 +486,11 @@ fn validate_integrity(
         }
     }
     for issue in issues {
-        let reduced = graph.compute_transitive_reduction(&issue.id);
+        let reduced = graph.compute_transitive_reduction(issue.id.as_str());
         let reduced_set: HashSet<_> = reduced.iter().map(|node| &node.id).collect();
         for dependency in &issue.dependencies {
             if !reduced_set.contains(dependency) {
-                let path = graph.find_shortest_path(&issue.id, dependency);
+                let path = graph.find_shortest_path(issue.id.as_str(), dependency.as_str());
                 let path = if path.is_empty() {
                     "unknown path".to_string()
                 } else {
@@ -661,11 +661,10 @@ fn project_plan_content(
     read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
-) -> Result<HashMap<String, String>> {
+) -> Result<HashMap<IssueId, String>> {
     let templates = &config.templates;
     let breakable: HashSet<String> = templates.breakable_types().into_iter().collect();
-    let by_id: HashMap<&crate::domain::identity::IssueId, &Issue> =
-        issues.iter().map(|issue| (&issue.id, issue)).collect();
+    let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|issue| (&issue.id, issue)).collect();
     let mut content = HashMap::new();
     for issue in issues {
         let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
@@ -919,7 +918,7 @@ mod tests {
             .unwrap()
     }
 
-    fn issue_path(id: &str) -> VirtualPath {
+    fn issue_path(id: &IssueId) -> VirtualPath {
         VirtualPath::data(format!(
             "{}/{}.json",
             VirtualPath::ISSUES.relative().as_str(),
@@ -1140,13 +1139,15 @@ mod tests {
         let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
             .unwrap()
             .all_ids
-            .remove(0);
+            .remove(0)
+            .parse::<IssueId>()
+            .unwrap();
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&repo, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.dependencies = vec!["9dbccee5-4241-57f2-ba6b-7bb89e05938a"
-            .parse::<crate::domain::identity::IssueId>()
+            .parse::<IssueId>()
             .unwrap()];
         issue.gates_required = vec!["planned".to_string()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
@@ -1216,7 +1217,7 @@ mod tests {
         let mut issue = store.list_issues().unwrap().remove(0);
         issue.dependencies.push(
             "5a1f6645-96bf-59db-932e-7f49ee5cc6bb"
-                .parse::<crate::domain::identity::IssueId>()
+                .parse::<IssueId>()
                 .unwrap(),
         );
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
@@ -1263,7 +1264,7 @@ mod tests {
             &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
-        let id = &index.all_ids[0];
+        let id = &index.all_ids[0].parse::<IssueId>().unwrap();
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
@@ -1304,7 +1305,7 @@ mod tests {
             &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
-        let id = &index.all_ids[0];
+        let id = &index.all_ids[0].parse::<IssueId>().unwrap();
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
         )
