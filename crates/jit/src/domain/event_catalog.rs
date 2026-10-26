@@ -167,7 +167,9 @@ impl EventTag {
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
     pub fn sample(self) -> Event {
-        let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
+        let issue_id: crate::domain::identity::IssueId = "00000000-0000-0000-0000-000000000001"
+            .parse()
+            .expect("sample issue id is a canonical issue id");
         let gate_key = "tests".to_string();
         let assignee: Assignee = "agent:worker-1"
             .parse()
@@ -214,7 +216,9 @@ impl EventTag {
                 issue_id,
                 2,
                 1,
-                vec!["00000000-0000-0000-0000-000000000002".to_string()],
+                vec!["00000000-0000-0000-0000-000000000002"
+                    .parse::<crate::domain::identity::IssueId>()
+                    .expect("sample dependency id is a canonical issue id")],
             ),
             EventTag::LocalRuleBypassed => {
                 EventBody::draft_local_rule_bypassed(issue_id, "type-required".to_string())
@@ -311,7 +315,7 @@ pub struct EventTagDoc {
     pub scope: EventScope,
     /// Whether records with this tag carry an `issue_id` field. True exactly for
     /// [`EventScope::Issue`] tags; tests hold this against the serialized record
-    /// and against [`EventBody::get_issue_id`].
+    /// and against [`EventBody::issue_id`].
     pub carries_issue_id: bool,
     /// What appends a record with this tag.
     pub description: String,
@@ -550,18 +554,18 @@ mod tests {
         }
     }
 
-    /// REQ-01/REQ-03: the `issue_id` column agrees with `Event::get_issue_id`,
+    /// REQ-01/REQ-03: the `issue_id` column agrees with `Event::issue_id`,
     /// the production accessor every consumer (the `--issue-id` filter, the
     /// lifecycle-timestamp derivation) reads an event's issue through: it returns
-    /// an empty id exactly for the records that carry no `issue_id` field.
+    /// `None` exactly for the records that carry no `issue_id` field.
     #[test]
-    fn test_carries_issue_id_matches_get_issue_id_accessor() {
+    fn test_carries_issue_id_matches_issue_id_accessor() {
         for row in event_catalog() {
             let event = row.tag.sample();
             assert_eq!(
                 row.carries_issue_id,
-                !event.get_issue_id().is_empty(),
-                "`{}`: catalog and Event::get_issue_id disagree",
+                event.issue_id().is_some(),
+                "`{}`: catalog and Event::issue_id disagree",
                 row.tag.as_str(),
             );
         }

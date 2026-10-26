@@ -285,7 +285,10 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
 
     let events = bypass_events(&executor);
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].get_issue_id(), id);
+    assert_eq!(
+        events[0].issue_id().map(|id| id.as_str()),
+        Some(id.as_str())
+    );
 }
 
 #[test]

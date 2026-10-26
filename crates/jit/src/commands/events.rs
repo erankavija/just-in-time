@@ -30,7 +30,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }
                 if let Some(ref issue) = issue {
-                    if !issue.matches(e.get_issue_id()) {
+                    if !e.issue_id().is_some_and(|id| issue.matches(id.as_str())) {
                         return false;
                     }
                 }
