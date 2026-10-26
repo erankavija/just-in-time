@@ -813,4 +813,215 @@ mod tests {
             std::collections::HashSet::from(["C0000000".to_string()])
         );
     }
+
+    fn ids_of(issues: &[Issue]) -> Vec<&str> {
+        issues.iter().map(|i| i.id.as_str()).collect()
+    }
+
+    fn state_issue(index: usize, state: State) -> Issue {
+        let mut issue = labeled_issue(&format!("Issue {index}"), &[]);
+        issue.id = index.to_string();
+        issue.state = state;
+        issue
+    }
+
+    #[test]
+    fn test_queries_over_no_issues_return_empty() {
+        let patterns = ["epic:auth".to_string()];
+        assert!(query_ready(&[]).is_empty());
+        assert!(query_blocked(&[]).is_empty());
+        assert!(query_closed(&[]).is_empty());
+        assert!(query_by_state(&[], State::Ready).is_empty());
+        assert!(query_by_priority(&[], Priority::High).is_empty());
+        assert!(query_by_assignee(&[], "agent:a").is_empty());
+        assert!(query_by_label(&[], "epic:auth").is_empty());
+        assert!(query_by_labels(&[], &patterns).is_empty());
+        assert!(query_strategic(&[], &["epic".to_string()]).is_empty());
+        assert!(query_available(&[], AvailableFilter::default()).is_empty());
+    }
+
+    #[test]
+    fn test_query_ready_requires_ready_state_unassigned_and_met_dependencies() {
+        let mut done_dep = state_issue(100, State::Done);
+        done_dep.id = "done-dep".into();
+        let mut open_dep = state_issue(101, State::InProgress);
+        open_dep.id = "open-dep".into();
+        let mut issues: Vec<Issue> = State::ALL
+            .into_iter()
+            .enumerate()
+            .map(|(index, state)| state_issue(index, state))
+            .collect();
+        let mut assigned = state_issue(50, State::Ready);
+        assigned.assignee = Some("agent:a".parse().unwrap());
+        let mut after_done = state_issue(51, State::Ready);
+        after_done.dependencies = vec!["done-dep".into()];
+        let mut after_open = state_issue(52, State::Ready);
+        after_open.dependencies = vec!["open-dep".into()];
+        issues.extend([done_dep, open_dep, assigned, after_done, after_open]);
+
+        let ready_ids = ids_of(&query_ready(&issues))
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+
+        let ready_state_index = State::ALL
+            .into_iter()
+            .position(|state| state == State::Ready)
+            .unwrap()
+            .to_string();
+        assert_eq!(ready_ids, [ready_state_index, "51".to_string()]);
+    }
+
+    proptest! {
+        #[test]
+        fn test_query_by_state_selects_exactly_issues_in_that_state(
+            indexes in proptest::collection::vec(0..State::ALL.len(), 0..30),
+        ) {
+            let issues: Vec<_> = indexes.iter().enumerate()
+                .map(|(i, &s)| state_issue(i, State::ALL[s])).collect();
+            let total: usize = State::ALL.into_iter().map(|state| {
+                let selected = query_by_state(&issues, state);
+                prop_assert!(selected.iter().all(|i| i.state == state));
+                Ok(selected.len())
+            }).collect::<Result<Vec<_>, TestCaseError>>()?.into_iter().sum();
+            prop_assert_eq!(total, issues.len());
+        }
+
+        #[test]
+        fn test_query_by_priority_selects_exactly_issues_at_that_priority(
+            indexes in proptest::collection::vec(0..Priority::ALL.len(), 0..30),
+        ) {
+            let issues: Vec<_> = indexes.iter().enumerate().map(|(i, &p)| {
+                let mut issue = state_issue(i, State::Backlog);
+                issue.priority = Priority::ALL[p];
+                issue
+            }).collect();
+            let total: usize = Priority::ALL.into_iter().map(|priority| {
+                let selected = query_by_priority(&issues, priority);
+                prop_assert!(selected.iter().all(|i| i.priority == priority));
+                Ok(selected.len())
+            }).collect::<Result<Vec<_>, TestCaseError>>()?.into_iter().sum();
+            prop_assert_eq!(total, issues.len());
+        }
+    }
+
+    #[test]
+    fn test_query_by_assignee_matches_exact_assignee_only() {
+        let assigned = |index: usize, assignee: Option<&str>| {
+            let mut issue = state_issue(index, State::Ready);
+            issue.assignee = assignee.map(|a| a.parse().unwrap());
+            issue
+        };
+        let issues = vec![
+            assigned(0, Some("agent:a")),
+            assigned(1, Some("agent:b")),
+            assigned(2, Some("agent:a")),
+            assigned(3, None),
+        ];
+
+        assert_eq!(ids_of(&query_by_assignee(&issues, "agent:a")), ["0", "2"]);
+        assert_eq!(ids_of(&query_by_assignee(&issues, "agent:b")), ["1"]);
+        assert!(query_by_assignee(&issues, "agent:c").is_empty());
+        assert!(query_by_assignee(&issues, "agent").is_empty());
+    }
+
+    #[test]
+    fn test_query_closed_selects_effectively_terminal_issues() {
+        let archived = |index: usize, from: Option<State>| {
+            let mut issue = state_issue(index, State::Archived);
+            issue.archived_from = from;
+            issue
+        };
+        let issues = vec![
+            state_issue(0, State::Done),
+            state_issue(1, State::Rejected),
+            state_issue(2, State::Backlog),
+            state_issue(3, State::InProgress),
+            archived(4, Some(State::Done)),
+            archived(5, Some(State::Backlog)),
+            archived(6, None),
+        ];
+
+        assert_eq!(ids_of(&query_closed(&issues)), ["0", "1", "4"]);
+    }
+
+    #[test]
+    fn test_query_by_label_matches_whole_label_exactly() {
+        let issues = vec![
+            labeled_issue("Mixed", &["component:AuthService", "epic:auth"]),
+            labeled_issue("Rule", &["enforces:@/rule/label-format"]),
+            labeled_issue("Other rule", &["enforces:@/rule/other-rule"]),
+        ];
+        let titles = |pattern: &str| {
+            query_by_label(&issues, pattern)
+                .into_iter()
+                .map(|i| i.title)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(titles("component:AuthService"), ["Mixed"]);
+        assert!(titles("component:authservice").is_empty());
+        assert!(titles("component:Auth").is_empty());
+        assert_eq!(titles("epic:auth"), ["Mixed"]);
+        assert_eq!(titles("enforces:@/rule/label-format"), ["Rule"]);
+        assert!(titles("enforces:@/rule").is_empty());
+    }
+
+    #[test]
+    fn test_query_by_label_namespace_wildcard_matches_any_value_in_that_namespace() {
+        let issues = vec![
+            labeled_issue("A", &["epic:auth"]),
+            labeled_issue("B", &["epic:billing", "component:api"]),
+            labeled_issue("C", &["component:api"]),
+            labeled_issue("D", &["epicx:auth"]),
+            labeled_issue("E", &[]),
+        ];
+        let titles = |pattern: &str| {
+            query_by_label(&issues, pattern)
+                .into_iter()
+                .map(|i| i.title)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(titles("epic:*"), ["A", "B"]);
+        assert_eq!(titles("component:*"), ["B", "C"]);
+        assert!(titles("milestone:*").is_empty());
+    }
+
+    #[test]
+    fn test_query_strategic_selects_issues_of_any_declared_strategic_type() {
+        let issues = vec![
+            labeled_issue("Milestone", &["type:milestone"]),
+            labeled_issue("Epic", &["type:epic", "epic:auth"]),
+            labeled_issue("Task", &["type:task"]),
+            labeled_issue("Untyped", &[]),
+        ];
+        let titles = |strategic: &[&str]| {
+            let types: Vec<String> = strategic.iter().map(|t| t.to_string()).collect();
+            query_strategic(&issues, &types)
+                .into_iter()
+                .map(|i| i.title)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(titles(&["milestone", "epic"]), ["Milestone", "Epic"]);
+        assert_eq!(titles(&["epic"]), ["Epic"]);
+        assert!(titles(&[]).is_empty());
+        assert!(titles(&["story"]).is_empty());
+    }
+
+    #[test]
+    fn test_query_strategic_ignores_membership_label_without_strategic_type() {
+        let issues = vec![
+            labeled_issue("Member", &["epic:auth", "type:task"]),
+            labeled_issue("Container", &["type:epic"]),
+        ];
+
+        let result = query_strategic(&issues, &["epic".to_string()]);
+
+        assert_eq!(
+            result.iter().map(|i| i.title.as_str()).collect::<Vec<_>>(),
+            ["Container"]
+        );
+    }
 }
