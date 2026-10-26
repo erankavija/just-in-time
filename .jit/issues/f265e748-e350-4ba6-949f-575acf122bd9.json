@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "97a8d12c-8bba-4a2b-a638-bb953b336a56",
+      "run_id": "97ec9022-5a7f-4d5f-abcb-2935d348dec5",
       "status": "failed",
-      "updated_at": "2026-10-25T23:15:03.934620260Z",
+      "updated_at": "2026-10-26T21:56:20.908956554Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Event issue accessor returns an optional IssueId",
-  "updated_at": "2026-10-25T23:15:03.934620260Z"
+  "updated_at": "2026-10-26T21:56:20.908956554Z"
 }
