@@ -2075,5 +2075,17 @@
     "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
     "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
   },
-  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies."
+  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies.",
+  "coordination": [
+    {
+      "session": 3,
+      "peer": "just-in-time-f4 (2195c98f lead)",
+      "hold": {
+        "19136324": "until 8acca4f4 merges (output.rs, visualization.rs)",
+        "53f78490": "until 8acca4f4 merges (output.rs)",
+        "7995aa5c": "until 1c5da41d merges (validation/)"
+      },
+      "then": "dispatch 7995aa5c and 19136324 first: upstream of 0af95f14"
+    }
+  ]
 }
