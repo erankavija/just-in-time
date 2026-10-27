@@ -19,6 +19,13 @@
       "format": "markdown",
       "label": "Session 2 handoff",
       "path": "dev/active/2195c98f-semantic-types/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "handoff",
+      "format": "markdown",
+      "label": "Session 3 handoff",
+      "path": "dev/active/2195c98f-semantic-types/handoff-2.md"
     }
   ],
   "first_ready_at": "2026-10-20T20:12:36.610884572Z",
@@ -41,5 +48,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-26T21:52:41.182841069Z"
+  "updated_at": "2026-10-27T01:03:09.785063348Z"
 }

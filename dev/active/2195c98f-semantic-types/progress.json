@@ -730,14 +730,15 @@
     "8acca4f4": 2
   },
   "external_blockers": {
-    "c780514e test-topology (paused)": [
-      "0af95f14",
+    "c780514e test-topology (led by session just-in-time-b4)": [
+      "0af95f14 (upstream ends c780514e wave 5)",
+      "5fac48b8 (upstream ends wave 6)",
       "13190465",
       "19d9bd7d",
-      "5fac48b8",
       "b45a2865",
       "b73b3e5a",
-      "c797b59b -> 7abcc22d"
+      "c797b59b -> 7abcc22d",
+      "641bd14e"
     ]
   },
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1380,9 +1381,13 @@
     "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
     "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
     "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
-    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
+    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership.",
+    "An alias-flip cargo check stops at lib errors and never type-checks cfg(test); grep the changed API's call sites and comparisons in all test modules too (f265e748, 3 review rounds).",
+    "Unresolved request text is not an IssueId; error/DTO carriers of it stay strings (8acca4f4).",
+    "Codex re-adds #[allow(...)] even when a rework item forbids it; grep the diff for #[allow before review.",
+    "Write story-review gap tasks as class sweeps over the whole crate, not single sites (83d04069 needed 3 rounds)."
   ],
-  "session_note": "Session 3 in progress.",
+  "session_note": "Session 3 handoff written as handoff-2.md; see it for next actions.",
   "decisions": [
     {
       "issue": "8acca4f4",
