@@ -166,18 +166,8 @@ mod tests {
         fs::write(full, content).unwrap();
     }
 
-    /// Strict-enforcement repository on a `feature` branch diverged from `main`,
-    /// with the shipped hook installed.
-    fn diverged_strict_repo() -> TempDir {
-        let temp = TempDir::new().unwrap();
-        let repo = temp.path();
+    fn seed_diverged_history(repo: &Path) {
         crate::test_cli::init_git_repository(repo).unwrap();
-        write(
-            repo,
-            ".jit/config.toml",
-            "[worktree]\nenforce_leases = \"strict\"\n",
-        );
-        write(repo, ".jit/gates.toml", "");
         git(repo, &["add", "-A"]);
         git(repo, &["commit", "-q", "-m", "base"]);
         git(repo, &["checkout", "-q", "-b", "feature"]);
@@ -187,7 +177,6 @@ mod tests {
         git(repo, &["commit", "-q", "-m", "main advances"]);
         git(repo, &["checkout", "-q", "feature"]);
         install_hooks(&repo.join(".git")).unwrap();
-        temp
     }
 
     fn commit_succeeds(repo: &Path, path: &str, content: &str) -> bool {
@@ -208,7 +197,8 @@ mod tests {
     #[test]
     fn test_pre_commit_hook_blocks_global_files_on_diverged_branch() {
         for path in [".jit/gates.toml", ".jit/config.toml"] {
-            let temp = diverged_strict_repo();
+            let (temp, _) = crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
+            seed_diverged_history(temp.path());
             assert!(
                 !commit_succeeds(temp.path(), path, &format!("{STRICT_CONFIG}# edit\n")),
                 "{path} commit must be blocked on a diverged branch"
@@ -219,17 +209,21 @@ mod tests {
     #[test]
     fn test_pre_commit_hook_blocks_issue_file_without_lease_in_strict_mode() {
         let issue = format!(".jit/issues/{ISSUE_ID}.json");
-        let no_index = diverged_strict_repo();
+        let (no_index, _) = crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
+        seed_diverged_history(no_index.path());
         assert!(!commit_succeeds(no_index.path(), &issue, "{}"));
 
-        let other_holder = diverged_strict_repo();
+        let (other_holder, _) =
+            crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
+        seed_diverged_history(other_holder.path());
         grant_lease(other_holder.path(), "agent:other");
         assert!(!commit_succeeds(other_holder.path(), &issue, "{}"));
     }
 
     #[test]
     fn test_pre_commit_hook_allows_issue_file_with_lease_held_by_committer() {
-        let temp = diverged_strict_repo();
+        let (temp, _) = crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
+        seed_diverged_history(temp.path());
         grant_lease(temp.path(), AGENT);
         assert!(commit_succeeds(
             temp.path(),
