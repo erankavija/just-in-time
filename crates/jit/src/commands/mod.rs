@@ -3703,16 +3703,11 @@ mod tests {
         );
     }
 
-    fn precheck_evidence_fixture() -> (
-        crate::storage::InMemoryStorage,
-        CommandExecutor<crate::storage::InMemoryStorage>,
-        IssueId,
-    ) {
+    /// Seed a ready issue with one automated and one passed manual precheck gate.
+    fn seed_precheck_evidence(storage: &crate::storage::InMemoryStorage) -> IssueId {
         use crate::declarations::{GateChecker, GateDefinition, GateRegistry, GateStage};
         use std::collections::HashMap;
 
-        let storage = crate::storage::InMemoryStorage::new();
-        storage.add_data_file("config.toml", "");
         storage.add_worktree_file("start-prompt.md", "captured prompt");
         let mut registry = GateRegistry::default();
         registry.gates.insert(
@@ -3753,7 +3748,7 @@ mod tests {
                 inputs: None,
             },
         );
-        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
+        crate::commands::test_helpers::seed_gate_registry(storage, &registry);
         let mut issue = crate::test_utils::fixture_issue("checked".to_string(), String::new());
         issue.state = State::Ready;
         issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
@@ -3767,10 +3762,8 @@ mod tests {
             },
         );
         let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-        let executor =
-            CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
-        (storage, executor, issue_id)
+        crate::commands::test_helpers::seed_issue(storage, issue);
+        issue_id
     }
 
     fn capture_precheck_plan(
@@ -4453,7 +4446,9 @@ enforce_leases = "strict"
     #[test]
     fn test_precheck_evidence_detects_manual_status_mutation() {
         use crate::storage::IssueStore;
-        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let storage = crate::storage::InMemoryStorage::new();
+        let issue_id = seed_precheck_evidence(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
 
         let mut issue = storage.load_issue(&issue_id).unwrap();
@@ -4465,7 +4460,9 @@ enforce_leases = "strict"
 
     #[test]
     fn test_precheck_evidence_detects_run_history_mutation() {
-        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let storage = crate::storage::InMemoryStorage::new();
+        let issue_id = seed_precheck_evidence(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
         let run = prior_precheck_run(&issue_id);
         storage.add_data_file(
@@ -4478,7 +4475,9 @@ enforce_leases = "strict"
 
     #[test]
     fn test_precheck_evidence_detects_prompt_mutation_and_preserves_captured_bytes() {
-        let (storage, executor, issue_id) = precheck_evidence_fixture();
+        let storage = crate::storage::InMemoryStorage::new();
+        let issue_id = seed_precheck_evidence(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id);
         assert_eq!(before.prompts["auto-start"], "captured prompt");
 
