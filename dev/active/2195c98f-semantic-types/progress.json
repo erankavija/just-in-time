@@ -633,14 +633,21 @@
       "short_id": "f8021e35",
       "title": "The server watcher recognises .jit files through VirtualPath",
       "reason": "Story 5dd29767 holistic-review F1: watcher.rs raw-matches well-known .jit names (story REQ-01).",
-      "status": "in_progress"
+      "status": "done"
     },
     {
       "id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
       "short_id": "e1940fcf",
       "title": "The validation schema test derives priority tokens from the vocabulary",
       "reason": "Story 83d04069 holistic-review F1: engine.rs test hardcodes Priority tokens (story REQ-02).",
-      "status": "in_progress"
+      "status": "done"
+    },
+    {
+      "id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
+      "short_id": "10ae7776",
+      "title": "Declared vocabularies are never restated as token lists or Debug names",
+      "reason": "Story 83d04069 holistic-review round 2: State token list in rules.rs test; Debug-rendered vocabularies in output.rs. Written as a class sweep to end per-instance rounds. Depends on 8acca4f4 (output.rs overlap).",
+      "status": "pending"
     }
   ],
   "escalations": [
@@ -706,7 +713,7 @@
     "91081bd3": 2,
     "d72bf093": 1,
     "f265e748": 2,
-    "8acca4f4": 1
+    "8acca4f4": 2
   },
   "external_blockers": {
     "c780514e test-topology (paused)": [
@@ -1301,6 +1308,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One test derives tokens from Priority::ALL; alternation slot Codex."
+    },
+    {
+      "issue": "8acca4f4",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Code-review rework 2 (final): typed batch target for gate evaluate-many; no stringified IssueIds into identity fields."
     }
   ],
   "surfaced_pitfalls": [
@@ -1360,5 +1374,8 @@
       "issue": "8acca4f4",
       "decision": "Error/DTO carriers of unresolved CLI request text (DependencyBatchRejectedError.rejected, JsonError::issue_not_found) hold request text as &str/String, not IssueId; request text is a parsing-boundary value, not an issue id."
     }
+  ],
+  "stories_done": [
+    "5dd29767"
   ]
 }
