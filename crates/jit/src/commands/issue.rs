@@ -864,23 +864,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
+    /// Apply the promotions [`issues_becoming_ready`](crate::domain::queries::issues_becoming_ready) decides.
     pub(super) fn check_auto_transitions(&self) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let issues = self.storage.list_issues()?;
-        let resolved = crate::domain::queries::build_issue_map(&issues);
-        let backlog_issues: Vec<_> = issues
+        crate::domain::queries::issues_becoming_ready(&issues)
             .iter()
-            .filter(|issue| issue.should_auto_transition_to_ready(&resolved))
-            .map(|i| i.id.clone())
-            .collect();
-
-        for issue_id in backlog_issues {
-            self.auto_transition_to_ready(&issue_id)?;
-        }
-
-        Ok(())
+            .try_for_each(|issue_id| self.auto_transition_to_ready(issue_id).map(|_| ()))
     }
 }
 
