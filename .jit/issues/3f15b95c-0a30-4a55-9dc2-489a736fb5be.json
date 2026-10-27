@@ -18,9 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2ab7bbb5-02e3-4aed-af30-840637f636c5",
+      "run_id": "928b238f-a04f-43d2-a89a-30be76ee9334",
       "status": "passed",
-      "updated_at": "2026-10-27T22:34:04.165177709Z",
+      "updated_at": "2026-10-27T22:43:17.313935883Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "37c2f3d8-cd02-480e-8306-014041316b2e",
+      "status": "failed",
+      "updated_at": "2026-10-27T22:47:25.013086326Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Query CLI tests assert one wiring case per subcommand and flag",
-  "updated_at": "2026-10-27T22:34:04.165177709Z"
+  "updated_at": "2026-10-27T22:47:25.013086326Z"
 }

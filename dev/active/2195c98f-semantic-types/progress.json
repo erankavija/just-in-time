@@ -730,7 +730,8 @@
   "d72bf093": 1,
   "f265e748": 2,
   "8acca4f4": 2,
-  "10ae7776": 1
+  "10ae7776": 1,
+  "55043636": 1
  },
  "external_blockers": {
   "c780514e test-topology (led by session just-in-time-4f)": [
@@ -1353,6 +1354,12 @@
    "model": "gpt-6-luna",
    "effort": "xhigh",
    "reason": "c780514e task taken over with user approval to shorten 0af95f14 path; narrow removal task"
+  },
+  {
+   "issue": "55043636",
+   "vendor": "claude",
+   "model": "opus",
+   "reason": "c780514e env-guard sweep (concurrency-critical); rework 1 after code-review F1 whole-env read"
   }
  ],
  "surfaced_pitfalls": [

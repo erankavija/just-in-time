@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a29e64c1dfaa5afa1fcff72127373f695ec3bd88",
+  "completed_at": "2026-10-27T22:43:05.898980623Z",
+  "duration_ms": 88778,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared memory seeding adoption meets all issue success criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "155d8c3c-6777-4f60-b26a-1f4c4e10ef7d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3d1c812f-5fc5-4bb6-90ed-64c8d694a975",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:41:37.120156006Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: dbbf60024; aad88f272 (merge; relevant changes are batch_create.rs, bulk_update.rs, events.rs)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 and REQ-06 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T22:40:03Z); code-review pending\nTruncation recovery: re-read resolved items individually; partitioned batch_create patch; inspected focused current helper and fixture ranges\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared memory seeding adoption meets all issue success criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
