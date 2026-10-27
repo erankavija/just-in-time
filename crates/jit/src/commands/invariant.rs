@@ -60,7 +60,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::commands::test_helpers::{
         memory_executor_declaring, seed_gate_registry, MemoryDeclarations,
     };
@@ -90,17 +89,6 @@ mod tests {
         seed_gate_registry(storage, &registry);
     }
 
-    /// Write the authored invariants after construction: initialization
-    /// rejects a registry whose bindings dangle, which these scenarios need.
-    fn write_invariants(executor: &CommandExecutor<InMemoryStorage>, invariants_toml: &str) {
-        let path = executor
-            .require_layout()
-            .unwrap()
-            .resolve(&crate::repository_state::VirtualPath::INVARIANTS)
-            .unwrap();
-        std::fs::write(path, invariants_toml).unwrap();
-    }
-
     #[test]
     fn test_check_reports_declared_but_unenforced() {
         // sample-invariant binds to a rule/gate that does not exist -> the sole drift.
@@ -115,10 +103,11 @@ mod tests {
             storage,
             MemoryDeclarations {
                 rules: Some(rules),
+                invariants: Some(inv),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(result.has_drift());
         assert_eq!(result.items.len(), 1, "{:?}", result.items);
@@ -142,10 +131,11 @@ mod tests {
             storage,
             MemoryDeclarations {
                 rules: Some(rules),
+                invariants: Some(inv),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
@@ -165,10 +155,11 @@ mod tests {
             storage,
             MemoryDeclarations {
                 rules: Some(rules),
+                invariants: Some(inv),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
@@ -188,10 +179,11 @@ mod tests {
             storage,
             MemoryDeclarations {
                 rules: Some(rules),
+                invariants: Some(inv),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         let json = serde_json::to_value(&result).unwrap();
         let findings = json["findings"].as_array().unwrap();
