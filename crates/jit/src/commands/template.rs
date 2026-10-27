@@ -1453,13 +1453,13 @@ mod tests {
     /// stale prose and the breakdown node that brackets the container and
     /// depends on it, with their ids.
     fn applied_bracket(container: &Issue) -> (Vec<Issue>, IssueId, IssueId) {
-        let mut planning = crate::domain::fixture_issue(
+        let mut planning = crate::test_utils::fixture_issue(
             "planning: Auth epic".to_string(),
             "prose from an earlier declaration".to_string(),
         );
         planning.labels = vec!["type:planning".to_string()];
         let mut breakdown =
-            crate::domain::fixture_issue("breakdown: Auth epic".to_string(), String::new());
+            crate::test_utils::fixture_issue("breakdown: Auth epic".to_string(), String::new());
         breakdown.labels = vec![
             "type:breakdown".to_string(),
             format!("brackets:{}", container.short_id()),
@@ -1632,7 +1632,7 @@ mod tests {
 
     #[test]
     fn test_type_label_value_extracts_type() {
-        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
         assert_eq!(label_utils::type_label_value(&issue.labels), Some("epic"));
     }
@@ -1648,7 +1648,8 @@ mod tests {
             .expect("shared template declares a breakdown node");
         breakdown_node.labels = vec!["custom-anchor:{container.short_id}".to_string()];
 
-        let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
+        let mut breakdown =
+            crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
         breakdown.labels = vec![
             "type:breakdown".to_string(),
             format!("custom-anchor:{}", container.short_id()),

@@ -2528,14 +2528,16 @@ depends_on = ["planning"]
                 .unwrap();
         let template = registry.get("custom-plan").unwrap();
 
-        let mut container = crate::domain::fixture_issue("container".to_string(), String::new());
+        let mut container =
+            crate::test_utils::fixture_issue("container".to_string(), String::new());
         container.id = fixture_id("69cf16b3-cd81-56d8-b74a-832a97365c98");
 
-        let mut planning = crate::domain::fixture_issue("planning".to_string(), String::new());
+        let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
         planning.id = fixture_id("d8936a00-b4cb-51e2-ab13-a1422f784c62");
         planning.labels = vec!["type:planning".to_string()];
 
-        let mut breakdown = crate::domain::fixture_issue("breakdown".to_string(), String::new());
+        let mut breakdown =
+            crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
         breakdown.id = fixture_id("e8f20edc-3573-5a7e-98c3-97b9ba5646af");
         breakdown.labels = vec![
             "type:breakdown".to_string(),
@@ -2988,7 +2990,7 @@ source-of-truth = \"registry-first\"
     }
 
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::fixture_issue(title.to_string(), body.to_string());
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }
@@ -3299,7 +3301,7 @@ priority = 100
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let issue = crate::domain::fixture_issue("Doc".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Doc".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
@@ -3346,8 +3348,8 @@ priority = 100
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let target = crate::domain::fixture_issue("Target".to_string(), String::new());
-        let other = crate::domain::fixture_issue("Other".to_string(), String::new());
+        let target = crate::test_utils::fixture_issue("Target".to_string(), String::new());
+        let other = crate::test_utils::fixture_issue("Other".to_string(), String::new());
         let (target_id, other_id) = (target.id.clone(), other.id.clone());
         seed_issue(executor.storage(), target);
         seed_issue(executor.storage(), other);
@@ -3419,7 +3421,7 @@ priority = 100
 
         let executor = setup();
         let mut issues = ["Target", "Other"]
-            .map(|title| crate::domain::fixture_issue(title.to_string(), String::new()));
+            .map(|title| crate::test_utils::fixture_issue(title.to_string(), String::new()));
         issues[0].state = crate::domain::State::Ready;
         let target_id = issues[0].id.clone();
         issues
