@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "d4688768-2d63-4512-b781-8713ab732751",
-      "status": "failed",
-      "updated_at": "2026-10-27T20:01:53.719463667Z",
+      "run_id": "e13dc4eb-a214-44c0-b96f-b65073a8e9f0",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:06:48.306128223Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Errors and output carry typed issue ids",
-  "updated_at": "2026-10-27T20:01:53.719463667Z"
+  "updated_at": "2026-10-27T20:06:48.306128223Z"
 }
