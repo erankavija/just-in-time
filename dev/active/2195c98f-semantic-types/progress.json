@@ -1440,5 +1440,8 @@
   "83d04069",
   "8c40d01b",
   "9537f74b"
+ ],
+ "session_rules": [
+  "Session 4 (invoker): do not stop to ask questions; record any escalation as blocked for the next session; write the handoff when all remaining work waits on invoker input; check workers every 30 min."
  ]
 }
