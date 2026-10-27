@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ace1694e2ff0db5285629a37ff9895c0fefc286a",
+  "completed_at": "2026-10-27T00:14:57.724174538Z",
+  "duration_ms": 253010,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared fixture replaces the local fast_issue copy without changing its behavior or test assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2f95b4f6-9e73-4ad3-bed0-79e63b14101a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b8e6f8a8-eff9-482a-aebd-8008b4cee222",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:10:44.713310544Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 53283d7fa, a0b4733ee\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-06 (issue description); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-10-27T00:10:05Z)\nTruncation recovery: Narrowed the truncated repository-wide fixture search to fast_issue and its shared helper; other-suite matches were outside this issue’s impact cone.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared fixture replaces the local fast_issue copy without changing its behavior or test assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
