@@ -139,30 +139,13 @@ fn acquire_selected_linked_lease(
 
 #[test]
 fn test_issue_release() {
-    let temp = setup_repo();
-    let id = create_issue(temp.path(), "Task");
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "claim", &id, "agent:worker-1"])
-        .assert()
-        .success();
+    let cli = jit::test_cli::JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Task"]).unwrap();
+    cli.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
 
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "release", &id, "timeout"])
-        .assert()
-        .success();
+    cli.run(["issue", "release", &id, "timeout"]).unwrap();
 
-    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .args(["issue", "show", &id, "--json"])
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let json: Value = serde_json::from_slice(&output).unwrap();
-    assert!(json["assignee"].is_null());
+    assert!(cli.run_json(["issue", "show", &id]).unwrap()["assignee"].is_null());
 }
 
 #[test]
