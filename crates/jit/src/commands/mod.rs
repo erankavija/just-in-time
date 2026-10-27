@@ -4480,13 +4480,7 @@ enforce_leases = "strict"
 
         let repo = tempfile::TempDir::new().unwrap();
         std::fs::create_dir(repo.path().join(".jit")).unwrap();
-        assert!(std::process::Command::new("git")
-            .arg("init")
-            .arg("-q")
-            .arg(repo.path())
-            .status()
-            .unwrap()
-            .success());
+        crate::test_cli::init_git_repository(repo.path()).unwrap();
         let paths = WorktreePaths::detect_from(repo.path()).unwrap();
         let coordinator = ClaimCoordinator::new(
             paths.clone(),

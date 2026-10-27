@@ -693,38 +693,20 @@ mod tests {
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use chrono::Utc;
-        use std::process::Command as StdCommand;
         use std::sync::Arc;
         use std::time::Duration as StdDuration;
 
-        fn git(dir: &std::path::Path, args: &[&str]) {
-            let status = StdCommand::new("git")
-                .current_dir(dir)
-                .args(args)
-                .status()
-                .unwrap();
-            assert!(status.success(), "git {:?} failed", args);
-        }
-
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let root = temp_dir.path();
+        let cli = crate::test_cli::JitCli::with_repository(tempfile::TempDir::new().unwrap());
+        let root = cli.root();
 
         // Minimal real git repo so `git worktree list` reports the main worktree.
-        git(root, &["init"]);
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test User"]);
         std::fs::write(root.join("README.md"), "# test\n").unwrap();
-        git(root, &["add", "."]);
-        git(root, &["commit", "-m", "init"]);
+        cli.init_git().unwrap().commit("init").unwrap();
 
         // Resolve the actual branch so lease worktree_ids match what the command
         // computes (no local .jit -> worktree_id is `wt:<branch>`).
-        let branch_out = StdCommand::new("git")
-            .current_dir(root)
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .output()
-            .unwrap();
-        let branch = String::from_utf8(branch_out.stdout)
+        let branch = cli
+            .git(["rev-parse", "--abbrev-ref", "HEAD"])
             .unwrap()
             .trim()
             .to_string();
