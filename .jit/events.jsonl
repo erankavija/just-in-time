@@ -20809,3 +20809,4 @@
 {"assignee":"agent:jit-execution-lead","id":"bd3e7c96-ea6e-4c4b-8a28-d4118d9ec7e8","issue_id":"b7078f0d-4725-4fd8-926c-50436c39880c","timestamp":"2026-10-27T20:56:20.637085887Z","type":"issue_claimed"}
 {"from":"ready","id":"cb83f63b-6943-45d2-ae8f-93f31063b756","issue_id":"d49d53db-98e5-4ce3-b3f9-e54ac64c3560","timestamp":"2026-10-27T20:56:21.201575162Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"6d44b64d-9865-4081-9a47-f30a159fff58","issue_id":"d49d53db-98e5-4ce3-b3f9-e54ac64c3560","timestamp":"2026-10-27T20:56:21.201575162Z","type":"issue_claimed"}
+{"id":"2dbd60f2-dde8-4853-bc6c-254af1b86e10","issue_id":"55e3d3fd-4fe9-4c16-a2f4-e463b9994f41","priority":"normal","timestamp":"2026-10-27T20:59:57.083162691Z","title":"Mutation and repair captures read only the documents their passes consume","type":"issue_created"}
