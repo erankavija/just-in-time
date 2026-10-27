@@ -1,11 +1,9 @@
 //! Read-only, byte-exact repository validation.
 //!
-//! Whole-repository validation ([`validate_repository`]) reads exclusively from a
-//! closed [`RepositoryImage`](crate::repository_state::RepositoryImage): a live
-//! capture validates the working tree and an overlay image validates a proposed
-//! final state, with no live filesystem or Git I/O in any pass. Every pass reads
-//! image-projected bytes through one byte-read closure, so no path forks its
-//! config/rules/gates loaders.
+//! Declaration, record, rule, and materialization checks read a closed
+//! [`RepositoryImage`]. Full validation supplies the document-reference pass's
+//! verdict separately, allowing its evidence to be captured one reference at a
+//! time. No pass performs live filesystem or Git I/O.
 
 use crate::config::JitConfig;
 use crate::declarations::rules::{RuleSet, Severity};
@@ -142,8 +140,11 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
-/// Validate the exact repository captured in `image` through the full read-only
-/// pipeline.
+/// Validate declarations, records, rules, and materializations in `image`.
+///
+/// Mutations use this pipeline without auditing unrelated document references;
+/// full validation supplies that pass's separately captured verdict through
+/// [`validate_repository_with_materializations`].
 ///
 /// The image is the single closed evidence source: a
 /// live capture validates the working tree, and an overlay image
@@ -178,13 +179,14 @@ pub fn validate_repository(
                 },
             )
         })?;
-    validate_repository_with_materializations(image, &declarations, expected.as_ref())
+    validate_repository_with_materializations(image, &declarations, expected.as_ref(), Ok(()))
 }
 
 pub(crate) fn validate_repository_with_materializations(
     image: &RepositoryImage,
     declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     expected: Option<&crate::repository_state::MaterializationPlan>,
+    document_references: Result<()>,
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
     let read = move |path: &str| image_read(image, path);
     let read: &ReadBytes<'_> = &read;
@@ -238,7 +240,7 @@ pub(crate) fn validate_repository_with_materializations(
     };
 
     if let Some(records) = &records {
-        let integrity_error = validate_integrity(image, &records.issues, &gates)
+        let integrity_error = validate_integrity(&records.issues, &gates, document_references)
             .context("repository-integrity validation pass")
             .err();
         if let Some(error) = integrity_error {
@@ -423,9 +425,9 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
 }
 
 fn validate_integrity(
-    image: &RepositoryImage,
     issues: &[Issue],
     gates: &GateRegistry,
+    document_references: Result<()>,
 ) -> Result<()> {
     let ids: HashSet<&IssueId> = issues.iter().map(|issue| &issue.id).collect();
     for issue in issues {
@@ -449,22 +451,7 @@ fn validate_integrity(
         }
     }
 
-    // Document references resolve against boundary-acquired evidence in the closed
-    // image, never live Git or filesystem I/O (plan §2 "Pinned document evidence"),
-    // through the rule `jit doc check-links` shares
-    // ([`resolve_document_reference`](crate::document::resolve_document_reference)).
-    for issue in issues {
-        for document in &issue.documents {
-            if let Some(reason) =
-                crate::document::resolve_document_reference(image, document)?.unresolved()
-            {
-                return Err(anyhow!(
-                    "Invalid document reference in issue '{}': {reason}",
-                    issue.id
-                ));
-            }
-        }
-    }
+    document_references?;
     let refs: Vec<&Issue> = issues.iter().collect();
     let graph = DependencyGraph::new(&refs);
     graph.validate_dag()?;
