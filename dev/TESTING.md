@@ -125,8 +125,9 @@ impl Default for TestHarness { /* delegates to new() */ }
 shapes; anything else goes through `h.executor` (any command) or `h.storage` (direct
 `IssueStore` calls).
 
-`with_item_kinds()` writes the canonical `[item_kinds]` table into the harness repo's
-`config.toml`. The engine bakes in no item kinds (`@/inv/domain-agnostic`), so a test that
+`with_item_kinds()` writes the shipped `[item_kinds]` table into the harness repo's
+`config.toml`, derived from `profiles/jit-default/manifest.toml` by
+`test_utils::shipped_item_kinds_toml()`; a test never restates a shipped kind. The engine bakes in no item kinds (`@/inv/domain-agnostic`), so a test that
 exercises addressable items, item indexing, or link resolution must opt in. Call it on the
 harness before creating issues:
 
