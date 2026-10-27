@@ -115,11 +115,11 @@ fn test_add_document_reference_same_path_updates_in_place() {
 
     let listed = h.executor.list_document_references(&id).unwrap();
     assert_eq!(
-        listed.documents.len(),
+        listed.items.len(),
         1,
         "re-adding the same path must not duplicate the reference"
     );
-    assert_eq!(listed.documents[0].path, "docs/spec.md");
+    assert_eq!(listed.items[0].path, "docs/spec.md");
 }
 
 #[test]
@@ -177,8 +177,8 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
     assert_last_event_is_documents_update(&h, &id, "doc-update");
 
     let listed = h.executor.list_document_references(&id).unwrap();
-    assert_eq!(listed.documents.len(), 1);
-    assert_eq!(listed.documents[0].label.as_deref(), Some("Final"));
+    assert_eq!(listed.items.len(), 1);
+    assert_eq!(listed.items[0].label.as_deref(), Some("Final"));
 }
 
 #[test]
@@ -228,13 +228,9 @@ fn test_add_document_reference_new_path_appends() {
         .unwrap();
 
     let listed = h.executor.list_document_references(&id).unwrap();
-    assert_eq!(
-        listed.documents.len(),
-        2,
-        "distinct paths must both be kept"
-    );
+    assert_eq!(listed.items.len(), 2, "distinct paths must both be kept");
 
-    let paths: Vec<&str> = listed.documents.iter().map(|d| d.path.as_str()).collect();
+    let paths: Vec<&str> = listed.items.iter().map(|d| d.path.as_str()).collect();
     assert!(paths.contains(&"docs/spec.md"));
     assert!(paths.contains(&"docs/other.md"));
 

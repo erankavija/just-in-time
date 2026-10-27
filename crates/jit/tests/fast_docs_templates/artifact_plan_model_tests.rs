@@ -1,7 +1,7 @@
 use jit::config::DocumentationConfig;
 use jit::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion, BlockerCode, ContentIdentity,
-    EvidenceCode, PlanBlocker, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
+    EvidenceCode, PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
     ARCHIVE_PLAN_SCHEMA_VERSION,
 };
 use serde_json::{json, Value};
@@ -280,6 +280,36 @@ fn test_preview_and_execution_share_the_artifact_plan_type() {
     let decoded: ArtifactPlan = serde_json::from_slice(&wire).unwrap();
     assert_eq!(preview_input(&decoded), 1);
     assert_eq!(execution_input(&decoded).unwrap(), 1);
+}
+
+#[test]
+fn test_artifact_plan_decode_rejects_a_non_canonical_plan() {
+    let wire = serde_json::to_value(configured_plan(
+        vec![
+            artifact("dev/a.md", ArtifactVersion::WorkingTree),
+            artifact("dev/b.md", ArtifactVersion::WorkingTree),
+        ],
+        Vec::new(),
+        Vec::new(),
+    ))
+    .unwrap();
+    let decoded = |edit: fn(&mut Value)| {
+        let mut value = wire.clone();
+        edit(&mut value);
+        serde_json::from_value::<ArtifactPlan>(value)
+    };
+
+    assert!(decoded(|value| value["count"] = json!(1)).is_err());
+    for edit in [
+        (|value: &mut Value| value["artifacts"].as_array_mut().unwrap().reverse())
+            as fn(&mut Value),
+        |value| value["action_counts"]["retain"] = json!(1),
+    ] {
+        assert_eq!(
+            decoded(edit).unwrap().executable_artifacts(),
+            Err(PlanError::NonCanonicalEnvelope)
+        );
+    }
 }
 
 #[test]

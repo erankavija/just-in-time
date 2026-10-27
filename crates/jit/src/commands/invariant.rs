@@ -13,26 +13,22 @@
 use super::*;
 use crate::validation::drift::DriftFinding;
 
-/// Result of a `jit invariant check` enforcement-drift run.
-///
-/// Returned by [`CommandExecutor::check_invariants`] and serialized as the
-/// `--json` payload: the list of [`DriftFinding`]s (each carrying the offending
-/// invariant id and the dangling subject) and the total `count`. An empty
-/// `findings` list means the registry and the declared rules/gates are
-/// consistent.
-#[derive(Debug, Serialize)]
-pub struct InvariantCheckResult {
-    /// Every drift finding (declared-but-unenforced, in the invariants' authored
-    /// order).
-    pub findings: Vec<DriftFinding>,
-    /// The number of drift findings (mirrors `findings.len()`).
-    pub count: usize,
+/// Collection key of [`InvariantCheckResult`].
+pub enum FindingsKey {}
+
+impl CollectionKey for FindingsKey {
+    const KEY: &'static str = "findings";
 }
+
+/// Result of a `jit invariant check` enforcement-drift run: every
+/// declared-but-unenforced [`DriftFinding`], in the invariants' authored order.
+/// No findings means the registry and the declared rules/gates are consistent.
+pub type InvariantCheckResult = ListEnvelope<FindingsKey, DriftFinding>;
 
 impl InvariantCheckResult {
     /// Whether any enforcement drift was found (the caller exits non-zero iff so).
     pub fn has_drift(&self) -> bool {
-        !self.findings.is_empty()
+        !self.items.is_empty()
     }
 }
 
@@ -58,10 +54,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // referenced by an `enforced-by` binding yields a declared-but-unenforced
         // finding here too, not a raw parse error.
         let findings: Vec<DriftFinding> = self.compute_drift_findings()?;
-        Ok(InvariantCheckResult {
-            count: findings.len(),
-            findings,
-        })
+        Ok(InvariantCheckResult::new(findings))
     }
 }
 
@@ -126,9 +119,9 @@ mod tests {
         let executor = exec(inv, rules, &[]);
         let result = executor.check_invariants().unwrap();
         assert!(result.has_drift());
-        assert_eq!(result.findings.len(), 1, "{:?}", result.findings);
-        assert_eq!(result.findings[0].invariant_id, "sample-invariant");
-        assert_eq!(result.findings[0].subject, "@/rule/ghost-rule");
+        assert_eq!(result.items.len(), 1, "{:?}", result.items);
+        assert_eq!(result.items[0].invariant_id, "sample-invariant");
+        assert_eq!(result.items[0].subject, "@/rule/ghost-rule");
     }
 
     #[test]
@@ -143,8 +136,7 @@ mod tests {
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &["code-review"]);
         let result = executor.check_invariants().unwrap();
-        assert!(!result.has_drift(), "{:?}", result.findings);
-        assert_eq!(result.count, 0);
+        assert!(!result.has_drift(), "{:?}", result.items);
     }
 
     #[test]
@@ -158,8 +150,7 @@ mod tests {
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &["code-review"]);
         let result = executor.check_invariants().unwrap();
-        assert!(!result.has_drift(), "{:?}", result.findings);
-        assert_eq!(result.count, 0);
+        assert!(!result.has_drift(), "{:?}", result.items);
     }
 
     #[test]
@@ -174,7 +165,6 @@ mod tests {
         let executor = exec(inv, rules, &[]);
         let result = executor.check_invariants().unwrap();
         let json = serde_json::to_value(&result).unwrap();
-        assert_eq!(json["count"], result.count);
         let findings = json["findings"].as_array().unwrap();
         assert_eq!(findings.len(), 1, "{json}");
         assert_eq!(findings[0]["invariant_id"], "sample-invariant");

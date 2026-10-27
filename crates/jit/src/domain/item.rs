@@ -920,7 +920,7 @@ pub fn unqualified_link_message(
 /// Carries the *derived* qualified id alongside the source self-id, the owning
 /// scope prefix (an issue short-id or `@`), the kind name, and the raw item text.
 /// Nothing here is stored — it is recomputed on demand by the indexers (REQ-05).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,

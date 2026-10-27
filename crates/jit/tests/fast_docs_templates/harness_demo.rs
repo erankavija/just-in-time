@@ -312,7 +312,7 @@ fn test_harness_item_list_and_resolve() {
     // Items are indexed across the repo and addressed by qualified id; the
     // shipped registry-first kinds contribute project items of their own.
     let listed = h.executor.list_items(Some("requirement")).unwrap();
-    assert_eq!(listed.count, 2);
+    assert_eq!(listed.count(), 2);
 
     // The `<short-id>/<self-id>` sugar resolves through the same issue-id resolver,
     // and the resolved item reports its canonical uniform qualified id.
