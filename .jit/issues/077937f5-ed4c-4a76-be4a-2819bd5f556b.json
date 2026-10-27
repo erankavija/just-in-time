@@ -27,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate, claim and hook tests use the shared file-backed constructors",
-  "updated_at": "2026-10-27T21:43:37.300779443Z"
+  "updated_at": "2026-10-27T21:44:32.265044579Z"
 }
