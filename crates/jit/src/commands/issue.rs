@@ -981,6 +981,82 @@ mod tests {
         );
     }
 
+    /// Seed one issue in `state` that depends on `dependencies`.
+    fn seed_in_state(
+        storage: &InMemoryStorage,
+        title: &str,
+        state: State,
+        dependencies: &[&IssueId],
+    ) -> IssueId {
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
+        issue.state = state;
+        issue.dependencies = dependencies.iter().map(|id| (*id).clone()).collect();
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(storage, issue);
+        id
+    }
+
+    /// Progress counts done and rejected children apart and every non-terminal
+    /// child as open; children are the direct dependencies in short-id order.
+    #[test]
+    fn test_issue_progress_and_issue_children_over_children_in_mixed_states() {
+        let storage = InMemoryStorage::new();
+        let done = seed_in_state(&storage, "Done child", State::Done, &[]);
+        let wip = seed_in_state(&storage, "WIP child", State::InProgress, &[]);
+        let rejected = seed_in_state(&storage, "Rejected child", State::Rejected, &[]);
+        let ready = seed_in_state(&storage, "Ready child", State::Ready, &[]);
+        let epic = seed_in_state(
+            &storage,
+            "Epic",
+            State::Backlog,
+            &[&done, &wip, &rejected, &ready],
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let progress = executor.issues().issue_progress(&epic).unwrap();
+        assert_eq!(progress.container.title, "Epic");
+        assert!(progress.dangling.is_empty());
+        let rollup = &progress.rollup;
+        assert_eq!(rollup.extras.total, 4);
+        assert_eq!(rollup.extras.done, 1);
+        assert_eq!(rollup.extras.rejected, 1);
+        assert_eq!(rollup.extras.open, 2);
+        assert_eq!(rollup.extras.percent, 25);
+        assert_eq!(rollup.items.len(), State::ALL.len());
+        let bucket = |s: State| rollup.items.iter().find(|c| c.state == s).unwrap().count;
+        assert_eq!(bucket(State::Done), 1);
+        assert_eq!(bucket(State::Gated), 0);
+
+        let children = executor.issues().issue_children(&epic).unwrap();
+        assert_eq!(children.count(), 4);
+        assert!(children.extras.dangling.is_empty());
+        let short_ids: Vec<&str> = children.items.iter().map(|c| c.short_id.as_str()).collect();
+        assert!(short_ids.is_sorted(), "children sorted by short id");
+    }
+
+    /// The status projection carries the issue's per-gate status and its
+    /// non-terminal dependencies as unmet.
+    #[test]
+    fn test_issue_status_response_projects_gates_and_unmet_dependencies() {
+        let storage = InMemoryStorage::new();
+        let dep = seed_in_state(&storage, "Upstream", State::Ready, &[]);
+        let mut child = crate::test_utils::fixture_issue("Gated child".into(), String::new());
+        child.dependencies = vec![dep.clone()];
+        child.gates_required = vec!["tests".into()];
+        crate::commands::test_helpers::seed_issue(&storage, child.clone());
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let status = executor.issues().issue_status_response(child).unwrap();
+
+        assert_eq!(status.title, "Gated child");
+        assert_eq!(status.gates.len(), 1);
+        assert_eq!(status.gates[0].key, "tests");
+        assert_eq!(
+            status.unmet_dependencies,
+            [crate::domain::identity::IssueIdStaging::short_id(&dep)]
+        );
+    }
+
     fn seed_ready(
         executor: &CommandExecutor<InMemoryStorage>,
         title: &str,

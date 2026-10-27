@@ -906,6 +906,63 @@ mod tests {
         );
     }
 
+    /// Candidates are every effectively terminal non-leaf container, each fully
+    /// evaluated, and reporting them leaves issues and events intact.
+    #[test]
+    fn test_archive_candidates_are_complete_and_non_mutating() {
+        let storage = crate::storage::InMemoryStorage::new();
+        let archive_root = format!(
+            "{}/archive",
+            storage.root().file_name().unwrap().to_string_lossy()
+        );
+        let seed = |title: &str, state: State, kind: &str| {
+            let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
+            issue.state = state;
+            issue.archived_from = (state == State::Archived).then_some(State::InProgress);
+            issue.labels = vec![format!("type:{kind}")];
+            let id = issue.id.clone();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
+            id
+        };
+        let rejected = seed("Rejected portfolio", State::Rejected, "portfolio");
+        let done = seed("Done portfolio", State::Done, "portfolio");
+        seed("Done leaf", State::Done, "unit");
+        seed("Archived portfolio", State::Archived, "portfolio");
+        let config = format!(
+            "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{archive_root}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
+        );
+        let executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+        let issues_before = executor.storage.list_issues().unwrap();
+        let events_before = executor.storage.read_events().unwrap();
+
+        let report = executor.archive_candidates().unwrap();
+
+        let target_ids = report
+            .candidates()
+            .iter()
+            .map(|plan| match plan.target() {
+                PlanTarget::Container { id } => id.clone(),
+                _ => panic!("candidate target must be a container"),
+            })
+            .collect::<Vec<_>>();
+        let mut expected = vec![done, rejected];
+        expected.sort();
+        assert_eq!(target_ids, expected);
+        assert_eq!(report.count(), 2);
+        assert!(report.candidates().iter().all(|plan| {
+            plan.count() == 0
+                && plan.policy_status() == crate::domain::artifact_plan::PolicyStatus::Configured
+        }));
+        assert_eq!(executor.storage.list_issues().unwrap(), issues_before);
+        assert_eq!(executor.storage.read_events().unwrap(), events_before);
+    }
+
     /// Seed an exact file-backed issue precondition without exercising command mutation behavior.
     fn seed_archive_issue_precondition(storage: &JsonFileStorage, issue: Issue) {
         let index_path = storage.root().join("index.json");
