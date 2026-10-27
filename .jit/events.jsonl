@@ -20924,3 +20924,5 @@
 {"from":"backlog","id":"77616cc1-5ba2-46ea-8497-703dd43ee82a","issue_id":"55043636-88c3-4d6e-8cce-e3503b6ea489","timestamp":"2026-10-27T22:25:44.428500202Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"4f01181b-d945-4825-a3c9-20665d6c424c","issue_id":"55043636-88c3-4d6e-8cce-e3503b6ea489","timestamp":"2026-10-27T22:25:44.638084166Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"c1024e8b-e1c0-4ded-afc2-69b34cb18994","issue_id":"55043636-88c3-4d6e-8cce-e3503b6ea489","timestamp":"2026-10-27T22:25:44.638084166Z","type":"issue_claimed"}
+{"id":"b2b93442-d4b9-4c3f-a205-00eb32fa0ee8","issue_id":"ea5ffaba-f183-46ae-8704-c4a17b5ebc60","priority":"high","timestamp":"2026-10-27T22:30:55.763199637Z","title":"Domain owners for query-all filter composition and gated readiness","type":"issue_created"}
+{"fields":["dependencies"],"id":"54388e2d-6414-419b-8061-e141e7bea9e8","issue_id":"3f15b95c-0a30-4a55-9dc2-489a736fb5be","timestamp":"2026-10-27T22:30:56.275659964Z","type":"issue_updated","updated_by":"dependency-add"}
