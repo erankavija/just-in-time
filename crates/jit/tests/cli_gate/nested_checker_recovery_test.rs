@@ -18,14 +18,8 @@
 //! genuinely held, which an in-process command harness cannot reproduce.
 
 use assert_cmd::prelude::*;
-use jit::test_cli::JitCli;
-use std::path::PathBuf;
+use jit::test_cli::{jit_binary, JitCli};
 use std::time::Duration;
-
-/// The `jit` binary the fixture spawns, for checkers that call it nested.
-fn fixture_binary(cli: &JitCli) -> PathBuf {
-    PathBuf::from(cli.command(["--version"]).get_program())
-}
 
 fn define_gate_and_issue(cli: &JitCli, gate: &str, checker_command: &str) -> String {
     cli.run([
@@ -63,7 +57,7 @@ fn issue_titles(cli: &JitCli) -> Vec<String> {
 #[test]
 fn test_gate_evaluate_allows_nested_mutating_jit() {
     let cli = JitCli::initialised().unwrap();
-    let jit = fixture_binary(&cli);
+    let jit = jit_binary();
     // The checker creates a fresh issue in the SAME repository through a nested
     // `jit` invocation — a mutating command that takes the repository write
     // lock the evaluator is holding.
