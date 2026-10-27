@@ -51,7 +51,7 @@ use std::collections::BTreeSet;
 ///
 /// `subject` is the dangling binding and `invariant_id` is the offending
 /// invariant's self-id (whose `@/invariant/<id>` qualified id addresses it).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct DriftFinding {
     /// The offending invariant's self-id.
     pub invariant_id: String,

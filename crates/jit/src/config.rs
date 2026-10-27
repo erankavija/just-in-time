@@ -2172,7 +2172,7 @@ target = "AGENTS.md"
         // The `[item_kinds.*]` registry parses as a name -> six-tuple map,
         // mirroring `[namespaces.*]`. An explicit declaration sets all six fields.
         let config_toml = r#"
-[item_kinds.requirement]
+[item_kinds.custom-requirement]
 section = "success_criteria"
 id-pattern = "REQ-\\d+"
 markers = ["[hard]"]
@@ -2180,9 +2180,9 @@ link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
 
-[item_kinds.decision]
+[item_kinds.custom-decision]
 section = "decisions"
-id-pattern = "D-\\d+"
+id-pattern = "DEC-\\d+"
 markers = []
 link-namespaces = ["per"]
 scope = "issue"
@@ -2196,7 +2196,7 @@ source-of-truth = "markdown-first"
         let kinds = config.item_kinds.as_ref().expect("item_kinds present");
         assert_eq!(kinds.len(), 2);
 
-        let req = &kinds["requirement"];
+        let req = &kinds["custom-requirement"];
         assert_eq!(req.section.as_deref(), Some("success_criteria"));
         assert_eq!(req.id_pattern.as_deref(), Some("REQ-\\d+"));
         assert_eq!(req.markers, Some(vec!["[hard]".to_string()]));
@@ -2206,7 +2206,7 @@ source-of-truth = "markdown-first"
         assert!(req.missing_required_fields().is_empty());
 
         // An empty `markers = []` is a PRESENT value (not missing).
-        let decision = &kinds["decision"];
+        let decision = &kinds["custom-decision"];
         assert_eq!(decision.markers, Some(vec![]));
         assert!(decision.missing_required_fields().is_empty());
     }
@@ -2220,7 +2220,7 @@ source-of-truth = "markdown-first"
         // REQ-01: an explicitly-declared kind missing any of the six required
         // fields is rejected by validation, naming the kind and the missing keys.
         let config_toml = r#"
-[item_kinds.requirement]
+[item_kinds.custom-requirement]
 section = "success_criteria"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
@@ -2229,7 +2229,7 @@ section = "success_criteria"
             .expect_err("partial declaration must be rejected");
         match err {
             ItemKindConfigError::MissingFields { kind, missing } => {
-                assert_eq!(kind, "requirement");
+                assert_eq!(kind, "custom-requirement");
                 // Every absent required field is named; `section` (present) is not.
                 for field in [
                     "id-pattern",
@@ -2259,12 +2259,15 @@ section = "success_criteria"
         let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
             layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[item_kinds.decision]\nsection = \"decisions\"\nid-pattern = \"D-\\\\d+\"\n",
+            "[item_kinds.custom-decision]\nsection = \"decisions\"\nid-pattern = \"DEC-\\\\d+\"\n",
         )
         .unwrap();
         let err = JitConfig::load(&layout).expect_err("load must reject partial kind");
         let msg = format!("{err:#}");
-        assert!(msg.contains("decision"), "error names the kind: {msg}");
+        assert!(
+            msg.contains("custom-decision"),
+            "error names the kind: {msg}"
+        );
         assert!(
             msg.contains("markers"),
             "error names a missing field: {msg}"
@@ -2287,15 +2290,15 @@ section = "success_criteria"
         // REQ-01: `aliases` parses from `[item_kinds.<kind>]` and a non-colliding
         // alias validates cleanly.
         let body = complete_kind_body();
-        let config_toml = format!("[item_kinds.invariant]\n{body}aliases = [\"inv\"]\n");
+        let config_toml = format!("[item_kinds.custom-invariant]\n{body}aliases = [\"cinv\"]\n");
         let config: JitConfig = toml::from_str(&config_toml).unwrap();
         config
             .validate_item_kinds()
             .expect("non-colliding alias validates");
         let kinds = config.item_kinds.unwrap();
         assert_eq!(
-            kinds["invariant"].aliases.as_deref(),
-            Some(["inv".to_string()].as_slice())
+            kinds["custom-invariant"].aliases.as_deref(),
+            Some(["cinv".to_string()].as_slice())
         );
     }
 
@@ -2305,7 +2308,7 @@ section = "success_criteria"
         // share the kind-name namespace.
         let body = complete_kind_body();
         let config_toml = format!(
-            "[item_kinds.requirement]\n{body}\n[item_kinds.decision]\n{body}aliases = [\"requirement\"]\n"
+            "[item_kinds.custom-requirement]\n{body}\n[item_kinds.custom-decision]\n{body}aliases = [\"custom-requirement\"]\n"
         );
         let config: JitConfig = toml::from_str(&config_toml).unwrap();
         let err = config
@@ -2317,8 +2320,8 @@ section = "success_criteria"
                 alias,
                 conflict,
             } => {
-                assert_eq!(kind, "decision");
-                assert_eq!(alias, "requirement");
+                assert_eq!(kind, "custom-decision");
+                assert_eq!(alias, "custom-requirement");
                 assert!(
                     conflict.contains("kind name"),
                     "conflict names cause: {conflict}"
@@ -2333,7 +2336,7 @@ section = "success_criteria"
         // REQ-02: an alias equal to ANOTHER kind's alias is rejected.
         let body = complete_kind_body();
         let config_toml = format!(
-            "[item_kinds.requirement]\n{body}aliases = [\"rq\"]\n[item_kinds.decision]\n{body}aliases = [\"rq\"]\n"
+            "[item_kinds.custom-requirement]\n{body}aliases = [\"rq\"]\n[item_kinds.custom-decision]\n{body}aliases = [\"rq\"]\n"
         );
         let config: JitConfig = toml::from_str(&config_toml).unwrap();
         let err = config
@@ -2362,12 +2365,15 @@ section = "success_criteria"
         let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
         std::fs::write(
             layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            format!("[item_kinds.requirement]\n{body}aliases = [\"requirement\"]\n"),
+            format!("[item_kinds.custom-requirement]\n{body}aliases = [\"custom-requirement\"]\n"),
         )
         .unwrap();
         let err = JitConfig::load(&layout).expect_err("load must reject colliding alias");
         let msg = format!("{err:#}");
-        assert!(msg.contains("requirement"), "error names the token: {msg}");
+        assert!(
+            msg.contains("custom-requirement"),
+            "error names the token: {msg}"
+        );
     }
 
     #[test]
@@ -2375,7 +2381,7 @@ section = "success_criteria"
         // REQ-01: both typed directions parse from their kebab-case tokens and are
         // DISTINCT from the `source` file path field. Each kind declares all six.
         let config_toml = r#"
-[item_kinds.requirement]
+[item_kinds.custom-requirement]
 section = "success_criteria"
 id-pattern = "REQ-\\d+"
 markers = ["[hard]"]
@@ -2392,17 +2398,15 @@ scope = "project"
 source = "policies.toml"
 source-of-truth = "registry-first"
 "#;
-        // Uses `policy` for the registry-first example: the direction
-        // (`source-of-truth`) is independent of the `source` field. (The built-in
-        // `invariant` kind is an ordinary registry-first kind too; this test only
-        // exercises the typed parse.)
+        // Uses a custom `policy` kind for the registry-first example: the
+        // direction (`source-of-truth`) is independent of the `source` field.
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         config
             .validate_item_kinds()
             .expect("complete kinds validate");
         let kinds = config.item_kinds.unwrap();
 
-        let req = &kinds["requirement"];
+        let req = &kinds["custom-requirement"];
         assert_eq!(req.source_of_truth, Some(SourceOfTruth::MarkdownFirst));
         assert_eq!(req.source_of_truth(), SourceOfTruth::MarkdownFirst);
 
@@ -2431,7 +2435,7 @@ source-of-truth = "registry-first"
         // REQ-01: an unrecognized direction is a descriptive parse error, not a
         // silent default.
         let config_toml = r#"
-[item_kinds.requirement]
+[item_kinds.custom-requirement]
 source-of-truth = "both"
 "#;
         let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();

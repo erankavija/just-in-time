@@ -201,17 +201,9 @@ mod tests {
              assert = { label-coverage = { kind = \"requirement\", child-state = \"done\" } }\n",
         )
         .unwrap();
-        let config: JitConfig = toml::from_str(
-            r#"
-[item_kinds.requirement]
-section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
-link-namespaces = ["satisfies"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#,
-        )
+        let config: JitConfig = toml::from_str(&crate::test_utils::shipped_item_kind_tables(&[
+            "requirement",
+        ]))
         .unwrap();
         assert_eq!(load_ruleset(&layout, &config).unwrap().rules.len(), 1);
         assert!(load_ruleset(&layout, &empty_config()).is_err());

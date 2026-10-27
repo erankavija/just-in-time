@@ -673,25 +673,14 @@ mod tests {
     };
     use std::collections::BTreeMap;
 
-    const CONFIG: &str = r#"
-[project]
-name = "materialize-test"
-
-[item_kinds.invariant]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-
-[projection.invariants]
-kind = "invariant"
-mode = "region"
-target = "AGENTS.md"
-style = "id-anchor"
-"#;
+    static CONFIG: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        format!(
+            "[project]\nname = \"materialize-test\"\n\n{}\n\
+             [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\n\
+             target = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        )
+    });
 
     const INVARIANTS: &str = r#"
 [[invariants]]
@@ -773,7 +762,7 @@ kind = "advisory"
 
     #[test]
     fn test_render_capture_closure_enumerates_registries_sources_and_target() {
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         // Selecting the single declared projection captures the four engine
         // registries, its region target, and its registry-first kind source.
         let paths =
@@ -814,7 +803,7 @@ kind = "advisory"
     #[test]
     fn test_validate_capture_closure_covers_registries_records_and_projections() {
         use std::collections::BTreeSet;
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         let closure =
             validate_capture_closure(&layout(), &config, &["abc".to_string()], None).unwrap();
         let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
@@ -844,7 +833,7 @@ kind = "advisory"
 
     #[test]
     fn test_render_capture_closure_adds_referenced_rule_schemas() {
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         // A rules.toml that references a json-schema pulls that schema into the
         // closure, so the effective-rule parse reads image-projected bytes.
         let rules = "[[rules]]\nname = \"shape\"\n\
@@ -856,10 +845,10 @@ kind = "advisory"
     #[test]
     fn test_render_selection_scopes_to_named_projection() {
         use std::collections::BTreeSet;
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (
                 "AGENTS.md",
@@ -951,10 +940,10 @@ kind = "advisory"
 
     #[test]
     fn test_derive_materialization_closes_over_its_image_for_every_request_variant() {
-        let config = config_decls(CONFIG);
+        let config = config_decls(&CONFIG);
         let (gate_registry, rule_set) = (gates(), rules());
         let declared_image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (
                 "AGENTS.md",
@@ -1048,11 +1037,11 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_emits_write_for_stale_region() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
         let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (
                 "AGENTS.md",
@@ -1081,12 +1070,12 @@ kind = "advisory"
 
     #[test]
     fn test_derive_project_render_fresh_region_emits_no_action() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let decls = declarations(&cfg, &g, &r);
         // First derive against a stale doc to obtain the exact fresh bytes.
         let stale = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (
                 "AGENTS.md",
@@ -1105,7 +1094,7 @@ kind = "advisory"
         let fresh_text = String::from_utf8(bytes.clone()).unwrap();
         // Re-derive against a doc that already holds the fresh bytes → no drift.
         let fresh = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(&fresh_text)),
         ]);
@@ -1126,7 +1115,8 @@ kind = "advisory"
         // Two region projections into ONE target compose deterministically.
         // CONFIG already declares the `invariants` projection; append a second.
         let config = format!(
-            "{CONFIG}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n"
+            "{}\n[projection.extra]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            *CONFIG
         );
         let agents = "# Doc\n\n<!-- jit:invariants:begin -->\nOLD-A\n<!-- jit:invariants:end -->\n\nmiddle\n\n<!-- jit:extra:begin -->\nOLD-B\n<!-- jit:extra:end -->\n".to_string();
         let build = || {
@@ -1167,10 +1157,10 @@ kind = "advisory"
 
     #[test]
     fn test_derive_then_compare_reports_stale_drift() {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let stale = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (
                 "AGENTS.md",
@@ -1196,7 +1186,7 @@ kind = "advisory"
         // Repair of a region projection splices ONLY the managed region; every
         // authored byte outside the markers is preserved unconditionally (ownership
         // matrix: configured region projection).
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let authored_prefix =
             "# Hand-authored heading\n\nAuthored intro the tool must never touch.\n\n";
@@ -1205,7 +1195,7 @@ kind = "advisory"
             "{authored_prefix}<!-- jit:invariants:begin -->\nMANUALLY EDITED DERIVED CONTENT\n<!-- jit:invariants:end -->{authored_suffix}"
         );
         let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(&agents)),
         ]);
@@ -1558,11 +1548,11 @@ kind = "advisory"
         // A region-projection target carrying DUPLICATE begin markers has ambiguous
         // ownership: repair fails before publication rather than serializing a
         // whole-file fallback (ownership matrix: ambiguous ownership is non-repairable).
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         let ambiguous = "# Doc\n\n<!-- jit:invariants:begin -->\nA\n<!-- jit:invariants:begin -->\nB\n<!-- jit:invariants:end -->\n";
         let image = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             ("AGENTS.md", Some(ambiguous)),
         ]);
@@ -1582,12 +1572,10 @@ kind = "advisory"
     /// drift both the default-ruleset family (a missing namespace-unique row) and
     /// the configured-projection family (a stale region) in one image.
     fn ns_and_projection_config(namespaces: &[&str]) -> String {
-        let mut out = String::from(
-            "[project]\nname = \"repair-target-paths-test\"\n\n\
-             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\n\
-             source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-             source-of-truth = \"registry-first\"\n\n\
+        let mut out = format!(
+            "[project]\nname = \"repair-target-paths-test\"\n\n{}\n\
              [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         for ns in namespaces {
             out.push_str(&format!(
@@ -1784,7 +1772,7 @@ kind = "advisory"
     fn image_with_ignore(ignore: Option<&str>) -> RepositoryImage {
         let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
         image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (".jit/rules.toml", None),
             ("AGENTS.md", Some(&agents)),
@@ -1793,7 +1781,7 @@ kind = "advisory"
     }
 
     fn repair(image: &RepositoryImage) -> Result<MaterializationPlan, RepositoryStateError> {
-        let cfg = config_decls(CONFIG);
+        let cfg = config_decls(&CONFIG);
         let (g, r) = (gates(), rules());
         derive_declared(
             image,
@@ -1908,7 +1896,7 @@ kind = "advisory"
     fn test_data_root_ignore_is_not_composed_when_its_target_is_outside_the_capture_closure() {
         let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
         let uncaptured = image(&[
-            (".jit/config.toml", Some(CONFIG)),
+            (".jit/config.toml", Some(CONFIG.as_str())),
             (".jit/invariants.toml", Some(INVARIANTS)),
             (".jit/rules.toml", None),
             ("AGENTS.md", Some(&agents)),
@@ -1927,7 +1915,7 @@ kind = "advisory"
     #[test]
     fn test_the_worktree_root_ignore_file_is_neither_captured_nor_written() {
         let worktree_ignore = VirtualPath::worktree(".gitignore").unwrap();
-        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+        let config: JitConfig = toml::from_str(&CONFIG).unwrap();
 
         let closure = validate_capture_closure(&layout(), &config, &[], None).unwrap();
         assert!(

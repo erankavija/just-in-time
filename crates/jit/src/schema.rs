@@ -734,6 +734,44 @@ impl CommandSchema {
                 Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
                 "WorktreeStoreDivergenceResponse",
             ),
+            "doc_list" => (
+                Some(schema_to_value::<crate::commands::DocumentListResult>()),
+                "DocumentListResult",
+            ),
+            "doc_assets_list" => (
+                Some(schema_to_value::<crate::commands::AssetListResult>()),
+                "AssetListResult",
+            ),
+            "item_list" | "item_search" => (
+                Some(schema_to_value::<crate::commands::ItemListResult>()),
+                "ItemListResult",
+            ),
+            "invariant_check" => (
+                Some(schema_to_value::<crate::commands::InvariantCheckResult>()),
+                "InvariantCheckResult",
+            ),
+            "project_render" => (
+                Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
+                "ProjectRenderResult",
+            ),
+            "archive_candidates" => (
+                Some(schema_to_value::<
+                    crate::domain::artifact_plan::ArchiveCandidates,
+                >()),
+                "ArchiveCandidates",
+            ),
+            // Without `--execute` the command previews the plan it would run.
+            "archive_document" | "archive_container" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<crate::domain::artifact_plan::ArtifactPlan>(),
+                        schema_to_value::<crate::domain::artifact_execution::ArchiveExecutionResult>(),
+                    ],
+                    "description": "Default: the ArtifactPlan preview. With --execute: \
+                        the ArchiveExecutionResult of the run."
+                });
+                (Some(union), "ArtifactPlan")
+            }
 
             // Default: no specific schema
             _ => (None, "CommandResponse"),
@@ -1913,6 +1951,27 @@ mod tests {
                      the storage names); got {props:?}"
                 ),
             }
+        }
+    }
+
+    #[test]
+    fn test_schema_list_results_declare_count_beside_their_collection() {
+        for (path, collection) in [
+            (&["doc", "list"][..], "documents"),
+            (&["doc", "assets", "list"], "assets"),
+            (&["item", "list"], "items"),
+            (&["item", "search"], "items"),
+            (&["invariant", "check"], "findings"),
+            (&["project", "render"], "projections"),
+            (&["archive", "candidates"], "candidates"),
+            (&["archive", "document"], "artifacts"),
+            (&["archive", "container"], "artifacts"),
+        ] {
+            let props = declared_property_names(&published_output_schema(path));
+            assert!(
+                props.contains("count") && props.contains(collection),
+                "{path:?} must declare `count` beside `{collection}`; got {props:?}"
+            );
         }
     }
 

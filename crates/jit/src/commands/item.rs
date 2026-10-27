@@ -17,14 +17,16 @@ use crate::domain::item::{
     AddressableItem, ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
 
-/// Result of a `jit item list` / `search` query.
-#[derive(Debug, Serialize)]
-pub struct ItemListResult {
-    /// The matched addressable items, in (issue, section, item) order.
-    pub items: Vec<AddressableItem>,
-    /// Number of matched items.
-    pub count: usize,
+/// Collection key of [`ItemListResult`].
+pub enum ItemsKey {}
+
+impl CollectionKey for ItemsKey {
+    const KEY: &'static str = "items";
 }
+
+/// Result of a `jit item list` / `search` query: the matched addressable items,
+/// in (issue, section, item) order.
+pub type ItemListResult = ListEnvelope<ItemsKey, AddressableItem>;
 
 /// Result of a `jit item show` / `resolve` query for one qualified id.
 ///
@@ -160,8 +162,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .with_context(|| format!("indexing items of issue {} failed", issue.short_id()))?;
             items.extend(indexed);
         }
-        let count = items.len();
-        Ok(ItemListResult { items, count })
+        Ok(ItemListResult::new(items))
     }
 
     /// Search addressable items whose self-id or text contains `query`
@@ -183,8 +184,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     || item.qualified_id.to_lowercase().contains(&q)
             })
             .collect();
-        let count = items.len();
-        Ok(ItemListResult { items, count })
+        Ok(ItemListResult::new(items))
     }
 
     /// Index the project-scope (`@`) addressable items, routing each kind by its
@@ -627,7 +627,7 @@ mod tests {
         let exec = executor_with(vec![a, b]);
 
         let result = exec.list_items(None).unwrap();
-        assert_eq!(result.count, 3);
+        assert_eq!(result.count(), 3);
         // Qualified ids disambiguate the two REQ-01s by their issue scope.
         let qids: Vec<&str> = result
             .items
@@ -641,8 +641,8 @@ mod tests {
     fn test_list_items_kind_filter_unknown_is_empty() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let exec = executor_with(vec![a]);
-        assert_eq!(exec.list_items(Some("nonexistent")).unwrap().count, 0);
-        assert_eq!(exec.list_items(Some("requirement")).unwrap().count, 1);
+        assert_eq!(exec.list_items(Some("nonexistent")).unwrap().count(), 0);
+        assert_eq!(exec.list_items(Some("requirement")).unwrap().count(), 1);
     }
 
     #[test]
@@ -652,9 +652,9 @@ mod tests {
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n- [hard] REQ-02: cycle check\n",
         );
         let exec = executor_with(vec![a]);
-        assert_eq!(exec.search_items("atomic", None).unwrap().count, 1);
-        assert_eq!(exec.search_items("REQ-02", None).unwrap().count, 1);
-        assert_eq!(exec.search_items("", None).unwrap().count, 2);
+        assert_eq!(exec.search_items("atomic", None).unwrap().count(), 1);
+        assert_eq!(exec.search_items("REQ-02", None).unwrap().count(), 1);
+        assert_eq!(exec.search_items("", None).unwrap().count(), 2);
     }
 
     #[test]
@@ -1068,7 +1068,7 @@ mod tests {
         );
     }
 
-    /// Build an executor that declares a NON-invariant, registry-first project
+    /// Build an executor that declares a custom registry-first project
     /// kind `policy` backed by a custom `.toml` through a structured `source`
     /// descriptor (`toml`/`table`/`id-field`/`text-field`/`link-fields`). The
     /// descriptor's toml file is served through the in-memory repo-file map (the
@@ -1138,7 +1138,7 @@ statement = \"Every dependency edge stays acyclic.\"
 
         // Both surface in the cross-repo list under the `@` project scope.
         let listed = exec.list_items(Some("policy")).unwrap();
-        assert_eq!(listed.count, 2);
+        assert_eq!(listed.count(), 2);
     }
 
     #[test]
@@ -1214,7 +1214,7 @@ kind = \"advisory\"
         // loaded invariant addressed as `@/<kind>/<self-id>`.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let result = exec.list_items(Some("invariant")).unwrap();
-        assert_eq!(result.count, 2);
+        assert_eq!(result.count(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1284,9 +1284,8 @@ enforce = true
     }
 
     /// Build an executor whose synthetic repo carries `.jit/gates.toml` with
-    /// `gates_toml` and a standalone `[item_kinds.gate]` declaration, exercising the
-    /// registry-first gate path the same way [`registry_exec_with_rules`] does for
-    /// rules.
+    /// `gates_toml` and the shipped item kinds, exercising the registry-first gate
+    /// path the same way [`registry_exec_with_rules`] does for rules.
     fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
@@ -1324,7 +1323,7 @@ stage = \"postcheck\"
         // other project-scoped registry-first kinds.
         let exec = registry_exec_with_gates(TWO_GATES);
         let result = exec.list_items(Some("gate")).unwrap();
-        assert_eq!(result.count, 2);
+        assert_eq!(result.count(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1432,7 +1431,7 @@ stage = \"postcheck\"
         // Both coexist in one unfiltered list with no DuplicateSelfId despite the
         // shared self-id (they differ by kind).
         let all = exec.list_items(None).unwrap();
-        assert_eq!(all.count, 2);
+        assert_eq!(all.count(), 2);
     }
 
     #[test]
@@ -1440,7 +1439,7 @@ stage = \"postcheck\"
         // The generic search path reaches registry-first invariants too.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
-        assert_eq!(hits.count, 1);
+        assert_eq!(hits.count(), 1);
         assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
     }
 
@@ -1465,7 +1464,7 @@ stage = \"postcheck\"
             .collect();
         // Only the two registry entries are invariants; the issue's missing-invariant line is
         // NOT among them (no markdown index for invariants).
-        assert_eq!(invariants.count, 2);
+        assert_eq!(invariants.count(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         assert!(!qids.iter().any(|q| q.ends_with("/missing-invariant")));
@@ -1478,7 +1477,7 @@ stage = \"postcheck\"
         // no items (graceful), and nothing is read from any markdown source.
         let issue = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let exec = executor_with(vec![issue]);
-        assert_eq!(exec.list_items(Some("invariant")).unwrap().count, 0);
+        assert_eq!(exec.list_items(Some("invariant")).unwrap().count(), 0);
     }
 
     /// Build an executor whose synthetic repo carries an explicit `config.toml`
@@ -1525,7 +1524,7 @@ stage = \"postcheck\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert_eq!(result.count, 2);
+        assert_eq!(result.count(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         // The issue's missing-invariant line is NOT a project invariant (registry-first reads
@@ -1557,7 +1556,7 @@ stage = \"postcheck\"
         );
         // No rejection: the kind resolves and indexes from the issue description.
         let result = exec.list_items(Some("tenet")).unwrap();
-        assert_eq!(result.count, 1);
+        assert_eq!(result.count(), 1);
         assert_eq!(
             result.items[0].qualified_id,
             format!("@/issue/{short}/tenet/sample-invariant")
