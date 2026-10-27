@@ -15,14 +15,6 @@ mod tests {
     use chrono::Utc;
     use tempfile::TempDir;
 
-    fn setup_storage() -> (TempDir, JsonFileStorage) {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        std::fs::create_dir(&data).unwrap();
-        let storage = JsonFileStorage::new(data);
-        (temp, storage)
-    }
-
     fn record_gate_run(
         temp: &TempDir,
         storage: &JsonFileStorage,
@@ -61,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_record_and_load_gate_run_result() {
-        let (temp, storage) = setup_storage();
+        let (temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let result = GateRunResult {
             schema_version: 1,
@@ -218,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_list_gate_runs_for_issue() {
-        let (temp, storage) = setup_storage();
+        let (temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         // Create multiple runs for the same issue
         let run_ids = (0..3)
@@ -266,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_list_gate_runs_for_nonexistent_issue() {
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let runs = storage.list_gate_runs_for_issue("nonexistent").unwrap();
         assert_eq!(runs.len(), 0);
@@ -274,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_load_nonexistent_gate_run() {
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let result = storage.load_gate_run_result("nonexistent");
         assert!(result.is_err());
@@ -282,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_gate_run_with_no_git_context() {
-        let (temp, storage) = setup_storage();
+        let (temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let result = GateRunResult {
             schema_version: 1,
