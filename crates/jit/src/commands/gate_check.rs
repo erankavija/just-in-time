@@ -1573,7 +1573,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::{compact_run_history_for_context, omit_current_gate_projection};
     use crate::commands::test_helpers::fixture_id;
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
@@ -1648,18 +1648,6 @@ mod tests {
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         issue_id
-    }
-
-    fn setup() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        // Create config with enforcement off for test backward compatibility
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        storage.add_data_file("config.toml", config_toml);
-
-        crate::commands::test_helpers::memory_executor(storage)
     }
 
     const RULE_VALIDATION_TEST_RULES: &str = r#"
