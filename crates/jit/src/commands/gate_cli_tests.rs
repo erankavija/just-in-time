@@ -2,28 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::test_helpers::seed_repo_file;
-    use crate::commands::CommandExecutor;
+    use crate::commands::test_helpers::setup;
     use crate::declarations::{GateChecker, GateMode, GateStage};
-    use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
-
-    fn setup() -> CommandExecutor<InMemoryStorage> {
-        // Disable worktree divergence checks in tests
-        crate::test_mode::enable();
-
-        let storage = InMemoryStorage::new();
-
-        // Create config with enforcement off for test backward compatibility
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        seed_repo_file(&storage, ".jit/config.toml", config_toml);
-
-        let layout = storage.repository_layout();
-        CommandExecutor::new(storage).with_layout(layout)
-    }
 
     // Test: jit gate define <key> --title "Title" --description "Desc" --stage postcheck --mode manual
     #[test]
