@@ -15,7 +15,6 @@ mod content_parser_cross_format;
 mod document_event_log_tests;
 mod git_module_tests;
 mod git_revision_tests;
-mod harness_demo;
 mod planning_preset_tests;
 mod research_bracket_tests;
 mod schema_tests;
