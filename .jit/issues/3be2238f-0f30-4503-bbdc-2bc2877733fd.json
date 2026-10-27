@@ -28,7 +28,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate command tests use the shared memory seeding",
-  "updated_at": "2026-10-27T20:54:25.944535605Z"
+  "updated_at": "2026-10-27T20:56:19.472918436Z"
 }

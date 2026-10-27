@@ -28,7 +28,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Issue, invariant and executor tests use the shared memory seeding",
-  "updated_at": "2026-10-27T20:54:27.931679997Z"
+  "updated_at": "2026-10-27T20:56:21.201575162Z"
 }

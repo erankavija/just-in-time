@@ -27,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Archive command tests use the shared file-backed constructors",
-  "updated_at": "2026-10-27T20:54:26.320943787Z"
+  "updated_at": "2026-10-27T20:56:20.068054955Z"
 }

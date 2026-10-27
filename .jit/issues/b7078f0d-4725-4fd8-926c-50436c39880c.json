@@ -27,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Item and validate unit tests use the shared memory seeding",
-  "updated_at": "2026-10-27T20:54:26.419077492Z"
+  "updated_at": "2026-10-27T20:56:20.637085887Z"
 }
