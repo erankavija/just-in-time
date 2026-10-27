@@ -5,15 +5,14 @@
 //! filtered by kind, searched, and resolved. Also covers graceful degradation
 //! (a prose line is not indexed) and a config-declared custom kind (REQ-01).
 
-use jit::test_cli::{jit_binary, JitCli};
+use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use serde_json::Value;
 
 #[test]
 fn test_item_list_indexes_requirements() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let body = "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n";
     let short = cli
@@ -45,8 +44,7 @@ fn test_item_list_indexes_requirements() {
 #[test]
 fn test_item_list_kind_filter() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     cli.create_issue([
         "-t",
@@ -88,8 +86,7 @@ fn test_item_list_kind_filter() {
 #[test]
 fn test_item_graceful_degradation() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     // A prose criterion line with no self-id is not indexed (REQ-06).
     let body = "## Success Criteria\n\n- [hard] REQ-01: real\n- [hard] just prose, no id here\n";
@@ -109,8 +106,7 @@ fn test_item_graceful_degradation() {
 #[test]
 fn test_item_show_and_resolve_by_qualified_id() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let short = cli
         .create_issue([
@@ -145,8 +141,7 @@ fn test_item_show_and_resolve_by_qualified_id() {
 #[test]
 fn test_item_show_unknown_self_id_fails() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let short = cli
         .create_issue([
@@ -167,8 +162,7 @@ fn test_item_show_unknown_self_id_fails() {
 #[test]
 fn test_item_search_by_text() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     cli.create_issue([
         "-t",
@@ -190,8 +184,7 @@ fn test_item_search_by_text() {
 #[test]
 fn test_item_custom_kind_from_config() {
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     // Declare a domain-agnostic custom kind in config (a name JIT does NOT ship as
     // a package-supplied kind); the engine indexes it purely from its tuple, never from its
@@ -237,8 +230,7 @@ fn test_issue_show_resolves_qualified_item_id() {
     // Finding 3: `jit issue show <issue>/<self-id>` resolves the addressed item
     // through the existing show dispatch.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let short = cli
         .create_issue([
@@ -279,8 +271,7 @@ fn test_item_command_failure_emits_json() {
     // Finding 4: an item command FAILURE with --json must emit a JSON object on
     // stdout, not a plain `Error: ...` line.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let short = cli
         .create_issue([
@@ -346,8 +337,7 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
     // REQ-01: `@/<kind>/<self-id>` RESOLVES through the actual `jit item show` binary,
     // sourced from a config-declared repository-local file (no test seam).
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     configure_project_scope_kind(
         &cli,
@@ -411,8 +401,7 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
     // resolves to a descriptive not-found error (not a panic, not the issue
     // resolver), with a JSON error object on stdout under --json.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     configure_project_scope_kind(&cli, None);
 
@@ -440,8 +429,7 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
     // `.jit/invariants.toml` as `@/<kind>/<self-id>`, with the package-supplied
     // registry-first invariant kind and NO markdown source involved.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     std::fs::write(
         cli.root().join(".jit").join("invariants.toml"),
@@ -530,8 +518,7 @@ fn test_item_kind_alias_resolves_through_real_cli() {
     // (the `--kind` filter and the kind segment of a project-scope address), and
     // canonical output still uses the registry name `invariant`.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     std::fs::write(
         cli.root().join(".jit").join("invariants.toml"),
@@ -588,8 +575,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     // resolves as ORDINARY config, indexing project items from its declared markdown
     // source like any other markdown-first project kind.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let config_path = cli.root().join(".jit").join("config.toml");
     // REPLACE the package-supplied (registry-first) `invariant` kind with a
@@ -642,8 +628,7 @@ fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
     // package (jit:bb7d57a2), so a profiled repo already declares it;
     // this test only needs to seed a gate entry in `.jit/gates.toml`.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
 
     std::fs::write(
@@ -715,8 +700,7 @@ fn test_validate_reports_dangling_item_link() {
     // `dangling-item-link` error finding, NOT silently dropped, and fails
     // validation (non-zero exit).
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     register_link_namespaces(&cli);
 
@@ -783,8 +767,7 @@ fn test_validate_reports_dangling_item_link() {
 fn test_validate_no_finding_for_resolvable_item_link() {
     // A resolvable qualified link produces NO dangling-item-link finding.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     register_link_namespaces(&cli);
 
@@ -841,8 +824,7 @@ fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
     // declares `[namespaces.enforces]`) — no `register_link_namespaces` helper
     // needed here, unlike the `satisfies` tests above.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
 
     // Bare init writes `.jit/rules.toml` with the default `label-format` rule
@@ -957,8 +939,7 @@ fn test_item_list_qualified_ids_round_trip_through_show() {
     // populates: issue-scope items (from the created issue's markdown) and
     // project-scope registry-first items (the seeded `.jit/rules.toml` rules).
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     cli.create_issue([
         "-t",
@@ -1030,8 +1011,7 @@ fn test_item_show_rule_renders_description_and_name_fallback() {
     // the rule's DESCRIPTION as its text (the item kind's `text-field` is
     // `description`), and a description-less rule falls back to its NAME.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
 
     // The applied package contributes described default rules to `.jit/rules.toml`;
@@ -1094,8 +1074,7 @@ fn test_namespace_unique_rule_addressable_after_config_driven_write() {
     // the write-through actually persists
     // the row.
     let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", Some(&jit_binary()))
-            .unwrap(),
+        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages", None).unwrap(),
     );
     let config_path = cli.root().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap();
