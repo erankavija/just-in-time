@@ -2269,7 +2269,6 @@ mod tests {
         fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
         for path in [
             "scripts/install.sh",
-            "scripts/install.sh",
             "workspace/active/target.md",
             "workspace/scratch/notes.md",
         ] {
@@ -2323,7 +2322,6 @@ mod tests {
         fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
         for path in [
             "scripts/install.sh",
-            "scripts/install.sh",
             "workspace/active/target.md",
             "workspace/scratch/notes.md",
         ] {
@@ -2366,7 +2364,6 @@ mod tests {
         fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
         fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
         for path in [
-            "scripts/install.sh",
             "scripts/install.sh",
             "workspace/active/target.md",
             "workspace/scratch/notes.md",
