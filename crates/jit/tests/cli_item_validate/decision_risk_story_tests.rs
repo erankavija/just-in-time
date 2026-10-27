@@ -43,24 +43,16 @@
 //!   description (the only source) changes BOTH indexes, and no top-level `.jit/`
 //!   file duplicates either `D-01` or `RISK-01`.
 
-use jit::commands::CommandExecutor;
-use jit::storage::{IssueStore, JsonFileStorage};
-use serde_json::Value;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
+use jit::test_utils::setup_test_repo_with_config;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Build a fresh repo from the shared taxonomy fixture and declare both item kinds.
-fn setup_test_repo() -> TempDir {
-    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    let config_path = temp.path().join(".jit/config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap();
-    config.push_str(
-        "\n[item_kinds.decision]\n\
+/// The shared taxonomy configuration plus the `decision` (namespace `per`) and
+/// `risk` (namespaces `mitigates`, `resolves`) kind declarations. They mirror
+/// the ones the package supplies (the engine bakes in no kinds), so the tests
+/// exercise the shipped kind shapes.
+fn story_config() -> String {
+    format!(
+        "{}\n[item_kinds.decision]\n\
          section = \"decisions\"\n\
          id-pattern = \"D-[0-9]+\"\n\
          markers = []\n\
@@ -74,26 +66,8 @@ fn setup_test_repo() -> TempDir {
          link-namespaces = [\"mitigates\", \"resolves\"]\n\
          scope = \"issue\"\n\
          source-of-truth = \"markdown-first\"\n",
-    );
-    std::fs::write(config_path, config).unwrap();
-    temp
-}
-
-/// Create an issue with `body` through the real CLI and return its 8-char short id.
-fn create_issue(repo: &Path, title: &str, body: &str) -> String {
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-d", body, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue create failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let full_id = json["id"].as_str().expect("created issue has an id");
-    full_id.chars().take(8).collect()
+        jit::test_taxonomy::test_taxonomy().config_fragment()
+    )
 }
 
 /// Description body used throughout the story tests: one `## Decisions` section
@@ -108,57 +82,6 @@ const STORY_BODY: &str = "\
 - RISK-01: parsing ambiguity between decision and risk ids\n\
 ";
 
-/// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
-/// `config.toml` declares the `decision` and `risk` kinds (the engine bakes in no
-/// kinds), seed `issues`, and return it paired with the seeded issues' short ids
-/// in insertion order.
-///
-/// The declared `decision` (namespace `per`) and `risk` (namespaces `mitigates`,
-/// `resolves`) kinds mirror the ones the package supplies, so this exercises the
-/// shipped kind shapes, not arbitrary overrides.
-fn default_executor_with(
-    repo: &Path,
-    issues: Vec<(&str, &str)>,
-) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let jit_dir = repo.join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-    std::fs::write(
-        jit_dir.join("config.toml"),
-        format!(
-            "{}[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"per\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n\n\
-         [item_kinds.risk]\n\
-         section = \"risks\"\n\
-         id-pattern = \"RISK-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"mitigates\", \"resolves\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-            taxonomy.config_fragment()
-        ),
-    )
-    .unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(repo, None)
-        .unwrap();
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-    let mut shorts = Vec::new();
-    for (title, body) in issues {
-        shorts.push(crate::create_issue(&executor, title, body));
-    }
-    (executor, shorts)
-}
-
 #[test]
 fn test_story_item_list_decision_and_risk_coexist() {
     // REQ-01 + REQ-02: in a fixture-initialized repo, an issue that carries BOTH a
@@ -166,21 +89,16 @@ fn test_story_item_list_decision_and_risk_coexist() {
     // by BOTH kinds through the SAME generic code path. `jit item list --kind
     // decision` returns ONLY the decision items; `jit item list --kind risk`
     // returns ONLY the risk items — no kind bleeds into the other's index.
-    let temp = setup_test_repo();
-    let short = create_issue(temp.path(), "Architecture + risks", STORY_BODY);
+    let cli = JitCli::with_repository(setup_test_repo_with_config(&story_config()).unwrap().0);
+    let short = cli
+        .create_issue(["-t", "Architecture + risks", "-d", STORY_BODY])
+        .unwrap()[..8]
+        .to_owned();
 
     // REQ-01: decision kind returns the decision.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "decision", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
-    assert!(
-        output.status.success(),
-        "item list --kind decision failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
         json["count"].as_u64().unwrap(),
         1,
@@ -201,17 +119,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
     );
 
     // REQ-02: risk kind returns the risk.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "risk", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "item list --kind risk failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     assert_eq!(
         json["count"].as_u64().unwrap(),
         1,
@@ -238,10 +146,8 @@ fn test_story_per_label_resolves_decision() {
     // through the generic `resolve_link_label`, even when the same issue also carries
     // a `## Risks` section. The coexistence of both kinds must not disrupt label
     // resolution for either kind.
-    let temp = TempDir::new().unwrap();
-    let (exec, shorts) =
-        default_executor_with(temp.path(), vec![("Architecture + risks", STORY_BODY)]);
-    let short = &shorts[0];
+    let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
+    let short = &crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
 
     let label = format!("per:{short}/D-01");
     let resolved = exec
@@ -275,10 +181,8 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // `resolve_link_label`, even when the same issue also carries a `## Decisions`
     // section. Both namespaces are recognized because the configured `risk` kind
     // declares them.
-    let temp = TempDir::new().unwrap();
-    let (exec, shorts) =
-        default_executor_with(temp.path(), vec![("Architecture + risks", STORY_BODY)]);
-    let short = &shorts[0];
+    let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
+    let short = &crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
 
     // mitigates: namespace.
     let mit_label = format!("mitigates:{short}/RISK-01");
@@ -332,11 +236,14 @@ fn test_story_markdown_sole_source_both_kinds() {
     //   (b) the owning issue file under `.jit/issues/` IS the sole occurrence of
     //       both ids;
     //   (c) editing the description and NOTHING else changes BOTH indexes.
-    let temp = setup_test_repo();
-    let short = create_issue(temp.path(), "Architecture + risks", STORY_BODY);
+    let cli = JitCli::with_repository(setup_test_repo_with_config(&story_config()).unwrap().0);
+    let short = cli
+        .create_issue(["-t", "Architecture + risks", "-d", STORY_BODY])
+        .unwrap()[..8]
+        .to_owned();
 
     // (a) No top-level `.jit/` file duplicates either id.
-    let jit_dir = temp.path().join(".jit");
+    let jit_dir = cli.root().join(".jit");
     for entry in std::fs::read_dir(&jit_dir).unwrap() {
         let path = entry.unwrap().path();
         if !path.is_file() {
@@ -390,24 +297,13 @@ fn test_story_markdown_sole_source_both_kinds() {
 \n\
 - RISK-02: log compaction complexity\n\
 ";
-    let output = Command::new(jit_binary())
-        .args(["issue", "update", &short, "-d", updated_body])
-        .current_dir(temp.path())
-        .output()
+    cli.run(["issue", "update", &short, "-d", updated_body])
         .unwrap();
-    assert!(
-        output.status.success(),
-        "issue update failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 
     // Decision index now shows D-02, not D-01.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "decision", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
     let dec_self_ids: Vec<&str> = json["items"]
         .as_array()
@@ -425,12 +321,7 @@ fn test_story_markdown_sole_source_both_kinds() {
     );
 
     // Risk index now shows RISK-02, not RISK-01.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "risk", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
     let risk_self_ids: Vec<&str> = json["items"]
         .as_array()

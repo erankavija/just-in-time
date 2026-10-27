@@ -8,19 +8,7 @@
 
 use jit::config::JitConfig;
 use jit::templates::TemplateRegistry;
-use std::fs;
-use tempfile::TempDir;
-
-/// Write a `.jit/config.toml` (declaring an `epic`/`planning`/`breakdown`
-/// hierarchy) plus an optional `templates.toml`, returning the temp dir.
-fn setup(config_toml: &str, templates_toml: Option<&str>) -> TempDir {
-    let temp = TempDir::new().unwrap();
-    fs::write(temp.path().join("config.toml"), config_toml).unwrap();
-    if let Some(t) = templates_toml {
-        fs::write(temp.path().join("templates.toml"), t).unwrap();
-    }
-    temp
-}
+use jit::test_utils::declaration_dir;
 
 const CONFIG_WITH_HIERARCHY: &str = r#"
 [type_hierarchy]
@@ -62,7 +50,11 @@ applies_to  = ["epic"]
 
 #[test]
 fn test_config_load_succeeds_with_valid_templates() {
-    let temp = setup(CONFIG_WITH_HIERARCHY, Some(VALID_PLAN_TEMPLATE));
+    let temp = declaration_dir(&[
+        ("config.toml", CONFIG_WITH_HIERARCHY),
+        ("templates.toml", VALID_PLAN_TEMPLATE),
+    ])
+    .unwrap();
     // Config load runs template validation; a valid file must not error.
     JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
@@ -80,7 +72,7 @@ fn test_config_load_succeeds_with_valid_templates() {
 
 #[test]
 fn test_config_load_succeeds_without_templates_file() {
-    let temp = setup(CONFIG_WITH_HIERARCHY, None);
+    let temp = declaration_dir(&[("config.toml", CONFIG_WITH_HIERARCHY)]).unwrap();
     JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
@@ -99,7 +91,11 @@ applies_to = ["epic"]
 role = "planning"
 type = "bogus"
 "#;
-    let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
+    let temp = declaration_dir(&[
+        ("config.toml", CONFIG_WITH_HIERARCHY),
+        ("templates.toml", bad),
+    ])
+    .unwrap();
     let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
@@ -130,7 +126,11 @@ role = "b"
 type = "breakdown"
 depends_on = ["a"]
 "#;
-    let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
+    let temp = declaration_dir(&[
+        ("config.toml", CONFIG_WITH_HIERARCHY),
+        ("templates.toml", bad),
+    ])
+    .unwrap();
     let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
@@ -158,7 +158,11 @@ type = "planning"
 kind = "teleport"
 role = "planning"
 "#;
-    let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
+    let temp = declaration_dir(&[
+        ("config.toml", CONFIG_WITH_HIERARCHY),
+        ("templates.toml", bad),
+    ])
+    .unwrap();
     let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
@@ -176,7 +180,11 @@ role = "planning"
 
 #[test]
 fn test_config_load_fails_on_malformed_templates_toml() {
-    let temp = setup(CONFIG_WITH_HIERARCHY, Some("[[template"));
+    let temp = declaration_dir(&[
+        ("config.toml", CONFIG_WITH_HIERARCHY),
+        ("templates.toml", "[[template"),
+    ])
+    .unwrap();
     assert!(
         JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
             temp.path()
