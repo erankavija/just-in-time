@@ -1765,9 +1765,7 @@ mod tests {
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), b"shared").unwrap();
-        git(repo.path(), &["init", "-q"]);
-        git(repo.path(), &["config", "user.email", "test@example.com"]);
-        git(repo.path(), &["config", "user.name", "Test"]);
+        crate::test_cli::init_git_repository(repo.path()).unwrap();
         git(repo.path(), &["add", "fixtures/root.md"]);
         git(repo.path(), &["commit", "-qm", "fixture"]);
         let commit = git(repo.path(), &["rev-parse", "HEAD"]);

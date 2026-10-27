@@ -1487,66 +1487,28 @@ mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
 
-    // The canonical kinds supplied by the package, rebuilt here from their exact
-    // field shape so the domain layer can pin that those fields project as
-    // expected. They are not baked into the engine (a repo with no `[item_kinds]`
-    // table has no kinds); these helpers stand in for the config-authored table.
+    // The shipped kinds come from the default package's manifest; the domain
+    // layer pins how their fields project.
+    fn shipped_cfg(name: &str) -> ItemKindConfig {
+        crate::test_utils::shipped_item_kinds()
+            .remove(name)
+            .unwrap_or_else(|| panic!("the default package ships no '{name}' kind"))
+    }
+
     fn req_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec!["[hard]".to_string()]),
-            link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_cfg("requirement")
     }
 
     fn decision_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("decisions".to_string()),
-            id_pattern: Some("D-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_cfg("decision")
     }
 
     fn risk_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("risks".to_string()),
-            id_pattern: Some("RISK-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["mitigates".to_string(), "resolves".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_cfg("risk")
     }
 
     fn invariant_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::Project),
-            source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
-                toml: ".jit/invariants.toml".to_string(),
-                table: "invariants".to_string(),
-                id_field: "id".to_string(),
-                text_field: "statement".to_string(),
-                link_fields: std::collections::BTreeMap::new(),
-            })),
-            source_of_truth: Some(SourceOfTruth::RegistryFirst),
-            aliases: None,
-        }
+        shipped_cfg("invariant")
     }
 
     fn req_kind() -> ItemKind {
@@ -1876,7 +1838,10 @@ mod tests {
         let (section, marker, pattern) = kind.as_triple();
         assert_eq!(section, "success_criteria");
         assert_eq!(marker, Some("[hard]"));
-        assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
+        assert_eq!(
+            pattern,
+            crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN
+        );
     }
 
     #[test]
@@ -1965,7 +1930,7 @@ mod tests {
 
     #[test]
     fn test_decision_kind_tuple() {
-        // The canonical decision kind: section `decisions`, D-NN ids, no marker,
+        // The shipped decision kind: section `decisions`, no marker,
         // `per` link namespace, issue-scoped, markdown-first.
         let decision = decision_kind();
         assert_eq!(decision.name(), "decision");
@@ -1976,12 +1941,12 @@ mod tests {
         let (section, marker, pattern) = decision.as_triple();
         assert_eq!(section, "decisions");
         assert_eq!(marker, None);
-        assert_eq!(pattern, "D-[0-9]+");
+        assert_eq!(Some(pattern), decision_cfg().id_pattern.as_deref());
     }
 
     #[test]
     fn test_invariant_kind_is_project_scope_registry_first() {
-        // The canonical invariant kind: project-scoped, registry-first, `enforces`
+        // The shipped invariant kind: project-scoped, registry-first, `enforces`
         // link namespace, and NO markdown `source` file (items come from the toml
         // registry named by its descriptor).
         let inv = invariant_kind();
@@ -1998,9 +1963,10 @@ mod tests {
         // registry-first project kind must declare a toml `source` descriptor, or it
         // is rejected at resolution with a typed MissingProjectSource — never a
         // silent empty result.
+        // A custom `policy` kind, absent from the default package.
         let base = |source: Option<ItemKindSource>| ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("POL-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
             scope: Some(KindScope::Project),
@@ -2097,10 +2063,11 @@ mod tests {
 
     #[test]
     fn test_markdown_first_project_kind_still_requires_source() {
-        // The guard still fires for a markdown-first project kind with no source.
+        // The guard still fires for a markdown-first project kind with no source;
+        // `doc-req` is a custom kind.
         let cfg = ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("DOC-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
             scope: Some(KindScope::Project),

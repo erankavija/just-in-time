@@ -153,7 +153,6 @@ mod tests {
 
     fn git(repo: &Path, args: &[&str]) -> std::process::Output {
         std::process::Command::new("git")
-            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
             .args(args)
             .current_dir(repo)
             .env("JIT_AGENT_ID", AGENT)
@@ -172,7 +171,7 @@ mod tests {
     fn diverged_strict_repo() -> TempDir {
         let temp = TempDir::new().unwrap();
         let repo = temp.path();
-        git(repo, &["init", "-q", "-b", "main"]);
+        crate::test_cli::init_git_repository(repo).unwrap();
         write(
             repo,
             ".jit/config.toml",

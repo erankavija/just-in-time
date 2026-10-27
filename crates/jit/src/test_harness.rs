@@ -44,45 +44,12 @@ impl TestHarness {
         Self { executor, storage }
     }
 
-    /// Declare the canonical `[item_kinds]` table (the package-supplied set) in
-    /// this harness's repo, so item indexing and link resolution recognize the
+    /// Declare the shipped item kinds, derived from the default package's manifest
+    /// ([`crate::test_utils::shipped_item_kinds_toml`]), in this harness's repo, so item indexing and link resolution recognize the
     /// shipped kinds. The engine bakes in no kinds, so tests that exercise
     /// addressable items must opt in. Call before creating issues.
     pub fn with_item_kinds(self) -> Self {
-        const CANONICAL_ITEM_KINDS: &str = "\
-[item_kinds.requirement]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = [\"[hard]\", \"[aspirational]\"]
-link-namespaces = [\"satisfies\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.decision]
-section = \"decisions\"
-id-pattern = \"D-[0-9]+\"
-markers = []
-link-namespaces = [\"per\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.risk]
-section = \"risks\"
-id-pattern = \"RISK-[0-9]+\"
-markers = []
-link-namespaces = [\"mitigates\", \"resolves\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-";
+        let item_kinds = crate::test_utils::shipped_item_kinds_toml();
         // Query paths still load declarations through ConfigManager's filesystem
         // reader, while mutation paths capture the aggregate in-memory image.
         // Keep both fixture views coherent until the read-side storage facade is
@@ -93,9 +60,8 @@ source-of-truth = \"registry-first\"
             .resolve(&crate::repository_state::VirtualPath::CONFIG)
             .unwrap();
         std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-        std::fs::write(config_path, CANONICAL_ITEM_KINDS).unwrap();
-        self.storage
-            .add_data_file("config.toml", CANONICAL_ITEM_KINDS);
+        std::fs::write(config_path, &item_kinds).unwrap();
+        self.storage.add_data_file("config.toml", &item_kinds);
         self
     }
 

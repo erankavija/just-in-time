@@ -281,17 +281,19 @@ mod tests {
     use super::*;
     use crate::config::JitConfig;
 
-    /// The tables a suite of its own writes after the fragment.
-    const SUITE_TABLES: &str = "\n[item_kinds.requirement]\nsection = \"success_criteria\"\n\
-                                id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"\n\
-                                markers = [\"[hard]\"]\nscope = \"issue\"\n\
-                                source-of-truth = \"markdown-first\"\n\n\
-                                [worktree]\nenforce_leases = \"off\"\n";
+    /// The tables a suite of its own writes after the fragment: the shipped item
+    /// kinds and a worktree table.
+    fn suite_tables() -> String {
+        format!(
+            "\n{}\n[worktree]\nenforce_leases = \"off\"\n",
+            crate::test_utils::shipped_item_kinds_toml()
+        )
+    }
 
     #[test]
     fn test_config_fragment_parses_with_suite_tables_appended() {
         let taxonomy = test_taxonomy();
-        let composed = format!("{}{SUITE_TABLES}", taxonomy.config_fragment());
+        let composed = format!("{}{}", taxonomy.config_fragment(), suite_tables());
 
         let config: JitConfig = toml::from_str(&composed)
             .expect("a suite's own tables append to the fragment without conflict");
