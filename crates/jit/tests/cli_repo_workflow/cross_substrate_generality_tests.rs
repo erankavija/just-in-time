@@ -31,7 +31,7 @@
 //!   this explicit.
 //! - REQ-03: the test passes under `cargo test`.
 
-use jit::test_cli::{jit_binary, JitCli};
+use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use serde_json::Value;
 
@@ -86,9 +86,8 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 fn test_all_four_kinds_through_one_generic_path() {
     // A repository carrying the `jit-default` package's `[item_kinds]` table,
     // which declares this fixture's four kinds among the six it carries.
-    let cli = JitCli::with_repository(
-        profiled_repository_fixture("jit-default", "packages", Some(&jit_binary())).unwrap(),
-    );
+    let cli =
+        JitCli::with_repository(profiled_repository_fixture("jit-default", "packages").unwrap());
 
     // --- Fixture: one issue with all three issue-scope kinds ---
     let issue_body = "\

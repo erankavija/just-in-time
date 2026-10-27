@@ -2645,7 +2645,6 @@ depends_on = ["planning"]
         let repo = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -2717,7 +2716,6 @@ depends_on = ["planning"]
         let repo = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -2745,7 +2743,6 @@ depends_on = ["planning"]
         let repo = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));

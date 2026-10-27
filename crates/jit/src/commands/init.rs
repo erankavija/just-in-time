@@ -1214,7 +1214,6 @@ mod tests {
         let repo = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -1246,8 +1245,8 @@ mod tests {
 
     #[test]
     fn test_single_profile_reinit_attributes_coupled_schema_repair() {
-        let repo = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
-            .unwrap();
+        let repo =
+            crate::test_utils::profiled_repository_fixture("jit-default", "packages").unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let schema = repo
             .path()

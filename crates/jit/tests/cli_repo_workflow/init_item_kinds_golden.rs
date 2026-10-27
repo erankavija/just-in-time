@@ -54,12 +54,8 @@ fn test_init_emits_item_kinds_table_the_package_declares() {
     // REQ-04, clause 1: the written `[item_kinds]` table carries exactly the
     // kinds the applied package declares, each with the declaration it gave.
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(
-            DEFAULT_PACKAGE,
-            "packages",
-            Some(jit::test_cli::jit_binary().as_path()),
-        )
-        .expect("clone a coherent default-package repository fixture"),
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
     );
     let config: Value = toml::from_str::<toml::Value>(
         &std::fs::read_to_string(cli.root().join(".jit").join("config.toml")).unwrap(),
@@ -91,12 +87,8 @@ fn test_init_emits_the_namespaces_the_registry_first_kinds_link_through() {
     // must itself be declared — otherwise it would fail the namespace-registry
     // rule even though the item it names resolves (REQ-02, jit:d30695e4).
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(
-            DEFAULT_PACKAGE,
-            "packages",
-            Some(jit::test_cli::jit_binary().as_path()),
-        )
-        .expect("clone a coherent default-package repository fixture"),
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
     );
     let config = toml::from_str::<toml::Value>(
         &std::fs::read_to_string(cli.root().join(".jit").join("config.toml")).unwrap(),
@@ -140,12 +132,8 @@ fn test_init_authored_table_indexes_all_kinds() {
     // (`.jit/gates.toml`) starts EMPTY, so this test defines one gate through
     // the real `jit gate define` CLI before asserting.
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(
-            DEFAULT_PACKAGE,
-            "packages",
-            Some(jit::test_cli::jit_binary().as_path()),
-        )
-        .expect("clone a coherent default-package repository fixture"),
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
     );
 
     let issue_body = "\
@@ -205,12 +193,8 @@ fn test_no_item_kinds_table_indexes_nothing() {
     // repo carrying issue criteria AND an invariants registry indexes NOTHING —
     // there are no baked default kinds.
     let cli = JitCli::with_repository(
-        jit::test_utils::profiled_repository_fixture(
-            DEFAULT_PACKAGE,
-            "packages",
-            Some(jit::test_cli::jit_binary().as_path()),
-        )
-        .expect("clone a coherent default-package repository fixture"),
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
     );
 
     let issue_body = "\
