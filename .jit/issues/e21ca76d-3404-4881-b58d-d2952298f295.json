@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-27T00:56:39.932594576Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "67fffe15-aa3a-4d96-a1e8-b1b2f485ff95",
+      "status": "failed",
+      "updated_at": "2026-10-27T00:59:16.643307413Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e21ca76d-3404-4881-b58d-d2952298f295",
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-27T00:56:39.932594576Z"
+  "updated_at": "2026-10-27T00:59:16.643307413Z"
 }

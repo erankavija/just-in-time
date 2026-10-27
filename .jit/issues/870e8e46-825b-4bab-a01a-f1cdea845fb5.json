@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ec6ac244-d492-4369-b9ec-16e9af0ed7bb",
+      "run_id": "6219266a-0c32-43e4-be91-831ccfb42e2c",
       "status": "passed",
-      "updated_at": "2026-10-25T00:55:02.920489260Z",
+      "updated_at": "2026-10-27T00:59:04.218412362Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "gate evaluation tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-26T22:00:54.820266662Z"
+  "updated_at": "2026-10-27T00:59:04.218412362Z"
 }

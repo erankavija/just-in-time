@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "20e8753a-5921-4a37-891f-73bf748c62b1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:59:09.676795837Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9c3b9da2-bb21-4d02-aead-6d970c71d821",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "failure-envelope contract tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-26T22:00:55.107992288Z"
+  "updated_at": "2026-10-27T00:59:09.676795837Z"
 }
