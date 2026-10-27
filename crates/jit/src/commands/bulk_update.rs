@@ -1735,7 +1735,7 @@ mod tests {
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..k {
             let mut issue = create_test_issue(
-                &crate::domain::fixture_issue(format!("Issue {index}"), String::new()).id,
+                &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
                 State::Ready,
                 vec![],
             );
@@ -1800,7 +1800,7 @@ mod tests {
             crate::commands::test_helpers::seed_issue(
                 &storage,
                 create_test_issue(
-                    &crate::domain::fixture_issue(format!("Issue {index}"), String::new()).id,
+                    &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
                     State::Ready,
                     vec![],
                 ),
@@ -1833,7 +1833,7 @@ mod tests {
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..3 {
             let mut issue = create_test_issue(
-                &crate::domain::fixture_issue(format!("Issue {index}"), String::new()).id,
+                &crate::test_utils::fixture_issue(format!("Issue {index}"), String::new()).id,
                 State::Ready,
                 vec![],
             );
