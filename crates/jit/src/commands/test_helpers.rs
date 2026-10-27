@@ -160,23 +160,41 @@ fn with_session_race(
     raced
 }
 
+/// Repository declarations a memory executor is built over; an absent one
+/// keeps what the store holds, else the product default.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MemoryDeclarations<'a> {
+    pub config: Option<&'a str>,
+    pub rules: Option<&'a str>,
+    pub templates: Option<&'a str>,
+}
+
 /// Executor over `storage` whose repository is set up by product
 /// initialization.
 pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    memory_executor_declaring(storage, "")
+    memory_executor_declaring(storage, MemoryDeclarations::default())
 }
 
-/// [`memory_executor`] for a scenario that declares configuration.
+/// [`memory_executor`] for a scenario that declares configuration, rules or
+/// templates.
 ///
-/// `config` is the scenario's own `.jit/config.toml` body; an empty body
-/// declares nothing, and a configuration `storage` already holds wins.
-/// Initializes a fault-free declaration copy, excluding [`VirtualPath::RECORDS`],
-/// then fills absent paths without changing seeded state. Seed declarations
-/// that initialization rejects (such as malformed rules) after this call.
+/// Each supplied declaration replaces what `storage` holds at its repository
+/// path before initialization, so initialization validates it and fills only
+/// absent paths without changing seeded state. Initializes a fault-free
+/// declaration copy, excluding [`VirtualPath::RECORDS`]. Seed declarations that
+/// initialization rejects (such as malformed rules) after this call.
 pub fn memory_executor_declaring(
     storage: InMemoryStorage,
-    config: &str,
+    declarations: MemoryDeclarations<'_>,
 ) -> CommandExecutor<InMemoryStorage> {
+    [
+        (VirtualPath::CONFIG, declarations.config),
+        (VirtualPath::RULES, declarations.rules),
+        (VirtualPath::TEMPLATES, declarations.templates),
+    ]
+    .into_iter()
+    .filter_map(|(path, body)| body.map(|body| (path, body)))
+    .for_each(|(path, body)| seed_repo_file(&storage, &path.repository_relative(), body));
     let layout = storage.repository_layout();
     let rules_source = storage.root().join(VirtualPath::RULES.relative().as_path());
     let rules_target = layout
@@ -199,9 +217,9 @@ pub fn memory_executor_declaring(
     let pristine = InMemoryStorage::rooted_at(storage.root());
     {
         let held = storage.repository_state();
-        let mut declarations = pristine.repository_state();
-        declarations.data_root_exists = held.data_root_exists;
-        declarations.entries = held
+        let mut copy = pristine.repository_state();
+        copy.data_root_exists = held.data_root_exists;
+        copy.entries = held
             .entries
             .iter()
             .filter(|(path, _)| {
@@ -212,14 +230,6 @@ pub fn memory_executor_declaring(
             })
             .map(|(path, entry)| (path.clone(), entry.clone()))
             .collect();
-    }
-    if !config.is_empty()
-        && storage
-            .read_repo_file(".jit/config.toml")
-            .expect("memory fixture config path is valid")
-            .is_none()
-    {
-        pristine.add_data_file("config.toml", config);
     }
     CommandExecutor::new(pristine.clone())
         .with_layout(layout.clone())
@@ -304,7 +314,10 @@ fn mirror_memory_declarations(
 pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
     memory_executor_declaring(
         InMemoryStorage::new(),
-        &format!("[worktree]\nenforce_leases = \"{mode}\"\n"),
+        MemoryDeclarations {
+            config: Some(&format!("[worktree]\nenforce_leases = \"{mode}\"\n")),
+            ..MemoryDeclarations::default()
+        },
     )
 }
 
@@ -326,7 +339,13 @@ mod tests {
     fn test_memory_executor_declaring_matches_product_initialization_plus_declared_config() {
         let declared = "[worktree]\nenforce_leases = \"warn\"\n";
         let storage = InMemoryStorage::new();
-        memory_executor_declaring(storage.clone(), declared);
+        memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                config: Some(declared),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let reference = InMemoryStorage::rooted_at(storage.root());
         reference.add_data_file("config.toml", declared);
@@ -337,6 +356,78 @@ mod tests {
 
         let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
         assert_eq!(image(&storage), image(&reference));
+    }
+
+    const DECLARED_CONFIG: &str = "[worktree]\nenforce_leases = \"warn\"\n";
+    const DECLARED_RULES: &str = "[[rules]]\nname = \"declared-rule\"\n\
+        assert = { require-section = { heading = \"Declared\" } }\n";
+    const DECLARED_TEMPLATES: &str = "[[template]]\nname = \"declared-template\"\n\
+        description = \"Declared.\"\napplies_to = [\"container\"]\n\
+        [[template.anchors]]\nname = \"container\"\n\
+        [[template.nodes]]\nrole = \"child\"\ntype = \"child\"\n\
+        description = \"Child of {container.title}.\"\n";
+
+    #[test]
+    fn test_memory_executor_declaring_loads_supplied_declarations() {
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(DECLARED_CONFIG),
+                rules: Some(DECLARED_RULES),
+                templates: Some(DECLARED_TEMPLATES),
+            },
+        );
+
+        let loaded = executor.config_manager.load().unwrap();
+        let declared_config: crate::config::JitConfig = toml::from_str(DECLARED_CONFIG).unwrap();
+        assert_eq!(
+            loaded.enforcement_mode(),
+            declared_config.enforcement_mode()
+        );
+        assert_eq!(
+            executor.rules().unwrap(),
+            &crate::declarations::rules::RuleSet::parse(DECLARED_RULES, Some(&loaded), []).unwrap()
+        );
+        assert_eq!(
+            loaded.templates,
+            crate::templates::TemplateRegistry::from_toml_str(DECLARED_TEMPLATES, &[] as &[&str])
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_memory_executor_declaring_initializes_each_unsupplied_declaration_as_product_default() {
+        let plain = InMemoryStorage::new();
+        memory_executor(plain.clone());
+        let supplied = [
+            (VirtualPath::CONFIG, DECLARED_CONFIG),
+            (VirtualPath::RULES, DECLARED_RULES),
+            (VirtualPath::TEMPLATES, DECLARED_TEMPLATES),
+        ];
+        for (unsupplied, _) in &supplied {
+            let declared = |path: VirtualPath| {
+                supplied
+                    .iter()
+                    .find(|(candidate, _)| candidate == &path && candidate != unsupplied)
+                    .map(|(_, body)| *body)
+            };
+            let storage = InMemoryStorage::rooted_at(plain.root());
+            memory_executor_declaring(
+                storage.clone(),
+                MemoryDeclarations {
+                    config: declared(VirtualPath::CONFIG),
+                    rules: declared(VirtualPath::RULES),
+                    templates: declared(VirtualPath::TEMPLATES),
+                },
+            );
+
+            let path = unsupplied.repository_relative();
+            assert_eq!(
+                storage.read_repo_file(&path).unwrap(),
+                plain.read_repo_file(&path).unwrap(),
+                "{path}"
+            );
+        }
     }
 
     #[test]
