@@ -2269,7 +2269,7 @@
     "pending_on_main": "5353463c cargo-ci + code-review re-run after da0df2152",
     "codex_in_flight": "fec9b43b,9c3b9da2,5f4daf6b in agent-22355a56 (uncommitted)"
   },
-  "priority_note": "Session 3: prioritize the upstream set of 2195c98f tasks 0af95f14 and 5fac48b8 (jit graph deps <id> --depth 0); message session just-in-time-f4 when both have only terminal dependencies.",
+  "priority_note": "Session 4: front-load 0af95f14's upstream, then 5fac48b8's; message just-in-time-c2 when each is fully terminal.",
   "coordination": [
     {
       "session": 3,
@@ -2284,6 +2284,15 @@
     {
       "session": 3,
       "note": "2195c98f lead released 19136324/53f78490 holds: 8acca4f4 blocked on user escalation; they will merge main into worktree-agent-8acca4f4 later"
+    },
+    {
+      "session": 4,
+      "peer": "just-in-time-c2 (2195c98f lead)",
+      "executed_by_peer": [
+        "2a6bc44c",
+        "55043636"
+      ],
+      "note": "Peer executes under c780514e gates/conventions with user approval; lead excludes them from its queue. Peer's blocked tasks: 0af95f14 (upstream 155d8c3c,44b40ce1,2c9badcd<-e2eb8862<-64f04da6,55043636<-2a6bc44c,50b800bb<-b7078f0d) and 5fac48b8 (also 5a93e443,9e411075,2cbe3ed8,4b5b8f4a,8da3f7f5,529f621d). Notify on each becoming fully terminal."
     }
   ],
   "landings": [
