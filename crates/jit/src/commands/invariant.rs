@@ -61,31 +61,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::{
+        memory_executor_declaring, seed_gate_registry, MemoryDeclarations,
+    };
     use crate::declarations::GateRegistry;
     use crate::storage::InMemoryStorage;
 
-    /// Build an executor over an in-memory `.jit` carrying the given
-    /// `invariants.toml`, `rules.toml`, and a gate registry with `gate_keys`.
-    fn exec(
-        invariants_toml: &str,
-        rules_toml: &str,
-        gate_keys: &[&str],
-    ) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        let layout = storage.repository_layout();
-        std::fs::create_dir_all(layout.data_root()).unwrap();
-        std::fs::write(
-            layout
-                .resolve(&crate::repository_state::VirtualPath::INVARIANTS)
-                .unwrap(),
-            invariants_toml,
-        )
-        .unwrap();
-        let rules_path = layout
-            .resolve(&crate::repository_state::VirtualPath::RULES)
-            .unwrap();
-        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-        std::fs::write(rules_path, rules_toml).unwrap();
+    /// Seed a gate registry holding a manual postcheck gate per key.
+    fn seed_manual_gates(storage: &InMemoryStorage, gate_keys: &[&str]) {
         let mut registry = GateRegistry::default();
         for key in gate_keys {
             registry.gates.insert(
@@ -104,8 +87,18 @@ mod tests {
                 },
             );
         }
-        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        CommandExecutor::new(storage).with_layout(layout)
+        seed_gate_registry(storage, &registry);
+    }
+
+    /// Write the authored invariants after construction: initialization
+    /// rejects a registry whose bindings dangle, which these scenarios need.
+    fn write_invariants(executor: &CommandExecutor<InMemoryStorage>, invariants_toml: &str) {
+        let path = executor
+            .require_layout()
+            .unwrap()
+            .resolve(&crate::repository_state::VirtualPath::INVARIANTS)
+            .unwrap();
+        std::fs::write(path, invariants_toml).unwrap();
     }
 
     #[test]
@@ -116,7 +109,16 @@ mod tests {
                    enforced-by = \"@/rule/ghost-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
-        let executor = exec(inv, rules, &[]);
+        let storage = InMemoryStorage::new();
+        seed_manual_gates(&storage, &[]);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(rules),
+                ..MemoryDeclarations::default()
+            },
+        );
+        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(result.has_drift());
         assert_eq!(result.items.len(), 1, "{:?}", result.items);
@@ -134,7 +136,16 @@ mod tests {
                    enforced-by = \"@/rule/real-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
-        let executor = exec(inv, rules, &["code-review"]);
+        let storage = InMemoryStorage::new();
+        seed_manual_gates(&storage, &["code-review"]);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(rules),
+                ..MemoryDeclarations::default()
+            },
+        );
+        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
@@ -148,7 +159,16 @@ mod tests {
                    enforced-by = \"@/gate/code-review\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
-        let executor = exec(inv, rules, &["code-review"]);
+        let storage = InMemoryStorage::new();
+        seed_manual_gates(&storage, &["code-review"]);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(rules),
+                ..MemoryDeclarations::default()
+            },
+        );
+        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
@@ -162,7 +182,16 @@ mod tests {
                    enforced-by = \"@/rule/ghost\"\n";
         let rules = "[[rules]]\nname = \"other\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
-        let executor = exec(inv, rules, &[]);
+        let storage = InMemoryStorage::new();
+        seed_manual_gates(&storage, &[]);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(rules),
+                ..MemoryDeclarations::default()
+            },
+        );
+        write_invariants(&executor, inv);
         let result = executor.check_invariants().unwrap();
         let json = serde_json::to_value(&result).unwrap();
         let findings = json["findings"].as_array().unwrap();

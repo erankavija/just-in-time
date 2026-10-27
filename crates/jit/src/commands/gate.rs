@@ -1428,25 +1428,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file};
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
-
-    fn setup() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-
-        // Create config with enforcement off for test backward compatibility
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        seed_repo_file(&storage, ".jit/config.toml", config_toml);
-
-        crate::commands::test_helpers::memory_executor(storage)
-    }
 
     #[test]
     fn test_pass_of_automated_gate_runs_checker() {

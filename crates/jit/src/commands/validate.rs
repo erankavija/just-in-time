@@ -2480,7 +2480,9 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
+    use crate::commands::test_helpers::{
+        fixture_id, seed_issue, seed_repo_file, MemoryDeclarations,
+    };
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2558,7 +2560,7 @@ depends_on = ["planning"]
     fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
         let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        std::fs::write(storage.root().join(".jit/config.toml"), config).unwrap();
         let executor = crate::test_utils::file_executor(repo.path()).unwrap();
 
         let error = executor
@@ -2763,17 +2765,19 @@ depends_on = ["planning"]
 
     #[test]
     fn test_validate_type_fix_is_noop_after_captured_repair() {
-        use crate::commands::test_helpers::memory_executor;
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
         let config = "[worktree]\nenforce_leases = \"off\"\n\
              [type_hierarchy.types]\ntask = 4\n\
              [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n";
-        storage.add_data_file("config.toml", config);
-        // The shared memory-executor setup mirrors this declaration through the
-        // selected layout for the filesystem loader.
-        let mut executor = memory_executor(storage.clone());
+        let mut executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                config: Some(config),
+                ..MemoryDeclarations::default()
+            },
+        );
         let id = executor
             .issues()
             .create_issue(
@@ -2897,61 +2901,6 @@ statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 ";
 
-    /// Build an executor over an in-memory `.jit` carrying a `.jit/invariants.toml`
-    /// (so the registry-first `invariant` kind resolves `enforces:@/invariant/<id>`) and the
-    /// canonical `[item_kinds]` table, seeded with `issues`.
-    fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        storage.add_data_file("config.toml", &crate::test_utils::shipped_item_kinds_toml());
-        // The registry-first `invariant` kind reads its toml through the storage
-        // boundary at the descriptor path, so seed the in-memory repo-file map (not
-        // the real fs) at `.jit/invariants.toml`.
-        storage.add_data_file("invariants.toml", REGISTRY_TOML);
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        finish_dangling_executor(storage)
-    }
-
-    /// Like [`dangling_exec`] but its `config.toml` ALSO registers the link
-    /// namespaces used by these tests (`satisfies`/`enforces`) so the default
-    /// `namespace-registry` local rule does not fire on the synthetic labels —
-    /// isolating the dangling-item-link pass as the validation failure.
-    fn dangling_exec_with_namespaces(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        // Invariant registry through the storage boundary (descriptor path); the
-        // `config.toml` is mirrored to the selected data root for `cached_config`.
-        storage.add_data_file("invariants.toml", REGISTRY_TOML);
-        let config = format!(
-            "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
-             [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
-             [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
-             {}",
-            crate::test_utils::shipped_item_kinds_toml()
-        );
-        storage.add_data_file("config.toml", &config);
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        finish_dangling_executor(storage)
-    }
-
-    fn finish_dangling_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-        let mut ids = storage
-            .list_issues()
-            .unwrap()
-            .into_iter()
-            .map(|issue| issue.id)
-            .collect::<Vec<_>>();
-        ids.sort();
-        storage.add_data_file(
-            "index.json",
-            &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []})
-                .to_string(),
-        );
-        crate::commands::test_helpers::memory_executor(storage)
-    }
-
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {
         let mut issue = crate::test_utils::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
@@ -2975,22 +2924,6 @@ mode = \"manual\"
 priority = 100
 ";
 
-    /// Like [`dangling_exec`] but ALSO declares `rule` and `gate` item kinds and
-    /// seeds `.jit/rules.toml` / `.jit/gates.toml`, exercising the dangling-link
-    /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
-    fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        let config = crate::test_utils::shipped_item_kinds_toml();
-        storage.add_data_file("config.toml", &config);
-        storage.add_data_file("invariants.toml", REGISTRY_TOML);
-        storage.add_data_file("rules.toml", ONE_RULE);
-        storage.add_data_file("gates.toml", ONE_GATE);
-        for issue in issues {
-            crate::commands::test_helpers::seed_issue(&storage, issue);
-        }
-        crate::commands::test_helpers::memory_executor(storage)
-    }
-
     #[test]
     fn test_dangling_link_findings_resolves_enforces_rule_and_gate_links() {
         // REQ-01 (jit:d30695e4): `rule` and `gate` declaring
@@ -3003,7 +2936,23 @@ priority = 100
             "",
             &["enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"],
         );
-        let exec = dangling_exec_with_rules_and_gates(vec![node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(ONE_RULE),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_repo_file(exec.storage(), ".jit/gates.toml", ONE_GATE);
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         assert!(
             exec.dangling_link_findings(&issues).unwrap().is_empty(),
@@ -3024,7 +2973,23 @@ priority = 100
                 "enforces:@/gate/no-such-gate",
             ],
         );
-        let exec = dangling_exec_with_rules_and_gates(vec![node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(ONE_RULE),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_repo_file(exec.storage(), ".jit/gates.toml", ONE_GATE);
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 2);
@@ -3049,7 +3014,22 @@ priority = 100
         let short = target.short_id();
         let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
         let node_id = node.id.clone();
-        let exec = dangling_exec(vec![target, node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), target);
+        seed_issue(exec.storage(), node);
 
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
@@ -3086,7 +3066,27 @@ priority = 100
                 "enforces:@/invariant/sample-invariant",
             ],
         );
-        let exec = dangling_exec(vec![target, node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&[
+            "invariant",
+            "requirement",
+            "decision",
+            "risk",
+        ]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), target);
+        seed_issue(exec.storage(), node);
 
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
@@ -3112,7 +3112,22 @@ priority = 100
                 &format!("satisfies:@/issue/{short}/requirement/REQ-01"),
             ],
         );
-        let exec = dangling_exec(vec![target, node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), target);
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         assert!(
             exec.dangling_link_findings(&issues).unwrap().is_empty(),
@@ -3122,7 +3137,21 @@ priority = 100
         // An unresolvable explicit form is still classified as qualified and
         // reported as dangling, never silently ignored as unqualified.
         let bad = issue_with_labels("bad", "", &["enforces:@/invariant/missing-invariant"]);
-        let exec = dangling_exec(vec![bad]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), bad);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
@@ -3138,7 +3167,21 @@ priority = 100
         // unresolvable qualified id: a dangling-link finding, never a panic or
         // a silently-ignored label.
         let node = issue_with_labels("node", "", &["enforces:@acme/invariant/sample-invariant"]);
-        let exec = dangling_exec(vec![node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
@@ -3160,7 +3203,21 @@ priority = 100
     fn test_dangling_link_findings_reports_unqualified_link_and_ignores_non_link_ns() {
         // An unqualified link label is reported once; non-link namespaces are not.
         let node = issue_with_labels("node", "", &["satisfies:REQ-01", "type:task", "epic:foo"]);
-        let exec = dangling_exec(vec![node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1, "{findings:?}");
@@ -3172,7 +3229,21 @@ priority = 100
         // REQ-03 for the project-scope invariant kind: `enforces:@/invariant/missing-invariant`
         // is a registered link namespace with a qualified-but-unresolvable id.
         let node = issue_with_labels("node", "", &["enforces:@/invariant/missing-invariant"]);
-        let exec = dangling_exec(vec![node]);
+        let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), node);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
@@ -3193,7 +3264,28 @@ priority = 100
         node.dependencies = vec![target.id.clone()];
         // Register the `satisfies` namespace so the dangling-link pass — not the
         // namespace-registry local rule — is the validation failure.
-        let exec = dangling_exec_with_namespaces(vec![target, node]);
+        let config = format!(
+            "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
+             [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
+             [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
+             {}",
+            crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"])
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), target);
+        seed_issue(exec.storage(), node);
 
         crate::test_mode::enable();
         let err = exec.validate_silent().unwrap_err();
@@ -3214,7 +3306,22 @@ priority = 100
         let short = target.short_id();
         let mut node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
         node.dependencies = vec![target.id.clone()];
-        let exec = dangling_exec(vec![target, node]);
+        let config = crate::test_utils::shipped_item_kinds_toml();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/invariants.toml", REGISTRY_TOML);
+        std::fs::write(
+            exec.storage().root().join(".jit/invariants.toml"),
+            REGISTRY_TOML,
+        )
+        .unwrap();
+        seed_issue(exec.storage(), target);
+        seed_issue(exec.storage(), node);
 
         let report = exec.run_rules(None).unwrap();
         assert!(report.has_errors());
