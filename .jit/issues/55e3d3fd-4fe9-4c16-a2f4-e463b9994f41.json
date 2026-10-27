@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fdddd32a-2bc8-4e79-a8eb-bd6852e729b7",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:41:23.738331598Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d7795ea3-a929-44c3-9c9d-e3f5fd0f1993",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:24:57.722831995Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "55e3d3fd-4fe9-4c16-a2f4-e463b9994f41",
   "labels": [
     "type:bug",
@@ -23,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Mutation and repair captures read only the documents their passes consume",
-  "updated_at": "2026-10-27T21:00:47.118501961Z"
+  "updated_at": "2026-10-27T21:41:23.738331598Z"
 }
