@@ -1315,12 +1315,20 @@
       "session": 4,
       "issue": "870e8e46",
       "category": "rework exceeded MAX_REWORK_ATTEMPTS (escalation policy 5)",
-      "status": "open",
+      "status": "resolved: option A (user, 2026-10-27)",
       "detail": "code-review 26cc6df7 F1: nested_checker_recovery_test.rs local binary locator. Fixed by lead in 60e450026.",
       "options": [
         "A (recommended): authorize code-review re-run on current main",
         "B: guidance / reject"
-      ]
+      ],
+      "decision": "Re-run 870e8e46 code-review on main after 60e450026."
+    },
+    {
+      "session": 4,
+      "issue": "529f621d",
+      "category": "criteria conflict: REQ-01 dependents-only signature vs REQ-03 unchanged global Backlog promotion",
+      "status": "resolved: option A (user, 2026-10-27)",
+      "decision": "REQ-01 amended: one pure domain function takes the issue graph after a transition and returns the issues that become ready; every command cascade, including delete, applies it. Rework: route delete cascade (commands/issue.rs:96-103) through it."
     }
   ],
   "rework_counts": {
@@ -1338,7 +1346,8 @@
     "c9442f7f": 2,
     "e7764cb1": 1,
     "e21ca76d": 1,
-    "173d98d5": 1
+    "173d98d5": 1,
+    "529f621d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1973,7 +1982,10 @@
     "e21ca76d-r0-s3": "lead FAIL: REQ-03 crate-wide; restatements remain in ~9 src modules",
     "reworks-s3-s3": "lead PASS e7764cb1 3609a2b08, fec9b43b 97116d05d, 5f4daf6b 24f34ca33, c9442f7f fea725838",
     "173d98d5-r0-s4": "lead FAIL (105ba819d): delete test_scenario_command_sets_agent_identity_for_child_process (steering_scenarios.rs:510-525, re-proves test_cli.rs:301); drop unused `let _cli = JitCli::uninitialised()` in 7 pure unit tests (steering_scenarios.rs:411,439,449,462,472,482,492); fix stale UUID-scrape capture prose in crates/jit/tests/fixtures/steering/README.md:19-20,32. Deleted extract_uuid tests and test_jit_cmd_strips_jit_data_dir justified (property owned by test_cli.rs:301). REQ-01..04 MET. Lead applies rework at landing.",
-    "870e8e46-s4": "code-review 26cc6df7 FAIL F1 (local fixture_binary locator); rework limit reached (2). Lead fix 60e450026 (shared jit_binary); code-review re-run awaits user approval."
+    "870e8e46-s4": "code-review 26cc6df7 FAIL F1 (local fixture_binary locator); rework limit reached (2). Lead fix 60e450026 (shared jit_binary); code-review re-run awaits user approval.",
+    "529f621d-s4": "independent review FAIL (953a428f5): REQ-01 signature (now amended) and delete cascade still decides per dependent. Rework 1 pending.",
+    "ad1e6d0e-s4": "lead PASS 3c73512ca; gates/invariants seeded on store (option a)",
+    "landB-s4": "independent review PASS 07f4b1d4, b93687b3, 717f9c2f; cherry-picked to worktree-agent-w4-landB (conflicts in item_cli_tests/invariant_registry_story_tests resolved to main's migrated side), lead fixes 0c86a1d6a (callers drop scenario arg), 9c2b65c2f (restating doc)"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
