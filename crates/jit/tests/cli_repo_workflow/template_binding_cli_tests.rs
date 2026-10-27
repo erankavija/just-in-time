@@ -17,7 +17,6 @@
 
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
-use jit::test_utils::declaration_dir;
 use serde_json::Value;
 
 /// The `plan` bracket under renamed bindings: `[roles]` names the planning role
@@ -98,37 +97,6 @@ applies_to  = ["epic"]
   to   = "split"
 "#;
 
-/// Run a jit command, asserting success, and parse its JSON stdout.
-fn jit_json(cli: &JitCli, args: &[&str]) -> Value {
-    let out = cli
-        .command(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
-/// Create an `epic` container, returning its full id.
-fn create_epic(cli: &JitCli, title: &str) -> String {
-    cli.create_issue([
-        "--title",
-        title,
-        "--description",
-        "## Success Criteria\n\n- [hard] REQ-01: it works\n",
-        "--label",
-        "type:epic",
-    ])
-    .unwrap()
-}
-
 /// The `data` payload of a command's JSON envelope.
 fn data(out: &Value) -> &Value {
     out.get("data").unwrap_or(out)
@@ -137,7 +105,7 @@ fn data(out: &Value) -> &Value {
 /// The dependency ids of an issue (`issue show --json` expands each into an
 /// object; read its `id`).
 fn dep_ids(cli: &JitCli, id: &str) -> Vec<String> {
-    let issue = jit_json(cli, &["issue", "show", id, "--json"]);
+    let issue = cli.run_json(["issue", "show", id]).unwrap();
     data(&issue)
         .get("dependencies")
         .and_then(|d| d.as_array())
@@ -151,7 +119,9 @@ fn dep_ids(cli: &JitCli, id: &str) -> Vec<String> {
 
 /// How many issues carry `type:planning`.
 fn planning_node_count(cli: &JitCli) -> u64 {
-    let listed = jit_json(cli, &["query", "all", "--label", "type:planning", "--json"]);
+    let listed = cli
+        .run_json(["query", "all", "--label", "type:planning"])
+        .unwrap();
     listed["count"]
         .as_u64()
         .unwrap_or_else(|| panic!("query all must report a count, got: {listed}"))
@@ -183,12 +153,14 @@ fn assert_bound_to_configured_anchor(out: &Value, epic: &str) {
 #[test]
 fn test_apply_auto_binds_the_configured_container_anchor() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    crate::apply_cli_tests::initialise_with_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
-    let epic = create_epic(&cli, "Auth epic");
+    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let out = jit_json(&cli, &["apply", "plan", &epic, "--json"]);
+    let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     assert_bound_to_configured_anchor(&out, &epic);
 
     // The created nodes answer to the renamed roles, and to no others.
@@ -218,10 +190,12 @@ fn test_apply_auto_binds_the_configured_container_anchor() {
 #[test]
 fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    crate::apply_cli_tests::initialise_with_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
-    let epic = create_epic(&cli, "Auth epic");
+    crate::install_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
     cli.command(["apply", "plan", &epic])
         .assert()
@@ -243,12 +217,14 @@ fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
 #[test]
 fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    crate::apply_cli_tests::initialise_with_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
-    let epic = create_epic(&cli, "Auth epic");
+    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let applied = jit_json(&cli, &["apply", "plan", &epic, "--json"]);
+    let applied = cli.run_json(["apply", "plan", &epic]).unwrap();
     let roles = &data(&applied)["created_node_ids_by_role"];
     let spec_id = roles["spec"].as_str().expect("spec id").to_string();
     let split_id = roles["split"].as_str().expect("split id").to_string();
@@ -257,7 +233,7 @@ fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
         .assert()
         .success();
 
-    let refreshed = jit_json(&cli, &["apply", "plan", &epic, "--force", "--json"]);
+    let refreshed = cli.run_json(["apply", "plan", &epic, "--force"]).unwrap();
     assert_bound_to_configured_anchor(&refreshed, &epic);
 
     let roles = &data(&refreshed)["created_node_ids_by_role"];
@@ -272,7 +248,7 @@ fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
         "--force must re-seed the existing breakdown node, got: {refreshed}"
     );
 
-    let spec = jit_json(&cli, &["issue", "show", &spec_id, "--json"]);
+    let spec = cli.run_json(["issue", "show", &spec_id]).unwrap();
     assert_eq!(
         data(&spec)["description"].as_str(),
         Some("Planning node for Auth epic (revised)."),
@@ -294,18 +270,19 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
         1,
     );
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    crate::apply_cli_tests::initialise_with_templates(&cli, &templates);
-    let positional = create_epic(&cli, "Positional epic");
-    let target = create_epic(&cli, "Target epic");
-    let reviewer = create_epic(&cli, "Reviewer epic");
+    crate::install_templates(&cli, &templates);
+    let positional = crate::create_epic(&cli, "Positional epic");
+    let target = crate::create_epic(&cli, "Target epic");
+    let reviewer = crate::create_epic(&cli, "Reviewer epic");
     let target_binding = format!("target={target}");
     let reviewer_binding = format!("reviewer={reviewer}");
 
-    let out = jit_json(
-        &cli,
-        &[
+    let out = cli
+        .run_json([
             "apply",
             "plan",
             &positional,
@@ -313,9 +290,8 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
             &target_binding,
             "--anchor",
             &reviewer_binding,
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     let bindings = data(&out)["anchor_bindings"].as_object().unwrap();
     assert_eq!(bindings["target"].as_str(), Some(target.as_str()));
     assert_eq!(bindings["reviewer"].as_str(), Some(reviewer.as_str()));

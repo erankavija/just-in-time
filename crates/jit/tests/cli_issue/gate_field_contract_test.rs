@@ -23,7 +23,6 @@
 //! build (REQ-04).
 
 use jit::test_cli::JitCli;
-use jit::test_taxonomy::TaxonomyRepo;
 use serde_json::Value;
 
 /// Create an issue carrying one required (manual) gate so every surface has a
@@ -82,16 +81,7 @@ fn assert_gates_array(view: &Value, ctx: &str) {
 
 #[test]
 fn test_issue_show_full_exposes_gates_array() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let view = temp.run_json(["issue", "show", &id]).unwrap();
     assert_gates_array(&view, "issue show --json");
@@ -99,16 +89,7 @@ fn test_issue_show_full_exposes_gates_array() {
 
 #[test]
 fn test_issue_show_summary_exposes_gates_array() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let view = temp.run_json(["issue", "show", &id, "--summary"]).unwrap();
     assert_gates_array(&view, "issue show --summary --json");
@@ -116,16 +97,7 @@ fn test_issue_show_summary_exposes_gates_array() {
 
 #[test]
 fn test_issue_status_exposes_gates_array() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let view = temp.run_json(["issue", "status", &id]).unwrap();
     assert_gates_array(&view, "issue status --json");
@@ -133,16 +105,7 @@ fn test_issue_status_exposes_gates_array() {
 
 #[test]
 fn test_graph_export_full_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let doc = temp
         .run_json(["graph", "export", "--format", "json", "--full"])
@@ -211,16 +174,7 @@ fn assert_summary_omits_gates(record: &Value, ctx: &str) {
 
 #[test]
 fn test_query_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
 
     let full = temp.run_json(["query", "all", "--full"]).unwrap();
@@ -240,16 +194,8 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
     // member. `query strategic` needs a strategic-typed issue, so one is
     // created with the same gate. Together these pin every documented
     // raw-record query variant to the storage shape.
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
     let id = seed_gated_issue(&temp);
 
     let available = temp.run_json(["query", "available", "--full"]).unwrap();
@@ -307,16 +253,7 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
 
 #[test]
 fn test_issue_list_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
 
     let full = temp.run_json(["issue", "list", "--full"]).unwrap();
@@ -331,16 +268,7 @@ fn test_issue_list_full_keeps_storage_gate_fields_and_summary_omits_them() {
 
 #[test]
 fn test_top_level_list_full_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
 
     // Top-level `list` normalizes to `issue list`, so `--full` must expose the
@@ -351,16 +279,7 @@ fn test_top_level_list_full_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
 
     let full = temp
@@ -383,16 +302,7 @@ fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
 
 #[test]
 fn test_issue_create_exposes_gates_array() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     temp.run([
         "gate",
         "define",
@@ -424,16 +334,7 @@ fn test_issue_create_exposes_gates_array() {
 
 #[test]
 fn test_issue_assign_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let record = temp
         .run_json(["issue", "assign", &id, "agent:worker-1"])
@@ -443,16 +344,7 @@ fn test_issue_assign_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_unassign_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     temp.run(["issue", "assign", &id, "agent:worker-1"])
         .unwrap();
@@ -462,16 +354,7 @@ fn test_issue_unassign_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_reject_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let record = temp.run_json(["issue", "reject", &id]).unwrap();
     assert_storage_record(&record, "issue reject");
@@ -479,16 +362,7 @@ fn test_issue_reject_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_claim_keeps_storage_gate_fields_and_carries_warnings() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let record = temp
         .run_json(["issue", "claim", &id, "agent:worker-1"])
@@ -502,16 +376,7 @@ fn test_issue_claim_keeps_storage_gate_fields_and_carries_warnings() {
 
 #[test]
 fn test_issue_claim_next_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let _id = seed_gated_issue(&temp);
     // The freshly created dependency-free issue auto-promotes to ready, so it is
     // the next claimable issue.
@@ -523,16 +388,7 @@ fn test_issue_claim_next_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_release_keeps_storage_gate_fields() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
-    let temp = JitCli::with_repository(taxonomy_repo.temp);
-    temp.run(["init"]).unwrap();
+    let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     temp.run(["issue", "claim", &id, "agent:worker-1"]).unwrap();
     let record = temp.run_json(["issue", "release", &id, "timeout"]).unwrap();

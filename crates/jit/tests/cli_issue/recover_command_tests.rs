@@ -4,23 +4,13 @@ use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use serde_json::Value;
-use std::process::Command;
 
 #[test]
 fn test_recover_command_exists() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
+    cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
 
     cli.command(["recover"]).assert().success();
@@ -31,16 +21,7 @@ fn test_recover_with_json_output() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
+    cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
 
     cli.command(["recover", "--json"])
@@ -84,16 +65,7 @@ fn test_recover_reports_actions_taken() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
+    cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
 
     cli.command(["recover"])
@@ -119,16 +91,7 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
+    cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
     let published = cli.root().join("applied-by-recovery.md");
     RedoRecord::new(
@@ -175,16 +138,7 @@ fn test_recover_json_classifies_an_unreadable_leftover_record_as_recovery_failed
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     std::fs::write(cli.root().join("README.md"), "# Test").unwrap();
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["add", "."])
-        .output()
-        .expect("Failed to git add");
-    Command::new("git")
-        .current_dir(cli.root())
-        .args(["commit", "-m", "Initial commit"])
-        .output()
-        .expect("Failed to git commit");
+    cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
     let scratch = cli
         .root()
