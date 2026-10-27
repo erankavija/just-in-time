@@ -162,8 +162,7 @@ fn membership_slug(issue: &Issue, hierarchy: &HierarchyConfig) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::fixture_issue;
-    use crate::test_utils::document_reference;
+    use crate::test_utils::{document_reference, fixture_issue};
     use proptest::prelude::*;
     use std::collections::HashMap;
 

@@ -676,8 +676,8 @@ mod tests {
     // Tests with Issue type (existing functionality)
     #[test]
     fn test_validate_add_dependency_success() {
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
-        let issue2 = crate::domain::fixture_issue("Issue 2".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), "Desc".to_string());
 
         let issues = vec![&issue1, &issue2];
         let graph = DependencyGraph::new(&issues);
@@ -689,7 +689,7 @@ mod tests {
 
     #[test]
     fn test_validate_add_dependency_with_nonexistent_issue() {
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
 
         let issues = vec![&issue1];
         let graph = DependencyGraph::new(&issues);
@@ -705,8 +705,9 @@ mod tests {
 
     #[test]
     fn test_validate_add_dependency_detects_direct_cycle() {
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
-        let issue2 = crate::domain::fixture_issue("Issue 2".to_string(), "Desc".to_string());
+        let mut issue1 =
+            crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), "Desc".to_string());
 
         // issue1 depends on issue2
         issue1.dependencies.push(issue2.id.clone());
@@ -721,9 +722,11 @@ mod tests {
 
     #[test]
     fn test_validate_add_dependency_detects_indirect_cycle() {
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), "Desc".to_string());
-        let issue3 = crate::domain::fixture_issue("Issue 3".to_string(), "Desc".to_string());
+        let mut issue1 =
+            crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let mut issue2 =
+            crate::test_utils::fixture_issue("Issue 2".to_string(), "Desc".to_string());
+        let issue3 = crate::test_utils::fixture_issue("Issue 3".to_string(), "Desc".to_string());
 
         // issue1 -> issue2 -> issue3
         issue1.dependencies.push(issue2.id.clone());
@@ -739,9 +742,10 @@ mod tests {
 
     #[test]
     fn test_get_roots_returns_issues_with_no_dependencies() {
-        let issue1 = crate::domain::fixture_issue("Root 1".to_string(), "Desc".to_string());
-        let mut issue2 = crate::domain::fixture_issue("Dependent".to_string(), "Desc".to_string());
-        let issue3 = crate::domain::fixture_issue("Root 2".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Root 1".to_string(), "Desc".to_string());
+        let mut issue2 =
+            crate::test_utils::fixture_issue("Dependent".to_string(), "Desc".to_string());
+        let issue3 = crate::test_utils::fixture_issue("Root 2".to_string(), "Desc".to_string());
 
         issue2.dependencies.push(issue1.id.clone());
 
@@ -756,11 +760,11 @@ mod tests {
 
     #[test]
     fn test_get_dependents_returns_direct_dependents() {
-        let issue1 = crate::domain::fixture_issue("Dependency".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Dependency".to_string(), "Desc".to_string());
         let mut issue2 =
-            crate::domain::fixture_issue("Dependent 1".to_string(), "Desc".to_string());
+            crate::test_utils::fixture_issue("Dependent 1".to_string(), "Desc".to_string());
         let mut issue3 =
-            crate::domain::fixture_issue("Dependent 2".to_string(), "Desc".to_string());
+            crate::test_utils::fixture_issue("Dependent 2".to_string(), "Desc".to_string());
 
         issue2.dependencies.push(issue1.id.clone());
         issue3.dependencies.push(issue1.id.clone());
@@ -776,9 +780,11 @@ mod tests {
 
     #[test]
     fn test_get_transitive_dependents() {
-        let issue1 = crate::domain::fixture_issue("Root".to_string(), "Desc".to_string());
-        let mut issue2 = crate::domain::fixture_issue("Level 1".to_string(), "Desc".to_string());
-        let mut issue3 = crate::domain::fixture_issue("Level 2".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Root".to_string(), "Desc".to_string());
+        let mut issue2 =
+            crate::test_utils::fixture_issue("Level 1".to_string(), "Desc".to_string());
+        let mut issue3 =
+            crate::test_utils::fixture_issue("Level 2".to_string(), "Desc".to_string());
 
         issue2.dependencies.push(issue1.id.clone());
         issue3.dependencies.push(issue2.id.clone());
@@ -794,9 +800,11 @@ mod tests {
 
     #[test]
     fn test_validate_dag_success_for_valid_graph() {
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), "Desc".to_string());
-        let mut issue3 = crate::domain::fixture_issue("Issue 3".to_string(), "Desc".to_string());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let mut issue2 =
+            crate::test_utils::fixture_issue("Issue 2".to_string(), "Desc".to_string());
+        let mut issue3 =
+            crate::test_utils::fixture_issue("Issue 3".to_string(), "Desc".to_string());
 
         issue2.dependencies.push(issue1.id.clone());
         issue3.dependencies.push(issue2.id.clone());
@@ -809,8 +817,10 @@ mod tests {
 
     #[test]
     fn test_validate_dag_detects_cycle() {
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), "Desc".to_string());
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), "Desc".to_string());
+        let mut issue1 =
+            crate::test_utils::fixture_issue("Issue 1".to_string(), "Desc".to_string());
+        let mut issue2 =
+            crate::test_utils::fixture_issue("Issue 2".to_string(), "Desc".to_string());
 
         issue1.dependencies.push(issue2.id.clone());
         issue2.dependencies.push(issue1.id.clone());
@@ -1283,10 +1293,11 @@ mod tests {
     #[test]
     fn test_get_isolated_nodes_with_issues() {
         // Test with actual Issue type
-        let issue1 = crate::domain::fixture_issue("Connected 1".to_string(), "Desc".to_string());
+        let issue1 =
+            crate::test_utils::fixture_issue("Connected 1".to_string(), "Desc".to_string());
         let mut issue2 =
-            crate::domain::fixture_issue("Connected 2".to_string(), "Desc".to_string());
-        let issue3 = crate::domain::fixture_issue("Isolated".to_string(), "Desc".to_string());
+            crate::test_utils::fixture_issue("Connected 2".to_string(), "Desc".to_string());
+        let issue3 = crate::test_utils::fixture_issue("Isolated".to_string(), "Desc".to_string());
 
         issue2.dependencies.push(issue1.id.clone());
 

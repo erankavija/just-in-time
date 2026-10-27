@@ -1597,7 +1597,7 @@ mod tests {
     }
 
     fn issue(title: &str, labels: &[&str]) -> Issue {
-        let mut i = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut i = crate::test_utils::fixture_issue(title.to_string(), String::new());
         i.labels = labels.iter().map(|s| s.to_string()).collect();
         i
     }
@@ -1611,7 +1611,7 @@ mod tests {
     fn typed_issue(title: &str, level: u8, extra_labels: &[&str]) -> Issue {
         let mut labels = vec![format!("type:{}", test_type(level))];
         labels.extend(extra_labels.iter().map(|label| (*label).to_string()));
-        let mut issue = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
         issue.labels = labels;
         issue
     }
@@ -1878,7 +1878,7 @@ source-of-truth = "markdown-first"
         let mut container = initiative_with_criteria(&["REQ-01"]);
         // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
         // credits the container's criterion.
-        let mut impl_node = crate::domain::fixture_issue(
+        let mut impl_node = crate::test_utils::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );

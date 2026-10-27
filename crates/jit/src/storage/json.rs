@@ -2271,12 +2271,12 @@ mod tests {
             let secondary_storage = JsonFileStorage::new(&secondary_data);
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_data);
 
-            let primary_only = crate::domain::fixture_issue(
+            let primary_only = crate::test_utils::fixture_issue(
                 "Only in primary".to_string(),
                 "The exact linked read must not aggregate this record".to_string(),
             );
             seed_issue_preimage(&main_storage, &primary_only);
-            let linked_only = crate::domain::fixture_issue(
+            let linked_only = crate::test_utils::fixture_issue(
                 "Only in linked".to_string(),
                 "The exact linked read must return this physical record".to_string(),
             );
@@ -2345,8 +2345,10 @@ mod tests {
             let (_temp, storage) = setup_storage();
 
             // Create and save an issue locally
-            let issue =
-                crate::domain::fixture_issue("Local Issue".to_string(), "Description".to_string());
+            let issue = crate::test_utils::fixture_issue(
+                "Local Issue".to_string(),
+                "Description".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2379,8 +2381,10 @@ mod tests {
         fn test_load_issue_creates_no_per_issue_sidecar_lock() {
             // REQ-01: reading an issue must not create a `<id>.lock` sidecar.
             let (_temp, storage) = setup_storage();
-            let issue =
-                crate::domain::fixture_issue("Sidecar-free".to_string(), "Description".to_string());
+            let issue = crate::test_utils::fixture_issue(
+                "Sidecar-free".to_string(),
+                "Description".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2406,7 +2410,7 @@ mod tests {
             fn lock_count_after_reading_all(issue_count: usize) -> usize {
                 let (temp, storage) = setup_storage();
                 for i in 0..issue_count {
-                    let issue = crate::domain::fixture_issue(
+                    let issue = crate::test_utils::fixture_issue(
                         format!("Issue {i}"),
                         "Description".to_string(),
                     );
@@ -2433,7 +2437,7 @@ mod tests {
         #[test]
         fn test_list_issues_changes_no_file_other_than_the_index_lock() {
             let (_temp, storage) = setup_storage();
-            let issue = crate::domain::fixture_issue(
+            let issue = crate::test_utils::fixture_issue(
                 "Listed without writes".to_string(),
                 "Description".to_string(),
             );
@@ -2457,8 +2461,10 @@ mod tests {
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
             // Create an issue and commit it
-            let issue =
-                crate::domain::fixture_issue("Committed Issue".to_string(), "From git".to_string());
+            let issue = crate::test_utils::fixture_issue(
+                "Committed Issue".to_string(),
+                "From git".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2502,7 +2508,7 @@ mod tests {
             let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create an issue in main worktree (not committed)
-            let issue = crate::domain::fixture_issue(
+            let issue = crate::test_utils::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2550,8 +2556,10 @@ mod tests {
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
             // Create and commit issue
-            let issue =
-                crate::domain::fixture_issue("Committed Issue".to_string(), "In git".to_string());
+            let issue = crate::test_utils::fixture_issue(
+                "Committed Issue".to_string(),
+                "In git".to_string(),
+            );
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2713,7 +2721,7 @@ mod tests {
             let (_temp_dir, repo_path, main_storage) = setup_git_repo();
 
             // Create issue in main worktree (not committed)
-            let issue = crate::domain::fixture_issue(
+            let issue = crate::test_utils::fixture_issue(
                 "Main WT Issue".to_string(),
                 "Uncommitted".to_string(),
             );
@@ -2803,7 +2811,7 @@ mod tests {
 
             // Create and commit issue
             let issue =
-                crate::domain::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
+                crate::test_utils::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 
@@ -2837,7 +2845,7 @@ mod tests {
 
             // Create and commit an issue
             let mut issue =
-                crate::domain::fixture_issue("Original".to_string(), "Old version".to_string());
+                crate::test_utils::fixture_issue("Original".to_string(), "Old version".to_string());
             let issue_id = issue.id.clone();
             seed_issue_preimage(&storage, &issue);
 

@@ -2,6 +2,8 @@
 //! integration targets as modules under one Cargo test target so Cargo links
 //! and runs them as a single executable (jit:8d4f7084).
 
+use jit::test_utils::fixture_issue;
+
 mod ai_review_verdict_tests;
 mod archive_path_layout_tests;
 mod artifact_discovery_tests;
@@ -29,10 +31,4 @@ fn seed_memory_data_file(storage: &jit::storage::InMemoryStorage, name: &str, co
     std::fs::create_dir_all(host_path.parent().unwrap()).unwrap();
     std::fs::write(host_path, content).unwrap();
     storage.add_data_file(name, content);
-}
-
-fn fixture_issue(title: String, description: String) -> jit::domain::Issue {
-    let mut issue = jit::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
 }
