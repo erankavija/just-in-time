@@ -3020,6 +3020,16 @@ mod tests {
         );
     }
 
+    /// An empty container reports percent 0 and still enumerates every state.
+    #[test]
+    fn test_state_rollup_from_issues_empty_counts_zero_in_every_state() {
+        let rollup = StateRollup::from_issues(&[]);
+        assert_eq!(rollup.extras.total, 0);
+        assert_eq!(rollup.extras.percent, 0);
+        assert_eq!(rollup.items.len(), State::ALL.len());
+        assert!(rollup.items.iter().all(|c| c.count == 0));
+    }
+
     /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
     /// state renders and serializes as effectively terminal; one archived from a
     /// non-terminal state stays non-terminal.
