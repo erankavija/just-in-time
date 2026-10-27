@@ -9,6 +9,8 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod config_manager;
+#[cfg(test)]
+mod crate_source_digest;
 pub mod declarations;
 pub mod document;
 pub mod domain;

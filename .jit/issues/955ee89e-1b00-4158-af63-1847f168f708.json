@@ -8,6 +8,7 @@
   ],
   "description": "Retire the private file-backed repository and executor setups of the library unit tests.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. Helpers that only arrange paths or mutate a repository they are given are scenario steps, for example `linked_checkout_paths` in `commands/worktree.rs`. JSON-backend unit tests in `storage/json.rs` construct the backend they test. The helpers below duplicate the shared constructors or open an executor over a store they are given.\n\nThis entry covers `init.rs`, `profile.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/commands/init.rs`: `executor_with_layout` (`:665`), `assert_repo_valid` (`:675`).\n- `crates/jit/src/commands/profile.rs`: `fixture` (`:2262`), `bare_repository_beside_shipped_packages` (`:3016`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: Each helper the Background lists no longer exists, and its tests obtain the repository, executor or declaration directory from the shared constructors.\n- [hard] REQ-03: No library test module defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own; scenario content stays in the tests as data.\n- [hard] REQ-04: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T20:54:26.229641350Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Init and profile command tests use the shared file-backed constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T20:54:26.229641350Z"
 }

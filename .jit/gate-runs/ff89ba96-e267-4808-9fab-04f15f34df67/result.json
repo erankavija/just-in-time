@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2a6802d8bb7fe39a53951b1fae5e2aa4151dc5d3",
+  "completed_at": "2026-10-27T20:50:21.783580726Z",
+  "duration_ms": 122393,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the six scoped suites use the shared CLI fixture and retain their assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "717f9c2f-b151-4803-b8bf-dc86df694fbc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff89ba96-e267-4808-9fab-04f15f34df67",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T20:48:19.389690346Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:717f9c2f` commits 535a3b136, 9c2b65c2f, 537ecbb0c, 110f2a0ae\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-27T20:48:09Z, reused); code-review pending\nTruncation recovery: bounded per-file patch slices, focused fixture/policy reads, and merge-parent scope comparisons performed\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the six scoped suites use the shared CLI fixture and retain their assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
