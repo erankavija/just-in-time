@@ -35,6 +35,9 @@ use std::sync::{Arc, Mutex};
 pub struct InMemoryStorage {
     /// Unique root path for parallel test isolation.
     root_path: std::path::PathBuf,
+    /// Removes a root [`new`](Self::new) minted once the last clone drops, so
+    /// host files a test mirrors under it do not outlive the store.
+    _minted_root: Option<Arc<MintedRoot>>,
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.
     repo_lock: Arc<RepoWriteLock>,
@@ -49,6 +52,14 @@ pub struct InMemoryStorage {
         Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
     #[cfg(feature = "test-support")]
     repository_state_apply_conflicts: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+struct MintedRoot(std::path::PathBuf);
+
+impl Drop for MintedRoot {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -68,9 +79,11 @@ impl InMemoryStorage {
     pub fn new() -> Self {
         // Generate unique root path for parallel test isolation
         let unique_id = uuid::Uuid::new_v4();
-        Self::rooted_at(std::path::PathBuf::from(format!(
-            "/tmp/jit-test-{unique_id}"
-        )))
+        let root = std::path::PathBuf::from(format!("/tmp/jit-test-{unique_id}"));
+        Self {
+            _minted_root: Some(Arc::new(MintedRoot(root.clone()))),
+            ..Self::rooted_at(root)
+        }
     }
 
     /// An in-memory store whose synthetic layout is rooted at `root_path`.
@@ -83,6 +96,7 @@ impl InMemoryStorage {
     pub fn rooted_at(root_path: impl Into<std::path::PathBuf>) -> Self {
         Self {
             root_path: root_path.into(),
+            _minted_root: None,
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
             mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
@@ -1241,6 +1255,20 @@ mod tests {
 
         let issues = storage.list_issues().unwrap();
         assert_eq!(issues.len(), 0);
+    }
+
+    #[test]
+    fn test_new_minted_root_is_removed_when_the_last_clone_drops() {
+        let storage = InMemoryStorage::new();
+        let clone = storage.clone();
+        let root = storage.root().to_path_buf();
+        std::fs::create_dir_all(root.join(".jit")).unwrap();
+        std::fs::write(root.join(".jit/config.toml"), "").unwrap();
+
+        drop(storage);
+        assert!(root.exists(), "a live clone keeps the minted root");
+        drop(clone);
+        assert!(!root.exists(), "the minted root outlived every clone");
     }
 
     #[test]
