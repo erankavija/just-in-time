@@ -1113,6 +1113,7 @@ mod tests {
             InMemoryStorage::new(),
             MemoryDeclarations::default(),
         );
+        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/config.toml", config);
         std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
@@ -1140,6 +1141,7 @@ mod tests {
             InMemoryStorage::new(),
             MemoryDeclarations::default(),
         );
+        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/config.toml", config);
         std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
@@ -1248,6 +1250,7 @@ kind = \"advisory\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1287,6 +1290,7 @@ kind = \"advisory\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1331,6 +1335,7 @@ enforce = true
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects this rules file, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
         let shown = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
@@ -1376,6 +1381,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects this gate registry, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
         let result = exec.list_items(Some("gate")).unwrap();
         assert_eq!(result.count(), 2);
@@ -1414,6 +1420,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects this gate registry, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
         let shown = exec.show_item("@/gate/cargo-ci").unwrap();
         assert_eq!(shown.item.self_id, "cargo-ci");
@@ -1457,6 +1464,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects these declarations (rules file, gate registry), so they are seeded after construction.
         seed_repo_file(exec.storage(), ".jit/gates.toml", COVERAGE_PREVIEW_GATE);
         seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
 
@@ -1496,6 +1504,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1528,6 +1537,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1583,6 +1593,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1635,6 +1646,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1669,6 +1681,7 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations::default(),
         );
+        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/config.toml", config);
         std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.list_items(None).unwrap_err();
@@ -1747,6 +1760,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects this rules file, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
         let err = exec.show_item("@/coverage-preview").unwrap_err();
         let msg = format!("{err:#}");
@@ -1859,6 +1873,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
         seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
         std::fs::write(
             exec.storage().root().join(".jit/invariants.toml"),
@@ -1931,6 +1946,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
+        // Initialization rejects these declarations (rules file, gate registry), so they are seeded after construction.
         seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
         seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
 
