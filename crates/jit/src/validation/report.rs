@@ -26,7 +26,7 @@ pub struct ReportedFinding {
     pub issue_id: Option<IssueId>,
     /// Name of the rule that produced this finding.
     pub rule: String,
-    /// Severity of this finding. Serializes as `"off"`/`"warn"`/`"error"`.
+    /// Severity of this finding, serialized as its token.
     pub severity: Severity,
     /// Human-readable message.
     pub message: String,
@@ -92,9 +92,9 @@ impl RuleReport {
 pub struct RuleOutcome {
     /// Name of the rule.
     pub rule: String,
-    /// Evaluation scope. Serializes as `"local"`/`"graph"`.
+    /// Evaluation scope, serialized as its token.
     pub scope: RuleScope,
-    /// Severity. Serializes as `"off"`/`"warn"`/`"error"`.
+    /// Severity, serialized as its token.
     pub severity: Severity,
     /// Human-readable rendering of the rule's authored selector.
     pub selector: String,

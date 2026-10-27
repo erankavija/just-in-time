@@ -55,6 +55,16 @@ pub fn repository_layout_for_data_root(data_root: &Path) -> RepositoryLayout {
     .expect("temporary test roots form a valid repository layout")
 }
 
+/// A TOML string array of `values` rendered by `Display`, so a fixture lists
+/// vocabulary values through their wire tokens.
+pub fn toml_string_array<T: std::fmt::Display>(values: &[T]) -> String {
+    let quoted = values
+        .iter()
+        .map(|value| format!("\"{value}\""))
+        .collect::<Vec<_>>();
+    format!("[{}]", quoted.join(", "))
+}
+
 /// A reference to `path` at HEAD with no label, type, format, or assets.
 pub fn document_reference(path: impl Into<String>) -> DocumentReference {
     DocumentReference {

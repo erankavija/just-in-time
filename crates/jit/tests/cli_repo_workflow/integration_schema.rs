@@ -305,9 +305,9 @@ fn test_schema_includes_type_definitions() {
     let state = &types["State"];
     assert_eq!(state["type"], "enum");
     let state_values = state["enum"].as_array().unwrap();
-    assert!(state_values.iter().any(|v| v == "backlog"));
-    assert!(state_values.iter().any(|v| v == "ready"));
-    assert!(state_values.iter().any(|v| v == "done"));
+    assert!(jit::domain::State::ALL
+        .iter()
+        .all(|state| state_values.iter().any(|v| v == state.as_str())));
 }
 
 #[test]

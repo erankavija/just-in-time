@@ -5,7 +5,7 @@
 //! [`ParsedContent`], so any content rule (a section/item check) yields IDENTICAL
 //! findings across all three formats.
 //!
-//! Compiled only when BOTH the `html` and `xml` features are enabled:
+//! Compiled only when BOTH markup-format features are enabled:
 //!   cargo test -p jit --features html,xml
 
 #![cfg(all(feature = "html", feature = "xml"))]

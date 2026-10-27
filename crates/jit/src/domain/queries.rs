@@ -74,9 +74,8 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 ///
 /// Produced by [`query_blocked`]: the CLI matches on these variants to build its
 /// presentation form without re-parsing text. The [`Display`](std::fmt::Display)
-/// implementation renders the canonical reason string (`dependency:<id>
-/// (<title>:<state>)` and `gate:<key> (<status>)`) shared by human and `--json`
-/// output.
+/// implementation renders the human reason string (`dependency:<id>
+/// (<title>:<state>)` and `gate:<key> (<status>)`) with wire tokens.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockingReason {
     /// An unmet dependency: the issue waits on `id` (titled `title`), which is in
@@ -109,7 +108,7 @@ impl std::fmt::Display for BlockingReason {
                 write!(f, "dependency:{} ({}:{})", id, title, state.as_str())
             }
             BlockingReason::Gate { key, status } => {
-                write!(f, "gate:{} ({:?})", key, status)
+                write!(f, "gate:{} ({})", key, status)
             }
         }
     }
@@ -796,10 +795,10 @@ mod tests {
         }));
         assert!(reasons
             .iter()
-            .any(|r| r.to_string() == "gate:never-run (Pending)"));
+            .any(|r| r.to_string() == format!("gate:never-run ({})", GateStatus::Pending)));
         assert!(reasons
             .iter()
-            .any(|r| r.to_string() == "gate:failed (Failed)"));
+            .any(|r| r.to_string() == format!("gate:failed ({})", GateStatus::Failed)));
     }
 
     #[test]

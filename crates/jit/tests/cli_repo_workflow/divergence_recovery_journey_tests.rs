@@ -22,6 +22,7 @@
 //! executes.
 
 use crate::linked_checkout_write_policy_tests::durable_events;
+use jit::domain::store_divergence::DivergenceClass;
 use jit::test_cli::{created_issue_id, JitCli};
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -183,7 +184,7 @@ fn index_stage(checkout: &JitCli, stage: u8) -> Value {
 /// stores that each created an issue conflicts here rather than in
 /// `.jit/issues/`, every time, because both sides inserted an id into one small
 /// array over a common base, and the union of the two sides is what the
-/// finding-class table's `local_only` and `reference_only` rows already decided
+/// finding-class table's one-sided rows already decided
 /// to keep. The page also stops routing this conflict to `jit validate --fix`,
 /// which fails to parse the conflicted file and, once it is resolved to one
 /// side alone, reports that no fixes were needed while `jit validate` rejects
@@ -427,9 +428,12 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
     // finding here is one-sided, so the table's automatic path applies and no
     // record needs a human decision.
     assert!(
-        reported
-            .iter()
-            .all(|(_, class, _)| class == "local_only" || class == "reference_only"),
+        reported.iter().all(|(_, class, _)| [
+            DivergenceClass::LocalOnly,
+            DivergenceClass::ReferenceOnly
+        ]
+        .iter()
+        .any(|one_sided| class == one_sided.as_str())),
         "this reproduction diverges by records held on one side only; report: {diverged}"
     );
 

@@ -323,7 +323,7 @@ pub trait IssueStore: Clone {
     ///
     /// A run qualifies only when it recorded the same digest, executed its own
     /// checker ([`GateVerdictOrigin::Executed`](crate::domain::GateVerdictOrigin)),
-    /// and reached a verdict — `passed` or `failed`. A run that errored reached
+    /// and reached a verdict, passing or failing. A run that errored reached
     /// none, so it is never a source.
     ///
     /// # Errors

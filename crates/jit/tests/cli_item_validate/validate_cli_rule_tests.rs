@@ -187,8 +187,8 @@ assert = { require-section = { heading = "Summary" } }
 #[test]
 fn test_validate_explain_renders_skipped_rule_with_state_reason() {
     // The success criterion: `jit validate <id> --explain` shows whether the
-    // state predicate matched. A fresh issue is in `backlog`, so the `done`-scoped
-    // rule is rendered as a [SKIP] line naming the issue state and the wanted
+    // state predicate matched. A fresh issue is not in the rule's wanted state,
+    // so the rule is rendered as a [SKIP] line naming the issue state and the wanted
     // token.
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),

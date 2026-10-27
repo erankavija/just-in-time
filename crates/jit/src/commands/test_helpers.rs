@@ -310,7 +310,7 @@ fn mirror_memory_declarations(
 ///
 /// # Arguments
 ///
-/// * `mode` - Enforcement mode: "strict", "warn", or "off"
+/// * `mode` - An [`EnforcementMode`](crate::config::EnforcementMode) token
 pub fn setup_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
     memory_executor_declaring(
         InMemoryStorage::new(),

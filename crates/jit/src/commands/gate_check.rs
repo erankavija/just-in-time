@@ -1642,42 +1642,49 @@ mod tests {
         issue_id
     }
 
-    const RULE_VALIDATION_TEST_RULES: &str = r#"
+    fn rule_validation_test_rules() -> String {
+        use crate::declarations::rules::ChildLink;
+        format!(
+            r#"
 [[rules]]
 name = "coverage-preview"
-when = { type = "breakdown" }
+when = {{ type = "breakdown" }}
 severity = "error"
-assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", container-from-label = "brackets" } }
+assert = {{ label-coverage = {{ marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "{dependencies}", container-from-label = "brackets" }} }}
 
 [[rules]]
 name = "unrelated-local-failure"
-when = { type = "task" }
+when = {{ type = "task" }}
 severity = "error"
-assert = { require-label = { label = "required:*", min = 1 } }
+assert = {{ require-label = {{ label = "required:*", min = 1 }} }}
 
 [[rules]]
 name = "unrelated-graph-failure"
-when = { type = "epic" }
+when = {{ type = "epic" }}
 severity = "error"
-assert = { label-coverage = { marker = "[hard]", child-link = "any" } }
+assert = {{ label-coverage = {{ marker = "[hard]", child-link = "{any}" }} }}
 
 [[rules]]
 name = "unrelated-label-reference"
-when = { type = "task" }
+when = {{ type = "task" }}
 severity = "error"
-assert = { label-reference = { from = "satisfies", to = "req" } }
-"#;
+assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
+"#,
+            dependencies = ChildLink::Dependencies,
+            any = ChildLink::Any,
+        )
+    }
 
     fn seed_rule_validation_rules(executor: &CommandExecutor<InMemoryStorage>) {
         std::fs::write(
             executor.storage.root().join("rules.toml"),
-            RULE_VALIDATION_TEST_RULES,
+            rule_validation_test_rules(),
         )
         .unwrap();
         seed_repo_file(
             &executor.storage,
             ".jit/rules.toml",
-            RULE_VALIDATION_TEST_RULES,
+            &rule_validation_test_rules(),
         );
         let rules_path = executor
             .storage
@@ -1685,7 +1692,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             .resolve(&crate::repository_state::VirtualPath::RULES)
             .unwrap();
         std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-        std::fs::write(rules_path, RULE_VALIDATION_TEST_RULES).unwrap();
+        std::fs::write(rules_path, rule_validation_test_rules()).unwrap();
     }
 
     fn seed_unrelated_manual_gate(executor: &CommandExecutor<InMemoryStorage>) {

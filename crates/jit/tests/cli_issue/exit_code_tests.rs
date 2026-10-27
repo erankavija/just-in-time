@@ -988,9 +988,9 @@ fn test_claim_assign_only_sets_assignee_without_transition() {
     let json: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
     assert_eq!(json["assignee"], "agent:test");
     // State is unchanged by --assign-only: a fresh, dependency-free issue is
-    // `ready`, and crucially it was NOT transitioned to `in_progress`.
-    assert_ne!(json["state"], "in_progress");
-    assert_eq!(json["state"], "ready");
+    // ready, and crucially it was NOT transitioned to in-progress.
+    assert_ne!(json["state"], jit::domain::State::InProgress.as_str());
+    assert_eq!(json["state"], jit::domain::State::Ready.as_str());
 }
 
 /// Regression: a normal claim on a ready (unblocked) issue still transitions to

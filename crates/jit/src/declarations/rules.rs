@@ -172,8 +172,8 @@ pub enum RuleConfigError {
 wire_vocabulary! {
     /// Severity of a rule finding.
     ///
-    /// `off` disables the rule entirely; `warn` reports without blocking; `error`
-    /// reports and (when `enforce` is set) can block a write.
+    /// Each variant's doc states its effect; only [`Severity::Error`] (with
+    /// `enforce` set) can block a write.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
     pub enum Severity {
         /// Rule is disabled.
@@ -334,9 +334,11 @@ fn valid_state_tokens() -> String {
 /// which deserialize into the same set-of-states predicate:
 ///
 /// ```toml
-/// when = { state = "in_progress" }                       # single
-/// when = { state = ["ready", "in_progress", "gated"] }   # list
+/// when = { state = "in_progress" }     # single
+/// when = { state = ["in_progress"] }   # list
 /// ```
+///
+/// The list form may hold any number of states.
 ///
 /// Matching is membership: [`StatePredicate::matches`] is true when the issue's
 /// state is one of the predicate's states. The authored tokens are parsed once,
@@ -547,7 +549,7 @@ pub enum Assertion {
         /// `gates_required`".
         gates: Vec<String>,
     },
-    /// A type-hierarchy warning (orphan-leaf or strategic-consistency).
+    /// A type-hierarchy warning, one [`TypeHierarchyKind`] check.
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
     /// kind; the workflow profile contributes the standard instances.
     /// Evaluation reuses the existing [`crate::domain::type_taxonomy`] domain functions
@@ -838,7 +840,7 @@ impl Assertion {
     /// resolves only against linked issues, all of which the neighborhood slice
     /// includes, so it runs.
     ///
-    /// `type-hierarchy` checks (orphan-leaf / strategic-consistency) reason about
+    /// `type-hierarchy` checks ([`TypeHierarchyKind`]) reason about
     /// each issue against the WHOLE set's parent/child relations, so they are
     /// likewise treated as repo-wide and validate-only. The per-issue graph kinds
     /// (`label-coverage`, `dependency-shape`, `gate-recency`) only need the
@@ -1690,7 +1692,7 @@ fn schema_source_from_bytes(
 mod tests {
     use super::*;
     use crate::domain::{Issue, State};
-    use crate::test_utils::{document_reference, fixture_issue};
+    use crate::test_utils::{document_reference, fixture_issue, toml_string_array};
 
     fn parse(content: &str) -> Result<RuleSet, RuleConfigError> {
         RuleSet::parse(content, None, [])
@@ -1777,13 +1779,16 @@ assert = { require-section = { heading = "Plan" } }
     #[test]
     fn test_selector_state_list_predicate_matches_any_member() {
         // A list `state` matches an issue in any listed state and nothing else.
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "list"
-when = { state = ["ready", "in_progress", "gated"] }
-assert = { require-section = { heading = "Plan" } }
-"#;
-        let set = parse(toml).unwrap();
+when = {{ state = {states} }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
+"#,
+            states = toml_string_array(&[State::Ready, State::InProgress, State::Gated]),
+        );
+        let set = parse(&toml).unwrap();
         let sel = &set.rules[0].when;
         assert!(sel.matches(&issue_with(&[], State::Ready)));
         assert!(sel.matches(&issue_with(&[], State::InProgress)));
@@ -1796,13 +1801,16 @@ assert = { require-section = { heading = "Plan" } }
     #[test]
     fn test_selector_state_list_combines_with_type() {
         // The state predicate AND-combines with the type selector.
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "epic-lifecycle"
-when = { type = "epic", state = ["ready", "in_progress"] }
-assert = { require-section = { heading = "Plan" } }
-"#;
-        let set = parse(toml).unwrap();
+when = {{ type = "epic", state = {states} }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
+"#,
+            states = toml_string_array(&[State::Ready, State::InProgress]),
+        );
+        let set = parse(&toml).unwrap();
         let sel = &set.rules[0].when;
         // type + state both match.
         assert!(sel.matches(&issue_with(&["type:epic"], State::InProgress)));
@@ -1828,15 +1836,7 @@ assert = { require-section = { heading = "Plan" } }
                 assert_eq!(rule, "typo");
                 assert_eq!(value, "in_progres");
                 // The valid list names every legal token.
-                for token in [
-                    "backlog",
-                    "ready",
-                    "in_progress",
-                    "gated",
-                    "done",
-                    "rejected",
-                    "archived",
-                ] {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -1900,10 +1900,10 @@ assert = { require-section = { heading = "Plan" } }
     fn test_state_predicate_matches_typed_set_equals_token_set() {
         // The pre-parsed set membership must agree with the authored tokens for
         // every lifecycle state.
-        let all = State::ALL;
-        let pred = StatePredicate::list(["ready", "in_progress", "done"]);
-        for state in all {
-            let want = matches!(state, State::Ready | State::InProgress | State::Done);
+        let chosen = [State::Ready, State::InProgress, State::Done];
+        let pred = StatePredicate::list(chosen.map(State::as_str));
+        for state in State::ALL {
+            let want = chosen.contains(&state);
             assert_eq!(pred.matches(state), want, "mismatch for {state:?}");
         }
     }
@@ -1985,23 +1985,27 @@ assert = { require-section = { heading = "Goals" } }
 
     #[test]
     fn test_severity_defaults_to_warn_and_parses_levels() {
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "default-sev"
-assert = { require-section = { heading = "A" } }
+assert = {{ require-section = {{ heading = "A" }} }}
 
 [[rules]]
 name = "error-sev"
-severity = "error"
+severity = "{error}"
 enforce = true
-assert = { require-section = { heading = "B" } }
+assert = {{ require-section = {{ heading = "B" }} }}
 
 [[rules]]
 name = "off-sev"
-severity = "off"
-assert = { require-section = { heading = "C" } }
-"#;
-        let set = parse(toml).unwrap();
+severity = "{off}"
+assert = {{ require-section = {{ heading = "C" }} }}
+"#,
+            error = Severity::Error,
+            off = Severity::Off,
+        );
+        let set = parse(&toml).unwrap();
         assert_eq!(set.rules[0].severity, Severity::Warn);
         assert_eq!(set.rules[1].severity, Severity::Error);
         assert!(set.rules[1].enforce);
@@ -2012,11 +2016,11 @@ assert = { require-section = { heading = "C" } }
     fn test_scope_is_derived_from_assertion_kind() {
         let toml = r#"
 [[rules]]
-name = "local"
+name = "label-rule"
 assert = { require-label = { label = "type:*" } }
 
 [[rules]]
-name = "graph"
+name = "coverage-rule"
 assert = { label-coverage = { child-state = "done" } }
 "#;
         let set = parse(toml).unwrap();

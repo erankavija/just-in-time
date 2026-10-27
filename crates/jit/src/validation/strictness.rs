@@ -56,17 +56,16 @@ impl Strictness {
     /// This is the ONE modulated decision shared by every enforcement choke
     /// point. It reads — never mutates — the rule's `enforce` and `severity`:
     ///
-    /// - [`Strictness::Strict`] blocks on any reported violation (a `warn` or
-    ///   `error` finding; an `off` rule reports nothing and so never reaches
-    ///   here).
+    /// - [`Strictness::Strict`] blocks on any reported violation (a
+    ///   [`Severity::Off`] rule reports nothing and so never reaches here).
     /// - [`Strictness::Loose`] blocks only when the rule enforces AND its
-    ///   severity is `error` — the exact pre-strictness rule.
+    ///   severity is [`Severity::Error`], the exact pre-strictness rule.
     /// - [`Strictness::Permissive`] never blocks.
     pub fn blocks(self, enforce: bool, severity: Severity) -> bool {
         match self {
-            // An `off` rule is filtered out before evaluation, so any finding
-            // that reaches here is `warn` or `error`; guard on `!= Off` anyway so
-            // the predicate is total and self-explanatory.
+            // An `Off` rule is filtered out before evaluation, so any finding
+            // that reaches here has another severity; guard on `!= Off` anyway
+            // so the predicate is total and self-explanatory.
             Strictness::Strict => severity != Severity::Off,
             Strictness::Loose => enforce && severity == Severity::Error,
             Strictness::Permissive => false,

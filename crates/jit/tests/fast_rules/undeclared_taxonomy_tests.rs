@@ -22,6 +22,15 @@ fn scaffolded_rule_names(jit_dir: &Path) -> Vec<String> {
         .collect()
 }
 
+/// Whether the scaffold wrote any rule asserting a `type-hierarchy` check.
+fn declares_type_hierarchy_rule(jit_dir: &Path) -> bool {
+    scaffolded_rules(jit_dir).iter().any(|rule| {
+        rule.get("assert")
+            .and_then(|assert| assert.get("type-hierarchy"))
+            .is_some()
+    })
+}
+
 fn scaffolded_rules(jit_dir: &Path) -> Vec<toml::Value> {
     let rules: toml::Value =
         toml::from_str(&fs::read_to_string(jit_dir.join("rules.toml")).unwrap()).unwrap();
@@ -238,11 +247,8 @@ unique = true
     assert_eq!(projected_namespaces(&jit_dir), names(&["squad"]));
     assert!(rule_names.contains(&"namespace-unique-squad".to_string()));
     assert!(
-        rule_names.iter().all(|name| {
-            name != "type-hierarchy-known"
-                && name != "orphan-leaf"
-                && name != "strategic-consistency"
-        }),
+        !rule_names.contains(&"type-hierarchy-known".to_string())
+            && !declares_type_hierarchy_rule(&jit_dir),
         "a repository declaring no type hierarchy received the rule: {rule_names:?}",
     );
 }
@@ -267,9 +273,7 @@ types = { objective = 1, action = 2 }
     assert_eq!(projected_types(&jit_dir), names(&["objective", "action"]));
     assert!(rule_names.contains(&"type-hierarchy-known".to_string()));
     assert!(
-        rule_names
-            .iter()
-            .all(|name| { name != "orphan-leaf" && name != "strategic-consistency" }),
+        !declares_type_hierarchy_rule(&jit_dir),
         "a repository that applied no package received a workflow rule: {rule_names:?}",
     );
     assert!(

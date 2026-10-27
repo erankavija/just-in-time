@@ -170,7 +170,10 @@ fn test_gate_evaluate_json_failure_matches_persisted_status() {
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["error"]["code"], "GATE_FAILED");
     assert_eq!(json["error"]["details"]["key"], "test-gate");
-    assert_eq!(json["error"]["details"]["status"], "failed");
+    assert_eq!(
+        json["error"]["details"]["status"],
+        jit::domain::GateRunStatus::Failed.as_str()
+    );
     assert_eq!(
         json["error"]["details"]["checker_result"]["status"],
         "failed"

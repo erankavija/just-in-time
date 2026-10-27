@@ -2907,11 +2907,13 @@ depends_on = ["planning"]
     #[test]
     fn test_render_selector_state_list_joins_with_pipe() {
         use crate::declarations::rules::{Selector, StatePredicate};
+        use crate::domain::State;
+        let (first, second) = (State::Ready, State::InProgress);
         let sel = Selector {
-            state: Some(StatePredicate::list(["ready", "in_progress"])),
+            state: Some(StatePredicate::list([first, second].map(State::as_str))),
             ..Default::default()
         };
-        assert_eq!(render_selector(&sel), "state=ready|in_progress");
+        assert_eq!(render_selector(&sel), format!("state={first}|{second}"));
     }
 
     #[test]

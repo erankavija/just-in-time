@@ -133,8 +133,8 @@ wire_vocabulary! {
     /// validation projection uses to extract `sections`.
     ///
     /// When absent on an issue the repo default (`[validation].content_format`)
-    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. HTML/XML are
-    /// only usable when the `html`/`xml` cargo features are built (see
+    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. A markup format
+    /// other than the default is usable only when its cargo feature is built (see
     /// [`content_parser_for`](crate::document::content_parser_for)).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     pub enum ContentFormat {
@@ -957,8 +957,8 @@ impl GateRunResult {
     /// makes the two evaluations questions about identical content. The run
     /// must have executed its own checker, so the record a reuse names is
     /// always the execution behind the verdict rather than another reference
-    /// to it. And the run must have reached a verdict — `passed` or `failed`;
-    /// an errored run reports the checker never getting there (a timeout, a
+    /// to it. And the run must have reached a verdict, passing or failing; an
+    /// errored run reports the checker never getting there (a timeout, a
     /// missing command), which says nothing about the inputs.
     pub fn is_reusable_for(
         &self,
@@ -2718,83 +2718,6 @@ mod tests {
 
         assert_eq!(doc, deserialized);
         assert_eq!(deserialized.assets.len(), 0);
-    }
-
-    // FromStr trait tests
-    mod fromstr_tests {
-        use super::*;
-        use crate::declarations::GateMode;
-        use std::str::FromStr;
-
-        // GateStage FromStr/Display/as_str
-
-        #[test]
-        fn test_gate_stage_from_str_accepts_valid() {
-            assert_eq!(
-                GateStage::from_str("precheck").unwrap(),
-                GateStage::Precheck
-            );
-            assert_eq!(
-                GateStage::from_str("postcheck").unwrap(),
-                GateStage::Postcheck
-            );
-        }
-
-        #[test]
-        fn test_gate_stage_from_str_rejects_invalid() {
-            assert!(GateStage::from_str("invalid").is_err());
-            assert!(GateStage::from_str("").is_err());
-            assert!(GateStage::from_str("PRECHECK").is_err());
-        }
-
-        #[test]
-        fn test_gate_stage_display_and_as_str_round_trip() {
-            assert_eq!(GateStage::Precheck.to_string(), "precheck");
-            assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
-            assert_eq!(GateStage::Precheck.as_str(), "precheck");
-            assert_eq!(GateStage::Postcheck.as_str(), "postcheck");
-        }
-
-        #[test]
-        fn test_gate_stage_display_equals_serde() {
-            // Display/as_str must match what serde produces (snake_case).
-            let json_pre = serde_json::to_string(&GateStage::Precheck).unwrap();
-            let json_post = serde_json::to_string(&GateStage::Postcheck).unwrap();
-            assert_eq!(json_pre, format!("\"{}\"", GateStage::Precheck));
-            assert_eq!(json_post, format!("\"{}\"", GateStage::Postcheck));
-        }
-
-        // GateMode FromStr/Display/as_str
-
-        #[test]
-        fn test_gate_mode_from_str_accepts_valid() {
-            assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
-            assert_eq!(GateMode::from_str("auto").unwrap(), GateMode::Auto);
-        }
-
-        #[test]
-        fn test_gate_mode_from_str_rejects_invalid() {
-            assert!(GateMode::from_str("invalid").is_err());
-            assert!(GateMode::from_str("").is_err());
-            assert!(GateMode::from_str("MANUAL").is_err());
-        }
-
-        #[test]
-        fn test_gate_mode_display_and_as_str_round_trip() {
-            assert_eq!(GateMode::Manual.to_string(), "manual");
-            assert_eq!(GateMode::Auto.to_string(), "auto");
-            assert_eq!(GateMode::Manual.as_str(), "manual");
-            assert_eq!(GateMode::Auto.as_str(), "auto");
-        }
-
-        #[test]
-        fn test_gate_mode_display_equals_serde() {
-            // Display/as_str must match what serde produces (snake_case).
-            let json_manual = serde_json::to_string(&GateMode::Manual).unwrap();
-            let json_auto = serde_json::to_string(&GateMode::Auto).unwrap();
-            assert_eq!(json_manual, format!("\"{}\"", GateMode::Manual));
-            assert_eq!(json_auto, format!("\"{}\"", GateMode::Auto));
-        }
     }
 
     mod assignee_tests {

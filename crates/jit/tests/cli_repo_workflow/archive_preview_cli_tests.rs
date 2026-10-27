@@ -1,4 +1,4 @@
-use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
+use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan, BlockerCode, EvidenceCode};
 use jit::output::{render_archive_candidates, render_archive_plan};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -841,9 +841,13 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 .unwrap()
                 .iter()
                 .any(|evidence| {
-                    evidence == "permanent-path"
-                        || evidence == "outside-development-root"
-                        || evidence == "unmanaged-path"
+                    [
+                        EvidenceCode::PermanentPath,
+                        EvidenceCode::OutsideDevelopmentRoot,
+                        EvidenceCode::UnmanagedPath,
+                    ]
+                    .iter()
+                    .any(|code| evidence == code.as_str())
                 })
         })
         .collect::<Vec<_>>();
@@ -1040,8 +1044,8 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
         assert_eq!(report["count"], 1);
         assert_eq!(report["candidates"][0]["policy_status"], expected);
         let blocker = match expected {
-            "unconfigured" => Some("policy-unconfigured"),
-            "incomplete" => Some("policy-incomplete"),
+            "unconfigured" => Some(BlockerCode::PolicyUnconfigured.as_str()),
+            "incomplete" => Some(BlockerCode::PolicyIncomplete.as_str()),
             _ => None,
         };
         if let Some(blocker) = blocker {

@@ -9,6 +9,7 @@
 //! expectation here restates the naming rule.
 
 use crate::doc_show_tests::{declared_area, membership_type_and_namespace, undeclared_area};
+use jit::domain::State;
 use jit::test_cli::{created_issue_id, JitCli};
 use jit::test_utils::setup_test_repo_with_config;
 use serde_json::Value;
@@ -534,9 +535,15 @@ fn test_doc_conformance_findings_block_no_state_transition() {
     );
 
     // The reported artifact stays put while its owner runs the lifecycle out.
-    ["in_progress", "done"].iter().for_each(|state| {
+    [State::InProgress, State::Done].iter().for_each(|state| {
         let output = cli
-            .command(["issue", "update", &issue.short_id, "--state", state])
+            .command([
+                "issue",
+                "update",
+                &issue.short_id,
+                "--state",
+                state.as_str(),
+            ])
             .output()
             .unwrap();
         assert!(

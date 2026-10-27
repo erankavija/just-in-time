@@ -976,6 +976,7 @@ fn derive_reduced_graph_intents(
 mod captured_tests {
     use super::*;
     use crate::commands::test_helpers::fixture_id;
+    use crate::domain::event_catalog::EventTag;
     use crate::storage::{InMemoryStorage, IssueStore, MutationPoint, RepositoryStateStore};
 
     #[derive(Default)]
@@ -1018,8 +1019,13 @@ mod captured_tests {
         assert_eq!(updated.state, State::Backlog);
         let events = executor.storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].get_type(), "issue_state_changed");
-        assert_eq!(events[1].get_type(), "issue_updated");
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| event.get_type())
+                .collect::<Vec<_>>(),
+            [EventTag::IssueStateChanged, EventTag::IssueUpdated].map(EventTag::as_str)
+        );
         let first = serde_json::to_value(&events[0]).unwrap();
         let second = serde_json::to_value(&events[1]).unwrap();
         assert_eq!(first["timestamp"], second["timestamp"]);
@@ -1117,7 +1123,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .into_iter()
             .map(|event| event.get_type().to_string())
             .collect::<Vec<_>>();
-        assert_eq!(event_types, vec!["issue_updated", "transition_blocked"]);
+        assert_eq!(
+            event_types,
+            [EventTag::IssueUpdated, EventTag::TransitionBlocked].map(EventTag::as_str)
+        );
     }
 
     #[test]

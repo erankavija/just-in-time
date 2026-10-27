@@ -1492,8 +1492,8 @@ mod research {
 
     #[test]
     fn test_research_inflight_goal_produces_zero_error_findings() {
-        // The coverage rule is scoped `state = "done"`. A goal in_progress with
-        // no covering experiments must produce zero ERROR findings from graph
+        // The coverage rule is scoped to the delivered state. An in-flight goal
+        // with no covering experiments must produce zero ERROR findings from graph
         // rules (the done-scoped rule simply does not match).
         let set = load_example("research");
         let rules = graph_rules(&set);

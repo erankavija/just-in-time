@@ -2389,12 +2389,7 @@ mod tests {
         rules["rules"]
             .as_array_of_tables_mut()
             .unwrap()
-            .retain(|rule| {
-                !matches!(
-                    rule["name"].as_str(),
-                    Some("orphan-leaf" | "strategic-consistency")
-                )
-            });
+            .retain(|rule| rule["assert"].get("type-hierarchy").is_none());
         fs::write(&rules_path, rules.to_string()).unwrap();
         // The workflow package and the package it depends on, side by side
         // inside the worktree, which is where a declared dependency is
@@ -2410,10 +2405,14 @@ mod tests {
             toml::from_str(&fs::read_to_string(temp.path().join(".jit/rules.toml")).unwrap())
                 .unwrap();
         let rules = rules["rules"].as_array().unwrap();
-        for expected in ["orphan-leaf", "strategic-consistency"] {
+        for expected in crate::declarations::rules::TypeHierarchyKind::ALL {
             assert!(
                 rules.iter().any(|rule| {
-                    rule["name"].as_str() == Some(expected)
+                    rule.get("assert")
+                        .and_then(|assert| assert.get("type-hierarchy"))
+                        .and_then(|hierarchy| hierarchy.get("kind"))
+                        .and_then(toml::Value::as_str)
+                        == Some(expected.as_str())
                         && rule["origin"].as_str() == Some("jit-dogfood")
                 }),
                 "workflow profile did not contribute {expected}: {rules:?}"

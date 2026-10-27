@@ -492,10 +492,11 @@ source-of-truth = "markdown-first"
     let _ = std::fs::remove_dir_all(storage.root());
 }
 
-/// F2 (REQ-07): full style shares the id-anchor missing-source guard. A `full`
-/// projection whose declared registry store is absent over the `read_repo_file`
-/// boundary is a typed `ProjectionError::SourceNotFound` raised BEFORE any write,
-/// never a silent empty render from the defaulted in-memory registry.
+/// F2 (REQ-07): the full style shares the anchor style's missing-source guard.
+/// A full-style projection whose declared registry store is absent over the
+/// `read_repo_file` boundary is a typed `ProjectionError::SourceNotFound` raised
+/// BEFORE any write, never a silent empty render from the defaulted in-memory
+/// registry.
 #[test]
 fn test_full_style_missing_registry_source_errors_pre_write() {
     let config = format!(

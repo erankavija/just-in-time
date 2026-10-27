@@ -714,12 +714,11 @@ fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
 ///   namespace on children whose value names the satisfied criterion (see
 ///   [`label_credits_id`]).
 /// - `child-state` (string, optional): when set, a satisfying child must be in
-///   this lifecycle state (snake_case, e.g. `"done"`). **Absent means any
-///   state** — there is no `"any"` token.
-/// - `child-link` (string, optional, default `"dependents"`): how a child
-///   relates to the container — `"dependents"`, `"dependencies"`, or `"any"`.
-///   For `"dependents"` / `"dependencies"` the walk is a transitive closure in
-///   that direction.
+///   this lifecycle state (a [`State`](crate::domain::State) token).
+///   **Absent means any state**; there is no wildcard token.
+/// - `child-link` (string, optional, default [`ChildLink::Dependents`]): how a
+///   child relates to the container, as a [`ChildLink`] token. For a
+///   directional link the walk is a transitive closure in that direction.
 /// - `child-type-exclude` (array of strings, optional): bare `type:` names that
 ///   are dropped from coverage candidates AND act as a traversal boundary (the
 ///   walk does not descend through them).
@@ -1423,11 +1422,11 @@ fn describe_missing(
 }
 
 // ---------------------------------------------------------------------------
-// type-hierarchy (orphan-leaf / strategic-consistency)
+// type-hierarchy (`TypeHierarchyKind` checks)
 // ---------------------------------------------------------------------------
 
-/// Evaluate a declarative `type-hierarchy` rule (orphan-leaf or
-/// strategic-consistency) by REUSING the existing
+/// Evaluate a declarative `type-hierarchy` rule (a [`TypeHierarchyKind`]
+/// check) by REUSING the existing
 /// [`crate::domain::type_taxonomy`] domain functions over each issue, converting their
 /// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
 ///
@@ -1731,27 +1730,31 @@ mod tests {
     #[test]
     fn test_coverage_credit_namespaces_reads_active_crediting_rules() {
         let set = RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "default-ns"
-severity = "error"
-assert = { label-coverage = { } }
+severity = "{error}"
+assert = {{ label-coverage = {{ }} }}
 
 [[rules]]
 name = "custom-ns"
-severity = "error"
-assert = { label-coverage = { satisfies-namespace = "tests" } }
+severity = "{error}"
+assert = {{ label-coverage = {{ satisfies-namespace = "tests" }} }}
 
 [[rules]]
 name = "checks"
-severity = "error"
-assert = { criteria-to-check = { check-namespace = "checks" } }
+severity = "{error}"
+assert = {{ criteria-to-check = {{ check-namespace = "checks" }} }}
 
 [[rules]]
 name = "disabled"
-severity = "off"
-assert = { label-coverage = { satisfies-namespace = "off-ns" } }
+severity = "{off}"
+assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
 "#,
+                error = crate::declarations::rules::Severity::Error,
+                off = crate::declarations::rules::Severity::Off,
+            ),
             None,
             [],
         )

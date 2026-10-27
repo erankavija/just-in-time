@@ -18,8 +18,10 @@ use std::process::{Command, Stdio};
 /// A failure from the full-text search backend (`ripgrep`).
 ///
 /// Distinguishes "`ripgrep` is not installed" from a search-execution failure so
-/// the CLI can pick the JSON `error_code` (`RIPGREP_NOT_FOUND` vs `SEARCH_FAILED`)
-/// and its suggestion by downcasting to this type rather than scanning the
+/// the CLI can pick the JSON `error_code`
+/// ([`RipgrepNotFound`](crate::output::ErrorCode::RipgrepNotFound) or
+/// [`SearchFailed`](crate::output::ErrorCode::SearchFailed)) and its suggestion
+/// by downcasting to this type rather than scanning the
 /// message text. Each variant's `Display` reproduces the original message
 /// verbatim, so user-facing output is unchanged.
 #[derive(Debug, thiserror::Error)]
@@ -391,9 +393,8 @@ mod tests {
         assert_eq!(search_match, deserialized);
     }
 
-    // SearchError exists so the CLI can pick the JSON `error_code`
-    // (RIPGREP_NOT_FOUND vs SEARCH_FAILED) by downcast rather than by scanning the
-    // message. These tests pin both halves of that contract: each variant's
+    // SearchError exists so the CLI can pick the JSON `error_code` by downcast
+    // rather than by scanning the message. These tests pin both halves of that contract: each variant's
     // `Display` reproduces the original `bail!` message verbatim, and the type
     // survives an `anyhow::Error` round trip so the downcast in `main.rs` works.
 

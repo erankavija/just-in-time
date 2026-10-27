@@ -104,6 +104,21 @@ pub enum GateRunField {
     EvaluationStability,
 }
 
+/// `tokens` as code spans joined into an English alternative: `a` or `b`, or
+/// `a`, `b`, or `c`.
+fn code_alternatives(tokens: &[&str]) -> String {
+    let spans = tokens
+        .iter()
+        .map(|token| format!("`{token}`"))
+        .collect::<Vec<_>>();
+    match spans.as_slice() {
+        [] => String::new(),
+        [only] => only.clone(),
+        [first, second] => format!("{first} or {second}"),
+        [leading @ .., last] => format!("{}, or {last}", leading.join(", ")),
+    }
+}
+
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
     pub const ALL: [GateRunField; 21] = [
@@ -174,7 +189,10 @@ impl GateRunField {
             GateRunField::GateKey => {
                 "Key of the gate that ran, as registered in `.jit/gates.toml`.".to_string()
             }
-            GateRunField::Stage => "Stage the gate ran at: `precheck` or `postcheck`.".to_string(),
+            GateRunField::Stage => format!(
+                "Stage the gate ran at: {}.",
+                code_alternatives(&GateStage::ALL.map(GateStage::as_str))
+            ),
             GateRunField::IssueId => {
                 "Full id of the issue the run is about. An issue's runs are selected by matching \
                  this field across the run directories, so `gate-runs/` is flat rather than \
@@ -193,12 +211,11 @@ impl GateRunField {
                  `commit`."
                     .to_string()
             }
-            GateRunField::Status => {
-                "The run's verdict: `passed`, `failed`, `error`, or `pending`. For an \
-                 executed checker the exit status decides it, as \
-                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines."
-                    .to_string()
-            }
+            GateRunField::Status => format!(
+                "The run's verdict: {}. For an executed checker the exit status decides it, as \
+                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines.",
+                code_alternatives(&GateRunStatus::ALL.map(GateRunStatus::as_str))
+            ),
             GateRunField::StartedAt => {
                 "RFC 3339 timestamp taken before the checker is launched.".to_string()
             }
