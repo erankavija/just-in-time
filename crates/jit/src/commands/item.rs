@@ -658,6 +658,32 @@ mod tests {
     }
 
     #[test]
+    fn test_list_items_kind_filter_excludes_items_of_other_shipped_kinds() {
+        let a = issue_with_criteria(
+            "A",
+            "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n",
+        );
+        let storage = InMemoryStorage::new();
+        seed_issue(&storage, a);
+        let config = crate::test_utils::shipped_item_kinds_toml();
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&config),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
+
+        // Registry-first shipped kinds contribute project items of their own.
+        let all = exec.list_items(None).unwrap();
+        assert!(all.items.iter().any(|i| i.kind == "gate"));
+        let requirements = exec.list_items(Some("requirement")).unwrap();
+        assert_eq!(requirements.count(), 2);
+        assert!(requirements.items.iter().all(|i| i.kind == "requirement"));
+    }
+
+    #[test]
     fn test_search_items_matches_text_and_id() {
         let a = issue_with_criteria(
             "A",

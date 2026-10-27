@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c98bd90c-e885-4d57-af3c-db023b7c329e",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:30:35.652577593Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d36bb7b2-8869-44ff-8c94-0976941a4d51",
+      "status": "failed",
+      "updated_at": "2026-10-27T21:35:42.010755611Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b469f36d-8fb3-4e73-a199-765c289dfe88",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archive command tests use the shared file-backed constructors",
-  "updated_at": "2026-10-27T20:56:20.068054955Z"
+  "updated_at": "2026-10-27T21:35:42.010755611Z"
 }

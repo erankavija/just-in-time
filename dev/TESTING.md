@@ -83,7 +83,7 @@ example test when you care about one specific input.
 Location: `crates/jit/src/test_harness.rs` (the harness, a `jit` library module gated on
 `cfg(any(test, feature = "test-support"))` so it compiles once for every target) and the
 in-process suites that use it, such as
-`crates/jit/tests/fast_docs_templates/harness_demo.rs`.
+`crates/jit/tests/fast_issue/test_no_coordinator.rs`.
 
 `TestHarness` backs a real `CommandExecutor` with `InMemoryStorage`, so a test drives command
 logic end to end in the calling process, with issue state held in memory. Each harness gets
@@ -141,30 +141,14 @@ A suite that runs in-process imports the shared harness from the `jit` library:
 
 ```rust
 use jit::test_harness::TestHarness;
-
-#[test]
-fn test_harness_query_ready() {
-    let h = TestHarness::new();
-
-    let ready_id = h.create_ready_issue("Ready task");
-    let assigned_id = h.create_ready_issue("Assigned task");
-    h.executor
-        .claim_issue(&assigned_id, "agent:worker-1".to_string())
-        .unwrap();
-
-    let ready = h.executor.query_ready().unwrap();
-
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, ready_id);
-}
 ```
 
-Harness tests in `fast_docs_templates/harness_demo.rs` cover queries, the issue lifecycle,
-dependency blocking and cycle detection, gates, container rollups, item resolution, response
-projections, and behavior at scale.
+`test_query_interface_works_without_coordinator` in `fast_issue/test_no_coordinator.rs` is a
+worked example: it creates issues through the harness helpers, claims one through
+`h.executor`, and asserts what `query_ready` returns.
 
-Run the whole suite with `cargo test --test fast_docs_templates`, or just the demo module
-with `cargo test --test fast_docs_templates harness_demo`.
+Run the whole suite with `cargo test --test fast_issue`, or one module with
+`cargo test --test fast_issue test_no_coordinator`.
 
 ## 3. Integration Tests
 
@@ -548,9 +532,7 @@ and each scenario runs multiple real `jit` subprocess invocations.
 
 ### Deliberate at-scale tests
 
-`test_harness_scales_with_many_issues` is the harness suite's own worked example of
-behavior-at-scale coverage (see "2. Harness Tests" above): 100 real issue creations through
-the full command pipeline. `test_resolve_ambiguous` creates real issues the same way until
+`test_resolve_ambiguous` creates real issues through the full command pipeline until
 two land on the same 4-character id prefix — the property under test, ambiguous-prefix
 rejection, cannot be observed without a real collision.
 `test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` writes 257 real
@@ -561,7 +543,6 @@ a run.
 
 | Test | Warm (ms) |
 | --- | ---: |
-| `harness_demo::test_harness_scales_with_many_issues` | 2,154 |
 | `short_hash_tests::test_resolve_ambiguous` | 1,969 |
 | `commands::gate_check::tests::test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` | 517 |
 
@@ -613,8 +594,8 @@ cargo test
 # Unit tests only, fastest feedback
 cargo test --lib
 
-# Harness tests
-cargo test --test fast_docs_templates harness_demo
+# Harness tests, one module
+cargo test --test fast_issue test_no_coordinator
 
 # One integration suite, or one module within it
 cargo test --test cli_repo_workflow
@@ -624,7 +605,7 @@ cargo test --test cli_query_graph query_tests
 cargo test --doc
 
 # A single test by name
-cargo test test_harness_query_ready
+cargo test test_query_interface_works_without_coordinator
 
 # With stdout captured from passing tests
 cargo test -- --nocapture
@@ -715,9 +696,10 @@ fn test_defer_issue_returns_issue_to_backlog() {
     // ...assertions on the returned value and on storage...
 }
 
-// 2. Harness test, in crates/jit/tests/fast_docs_templates/harness_demo.rs
+// 2. Harness test, in an in-process workflow suite such as
+//    crates/jit/tests/fast_issue/test_no_coordinator.rs
 #[test]
-fn test_harness_defer_issue() {
+fn test_defer_issue_returns_ready_issue_to_backlog() {
     let h = TestHarness::new();
     let id = h.create_ready_issue("Task");
 
@@ -746,4 +728,4 @@ fn test_cli_defer_issue() {
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
 - [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
 - [crates/jit/src/test_harness.rs](../crates/jit/src/test_harness.rs) - the harness implementation
-- [crates/jit/tests/fast_docs_templates/harness_demo.rs](../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples
+- [crates/jit/tests/fast_issue/test_no_coordinator.rs](../crates/jit/tests/fast_issue/test_no_coordinator.rs) - worked harness examples
