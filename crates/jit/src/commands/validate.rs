@@ -2604,9 +2604,10 @@ depends_on = ["planning"]
         let jit_dir = repo.path().join(".jit");
         let config = format!(
             "{}\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = {{ toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }}\n\
+            {}\n\
             [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
-            taxonomy.config_fragment()
+            taxonomy.config_fragment(),
+            crate::test_utils::shipped_item_kinds_toml()
         );
         std::fs::write(jit_dir.join("config.toml"), config).unwrap();
         std::fs::write(
@@ -2897,50 +2898,12 @@ statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 ";
 
-    /// The complete `[item_kinds]` table supplied by the package. The engine bakes
-    /// in no kinds, so the dangling-link pass (which owns a label's namespace only when a
-    /// declared kind claims it) needs the table to recognize the test labels.
-    const CANONICAL_ITEM_KINDS: &str = "\
-[item_kinds.requirement]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = [\"[hard]\"]
-link-namespaces = [\"satisfies\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.decision]
-section = \"decisions\"
-id-pattern = \"D-[0-9]+\"
-markers = []
-link-namespaces = [\"per\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.risk]
-section = \"risks\"
-id-pattern = \"RISK-[0-9]+\"
-markers = []
-link-namespaces = [\"mitigates\", \"resolves\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-";
-
     /// Build an executor over an in-memory `.jit` carrying a `.jit/invariants.toml`
     /// (so the registry-first `invariant` kind resolves `enforces:@/invariant/<id>`) and the
     /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        storage.add_data_file("config.toml", CANONICAL_ITEM_KINDS);
+        storage.add_data_file("config.toml", &crate::test_utils::shipped_item_kinds_toml());
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
         // the real fs) at `.jit/invariants.toml`.
@@ -2964,7 +2927,8 @@ source-of-truth = \"registry-first\"
             "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
              [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
              [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
-             {CANONICAL_ITEM_KINDS}"
+             {}",
+            crate::test_utils::shipped_item_kinds_toml()
         );
         storage.add_data_file("config.toml", &config);
         for issue in issues {
@@ -2995,30 +2959,6 @@ source-of-truth = \"registry-first\"
         issue
     }
 
-    /// `[item_kinds]` declarations for `rule` and `gate` (jit:d30695e4), both
-    /// declaring `link-namespaces = ["enforces"]` like the live repo's config, so
-    /// an `enforces:@/rule/<name>` / `enforces:@/gate/<key>` label is recognized
-    /// by the dangling-link pass alongside [`CANONICAL_ITEM_KINDS`]'s invariant.
-    const RULE_AND_GATE_ITEM_KINDS: &str = "\
-[item_kinds.rule]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
-source-of-truth = \"registry-first\"
-
-[item_kinds.gate]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
-source-of-truth = \"registry-first\"
-";
-
     const ONE_RULE: &str = "\
 [[rules]]
 name = \"label-format\"
@@ -3041,7 +2981,7 @@ priority = 100
     /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
     fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
-        let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
+        let config = crate::test_utils::shipped_item_kinds_toml();
         storage.add_data_file("config.toml", &config);
         storage.add_data_file("invariants.toml", REGISTRY_TOML);
         storage.add_data_file("rules.toml", ONE_RULE);

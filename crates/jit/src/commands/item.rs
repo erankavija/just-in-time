@@ -568,62 +568,14 @@ mod tests {
     use super::*;
     use crate::storage::InMemoryStorage;
 
-    /// The five markdown/registry kinds from the package-supplied `[item_kinds]`
-    /// table. The package also declares `gate` (jit:bb7d57a2), omitted here
-    /// because its registry-first source starts empty on a fresh init and these
-    /// synthetic-root tests have no gate registry to index — gate resolution is
-    /// exercised via [`GATE_ITEM_KIND`] below. The engine bakes in no kinds, so
-    /// helpers that exercise the canonical set write this to config (the
-    /// established `InMemoryStorage` pattern: a real `config.toml` at the synthetic
-    /// root, the only on-disk file config loading requires).
-    const CANONICAL_ITEM_KINDS: &str = "\
-[item_kinds.requirement]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = [\"[hard]\"]
-link-namespaces = [\"satisfies\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.decision]
-section = \"decisions\"
-id-pattern = \"D-[0-9]+\"
-markers = []
-link-namespaces = [\"per\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.risk]
-section = \"risks\"
-id-pattern = \"RISK-[0-9]+\"
-markers = []
-link-namespaces = [\"mitigates\", \"resolves\"]
-scope = \"issue\"
-source-of-truth = \"markdown-first\"
-
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-
-[item_kinds.rule]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }
-source-of-truth = \"registry-first\"
-";
-
     fn executor_with(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            crate::test_utils::shipped_item_kinds_toml(),
+        )
+        .unwrap();
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
@@ -632,7 +584,7 @@ source-of-truth = \"registry-first\"
 
     /// Build an [`InMemoryStorage`] executor whose `config.toml` declares
     /// `[project] name = "<name>"` alongside a single markdown-first,
-    /// project-scope `glossary` kind sourced from `project-items.md` (task
+    /// project-scope custom `glossary` kind sourced from `project-items.md` (task
     /// a1b6b3da: exercises the `@<name>/<kind>/<self-id>` binding against a repo
     /// with a real declared project identity).
     fn project_exec_with_name(
@@ -726,7 +678,7 @@ source-of-truth = \"registry-first\"
     }
 
     /// Build an [`InMemoryStorage`] executor that declares a markdown-first
-    /// project-scope `glossary` kind sourced from `project-items.md`, seeding the
+    /// project-scope custom `glossary` kind sourced from `project-items.md`, seeding the
     /// source through the in-memory repo-file map (NO real source file). `config.toml`
     /// is written to the synthetic root (the established `InMemoryStorage` config
     /// pattern, the only on-disk file config loading requires). `extra_config` is
@@ -810,10 +762,10 @@ source-of-truth = \"registry-first\"
             "## Success Criteria\n\n- [hard] GLOSS-01: issue one\n".to_string(),
         );
         let short = issue.short_id();
-        // The issue-scope `requirement` kind must also see GLOSS-* ids.
+        // A custom issue-scope kind must also see GLOSS-* ids.
         let exec = project_exec(
             Some("## Success Criteria\n\n- GLOSS-01: project one\n"),
-            "\n[item_kinds.requirement]\n\
+            "\n[item_kinds.issue-glossary]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"GLOSS-[0-9]+\"\n\
              markers = [\"[hard]\"]\n\
@@ -831,7 +783,7 @@ source-of-truth = \"registry-first\"
     }
 
     /// Build an executor declaring two project-scope markdown-first kinds
-    /// (`rule`, `gate`) that share a permissive id-pattern, each sourced from its
+    /// (custom `custom-rule`, `custom-gate`) that share a permissive id-pattern, each sourced from its
     /// own markdown file, so both can mint the SAME self-id in the project scope.
     fn two_project_kinds_exec(
         rules_md: Option<&str>,
@@ -841,7 +793,7 @@ source-of-truth = \"registry-first\"
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
-            "[item_kinds.rule]\n\
+            "[item_kinds.custom-rule]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"[a-z][a-z-]*\"\n\
              markers = []\n\
@@ -850,7 +802,7 @@ source-of-truth = \"registry-first\"
              source = \"rules.md\"\n\
              source-of-truth = \"markdown-first\"\n\
              \n\
-             [item_kinds.gate]\n\
+             [item_kinds.custom-gate]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"[a-z][a-z-]*\"\n\
              markers = []\n\
@@ -871,7 +823,7 @@ source-of-truth = \"registry-first\"
 
     #[test]
     fn test_show_item_explicit_kind_disambiguates_same_self_id() {
-        // REQ-01: a `rule` and a `gate` both self-id `coverage-preview` in the
+        // REQ-01: a `custom-rule` and a `custom-gate` both self-id `coverage-preview` in the
         // project scope each resolve to their OWN distinct item via the explicit
         // `@/<kind>/<self-id>` address, never a silent first-match.
         let exec = two_project_kinds_exec(
@@ -879,21 +831,21 @@ source-of-truth = \"registry-first\"
             Some("## Success Criteria\n\n- coverage-preview: the gate form\n"),
         );
 
-        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
-        assert_eq!(rule.item.kind, "rule");
+        let rule = exec.show_item("@/custom-rule/coverage-preview").unwrap();
+        assert_eq!(rule.item.kind, "custom-rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert!(rule.item.text.contains("rule form"));
 
-        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
-        assert_eq!(gate.item.kind, "gate");
+        let gate = exec.show_item("@/custom-gate/coverage-preview").unwrap();
+        assert_eq!(gate.item.kind, "custom-gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert!(gate.item.text.contains("gate form"));
 
         // Distinct items sharing a scope and self-id: the kind is a segment of the
         // minted id, so they even derive DISTINCT qualified ids.
         assert_ne!(rule.item.text, gate.item.text);
-        assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
-        assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
+        assert_eq!(rule.item.qualified_id, "@/custom-rule/coverage-preview");
+        assert_eq!(gate.item.qualified_id, "@/custom-gate/coverage-preview");
         assert_ne!(rule.item.qualified_id, gate.item.qualified_id);
     }
 
@@ -907,16 +859,16 @@ source-of-truth = \"registry-first\"
             Some("## Success Criteria\n\n- other-gate: an unrelated gate\n"),
         );
 
-        // The self-id `only-rule` belongs to `rule`, not `gate`.
-        let err = exec.show_item("@/gate/only-rule").unwrap_err();
+        // The self-id `only-rule` belongs to `custom-rule`, not `custom-gate`.
+        let err = exec.show_item("@/custom-gate/only-rule").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("no addressable item"), "message: {msg}");
         assert!(msg.contains("gate"), "message: {msg}");
 
         // Sanity: the correct kind DOES resolve it.
         assert_eq!(
-            exec.show_item("@/rule/only-rule").unwrap().item.kind,
-            "rule"
+            exec.show_item("@/custom-rule/only-rule").unwrap().item.kind,
+            "custom-rule"
         );
     }
 
@@ -992,13 +944,7 @@ source-of-truth = \"registry-first\"
         let short = issue.short_id();
         let exec = project_exec(
             Some("## Success Criteria\n\n- GLOSS-01: a glossary entry\n"),
-            "\n[item_kinds.requirement]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"\n\
-             markers = [\"[hard]\"]\n\
-             link-namespaces = [\"satisfies\"]\n\
-             scope = \"issue\"\n\
-             source-of-truth = \"markdown-first\"\n",
+            &crate::test_utils::shipped_item_kinds_toml(),
             vec![issue],
         );
 
@@ -1220,7 +1166,11 @@ statement = \"Every dependency edge stays acyclic.\"
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            crate::test_utils::shipped_item_kinds_toml(),
+        )
+        .unwrap();
         storage.add_data_file("invariants.toml", invariants_toml);
         for issue in issues {
             crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -1235,7 +1185,11 @@ statement = \"Every dependency edge stays acyclic.\"
     fn registry_exec_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            crate::test_utils::shipped_item_kinds_toml(),
+        )
+        .unwrap();
         storage.add_data_file("rules.toml", rules_toml);
         CommandExecutor::new(storage)
     }
@@ -1329,24 +1283,6 @@ enforce = true
         assert_eq!(shown.issue_title, None);
     }
 
-    /// A standalone `[item_kinds.gate]` declaration sourced from `.jit/gates.toml`
-    /// (jit:42898915), mirroring the live repo's config. `gate` is supplied by the
-    /// package (jit:bb7d57a2), but stays out of [`CANONICAL_ITEM_KINDS`] in these
-    /// tests: a freshly initialized `.jit/gates.toml` starts empty (bare init
-    /// seeds no default gates), so canonical-set
-    /// tests would have nothing to index. This mirrors [`policy_exec`]'s
-    /// standalone-config pattern rather than extending `CANONICAL_ITEM_KINDS`.
-    const GATE_ITEM_KIND: &str = "\
-[item_kinds.gate]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
-source-of-truth = \"registry-first\"
-";
-
     /// Build an executor whose synthetic repo carries `.jit/gates.toml` with
     /// `gates_toml` and a standalone `[item_kinds.gate]` declaration, exercising the
     /// registry-first gate path the same way [`registry_exec_with_rules`] does for
@@ -1354,7 +1290,11 @@ source-of-truth = \"registry-first\"
     fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), GATE_ITEM_KIND).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            crate::test_utils::shipped_item_kinds_toml(),
+        )
+        .unwrap();
         storage.add_data_file("gates.toml", gates_toml);
         CommandExecutor::new(storage)
     }
@@ -1441,8 +1381,11 @@ stage = \"postcheck\"
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
-        let config = format!("{CANONICAL_ITEM_KINDS}\n{GATE_ITEM_KIND}");
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            crate::test_utils::shipped_item_kinds_toml(),
+        )
+        .unwrap();
         storage.add_data_file("rules.toml", rules_toml);
         storage.add_data_file("gates.toml", gates_toml);
         CommandExecutor::new(storage)
@@ -1563,20 +1506,12 @@ stage = \"postcheck\"
     #[test]
     fn test_invariant_config_resolves_through_its_toml_descriptor() {
         // REQ-03: the `invariant` name carries no special routing — a config-declared
-        // `[item_kinds.invariant]` with a toml `source` descriptor indexes its
+        // `[item_kinds.invariant]` (shipped) with a toml `source` descriptor indexes its
         // registry items exactly like any other registry-first kind. Here the
         // descriptor names `.jit/invariants.toml`, so `item list --kind invariant`
         // returns the registry entries through the GENERIC toml path.
         let exec = config_exec(
-            "[item_kinds.invariant]\n\
-             section = \"success_criteria\"\n\
-             id-pattern = \"[a-z][a-z0-9-]*\"\n\
-             markers = []\n\
-             link-namespaces = [\"enforces\"]\n\
-             scope = \"project\"\n\
-             source = { toml = \".jit/invariants.toml\", table = \"invariants\", \
-             id-field = \"id\", text-field = \"statement\" }\n\
-             source-of-truth = \"registry-first\"\n",
+            &crate::test_utils::shipped_item_kinds_toml(),
             Some(TWO_INVARIANTS),
             // An issue with an invariant-looking line: it must NEVER become a project invariant.
             vec![issue_with_criteria(
@@ -1600,8 +1535,8 @@ stage = \"postcheck\"
 
     #[test]
     fn test_issue_scoped_invariant_config_is_no_longer_reserved() {
-        // REQ-03: an `[item_kinds.invariant]` declared registry-first BUT issue-scoped
-        // was once rejected to keep invariants out of the issue-description parser.
+        // REQ-03: a custom `[item_kinds.tenet]` declared registry-first BUT issue-scoped
+        // (as the shipped `invariant` once was) was once rejected to keep invariants out of the issue-description parser.
         // With the reserved-name branch gone it resolves as an ORDINARY issue-scope
         // kind, indexing its items from issue descriptions like any other.
         let issue = issue_with_criteria(
@@ -1610,7 +1545,7 @@ stage = \"postcheck\"
         );
         let short = issue.short_id();
         let exec = config_exec(
-            "[item_kinds.invariant]\n\
+            "[item_kinds.tenet]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"[a-z][a-z0-9-]*\"\n\
              markers = []\n\
@@ -1621,11 +1556,11 @@ stage = \"postcheck\"
             vec![issue],
         );
         // No rejection: the kind resolves and indexes from the issue description.
-        let result = exec.list_items(Some("invariant")).unwrap();
+        let result = exec.list_items(Some("tenet")).unwrap();
         assert_eq!(result.count, 1);
         assert_eq!(
             result.items[0].qualified_id,
-            format!("@/issue/{short}/invariant/sample-invariant")
+            format!("@/issue/{short}/tenet/sample-invariant")
         );
     }
 
@@ -1635,6 +1570,7 @@ stage = \"postcheck\"
         // descriptor has nothing to project from. It is rejected at kind resolution
         // with a typed MissingProjectSource (symmetric to a markdown-first project
         // kind missing its source) rather than silently producing no items.
+        // `foo` is a custom kind.
         let exec = config_exec(
             "[item_kinds.foo]\n\
              section = \"success_criteria\"\n\
