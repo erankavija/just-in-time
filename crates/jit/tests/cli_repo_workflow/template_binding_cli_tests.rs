@@ -17,7 +17,6 @@
 
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
-use jit::test_utils::declaration_dir;
 use serde_json::Value;
 
 /// The `plan` bracket under renamed bindings: `[roles]` names the planning role
@@ -154,9 +153,10 @@ fn assert_bound_to_configured_anchor(out: &Value, epic: &str) {
 #[test]
 fn test_apply_auto_binds_the_configured_container_anchor() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    cli.run(["init"]).unwrap();
     crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -190,9 +190,10 @@ fn test_apply_auto_binds_the_configured_container_anchor() {
 #[test]
 fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    cli.run(["init"]).unwrap();
     crate::install_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -216,9 +217,10 @@ fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
 #[test]
 fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    cli.run(["init"]).unwrap();
     crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -268,9 +270,10 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
         1,
     );
     let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", crate::apply_cli_tests::CONFIG_TOML)]).unwrap(),
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
     );
-    cli.run(["init"]).unwrap();
     crate::install_templates(&cli, &templates);
     let positional = crate::create_epic(&cli, "Positional epic");
     let target = crate::create_epic(&cli, "Target epic");

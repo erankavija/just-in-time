@@ -57,7 +57,7 @@ fn test_init_emits_item_kinds_table_the_package_declares() {
         jit::test_utils::profiled_repository_fixture(
             DEFAULT_PACKAGE,
             "packages",
-            Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+            Some(jit::test_cli::jit_binary().as_path()),
         )
         .expect("clone a coherent default-package repository fixture"),
     );
@@ -94,7 +94,7 @@ fn test_init_emits_the_namespaces_the_registry_first_kinds_link_through() {
         jit::test_utils::profiled_repository_fixture(
             DEFAULT_PACKAGE,
             "packages",
-            Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+            Some(jit::test_cli::jit_binary().as_path()),
         )
         .expect("clone a coherent default-package repository fixture"),
     );
@@ -143,7 +143,7 @@ fn test_init_authored_table_indexes_all_kinds() {
         jit::test_utils::profiled_repository_fixture(
             DEFAULT_PACKAGE,
             "packages",
-            Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+            Some(jit::test_cli::jit_binary().as_path()),
         )
         .expect("clone a coherent default-package repository fixture"),
     );
@@ -208,7 +208,7 @@ fn test_no_item_kinds_table_indexes_nothing() {
         jit::test_utils::profiled_repository_fixture(
             DEFAULT_PACKAGE,
             "packages",
-            Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+            Some(jit::test_cli::jit_binary().as_path()),
         )
         .expect("clone a coherent default-package repository fixture"),
     );

@@ -12,7 +12,6 @@
 
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
-use jit::test_utils::declaration_dir;
 
 /// Hierarchy declaring the bracket node types so `epic`/`planning`/`breakdown`
 /// are valid types in the temp repo. The bracket vocabulary itself comes from the
@@ -63,9 +62,11 @@ applies_to  = ["epic"]
 /// invokes the engine, creating the bracket's planning + breakdown nodes.
 #[test]
 fn test_apply_plan_creates_bracket_nodes() {
-    let cli =
-        JitCli::with_repository(declaration_dir(&[(".jit/config.toml", CONFIG_TOML)]).unwrap());
-    cli.run(["init"]).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
     crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -124,9 +125,11 @@ fn test_apply_plan_creates_bracket_nodes() {
 /// name, resolved anchor bindings, and the created node ids by role.
 #[test]
 fn test_apply_plan_json_reports_template_and_created_nodes() {
-    let cli =
-        JitCli::with_repository(declaration_dir(&[(".jit/config.toml", CONFIG_TOML)]).unwrap());
-    cli.run(["init"]).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
     crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -162,9 +165,11 @@ fn test_apply_plan_json_reports_template_and_created_nodes() {
 /// and the `C → B` anchor edge.
 #[test]
 fn test_apply_with_explicit_container_anchor_creates_bracket() {
-    let cli =
-        JitCli::with_repository(declaration_dir(&[(".jit/config.toml", CONFIG_TOML)]).unwrap());
-    cli.run(["init"]).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
     crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
     let epic = crate::create_epic(&cli, "Auth epic");
 
@@ -229,9 +234,11 @@ fn test_apply_with_explicit_container_anchor_creates_bracket() {
 /// creates nothing.
 #[test]
 fn test_apply_rejects_malformed_anchor() {
-    let cli =
-        JitCli::with_repository(declaration_dir(&[(".jit/config.toml", CONFIG_TOML)]).unwrap());
-    cli.run(["init"]).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
     crate::install_templates(&cli, PLAN_TEMPLATE_TOML);
     let epic = crate::create_epic(&cli, "Auth epic");
 
