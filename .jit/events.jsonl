@@ -20811,3 +20811,6 @@
 {"assignee":"agent:jit-execution-lead","id":"6d44b64d-9865-4081-9a47-f30a159fff58","issue_id":"d49d53db-98e5-4ce3-b3f9-e54ac64c3560","timestamp":"2026-10-27T20:56:21.201575162Z","type":"issue_claimed"}
 {"id":"2dbd60f2-dde8-4853-bc6c-254af1b86e10","issue_id":"55e3d3fd-4fe9-4c16-a2f4-e463b9994f41","priority":"normal","timestamp":"2026-10-27T20:59:57.083162691Z","title":"Mutation and repair captures read only the documents their passes consume","type":"issue_created"}
 {"fields":["dependencies"],"id":"65c8cb1f-8c22-486f-adf9-0ec2f9a083af","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-10-27T21:00:39.412794110Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"664b2d9d-80ac-4ee9-94d9-ea7ec7b99946","issue_id":"55e3d3fd-4fe9-4c16-a2f4-e463b9994f41","timestamp":"2026-10-27T21:00:46.917701531Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"e0c53954-cadb-4a95-bc5f-86c105f5e880","issue_id":"55e3d3fd-4fe9-4c16-a2f4-e463b9994f41","timestamp":"2026-10-27T21:00:46.917701531Z","type":"issue_claimed"}
+{"fields":["description"],"id":"338be417-8465-4625-a33e-5433dba6792f","issue_id":"55e3d3fd-4fe9-4c16-a2f4-e463b9994f41","timestamp":"2026-10-27T21:00:47.118501961Z","type":"issue_updated","updated_by":"issue-update"}
