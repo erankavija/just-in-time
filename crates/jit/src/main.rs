@@ -813,19 +813,16 @@ fn resolve_optional_gate_key(
 /// `INVALID_ARGUMENT` error (routed `--json`-aware).
 fn parse_run_status(value: &str, json: bool) -> Result<jit::domain::GateRunStatus> {
     use jit::domain::GateRunStatus;
-    match value.to_ascii_lowercase().as_str() {
-        "passed" => Ok(GateRunStatus::Passed),
-        "failed" => Ok(GateRunStatus::Failed),
-        "error" => Ok(GateRunStatus::Error),
-        "pending" => Ok(GateRunStatus::Pending),
-        other => Err(invalid_argument(
+    let value = value.to_ascii_lowercase();
+    GateRunStatus::from_str(&value).map_err(|_| {
+        invalid_argument(
             format!(
-                "unknown --status value '{other}'; expected one of: \
-                 passed, failed, error, pending."
+                "unknown --status value '{value}'; expected one of: {}.",
+                GateRunStatus::ALL.map(GateRunStatus::as_str).join(", ")
             ),
             json,
-        )),
-    }
+        )
+    })
 }
 
 /// Render a report stream verbatim, keeping only the last `tail` lines when set.
@@ -920,17 +917,10 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
 }
 
 fn print_gate_run_details(result: &GateRunResult) {
-    let status_str = match result.status {
-        jit::domain::GateRunStatus::Passed => "passed",
-        jit::domain::GateRunStatus::Failed => "failed",
-        jit::domain::GateRunStatus::Error => "error",
-        _ => "unknown",
-    };
-
     println!(
         "Gate '{}' last run: {} (exit code: {})",
         result.gate_key,
-        status_str,
+        result.status,
         result
             .exit_code
             .map(|c| c.to_string())
@@ -5492,8 +5482,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 let minimal: Vec<MinimalBlockedIssue> = blocked
                                     .iter()
                                     .map(|(issue, reasons)| {
-                                        let reason_strings =
-                                            reasons.iter().map(ToString::to_string).collect();
+                                        let reason_strings = reasons
+                                            .iter()
+                                            .map(jit::output::minimal_blocked_reason)
+                                            .collect();
                                         MinimalBlockedIssue::from((issue, reason_strings))
                                     })
                                     .collect();

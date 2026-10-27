@@ -22,6 +22,7 @@
 //! executes.
 
 use crate::linked_checkout_write_policy_tests::durable_events;
+use jit::domain::store_divergence::DivergenceClass;
 use jit::test_cli::{created_issue_id, JitCli};
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -427,9 +428,12 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
     // finding here is one-sided, so the table's automatic path applies and no
     // record needs a human decision.
     assert!(
-        reported
-            .iter()
-            .all(|(_, class, _)| class == "local_only" || class == "reference_only"),
+        reported.iter().all(|(_, class, _)| [
+            DivergenceClass::LocalOnly,
+            DivergenceClass::ReferenceOnly
+        ]
+        .iter()
+        .any(|one_sided| class == one_sided.as_str())),
         "this reproduction diverges by records held on one side only; report: {diverged}"
     );
 

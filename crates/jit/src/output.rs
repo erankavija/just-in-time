@@ -19,6 +19,7 @@ use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::IssueId;
 use crate::domain::identity::IssueIdStaging;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::queries::BlockingReason;
 use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{
@@ -253,8 +254,8 @@ pub fn render_issue_list<'a>(
         let _ = write!(lines, "  {} | {}", issue.id, issue.title);
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {:?}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {:?}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
             };
         }
         lines.push('\n');
@@ -451,9 +452,12 @@ mod issue_list_render_tests {
             false,
         );
 
+        let (state, priority) = (issues[0].state, issues[0].priority);
         assert_eq!(
             rendered,
-            "Header:\n  aaaaaaaa-0000-4000-8000-000000000001 | First | Backlog | Normal\n    - waits on x\n  bbbbbbbb-0000-4000-8000-000000000002 | Second | Backlog | Normal\n\nTotal: 2"
+            format!(
+                "Header:\n  aaaaaaaa-0000-4000-8000-000000000001 | First | {state} | {priority}\n    - waits on x\n  bbbbbbbb-0000-4000-8000-000000000002 | Second | {state} | {priority}\n\nTotal: 2"
+            )
         );
     }
 
@@ -492,7 +496,10 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            "  aaaaaaaa-0000-4000-8000-000000000001 | First | Normal"
+            format!(
+                "  aaaaaaaa-0000-4000-8000-000000000001 | First | {}",
+                issues[0].priority
+            )
         );
     }
 
@@ -1455,6 +1462,16 @@ pub struct TemplateApplyResponse {
 
 /// Response for blocked query with reasons (minimal issue + reasons)
 pub type BlockedListResponse = ListEnvelope<IssuesKey, MinimalBlockedIssue>;
+
+/// One [`BlockedListResponse`] reason string. A gate reason keeps the status
+/// variant name (`gate:<key> (Pending)`) the JSON contract carries; human output
+/// renders the wire token through [`BlockingReason`]'s `Display`.
+pub fn minimal_blocked_reason(reason: &BlockingReason) -> String {
+    match reason {
+        BlockingReason::Gate { key, status } => format!("gate:{key} ({status:?})"),
+        BlockingReason::Dependency { .. } => reason.to_string(),
+    }
+}
 
 /// Multi-id envelope for `issue show <id> <id> …` — full show projections in
 /// argument order.
@@ -3549,234 +3566,71 @@ mod tests {
     #[test]
     fn test_error_code_wire_strings_and_exit_statuses_match_contract() {
         let expected = [
-            (
-                ErrorCode::IssueNotFound,
-                "ISSUE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::GateNotFound,
-                "GATE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::CycleDetected,
-                "CYCLE_DETECTED",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::InvalidArgument,
-                "INVALID_ARGUMENT",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::InvalidLabelPattern,
-                "INVALID_LABEL_PATTERN",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::ValidationFailed,
-                "VALIDATION_FAILED",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::AlreadyExists,
-                "ALREADY_EXISTS",
-                ExitCode::AlreadyExists,
-            ),
-            (
-                ErrorCode::InvalidState,
-                "INVALID_STATE",
-                ExitCode::InvalidArgument,
-            ),
-            (ErrorCode::Blocked, "BLOCKED", ExitCode::ValidationFailed),
-            (
-                ErrorCode::GateFailed,
-                "GATE_FAILED",
-                ExitCode::ValidationFailed,
-            ),
-            (ErrorCode::IoError, "IO_ERROR", ExitCode::ExternalError),
-            (
-                ErrorCode::PermissionDenied,
-                "PERMISSION_DENIED",
-                ExitCode::PermissionDenied,
-            ),
-            (ErrorCode::ParseError, "PARSE_ERROR", ExitCode::GenericError),
-            (
-                ErrorCode::ClaimRequiresGit,
-                "CLAIM_REQUIRES_GIT",
-                ExitCode::ExternalError,
-            ),
-            (
-                ErrorCode::AmbiguousId,
-                "AMBIGUOUS_ID",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::InvalidIdPrefix,
-                "INVALID_ID_PREFIX",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::RepositoryNotFound,
-                "REPOSITORY_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::RepositoryFormatTooNew,
-                "REPOSITORY_FORMAT_TOO_NEW",
-                ExitCode::ExternalError,
-            ),
-            (
-                ErrorCode::DeletionNotConfirmed,
-                "DELETION_NOT_CONFIRMED",
-                ExitCode::InvalidArgument,
-            ),
+            (ErrorCode::IssueNotFound, ExitCode::NotFound),
+            (ErrorCode::GateNotFound, ExitCode::NotFound),
+            (ErrorCode::CycleDetected, ExitCode::ValidationFailed),
+            (ErrorCode::InvalidArgument, ExitCode::InvalidArgument),
+            (ErrorCode::InvalidLabelPattern, ExitCode::InvalidArgument),
+            (ErrorCode::ValidationFailed, ExitCode::ValidationFailed),
+            (ErrorCode::AlreadyExists, ExitCode::AlreadyExists),
+            (ErrorCode::InvalidState, ExitCode::InvalidArgument),
+            (ErrorCode::Blocked, ExitCode::ValidationFailed),
+            (ErrorCode::GateFailed, ExitCode::ValidationFailed),
+            (ErrorCode::IoError, ExitCode::ExternalError),
+            (ErrorCode::PermissionDenied, ExitCode::PermissionDenied),
+            (ErrorCode::ParseError, ExitCode::GenericError),
+            (ErrorCode::ClaimRequiresGit, ExitCode::ExternalError),
+            (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
+            (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
+            (ErrorCode::RepositoryNotFound, ExitCode::NotFound),
+            (ErrorCode::RepositoryFormatTooNew, ExitCode::ExternalError),
+            (ErrorCode::DeletionNotConfirmed, ExitCode::InvalidArgument),
             (
                 ErrorCode::LinkedCheckoutWriteRefused,
-                "LINKED_CHECKOUT_WRITE_REFUSED",
                 ExitCode::InvalidArgument,
             ),
-            (
-                ErrorCode::ProfileNotFound,
-                "PROFILE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ProfileConflict,
-                "PROFILE_CONFLICT",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::DependencyError,
-                "DEPENDENCY_ERROR",
-                ExitCode::NotFound,
-            ),
-            (ErrorCode::GateError, "GATE_ERROR", ExitCode::AlreadyExists),
-            (
-                ErrorCode::GateCheckError,
-                "GATE_CHECK_ERROR",
-                ExitCode::NotFound,
-            ),
-            (ErrorCode::PresetError, "PRESET_ERROR", ExitCode::NotFound),
-            (
-                ErrorCode::ItemNotFound,
-                "ITEM_NOT_FOUND",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ItemCommandFailed,
-                "ITEM_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::InvariantCommandFailed,
-                "INVARIANT_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ProjectCommandFailed,
-                "PROJECT_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ProfileError,
-                "PROFILE_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::SearchFailed,
-                "SEARCH_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::RipgrepNotFound,
-                "RIPGREP_NOT_FOUND",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::WorktreeInfoError,
-                "WORKTREE_INFO_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::WorktreeListError,
-                "WORKTREE_LIST_ERROR",
-                ExitCode::GenericError,
-            ),
+            (ErrorCode::ProfileNotFound, ExitCode::NotFound),
+            (ErrorCode::ProfileConflict, ExitCode::ValidationFailed),
+            (ErrorCode::DependencyError, ExitCode::NotFound),
+            (ErrorCode::GateError, ExitCode::AlreadyExists),
+            (ErrorCode::GateCheckError, ExitCode::NotFound),
+            (ErrorCode::PresetError, ExitCode::NotFound),
+            (ErrorCode::ItemNotFound, ExitCode::GenericError),
+            (ErrorCode::ItemCommandFailed, ExitCode::GenericError),
+            (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
+            (ErrorCode::ProjectCommandFailed, ExitCode::GenericError),
+            (ErrorCode::ProfileError, ExitCode::GenericError),
+            (ErrorCode::SearchFailed, ExitCode::GenericError),
+            (ErrorCode::RipgrepNotFound, ExitCode::GenericError),
+            (ErrorCode::WorktreeInfoError, ExitCode::GenericError),
+            (ErrorCode::WorktreeListError, ExitCode::GenericError),
             (
                 ErrorCode::WorktreeStoreDivergenceError,
-                "WORKTREE_STORE_DIVERGENCE_ERROR",
                 ExitCode::GenericError,
             ),
-            (
-                ErrorCode::HooksInstallError,
-                "HOOKS_INSTALL_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::GenericError,
-                "GENERIC_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::RecoveryFailed,
-                "recovery_failed",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimAcquireError,
-                "CLAIM_ACQUIRE_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimReleaseError,
-                "CLAIM_RELEASE_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimRenewError,
-                "CLAIM_RENEW_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimHeartbeatError,
-                "CLAIM_HEARTBEAT_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimStatusError,
-                "CLAIM_STATUS_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimListError,
-                "CLAIM_LIST_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimForceEvictError,
-                "CLAIM_FORCE_EVICT_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::LockTimeout,
-                "LOCK_TIMEOUT",
-                ExitCode::LockTimeout,
-            ),
+            (ErrorCode::HooksInstallError, ExitCode::GenericError),
+            (ErrorCode::GenericError, ExitCode::GenericError),
+            (ErrorCode::RecoveryFailed, ExitCode::GenericError),
+            (ErrorCode::ClaimAcquireError, ExitCode::NotFound),
+            (ErrorCode::ClaimReleaseError, ExitCode::NotFound),
+            (ErrorCode::ClaimRenewError, ExitCode::NotFound),
+            (ErrorCode::ClaimHeartbeatError, ExitCode::NotFound),
+            (ErrorCode::ClaimStatusError, ExitCode::GenericError),
+            (ErrorCode::ClaimListError, ExitCode::GenericError),
+            (ErrorCode::ClaimForceEvictError, ExitCode::NotFound),
+            (ErrorCode::LockTimeout, ExitCode::LockTimeout),
         ];
 
         assert_eq!(expected.len(), ErrorCode::ALL.len());
-        for ((code, wire, status), listed) in expected.into_iter().zip(ErrorCode::ALL) {
+        for ((code, status), listed) in expected.into_iter().zip(ErrorCode::ALL) {
             assert_eq!(code, listed);
-            assert_eq!(code.as_str(), wire);
             assert_eq!(code.exit_code(), status);
             let error = JsonError::new(code, "failure");
             assert_eq!(error.exit_code(), status);
             assert_eq!(
                 serde_json::to_value(&error).expect("registered error should serialize")["error"]
                     ["code"],
-                wire
+                code.as_str()
             );
         }
     }

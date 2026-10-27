@@ -584,14 +584,17 @@ mod tests {
 
         assert_eq!(
             no_issue,
-            BTreeSet::from([
-                "artifact_archive_executed",
-                "gate_definition_created",
-                "gate_definition_removed",
-                "gate_definition_updated",
-                "linked_checkout_write_overridden",
-                "profile_lifecycle",
-            ]),
+            BTreeSet::from(
+                [
+                    EventTag::ArtifactArchiveExecuted,
+                    EventTag::GateDefinitionCreated,
+                    EventTag::GateDefinitionRemoved,
+                    EventTag::GateDefinitionUpdated,
+                    EventTag::LinkedCheckoutWriteOverridden,
+                    EventTag::ProfileLifecycle,
+                ]
+                .map(EventTag::as_str)
+            ),
         );
     }
 

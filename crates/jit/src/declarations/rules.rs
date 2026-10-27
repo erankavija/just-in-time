@@ -1828,15 +1828,7 @@ assert = { require-section = { heading = "Plan" } }
                 assert_eq!(rule, "typo");
                 assert_eq!(value, "in_progres");
                 // The valid list names every legal token.
-                for token in [
-                    "backlog",
-                    "ready",
-                    "in_progress",
-                    "gated",
-                    "done",
-                    "rejected",
-                    "archived",
-                ] {
+                for token in State::ALL.map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -1900,10 +1892,10 @@ assert = { require-section = { heading = "Plan" } }
     fn test_state_predicate_matches_typed_set_equals_token_set() {
         // The pre-parsed set membership must agree with the authored tokens for
         // every lifecycle state.
-        let all = State::ALL;
-        let pred = StatePredicate::list(["ready", "in_progress", "done"]);
-        for state in all {
-            let want = matches!(state, State::Ready | State::InProgress | State::Done);
+        let chosen = [State::Ready, State::InProgress, State::Done];
+        let pred = StatePredicate::list(chosen.map(State::as_str));
+        for state in State::ALL {
+            let want = chosen.contains(&state);
             assert_eq!(pred.matches(state), want, "mismatch for {state:?}");
         }
     }

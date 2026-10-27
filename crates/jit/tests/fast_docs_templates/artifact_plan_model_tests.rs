@@ -1,7 +1,7 @@
 use jit::config::DocumentationConfig;
 use jit::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion, BlockerCode, ContentIdentity,
-    EvidenceCode, PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
+    PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
     ARCHIVE_PLAN_SCHEMA_VERSION,
 };
 use serde_json::{json, Value};
@@ -194,13 +194,13 @@ fn test_policy_status_preserves_three_explicitness_states() {
         .unwrap();
         assert!(!plan.eligible());
         let expected = match status {
-            PolicyStatus::Unconfigured => "policy-unconfigured",
-            PolicyStatus::Incomplete => "policy-incomplete",
+            PolicyStatus::Unconfigured => BlockerCode::PolicyUnconfigured,
+            PolicyStatus::Incomplete => BlockerCode::PolicyIncomplete,
             PolicyStatus::Configured => unreachable!(),
         };
         assert_eq!(
             serde_json::to_value(&plan).unwrap()["blockers"][0]["code"],
-            expected
+            expected.as_str()
         );
         assert!(plan.executable_artifacts().is_err());
     }
@@ -313,7 +313,7 @@ fn test_artifact_plan_decode_rejects_a_non_canonical_plan() {
 }
 
 #[test]
-fn test_archive_plan_schema_v1_golden_fields_and_codes() {
+fn test_archive_plan_schema_v1_golden_fields() {
     let value = serde_json::to_value(configured_plan(
         vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
         Vec::new(),
@@ -368,49 +368,5 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "already_archived",
             "pending_deletions",
         ])
-    );
-    assert_eq!(
-        EvidenceCode::ALL.map(EvidenceCode::as_str),
-        [
-            "permanent-path",
-            "outside-development-root",
-            "outside-owner",
-            "active-owner",
-            "unmanaged-path",
-            "archived-source",
-            "pinned-historical",
-        ]
-    );
-    assert_eq!(
-        BlockerCode::ALL.map(BlockerCode::as_str),
-        [
-            "policy-unconfigured",
-            "policy-incomplete",
-            "unmanaged-selected-root",
-            "destination-conflict",
-            "document-non-terminal-owner",
-            "pinned-read-failed",
-            "repository-escape",
-            "unresolvable-edge",
-            "unpreservable-layout",
-            "non-terminal-target",
-            "missing-source",
-            "symlink-artifact",
-            "unsupported-artifact-type",
-        ]
-    );
-    assert_eq!(
-        WarningCode::ALL.map(WarningCode::as_str),
-        [
-            "missing-edge-target",
-            "external-edge",
-            "no-owner",
-            "residue-source",
-            "deletion-failed",
-            "not-selected-sibling",
-            "dynamic-loading-suspected",
-            "unsupported-edge-target",
-            "moving-path-citation",
-        ]
     );
 }

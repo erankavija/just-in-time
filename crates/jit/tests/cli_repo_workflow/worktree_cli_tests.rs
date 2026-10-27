@@ -4,6 +4,7 @@
 
 use assert_cmd::prelude::*;
 use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
+use jit::domain::store_divergence::{DivergenceClass, DivergentRecord};
 use jit::domain::LinkedCheckoutWriteStance;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -1067,14 +1068,16 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
     };
     let classes = tokens("class");
     assert!(
-        classes.iter().any(|class| class == "local_only")
-            && classes.iter().any(|class| class == "reference_only"),
+        [DivergenceClass::LocalOnly, DivergenceClass::ReferenceOnly]
+            .iter()
+            .all(|direction| classes.iter().any(|class| class == direction.as_str())),
         "a store divergence is reported in both directions: {machine}"
     );
     let records = tokens("record");
     assert!(
-        records.iter().any(|record| record == "issue")
-            && records.iter().any(|record| record == "event"),
+        DivergentRecord::ALL
+            .iter()
+            .all(|kind| records.iter().any(|record| record == kind.as_str())),
         "both issue records and event records are compared: {machine}"
     );
 

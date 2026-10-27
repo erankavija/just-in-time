@@ -1920,11 +1920,8 @@ default_type = "task"
 
     #[test]
     fn test_each_strictness_level_deserializes() {
-        for (level, expected) in [
-            ("strict", crate::validation::Strictness::Strict),
-            ("loose", crate::validation::Strictness::Loose),
-            ("permissive", crate::validation::Strictness::Permissive),
-        ] {
+        for expected in crate::validation::Strictness::ALL {
+            let level = expected.as_str();
             let toml = format!("[validation]\nstrictness = \"{level}\"\n");
             let config: JitConfig =
                 toml::from_str(&toml).unwrap_or_else(|e| panic!("'{level}' must deserialize: {e}"));
@@ -1941,7 +1938,9 @@ default_type = "task"
             assert!(msg.contains(token), "names the bad value: {msg}");
             assert!(msg.contains("strictness"), "names the key: {msg}");
             assert!(
-                msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
+                crate::validation::Strictness::ALL
+                    .iter()
+                    .all(|level| msg.contains(level.as_str())),
                 "lists the accepted values: {msg}"
             );
         }
