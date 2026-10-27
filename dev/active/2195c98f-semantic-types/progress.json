@@ -718,6 +718,12 @@
     "story 83d04069 via 10ae7776"
    ],
    "resolution": "Invoker: lead removes the three #[allow(unused_imports)] attributes. Code-review and cargo-ci passed; landed 76a3af872."
+  },
+  {
+   "issue": "e2eb8862, 2c9badcd",
+   "status": "open",
+   "reason": "Take over the last two c780514e blockers of 0af95f14 while the c780514e lead waits on the invoker? Prior approval covered only 2a6bc44c and 55043636.",
+   "recommendation": "Take them (A)."
   }
  ],
  "rework_counts": {
@@ -1414,7 +1420,7 @@
   "Write story-review gap tasks as class sweeps over the whole crate, not single sites (83d04069 needed 3 rounds).",
   "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression."
  ],
- "session_note": "Session 4: stories 8c40d01b and 83d04069 closed (5/6 done). Remaining story e2651d77 waits on c780514e (led by just-in-time-4f); lead executes c780514e tasks 2a6bc44c -> 55043636 to shorten the path.",
+ "session_note": "Session 4 handoff written as handoff-3.md; see it for next actions.",
  "decisions": [
   {
    "issue": "8acca4f4",
