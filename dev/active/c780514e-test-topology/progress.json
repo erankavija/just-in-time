@@ -1329,6 +1329,13 @@
       "category": "criteria conflict: REQ-01 dependents-only signature vs REQ-03 unchanged global Backlog promotion",
       "status": "resolved: option A (user, 2026-10-27)",
       "decision": "REQ-01 amended: one pure domain function takes the issue graph after a transition and returns the issues that become ready; every command cascade, including delete, applies it. Rework: route delete cascade (commands/issue.rs:96-103) through it."
+    },
+    {
+      "session": 4,
+      "issue": "b7078f0d",
+      "category": "same finding twice (REQ-02 post-construction declaration writes); shared test infrastructure change (policy 7)",
+      "status": "resolved: extend shared fixture (user, 2026-10-28)",
+      "decision": "MemoryDeclarations gains invariants/gates and post-initialization installation; 18 item/validate sites and invariant.rs write_invariants converge onto it. Rework 2 of 2 (Claude Opus)."
     }
   ],
   "rework_counts": {
@@ -1349,7 +1356,7 @@
     "173d98d5": 1,
     "529f621d": 1,
     "b469f36d": 1,
-    "b7078f0d": 1
+    "b7078f0d": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1997,7 +2004,8 @@
     "landB-s4": "independent review PASS 07f4b1d4, b93687b3, 717f9c2f; cherry-picked to worktree-agent-w4-landB (conflicts in item_cli_tests/invariant_registry_story_tests resolved to main's migrated side), lead fixes 0c86a1d6a (callers drop scenario arg), 9c2b65c2f (restating doc)",
     "adoptB-s4": "lead PASS 3be2238f 3dd0ebd4e, d49d53db 60691d775 (write_invariants seed-on-executor helper accepted: init rejects dangling bindings)",
     "adoptA-s4": "lead PASS b7078f0d 4302797b2, b469f36d 737327ebf; cargo-ci red on stray config path (74d338c74 lead fix); code-review FAIL b7078f0d df54c692 F1 (post-construction declaration writes) -> rework 1 dispatched (Claude Sonnet); b469f36d d36bb7b2 F1 (duplicated install.sh owner) -> lead fix e942530d7",
-    "077937f5-s4": "lead PASS e648f9cb8 (Codex luna); lib suite verified outside sandbox"
+    "077937f5-s4": "lead PASS e648f9cb8 (Codex luna); lib suite verified outside sandbox",
+    "harness-s4": "lead PASS 50b800bb cce28f9fe, 2d537b7c 36fb35636; cargo-ci + code-review pass both; :314 owners accepted (resolve_link_label in commands/item.rs, triple in domain/item.rs); dev/benchmarks harness_demo mentions kept as recorded evidence"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2230,6 +2238,15 @@
         "b7078f0d"
       ],
       "reason": "rework 1: code-review df54c692 F1"
+    },
+    {
+      "session": 4,
+      "slot": "A agent-22355a56 branch worktree-agent-w4-memdecl",
+      "worker": "Claude Opus",
+      "issues": [
+        "b7078f0d"
+      ],
+      "reason": "final rework; shared fixture contract change"
     }
   ],
   "checkpoint": {
