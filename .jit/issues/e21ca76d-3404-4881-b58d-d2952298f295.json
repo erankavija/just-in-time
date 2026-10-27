@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f82c9257-5896-4242-9861-e3e8cb244e2c",
+      "run_id": "bfa51480-19ef-41f6-b90f-a6789263bde9",
       "status": "passed",
-      "updated_at": "2026-10-27T00:27:03.316185421Z",
+      "updated_at": "2026-10-27T00:56:39.932594576Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +34,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-27T00:27:03.316185421Z"
+  "updated_at": "2026-10-27T00:56:39.932594576Z"
 }

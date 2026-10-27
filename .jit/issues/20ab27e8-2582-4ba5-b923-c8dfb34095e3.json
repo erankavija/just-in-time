@@ -8,6 +8,7 @@
   ],
   "description": "Remove the decision-kind copies from the item and validate CLI suite.\n\n## Background\n\n`cli_item_validate/decision_kind_tests.rs` (`:15`, `:55`, `:175`) and `cli_item_validate/decision_risk_story_tests.rs` (`:16`, `:65`, `:131`) restate the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No test in these files restates a shipped kind's declaration or its id pattern.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T00:57:01.790494667Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Decision-kind CLI tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T00:57:01.790494667Z"
 }
