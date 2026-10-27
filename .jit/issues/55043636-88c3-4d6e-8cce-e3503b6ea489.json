@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "379b39d7-6c82-491c-9eda-7a06e97c8f91",
-      "status": "failed",
-      "updated_at": "2026-10-27T22:43:10.489903491Z",
+      "run_id": "77057743-6978-40ed-aebd-1cdaad7139fc",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:52:18.965873791Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Tests read shared process environment only under the environment guard",
-  "updated_at": "2026-10-27T22:43:10.489903491Z"
+  "updated_at": "2026-10-27T22:52:18.965873791Z"
 }
