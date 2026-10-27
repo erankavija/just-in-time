@@ -2530,9 +2530,7 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{
-        fixture_id, seed_issue, seed_repo_file, MemoryDeclarations,
-    };
+    use crate::commands::test_helpers::{fixture_id, seed_issue, MemoryDeclarations};
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2729,7 +2727,7 @@ depends_on = ["planning"]
 
     #[test]
     fn test_validate_fix_rejects_ambiguous_region_without_memory_writes() {
-        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_repo_file};
         use crate::storage::IssueStore;
 
         let (_source, storage) =
@@ -2745,9 +2743,14 @@ depends_on = ["planning"]
                 "<!-- jit:invariants:begin -->\n<!-- jit:invariants:begin -->",
                 1,
             );
-        let mut executor = memory_executor(storage.clone());
-        // Initialization rejects the drifted rules, so they are seeded after construction.
-        seed_repo_file(&storage, ".jit/rules.toml", &rules);
+        let mut executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                rules: Some(&rules),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
         seed_repo_file(&storage, "AGENTS.md", &agents);
 
         let error = executor.validate_with_fix(true, false).unwrap_err();
@@ -2988,14 +2991,13 @@ priority = 100
             &["enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"],
         );
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
-        seed_repo_file(&storage, ".jit/gates.toml", ONE_GATE);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
                 rules: Some(ONE_RULE),
+                invariants: Some(REGISTRY_TOML),
+                gates: Some(ONE_GATE),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3021,14 +3023,13 @@ priority = 100
             ],
         );
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
-        seed_repo_file(&storage, ".jit/gates.toml", ONE_GATE);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
                 rules: Some(ONE_RULE),
+                invariants: Some(REGISTRY_TOML),
+                gates: Some(ONE_GATE),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3058,12 +3059,11 @@ priority = 100
         let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
         let node_id = node.id.clone();
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3111,12 +3111,11 @@ priority = 100
             "decision",
             "risk",
         ]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3148,12 +3147,11 @@ priority = 100
             ],
         );
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3169,12 +3167,11 @@ priority = 100
         // reported as dangling, never silently ignored as unqualified.
         let bad = issue_with_labels("bad", "", &["enforces:@/invariant/missing-invariant"]);
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3195,12 +3192,11 @@ priority = 100
         // a silently-ignored label.
         let node = issue_with_labels("node", "", &["enforces:@acme/invariant/sample-invariant"]);
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3227,12 +3223,11 @@ priority = 100
         // An unqualified link label is reported once; non-link namespaces are not.
         let node = issue_with_labels("node", "", &["satisfies:REQ-01", "type:task", "epic:foo"]);
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3249,12 +3244,11 @@ priority = 100
         // is a registered link namespace with a qualified-but-unresolvable id.
         let node = issue_with_labels("node", "", &["enforces:@/invariant/missing-invariant"]);
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant"]);
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3286,12 +3280,11 @@ priority = 100
              {}",
             crate::test_utils::shipped_item_kind_tables(&["invariant", "requirement"])
         );
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3318,12 +3311,11 @@ priority = 100
         let mut node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
         node.dependencies = vec![target.id.clone()];
         let config = crate::test_utils::shipped_item_kinds_toml();
-        let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/invariants.toml", REGISTRY_TOML);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
-            storage,
+            InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(REGISTRY_TOML),
                 ..MemoryDeclarations::default()
             },
         );
@@ -3480,12 +3472,36 @@ priority = 100
         }
     }
 
+    const CUSTOM_PLAN_TEMPLATE: &str = r#"
+[[template]]
+name = "custom-plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+doc = "receipts/large.log"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+labels = ["scaffold:{container.short_id}"]
+depends_on = ["planning"]
+"#;
+
     #[test]
     fn test_capture_repair_plan_ignores_document_larger_than_capture_budget() {
-        use crate::commands::test_helpers::{seed_issue, seed_repo_file, setup};
+        use crate::commands::test_helpers::{
+            memory_executor_declaring, seed_issue, seed_repo_file,
+        };
         use crate::storage::{RepositoryMutationSession, RepositoryStateStore};
 
-        let executor = setup();
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+                templates: Some(CUSTOM_PLAN_TEMPLATE),
+                ..MemoryDeclarations::default()
+            },
+        );
         let mut issue = crate::test_utils::fixture_issue("Large receipt".into(), String::new());
         issue.labels = vec!["type:planning".into()];
         let mut document = crate::test_utils::document_reference("receipts/large.log");
@@ -3503,24 +3519,6 @@ priority = 100
         seed_issue(executor.storage(), issue);
         seed_issue(executor.storage(), container);
         seed_issue(executor.storage(), breakdown);
-        seed_repo_file(
-            executor.storage(),
-            ".jit/templates.toml",
-            r#"
-[[template]]
-name = "custom-plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "planning"
-doc = "receipts/large.log"
-[[template.nodes]]
-role = "breakdown"
-type = "breakdown"
-labels = ["scaffold:{container.short_id}"]
-depends_on = ["planning"]
-"#,
-        );
         let max_bytes = 64 * 1024;
         seed_repo_file(
             executor.storage(),

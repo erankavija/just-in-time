@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e371e3a16cbffa09dd2af6f0e787cb7bea071418",
+  "completed_at": "2026-10-27T21:50:48.299326387Z",
+  "duration_ms": 165539,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied by the attributed deletion, focused owner tests, and updated testing guidance.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2d537b7c-d772-49ce-93b6-24ae15f0a92e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7304e7df-1893-48ec-9cbf-5d8ccc54166f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:48:02.759999693Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 36fb35636, e371e3a16 (`jit:2d537b7c`; merge inspected against first parent)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/c780514e-8491-40a7-8844-3974bba91257.json\nResolved items: @/issue/c780514e/requirement/REQ-02 (.jit issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-10-27T21:47:54.381552835+00:00)\nTruncation recovery: re-read path-bounded documentation and merge-source patches plus current owner-test ranges; excluded unrelated historical gate artifacts outside the impact cone\n\n1. No findings. `harness_demo.rs` is deleted and no longer declared; its former properties have focused owners; `dev/TESTING.md` now points to the retained harness example.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied by the attributed deletion, focused owner tests, and updated testing guidance.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -167,6 +167,26 @@ pub struct MemoryDeclarations<'a> {
     pub config: Option<&'a str>,
     pub rules: Option<&'a str>,
     pub templates: Option<&'a str>,
+    pub invariants: Option<&'a str>,
+    pub gates: Option<&'a str>,
+    /// Install the supplied declarations verbatim after initialization, which
+    /// then neither validates nor rejects them (such as malformed rules).
+    pub after_initialization: bool,
+}
+
+impl MemoryDeclarations<'_> {
+    fn install(&self, storage: &InMemoryStorage) {
+        [
+            (VirtualPath::CONFIG, self.config),
+            (VirtualPath::RULES, self.rules),
+            (VirtualPath::TEMPLATES, self.templates),
+            (VirtualPath::INVARIANTS, self.invariants),
+            (VirtualPath::GATES, self.gates),
+        ]
+        .into_iter()
+        .filter_map(|(path, body)| body.map(|body| (path, body)))
+        .for_each(|(path, body)| seed_repo_file(storage, &path.repository_relative(), body));
+    }
 }
 
 /// Executor over `storage` whose repository is set up by product
@@ -175,26 +195,21 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
     memory_executor_declaring(storage, MemoryDeclarations::default())
 }
 
-/// [`memory_executor`] for a scenario that declares configuration, rules or
-/// templates.
+/// [`memory_executor`] for a scenario that declares repository declarations.
 ///
 /// Each supplied declaration replaces what `storage` holds at its repository
-/// path before initialization, so initialization validates it and fills only
-/// absent paths without changing seeded state. Initializes a fault-free
-/// declaration copy, excluding [`VirtualPath::RECORDS`]. Seed declarations that
-/// initialization rejects (such as malformed rules) after this call.
+/// path, before initialization unless
+/// [`MemoryDeclarations::after_initialization`] is set; initialization fills
+/// only absent paths without changing seeded state. Initializes a fault-free
+/// declaration copy, excluding [`VirtualPath::RECORDS`], and mirrors the
+/// declarations to the host paths their loaders read.
 pub fn memory_executor_declaring(
     storage: InMemoryStorage,
     declarations: MemoryDeclarations<'_>,
 ) -> CommandExecutor<InMemoryStorage> {
-    [
-        (VirtualPath::CONFIG, declarations.config),
-        (VirtualPath::RULES, declarations.rules),
-        (VirtualPath::TEMPLATES, declarations.templates),
-    ]
-    .into_iter()
-    .filter_map(|(path, body)| body.map(|body| (path, body)))
-    .for_each(|(path, body)| seed_repo_file(&storage, &path.repository_relative(), body));
+    if !declarations.after_initialization {
+        declarations.install(&storage);
+    }
     let layout = storage.repository_layout();
     let rules_source = storage.root().join(VirtualPath::RULES.relative().as_path());
     let rules_target = layout
@@ -242,6 +257,9 @@ pub fn memory_executor_declaring(
         for (path, entry) in initialized.entries {
             state.entries.entry(path).or_insert(entry);
         }
+    }
+    if declarations.after_initialization {
+        declarations.install(&storage);
     }
     mirror_memory_declarations(&storage, &layout);
     CommandExecutor::new(storage).with_layout(layout)
@@ -375,6 +393,7 @@ mod tests {
                 config: Some(DECLARED_CONFIG),
                 rules: Some(DECLARED_RULES),
                 templates: Some(DECLARED_TEMPLATES),
+                ..MemoryDeclarations::default()
             },
         );
 
@@ -418,6 +437,7 @@ mod tests {
                     config: declared(VirtualPath::CONFIG),
                     rules: declared(VirtualPath::RULES),
                     templates: declared(VirtualPath::TEMPLATES),
+                    ..MemoryDeclarations::default()
                 },
             );
 
@@ -428,6 +448,30 @@ mod tests {
                 "{path}"
             );
         }
+    }
+
+    #[test]
+    fn test_memory_executor_declaring_installs_rejected_declaration_verbatim_after_initialization()
+    {
+        let malformed = "[[rules]\nname = \"unterminated\"\n";
+        let storage = InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                rules: Some(malformed),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+
+        assert_eq!(
+            storage
+                .read_repo_file(&VirtualPath::RULES.repository_relative())
+                .unwrap()
+                .as_deref(),
+            Some(malformed)
+        );
+        assert!(executor.rules().is_err());
     }
 
     #[test]
