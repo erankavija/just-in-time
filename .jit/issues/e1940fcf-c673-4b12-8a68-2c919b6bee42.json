@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Derive the priority tokens in the validation schema test from the `Priority` vocabulary instead of a handwritten list.\n\n## Background\n\n`Priority` is a closed vocabulary declared once through the vocabulary macro, and `Priority::ALL` enumerates its variants. The local-reference schema test in `crates/jit/src/validation/engine.rs` (around line 893) builds its `State` enum from `State::ALL` but writes the `Priority` enum as the literal list `[\"low\", \"normal\", \"high\", \"critical\"]`, so the test restates the vocabulary and drifts if a priority is added or renamed.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema built by the local-reference test takes its `Priority` tokens from `Priority::ALL` and each variant's token method, as it already does for `State`.\n- [hard] REQ-02: No handwritten list of `Priority` wire tokens remains under `crates/jit/src/validation/`.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:01:24.766324797Z",
   "first_ready_at": "2026-10-26T23:41:51.636915630Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "The validation schema test derives priority tokens from the vocabulary",
-  "updated_at": "2026-10-27T00:01:11.876524265Z"
+  "updated_at": "2026-10-27T00:01:24.766324797Z"
 }
