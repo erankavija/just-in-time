@@ -2006,7 +2006,8 @@
     "adoptA-s4": "lead PASS b7078f0d 4302797b2, b469f36d 737327ebf; cargo-ci red on stray config path (74d338c74 lead fix); code-review FAIL b7078f0d df54c692 F1 (post-construction declaration writes) -> rework 1 dispatched (Claude Sonnet); b469f36d d36bb7b2 F1 (duplicated install.sh owner) -> lead fix e942530d7",
     "077937f5-s4": "lead PASS e648f9cb8 (Codex luna); lib suite verified outside sandbox",
     "harness-s4": "lead PASS 50b800bb cce28f9fe, 2d537b7c 36fb35636; cargo-ci + code-review pass both; :314 owners accepted (resolve_link_label in commands/item.rs, triple in domain/item.rs); dev/benchmarks harness_demo mentions kept as recorded evidence",
-    "b7078f0d-r2-s4": "lead PASS b6fabbf18; cargo-ci + code-review 80443928 pass; closed"
+    "b7078f0d-r2-s4": "lead PASS b6fabbf18; cargo-ci + code-review 80443928 pass; closed",
+    "529f621d-r1-s4": "lead PASS eb68c7ff2 (Codex sol): delete + dependency-removal cascades apply issues_becoming_ready; new delete-event-order owner"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2268,6 +2269,19 @@
         "44b40ce1"
       ],
       "reason": "0af95f14 upstream; bounded adoptions"
+    },
+    {
+      "session": 4,
+      "slot": "A agent-22355a56 branch worktree-agent-w4-querygraph",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "14d95c74",
+        "28373fb7",
+        "37c169ad",
+        "3f15b95c",
+        "8da3f7f5"
+      ],
+      "reason": "5fac48b8 upstream; one integration target, sequential"
     }
   ],
   "checkpoint": {
