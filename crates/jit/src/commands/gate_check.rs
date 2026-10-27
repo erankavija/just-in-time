@@ -828,15 +828,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect::<std::result::Result<Vec<_>, _>>()?,
             )?;
             if matches!(checker, GateChecker::Exec { .. }) {
-                for document in &issue.documents {
-                    let requests =
-                        crate::document::DocumentReferenceRequests::for_reference(document)?;
-                    if let Some(worktree) = requests.worktree() {
-                        spec.discover_paths([worktree.clone()])?;
-                    }
-                    let (revision, path) = requests.pinned();
-                    spec.discover_pinned(revision, path)?;
-                }
+                super::validate::discover_document_references(&issue.documents, spec)?;
             }
             if let GateChecker::Exec {
                 pass_context: true,
@@ -4028,8 +4020,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
     }
 
-    /// A precheck validating the whole repository runs over the issue's
-    /// documents, which the transition's own base does not read.
+    /// A broad precheck remains stable when the issue has document references.
     #[test]
     fn test_update_issue_state_broad_precheck_over_issue_documents_records_a_stable_run() {
         let (repo, executor, issue_id) = setup_file_repository();

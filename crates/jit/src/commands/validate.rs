@@ -23,6 +23,16 @@ pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
 /// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
 pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
 
+#[derive(Clone, Copy)]
+enum BaseCapturePurpose<'a> {
+    Validation,
+    Mutation {
+        precheck_target: Option<&'a IssueId>,
+    },
+    Repair,
+    Archive,
+}
+
 struct CapturedRepairPlan {
     image: crate::repository_state::RepositoryImage,
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
@@ -99,12 +109,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
     /// Validate the exact repository through the closed-image pipeline.
     ///
-    /// Every backend captures a bounded whole-repository image through a
-    /// mutation session and validates it with
-    /// [`validate_repository`](crate::validation::repository::validate_repository),
-    /// so every pass reads only image-projected content and no ambient filesystem or
-    /// Git I/O. The same canonical repair plan supplies derived-state expectations
-    /// for validation and `--fix`.
+    /// Declaration and rule passes share the repair image; document references
+    /// resolve in separate bounded images under the same session. Every pass
+    /// reads captured evidence, with the repair plan supplying derived-state
+    /// expectations for validation and `--fix`.
     pub fn validate_silent(&self) -> Result<()> {
         let report = self.capture_validation_report()?.0?;
         if report.rule_report.has_errors() {
@@ -125,15 +133,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Capture the bounded whole-repository validation image through a mutation
+    /// Capture the declaration and rule-validation image through a mutation
     /// session, in the one round
     /// [`capture_proposed_base_inner`](Self::capture_proposed_base_inner) reads.
     fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
         self.capture_validation_image_with(&std::collections::BTreeMap::new())
     }
 
-    /// Capture the whole-repository validation image, optionally over a proposed
-    /// overlay.
+    /// Capture the declaration and rule-validation image, optionally over a
+    /// proposed overlay. Document-reference auditing is a separate capture pass.
     ///
     /// With an empty `overrides` this captures and validates the live repository.
     /// With a non-empty overlay (the projection of a proposed
@@ -177,9 +185,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// schema files, profile assets, directories) into the base so a
     /// subsequent `apply` finds each action's captured preimage; `start` is an
     /// image this session's round has already read, which the base grows from.
-    /// The base also reads every issue document reference: its working-tree
-    /// entry when unpinned, and its pinned evidence. Sharing one held session lets a caller capture the base and apply its
-    /// delta under the same guard without a second, deadlock-prone session.
+    /// Only rule-consumed plan documents enter here; other consuming passes
+    /// extend their selected references through [`discover_document_references`].
+    /// Sharing one held session lets a caller capture and apply under the same guard.
     pub(crate) fn capture_proposed_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -190,21 +198,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        let Some((image, issues)) = self.capture_proposed_base_inner(
+        self.capture_proposed_base_inner(
             session,
             start,
             overrides,
             extra_paths,
-            None,
-            false,
-            false,
-        )?
-        else {
-            return Ok(None);
-        };
-        super::grow_discovering(session, image, |_, spec| {
-            discover_document_references(&issues, spec)
-        })
+            BaseCapturePurpose::Validation,
+        )
+        .map(|captured| captured.map(|(image, _)| image))
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
@@ -220,9 +221,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             &std::collections::BTreeMap::new(),
             extra_paths,
-            precheck_target,
-            true,
-            false,
+            BaseCapturePurpose::Mutation { precheck_target },
         )
         .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
     }
@@ -283,9 +282,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(image),
             &std::collections::BTreeMap::new(),
             &[],
-            Some(issue_id),
-            true,
-            false,
+            BaseCapturePurpose::Mutation {
+                precheck_target: Some(issue_id),
+            },
         )?;
         Ok(grown.map(|(image, issues)| MutationPreflight {
             image,
@@ -305,9 +304,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             &std::collections::BTreeMap::new(),
             &[],
-            None,
-            false,
-            true,
+            BaseCapturePurpose::Archive,
         )
         .map(|captured| captured.map(|(image, _)| image))
     }
@@ -318,10 +315,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// The round reads the registries, the event log (as its length and tail
     /// for a `mutation`, which also parses issues strictly) and the caller's
     /// paths; then the
-    /// validation closure those registries plan; then what the captured issues
-    /// name: the plan documents, and a precheck target's prompt files and
-    /// gate-run results.
-    #[allow(clippy::too_many_arguments)]
+    /// closure those registries plan. Validation and mutation passes also read
+    /// linked plan documents; a mutation's precheck target adds prompt files and
+    /// gate-run results. Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -331,20 +327,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&IssueId>,
-        mutation: bool,
-        archive_scan: bool,
+        purpose: BaseCapturePurpose<'_>,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
 
+        let mutation = matches!(purpose, BaseCapturePurpose::Mutation { .. });
+        let precheck_target = match purpose {
+            BaseCapturePurpose::Mutation { precheck_target } => precheck_target,
+            _ => None,
+        };
         // An archive rerun enumerates every directory below its existing
         // container destination, so it is allowed a listing per directory an
         // archive of the admitted size can hold rather than the handful a
         // registry scan needs.
         let budget = CaptureBudget {
-            max_listings: if archive_scan {
+            max_listings: if matches!(purpose, BaseCapturePurpose::Archive) {
                 1 << 16
             } else {
                 MUTATION_CAPTURE_BUDGET.max_listings
@@ -441,14 +440,19 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 } else {
                     effective_issues(image, &all_ids, &effective_repo_path)?
                 };
-                capture_precheck_history = discover_issue_closure(
-                    image,
-                    spec,
-                    &parsed,
-                    &config,
-                    &effective_virtual_path,
-                    precheck_target,
-                )?;
+                if matches!(
+                    purpose,
+                    BaseCapturePurpose::Validation | BaseCapturePurpose::Mutation { .. }
+                ) {
+                    capture_precheck_history = discover_issue_closure(
+                        image,
+                        spec,
+                        &parsed,
+                        &config,
+                        &effective_virtual_path,
+                        precheck_target,
+                    )?;
+                }
                 issues = Some(parsed);
             }
             if capture_precheck_history {
@@ -517,7 +521,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 let Some(derived) = self.capture_repair_plan(session)? else {
                     return Ok(SessionStep::Retry);
                 };
-                let captured = match derived {
+                let mut captured = match derived {
                     Ok(derived) => derived,
                     Err(failure) => {
                         return Ok(SessionStep::Done((
@@ -526,14 +530,31 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         )));
                     }
                 };
+                let Some(image) = self.capture_proposed_base(
+                    session,
+                    &std::collections::BTreeMap::new(),
+                    &[],
+                    Some(captured.image),
+                )?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                captured.image = image;
                 let divergences =
                     captured_divergences(&captured.image, captured.declarations.config())
                         .unwrap_or_else(|_| crate::output::DivergenceResponse::new(Vec::new()));
+                let issues = captured_active_issues(&captured.image).unwrap_or_default();
+                let Some(document_references) =
+                    capture_document_reference_validation(session, &issues)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
                 let report =
                     crate::validation::repository::validate_repository_with_materializations(
                         &captured.image,
                         &captured.declarations,
                         captured.plan.as_ref(),
+                        document_references,
                     );
                 Ok(SessionStep::Done((report, divergences)))
             },
@@ -615,8 +636,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     > {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
 
-        let Some(image) =
-            self.capture_proposed_base(session, &std::collections::BTreeMap::new(), &[], None)?
+        let Some((image, _)) = self.capture_proposed_base_inner(
+            session,
+            None,
+            &std::collections::BTreeMap::new(),
+            &[],
+            BaseCapturePurpose::Repair,
+        )?
         else {
             return Ok(None);
         };
@@ -885,21 +911,45 @@ pub(crate) struct MutationPreflight {
     pub(crate) issues: Option<Vec<Issue>>,
 }
 
-/// Request every issue document reference: its working-tree entry when
-/// unpinned, and its pinned evidence.
-fn discover_document_references(
-    issues: &[Issue],
+/// Request only the references a consuming pass selects.
+pub(super) fn discover_document_references<'a>(
+    documents: impl IntoIterator<Item = &'a crate::domain::DocumentReference>,
     spec: &mut crate::repository_state::CaptureSpec,
 ) -> Result<()> {
-    issues
-        .iter()
-        .flat_map(|issue| &issue.documents)
-        .try_for_each(|document| {
-            let requests = crate::document::DocumentReferenceRequests::for_reference(document)?;
-            spec.discover_paths(requests.worktree().cloned())?;
-            let (revision, path) = requests.pinned();
-            Ok(spec.discover_pinned(revision, path)?)
-        })
+    documents.into_iter().try_for_each(|document| {
+        let requests = crate::document::DocumentReferenceRequests::for_reference(document)?;
+        spec.discover_paths(requests.worktree().cloned())?;
+        let (revision, path) = requests.pinned();
+        Ok(spec.discover_pinned(revision, path)?)
+    })
+}
+
+/// Resolve each reference without retaining the other references' bytes.
+/// `None` restarts the enclosing capture after a read conflict.
+fn capture_document_reference_validation(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    issues: &[Issue],
+) -> Result<Option<Result<()>>> {
+    use crate::repository_state::CaptureSpec;
+
+    for issue in issues {
+        for document in &issue.documents {
+            let mut spec = CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
+            discover_document_references(std::iter::once(document), &mut spec)?;
+            let Some(image) = super::capture_or_retry(session.capture(spec))? else {
+                return Ok(None);
+            };
+            if let Some(reason) =
+                crate::document::resolve_document_reference(&image, document)?.unresolved()
+            {
+                return Ok(Some(Err(anyhow!(
+                    "Invalid document reference in issue '{}': {reason}",
+                    issue.id
+                ))));
+            }
+        }
+    }
+    Ok(Some(Ok(())))
 }
 
 /// Each breakable container's plan-document path, from its planning node as
@@ -3228,11 +3278,9 @@ priority = 100
         assert!(value.to_string().contains(DANGLING_LINK_RULE));
     }
 
-    /// An issue mutation captures no issue document reference, working-tree or
-    /// pinned, and reads the log as a tail, while whole-repository validation of
-    /// the same repository reads all of them.
+    /// Shared bases exclude references; a consuming pass requests its own scope.
     #[test]
-    fn test_capture_mutation_base_excludes_issue_document_references() {
+    fn test_capture_proposed_base_scopes_document_references_to_the_consuming_pass() {
         use crate::commands::test_helpers::{seed_issue, setup};
         use crate::repository_state::{ReadMode, VirtualPath};
         use crate::storage::RepositoryStateStore;
@@ -3266,8 +3314,25 @@ priority = 100
             .expect("a settled capture")
             .image;
 
-        assert!(validation.capture_spec().contains_path(&document));
-        assert!(!validation.capture_spec().pinned().is_empty());
+        assert!(!validation.capture_spec().contains_path(&document));
+        assert!(validation.capture_spec().pinned().is_empty());
+        let mut selected = executor.storage().load_issue(&issue_id).unwrap();
+        selected.documents.truncate(1);
+        let scoped =
+            super::super::grow_discovering(session.as_mut(), validation.clone(), |_, spec| {
+                discover_document_references(&selected.documents, spec)
+            })
+            .unwrap()
+            .expect("a settled scoped capture");
+        assert!(scoped.capture_spec().contains_path(&document));
+        assert!(scoped
+            .capture_spec()
+            .pinned()
+            .contains(&("HEAD".into(), "dev/notes.md".into())));
+        assert!(!scoped
+            .capture_spec()
+            .pinned()
+            .contains(&("HEAD".into(), "dev/pinned.md".into())));
         assert!(!mutation.capture_spec().contains_path(&document));
         assert!(mutation.capture_spec().pinned().is_empty());
         let events = |image: &crate::repository_state::RepositoryImage| {
@@ -3275,6 +3340,192 @@ priority = 100
         };
         assert_eq!(events(&mutation), Some(ReadMode::Tail));
         assert_ne!(events(&validation), Some(ReadMode::Tail));
+    }
+
+    struct LimitedCaptureSession {
+        inner: Box<dyn crate::storage::RepositoryMutationSession>,
+        max_bytes: u64,
+    }
+
+    impl LimitedCaptureSession {
+        fn limit(
+            &self,
+            spec: crate::repository_state::CaptureSpec,
+        ) -> crate::repository_state::CaptureSpec {
+            use crate::repository_state::{CaptureBudget, CaptureSpec, ReadMode};
+            let mut limited = CaptureSpec::new(
+                [],
+                CaptureBudget {
+                    max_bytes: self.max_bytes,
+                    ..spec.budget()
+                },
+            )
+            .unwrap();
+            for path in spec.paths() {
+                match spec.read_mode(path) {
+                    Some(ReadMode::Tail) => limited.discover_tail(path.clone()).unwrap(),
+                    _ => limited.discover_paths([path.clone()]).unwrap(),
+                }
+            }
+            limited
+                .discover_listings(spec.listings().iter().cloned())
+                .unwrap();
+            for (revision, path) in spec.pinned() {
+                limited.discover_pinned(revision, path).unwrap();
+            }
+            limited
+        }
+    }
+
+    impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
+        fn layout(&self) -> &crate::repository_state::RepositoryLayout {
+            self.inner.layout()
+        }
+        fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
+            self.inner.recovery_report()
+        }
+        fn capture(
+            &mut self,
+            spec: crate::repository_state::CaptureSpec,
+        ) -> std::result::Result<
+            crate::repository_state::RepositoryImage,
+            crate::storage::RepositoryStateStoreError,
+        > {
+            self.inner.capture(self.limit(spec))
+        }
+        fn extend(
+            &mut self,
+            image: crate::repository_state::RepositoryImage,
+            spec: crate::repository_state::CaptureSpec,
+        ) -> std::result::Result<
+            crate::repository_state::RepositoryImage,
+            crate::storage::RepositoryStateStoreError,
+        > {
+            self.inner.extend(image, self.limit(spec))
+        }
+        fn apply(
+            &mut self,
+            plan: &crate::repository_state::MaterializationPlan,
+        ) -> std::result::Result<
+            crate::storage::RepositoryApplyOutcome,
+            crate::storage::RepositoryStateStoreError,
+        > {
+            self.inner.apply(plan)
+        }
+    }
+
+    #[test]
+    fn test_capture_repair_plan_ignores_document_larger_than_capture_budget() {
+        use crate::commands::test_helpers::{seed_issue, seed_repo_file, setup};
+        use crate::storage::{RepositoryMutationSession, RepositoryStateStore};
+
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("Large receipt".into(), String::new());
+        issue.labels = vec!["type:planning".into()];
+        let mut document = crate::test_utils::document_reference("receipts/large.log");
+        document.label = Some("plan".into());
+        issue.documents.push(document);
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.labels = vec!["type:epic".into()];
+        let mut breakdown = crate::test_utils::fixture_issue("Breakdown".into(), String::new());
+        breakdown.labels = vec![
+            "type:breakdown".into(),
+            format!("scaffold:{}", container.short_id()),
+        ];
+        breakdown.dependencies.push(issue.id.clone());
+        container.dependencies.push(breakdown.id.clone());
+        seed_issue(executor.storage(), issue);
+        seed_issue(executor.storage(), container);
+        seed_issue(executor.storage(), breakdown);
+        seed_repo_file(
+            executor.storage(),
+            ".jit/templates.toml",
+            r#"
+[[template]]
+name = "custom-plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+doc = "receipts/large.log"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+labels = ["scaffold:{container.short_id}"]
+depends_on = ["planning"]
+"#,
+        );
+        let max_bytes = 64 * 1024;
+        seed_repo_file(
+            executor.storage(),
+            "receipts/large.log",
+            &"x".repeat(max_bytes * 2),
+        );
+        seed_repo_file(
+            executor.storage(),
+            ".jit/schemas/default-label-format.json",
+            "false",
+        );
+        let mut session = LimitedCaptureSession {
+            inner: executor
+                .storage()
+                .open_mutation_session(executor.require_layout().unwrap())
+                .unwrap(),
+            max_bytes: max_bytes as u64,
+        };
+        let captured = executor
+            .capture_repair_plan(&mut session)
+            .unwrap()
+            .expect("settled capture")
+            .unwrap();
+        assert!(!captured.image.capture_spec().contains_path(
+            &crate::repository_state::VirtualPath::worktree("receipts/large.log").unwrap()
+        ));
+        assert!(captured.image.capture_spec().pinned().is_empty());
+        let plan = captured.plan.unwrap();
+        assert!(
+            !plan.delta().actions().is_empty(),
+            "the stale schema needs repair"
+        );
+        session.apply(&plan).unwrap();
+        assert_ne!(
+            executor
+                .storage()
+                .read_repo_file(".jit/schemas/default-label-format.json")
+                .unwrap()
+                .as_deref(),
+            Some("false")
+        );
+    }
+
+    #[test]
+    fn test_capture_document_reference_validation_bounds_each_reference_independently() {
+        use crate::commands::test_helpers::{seed_issue, seed_repo_file, setup};
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("Receipts".into(), String::new());
+        let max_bytes = 64 * 1024;
+        let content = "x".repeat(max_bytes * 3 / 4);
+        for path in ["receipts/first.log", "receipts/second.log"] {
+            seed_repo_file(executor.storage(), path, &content);
+            issue
+                .documents
+                .push(crate::test_utils::document_reference(path));
+        }
+        assert!(issue.documents.len() * content.len() > max_bytes);
+        seed_issue(executor.storage(), issue.clone());
+        let mut session = LimitedCaptureSession {
+            inner: executor
+                .storage()
+                .open_mutation_session(executor.require_layout().unwrap())
+                .unwrap(),
+            max_bytes: max_bytes as u64,
+        };
+        capture_document_reference_validation(&mut session, &[issue])
+            .unwrap()
+            .expect("settled captures")
+            .expect("every reference resolves within its own budget");
     }
 
     /// Preflight reads only the lease configuration, index, and resolved issue.
