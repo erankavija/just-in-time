@@ -7,28 +7,12 @@
 use jit::declarations::{GateMode, GateStage};
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
+use jit::test_utils::{declaration_dir, file_executor};
 use jit::CommandExecutor;
 use std::sync::{mpsc, Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
-
-/// A file-backed executor over a repository whose gate-preset directory is the
-/// one a project declares its presets in.
-///
-/// A project-defined preset lives under `.jit/config/gate-presets/`, which the
-/// in-memory harness does not model, so these cases run over a real store.
-fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
-    jit::test_mode::enable();
-    let worktree = temp.path().join("worktree");
-    std::fs::create_dir(&worktree).unwrap();
-    let data_root = worktree.join(".jit");
-    std::fs::create_dir(&data_root).unwrap();
-    let storage = JsonFileStorage::new(data_root);
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
-    let layout = jit::storage::discover_repository_layout(&worktree, storage.root()).unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
 
 /// Define `key` as a manual postcheck gate in the repository's own registry.
 fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
@@ -96,8 +80,8 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
             let ready = Arc::clone(&ready);
             let sender = sender.clone();
             thread::spawn(move || {
-                let temp = TempDir::new().expect("create fixture temp directory");
-                let executor = file_backed_executor(&temp);
+                let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+                let executor = file_executor(&temp.path().join("worktree")).unwrap();
                 let data_root = executor.storage().root().to_path_buf();
                 let worktree_root = data_root
                     .parent()
@@ -173,8 +157,8 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
 /// timeout-override overwrite — and a no-write re-application appends none.
 #[test]
 fn test_apply_gate_preset_appends_definition_events() {
-    let temp = TempDir::new().unwrap();
-    let executor = file_backed_executor(&temp);
+    let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+    let executor = file_executor(&temp.path().join("worktree")).unwrap();
     // Captured from a definition the project authors, then removed from the
     // registry, so the first application is the write that defines its key.
     preset_captured_from_gates(&executor, "review", &["team-review"]);
@@ -260,8 +244,8 @@ fn test_apply_gate_preset_appends_definition_events() {
 /// because the save/list/show path reads `.jit/config/gate-presets/`.
 #[test]
 fn test_project_defined_preset_save_list_show_apply_in_process() {
-    let temp = TempDir::new().unwrap();
-    let executor = file_backed_executor(&temp);
+    let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+    let executor = file_executor(&temp.path().join("worktree")).unwrap();
 
     // SAVE: capture a reference issue's gates into a project-defined preset,
     // written under the project's gate-presets directory.
