@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "053e0e52-1bbc-4b18-815b-0eea82e56ab4",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:25:33.004248343Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fb4782d7-813d-4301-8b84-81c801a59265",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:23:27.247372926Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2a6bc44c-459e-4837-baf9-0022778b0870",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Fixture setup runs inside the suite with no runner hook",
-  "updated_at": "2026-10-27T22:10:24.890903169Z"
+  "updated_at": "2026-10-27T22:25:33.004248343Z"
 }

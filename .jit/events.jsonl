@@ -20884,6 +20884,7 @@
 {"from":"ready","id":"b89bdd31-14c7-49d8-a202-636ec99b4118","issue_id":"2a6bc44c-459e-4837-baf9-0022778b0870","timestamp":"2026-10-27T22:09:10.411606741Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"27a6a21a-1c74-4a64-b684-33be6a75276e","issue_id":"2a6bc44c-459e-4837-baf9-0022778b0870","timestamp":"2026-10-27T22:09:10.411606741Z","type":"issue_claimed"}
 {"fields":["description"],"id":"43d79aa3-a846-4c2d-9a08-502008d27bda","issue_id":"2a6bc44c-459e-4837-baf9-0022778b0870","timestamp":"2026-10-27T22:10:24.890903169Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"code-review","id":"aae58249-0719-4af4-8ce3-4a397bdd47a0","issue_id":"2a6bc44c-459e-4837-baf9-0022778b0870","timestamp":"2026-10-27T22:23:27.247372926Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"ccfb66eb-3bc8-4bec-b028-5a1f3bee252b","issue_id":"b7078f0d-4725-4fd8-926c-50436c39880c","timestamp":"2026-10-27T22:12:42.591246717Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"1c464878-3785-4029-85f8-d4a3fd834655","issue_id":"b7078f0d-4725-4fd8-926c-50436c39880c","timestamp":"2026-10-27T22:14:14.723700692Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"9331d804-40d6-44ed-b8ba-716081101954","issue_id":"b7078f0d-4725-4fd8-926c-50436c39880c","timestamp":"2026-10-27T22:14:42.492419313Z","to":"done","type":"issue_state_changed"}
@@ -20916,3 +20917,4 @@
 {"from":"in_progress","id":"0367eacb-c38a-47f7-8403-c2ae7781060b","issue_id":"529f621d-fdff-4c0c-b349-58bfbe2b93ad","timestamp":"2026-10-27T22:22:20.861773302Z","to":"done","type":"issue_state_changed"}
 {"id":"4edb6e46-288a-4005-b9e4-d379b4177889","issue_id":"529f621d-fdff-4c0c-b349-58bfbe2b93ad","timestamp":"2026-10-27T22:22:20.861773302Z","type":"issue_completed"}
 {"from":"backlog","id":"673e6ea7-0fe3-4f40-9eb0-ab1db961a46d","issue_id":"53d582ab-f36d-4ed0-a8e2-7fa902717c9a","timestamp":"2026-10-27T22:22:20.976157430Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"3683364c-2907-411d-82ab-b12072823688","issue_id":"2a6bc44c-459e-4837-baf9-0022778b0870","timestamp":"2026-10-27T22:25:33.004248343Z","type":"gate_passed","updated_by":"auto:executor"}
