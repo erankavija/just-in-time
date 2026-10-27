@@ -9,14 +9,17 @@ use crate::commands::ProfileSelector;
 use crate::config::ItemKindConfig;
 use crate::domain::DocumentReference;
 use crate::profile::{
-    capture_package_tree, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
+    capture_package_tree, CapturedFile, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
 };
 use crate::repository_state::{Contribution, MapEntryTarget};
 use crate::repository_state::{FileMode, VirtualPath};
 #[cfg(any(test, feature = "test-support"))]
 use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence};
+use crate::storage::lock::LockGuard;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
+use crate::storage::{
+    discover_repository_layout, FileLocker, IssueStore, JsonFileStorage, LockMode,
+};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -24,12 +27,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fs;
-use std::io::Read;
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, SystemTime};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 use tempfile::TempDir;
 
 /// Give a temporary data root a valid repository layout for loader tests.
@@ -230,10 +230,14 @@ impl Drop for EnvGuard {
 pub const PROFILE_PACKAGE_SOURCES: &str = "profiles";
 
 const PROFILED_REPOSITORY_FIXTURE_SCHEMA: u32 = 1;
-/// Longest wait on a fixture build lock; below the 20 s per-test timeout in `.config/nextest.toml`.
+/// Longest wait on a fixture profile lock; below the 20 s per-test timeout in `.config/nextest.toml`.
 const PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND: Duration = Duration::from_secs(12);
 const PROFILED_REPOSITORY_FIXTURE_DIRECTORY: &str = "jit-profiled-repository-fixtures";
 const PROFILED_REPOSITORY_FIXTURE_SETUP: &str = "command-executor.initialize-fresh-repository.v1";
+const PROFILED_REPOSITORY_FIXTURE_STAGING: &str = ".profiled-repository-staging-";
+const PROFILED_REPOSITORY_FIXTURE_RETIRED: &str = ".profiled-repository-retired-";
+/// Digest of the `jit` crate source this setup implementation was compiled from (`build.rs`).
+const CRATE_SOURCE_SHA256: &str = env!("JIT_CRATE_SOURCE_SHA256");
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -248,6 +252,7 @@ struct ProfiledRepositoryFixtureManifest {
 struct ProfiledRepositoryFixtureReceipt {
     schema_version: u32,
     run_id: String,
+    crate_source_sha256: String,
     entries: BTreeMap<String, PathBuf>,
 }
 
@@ -276,77 +281,56 @@ const PROFILED_REPOSITORY_FIXTURES: [ProfiledRepositoryFixtureSpec; 2] = [
     },
 ];
 
-#[derive(Default)]
-struct DirectProfiledRepositoryFixtures {
-    entries: BTreeMap<String, PathBuf>,
-    executable_digests: BTreeMap<OrdinaryFileIdentity, String>,
+/// What one fixture profile's entry is built from, captured once per process.
+struct ProfiledRepositoryFixtureInputs {
+    key: String,
+    packages: BTreeMap<String, CapturedPackageTree>,
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct OrdinaryFileIdentity {
-    canonical_path: PathBuf,
-    length: u64,
-    modified: SystemTime,
-    #[cfg(unix)]
-    device: u64,
-    #[cfg(unix)]
-    inode: u64,
-    #[cfg(unix)]
-    change_seconds: i64,
-    #[cfg(unix)]
-    change_nanoseconds: i64,
-}
+static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<
+    BTreeMap<String, Arc<ProfiledRepositoryFixtureInputs>>,
+> = Mutex::new(BTreeMap::new());
 
-struct ExecutableProvenance {
-    canonical_path: PathBuf,
-    sha256: String,
+/// A published fixture entry, kept from retirement while the lease lives.
+#[derive(Debug)]
+struct ProfiledRepositoryFixtureLease {
+    entry: PathBuf,
+    _profile_lock: LockGuard,
 }
-
-static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<Option<DirectProfiledRepositoryFixtures>> =
-    Mutex::new(None);
 
 /// A freshly initialized repository carrying this checkout's profile package.
 ///
 /// The expensive initialization is published once as an immutable baseline in
-/// the Cargo target directory. Its identity includes every captured package
-/// file in the selected dependency closure (path, bytes, and mode), the selected
-/// profile, a setup-contract token, the current test executable that contains
-/// the setup implementation, and an optional scenario executable. Every caller
-/// receives an ordinary deep copy in a fresh temporary directory, so process-
-/// level tests retain real filesystem and CLI boundaries without sharing
-/// mutable repository state.
+/// the Cargo target directory, under one directory per fixture profile (the
+/// package id and the directory its packages are written to). Its key digests
+/// the captured package closure (path, bytes, and mode of every file), the
+/// `jit` crate source, and a setup-contract token, so every test executable
+/// built from one source shares the entry and a rebuild without a source or
+/// package change reuses it. Every caller receives an ordinary deep copy in a
+/// fresh temporary directory, so process-level tests retain real filesystem and
+/// CLI boundaries without sharing mutable repository state.
 ///
-/// Publication is serialized across nextest processes and is one atomic
-/// directory rename. An occupied or corrupted entry is an error rather than a
-/// reason to rebuild in place: source or executable changes select a new key,
-/// while damage to an entry with the same key fails closed.
-///
-/// CLI integration tests pass `CARGO_BIN_EXE_jit` as `scenario_executable`;
-/// in-process tests pass `None`.
-pub fn profiled_repository_fixture(
-    id: &str,
-    package_directory: &str,
-    scenario_executable: Option<&Path>,
-) -> Result<TempDir> {
+/// Readers copy under a shared profile lock. Building is serialized under the
+/// exclusive one and publishes by one atomic no-replace rename, then retires
+/// the profile's older entries, so the cache holds one entry per profile and a
+/// retirement never removes an entry while it is being copied. An occupied or
+/// corrupted entry fails closed rather than being rebuilt in place.
+pub fn profiled_repository_fixture(id: &str, package_directory: &str) -> Result<TempDir> {
     #[cfg(test)]
-    let nextest_entry = {
+    let nextest_lease = {
         let _receipt_environment_lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         nextest_profiled_repository_fixture(id, package_directory)?
     };
     #[cfg(not(test))]
-    let nextest_entry = nextest_profiled_repository_fixture(id, package_directory)?;
-    if let Some(entry) = nextest_entry {
-        let clone = TempDir::new()?;
-        copy_tree_exact(&entry.join("repository"), clone.path())?;
-        return Ok(clone);
-    }
-
-    // No receipt: the direct path builds each key once under its lock; later consumers read it.
-    let entry = direct_profiled_repository_fixture(id, package_directory, scenario_executable)?;
+    let nextest_lease = nextest_profiled_repository_fixture(id, package_directory)?;
+    let lease = match nextest_lease {
+        Some(lease) => lease,
+        None => direct_profiled_repository_fixture(id, package_directory)?,
+    };
     let clone = TempDir::new()?;
-    copy_tree_exact(&entry.join("repository"), clone.path())?;
+    copy_tree_exact(&lease.entry.join("repository"), clone.path())?;
     Ok(clone)
 }
 
@@ -362,7 +346,7 @@ pub fn profiled_in_memory_repository_fixture(
         .iter()
         .find(|spec| spec.id == id)
         .with_context(|| format!("unsupported profiled-repository fixture '{id}'"))?;
-    let repository = profiled_repository_fixture(id, spec.package_directory, None)?;
+    let repository = profiled_repository_fixture(id, spec.package_directory)?;
     let storage = crate::storage::InMemoryStorage::rooted_at(repository.path());
     storage.seed_repository_tree_fixture(repository.path())?;
     Ok((repository, storage))
@@ -371,125 +355,56 @@ pub fn profiled_in_memory_repository_fixture(
 fn direct_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
-    scenario_executable: Option<&Path>,
-) -> Result<PathBuf> {
-    let mut state = DIRECT_PROFILED_REPOSITORY_FIXTURES
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let state = state.get_or_insert_with(DirectProfiledRepositoryFixtures::default);
-    let scenario_provenance = scenario_executable
-        .map(|executable| executable_provenance(executable, &mut state.executable_digests))
-        .transpose()?;
-    let entry_key = direct_entry_key(id, package_directory, scenario_provenance.as_ref());
-    if let Some(entry) = state.entries.get(&entry_key) {
-        return Ok(entry.clone());
-    }
-
-    let packages = capture_profile_package_closure(id)?;
+) -> Result<ProfiledRepositoryFixtureLease> {
+    let profile = fixture_profile(id, package_directory);
+    let inputs = {
+        let mut memo = DIRECT_PROFILED_REPOSITORY_FIXTURES
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match memo.get(&profile) {
+            Some(inputs) => Arc::clone(inputs),
+            None => {
+                let inputs = Arc::new(profiled_repository_fixture_inputs(id)?);
+                memo.insert(profile.clone(), Arc::clone(&inputs));
+                inputs
+            }
+        }
+    };
     let package_root = VirtualPath::worktree(package_directory)?;
     let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
-    let key = profiled_repository_fixture_key(
-        id,
-        package_root.relative().as_path(),
-        &fixture_setup,
-        scenario_provenance.as_ref(),
-        &packages,
-    )?;
     let cache_root = profiled_repository_fixture_cache_root(&fixture_setup)?;
-    let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
+    ensure_profiled_repository_fixture(&cache_root, &profile, &inputs.key, |repository| {
         initialize_profiled_repository_fixture(
             repository,
             id,
             package_root.relative().as_path(),
-            &packages,
+            &inputs.packages,
         )
-    })?;
-    state.entries.insert(entry_key, entry.clone());
-    Ok(entry)
-}
-
-fn direct_entry_key(
-    id: &str,
-    package_directory: &str,
-    scenario_executable: Option<&ExecutableProvenance>,
-) -> String {
-    format!(
-        "{}\0{}\0{}",
-        receipt_entry_key(id, package_directory),
-        scenario_executable
-            .map(|provenance| provenance.canonical_path.to_string_lossy())
-            .as_deref()
-            .unwrap_or("<none>"),
-        scenario_executable
-            .map(|provenance| provenance.sha256.as_str())
-            .unwrap_or("<none>")
-    )
-}
-
-fn executable_provenance(
-    executable: &Path,
-    digests: &mut BTreeMap<OrdinaryFileIdentity, String>,
-) -> Result<ExecutableProvenance> {
-    let identity = ordinary_file_identity(executable)?;
-    if let Some(sha256) = digests.get(&identity) {
-        return Ok(ExecutableProvenance {
-            canonical_path: identity.canonical_path,
-            sha256: sha256.clone(),
-        });
-    }
-
-    let mut hasher = Sha256::new();
-    hash_file(&mut hasher, executable)
-        .with_context(|| format!("hash scenario executable {}", executable.display()))?;
-    let after_hash = ordinary_file_identity(executable)?;
-    if identity != after_hash {
-        bail!(
-            "scenario executable {} changed while its provenance was captured",
-            executable.display()
-        );
-    }
-    let sha256 = format!("{:x}", hasher.finalize());
-    digests.insert(identity.clone(), sha256.clone());
-    Ok(ExecutableProvenance {
-        canonical_path: identity.canonical_path,
-        sha256,
     })
 }
 
-fn ordinary_file_identity(path: &Path) -> Result<OrdinaryFileIdentity> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("inspect scenario executable {}", path.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        bail!(
-            "scenario executable {} must be an ordinary file",
-            path.display()
-        );
-    }
-    Ok(OrdinaryFileIdentity {
-        canonical_path: fs::canonicalize(path)
-            .with_context(|| format!("canonicalize scenario executable {}", path.display()))?,
-        length: metadata.len(),
-        modified: metadata
-            .modified()
-            .with_context(|| format!("read modification time for {}", path.display()))?,
-        #[cfg(unix)]
-        device: metadata.dev(),
-        #[cfg(unix)]
-        inode: metadata.ino(),
-        #[cfg(unix)]
-        change_seconds: metadata.ctime(),
-        #[cfg(unix)]
-        change_nanoseconds: metadata.ctime_nsec(),
-    })
+fn profiled_repository_fixture_inputs(id: &str) -> Result<ProfiledRepositoryFixtureInputs> {
+    let packages = capture_profile_package_closure(id)?;
+    let key = profiled_repository_fixture_key(
+        &package_closure_sha256(packages.iter().flat_map(|(package_id, package)| {
+            package
+                .files()
+                .iter()
+                .map(move |(relative, file)| (package_id.as_str(), relative.as_str(), file))
+        })),
+        CRATE_SOURCE_SHA256,
+    );
+    Ok(ProfiledRepositoryFixtureInputs { key, packages })
 }
 
 /// Prepare the verified immutable repository fixtures for one nextest run.
 ///
 /// Nextest executes this once, before any matching test processes. The receipt
 /// is bound to that run's own id and exported through `NEXTEST_ENV`; consumers
-/// therefore skip repeated source and executable hashing but cannot accept a
-/// receipt copied from another run. Direct libtest execution has no receipt and
-/// takes the fully verified builder path above.
+/// therefore skip repeated package capture and entry hashing but cannot accept
+/// a receipt copied from another run. A consumer built from other crate source
+/// than the setup binary ignores the receipt, as direct libtest execution has
+/// none, and takes the fully verified builder path above.
 fn prepare_profiled_repository_fixture_receipt(
     id: &str,
     run_id: &str,
@@ -499,29 +414,24 @@ fn prepare_profiled_repository_fixture_receipt(
         .iter()
         .find(|spec| spec.id == id)
         .with_context(|| format!("unsupported profiled-repository fixture '{id}'"))?;
-    let packages = capture_profile_package_closure(spec.id)?;
+    let inputs = profiled_repository_fixture_inputs(spec.id)?;
     let package_directory = VirtualPath::worktree(spec.package_directory)?;
-    let key = profiled_repository_fixture_key(
-        spec.id,
-        package_directory.relative().as_path(),
-        setup_executable,
-        None,
-        &packages,
-    )?;
+    let profile = fixture_profile(spec.id, spec.package_directory);
     let cache_root = profiled_repository_fixture_cache_root(setup_executable)?;
-    let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
-        initialize_profiled_repository_fixture(
-            repository,
-            spec.id,
-            package_directory.relative().as_path(),
-            &packages,
-        )
-    })?;
-    validate_profiled_repository_fixture(&entry, &key)?;
+    let lease =
+        ensure_profiled_repository_fixture(&cache_root, &profile, &inputs.key, |repository| {
+            initialize_profiled_repository_fixture(
+                repository,
+                spec.id,
+                package_directory.relative().as_path(),
+                &inputs.packages,
+            )
+        })?;
     let receipt = ProfiledRepositoryFixtureReceipt {
         schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
         run_id: run_id.to_string(),
-        entries: BTreeMap::from([(receipt_entry_key(spec.id, spec.package_directory), entry)]),
+        crate_source_sha256: CRATE_SOURCE_SHA256.to_string(),
+        entries: BTreeMap::from([(profile, lease.entry.clone())]),
     };
     let receipt_path = cache_root.join(format!("run-{run_id}-{}.json", spec.id));
     let receipt_bytes = serde_json::to_vec(&receipt)?;
@@ -560,7 +470,7 @@ pub fn prepare_nextest_profiled_repository_fixture(id: &str) -> Result<()> {
 fn nextest_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
-) -> Result<Option<PathBuf>> {
+) -> Result<Option<ProfiledRepositoryFixtureLease>> {
     let runtime_artifact = std::env::current_exe()
         .context("resolve profiled-repository fixture consumer executable")?;
     nextest_profiled_repository_fixture_for_artifact(id, package_directory, &runtime_artifact)
@@ -570,7 +480,7 @@ fn nextest_profiled_repository_fixture_for_artifact(
     id: &str,
     package_directory: &str,
     runtime_artifact: &Path,
-) -> Result<Option<PathBuf>> {
+) -> Result<Option<ProfiledRepositoryFixtureLease>> {
     let Some(receipt_environment) = receipt_environment_name(id) else {
         return Ok(None);
     };
@@ -595,14 +505,30 @@ fn nextest_profiled_repository_fixture_for_artifact(
     if receipt.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA || receipt.run_id != run_id {
         bail!("profiled-repository fixture receipt does not belong to this nextest run");
     }
+    if receipt.crate_source_sha256 != CRATE_SOURCE_SHA256 {
+        // A setup binary built from other source; its entry is not this consumer's fixture.
+        return Ok(None);
+    }
+    let profile = fixture_profile(id, package_directory);
     let entry = receipt
         .entries
-        .get(&receipt_entry_key(id, package_directory))
+        .get(&profile)
         .with_context(|| format!("nextest fixture receipt has no {id} at {package_directory}"))?;
     let cache_root = profiled_repository_fixture_cache_root(runtime_artifact)?;
-    if entry.parent() != Some(cache_root.as_path()) {
-        bail!("profiled-repository fixture receipt names an entry outside its cache");
+    if entry.parent() != Some(cache_root.join(&profile).as_path()) {
+        bail!("profiled-repository fixture receipt names an entry outside its profile cache");
     }
+    let key = entry
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("profiled-repository fixture receipt names an entry without a key")?;
+    let profile_lock = lock_fixture_profile(
+        &cache_root,
+        &profile,
+        key,
+        PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND,
+        LockMode::Shared,
+    )?;
     let entry_metadata = fs::symlink_metadata(entry)?;
     if !entry_metadata.file_type().is_dir() || entry_metadata.file_type().is_symlink() {
         bail!("profiled-repository fixture receipt names a non-directory entry");
@@ -615,12 +541,15 @@ fn nextest_profiled_repository_fixture_for_artifact(
     let manifest: ProfiledRepositoryFixtureManifest =
         serde_json::from_slice(&fs::read(manifest_path)?)?;
     if manifest.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA
-        || entry.file_name().and_then(|name| name.to_str()) != Some(manifest.key.as_str())
+        || manifest.key != key
         || !entry.join("repository").is_dir()
     {
         bail!("profiled-repository fixture receipt names an invalid cache entry");
     }
-    Ok(Some(entry.clone()))
+    Ok(Some(ProfiledRepositoryFixtureLease {
+        entry: entry.clone(),
+        _profile_lock: profile_lock,
+    }))
 }
 
 fn receipt_environment_name(id: &str) -> Option<&'static str> {
@@ -631,8 +560,10 @@ fn receipt_environment_name(id: &str) -> Option<&'static str> {
     }
 }
 
-fn receipt_entry_key(id: &str, package_directory: &str) -> String {
-    format!("{id}\0{package_directory}")
+/// The cache directory name of one fixture profile: the package id and the
+/// directory its packages are written to.
+fn fixture_profile(id: &str, package_directory: &str) -> String {
+    format!("{id}@{}", package_directory.replace(['/', '\\'], "+"))
 }
 
 fn initialize_profiled_repository_fixture(
@@ -685,53 +616,39 @@ fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, Captured
     Ok(packages)
 }
 
-fn profiled_repository_fixture_key(
-    id: &str,
-    package_directory: &Path,
-    setup_executable: &Path,
-    scenario_executable: Option<&ExecutableProvenance>,
-    packages: &BTreeMap<String, CapturedPackageTree>,
-) -> Result<String> {
+/// Digest of a captured package closure, one `(package id, package-relative path, file)` per file.
+fn package_closure_sha256<'a>(
+    files: impl IntoIterator<Item = (&'a str, &'a str, &'a CapturedFile)>,
+) -> String {
     let mut hasher = Sha256::new();
-    hash_field(
-        &mut hasher,
-        &PROFILED_REPOSITORY_FIXTURE_SCHEMA.to_le_bytes(),
-    );
-    hash_field(&mut hasher, PROFILED_REPOSITORY_FIXTURE_SETUP.as_bytes());
-    hash_field(&mut hasher, std::env::consts::OS.as_bytes());
-    hash_field(&mut hasher, id.as_bytes());
-    hash_field(&mut hasher, package_directory.to_string_lossy().as_bytes());
-    hash_file(&mut hasher, setup_executable).with_context(|| {
-        format!(
-            "hash profiled-repository fixture setup executable {}",
-            setup_executable.display()
-        )
-    })?;
-    if let Some(scenario_executable) = scenario_executable {
+    files.into_iter().for_each(|(package_id, relative, file)| {
+        hash_field(&mut hasher, package_id.as_bytes());
+        hash_field(&mut hasher, relative.as_bytes());
         hash_field(
             &mut hasher,
-            scenario_executable
-                .canonical_path
-                .to_string_lossy()
-                .as_bytes(),
+            match file.mode {
+                FileMode::Regular => b"regular",
+                FileMode::Executable => b"executable",
+            },
         );
-        hash_field(&mut hasher, scenario_executable.sha256.as_bytes());
-    }
-    for (package_id, package) in packages {
-        hash_field(&mut hasher, package_id.as_bytes());
-        for (relative, file) in package.files() {
-            hash_field(&mut hasher, relative.as_bytes());
-            hash_field(
-                &mut hasher,
-                match file.mode {
-                    FileMode::Regular => b"regular",
-                    FileMode::Executable => b"executable",
-                },
-            );
-            hash_field(&mut hasher, &file.bytes);
-        }
-    }
-    Ok(format!("{:x}", hasher.finalize()))
+        hash_field(&mut hasher, &file.bytes);
+    });
+    format!("{:x}", hasher.finalize())
+}
+
+fn profiled_repository_fixture_key(
+    package_closure_sha256: &str,
+    crate_source_sha256: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    [
+        PROFILED_REPOSITORY_FIXTURE_SETUP,
+        package_closure_sha256,
+        crate_source_sha256,
+    ]
+    .iter()
+    .for_each(|field| hash_field(&mut hasher, field.as_bytes()));
+    format!("{:x}", hasher.finalize())
 }
 
 /// Derive the cache context Cargo used to place a running artifact.
@@ -788,67 +705,61 @@ fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<Pat
 
 fn ensure_profiled_repository_fixture(
     cache_root: &Path,
+    profile: &str,
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<PathBuf> {
+) -> Result<ProfiledRepositoryFixtureLease> {
     ensure_profiled_repository_fixture_within(
         cache_root,
+        profile,
         key,
         PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND,
         build,
     )
 }
 
-/// Builds the entry under its lock, or reads the one a concurrent consumer
-/// published. A wait past `bound` fails naming the lock, key and holder.
+/// Leases the profile's entry for `key`, building and publishing it under the
+/// exclusive profile lock when absent and then retiring the profile's older
+/// entries. Lock waits share one `bound`; a wait past it fails naming the lock,
+/// profile, key and holder.
 fn ensure_profiled_repository_fixture_within(
     cache_root: &Path,
+    profile: &str,
     key: &str,
     bound: Duration,
     build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<PathBuf> {
-    fs::create_dir_all(cache_root)?;
-    let lock_root = cache_root.join("locks");
-    fs::create_dir_all(&lock_root)?;
-    let lock_path = lock_root.join(format!("{key}.lock"));
-    let _lock = FileLocker::new(bound)
-        .lock_exclusive_with_metadata(&lock_path, &format!("fixture-build:{key}"))
-        .map_err(|error| {
-            if !crate::storage::is_lock_timeout(&error) {
-                return error;
-            }
-            let holder = fs::read(lock_path.with_extension("lock.meta"))
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<crate::storage::LockMetadata>(&bytes).ok())
-                .map_or_else(
-                    || "unknown".to_string(),
-                    |meta| format!("pid {} ({})", meta.pid, meta.agent_id),
-                );
-            error.context(format!(
-                "profiled-repository fixture key {key} is still being built; lock {} held by {holder}",
-                lock_path.display()
-            ))
-        })?;
-    let entry = cache_root.join(key);
-    match fs::symlink_metadata(&entry) {
-        Ok(_) => {
-            validate_profiled_repository_fixture(&entry, key)?;
-            return Ok(entry);
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(error).with_context(|| {
-                format!(
-                    "inspect profiled-repository fixture entry {}",
-                    entry.display()
-                )
-            });
-        }
+) -> Result<ProfiledRepositoryFixtureLease> {
+    let began = std::time::Instant::now();
+    let profile_root = cache_root.join(profile);
+    fs::create_dir_all(&profile_root)?;
+    let entry = profile_root.join(key);
+    let shared = lock_fixture_profile(cache_root, profile, key, bound, LockMode::Shared)?;
+    if is_published_fixture(&entry)? {
+        validate_profiled_repository_fixture(&entry, key)?;
+        return Ok(ProfiledRepositoryFixtureLease {
+            entry,
+            _profile_lock: shared,
+        });
+    }
+    drop(shared);
+    let exclusive = lock_fixture_profile(
+        cache_root,
+        profile,
+        key,
+        bound.saturating_sub(began.elapsed()),
+        LockMode::Exclusive,
+    )?;
+    if is_published_fixture(&entry)? {
+        validate_profiled_repository_fixture(&entry, key)?;
+        return Ok(ProfiledRepositoryFixtureLease {
+            entry,
+            _profile_lock: exclusive,
+        });
     }
 
     let staging = tempfile::Builder::new()
-        .prefix(".profiled-repository-staging-")
-        .tempdir_in(cache_root)?;
+        .prefix(PROFILED_REPOSITORY_FIXTURE_STAGING)
+        .tempdir_in(&profile_root)?;
     let repository = staging.path().join("repository");
     fs::create_dir(&repository)?;
     build(&repository)?;
@@ -874,7 +785,87 @@ fn ensure_profiled_repository_fixture_within(
         });
     }
     validate_profiled_repository_fixture(&entry, key)?;
-    Ok(entry)
+    retire_older_fixture_entries(&profile_root, key)?;
+    Ok(ProfiledRepositoryFixtureLease {
+        entry,
+        _profile_lock: exclusive,
+    })
+}
+
+fn lock_fixture_profile(
+    cache_root: &Path,
+    profile: &str,
+    key: &str,
+    bound: Duration,
+    mode: LockMode,
+) -> Result<LockGuard> {
+    let lock_root = cache_root.join("locks");
+    fs::create_dir_all(&lock_root)?;
+    let lock_path = lock_root.join(format!("{profile}.lock"));
+    let locker = FileLocker::new(bound);
+    match mode {
+        LockMode::Shared => locker.lock_shared(&lock_path),
+        LockMode::Exclusive => locker
+            .lock_exclusive_with_metadata(&lock_path, &format!("fixture-build:{profile}/{key}")),
+    }
+    .map_err(|error| {
+        if !crate::storage::is_lock_timeout(&error) {
+            return error;
+        }
+        let holder = fs::read(lock_path.with_extension("lock.meta"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<crate::storage::LockMetadata>(&bytes).ok())
+            .map_or_else(
+                || "readers or an unknown holder".to_string(),
+                |meta| format!("pid {} ({})", meta.pid, meta.agent_id),
+            );
+        error.context(format!(
+            "profiled-repository fixture {profile} key {key} is busy; lock {} held by {holder}",
+            lock_path.display()
+        ))
+    })
+}
+
+fn is_published_fixture(entry: &Path) -> Result<bool> {
+    match fs::symlink_metadata(entry) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).with_context(|| {
+            format!(
+                "inspect profiled-repository fixture entry {}",
+                entry.display()
+            )
+        }),
+    }
+}
+
+/// Removes every profile entry but `current`, including abandoned staging and
+/// retirement directories. The caller holds the exclusive profile lock, so no
+/// reader is copying a retired entry; each is renamed out of its key before
+/// removal, so an interrupted retirement never leaves a partial entry at a key.
+fn retire_older_fixture_entries(profile_root: &Path, current: &str) -> Result<()> {
+    let retired = tempfile::Builder::new()
+        .prefix(PROFILED_REPOSITORY_FIXTURE_RETIRED)
+        .tempdir_in(profile_root)?;
+    let retired_name = retired.path().file_name().map(OsStr::to_os_string);
+    fs::read_dir(profile_root)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<std::io::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|name| name != current && Some(name) != retired_name.as_ref())
+        .try_for_each(|name| fs::rename(profile_root.join(&name), retired.path().join(&name)))
+        .with_context(|| {
+            format!(
+                "retire older profiled-repository fixtures in {}",
+                profile_root.display()
+            )
+        })?;
+    retired.close().with_context(|| {
+        format!(
+            "remove retired profiled-repository fixtures in {}",
+            profile_root.display()
+        )
+    })
 }
 
 fn validate_profiled_repository_fixture(entry: &Path, expected_key: &str) -> Result<()> {
@@ -993,19 +984,6 @@ fn tree_sha256(root: &Path) -> Result<String> {
 fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update((bytes.len() as u64).to_le_bytes());
     hasher.update(bytes);
-}
-
-fn hash_file(hasher: &mut Sha256, path: &Path) -> Result<()> {
-    let mut file = fs::File::open(path)?;
-    hash_field(hasher, &file.metadata()?.len().to_le_bytes());
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            return Ok(());
-        }
-        hasher.update(&buffer[..read]);
-    }
 }
 
 fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
@@ -1723,7 +1701,7 @@ mod tests {
     use super::*;
     use crate::storage::IssueStore;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
+    use std::sync::Barrier;
 
     /// The shipped package that carries more than a manifest, which is the one
     /// whose capture actually draws content out of the checkout.
@@ -1869,12 +1847,18 @@ mod tests {
                 let start = Arc::clone(&start);
                 std::thread::spawn(move || {
                     start.wait();
-                    ensure_profiled_repository_fixture(&cache_root, "same-key", |repository| {
-                        builds.fetch_add(1, Ordering::SeqCst);
-                        fs::write(repository.join("state"), b"coherent")?;
-                        Ok(())
-                    })
+                    ensure_profiled_repository_fixture(
+                        &cache_root,
+                        "profile",
+                        "same-key",
+                        |repository| {
+                            builds.fetch_add(1, Ordering::SeqCst);
+                            fs::write(repository.join("state"), b"coherent")?;
+                            Ok(())
+                        },
+                    )
                     .unwrap()
+                    .entry
                 })
             })
             .collect::<Vec<_>>();
@@ -1889,12 +1873,14 @@ mod tests {
             fs::read(entries[0].join("repository/state")).unwrap(),
             b"coherent"
         );
-        let repeated = ensure_profiled_repository_fixture(&cache_root, "same-key", |_| {
-            builds.fetch_add(1, Ordering::SeqCst);
-            Ok(())
-        })
-        .unwrap();
-        assert_eq!(repeated, entries[0]);
+        let repeated =
+            ensure_profiled_repository_fixture(&cache_root, "profile", "same-key", |_| {
+                builds.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(repeated.entry, entries[0]);
+        drop(repeated);
         assert_eq!(
             builds.load(Ordering::SeqCst),
             1,
@@ -1902,7 +1888,7 @@ mod tests {
         );
 
         fs::write(entries[0].join("repository/state"), b"corrupt").unwrap();
-        let error = ensure_profiled_repository_fixture(&cache_root, "same-key", |_| {
+        let error = ensure_profiled_repository_fixture(&cache_root, "profile", "same-key", |_| {
             builds.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -1931,13 +1917,19 @@ mod tests {
                 .map(|_| {
                     scope.spawn(|| {
                         start.wait();
-                        ensure_profiled_repository_fixture(cache.path(), "cold-key", |repository| {
-                            builds.fetch_add(1, Ordering::SeqCst);
-                            std::thread::sleep(Duration::from_millis(200));
-                            fs::write(repository.join("state"), b"built")?;
-                            Ok(())
-                        })
+                        ensure_profiled_repository_fixture(
+                            cache.path(),
+                            "profile",
+                            "cold-key",
+                            |repository| {
+                                builds.fetch_add(1, Ordering::SeqCst);
+                                std::thread::sleep(Duration::from_millis(200));
+                                fs::write(repository.join("state"), b"built")?;
+                                Ok(())
+                            },
+                        )
                         .unwrap()
+                        .entry
                     })
                 })
                 .collect::<Vec<_>>()
@@ -1956,14 +1948,15 @@ mod tests {
         let cache = TempDir::new().unwrap();
         let lock_root = cache.path().join("locks");
         fs::create_dir_all(&lock_root).unwrap();
-        let lock_path = lock_root.join("held-key.lock");
+        let lock_path = lock_root.join("held-profile.lock");
         let _holder = FileLocker::new(Duration::from_secs(1))
-            .lock_exclusive_with_metadata(&lock_path, "fixture-build:held-key")
+            .lock_exclusive_with_metadata(&lock_path, "fixture-build:held-profile/other-key")
             .unwrap();
         let built = AtomicUsize::new(0);
 
         let error = ensure_profiled_repository_fixture_within(
             cache.path(),
+            "held-profile",
             "held-key",
             Duration::from_millis(100),
             |_| {
@@ -1978,6 +1971,7 @@ mod tests {
             message.contains(&lock_path.display().to_string()),
             "{message}"
         );
+        assert!(message.contains("held-profile"), "{message}");
         assert!(message.contains("held-key"), "{message}");
         assert!(
             message.contains(&format!("pid {}", std::process::id())),
@@ -1994,10 +1988,12 @@ mod tests {
     #[test]
     fn test_profiled_repository_fixture_refuses_an_occupied_publication_path() {
         let cache = TempDir::new().unwrap();
-        fs::write(cache.path().join("occupied"), b"not a fixture").unwrap();
+        let occupied = cache.path().join("profile/occupied");
+        fs::create_dir_all(occupied.parent().unwrap()).unwrap();
+        fs::write(&occupied, b"not a fixture").unwrap();
         let built = AtomicUsize::new(0);
 
-        let error = ensure_profiled_repository_fixture(cache.path(), "occupied", |_| {
+        let error = ensure_profiled_repository_fixture(cache.path(), "profile", "occupied", |_| {
             built.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -2008,24 +2004,23 @@ mod tests {
             "unexpected occupied-path refusal: {error:#}"
         );
         assert_eq!(built.load(Ordering::SeqCst), 0);
-        assert_eq!(
-            fs::read(cache.path().join("occupied")).unwrap(),
-            b"not a fixture"
-        );
+        assert_eq!(fs::read(&occupied).unwrap(), b"not a fixture");
     }
 
     #[test]
     fn test_profiled_repository_fixture_no_replace_preserves_raced_occupied_directory() {
         let cache = TempDir::new().unwrap();
-        let occupied = cache.path().join("raced");
+        let profile_root = cache.path().join("profile");
+        let occupied = profile_root.join("raced");
 
-        let error = ensure_profiled_repository_fixture(cache.path(), "raced", |repository| {
-            fs::write(repository.join("state"), b"candidate")?;
-            fs::create_dir(&occupied)?;
-            fs::write(occupied.join("bystander"), b"wins")?;
-            Ok(())
-        })
-        .unwrap_err();
+        let error =
+            ensure_profiled_repository_fixture(cache.path(), "profile", "raced", |repository| {
+                fs::write(repository.join("state"), b"candidate")?;
+                fs::create_dir(&occupied)?;
+                fs::write(occupied.join("bystander"), b"wins")?;
+                Ok(())
+            })
+            .unwrap_err();
 
         assert!(
             format!("{error:#}").contains("atomically publish"),
@@ -2033,23 +2028,21 @@ mod tests {
         );
         assert_eq!(fs::read(occupied.join("bystander")).unwrap(), b"wins");
         assert!(
-            fs::read_dir(cache.path())
+            fs::read_dir(&profile_root)
                 .unwrap()
                 .filter_map(Result::ok)
                 .all(|entry| !entry
                     .file_name()
                     .to_string_lossy()
-                    .starts_with(".profiled-repository-staging-")),
+                    .starts_with(PROFILED_REPOSITORY_FIXTURE_STAGING)),
             "a refused publication must clean its private staging directory"
         );
     }
 
     #[test]
     fn test_profiled_repository_fixture_clones_are_isolated_and_profiled() {
-        let first =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
-        let second =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
+        let first = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
+        let second = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
         let profile_asset = Path::new(".agents/skills/jit-manage/SKILL.md");
 
         assert!(first.path().join(profile_asset).is_file());
@@ -2064,8 +2057,7 @@ mod tests {
             "fixture clones must not share mutable files"
         );
 
-        let third =
-            profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES, None).unwrap();
+        let third = profiled_repository_fixture("jit-dogfood", PROFILE_PACKAGE_SOURCES).unwrap();
         assert_eq!(
             fs::read(second.path().join("AGENTS.md")).unwrap(),
             fs::read(third.path().join("AGENTS.md")).unwrap(),
@@ -2143,6 +2135,42 @@ mod tests {
             .set(format!("{environment}_SHA256"), "0".repeat(64));
         let wrong_digest = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
         assert!(wrong_digest.to_string().contains("content mismatch"));
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_receipt_from_other_crate_source_is_ignored() {
+        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut env = EnvGuard::acquire();
+        let runtime_target = TempDir::new().unwrap();
+        let setup_artifact = runtime_target.path().join("debug/jit");
+        fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
+        fs::write(&setup_artifact, b"fixture setup artifact").unwrap();
+        let id = "jit-default";
+        let run_id = "other-source-run";
+        let receipt =
+            prepare_profiled_repository_fixture_receipt(id, run_id, &setup_artifact).unwrap();
+        let mut other_source: ProfiledRepositoryFixtureReceipt =
+            serde_json::from_slice(&fs::read(&receipt.path).unwrap()).unwrap();
+        other_source.crate_source_sha256 = "0".repeat(64);
+        let other_source_bytes = serde_json::to_vec(&other_source).unwrap();
+        let other_source_path = runtime_target.path().join("other-source-receipt.json");
+        fs::write(&other_source_path, &other_source_bytes).unwrap();
+        let environment = receipt_environment_name(id).unwrap();
+        env.set("NEXTEST_RUN_ID", run_id)
+            .set(environment, &other_source_path)
+            .set(
+                format!("{environment}_SHA256"),
+                format!("{:x}", Sha256::digest(&other_source_bytes)),
+            );
+
+        assert!(
+            nextest_profiled_repository_fixture_for_artifact(id, "packages", &setup_artifact)
+                .unwrap()
+                .is_none(),
+            "a consumer must not take an entry built from other crate source"
+        );
     }
 
     #[test]
@@ -2224,6 +2252,7 @@ mod tests {
             .args(["--edition=2021", source.to_str().unwrap(), "-o"])
             .arg(&setup_artifact)
             .env("CARGO_MANIFEST_DIR", &setup_checkout)
+            .current_dir(runtime_target.path())
             .output()
             .unwrap();
         assert!(
@@ -2235,6 +2264,7 @@ mod tests {
             .args(["--edition=2021", source.to_str().unwrap(), "-o"])
             .arg(&consumer_artifact)
             .env("CARGO_MANIFEST_DIR", repository_checkout())
+            .current_dir(runtime_target.path())
             .output()
             .unwrap();
         assert!(
@@ -2289,38 +2319,184 @@ mod tests {
                 .unwrap();
 
         assert!(
-            entry.is_some_and(|entry| entry.parent() == Some(expected_cache_root.as_path())),
+            entry.is_some_and(|lease| lease.entry.parent()
+                == Some(
+                    expected_cache_root
+                        .join(fixture_profile(id, "packages"))
+                        .as_path()
+                )),
             "a same-run consumer in the shared runtime target must accept the setup receipt"
         );
     }
 
     #[test]
-    fn test_direct_profiled_repository_fixture_scenario_identity_does_not_alias() {
-        let workspace = TempDir::new().unwrap();
-        let first = workspace.path().join("first");
-        let second = workspace.path().join("second");
-        fs::write(&first, b"same scenario bytes").unwrap();
-        fs::write(&second, b"same scenario bytes").unwrap();
-        let mut digests = BTreeMap::new();
-        let first_provenance = executable_provenance(&first, &mut digests).unwrap();
-        let second_provenance = executable_provenance(&second, &mut digests).unwrap();
+    fn test_profiled_repository_fixture_receipts_from_distinct_setup_executables_name_one_entry() {
+        let runtime_target = TempDir::new().unwrap();
+        let setups = [
+            (
+                runtime_target.path().join("debug/jit"),
+                "first setup",
+                "first-run",
+            ),
+            (
+                runtime_target.path().join("debug/deps/other-setup"),
+                "second setup",
+                "second-run",
+            ),
+        ];
+        let entries = setups
+            .iter()
+            .map(|(artifact, bytes, run_id)| {
+                fs::create_dir_all(artifact.parent().unwrap()).unwrap();
+                fs::write(artifact, bytes).unwrap();
+                let receipt =
+                    prepare_profiled_repository_fixture_receipt("jit-default", run_id, artifact)
+                        .unwrap();
+                serde_json::from_slice::<ProfiledRepositoryFixtureReceipt>(
+                    &fs::read(receipt.path).unwrap(),
+                )
+                .unwrap()
+                .entries
+            })
+            .collect::<Vec<_>>();
 
-        assert_ne!(
-            direct_entry_key("jit-default", "packages", Some(&first_provenance)),
-            direct_entry_key("jit-default", "packages", Some(&second_provenance)),
-            "distinct scenario executables must not alias the process-local memo"
+        assert_eq!(
+            entries[0], entries[1],
+            "setup executables differing in bytes and path must share one entry"
+        );
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_key_changes_with_a_package_byte() {
+        let packages = capture_profile_package_closure("jit-dogfood").unwrap();
+        let mut files = packages
+            .iter()
+            .flat_map(|(package_id, package)| {
+                package.files().iter().map(move |(relative, file)| {
+                    (package_id.clone(), relative.clone(), file.clone())
+                })
+            })
+            .collect::<Vec<_>>();
+        let key = |files: &[(String, String, CapturedFile)]| {
+            profiled_repository_fixture_key(
+                &package_closure_sha256(files.iter().map(|(package_id, relative, file)| {
+                    (package_id.as_str(), relative.as_str(), file)
+                })),
+                CRATE_SOURCE_SHA256,
+            )
+        };
+        let captured = key(&files);
+        assert_eq!(
+            profiled_repository_fixture_inputs("jit-dogfood")
+                .unwrap()
+                .key,
+            captured,
+            "the fixture must key on this closure and the compiled crate source"
         );
 
-        let replacement = workspace.path().join("replacement");
-        fs::write(&replacement, b"different scenario bytes").unwrap();
-        fs::rename(&replacement, &first).unwrap();
-        let replacement_provenance = executable_provenance(&first, &mut digests).unwrap();
+        files[0].2.bytes[0] ^= 1;
+        assert_ne!(key(&files), captured);
+    }
 
-        assert_ne!(
-            direct_entry_key("jit-default", "packages", Some(&first_provenance)),
-            direct_entry_key("jit-default", "packages", Some(&replacement_provenance)),
-            "replacing an executable at the same path must select a new process-local memo entry"
+    #[test]
+    fn test_profiled_repository_fixture_key_changes_with_a_crate_source_byte() {
+        use crate::crate_source_digest::{crate_source_sha256, CRATE_SOURCE_ROOTS};
+
+        let crate_root = TempDir::new().unwrap();
+        fs::create_dir(crate_root.path().join("src")).unwrap();
+        [
+            ("Cargo.toml", "[package]\n"),
+            ("build.rs", "fn main() {}\n"),
+            ("src/lib.rs", "pub fn setup() {}\n"),
+        ]
+        .iter()
+        .for_each(|(path, contents)| fs::write(crate_root.path().join(path), contents).unwrap());
+        let key = || {
+            profiled_repository_fixture_key(
+                "package-closure",
+                &crate_source_sha256(crate_root.path(), &CRATE_SOURCE_ROOTS).unwrap(),
+            )
+        };
+        let original = key();
+        assert_eq!(key(), original);
+
+        fs::write(
+            crate_root.path().join("src/lib.rs"),
+            "pub fn setup() {}\n\n",
+        )
+        .unwrap();
+        assert_ne!(key(), original);
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_publication_retires_the_profiles_older_entries() {
+        let cache = TempDir::new().unwrap();
+        let publish = |profile: &str, key: &str| {
+            ensure_profiled_repository_fixture(cache.path(), profile, key, |repository| {
+                fs::write(repository.join("state"), key)?;
+                Ok(())
+            })
+            .unwrap()
+            .entry
+        };
+        publish("profile", "first");
+        let neighbour = publish("neighbour", "first");
+        let abandoned = cache
+            .path()
+            .join("profile")
+            .join(format!("{PROFILED_REPOSITORY_FIXTURE_STAGING}abandoned"));
+        fs::create_dir(&abandoned).unwrap();
+
+        let current = publish("profile", "second");
+
+        let remaining = fs::read_dir(cache.path().join("profile"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(remaining, [current]);
+        validate_profiled_repository_fixture(&neighbour, "first").unwrap();
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_retirement_waits_for_a_concurrent_reader() {
+        let cache = TempDir::new().unwrap();
+        let write_key = |key: &'static str| {
+            move |repository: &Path| -> Result<()> {
+                fs::write(repository.join("state"), key)?;
+                Ok(())
+            }
+        };
+        let reader = ensure_profiled_repository_fixture(
+            cache.path(),
+            "profile",
+            "current",
+            write_key("current"),
+        )
+        .unwrap();
+
+        let blocked = ensure_profiled_repository_fixture_within(
+            cache.path(),
+            "profile",
+            "next",
+            Duration::from_millis(200),
+            write_key("next"),
+        )
+        .unwrap_err();
+
+        assert!(format!("{blocked:#}").contains("busy"), "{blocked:#}");
+        let clone = TempDir::new().unwrap();
+        copy_tree_exact(&reader.entry.join("repository"), clone.path()).unwrap();
+        assert_eq!(fs::read(clone.path().join("state")).unwrap(), b"current");
+        let current = reader.entry.clone();
+        drop(reader);
+        let next =
+            ensure_profiled_repository_fixture(cache.path(), "profile", "next", write_key("next"))
+                .unwrap();
+        assert_eq!(
+            fs::read(next.entry.join("repository/state")).unwrap(),
+            b"next"
         );
+        assert!(!current.exists(), "the released entry must be retired");
     }
 
     #[test]

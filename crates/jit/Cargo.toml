@@ -97,6 +97,10 @@ xml = ["dep:quick-xml"]
 # OFF by default.
 test-support = []
 
+[build-dependencies]
+# Hashes the crate source for the profiled-repository fixture key (`build.rs`).
+sha2 = "0.10"
+
 [dev-dependencies]
 # Enables `test-support` for this crate's own test builds (inline `#[cfg(test)]`
 # modules and the `tests/` integration binaries) without making the feature

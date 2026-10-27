@@ -49,10 +49,6 @@ pub(crate) const DEFAULT_PACKAGE: &str = "jit-default";
 
 /// A fresh repository carrying the default package's vocabulary.
 pub(crate) fn setup_repo_with_default_vocabulary() -> tempfile::TempDir {
-    jit::test_utils::profiled_repository_fixture(
-        DEFAULT_PACKAGE,
-        "packages",
-        Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
-    )
-    .expect("clone a coherent default-vocabulary repository fixture")
+    jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+        .expect("clone a coherent default-vocabulary repository fixture")
 }

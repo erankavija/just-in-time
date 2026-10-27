@@ -2426,7 +2426,6 @@ mod tests {
         let temp = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
         let dogfood = ProfilePackage::from_directory(&temp.path().join("profiles/jit-dogfood"))

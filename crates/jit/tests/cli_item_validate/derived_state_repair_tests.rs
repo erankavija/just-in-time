@@ -29,7 +29,6 @@ fn profiled_repo() -> TempDir {
     jit::test_utils::profiled_repository_fixture(
         "jit-dogfood",
         jit::test_utils::PROFILE_PACKAGE_SOURCES,
-        Some(Path::new(env!("CARGO_BIN_EXE_jit"))),
     )
     .expect("clone a coherent profiled repository fixture")
 }
