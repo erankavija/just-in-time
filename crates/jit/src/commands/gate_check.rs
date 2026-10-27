@@ -2056,25 +2056,36 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
     }
 
-    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, IssueId) {
-        let repo = tempfile::tempdir().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
-        executor
-            .initialize_fresh_repository(repo.path(), None)
+    fn seed_gate_issue(
+        executor: &CommandExecutor<JsonFileStorage>,
+        taxonomy: &crate::test_taxonomy::TestTaxonomy,
+        gate_key: &str,
+        issue_title: &str,
+        issue_description: &str,
+    ) -> IssueId {
+        let (issue_id, _) = executor
+            .issues()
+            .create_issue(
+                issue_title.to_string(),
+                issue_description.to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                vec![format!("type:{}", taxonomy.type_at_level(4))],
+                None,
+                None,
+                false,
+            )
             .unwrap();
+        executor.add_gate(&issue_id, gate_key.to_string()).unwrap();
+        issue_id
+    }
+
+    fn seed_file_repository(
+        executor: &CommandExecutor<JsonFileStorage>,
+        taxonomy: &crate::test_taxonomy::TestTaxonomy,
+        issue_title: &str,
+        issue_description: &str,
+    ) -> IssueId {
         executor
             .define_gate(
                 "not-a-reserved-repository-key".to_string(),
@@ -2097,28 +2108,24 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 100,
             )
             .unwrap();
-        let (issue_id, _) = executor
-            .issues()
-            .create_issue(
-                "Test".to_string(),
-                "Test".to_string(),
-                crate::domain::Priority::Normal,
-                Vec::new(),
-                vec![format!("type:{}", taxonomy.type_at_level(4))],
-                None,
-                None,
-                false,
-            )
-            .unwrap();
-        executor
-            .add_gate(&issue_id, "not-a-reserved-repository-key".to_string())
-            .unwrap();
-        (repo, executor, issue_id)
+        seed_gate_issue(
+            executor,
+            taxonomy,
+            "not-a-reserved-repository-key",
+            issue_title,
+            issue_description,
+        )
     }
 
     #[test]
     fn test_captured_issue_rule_report_preserves_invalid_hierarchy_error() {
-        let (_repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             crate::test_taxonomy::invalid_hierarchy_config_fragment()
@@ -2137,10 +2144,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
     }
 
-    /// A file-backed repository whose declared gate inputs live under
-    /// `workspace/`, with an `exec` checker that appends one byte per execution
-    /// to a log OUTSIDE every declared root — so executions can be counted
-    /// without the counting itself changing the digest.
     struct ReuseFixture {
         repo: tempfile::TempDir,
         executor: CommandExecutor<JsonFileStorage>,
@@ -2148,44 +2151,28 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     impl ReuseFixture {
-        /// `roots`/`exclude` are the gate's declared inputs; `None` declares
-        /// none. `verdict_exit` is the checker's exit status.
-        fn new(declaration: Option<(&[&str], &[&str])>, verdict_exit: u8) -> Self {
-            let repo = tempfile::tempdir().expect("a temp repository");
-            let storage = JsonFileStorage::new(repo.path().join(".jit"));
-            let taxonomy = crate::test_taxonomy::test_taxonomy();
-            std::fs::create_dir_all(storage.root()).expect("create data root");
+        fn seed(&self, declaration: Option<(&[&str], &[&str])>, verdict_exit: u8) {
+            std::fs::create_dir_all(self.repo.path().join("workspace/src"))
+                .expect("create workspace");
             std::fs::write(
-                storage.root().join("config.toml"),
-                format!(
-                    "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                    taxonomy.config_fragment()
-                ),
+                self.repo.path().join("workspace/src/lib.rs"),
+                "fn main() {}\n",
             )
-            .expect("write config");
-            let layout = crate::storage::discover_repository_layout(repo.path(), storage.root())
-                .expect("a repository layout");
-            let executor = CommandExecutor::new(storage).with_layout(layout);
-            executor
-                .initialize_fresh_repository(repo.path(), None)
-                .expect("a fresh repository");
+            .expect("write source");
+            std::fs::write(self.repo.path().join("elsewhere.txt"), "unread\n")
+                .expect("write outsider");
 
-            std::fs::create_dir_all(repo.path().join("workspace/src")).expect("create workspace");
-            std::fs::write(repo.path().join("workspace/src/lib.rs"), "fn main() {}\n")
-                .expect("write source");
-            std::fs::write(repo.path().join("elsewhere.txt"), "unread\n").expect("write outsider");
-
-            let gate_key = "workspace-check".to_string();
-            let log = repo.path().join("executions.log");
-            let mut registry = executor
+            let log = self.repo.path().join("executions.log");
+            let mut registry = self
+                .executor
                 .storage
                 .load_gate_registry()
                 .expect("the seeded registry");
             registry.gates.insert(
-                gate_key.clone(),
+                self.gate_key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: gate_key.clone(),
+                    key: self.gate_key.clone(),
                     title: "Workspace check".to_string(),
                     description: "Workspace check".to_string(),
                     stage: GateStage::Postcheck,
@@ -2212,36 +2199,19 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             );
             let bytes = crate::declarations::serialize_gate_registry(&registry)
                 .expect("the registry serializes");
-            std::fs::write(repo.path().join(".jit/gates.toml"), bytes).expect("write registry");
-
-            Self {
-                repo,
-                executor,
-                gate_key,
-            }
+            std::fs::write(self.repo.path().join(".jit/gates.toml"), bytes)
+                .expect("write registry");
         }
 
-        /// A new issue requiring the gate under test.
-        fn issue(&self) -> IssueId {
+        fn issue(&self, title: &str, description: &str) -> IssueId {
             let taxonomy = crate::test_taxonomy::test_taxonomy();
-            let (issue_id, _) = self
-                .executor
-                .issues()
-                .create_issue(
-                    "Test".to_string(),
-                    "Test".to_string(),
-                    crate::domain::Priority::Normal,
-                    Vec::new(),
-                    vec![format!("type:{}", taxonomy.type_at_level(4))],
-                    None,
-                    None,
-                    false,
-                )
-                .expect("an issue");
-            self.executor
-                .add_gate(&issue_id, self.gate_key.clone())
-                .expect("the gate is required");
-            issue_id
+            seed_gate_issue(
+                &self.executor,
+                &taxonomy,
+                &self.gate_key,
+                title,
+                description,
+            )
         }
 
         fn evaluate(&self, issue_id: &IssueId) -> GateRunResult {
@@ -2250,7 +2220,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .expect("the gate evaluates")
         }
 
-        /// How many times the checker process has run.
         fn executions(&self) -> usize {
             std::fs::read(self.repo.path().join("executions.log"))
                 .map(|bytes| bytes.len())
@@ -2302,9 +2271,20 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// the checker.
     #[test]
     fn test_check_gate_reuses_a_recorded_verdict_over_identical_declared_inputs() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let first_issue = fixture.issue();
-        let second_issue = fixture.issue();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let first_issue = fixture.issue("Test", "Test");
+        let second_issue = fixture.issue("Test", "Test");
 
         let executed = fixture.evaluate(&first_issue);
         let reused = fixture.evaluate(&second_issue);
@@ -2327,9 +2307,20 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// passed or failed — a recorded failure is not quietly dropped.
     #[test]
     fn test_check_gate_reuses_a_recorded_failure_and_names_its_run() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 1);
-        let first_issue = fixture.issue();
-        let second_issue = fixture.issue();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 1);
+        let first_issue = fixture.issue("Test", "Test");
+        let second_issue = fixture.issue("Test", "Test");
 
         let executed = fixture.evaluate(&first_issue);
         let reused = fixture.evaluate(&second_issue);
@@ -2344,23 +2335,34 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// change the digest, so the next evaluation executes the checker.
     #[test]
     fn test_check_gate_executes_again_after_declared_inputs_change() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let first = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let first = fixture.evaluate(&fixture.issue("Test", "Test"));
         assert_eq!(fixture.executions(), 1);
 
         fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
-        let after_edit = fixture.evaluate(&fixture.issue());
+        let after_edit = fixture.evaluate(&fixture.issue("Test", "Test"));
         assert_eq!(fixture.executions(), 2, "an edited input must re-execute");
         assert!(after_edit.origin.is_executed());
         assert_ne!(after_edit.inputs_digest, first.inputs_digest);
 
         fixture.write("workspace/src/added.rs", "fn added() {}\n");
-        let after_add = fixture.evaluate(&fixture.issue());
+        let after_add = fixture.evaluate(&fixture.issue("Test", "Test"));
         assert_eq!(fixture.executions(), 3, "an added input must re-execute");
         assert_ne!(after_add.inputs_digest, after_edit.inputs_digest);
 
         fixture.remove("workspace/src/lib.rs");
-        let after_remove = fixture.evaluate(&fixture.issue());
+        let after_remove = fixture.evaluate(&fixture.issue("Test", "Test"));
         assert_eq!(fixture.executions(), 4, "a removed input must re-execute");
         assert_ne!(after_remove.inputs_digest, after_add.inputs_digest);
     }
@@ -2370,15 +2372,26 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// produced it.
     #[test]
     fn test_check_gate_reuses_after_declared_inputs_return_to_a_verified_state() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let original = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let original = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
-        fixture.evaluate(&fixture.issue());
+        fixture.evaluate(&fixture.issue("Test", "Test"));
         assert_eq!(fixture.executions(), 2);
 
         fixture.write("workspace/src/lib.rs", "fn main() {}\n");
-        let restored = fixture.evaluate(&fixture.issue());
+        let restored = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(fixture.executions(), 2, "the restored content was verified");
         assert_eq!(restored.inputs_digest, original.inputs_digest);
@@ -2389,11 +2402,22 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// alone, so the next evaluation reuses instead of re-executing.
     #[test]
     fn test_check_gate_reuses_after_a_change_no_declared_root_covers() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let executed = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         fixture.write("elsewhere.txt", "rewritten\n");
-        let reused = fixture.evaluate(&fixture.issue());
+        let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(fixture.executions(), 1);
         assert_eq!(reused.inputs_digest, executed.inputs_digest);
@@ -2404,12 +2428,23 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// so changing it reuses.
     #[test]
     fn test_check_gate_reuses_after_a_change_a_declared_exclusion_matches() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &["workspace/notes/**"])), 0);
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &["workspace/notes/**"])), 0);
         fixture.write("workspace/notes/scratch.md", "before\n");
-        let executed = fixture.evaluate(&fixture.issue());
+        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         fixture.write("workspace/notes/scratch.md", "after\n");
-        let reused = fixture.evaluate(&fixture.issue());
+        let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(fixture.executions(), 1);
         assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
@@ -2419,10 +2454,21 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// every evaluation executes its checker and records no digest.
     #[test]
     fn test_check_gate_executes_every_time_for_a_gate_declaring_no_inputs() {
-        let fixture = ReuseFixture::new(None, 0);
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(None, 0);
 
-        let first = fixture.evaluate(&fixture.issue());
-        let second = fixture.evaluate(&fixture.issue());
+        let first = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let second = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(fixture.executions(), 2);
         assert!(first.inputs_digest.is_none());
@@ -2433,13 +2479,24 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// declared inputs would otherwise license reuse.
     #[test]
     fn test_check_gate_with_execute_source_ignores_a_reusable_verdict() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let executed = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         let forced = fixture
             .executor
             .check_gate_with(
-                &fixture.issue(),
+                &fixture.issue("Test", "Test"),
                 &fixture.gate_key,
                 super::VerdictSource::Execute,
             )
@@ -2458,8 +2515,21 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// run rather than claiming a verification of its own.
     #[test]
     fn test_check_gate_executes_once_across_a_wave_over_one_unchanged_tree() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let wave: Vec<GateRunResult> = (0..5).map(|_| fixture.evaluate(&fixture.issue())).collect();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let wave: Vec<GateRunResult> = (0..5)
+            .map(|_| fixture.evaluate(&fixture.issue("Test", "Test")))
+            .collect();
 
         assert_eq!(fixture.executions(), 1);
         let executed: Vec<&GateRunResult> =
@@ -2483,10 +2553,21 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_check_gate_never_reuses_a_run_that_errored() {
         // Exit 127 is the shell's "command not found": a runner error, not a
         // checker verdict.
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 127);
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 127);
 
-        let errored = fixture.evaluate(&fixture.issue());
-        let retried = fixture.evaluate(&fixture.issue());
+        let errored = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let retried = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(errored.status, GateRunStatus::Error);
         assert_eq!(fixture.executions(), 2, "an errored run must not be reused");
@@ -2498,14 +2579,25 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// verdict the edited checker never produced.
     #[test]
     fn test_check_gate_executes_again_after_the_checker_declaration_changes() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let before = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let before = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         fixture.rewrite_checker_command(&format!(
             "printf xx >> '{}'; exit 0",
             fixture.repo.path().join("executions.log").to_string_lossy()
         ));
-        let after = fixture.evaluate(&fixture.issue());
+        let after = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(
             fixture.executions(),
@@ -2520,9 +2612,20 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// distinguishable from a derived one and names the run behind it.
     #[test]
     fn test_gate_run_summary_distinguishes_a_reused_verdict_from_a_derived_one() {
-        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
-        let executed = fixture.evaluate(&fixture.issue());
-        let reused = fixture.evaluate(&fixture.issue());
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".to_string(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         let rendered = |run: &GateRunResult| {
             serde_json::to_value(crate::output::GateRunSummary::lean(run))
@@ -2619,7 +2722,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_exec_gate_ignores_unrelated_malformed_issue_and_unsafe_prompt() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -2658,7 +2767,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_exec_without_context_ignores_unrelated_corrupt_gate_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -2685,7 +2800,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_exec_with_context_rejects_corrupt_gate_run_with_path() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -2703,7 +2824,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_review_placeholder_ignores_unsupported_target_documents() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         executor
             .add_gate(&issue_id, "editable-review".to_string())
             .unwrap();
@@ -2723,7 +2850,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_builtin_gate_evidence_changes_with_broad_validation_input() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let before = capture_gate_evidence(&executor, &issue_id, "not-a-reserved-repository-key");
         std::fs::write(
             repo.path().join(".jit/rules.toml"),
@@ -2738,7 +2871,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_repository_validation_checker_uses_injected_overlay_result_path() {
-        let (_repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
         let live_image = executor
             .capture_validation_image_with(&std::collections::BTreeMap::new())
@@ -2800,7 +2939,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_check_gate_file_repository_ignores_legacy_cached_rules() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
         let cached = executor.run_rules(None).unwrap();
         assert!(!cached
@@ -2826,7 +2971,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_repository_validation_file_backend_reports_missing_index_through_view() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
         let image = executor
             .capture_validation_image_with(&std::collections::BTreeMap::new())
@@ -3145,7 +3296,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_builtin_checker_records_unloadable_declarations_as_error_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         std::fs::write(repo.path().join(".jit/rules.toml"), "[[rules\nnot toml").unwrap();
         for checker in [
             GateChecker::IssueValidation,
@@ -3173,7 +3330,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_builtin_checker_records_content_finding_as_failed_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
         std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
 
@@ -3763,7 +3926,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -3822,7 +3991,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[test]
     fn test_lifecycle_precheck_without_context_ignores_corrupt_gate_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -3964,7 +4139,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_lifecycle_precheck_records_one_moved_run_when_checker_mutates_repository() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4020,7 +4201,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// documents, which the transition's own base does not read.
     #[test]
     fn test_update_issue_state_broad_precheck_over_issue_documents_records_a_stable_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let gate_key = "not-a-reserved-repository-key";
         executor
             .update_gate(
@@ -4431,7 +4618,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_check_gate_records_inputs_moved_without_reexecuting_when_prompt_changes_during_checker()
     {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         std::fs::write(repo.path().join("review-prompt.md"), "old prompt").unwrap();
         add_exec_gate(
             &executor,
@@ -4467,7 +4660,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_records_pre_run_verdict_when_issue_changes_during_checker() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let issue_path = format!(".jit/issues/{issue_id}.json");
         add_exec_gate(
             &executor,
@@ -4509,7 +4708,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_records_pre_run_verdict_when_direct_dependency_changes() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let (dependency_id, _) = executor
             .issues()
             .create_issue(
@@ -4561,7 +4766,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_records_pre_run_verdict_when_gate_definition_changes_during_checker() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         std::fs::write(
             repo.path().join("gate-race.sh"),
             "if [ ! -f .gate-race-seen ]; then : > .gate-race-seen; sed -i 's/Original race title/Changed race title/' .jit/gates.toml; fi\nprintf x >> checker-count\ncat \"$JIT_CONTEXT_FILE\"\n",
@@ -4610,7 +4821,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_never_retargets_resolved_id_after_replacement() {
-        let (repo, executor, created_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let created_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
         let replacement_id = fixture_id("0f0e0d0c-ffff-4fff-8fff-ffffffffffff");
         let mut original = executor.storage.load_issue(&created_id).unwrap();
@@ -4673,7 +4890,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_classifies_same_issue_run_drift_but_not_unrelated_run() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let mut concurrent = prior_run(
             "concurrent",
             "run-race",
@@ -4715,7 +4938,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             crate::domain::GateEvaluationStability::InputsMoved
         );
 
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         concurrent.issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000002");
         std::fs::write(
             repo.path().join("concurrent-run.json"),
@@ -4812,7 +5041,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_records_one_run_and_event_when_inputs_move_during_checker() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4870,7 +5105,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[cfg(unix)]
     #[test]
     fn test_check_gate_records_failing_verdict_and_findings_when_inputs_move_during_checker() {
-        let (repo, executor, issue_id) = setup_file_repository();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
             &issue_id,
