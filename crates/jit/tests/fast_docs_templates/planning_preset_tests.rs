@@ -152,9 +152,9 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
 }
 
 /// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
-/// registry appends a registry-scoped audit event per definition write —
-/// `gate_definition_created` for a new key, `gate_definition_updated` for a
-/// timeout-override overwrite — and a no-write re-application appends none.
+/// registry appends a registry-scoped audit event per definition write (a
+/// created event for a new key, an updated event for a timeout-override
+/// overwrite), and a no-write re-application appends none.
 #[test]
 fn test_apply_gate_preset_appends_definition_events() {
     let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();

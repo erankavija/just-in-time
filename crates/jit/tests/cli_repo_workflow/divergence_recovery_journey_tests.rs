@@ -184,7 +184,7 @@ fn index_stage(checkout: &JitCli, stage: u8) -> Value {
 /// stores that each created an issue conflicts here rather than in
 /// `.jit/issues/`, every time, because both sides inserted an id into one small
 /// array over a common base, and the union of the two sides is what the
-/// finding-class table's `local_only` and `reference_only` rows already decided
+/// finding-class table's one-sided rows already decided
 /// to keep. The page also stops routing this conflict to `jit validate --fix`,
 /// which fails to parse the conflicted file and, once it is resolved to one
 /// side alone, reports that no fixes were needed while `jit validate` rejects

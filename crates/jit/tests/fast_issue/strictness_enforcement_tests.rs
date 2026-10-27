@@ -7,10 +7,9 @@
 //! They prove each level produces a DISTINCT block/allow outcome on the SAME
 //! violation set, so no accepted strictness value is silently inert (REQ-03):
 //!
-//! - a `warn` rule's violation blocks under `strict` but not under `loose` /
-//!   `permissive`;
-//! - an `enforce` error rule's violation blocks under `strict` / `loose` but is
-//!   downgraded to advisory under `permissive`;
+//! - a warning rule's violation blocks only under the strictest level;
+//! - an enforced error rule's violation blocks under every level except the
+//!   most permissive, which downgrades it to advisory;
 //! - an unrecognized strictness value is rejected rather than silently ignored.
 
 use jit::commands::CommandExecutor;

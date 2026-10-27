@@ -1001,7 +1001,7 @@ mod tests {
         assert!(rules
             .rules
             .iter()
-            .all(|r| { r.name != "orphan-leaf" && r.name != "strategic-consistency" }));
+            .all(|r| !matches!(r.assert, Assertion::TypeHierarchy { .. })));
         assert!(rules.rules.iter().all(|r| r.scope != RuleScope::Graph));
         assert!(rules
             .rules

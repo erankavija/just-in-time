@@ -216,7 +216,7 @@ fn render_validation_json(
 /// `fail`) or a runner error (`IO_ERROR`, exit 10, verdict `error`) per the
 /// carried [`GateRunStatus`](jit::domain::GateRunStatus); `GateNotRequiredError`
 /// becomes `INVALID_ARGUMENT` (exit 2); an unresolved id becomes
-/// `ISSUE_NOT_FOUND` (exit 3); anything else `GATE_ERROR`. In non-JSON mode it
+/// [`ErrorCode::IssueNotFound`] (exit 3); anything else [`ErrorCode::GateError`]. In non-JSON mode it
 /// surfaces any gate-failure warnings and returns `Err(e)` so the top-level
 /// handler maps the exit code via [`classify`], so both output modes
 /// agree.
@@ -2120,7 +2120,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
 
                         // Surface workflow type-hierarchy warnings
-                        // (orphan-leaf / strategic-consistency) for the new issue
+                        // (`TypeHierarchyKind` checks) for the new issue
                         // unless --force or --quiet. These are GRAPH rule
                         // findings produced by the rule engine, not a hard-coded
                         // check. `--orphan` suppresses the orphan-leaf hint
@@ -2443,8 +2443,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // hide the typed id-resolution error from `refine_id_error`'s
                     // downcast). A bad id is routed through `handle_json_error!`
                     // exactly like `issue show`: under `--json` it prints the
-                    // refined error envelope (ISSUE_NOT_FOUND / INVALID_ID_PREFIX /
-                    // AMBIGUOUS_ID with the matching exit code) and exits, so a
+                    // refined error envelope (the id-lookup `ErrorCode` with its
+                    // matching exit code) and exits, so a
                     // multi-id run fails fast on the first bad id.
                     let mut statuses = Vec::with_capacity(ids.len());
                     for id in &ids {
@@ -2640,7 +2640,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         // Tri-state for the per-issue content_format override:
                         //   flag absent            -> None              (leave unchanged)
                         //   "inherit"/"default"    -> Some(None)        (clear to repo default)
-                        //   "markdown"/"html"/"xml" -> Some(Some(fmt))  (set the override)
+                        //   a ContentFormat token  -> Some(Some(fmt))  (set the override)
                         let content_format: Option<Option<jit::domain::ContentFormat>> =
                             match content_format.as_deref() {
                                 None => None,

@@ -1943,8 +1943,8 @@ mod tests {
         }
     }
 
-    /// Create-time warnings the package's own `orphan-leaf` and
-    /// `strategic-consistency` rules raise over one issue carrying `labels`,
+    /// Create-time warnings the package's own type-hierarchy rules raise over
+    /// one issue carrying `labels`,
     /// evaluated in memory over the declared test vocabulary.
     fn create_time_warnings(labels: Vec<String>) -> Vec<crate::validation::graph::GraphFinding> {
         let (_workspace, package) = assembled_package();
@@ -1957,17 +1957,15 @@ mod tests {
                     target: KeyedArrayTarget::Rules,
                     value,
                     ..
-                } if matches!(
-                    value.get("name").and_then(serde_json::Value::as_str),
-                    Some("orphan-leaf" | "strategic-consistency")
-                ) =>
-                {
-                    Some(value.clone())
-                }
+                } if value["assert"]["type-hierarchy"].is_object() => Some(value.clone()),
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(rules.len(), 2, "the package declares both warnings");
+        assert_eq!(
+            rules.len(),
+            crate::declarations::rules::TypeHierarchyKind::ALL.len(),
+            "the package declares one warning per hierarchy check"
+        );
         let declared = toml::to_string(&serde_json::json!({ "rules": rules }))
             .expect("the package's rules serialize as a rules file");
         let ruleset = crate::declarations::rules::RuleSet::parse(&declared, None, [])

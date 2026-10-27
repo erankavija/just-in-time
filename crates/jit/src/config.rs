@@ -47,8 +47,8 @@ pub struct JitConfig {
     ///
     /// Each `[projection.<name>]` table declares one projection of an addressable
     /// item kind (or kinds) into a documentation target: its `kind`, `mode`
-    /// (`separate-file`|`region`), `target` (repo-relative), render `style`
-    /// (`id-anchor`|`full`), and optional region delimiters. Keyed by the
+    /// ([`ProjectionMode`]), `target` (repo-relative), render `style`
+    /// ([`ProjectionStyle`]), and optional region delimiters. Keyed by the
     /// projection name, which also derives the default region markers
     /// (`<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`). The engine drives
     /// every declared projection from the single `jit project render` command; the
@@ -835,8 +835,8 @@ impl schemars::JsonSchema for ProjectionKinds {
 /// `jit project render` command. Fields:
 ///
 /// - `kind` — the [`ProjectionKinds`] to render (one name, or an array).
-/// - `mode` — [`ProjectionMode`] (`separate-file` writes a whole file; `region`
-///   rewrites only a delimited block, byte-preserving everything outside).
+/// - `mode` — [`ProjectionMode`]: a whole separate file, or a delimited region
+///   rewritten byte-preserving everything outside it.
 /// - `target` — REQUIRED repo-relative documentation path (config-driven; the
 ///   engine hardcodes no filename and applies no default). A projection that
 ///   declares no target is a typed error at render and validation, never a
@@ -938,9 +938,8 @@ impl ProjectionConfig {
 wire_vocabulary! {
     /// How a registry is projected into its documentation target.
     ///
-    /// Deserialized from the kebab-case tokens `separate-file` and `region`;
-    /// an unrecognized value is a descriptive parse error rather than a silent
-    /// default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
+    /// Deserialized from each variant's kebab-case token; an unrecognized value
+    /// is a descriptive parse error rather than a silent default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
     #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
     pub enum ProjectionMode {
         /// Write the rendered block to a separate whole file.
@@ -965,9 +964,9 @@ impl Default for ProjectionMode {
 wire_vocabulary! {
     /// How a projected registry is rendered into the markdown block.
     ///
-    /// Deserialized from the tokens `full` and `id-anchor`; an unrecognized
-    /// value is a descriptive parse error rather than a silent default. The
-    /// default (no `style` field) is [`ProjectionStyle::DEFAULT`].
+    /// Deserialized from each variant's token; an unrecognized value is a
+    /// descriptive parse error rather than a silent default. The default (no
+    /// `style` field) is [`ProjectionStyle::DEFAULT`].
     ///
     /// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet
     ///   list of `- **{self-id}** — {text}` rows from any addressable item kind.
@@ -1042,11 +1041,13 @@ pub enum ItemKindConfigError {
 /// recognised tokens.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum EnforcementModeError {
-    /// The value is not one of `"strict"`, `"warn"`, or `"off"`.
-    #[error("invalid enforcement mode '{value}'; expected 'strict', 'warn', or 'off'")]
+    /// The value is not the token of any [`EnforcementMode`].
+    #[error("invalid enforcement mode '{value}'; expected {expected}")]
     Invalid {
         /// The unrecognised value.
         value: String,
+        /// The accepted tokens, quoted and joined for the message.
+        expected: String,
     },
 }
 
@@ -1064,8 +1065,8 @@ pub struct WorktreeConfig {
 
 /// Enforcement mode for lease requirements.
 ///
-/// Parsed (case-insensitively) from the tokens `"strict"` / `"warn"` / `"off"`
-/// in TOML configuration (`[worktree] enforce_leases = ...`).
+/// Parsed case-insensitively from [`EnforcementMode::as_str`] tokens in TOML
+/// configuration (`[worktree] enforce_leases = ...`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
     /// Block operations without active lease (production-safe).
@@ -1079,6 +1080,9 @@ pub enum EnforcementMode {
 impl EnforcementMode {
     /// Mode a `[worktree]` section applies when it omits `enforce_leases`.
     pub const DEFAULT: Self = Self::Strict;
+
+    /// Every mode, in declaration order.
+    pub const ALL: [Self; 3] = [Self::Strict, Self::Warn, Self::Off];
 
     /// The configuration token for this mode.
     pub const fn as_str(self) -> &'static str {
@@ -1100,14 +1104,16 @@ impl std::str::FromStr for EnforcementMode {
     type Err = EnforcementModeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "strict" => Ok(EnforcementMode::Strict),
-            "warn" => Ok(EnforcementMode::Warn),
-            "off" => Ok(EnforcementMode::Off),
-            _ => Err(EnforcementModeError::Invalid {
-                value: s.to_string(),
-            }),
-        }
+        Self::ALL
+            .into_iter()
+            .find(|mode| mode.as_str().eq_ignore_ascii_case(s))
+            .ok_or_else(|| {
+                let [strict, warn, off] = Self::ALL;
+                EnforcementModeError::Invalid {
+                    value: s.to_string(),
+                    expected: format!("'{strict}', '{warn}', or '{off}'"),
+                }
+            })
     }
 }
 
@@ -2380,13 +2386,14 @@ section = "success_criteria"
     fn test_item_kinds_source_of_truth_resolves_both_directions() {
         // REQ-01: both typed directions parse from their kebab-case tokens and are
         // DISTINCT from the `source` file path field. Each kind declares all six.
-        let config_toml = r#"
+        let config_toml = format!(
+            r#"
 [item_kinds.custom-requirement]
 section = "success_criteria"
 id-pattern = "REQ-\\d+"
 markers = ["[hard]"]
 link-namespaces = ["satisfies"]
-scope = "issue"
+scope = "{issue}"
 source-of-truth = "markdown-first"
 
 # `policy` is a custom kind; the default package does not ship it.
@@ -2395,13 +2402,16 @@ section = "policies"
 id-pattern = "POL-\\d+"
 markers = []
 link-namespaces = ["upholds"]
-scope = "project"
+scope = "{project}"
 source = "policies.toml"
 source-of-truth = "registry-first"
-"#;
+"#,
+            issue = KindScope::Issue,
+            project = KindScope::Project,
+        );
         // Uses a custom `policy` kind for the registry-first example: the
         // direction (`source-of-truth`) is independent of the `source` field.
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let config: JitConfig = toml::from_str(&config_toml).unwrap();
         config
             .validate_item_kinds()
             .expect("complete kinds validate");
@@ -2736,20 +2746,19 @@ max_indefinite_leases_per_agent = 3
         const NO_SECTION: &str = "";
         const SECTION_WITHOUT_KEY: &str = "[worktree]\n";
         let explicit = |mode: &str| format!("[worktree]\nenforce_leases = \"{mode}\"\n");
-        let states = [
-            NO_SECTION.to_string(),
-            SECTION_WITHOUT_KEY.to_string(),
-            explicit("strict"),
-            explicit("warn"),
-            explicit("off"),
-        ];
+        let states = [NO_SECTION.to_string(), SECTION_WITHOUT_KEY.to_string()]
+            .into_iter()
+            .chain(EnforcementMode::ALL.map(|mode| explicit(mode.as_str())))
+            .collect::<Vec<_>>();
         let mut env = EnvGuard::acquire();
         for repo in &states {
             let repo_dir = TempDir::new().unwrap();
             let repo_dir_layout =
                 crate::test_utils::repository_layout_for_data_root(repo_dir.path());
             std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
-            for env_value in [None, Some("strict"), Some("warn"), Some("off")] {
+            for env_value in
+                std::iter::once(None).chain(EnforcementMode::ALL.map(|mode| Some(mode.as_str())))
+            {
                 match env_value {
                     Some(value) => env.set("JIT_ENFORCE_LEASES", value),
                     None => env.remove("JIT_ENFORCE_LEASES"),

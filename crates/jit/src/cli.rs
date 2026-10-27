@@ -845,10 +845,10 @@ pub enum IssueCommands {
     ///
     /// Membership follows the dependency DAG (direct dependencies are the
     /// children; labels are advisory and not consulted). `by state` lists every
-    /// lifecycle state, zero-count states included. `done` and `rejected` are
+    /// lifecycle state, zero-count states included. The two terminal states are
     /// counted distinctly — a rejected child is terminal but not delivered — and,
-    /// because `archived` is terminality-preserving, a child archived from
-    /// `done`/`rejected` counts toward that origin; `open` is every child that is
+    /// because archiving is terminality-preserving, an archived child counts
+    /// toward its terminal origin; `open` is every child that is
     /// not effectively terminal; the `done/total` ratio and percent measure
     /// delivery. For a deep rollup use `jit graph deps <id> --depth`; to
     /// aggregate a label bucket use `jit query count --by state --label ns:v`.
@@ -2140,10 +2140,10 @@ pub enum QueryCommands {
     /// none given means the whole repository); membership is by label here, the
     /// advisory grouping counterpart to the DAG-authoritative `issue progress`
     /// over a container's children. `--by state` lists every lifecycle state,
-    /// zero-count states included. `done` and `rejected` are counted distinctly
-    /// (a rejected issue is terminal but not delivered) and, because `archived` is
-    /// terminality-preserving, an issue archived from `done`/`rejected` counts
-    /// toward that origin; `open` is every issue that is not effectively terminal;
+    /// zero-count states included. The two terminal states are counted distinctly
+    /// (a rejected issue is terminal but not delivered) and, because archiving is
+    /// terminality-preserving, an archived issue counts toward its terminal
+    /// origin; `open` is every issue that is not effectively terminal;
     /// the `done/total` ratio and percent measure delivery.
     ///
     /// `--json` emits `{count, by_state: [{state, count}], total, done, rejected,

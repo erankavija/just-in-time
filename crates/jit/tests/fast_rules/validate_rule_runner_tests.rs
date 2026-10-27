@@ -252,7 +252,7 @@ assert = { require-section = { heading = "Plan" } }
 #[test]
 fn test_explain_state_predicate_mismatch_names_state_and_tokens() {
     // The success criterion: `--explain` shows whether the state predicate
-    // matched. A rule wanting `done` against an `in_progress` issue is skipped
+    // matched. A rule wanting one state against an issue in another is skipped
     // with a reason naming BOTH the issue state and the predicate token.
     let rules = r#"
 [[rules]]

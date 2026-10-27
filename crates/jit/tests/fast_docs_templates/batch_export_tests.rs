@@ -14,6 +14,7 @@ use jit::declarations::GateMode;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::toml_string_array;
 
 const CONFIG_TOML: &str = r#"
 [version]
@@ -42,28 +43,34 @@ applies_to = ["epic"]
   depends_on = ["planning"]
 "#;
 
-const RULES_TOML: &str = r#"
+fn rules_toml() -> String {
+    format!(
+        r#"
 [[rules]]
 name = "coverage-preview"
 origin = "bracket"
 description = "coverage preview for tests"
-when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
+when = {{ type = "breakdown", state = {states} }}
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
-"#;
+assert = {{ label-coverage = {{ criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] }} }}
+"#,
+        states = toml_string_array(&[State::InProgress, State::Gated, State::Done]),
+    )
+}
 
 /// Write the config/templates/rules files a batch export reads. Must be called
 /// before any executor operation, since config is cached on first access.
 fn configure(h: &TestHarness) {
     let layout = h.storage.repository_layout();
+    let rules = rules_toml();
     for (virtual_path, contents) in [
         (jit::repository_state::VirtualPath::CONFIG, CONFIG_TOML),
         (
             jit::repository_state::VirtualPath::TEMPLATES,
             TEMPLATES_TOML,
         ),
-        (jit::repository_state::VirtualPath::RULES, RULES_TOML),
+        (jit::repository_state::VirtualPath::RULES, rules.as_str()),
     ] {
         let path = layout.resolve(&virtual_path).unwrap();
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

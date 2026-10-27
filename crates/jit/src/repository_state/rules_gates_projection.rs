@@ -203,6 +203,7 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::declarations::rules::Severity;
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use std::collections::HashMap;
@@ -211,20 +212,24 @@ mod tests {
         // `label-format` carries a description (rendered verbatim); `orphan-leaf`
         // has none (exercises the name fallback), so one fixture covers both.
         RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "label-format"
 description = "Every label is namespace:value."
-severity = "error"
+severity = "{error}"
 enforce = true
-assert = { require-label = { label = "type:*" } }
+assert = {{ require-label = {{ label = "type:*" }} }}
 
 [[rules]]
 name = "orphan-leaf"
-severity = "warn"
+severity = "{warn}"
 enforce = false
-assert = { require-section = { heading = "Goal" } }
+assert = {{ require-section = {{ heading = "Goal" }} }}
 "#,
+                error = Severity::Error,
+                warn = Severity::Warn,
+            ),
             None,
             [],
         )
@@ -294,22 +299,26 @@ assert = { require-section = { heading = "Goal" } }
     fn test_render_full_rule_prose_suffix_and_description_fallback() {
         // REQ-04: a described rule renders its description then the prose suffix;
         // a description-less rule falls back to its name. The suffix is prose
-        // (`error, enforced` / `warn, advisory`), never `severity: …, enforce: …`.
+        // (severity, then enforced or advisory), never `severity: …, enforce: …`.
         let rules = RuleSet::parse(
-            r#"
+            &format!(
+                r#"
 [[rules]]
 name = "described"
 description = "A hand-authored explanation."
-severity = "error"
+severity = "{error}"
 enforce = true
-assert = { require-label = { label = "type:*" } }
+assert = {{ require-label = {{ label = "type:*" }} }}
 
 [[rules]]
 name = "bare"
-severity = "warn"
+severity = "{warn}"
 enforce = false
-assert = { require-section = { heading = "Goal" } }
+assert = {{ require-section = {{ heading = "Goal" }} }}
 "#,
+                error = Severity::Error,
+                warn = Severity::Warn,
+            ),
             None,
             [],
         )

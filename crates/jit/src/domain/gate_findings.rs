@@ -89,10 +89,12 @@ pub struct GateFinding {
     /// Checker-assigned finding identifier (e.g. `"F1"`).
     #[serde(default)]
     pub id: String,
-    /// Checker-defined severity label (e.g. `"high"`, `"medium"`, `"low"`).
+    /// Checker-defined severity label; engine-emitted findings use
+    /// [`FindingSeverity`].
     #[serde(default)]
     pub severity: String,
-    /// Whether the finding affects the verdict (e.g. `"blocking"`, `"advisory"`).
+    /// Whether the finding affects the verdict; engine-emitted findings use
+    /// [`FindingDisposition`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disposition: Option<String>,
     /// How the finding relates to the reviewed work (e.g. `"issue-impact"`).
@@ -231,12 +233,14 @@ mod tests {
 
     #[test]
     fn test_parse_gate_findings_extracts_verdict_summary_and_findings() {
-        let stdout = block(
-            r#"{"verdict":"fail","summary":"2 problems","findings":[
-                {"id":"F1","severity":"high","disposition":"blocking","origin":"issue-impact","summary":"missing guard","file":"src/x.rs","line":42},
-                {"id":"F2","severity":"low","summary":"nit"}
-            ]}"#,
-        );
+        let stdout = block(&format!(
+            r#"{{"verdict":"fail","summary":"2 problems","findings":[
+                {{"id":"F1","severity":"{high}","disposition":"blocking","origin":"issue-impact","summary":"missing guard","file":"src/x.rs","line":42}},
+                {{"id":"F2","severity":"{low}","summary":"nit"}}
+            ]}}"#,
+            high = FindingSeverity::High,
+            low = FindingSeverity::Low,
+        ));
         let parsed = parse_gate_findings(&stdout).unwrap();
         assert_eq!(parsed.verdict, "fail");
         assert_eq!(parsed.summary, "2 problems");

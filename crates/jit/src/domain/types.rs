@@ -133,8 +133,8 @@ wire_vocabulary! {
     /// validation projection uses to extract `sections`.
     ///
     /// When absent on an issue the repo default (`[validation].content_format`)
-    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. HTML/XML are
-    /// only usable when the `html`/`xml` cargo features are built (see
+    /// applies; the final fallback is [`ContentFormat::DEFAULT`]. A markup format
+    /// other than the default is usable only when its cargo feature is built (see
     /// [`content_parser_for`](crate::document::content_parser_for)).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
     pub enum ContentFormat {
@@ -957,8 +957,8 @@ impl GateRunResult {
     /// makes the two evaluations questions about identical content. The run
     /// must have executed its own checker, so the record a reuse names is
     /// always the execution behind the verdict rather than another reference
-    /// to it. And the run must have reached a verdict — `passed` or `failed`;
-    /// an errored run reports the checker never getting there (a timeout, a
+    /// to it. And the run must have reached a verdict, passing or failing; an
+    /// errored run reports the checker never getting there (a timeout, a
     /// missing command), which says nothing about the inputs.
     pub fn is_reusable_for(
         &self,

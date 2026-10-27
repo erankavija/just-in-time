@@ -369,6 +369,7 @@ pub fn render_event_reference() -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let [issue, registry, repository] = EventScope::ALL;
     format!(
         "<!-- Generated from `jit::domain::event_catalog::event_catalog` — do not edit by hand. -->\n\
          \n\
@@ -381,8 +382,8 @@ pub fn render_event_reference() -> String {
          `events` array, by `jit --schema`.\n\
          \n\
          The **scope** is the state a record is about, and it decides the `issue_id` field:\n\
-         an `issue`-scoped record names the one issue it concerns, while `registry`- and\n\
-         `repository`-scoped records omit `issue_id` entirely, because they record a change\n\
+         an `{issue}`-scoped record names the one issue it concerns, while `{registry}`- and\n\
+         `{repository}`-scoped records omit `issue_id` entirely, because they record a change\n\
          to shared state. The tags whose records carry no `issue_id` are exactly:\n\
          \n\
          {no_issue}\n\

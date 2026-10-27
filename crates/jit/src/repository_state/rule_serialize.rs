@@ -493,9 +493,13 @@ pub(crate) fn toml_literal_string(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::rules::{RuleScope, RuleSet, Severity};
+    use crate::declarations::rules::{
+        ChildLink, DependencyShapeMode, LabelReferenceScope, RuleScope, RuleSet, Severity,
+    };
+    use crate::domain::State;
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::repository_state::default_rules::default_ruleset;
+    use crate::test_utils::toml_string_array;
     use std::collections::HashMap;
 
     fn test_type(level: u8) -> String {
@@ -663,19 +667,23 @@ assert = { require-section = { heading = "Goals" } }
     fn test_round_trip_rule_origin_field() {
         // REQ-03: a rule's `origin` (built-in provenance) round-trips, and a
         // rule with none reloads with `None` (not an empty string).
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "with-origin"
 origin = "bracket"
-severity = "error"
-assert = { require-section = { heading = "Goals" } }
+severity = "{error}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
 
 [[rules]]
 name = "without-origin"
-severity = "warn"
-assert = { require-section = { heading = "Goals" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+severity = "{warn}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
+"#,
+            error = Severity::Error,
+            warn = Severity::Warn,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
         assert_eq!(set.rules[1].origin, None);
         let out = serialize_ruleset(&set).unwrap();
@@ -687,19 +695,23 @@ assert = { require-section = { heading = "Goals" } }
     fn test_round_trip_rule_description_field() {
         // REQ-01: a rule's optional `description` round-trips, and a rule with
         // none reloads with `None` (not an empty string).
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "with-description"
 description = "Every label must be namespace:value."
-severity = "error"
-assert = { require-section = { heading = "Goals" } }
+severity = "{error}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
 
 [[rules]]
 name = "without-description"
-severity = "warn"
-assert = { require-section = { heading = "Goals" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+severity = "{warn}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
+"#,
+            error = Severity::Error,
+            warn = Severity::Warn,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(
             set.rules[0].description.as_deref(),
             Some("Every label must be namespace:value.")
@@ -743,31 +755,33 @@ assert = { require-section = { heading = "Goals" } }
     #[test]
     fn test_round_trip_criteria_to_check() {
         // The criteria-to-check kind round-trips all its optional fields.
-        let toml = test_toml(
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "ctc-both"
-when = { type = "__strategic_type__" }
-severity = "error"
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
 enforce = true
-assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }
+assert = {{ criteria-to-check = {{ marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" }} }}
 
 [[rules]]
 name = "ctc-gate-only"
-severity = "warn"
-assert = { criteria-to-check = { gate-prefix = "verify:" } }
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ gate-prefix = "verify:" }} }}
 
 [[rules]]
 name = "ctc-label-only"
-severity = "warn"
-assert = { criteria-to-check = { check-namespace = "checks", id-pattern = "SC-[0-9]+" } }
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ check-namespace = "checks", id-pattern = "SC-[0-9]+" }} }}
 
 [[rules]]
 name = "ctc-custom-section"
-severity = "warn"
-assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-prefix = "gate:" } }
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ criteria-section = "acceptance_criteria", gate-prefix = "gate:" }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
     }
@@ -775,54 +789,64 @@ assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-
     #[test]
     fn test_round_trip_graph_config_kinds() {
         // Graph configs retain explicit defaults distinctly from absent keys.
-        let toml = test_toml(
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "coverage"
-when = { type = "__strategic_type__" }
-severity = "error"
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", child-state = "done" } }
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
+assert = {{ label-coverage = {{ criteria-section = "success_criteria", marker = "[hard]", child-state = "{done}" }} }}
 
 [[rules]]
 name = "coverage-defaults"
-assert = { label-coverage = {} }
+assert = {{ label-coverage = {{}} }}
 
 [[rules]]
 name = "coverage-all-options"
-assert = { label-coverage = { child-link = "dependents", child-state = "rejected", child-type-exclude = ["story", "task", "story"], container-from-label = "brackets", criteria-section = "success_criteria", id-pattern = '[A-Z][A-Z0-9]*-[0-9]+', marker = "[hard]", satisfies-namespace = "satisfies" } }
+assert = {{ label-coverage = {{ child-link = "{dependents}", child-state = "{rejected}", child-type-exclude = ["story", "task", "story"], container-from-label = "brackets", criteria-section = "success_criteria", id-pattern = '[A-Z][A-Z0-9]*-[0-9]+', marker = "[hard]", satisfies-namespace = "satisfies" }} }}
 
 [[rules]]
 name = "reference"
-severity = "warn"
-assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req", scope = "{linked}" }} }}
 
 [[rules]]
 name = "reference-explicit-global"
-severity = "warn"
-assert = { label-reference = { from = "satisfies", to = "req", scope = "global" } }
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req", scope = "{global}" }} }}
 
 [[rules]]
 name = "reference-default-scope"
-severity = "warn"
-assert = { label-reference = { from = "satisfies", to = "req" } }
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
 [[rules]]
 name = "shape"
-when = { type = "__leaf_type__" }
-severity = "error"
-assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
+when = {{ type = "__leaf_type__" }}
+severity = "{error}"
+assert = {{ dependency-shape = {{ target = {{ type = "design" }}, mode = "{must}", transitive = true }} }}
 
 [[rules]]
 name = "shape-default-keys"
-severity = "warn"
-assert = { dependency-shape = { target = { type = "design", state = ["ready", "done"] } } }
+severity = "{warn}"
+assert = {{ dependency-shape = {{ target = {{ type = "design", state = {shape_states} }} }} }}
 
 [[rules]]
 name = "shape-should"
-severity = "warn"
-assert = { dependency-shape = { target = { label = "area:*" }, mode = "should", transitive = false } }
+severity = "{warn}"
+assert = {{ dependency-shape = {{ target = {{ label = "area:*" }}, mode = "{should}", transitive = false }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+            done = State::Done,
+            rejected = State::Rejected,
+            linked = LabelReferenceScope::Linked,
+            global = LabelReferenceScope::Global,
+            must = DependencyShapeMode::Must,
+            should = DependencyShapeMode::Should,
+            shape_states = toml_string_array(&[State::Ready, State::Done]),
+            dependents = ChildLink::Dependents,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
         let serialized = serialize_ruleset(&set).unwrap();
@@ -867,25 +891,27 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
     fn test_round_trip_state_predicate_single_and_list() {
         // A single-state selector serializes as a string and a multi-state
         // selector as a TOML array; both must reload to the same predicate.
-        let toml = test_toml(
+        let listed = [State::Ready, State::InProgress, State::Gated];
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "single-state"
-when = { type = "__strategic_type__", state = "in_progress" }
-assert = { require-section = { heading = "Plan" } }
+when = {{ type = "__strategic_type__", state = "in_progress" }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
 
 [[rules]]
 name = "list-state"
-when = { state = ["ready", "in_progress", "gated"] }
-assert = { require-section = { heading = "Plan" } }
+when = {{ state = {listed} }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
 "#,
-        );
+            listed = toml_string_array(&listed),
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains(r#"state = "in_progress""#));
         assert!(out
             .rules_toml
-            .contains(r#"state = ["ready", "in_progress", "gated"]"#));
+            .contains(&format!("state = {}", toml_string_array(&listed))));
         assert_round_trips(&set);
     }
 
@@ -893,21 +919,23 @@ assert = { require-section = { heading = "Plan" } }
     fn test_round_trip_criteria_label_match() {
         // The criteria-label-match kind must serialize and reload with all
         // fields preserved, matching the gate-recency pattern for round-trip tests.
-        let toml = test_toml(
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "req-matches-criterion"
-when = { type = "__strategic_type__" }
-severity = "error"
-assert = { criteria-label-match = { namespace = "req", marker = "[hard]" } }
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
+assert = {{ criteria-label-match = {{ namespace = "req", marker = "[hard]" }} }}
 
 [[rules]]
 name = "req-custom-section"
-when = { type = "__strategic_type__" }
-severity = "warn"
-assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' } }
+when = {{ type = "__strategic_type__" }}
+severity = "{warn}"
+assert = {{ criteria-label-match = {{ namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(set.rules.len(), 2);
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
