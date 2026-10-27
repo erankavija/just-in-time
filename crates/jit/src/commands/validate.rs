@@ -2610,7 +2610,7 @@ depends_on = ["planning"]
     fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
         let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(storage.root().join(".jit/config.toml"), config).unwrap();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
         let executor = crate::test_utils::file_executor(repo.path()).unwrap();
 
         let error = executor
