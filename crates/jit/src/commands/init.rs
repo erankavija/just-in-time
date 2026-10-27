@@ -1308,6 +1308,7 @@ mod tests {
             .project_name()
             .cloned()
             .unwrap();
+        // `race` is a custom kind; the default package does not ship it.
         config.push_str(
             "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
              markers = []\nlink-namespaces = []\nscope = \"project\"\n\

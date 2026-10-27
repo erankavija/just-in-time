@@ -1980,6 +1980,7 @@ default_type = "task"
             format!("[validation]\n{key} = 1\n"),
             format!("[documentation]\n{key} = 1\n"),
             format!("[namespaces.ns]\n{key} = 1\n"),
+            // `kind` is a custom kind; the default package does not ship it.
             format!("[item_kinds.kind]\n{key} = 1\n"),
             format!("[item_kinds.kind]\nsource = {{ {key} = 1 }}\n"),
             format!("[projection.view]\n{key} = 1\n"),
@@ -2389,6 +2390,7 @@ link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
 
+# `policy` is a custom kind; the default package does not ship it.
 [item_kinds.policy]
 section = "policies"
 id-pattern = "POL-\\d+"
@@ -2478,6 +2480,7 @@ types = { task = 1 }
     fn test_item_kind_scope_invalid_token_is_parse_error() {
         // REQ: an unrecognised scope token is a TOML parse/deserialize error,
         // not a silent fallback to issue scope.
+        // `thing` is a custom kind; the default package does not ship it.
         let err =
             toml::from_str::<JitConfig>("[item_kinds.thing]\nscope = \"global\"\n").unwrap_err();
         let msg = err.to_string();

@@ -593,6 +593,7 @@ mod tests {
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        // `glossary` is a custom kind; the default package does not ship it.
         let config = format!(
             "[project]\n\
              name = \"{name}\"\n\
@@ -694,6 +695,7 @@ mod tests {
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        // `glossary` is a custom kind; the default package does not ship it.
         let config = format!(
             "[item_kinds.glossary]\n\
              section = \"success_criteria\"\n\
@@ -1019,6 +1021,7 @@ mod tests {
         // rather than reading a file outside the repository.
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        // `glossary` is a custom kind; the default package does not ship it.
         std::fs::write(
             storage.root().join("config.toml"),
             "[item_kinds.glossary]\n\
@@ -1047,6 +1050,7 @@ mod tests {
         // Path-safety: an absolute source path is rejected by the storage boundary.
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        // `glossary` is a custom kind; the default package does not ship it.
         std::fs::write(
             storage.root().join("config.toml"),
             "[item_kinds.glossary]\n\
@@ -1078,6 +1082,7 @@ mod tests {
     fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        // `policy` is a custom kind; the default package does not ship it.
         let config = "[item_kinds.policy]\n\
              section = \"success_criteria\"\n\
              id-pattern = \"POL-[0-9]+\"\n\
