@@ -734,15 +734,11 @@
   "55043636": 1
  },
  "external_blockers": {
-  "c780514e test-topology (led by session just-in-time-4f)": [
-   "0af95f14 (upstream ends c780514e wave 5)",
-   "5fac48b8 (upstream ends wave 6)",
-   "13190465",
-   "19d9bd7d",
-   "b45a2865",
-   "b73b3e5a",
-   "c797b59b -> 7abcc22d",
-   "641bd14e"
+  "c780514e test-topology (led by just-in-time-4f)": [
+   "0af95f14 waits only on 2c9badcd (<- e2eb8862 <- 64f04da6, 4f slot B)",
+   "5fac48b8 waits on 0af95f14 plus 529f621d, 5a93e443, 9e411075, 2cbe3ed8, 4b5b8f4a, 8da3f7f5",
+   "13190465, 19d9bd7d, b45a2865, b73b3e5a follow 0af95f14",
+   "c797b59b -> 7abcc22d and 641bd14e follow 5fac48b8"
   ]
  },
  "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1450,5 +1446,23 @@
  ],
  "session_rules": [
   "Session 4 (invoker): do not stop to ask questions; record any escalation as blocked for the next session; write the handoff when all remaining work waits on invoker input; check workers every 30 min."
+ ],
+ "lead_executed_external": [
+  {
+   "issue": "2a6bc44c",
+   "state": "done",
+   "merge": "34a960123"
+  },
+  {
+   "issue": "55043636",
+   "state": "done",
+   "merge": "e3be5cb24",
+   "note": "deleted EnvGuard/CurrentDirGuard; c780514e scope items (3f8da8c4 REQ-03, epic REQ-09 wording) handed to 4f"
+  },
+  {
+   "issue": "55e3d3fd",
+   "state": "done",
+   "merge": "7aa7ed622"
+  }
  ]
 }
