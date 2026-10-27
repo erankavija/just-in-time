@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-27T20:17:12.950526643Z",
   "context": {},
   "created_at": "2026-10-27T00:08:56.805282113Z",
@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "29f1303f-dfcf-4013-82b4-947d44afd3e7",
+      "status": "failed",
+      "updated_at": "2026-10-27T21:28:45.572229929Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
   "labels": [
     "epic:semantic-types",
@@ -29,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Declared vocabularies are never restated as token lists or Debug names",
-  "updated_at": "2026-10-27T20:17:12.950526643Z"
+  "updated_at": "2026-10-27T21:28:45.572229929Z"
 }
