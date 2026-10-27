@@ -48,20 +48,3 @@ pub(crate) fn setup_test_repo_with_taxonomy() -> TaxonomyRepo {
 pub(crate) fn type_label(taxonomy: &jit::test_taxonomy::TestTaxonomy, level: u8) -> String {
     format!("type:{}", taxonomy.type_at_level(level))
 }
-
-pub(crate) fn membership_label(
-    taxonomy: &jit::test_taxonomy::TestTaxonomy,
-    level: u8,
-    value: &str,
-) -> String {
-    format!("{}:{value}", membership_namespace(taxonomy, level))
-}
-
-pub(crate) fn membership_namespace(taxonomy: &jit::test_taxonomy::TestTaxonomy, level: u8) -> &str {
-    let type_name = taxonomy.type_at_level(level);
-    taxonomy
-        .label_associations
-        .get(type_name)
-        .map(String::as_str)
-        .expect("every taxonomy container type has a membership namespace")
-}
