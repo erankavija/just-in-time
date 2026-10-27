@@ -8,6 +8,7 @@
   ],
   "description": "Retire the private memory executors of the remaining command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. `setup` in `commands/gate.rs` writes the scenario value `enforce_leases = \"off\"` directly into the store. The literal `schema_version` fields in `prior_run` (`commands/gate_check.rs`) and `prior_precheck_run` (`commands/mod.rs`) belong to gate-run records, not to a repository index, and stay.\n\nThis entry covers `batch_create.rs`, `bulk_update.rs`, `events.rs`.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/commands/batch_create.rs`: `executor` (`:672`), `coverage_executor` (`:926`).\n- `crates/jit/src/commands/bulk_update.rs`: `blocked_dependent_fixture` (`:1973`).\n- `crates/jit/src/commands/events.rs`: `seeded_override_executor` (`:52`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No test module in the files in this entry's footprint defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T20:54:25.851164807Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Batch-command tests use the shared memory seeding",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T20:54:25.851164807Z"
 }

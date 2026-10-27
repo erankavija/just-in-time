@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2a6802d8bb7fe39a53951b1fae5e2aa4151dc5d3",
+  "completed_at": "2026-10-27T20:49:32.794162859Z",
+  "duration_ms": 73107,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable fixture rewrite satisfies all five hard criteria; its key, callers, locking, retirement, and focused tests are coherent.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "07f4b1d4-7dde-47ae-929c-c0d892741b27",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aacdfb49-4d37-4caa-badf-14be3bb7fce9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T20:48:19.686712778Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7808a59f1, 0c86a1d6a, 535a3b136, 2a6802d8b (all `jit:07f4b1d4`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/bounded-rust-build-footprint and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-11 and REQ-13 (issue source); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-27T20:47:51Z; code-review has no prior recorded result\nTruncation recovery: recovered focused fixture implementation, key/retirement tests, caller search, source-digest code, and per-commit patches\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable fixture rewrite satisfies all five hard criteria; its key, callers, locking, retirement, and focused tests are coherent.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
