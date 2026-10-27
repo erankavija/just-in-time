@@ -7,6 +7,7 @@ use jit::output::ErrorCode;
 use jit::storage::{
     publish_fixture_directory_noreplace, publish_fixture_file_noreplace, FileLocker,
 };
+use jit::test_cli::{created_issue_id, jit_binary, JitCli};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,10 +25,6 @@ const CORPUS_RECEIPT: &str = "JIT_RECORDED_FAILURE_CORPUS_RECEIPT";
 const CORPUS_SETUP_MODE: &str = "JIT_RECORDED_FAILURE_CORPUS_SETUP";
 const FIXTURE_CONTRACT: &str = include_str!("failure_probe_fixture.rs");
 static DIRECT_CORPUS: OnceLock<Result<Arc<RecordedFailureCorpus>, String>> = OnceLock::new();
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
 
 /// Observable result of driving a registry invocation through its recorded setup.
 pub(crate) struct ForcedFailure {
@@ -289,7 +286,7 @@ fn corpus_key() -> Result<String> {
     corpus_key_from_sources(
         REGISTRY_TOML.as_bytes(),
         FIXTURE_CONTRACT.as_bytes(),
-        Path::new(jit_binary()),
+        &jit_binary(),
         &std::env::current_exe().context("resolve corpus setup executable")?,
     )
 }
@@ -491,7 +488,8 @@ pub(crate) fn drive_recorded_failure(
     invocation: &super::failure_lever_registry::FailureLeverInvocation,
 ) -> ForcedFailure {
     assert_recorded_invocation_parses(&invocation.path, &invocation.argv);
-    let mut fixture = FailureFixture::new();
+    let mut fixture =
+        FailureFixture::new(JitCli::uninitialised().expect("create failure-probe repository"));
     invocation.setup.iter().for_each(|step| {
         fixture.apply(
             SetupStep::parse(step)
@@ -529,16 +527,15 @@ fn require_parser_acceptance<T>(path: &str, parsed: Result<T, clap::Error>) {
 }
 
 struct FailureFixture {
-    repository: TempDir,
+    cli: JitCli,
     environment: BTreeMap<String, Option<String>>,
 }
 
 impl FailureFixture {
-    fn new() -> Self {
-        let repository = TempDir::new().expect("create failure-probe repository");
-        let git_ceiling = repository.path().display().to_string();
+    fn new(cli: JitCli) -> Self {
+        let git_ceiling = cli.root().display().to_string();
         Self {
-            repository,
+            cli,
             // Git may discover a repository inherited from the host's `/tmp`.
             // Stop discovery at the temporary repository so `git:absent`
             // observes only the fixture it was asked to inspect.
@@ -550,36 +547,26 @@ impl FailureFixture {
     }
 
     fn root(&self) -> &Path {
-        self.repository.path()
+        self.cli.root()
     }
 
-    fn run_jit(&self, args: &[String]) -> Output {
-        let mut command = Command::new(jit_binary());
-        command.current_dir(self.root()).args(args);
+    fn run_jit<S: AsRef<std::ffi::OsStr>>(&self, args: &[S]) -> Output {
+        let set = self
+            .environment
+            .iter()
+            .filter_map(|(name, value)| value.as_ref().map(|value| (name, value)));
+        let mut command = self.cli.command_with_env(args, set);
         self.environment
             .iter()
-            .for_each(|(name, value)| match value {
-                Some(value) => {
-                    command.env(name, value);
-                }
-                None => {
-                    command.env_remove(name);
-                }
+            .filter(|(_, value)| value.is_none())
+            .for_each(|(name, _)| {
+                command.env_remove(name);
             });
         command.output().expect("run recorded jit invocation")
     }
 
-    fn run_setup_jit(&self, args: &[&str]) -> Output {
-        self.run_jit(
-            &args
-                .iter()
-                .map(|argument| (*argument).to_owned())
-                .collect::<Vec<_>>(),
-        )
-    }
-
     fn require_setup_jit(&self, args: &[&str]) -> Output {
-        let output = self.run_setup_jit(args);
+        let output = self.run_jit(args);
         assert!(
             output.status.success(),
             "setup command {args:?} failed: stdout={} stderr={}",
@@ -587,19 +574,6 @@ impl FailureFixture {
             String::from_utf8_lossy(&output.stderr)
         );
         output
-    }
-
-    fn run_git(&self, args: &[&str]) {
-        let output = Command::new("git")
-            .current_dir(self.root())
-            .args(args)
-            .output()
-            .expect("run git setup command");
-        assert!(
-            output.status.success(),
-            "git {args:?} failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
     }
 
     fn apply(&mut self, step: SetupStep) {
@@ -644,9 +618,12 @@ impl FailureFixture {
             }
             SetupStep::SelectedLinkedWorktree => {
                 // The linked checkout only carries a store if HEAD tracks one.
-                self.run_git(&["add", "-A"]);
-                self.run_git(&["commit", "-q", "-m", "track the jit store"]);
-                self.run_git(&["worktree", "add", "linked"]);
+                self.cli
+                    .commit("track the jit store")
+                    .expect("commit the jit store");
+                self.cli
+                    .git(["worktree", "add", "linked"])
+                    .expect("add the linked worktree");
                 self.environment.insert(
                     "JIT_DATA_DIR".to_owned(),
                     Some(self.root().join("linked/.jit").display().to_string()),
@@ -659,13 +636,14 @@ impl FailureFixture {
                     .expect("write malformed preset");
             }
             SetupStep::GitRepositoryWithHead => {
-                self.run_git(&["init"]);
-                self.run_git(&["config", "user.email", "fixture@example.com"]);
-                self.run_git(&["config", "user.name", "Failure Fixture"]);
-                self.run_git(&["commit", "--allow-empty", "-m", "fixture"]);
+                self.cli
+                    .init_git()
+                    .expect("initialise git")
+                    .commit("fixture")
+                    .expect("commit the fixture HEAD");
             }
             SetupStep::GitRepositoryWithoutHead => {
-                self.run_git(&["init"]);
+                self.cli.init_git().expect("initialise git");
             }
             SetupStep::GitAbsent => {
                 assert!(!self.root().join(".git").exists(), "git must remain absent");
@@ -703,11 +681,11 @@ impl FailureFixture {
                 ]);
                 let created: serde_json::Value = serde_json::from_slice(&created.stdout)
                     .expect("claim fixture issue creation emits JSON");
-                let issue_id = created["id"].as_str().expect("created issue id");
+                let issue_id = created_issue_id(&created).expect("created issue id");
                 self.require_setup_jit(&[
                     "claim",
                     "acquire",
-                    issue_id,
+                    &issue_id,
                     "--ttl",
                     "600",
                     "--agent-id",
