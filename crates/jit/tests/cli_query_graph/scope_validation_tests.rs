@@ -1106,8 +1106,7 @@ mod file_backed_external_plan {
     /// Returns the temp dir (kept alive = the repo root) and the executor.
     fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         jit::test_mode::enable();
-        let repo = crate::setup_test_repo_with_taxonomy();
-        let repo_root = repo.temp;
+        let repo_root = jit::test_taxonomy::setup_test_repo_with_taxonomy().temp;
         let jit_dir = repo_root.path().join(".jit");
         std::fs::write(
             jit_dir.join("config.toml"),
@@ -1227,45 +1226,11 @@ mod file_backed_external_plan {
 // ---------------------------------------------------------------------------
 
 mod cli {
+    use jit::test_cli::JitCli;
+    use jit::test_taxonomy::{
+        setup_test_repo_with_taxonomy, type_label, TaxonomyRepo, TestTaxonomy,
+    };
     use std::fs;
-    use std::process::Command;
-    use tempfile::TempDir;
-
-    fn jit() -> &'static str {
-        env!("CARGO_BIN_EXE_jit")
-    }
-
-    fn run(dir: &TempDir, args: &[&str]) -> std::process::Output {
-        Command::new(jit())
-            .current_dir(dir)
-            .args(args)
-            .output()
-            .expect("jit runs")
-    }
-
-    fn create(dir: &TempDir, title: &str, description: &str, labels: &[&str]) -> String {
-        let mut args = vec![
-            "issue",
-            "create",
-            "--title",
-            title,
-            "--description",
-            description,
-            "--json",
-        ];
-        for label in labels {
-            args.push("--label");
-            args.push(label);
-        }
-        let out = run(dir, &args);
-        assert!(
-            out.status.success(),
-            "create failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-        json["id"].as_str().unwrap().to_string()
-    }
 
     /// Coverage rule keyed on the breakdown node; error-severity, enforcing.
     fn coverage_rules(breakdown_type: &str) -> String {
@@ -1281,46 +1246,64 @@ assert = {{ label-coverage = {{ }} }}
         )
     }
 
-    /// Build a `C -> impl -> B` spine where B carries the criterion from the
-    /// shared taxonomy fixture. Returns (repository, container-id). The impl child credits
+    /// Seed a `C -> impl -> B` spine into `cli` where B carries the criterion from
+    /// the shared taxonomy fixture. Returns the container id. The impl child credits
     /// B's REQ-01 only when `covered`.
-    fn setup_spine(covered: bool) -> (crate::TaxonomyRepo, String) {
-        let dir = crate::setup_test_repo_with_taxonomy();
-        let breakdown_type = dir.taxonomy.type_at_level(3);
+    fn seed_spine(cli: &JitCli, taxonomy: &TestTaxonomy, covered: bool) -> String {
         fs::write(
-            dir.path().join(".jit/rules.toml"),
-            coverage_rules(breakdown_type),
+            cli.root().join(".jit/rules.toml"),
+            coverage_rules(taxonomy.type_at_level(3)),
         )
         .unwrap();
 
-        let breakdown_label = crate::type_label(&dir.taxonomy, 3);
-        let b = create(
-            &dir,
-            "breakdown",
-            "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
-            &[breakdown_label.as_str()],
-        );
-        let implementation_label = crate::type_label(&dir.taxonomy, 4);
+        let b = cli
+            .create_issue([
+                "--title",
+                "breakdown",
+                "--description",
+                "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
+                "--label",
+                &type_label(taxonomy, 3),
+            ])
+            .unwrap();
         let credit = format!("satisfies:{}/REQ-01", &b[..8]);
+        let implementation_label = type_label(taxonomy, 4);
         let impl_labels: &[&str] = if covered {
-            &[implementation_label.as_str(), credit.as_str()]
+            &[&implementation_label, &credit]
         } else {
-            &[implementation_label.as_str()]
+            &[&implementation_label]
         };
-        let impl_id = create(&dir, "impl", "", impl_labels);
-        assert!(run(&dir, &["dep", "add", &impl_id, &b]).status.success());
+        let impl_id = cli
+            .create_issue(
+                ["--title", "impl", "--description", ""]
+                    .into_iter()
+                    .chain(impl_labels.iter().flat_map(|label| ["--label", *label])),
+            )
+            .unwrap();
+        cli.run(["dep", "add", &impl_id, &b]).unwrap();
 
-        let container_label = crate::type_label(&dir.taxonomy, 2);
-        let c = create(&dir, "container", "", &[container_label.as_str()]);
-        assert!(run(&dir, &["dep", "add", &c, &impl_id]).status.success());
-
-        (dir, c)
+        let c = cli
+            .create_issue([
+                "--title",
+                "container",
+                "--description",
+                "",
+                "--label",
+                &type_label(taxonomy, 2),
+            ])
+            .unwrap();
+        cli.run(["dep", "add", &c, &impl_id]).unwrap();
+        c
     }
 
     #[test]
     fn test_cli_scope_exits_4_with_findings_on_failure() {
-        let (dir, c) = setup_spine(false);
-        let out = run(&dir, &["validate", "--scope", &c]);
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, false);
+
+        let out = cli.command(["validate", "--scope", &c]).output().unwrap();
+
         assert_eq!(
             out.status.code(),
             Some(4),
@@ -1340,8 +1323,15 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_json_failure_emits_one_validation_envelope() {
-        let (dir, c) = setup_spine(false);
-        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, false);
+
+        let out = cli
+            .command(["validate", "--scope", &c, "--json"])
+            .output()
+            .unwrap();
+
         assert_eq!(out.status.code(), Some(4));
         assert!(out.stderr.is_empty(), "JSON failure stays stream-pure");
         let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -1359,8 +1349,12 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_exits_0_when_clean() {
-        let (dir, c) = setup_spine(true);
-        let out = run(&dir, &["validate", "--scope", &c]);
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, true);
+
+        let out = cli.command(["validate", "--scope", &c]).output().unwrap();
+
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -1371,10 +1365,12 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_json_success_keeps_the_scope_report() {
-        let (dir, c) = setup_spine(true);
-        let out = run(&dir, &["validate", "--scope", &c, "--json"]);
-        assert_eq!(out.status.code(), Some(0));
-        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+        let cli = JitCli::with_repository(temp);
+        let c = seed_spine(&cli, &taxonomy, true);
+
+        let json = cli.run_json(["validate", "--scope", &c]).unwrap();
+
         assert!(
             json["findings"].is_array(),
             "successful report stays direct: {json}"
@@ -1384,8 +1380,13 @@ assert = {{ label-coverage = {{ }} }}
 
     #[test]
     fn test_cli_scope_rejects_combination_with_id() {
-        let dir = crate::setup_test_repo_with_taxonomy();
-        let out = run(&dir, &["validate", "someid", "--scope", "other"]);
+        let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+
+        let out = cli
+            .command(["validate", "someid", "--scope", "other"])
+            .output()
+            .unwrap();
+
         assert!(
             !out.status.success(),
             "`--scope` combined with a positional id must be rejected"
