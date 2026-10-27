@@ -1383,11 +1383,14 @@
       "from": "w-crw1",
       "finding": "JitCli has no constructor for a repository root with a chosen basename; project-name seeding tests in project_config_tests.rs and profile_acceptance_tests.rs build one inline with tempfile::Builder + JitCli::with_repository.",
       "disposition": "Accepted as composition of the shared fixture (no local constructor function). A JitCli::with_named_root constructor would remove the inline builder; fold into the fixture-gap task if the user approves option A."
-    }
+    },
+    "s4: wave-3 adoption tasks (ad1e6d0e chain) dispatched before wave 2 closed, by the priority directive for 2195c98f's blocked tasks; contained by per-issue gates."
   ],
   "traps": [
     "A shared-helper change (memory_executor) passed its worker's lib tests but broke integration targets on main (fast_issue graph_rule_validation_tests); main was red ~8 min and the merge was reverted (cf274f369). Workers changing a shared test helper must run every integration target that consumes it before handing back.",
-    "871df4b0 actual full/warm doctest timings met criterion, but evidence stayed in /tmp and was not linked before review; reviewer could not verify warm/load bounds and failed. Commit and link reproducible measurement evidence before measurement-dependent reviews."
+    "871df4b0 actual full/warm doctest timings met criterion, but evidence stayed in /tmp and was not linked before review; reviewer could not verify warm/load bounds and failed. Commit and link reproducible measurement evidence before measurement-dependent reviews.",
+    "s4: land.sh's dirty check runs even when the branch is already merged; keep progress.json clean on main for the whole land.sh run.",
+    "s4: scratch_build compiled-module walk must see every module a build compiles; a #[path] module in build.rs broke main (fixed 2a6802d8b). Run scratch_build before landing build.rs/module-layout changes."
   ],
   "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
@@ -1985,7 +1988,8 @@
     "870e8e46-s4": "code-review 26cc6df7 FAIL F1 (local fixture_binary locator); rework limit reached (2). Lead fix 60e450026 (shared jit_binary); code-review re-run awaits user approval.",
     "529f621d-s4": "independent review FAIL (953a428f5): REQ-01 signature (now amended) and delete cascade still decides per dependent. Rework 1 pending.",
     "ad1e6d0e-s4": "lead PASS 3c73512ca; gates/invariants seeded on store (option a)",
-    "landB-s4": "independent review PASS 07f4b1d4, b93687b3, 717f9c2f; cherry-picked to worktree-agent-w4-landB (conflicts in item_cli_tests/invariant_registry_story_tests resolved to main's migrated side), lead fixes 0c86a1d6a (callers drop scenario arg), 9c2b65c2f (restating doc)"
+    "landB-s4": "independent review PASS 07f4b1d4, b93687b3, 717f9c2f; cherry-picked to worktree-agent-w4-landB (conflicts in item_cli_tests/invariant_registry_story_tests resolved to main's migrated side), lead fixes 0c86a1d6a (callers drop scenario arg), 9c2b65c2f (restating doc)",
+    "adoptB-s4": "lead PASS 3be2238f 3dd0ebd4e, d49d53db 60691d775 (write_invariants seed-on-executor helper accepted: init rejects dangling bindings)"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2161,6 +2165,35 @@
         "53f78490"
       ],
       "reason": "e21ca76d crate-wide REQ-03 rework; 19136324/53f78490 released by 2195c98f lead (8acca4f4 escalated); 53f78490 is contract-setting (schema/MCP)"
+    },
+    {
+      "session": 4,
+      "slot": "A agent-22355a56 branch worktree-agent-w4-memexec",
+      "worker": "Claude Opus",
+      "issues": [
+        "ad1e6d0e"
+      ],
+      "reason": "contract-setting shared fixture API; critical path of 2195c98f 0af95f14/5fac48b8"
+    },
+    {
+      "session": 4,
+      "slot": "A agent-22355a56 branch worktree-agent-w4-adoptA",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "b7078f0d",
+        "b469f36d"
+      ],
+      "reason": "bounded fixture adoptions; tiering default; alternation"
+    },
+    {
+      "session": 4,
+      "slot": "B agent-de880d9c branch worktree-agent-w4-adoptB",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "3be2238f",
+        "d49d53db"
+      ],
+      "reason": "bounded fixture adoptions; alternation"
     }
   ],
   "checkpoint": {
@@ -2232,7 +2265,8 @@
       "issues": "74b2a0d3 9964af3f b511222f 5876e131 e21ca76d(partial)",
       "cargo_ci": "all passed",
       "code_review": "4 passed; e21ca76d in rework"
-    }
+    },
+    "s4: 535a3b136 landB (07f4b1d4,b93687b3,717f9c2f); 1ef4d50c4 ad1e6d0e; main red until 2a6802d8b (module walk #[path]); cargo-ci pass x5 after fix; failed run 445f2bcb preserved"
   ],
   "current_session": 4
 }
