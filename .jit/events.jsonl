@@ -20869,3 +20869,12 @@
 {"id":"71cc37f5-9c2f-465f-81c4-3f39bc2236ec","issue_id":"077937f5-ed4c-4a76-be4a-2819bd5f556b","timestamp":"2026-10-27T22:01:17.326852705Z","type":"issue_completed"}
 {"from":"in_progress","id":"eba963af-2fc3-496f-98cd-fe60bc57b515","issue_id":"b469f36d-8fb3-4e73-a199-765c289dfe88","timestamp":"2026-10-27T22:01:37.412603530Z","to":"done","type":"issue_state_changed"}
 {"id":"1d6641cc-bfcd-4a39-919c-f264f9a79222","issue_id":"b469f36d-8fb3-4e73-a199-765c289dfe88","timestamp":"2026-10-27T22:01:37.412603530Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"d1ccac93-1fd7-44b9-9ddd-2a5b13aff7ab","issue_id":"155d8c3c-6777-4f60-b26a-1f4c4e10ef7d","timestamp":"2026-10-27T22:03:18.585899081Z","type":"issue_claimed"}
+{"from":"ready","id":"dc4c1598-7ef6-4c04-9334-406bee511b36","issue_id":"155d8c3c-6777-4f60-b26a-1f4c4e10ef7d","timestamp":"2026-10-27T22:03:18.780244534Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"2b540c93-9071-4cf7-ab34-f716ae331dbd","issue_id":"155d8c3c-6777-4f60-b26a-1f4c4e10ef7d","timestamp":"2026-10-27T22:03:18.780244534Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"42d50ce8-1cb9-45d2-a7b8-8f1f550a07c6","issue_id":"64f04da6-c24f-49b8-891d-e8c4245cfe03","timestamp":"2026-10-27T22:03:19.035493379Z","type":"issue_claimed"}
+{"from":"ready","id":"bf248af2-bb99-44fd-9d48-58491a1ae76b","issue_id":"64f04da6-c24f-49b8-891d-e8c4245cfe03","timestamp":"2026-10-27T22:03:19.230532056Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"145c35e5-a41c-4c06-88e3-9da3469d5314","issue_id":"64f04da6-c24f-49b8-891d-e8c4245cfe03","timestamp":"2026-10-27T22:03:19.230532056Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"71be839e-74dc-4cce-8af3-4a22ed0c765f","issue_id":"44b40ce1-5e1e-48b4-b65e-d44fc192b3ca","timestamp":"2026-10-27T22:03:19.481502876Z","type":"issue_claimed"}
+{"from":"ready","id":"8744366c-0d37-47e7-b77e-53936b1b1158","issue_id":"44b40ce1-5e1e-48b4-b65e-d44fc192b3ca","timestamp":"2026-10-27T22:03:19.682587428Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"d1be1e14-14d5-4f4d-87dc-4eef76c0f9e6","issue_id":"44b40ce1-5e1e-48b4-b65e-d44fc192b3ca","timestamp":"2026-10-27T22:03:19.682587428Z","type":"issue_claimed"}
