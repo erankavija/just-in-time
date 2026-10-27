@@ -1,56 +1,22 @@
 //! Integration tests for label query JSON output
 
 use jit::output::ErrorCode;
-use std::process::Command;
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::{membership_label, setup_test_repo_with_taxonomy, TaxonomyRepo};
 use std::str::FromStr;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
 
 #[test]
 fn test_query_label_json_exact_match() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-    let label = crate::membership_label(&temp.taxonomy, 1, "v1.0");
-
-    // Create issue with label
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Milestone Task",
-            "--label",
-            label.as_str(),
-        ])
-        .current_dir(temp.path())
-        .output()
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let label = membership_label(&taxonomy, 1, "v1.0");
+    cli.create_issue(["-t", "Milestone Task", "--label", &label])
         .unwrap();
 
-    // Query with JSON
-    let output = Command::new(jit)
-        .args([
-            "query",
-            "all",
-            "--label",
-            label.as_str(),
-            "--full",
-            "--json",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["query", "all", "--label", &label, "--full"])
         .unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // success field removed
     assert_eq!(json["count"], 1);
     assert!(json["issues"].is_array());
     assert_eq!(json["issues"].as_array().unwrap().len(), 1);
@@ -65,89 +31,41 @@ fn test_query_label_json_exact_match() {
 
 #[test]
 fn test_query_label_json_wildcard() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    // Create multiple issues with milestone labels
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task v1",
-            "--label",
-            "milestone:v1.0",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task v1", "--label", "milestone:v1.0"])
+        .unwrap();
+    cli.create_issue(["-t", "Task v2", "--label", "milestone:v2.0"])
         .unwrap();
 
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task v2",
-            "--label",
-            "milestone:v2.0",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["query", "all", "--label", "milestone:*"])
         .unwrap();
 
-    // Query with wildcard
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "milestone:*", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // success field removed
     assert_eq!(json["count"], 2);
     assert_eq!(json["issues"].as_array().unwrap().len(), 2);
 }
 
 #[test]
 fn test_query_label_json_no_matches() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    // Create issue without the queried label
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "--label", "milestone:v1.0"])
-        .current_dir(temp.path())
-        .output()
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "--label", "milestone:v1.0"])
         .unwrap();
 
-    // Query for different label
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "epic:auth", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["query", "all", "--label", "epic:auth"])
         .unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // success field removed
     assert_eq!(json["count"], 0);
     assert_eq!(json["issues"].as_array().unwrap().len(), 0);
 }
 
 #[test]
 fn test_query_label_json_invalid_pattern() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
     // Query with invalid pattern (no colon)
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "invalidlabel", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["query", "all", "--label", "invalidlabel", "--json"])
         .output()
         .unwrap();
 
@@ -170,32 +88,13 @@ fn test_query_label_json_invalid_pattern() {
 
 #[test]
 fn test_query_label_text_output() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    // Create issue with label
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Test Task",
-            "--label",
-            "milestone:v1.0",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Test Task", "--label", "milestone:v1.0"])
         .unwrap();
 
-    // Query without --json flag
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "milestone:v1.0"])
-        .current_dir(temp.path())
-        .output()
+    let stdout = cli
+        .run(["query", "all", "--label", "milestone:v1.0"])
         .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(stdout.contains("All issues (filtered):"));
     assert!(stdout.contains("Test Task"));
@@ -204,13 +103,11 @@ fn test_query_label_text_output() {
 
 #[test]
 fn test_query_label_with_uppercase_namespace() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
-    // Query with uppercase namespace (should fail validation)
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "Milestone:v1.0", "--json"])
-        .current_dir(temp.path())
+    // Uppercase namespace fails validation
+    let output = cli
+        .command(["query", "all", "--label", "Milestone:v1.0", "--json"])
         .output()
         .unwrap();
 
@@ -226,27 +123,13 @@ fn test_query_label_with_uppercase_namespace() {
 
 #[test]
 fn test_query_label_wildcard_with_no_matches() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    // Create issue with different namespace
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "--label", "epic:auth"])
-        .current_dir(temp.path())
-        .output()
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "--label", "epic:auth"])
         .unwrap();
 
-    // Query wildcard that doesn't match
-    let output = Command::new(jit)
-        .args(["query", "all", "--label", "milestone:*", "--json"])
-        .current_dir(temp.path())
-        .output()
+    let json = cli
+        .run_json(["query", "all", "--label", "milestone:*"])
         .unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // success field removed
     assert_eq!(json["count"], 0);
 }

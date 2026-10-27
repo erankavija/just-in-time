@@ -235,6 +235,13 @@ Reserve this layer for what only it can see: user-facing command contracts, `--j
 shapes, flag combinations, and regression tests for reported CLI bugs. Workflow coverage
 belongs in the harness layer, where it runs faster and fails more legibly.
 
+`crates/jit/tests/cli_query_graph/query_tests.rs` shows the reduced shape: each `query`
+subcommand and flag has one wiring case that proves the command reaches the domain query
+and applies its filter. Selection, priority order and blocked reasons belong to the pure
+functions in `crates/jit/src/domain/queries.rs`, so the suite re-proves none of them. The
+`query all` filter-composition cases and the gated-ready case stay until a lower layer owns
+those properties.
+
 `crates/server/tests/` holds the equivalent layer for the web UI server crate, organized
 the same way: one `server_integration` suite whose `main.rs` declares the modules, covering
 both the in-process API cases and the real-process shutdown cases that spawn the compiled
@@ -267,10 +274,11 @@ Test Costs" below attributes what the measured suite duration is spent on.
 The measurement is taken over a target the `suite-build` step has already built and read
 into the page cache, so a fresh target directory and a warm one reach the same verdict and
 a duration failure is about the tree (jit:0708d692). Anything the suite runs inside the clock,
-including the setup scripts `.config/nextest.toml` declares, must reuse the workspace build's
-Cargo resolution, or it compiles a second feature-unification variant mid-suite;
-`scratch_build/build_profile_policy_tests.rs` asserts this. What remains state-dependent is
-the suite's own first-run fixture construction, whose margin the budgets README records; see
+including the recorded-failure-corpus setup script `.config/nextest.toml` declares, must reuse
+the workspace build's Cargo resolution, or it compiles a second feature-unification variant
+mid-suite; `scratch_build/build_profile_policy_tests.rs` asserts this. Profiled-repository
+fixtures are built inside the suite on first use from a cache keyed by their inputs. Their
+first-run construction contributes to the duration margin the budgets README records; see
 [dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
 for the cold and warm figures behind this paragraph. Re-measuring needs `--force`, since
 `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not

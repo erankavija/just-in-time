@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bad5b64b80be9f6a9fd370474dc910340a076c18",
+  "completed_at": "2026-10-27T22:00:11.816101008Z",
+  "duration_ms": 70568,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are verifiably met; no cross-cutting incoherence or unsubstantiated linked quantitative claim was found.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "83d04069-e6ea-4591-a97f-44c2c941aa72",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0339e03e-4204-487d-a591-79f9f6e9b959",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:59:01.247934498Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are verifiably met; no cross-cutting incoherence or unsubstantiated linked quantitative claim was found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

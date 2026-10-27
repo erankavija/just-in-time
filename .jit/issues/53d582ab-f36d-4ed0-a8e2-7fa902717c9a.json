@@ -7,6 +7,7 @@
   ],
   "description": "Leave one harness owner of the cascade wiring by removing the cascade re-proof from the lifecycle timestamp tests.\n\n## Background\n\nHarness-level tests at `crates/jit/src/commands/bulk_update.rs:2001` and `crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs:89` both drive the command cascade to dependents. A pure domain function owns the cascade's rules, and the `bulk_update.rs` test is the harness owner of its wiring.\n\n## Success Criteria\n\n- [hard] REQ-01: `lifecycle_timestamps_tests.rs` asserts no cascade rule; a test there keeps the timestamp properties it asserts.\n- [hard] REQ-02: The `bulk_update.rs` test remains the one harness test that asserts the cascade's wiring.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T22:22:20.976157430Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Lifecycle harness tests stop re-proving the auto-transition cascade",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:22:20.976157430Z"
 }

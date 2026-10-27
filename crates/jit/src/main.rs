@@ -1654,15 +1654,6 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> ExitCode {
 /// Parse the command line and dispatch it, handing back the parsed output mode
 /// with the result so failure rendering reads the same mode the arms did.
 fn run() -> (OutputMode, Result<()>) {
-    #[cfg(feature = "test-support")]
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("__test-fixture-setup")) {
-        let result = std::env::args()
-            .nth(2)
-            .context("test fixture setup requires a profile id")
-            .and_then(|id| jit::test_utils::prepare_nextest_profiled_repository_fixture(&id));
-        return (OutputMode::default(), result);
-    }
-
     let args: Vec<String> = env::args().collect();
     let cli = match Cli::try_parse_from(args.clone()) {
         Ok(cli) => cli,

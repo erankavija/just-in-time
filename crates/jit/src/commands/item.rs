@@ -670,10 +670,11 @@ mod tests {
             storage,
             MemoryDeclarations {
                 config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
 
         // Registry-first shipped kinds contribute project items of their own.
         let all = exec.list_items(None).unwrap();
@@ -1137,11 +1138,12 @@ mod tests {
             source-of-truth = \"markdown-first\"\n";
         let exec = crate::commands::test_helpers::memory_executor_declaring(
             InMemoryStorage::new(),
-            MemoryDeclarations::default(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
         );
-        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/config.toml", config);
-        std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
         // The typed InvalidPath cause is in the error chain (alternate Display
         // renders the full anyhow context chain).
@@ -1165,11 +1167,12 @@ mod tests {
             source-of-truth = \"markdown-first\"\n";
         let exec = crate::commands::test_helpers::memory_executor_declaring(
             InMemoryStorage::new(),
-            MemoryDeclarations::default(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
         );
-        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/config.toml", config);
-        std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
@@ -1273,16 +1276,11 @@ kind = \"advisory\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
         let result = exec.list_items(Some("invariant")).unwrap();
         assert_eq!(result.count(), 2);
         let qids: Vec<&str> = result
@@ -1313,16 +1311,11 @@ kind = \"advisory\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
         let shown = exec.show_item("@/invariant/second-invariant").unwrap();
         assert_eq!(shown.item.self_id, "second-invariant");
         assert_eq!(shown.item.qualified_id, "@/invariant/second-invariant");
@@ -1358,11 +1351,11 @@ enforce = true
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects this rules file, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
         let shown = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
         // The minted qualified id carries the kind segment, so it equals the
@@ -1404,11 +1397,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects this gate registry, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
         let result = exec.list_items(Some("gate")).unwrap();
         assert_eq!(result.count(), 2);
         let qids: Vec<&str> = result
@@ -1443,11 +1436,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                gates: Some(TWO_GATES),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects this gate registry, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
         let shown = exec.show_item("@/gate/cargo-ci").unwrap();
         assert_eq!(shown.item.self_id, "cargo-ci");
         // The minted qualified id carries the kind segment, so it round-trips with
@@ -1487,12 +1480,12 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                gates: Some(COVERAGE_PREVIEW_GATE),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects these declarations (rules file, gate registry), so they are seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/gates.toml", COVERAGE_PREVIEW_GATE);
-        seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
 
         let rule = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(rule.item.kind, "rule");
@@ -1527,16 +1520,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
         let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
         assert_eq!(hits.count(), 1);
         assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
@@ -1560,16 +1548,11 @@ stage = \"postcheck\"
             storage,
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
 
         let invariants = exec.list_items(Some("invariant")).unwrap();
         let qids: Vec<&str> = invariants
@@ -1616,16 +1599,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
         seed_issue(
             exec.storage(),
             issue_with_criteria(
@@ -1669,16 +1647,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
         seed_issue(exec.storage(), issue);
         // No rejection: the kind resolves and indexes from the issue description.
         let result = exec.list_items(Some("tenet")).unwrap();
@@ -1705,11 +1678,12 @@ stage = \"postcheck\"
             source-of-truth = \"registry-first\"\n";
         let exec = crate::commands::test_helpers::memory_executor_declaring(
             InMemoryStorage::new(),
-            MemoryDeclarations::default(),
+            MemoryDeclarations {
+                config: Some(config),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
         );
-        // Initialization rejects an unconfined or sourceless item-kind declaration, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/config.toml", config);
-        std::fs::write(exec.storage().root().join(".jit/config.toml"), config).unwrap();
         let err = exec.list_items(None).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
@@ -1783,11 +1757,11 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects this rules file, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
         let err = exec.show_item("@/coverage-preview").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
@@ -1896,16 +1870,11 @@ stage = \"postcheck\"
             storage,
             MemoryDeclarations {
                 config: Some(&config),
+                invariants: Some(TWO_INVARIANTS),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects the dangling enforced-by binding, so it is seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/invariants.toml", TWO_INVARIANTS);
-        std::fs::write(
-            exec.storage().root().join(".jit/invariants.toml"),
-            TWO_INVARIANTS,
-        )
-        .unwrap();
 
         // requirement / `satisfies:` -> the requirement item.
         let req = exec
@@ -1969,12 +1938,12 @@ stage = \"postcheck\"
             InMemoryStorage::new(),
             MemoryDeclarations {
                 config: Some(&config),
+                gates: Some(TWO_GATES),
+                rules: Some(ONE_RULE),
+                after_initialization: true,
                 ..MemoryDeclarations::default()
             },
         );
-        // Initialization rejects these declarations (rules file, gate registry), so they are seeded after construction.
-        seed_repo_file(exec.storage(), ".jit/gates.toml", TWO_GATES);
-        seed_repo_file(exec.storage(), ".jit/rules.toml", ONE_RULE);
 
         let rule = exec
             .resolve_link_label("enforces:@/rule/coverage-preview")
