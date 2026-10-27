@@ -88,6 +88,7 @@ fn derive_issue_deletion(
         })
         .collect::<Vec<_>>();
     let plan_content = validate::plan_content_from_image(image, &projected)?;
+    let ready_ids = crate::domain::queries::issues_becoming_ready(&projected);
 
     let mut intents = vec![MutationIntent::DeleteIssue {
         issue_id: target_id.clone(),
@@ -99,8 +100,7 @@ fn derive_issue_deletion(
             .position(|issue| issue.id == dependent_id)
             .ok_or_else(|| anyhow!("captured dependent {dependent_id} disappeared"))?;
         let mut dependent = projected[position].clone();
-        let resolved = crate::domain::queries::build_issue_map(&projected);
-        if dependent.should_auto_transition_to_ready(&resolved) {
+        if ready_ids.contains(&dependent_id) {
             match derive_state_transition(
                 dependent.clone(),
                 State::Ready,
@@ -2341,6 +2341,59 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             })
             .expect("deletion must log an issue_deleted event");
         assert!(matches!(logged.body(), EventBody::IssueDeleted { .. }));
+    }
+
+    #[test]
+    fn test_delete_issue_cascade_preserves_promotion_event_order() {
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut dependency = crate::test_utils::fixture_issue("Dependency".into(), String::new());
+        dependency.state = State::Ready;
+        let dependency_id = dependency.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
+        let dependent_ids = [
+            fixture_id("00000001-0000-0000-0000-000000000000"),
+            fixture_id("00000002-0000-0000-0000-000000000000"),
+        ];
+        for id in dependent_ids.iter().rev() {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.id = id.clone();
+            dependent.state = State::Backlog;
+            dependent.dependencies = vec![dependency_id.clone()];
+            crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+        }
+        let mut unrelated = crate::test_utils::fixture_issue("Unrelated".into(), String::new());
+        unrelated.state = State::Backlog;
+        crate::commands::test_helpers::seed_issue(&executor.storage, unrelated);
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        executor.issues().delete_issue(&dependency_id).unwrap();
+
+        let events = executor.storage.read_events().unwrap();
+        let bodies = events[events_before..]
+            .iter()
+            .map(|event| event.body().clone())
+            .collect::<Vec<_>>();
+        let expected = std::iter::once(EventBody::draft_issue_deleted(dependency_id))
+            .chain(dependent_ids.iter().map(|id| {
+                EventBody::draft_issue_state_changed(id.clone(), State::Backlog, State::Ready)
+            }))
+            .chain(dependent_ids.iter().map(|id| {
+                EventBody::draft_issue_updated(
+                    id.clone(),
+                    "dependency-cascade-delete".into(),
+                    vec!["dependencies".into()],
+                )
+            }))
+            .collect::<Vec<_>>();
+        assert_eq!(bodies, expected);
     }
 
     #[test]

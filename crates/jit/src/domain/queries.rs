@@ -70,13 +70,9 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
         .collect()
 }
 
-/// The issues the dependency auto-transition promotes to `Ready`, in `issues`
-/// order: each `Backlog` issue [`Issue::should_auto_transition_to_ready`] admits.
-///
-/// Readiness derives from the whole graph, so after a dependency reaches a
-/// terminal state the answer is every `Backlog` issue nothing blocks, not only
-/// that dependency's dependents. A promotion meets no dependency, so applying
-/// the answer leaves nothing further to promote.
+/// Take the whole issue graph after a mutation and return, in input order,
+/// every `Backlog` issue whose dependencies are all met.
+/// A promotion meets no dependency, so applying the result requires no further pass.
 pub fn issues_becoming_ready(issues: &[Issue]) -> Vec<crate::domain::identity::IssueId> {
     let resolved = build_issue_map(issues);
     issues
