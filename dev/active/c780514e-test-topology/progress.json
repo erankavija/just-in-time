@@ -345,7 +345,7 @@
           "key": "cli-query-graph-fixture-issue-adoption",
           "title": "cli_query_graph uses the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "b93687b3-9393-4231-84f6-95ba9a607483",
@@ -385,7 +385,7 @@
           "key": "fast-docs-templates-fixture-issue-adoption",
           "title": "fast_docs_templates uses the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "2f95b4f6-9e73-4ad3-bed0-79e63b14101a",
@@ -393,7 +393,7 @@
           "key": "fast-issue-fixture-issue-adoption",
           "title": "fast_issue uses the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "b90b1660-6ea6-48b3-9866-df8709838ebb",
@@ -401,7 +401,7 @@
           "key": "fast-rules-fixture-issue-adoption",
           "title": "fast_rules uses the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "de880d9c-c9bf-475c-8d89-de0b2e55f620",
@@ -433,7 +433,7 @@
           "key": "fixture-issue-domain-artifact-adoption",
           "title": "Domain artifact and projection unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "19136324-fa38-46da-8492-59d6486b9134",
@@ -449,7 +449,7 @@
           "key": "fixture-issue-graph-validation-adoption",
           "title": "Graph, validation and declaration unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "b612cde1-ee3f-48b3-a47d-90dffcb601d9",
@@ -457,7 +457,7 @@
           "key": "fixture-issue-storage-state-adoption",
           "title": "Storage and repository-state unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "5876e131-02c4-4d66-b5ae-a969dfc78b32",
@@ -545,7 +545,7 @@
           "key": "query-domain-owner-gaps",
           "title": "Domain query tests own each property the query re-proofs assert",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "2f717d93-f1ea-49cf-8769-4d244a4a3bec",
@@ -553,7 +553,7 @@
           "key": "server-git-fixture-adoption",
           "title": "Server unit tests initialise git through the shared helper",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "e21ca76d-3404-4881-b58d-d2952298f295",
@@ -569,7 +569,7 @@
           "key": "cli-fixture-commit-binary-linked-checkout",
           "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
