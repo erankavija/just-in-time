@@ -484,9 +484,9 @@ mod tests {
     #[test]
     fn test_build_issue_map() {
         // Create test issues
-        let issue1 = crate::domain::fixture_issue("Task 1".to_string(), String::new());
-        let issue2 = crate::domain::fixture_issue("Task 2".to_string(), String::new());
-        let issue3 = crate::domain::fixture_issue("Task 3".to_string(), String::new());
+        let issue1 = crate::test_utils::fixture_issue("Task 1".to_string(), String::new());
+        let issue2 = crate::test_utils::fixture_issue("Task 2".to_string(), String::new());
+        let issue3 = crate::test_utils::fixture_issue("Task 3".to_string(), String::new());
 
         let issues = vec![issue1.clone(), issue2.clone(), issue3.clone()];
 
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_build_issue_map_single() {
-        let issue = crate::domain::fixture_issue("Single task".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Single task".to_string(), String::new());
         let issues = vec![issue.clone()];
         let map = build_issue_map(&issues);
 
@@ -523,7 +523,7 @@ mod tests {
     }
 
     fn labeled_issue(title: &str, labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
         issue.labels = labels.iter().map(|l| l.to_string()).collect();
         issue
     }
@@ -594,7 +594,7 @@ mod tests {
 
     /// Build an issue with the given id, type label, and dependency ids.
     fn scope_issue(id: &str, type_: &str, deps: &[&str]) -> Issue {
-        let mut issue = crate::domain::fixture_issue(format!("issue {id}"), String::new());
+        let mut issue = crate::test_utils::fixture_issue(format!("issue {id}"), String::new());
         issue.id = id.to_string();
         issue.labels = vec![crate::labels::type_label(type_)];
         issue.dependencies = deps.iter().map(|s| s.to_string()).collect();
@@ -698,11 +698,11 @@ mod tests {
 
     #[test]
     fn test_query_blocked_dependency_reason_is_typed() {
-        let mut dep = crate::domain::fixture_issue("Upstream".to_string(), String::new());
+        let mut dep = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
         dep.id = "dep1".to_string();
         dep.state = State::InProgress;
 
-        let mut blocked = crate::domain::fixture_issue("Downstream".to_string(), String::new());
+        let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string()];
@@ -729,15 +729,15 @@ mod tests {
     #[test]
     fn test_query_blocked_omits_rejected_dependency_from_reasons() {
         // A Rejected dependency is met: only the in_progress one is a reason.
-        let mut rejected = crate::domain::fixture_issue("Abandoned".to_string(), String::new());
+        let mut rejected = crate::test_utils::fixture_issue("Abandoned".to_string(), String::new());
         rejected.id = "dep1".to_string();
         rejected.state = State::Rejected;
 
-        let mut pending = crate::domain::fixture_issue("Upstream".to_string(), String::new());
+        let mut pending = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
         pending.id = "dep2".to_string();
         pending.state = State::InProgress;
 
-        let mut blocked = crate::domain::fixture_issue("Downstream".to_string(), String::new());
+        let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
@@ -762,11 +762,11 @@ mod tests {
 
         // A Backlog issue with an unmet dependency keeps it blocked; a required
         // gate with no recorded status contributes a Pending gate reason.
-        let mut dep = crate::domain::fixture_issue("Upstream".to_string(), String::new());
+        let mut dep = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
         dep.id = "dep1".to_string();
         dep.state = State::InProgress;
 
-        let mut blocked = crate::domain::fixture_issue("Downstream".to_string(), String::new());
+        let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
         blocked.id = "blocked1".to_string();
         blocked.state = State::Backlog;
         blocked.dependencies = vec!["dep1".to_string()];
