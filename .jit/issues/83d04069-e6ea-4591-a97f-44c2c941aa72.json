@@ -25,6 +25,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: each closed vocabulary is one macro-declared enum with exact-token parsing and no restated token.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Each closed vocabulary named by the epic is one enum declared through the vocabulary macro, with exact-token parsing.\n- [hard] REQ-02: No token function, token table or mirror enum restates a declared vocabulary.\n- [hard] REQ-03: `Priority` orders through `Ord`, and projections and query value lists use typed vocabularies.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:08:06.789571791Z",
   "first_ready_at": "2026-10-26T22:13:46.620498838Z",
   "gates_required": [
     "cargo-ci",
@@ -32,15 +33,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "bd2eca27-ebe2-4251-9bca-c07087c2ab5d",
+      "run_id": "7c1fd77b-bf06-4bf5-b868-82794d04d7c2",
       "status": "passed",
-      "updated_at": "2026-10-27T00:08:33.479566499Z",
+      "updated_at": "2026-10-27T22:04:16.619817858Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "9d45dccb-9140-46bb-a6c1-8a9a3b6ee051",
-      "status": "failed",
-      "updated_at": "2026-10-27T00:06:19.396480739Z",
+      "run_id": "0339e03e-4204-487d-a591-79f9f6e9b959",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:01:09.531014981Z",
       "updated_by": "auto:executor"
     }
   },
@@ -58,7 +59,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Closed vocabularies state their wire spelling once",
-  "updated_at": "2026-10-27T00:08:57.312168054Z"
+  "updated_at": "2026-10-27T22:08:06.789571791Z"
 }
