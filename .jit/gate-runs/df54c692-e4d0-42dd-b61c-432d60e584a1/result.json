@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4c42adc879769a0ec80017d586773576878a8116",
+  "completed_at": "2026-10-27T21:36:56.823195239Z",
+  "duration_ms": 337591,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/item.rs",
+        "id": "F1",
+        "line": 1117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b7078f0d/requirement/REQ-02",
+          "@/issue/c780514e/requirement/REQ-06",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "Tests bypass shared declaration setup by writing config and invariant declarations after creating the shared executor."
+      }
+    ],
+    "summary": "Private post-construction declaration writes remain in the migrated item and validate tests.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b7078f0d-4725-4fd8-926c-50436c39880c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "df54c692-e4d0-42dd-b61c-432d60e584a1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:31:19.231320292Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16803 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17f46-59ee-7330-82b0-3117acf2f5ff\n--------\nuser\n--- 16790 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4302797b2, 43cb9fc9d, 74d338c74 (`jit:b7078f0d`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/b7078f0d/requirement/REQ-01, REQ-02, REQ-03; @/issue/c780514e/requirement/REQ-05, REQ-06; @/charter/D-18; @/invariant/shared-test-contracts, semantic-test-assertions, orthogonal-tests, essential-code-prose\nGate evidence: cargo-ci passed (exit 0, latest recorded run 2026-10-27T21:30:18Z)\nTruncation recovery: Re-read patches per path and recovered affected current-file ranges; merge-only archive work was scoped to `jit:b469f36d`, and JIT records were treated as historical evidence.\n\n1. **F1 — blocking, issue-impact:** The migration still bypasses shared declaration setup. Item tests construct a default executor and then directly seed and write `.jit/config.toml` at [item.rs:1112](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:1112) and [item.rs:1139](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:1139); validate tests repeatedly do the same for `.jit/invariants.toml` at [validate.rs:2937](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:2937). The shared constructor initializes before returning and mirrors declarations already seeded in storage, so these are avoidable private post-construction setup paths. This violates hard REQ-02’s requirement that scenario values reach the shared constructor as declarations and conflicts with the shared-fixture policy.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Private post-construction declaration writes remain in the migrated item and validate tests.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Tests bypass shared declaration setup by writing config and invariant declarations after creating the shared executor.\",\"file\":\"crates/jit/src/commands/item.rs\",\"line\":1117,\"references\":[\"@/issue/b7078f0d/requirement/REQ-02\",\"@/issue/c780514e/requirement/REQ-06\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
