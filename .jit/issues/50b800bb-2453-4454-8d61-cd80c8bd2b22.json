@@ -19,7 +19,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "be535cd7-1c6d-4511-879b-962b3cc7d3f4",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:47:54.148943853Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2d1e0968-728e-4319-b84c-5a0dac188451",
+      "status": "passed",
+      "updated_at": "2026-10-27T21:52:03.472443573Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "50b800bb-2453-4454-8d61-cd80c8bd2b22",
   "labels": [
     "type:task",
@@ -34,5 +47,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Unique harness demonstration cases move beside their owners",
-  "updated_at": "2026-10-27T21:22:17.579867483Z"
+  "updated_at": "2026-10-27T21:52:03.472443573Z"
 }
