@@ -764,7 +764,6 @@ mod tests {
     // Use shared test utilities
     use crate::test_utils::{
         create_test_paths, grow_event_log_beyond, setup_test_repo, setup_test_repo_with_config,
-        CurrentDirGuard,
     };
 
     /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
@@ -1830,13 +1829,8 @@ mod tests {
         // Create a temp directory that's NOT a git repo
         let temp = TempDir::new().unwrap();
 
-        // Change to non-git directory
-        let result = {
-            let _cwd = CurrentDirGuard::new(&temp).unwrap();
-
-            // get_current_branch() should return an error, not "main"
-            get_current_branch(temp.path())
-        };
+        // get_current_branch() should return an error, not "main"
+        let result = get_current_branch(temp.path());
 
         // Should fail, not return "main" as fallback
         assert!(

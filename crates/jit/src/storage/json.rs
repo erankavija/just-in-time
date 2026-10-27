@@ -2991,8 +2991,9 @@ mod tests {
         let jit_dir = repo_root.path().join(".jit");
         fs::create_dir_all(&jit_dir).unwrap();
 
-        // Write a fixture file inside the repo root.
-        let file_name = "test-doc.md";
+        // A name no process working directory holds, so a naive fs::read(path)
+        // relative to it would find nothing.
+        let file_name = "read-path-bytes-from-repository-root.md";
         let expected = b"# Hello from repo root";
         fs::write(repo_root.path().join(file_name), expected).unwrap();
 
@@ -3000,12 +3001,7 @@ mod tests {
         let storage = JsonFileStorage::new(&jit_dir);
         configure_test_layout(&storage, repo_root.path(), &jit_dir);
 
-        // Change CWD to a completely unrelated directory so that a naive
-        // fs::read(path) using process CWD would fail to find the file.
-        let result = {
-            let _cwd = crate::test_utils::CurrentDirGuard::new(std::env::temp_dir()).unwrap();
-            storage.read_path_bytes(file_name, None)
-        };
+        let result = storage.read_path_bytes(file_name, None);
 
         let (bytes, label) =
             result.expect("read_path_bytes should succeed even when CWD != repo root");

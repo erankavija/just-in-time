@@ -146,7 +146,7 @@ impl JitCli {
     {
         let mut command = Command::new(program);
         command.current_dir(self.root()).args(args);
-        inherited_product_vars().for_each(|name| {
+        product_vars(std::env::vars_os().map(|(name, _)| name)).for_each(|name| {
             command.env_remove(name);
         });
         command.env("JIT_TEST_MODE", "1");
@@ -220,23 +220,34 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let args: Vec<OsString> = args
-        .into_iter()
-        .map(|arg| arg.as_ref().to_os_string())
-        .collect();
+    git_stdout(git_command(path, args))
+}
+
+/// A `git args` command in `path`, isolated from the developer's git
+/// configuration whatever `HOME` it inherits.
+fn git_command<I, S>(path: &Path, args: I) -> Command
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
     let mut command = Command::new("git");
     command
         .current_dir(path)
-        .args(&args)
+        .args(args)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", "/dev/null");
     GIT_REDIRECTS.iter().for_each(|name| {
         command.env_remove(name);
     });
+    command
+}
+
+fn git_stdout(mut command: Command) -> Result<String> {
     let output = command.output().context("spawn git")?;
     if !output.status.success() {
         bail!(
-            "git {args:?} failed: {}",
+            "git {:?} failed: {}",
+            command.get_args().collect::<Vec<_>>(),
             String::from_utf8_lossy(&output.stderr)
         );
     }
@@ -273,9 +284,10 @@ fn machine_local_ignores() -> Result<Vec<String>> {
         .collect()
 }
 
-fn inherited_product_vars() -> impl Iterator<Item = OsString> {
-    std::env::vars_os()
-        .map(|(name, _)| name)
+/// The product variables among the environment variable `names`.
+fn product_vars(names: impl IntoIterator<Item = OsString>) -> impl Iterator<Item = OsString> {
+    names
+        .into_iter()
         .filter(|name| name.to_string_lossy().starts_with(PRODUCT_ENV_PREFIX))
 }
 
@@ -294,32 +306,70 @@ pub fn jit_binary() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::EnvGuard;
     use serde_json::json;
 
     #[test]
-    fn test_command_removes_inherited_product_vars_and_keeps_overrides_per_process() {
-        let mut env = EnvGuard::acquire();
-        env.set("JIT_AGENT_ID", "agent:ambient")
-            .set("JIT_DATA_DIR", "/ambient");
+    fn test_product_vars_selects_only_product_prefixed_names() {
+        let names = ["JIT_AGENT_ID", "PATH", "JIT_DATA_DIR", "NOT_JIT_"].map(OsString::from);
+
+        let selected: Vec<OsString> = product_vars(names).collect();
+
+        assert_eq!(
+            selected,
+            ["JIT_AGENT_ID", "JIT_DATA_DIR"].map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn test_command_with_env_sets_overrides_for_its_process_alone() {
         let cli = JitCli::uninitialised().unwrap();
 
-        let plain = cli.command(["status"]);
         let overridden = cli.command_with_env(["status"], [("JIT_AGENT_ID", "agent:given")]);
+        let plain = cli.command(["status"]);
         let value = |command: &Command, name: &str| {
             command
                 .get_envs()
                 .find(|(key, _)| *key == name)
-                .map(|(_, value)| value.map(|v| v.to_string_lossy().into_owned()))
+                .and_then(|(_, value)| value.map(|v| v.to_string_lossy().into_owned()))
         };
 
-        assert_eq!(value(&plain, "JIT_AGENT_ID"), Some(None));
-        assert_eq!(value(&plain, "JIT_DATA_DIR"), Some(None));
         assert_eq!(
-            value(&overridden, "JIT_AGENT_ID"),
-            Some(Some("agent:given".into()))
+            value(&overridden, "JIT_AGENT_ID").as_deref(),
+            Some("agent:given")
         );
-        assert_eq!(value(&plain, "JIT_AGENT_ID"), Some(None));
+        assert_eq!(value(&plain, "JIT_AGENT_ID"), None);
+        assert_eq!(value(&plain, "JIT_TEST_MODE").as_deref(), Some("1"));
+    }
+
+    /// A global hook rejects every commit, so a successful commit proves the
+    /// fixture's git never reads the configuration under `HOME`.
+    #[cfg(unix)]
+    #[test]
+    fn test_git_command_ignores_global_configuration_under_inherited_home() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let home = TempDir::new().unwrap();
+        let hook = home.path().join("pre-commit");
+        std::fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(
+            home.path().join(".gitconfig"),
+            format!("[core]\n\thooksPath = {}\n", home.path().display()),
+        )
+        .unwrap();
+        let repo = TempDir::new().unwrap();
+        init_git_repository(repo.path()).unwrap();
+        let mut commit = git_command(repo.path(), ["commit", "-q", "--allow-empty", "-m", "c"]);
+        commit.env("HOME", home.path());
+
+        git_stdout(commit).unwrap();
+
+        assert_eq!(
+            git(repo.path(), ["log", "-1", "--format=%s"])
+                .unwrap()
+                .trim(),
+            "c"
+        );
     }
 
     #[test]
@@ -330,21 +380,20 @@ mod tests {
             "[user]\n\tname = Developer\n\temail = dev@example.org\n[commit]\n\tgpgsign = true\n",
         )
         .unwrap();
-        let mut env = EnvGuard::acquire();
-        env.set("HOME", home.path()).remove("GIT_CONFIG_GLOBAL");
         let repo = TempDir::new().unwrap();
 
         init_git_repository(repo.path()).unwrap();
-        let output = Command::new("git")
-            .current_dir(repo.path())
-            .args(["commit", "--allow-empty", "-m", "c"])
-            .output()
-            .unwrap();
-        let author = Command::new("git")
-            .current_dir(repo.path())
-            .args(["log", "-1", "--format=%an <%ae>"])
-            .output()
-            .unwrap();
+        let developer_git = |args: &[&str]| {
+            Command::new("git")
+                .current_dir(repo.path())
+                .env("HOME", home.path())
+                .env_remove("GIT_CONFIG_GLOBAL")
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        let output = developer_git(&["commit", "--allow-empty", "-m", "c"]);
+        let author = developer_git(&["log", "-1", "--format=%an <%ae>"]);
 
         assert!(output.status.success(), "{output:?}");
         assert_eq!(

@@ -1382,12 +1382,6 @@ impl EffectiveConfig {
         resolve_enforcement_mode(self.repo_config.as_ref().and_then(|c| c.worktree.as_ref()))
     }
 
-    /// Get the effective agent ID from environment variable.
-    /// Returns None if JIT_AGENT_ID is not set.
-    pub fn agent_id(&self) -> Option<String> {
-        std::env::var("JIT_AGENT_ID").ok()
-    }
-
     /// Get the effective lease limits: the repository config's
     /// [`JitConfig::coordination`].
     pub fn coordination(&self) -> EffectiveCoordination {
@@ -1485,7 +1479,6 @@ impl EffectiveConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::EnvGuard;
     use tempfile::TempDir;
 
     #[test]
@@ -2750,30 +2743,18 @@ max_indefinite_leases_per_agent = 3
             .into_iter()
             .chain(EnforcementMode::ALL.map(|mode| explicit(mode.as_str())))
             .collect::<Vec<_>>();
-        let mut env = EnvGuard::acquire();
         for repo in &states {
             let repo_dir = TempDir::new().unwrap();
             let repo_dir_layout =
                 crate::test_utils::repository_layout_for_data_root(repo_dir.path());
             std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
-            for env_value in
-                std::iter::once(None).chain(EnforcementMode::ALL.map(|mode| Some(mode.as_str())))
-            {
-                match env_value {
-                    Some(value) => env.set("JIT_ENFORCE_LEASES", value),
-                    None => env.remove("JIT_ENFORCE_LEASES"),
-                };
-                let enforced = JitConfig::load(&repo_dir_layout)
-                    .unwrap()
-                    .enforcement_mode();
-                let reported = EffectiveConfig::load(&repo_dir_layout)
-                    .unwrap()
-                    .enforcement_mode();
-                assert_eq!(
-                    reported, enforced,
-                    "repo {repo:?}, JIT_ENFORCE_LEASES {env_value:?}"
-                );
-            }
+            let enforced = JitConfig::load(&repo_dir_layout)
+                .unwrap()
+                .enforcement_mode();
+            let reported = EffectiveConfig::load(&repo_dir_layout)
+                .unwrap()
+                .enforcement_mode();
+            assert_eq!(reported, enforced, "repo {repo:?}");
         }
     }
 
@@ -2814,14 +2795,6 @@ max_indefinite_leases_per_agent = 3
                 "repo {repo:?}"
             );
         }
-    }
-
-    #[test]
-    fn test_env_override_agent_id() {
-        let mut env = EnvGuard::acquire();
-        env.set("JIT_AGENT_ID", "agent:env-test");
-        let config = EffectiveConfig::default();
-        assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
     }
 
     // ============================================================

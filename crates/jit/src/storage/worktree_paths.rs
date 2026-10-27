@@ -278,7 +278,7 @@ mod tests {
 
     #[test]
     fn test_detect_in_main_worktree() {
-        let paths = WorktreePaths::detect().unwrap();
+        let paths = WorktreePaths::detect_from(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
 
         // Test the is_worktree() invariant: it should be false IFF common_dir == worktree_root/.git
         let expected_is_main = paths.common_dir == paths.worktree_root.join(".git");

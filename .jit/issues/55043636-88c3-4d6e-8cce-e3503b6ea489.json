@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d30c8234-e262-43ad-b588-5f30a6ed5be7",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:54:00.366535717Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "77057743-6978-40ed-aebd-1cdaad7139fc",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:52:18.965873791Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "55043636-88c3-4d6e-8cce-e3503b6ea489",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Tests read shared process environment only under the environment guard",
-  "updated_at": "2026-10-27T22:25:44.638084166Z"
+  "updated_at": "2026-10-27T22:54:00.366535717Z"
 }

@@ -25,10 +25,10 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -129,103 +129,6 @@ mod fixture_issue_tests {
             ("Title", "Body")
         );
         assert_ne!(first.id, second.id);
-    }
-}
-
-/// Serializes tests that temporarily change the process-wide working directory.
-///
-/// The mutex is recovered after poisoning because a panic while a guard is
-/// alive runs its `Drop` implementation before the mutex guard is released,
-/// so the directory has already been restored when another test acquires it.
-static CURRENT_DIR_LOCK: Mutex<()> = Mutex::new(());
-
-/// Serializes tests that temporarily change the process environment.
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
-
-/// Change the process working directory for a scope and restore it on drop.
-///
-/// This guard is intended for tests only. The process-wide lock prevents two
-/// tests from observing or changing the working directory at the same time,
-/// and restoration also occurs while unwinding after a panic.
-#[must_use = "dropping the guard restores the process working directory"]
-pub struct CurrentDirGuard {
-    original: PathBuf,
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl CurrentDirGuard {
-    /// Change the process working directory, retaining the directory to which
-    /// it must be restored when this guard is dropped.
-    pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        let lock = CURRENT_DIR_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let original = std::env::current_dir()?;
-        std::env::set_current_dir(path)?;
-
-        Ok(Self {
-            original,
-            _lock: lock,
-        })
-    }
-}
-
-impl Drop for CurrentDirGuard {
-    fn drop(&mut self) {
-        let _ = std::env::set_current_dir(&self.original);
-    }
-}
-
-/// Change process environment variables for a scope and restore their prior
-/// values on drop.
-///
-/// This guard is intended for tests only. The process-wide lock keeps two
-/// guards from interleaving, so a test that holds one may call code reading the
-/// environment without observing another test's values. Guards do not nest.
-#[must_use = "dropping the guard restores the process environment"]
-pub struct EnvGuard {
-    saved: Vec<(OsString, Option<OsString>)>,
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl EnvGuard {
-    /// Take the environment lock without changing any variable.
-    pub fn acquire() -> Self {
-        let lock = ENVIRONMENT_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        Self {
-            saved: Vec::new(),
-            _lock: lock,
-        }
-    }
-
-    pub fn set(&mut self, name: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> &mut Self {
-        self.remember(name.as_ref());
-        std::env::set_var(name, value);
-        self
-    }
-
-    pub fn remove(&mut self, name: impl AsRef<OsStr>) -> &mut Self {
-        self.remember(name.as_ref());
-        std::env::remove_var(name);
-        self
-    }
-
-    fn remember(&mut self, name: &OsStr) {
-        self.saved
-            .push((name.to_os_string(), std::env::var_os(name)));
-    }
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        for (name, value) in self.saved.drain(..).rev() {
-            match value {
-                Some(value) => std::env::set_var(name, value),
-                None => std::env::remove_var(name),
-            }
-        }
     }
 }
 
@@ -1553,24 +1456,6 @@ mod tests {
         assert_eq!(create_test_paths(&temp).worktree_root, temp.path());
     }
 
-    #[test]
-    fn test_current_dir_guard_restores_after_panic() {
-        let elsewhere = TempDir::new().unwrap();
-        let mut original = None;
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            original = Some(_cwd.original.clone());
-            assert_eq!(std::env::current_dir().unwrap(), elsewhere.path());
-            panic!("the guard must restore the directory during unwinding");
-        }));
-
-        assert!(result.is_err());
-        let _verification_lock = CURRENT_DIR_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        assert_eq!(std::env::current_dir().unwrap(), original.unwrap());
-    }
-
     /// Every package this repository ships captures under the id its source
     /// directory is named after, which is what makes an id a sufficient way to
     /// name one.
@@ -1604,10 +1489,9 @@ mod tests {
     /// The checkout is resolved from the crate's own manifest directory, so the
     /// entry point answers the same from any working directory.
     ///
-    /// Observed the way `storage::json`'s repository-root reads observe theirs:
-    /// the process working directory is moved to an unrelated place for the
-    /// call, so a relative path anywhere in the resolution would find nothing,
-    /// and restored before anything is asserted.
+    /// Tests run in the crate directory, below the checkout root, so a
+    /// resolution relative to the working directory would find no package
+    /// sources there.
     #[test]
     fn test_capture_repository_package_resolves_the_checkout_independently_of_the_working_directory(
     ) {
@@ -1618,16 +1502,12 @@ mod tests {
             checkout.display()
         );
 
-        let elsewhere = TempDir::new().unwrap();
         let workspace = TempDir::new().unwrap();
         let id = package_carrying_drawn_content();
         let destination = workspace.path().join("package");
-        let captured = {
-            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            capture_repository_package(&id, &destination)
-        };
 
-        let package = captured.expect("the package captures from an unrelated working directory");
+        let package = capture_repository_package(&id, &destination)
+            .expect("the package captures from the crate directory");
         assert_eq!(package.model().id.as_str(), id);
         assert!(
             package.file_count() > 1,
@@ -1984,11 +1864,6 @@ mod tests {
         let default_target = workspace.path().join("default-target");
         let absolute_custom_target = TempDir::new().unwrap();
         let relative_custom_target = workspace.path().join("relative-custom-target");
-        let mut env = EnvGuard::acquire();
-        env.set(
-            "CARGO_TARGET_DIR",
-            "relative-to-a-different-process-directory",
-        );
         let cases = [
             (default_target.join("debug/jit"), default_target.clone()),
             (

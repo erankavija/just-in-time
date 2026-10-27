@@ -42,10 +42,19 @@ pub enum ListenerSource {
 /// Returns an error if the inherited descriptor is not a usable TCP listener,
 /// or if binding `bind_addr` fails.
 pub fn resolve_listener(bind_addr: &str) -> Result<(TcpListener, ListenerSource)> {
-    if let Some(listener) = ListenFd::from_env()
+    let inherited = ListenFd::from_env()
         .take_tcp_listener(0)
-        .context("Failed to adopt the listener handed down by the launching process")?
-    {
+        .context("Failed to adopt the listener handed down by the launching process")?;
+    listener_from(inherited, bind_addr)
+}
+
+/// Adopt `inherited` when present, else bind `bind_addr`; either listener is
+/// returned non-blocking.
+fn listener_from(
+    inherited: Option<TcpListener>,
+    bind_addr: &str,
+) -> Result<(TcpListener, ListenerSource)> {
+    if let Some(listener) = inherited {
         listener
             .set_nonblocking(true)
             .context("Failed to set the inherited listener non-blocking")?;
@@ -103,12 +112,14 @@ mod recovery_startup_tests {
         record(&bytes).commit(&data).unwrap();
     }
 
-    /// REQ-02, REQ-03, REQ-04: a relative spelling and the absolute one bind
-    /// the same layout, so reads through either serve the repository's issues.
+    /// REQ-02, REQ-03, REQ-04: a spelling through `..` components and the
+    /// normalized one bind the same layout, so reads through either serve the
+    /// repository's issues. Resolving a relative `--data-dir` against the
+    /// process directory is observed by the spawned server in
+    /// `graceful_shutdown_tests`.
     #[test]
     fn test_server_startup_serves_reads_from_relative_data_dir_spellings() {
         use jit::storage::IssueStore;
-        use jit::test_utils::CurrentDirGuard;
 
         let temp = TempDir::new().unwrap();
         let root = temp.path().canonicalize().unwrap();
@@ -135,10 +146,10 @@ mod recovery_startup_tests {
 
         let sibling = root.join("sibling");
         std::fs::create_dir(&sibling).unwrap();
-        let _cwd = CurrentDirGuard::new(&sibling).unwrap();
         for spelling in ["../repo/.jit", "../sibling/../repo/.jit"] {
             let layout =
-                jit::storage::discover_repository_layout(root.join("repo"), spelling).unwrap();
+                jit::storage::discover_repository_layout(root.join("repo"), sibling.join(spelling))
+                    .unwrap();
             let (storage, _session) =
                 prepare_server_storage(layout).expect("startup over a relative data directory");
             let ids: Vec<_> = storage
@@ -216,31 +227,11 @@ mod recovery_startup_tests {
 mod resolve_listener_tests {
     use super::*;
 
-    use jit::test_utils::EnvGuard;
-
-    /// Hold the environment guard for a test that reads or writes the
-    /// `LISTEN_*` environment, starting from a clean slate.
-    ///
-    /// `ListenFd::from_env` (inside [`resolve_listener`]) CONSUMES that
-    /// environment, so two tests interleaving on it steal each other's state
-    /// under the parallel test runner (jit:894337e2 / jit:6eb585bc s4).
-    /// `LISTEN_FDS_FIRST_FD` is cleared too, since listenfd does not remove it.
-    fn scrubbed_listen_env() -> EnvGuard {
-        let mut env = EnvGuard::acquire();
-        env.remove("LISTEN_FDS")
-            .remove("LISTEN_FDS_FIRST_FD")
-            .remove("LISTEN_PID");
-        env
-    }
-
     #[test]
-    fn test_resolve_listener_binds_when_no_fd_inherited() {
-        let _env = scrubbed_listen_env();
-
-        // No LISTEN_FDS in the environment → the server binds the address
-        // itself. `:0` asks the OS for a free ephemeral port, so this test
-        // never contends with a sibling over a fixed port number.
-        let (listener, source) = resolve_listener("127.0.0.1:0").unwrap();
+    fn test_listener_from_binds_when_no_listener_inherited() {
+        // `:0` asks the OS for a free ephemeral port, so this test never
+        // contends with a sibling over a fixed port number.
+        let (listener, source) = listener_from(None, "127.0.0.1:0").unwrap();
         assert_eq!(source, ListenerSource::Bound);
         assert!(listener.local_addr().unwrap().port() > 0);
     }
@@ -248,36 +239,21 @@ mod resolve_listener_tests {
     /// The child-adoption path: a socket the launching process already bound
     /// is adopted verbatim, with no second bind.
     ///
-    /// This is the in-process half of the cross-process handoff — the parent
-    /// half (clearing close-on-exec and publishing `LISTEN_FDS*`) is covered
-    /// by `commands::serve::tests::test_inherit_listener_hands_off_socket` in
-    /// the `jit` crate.
+    /// The parent half (clearing close-on-exec and publishing `LISTEN_FDS*`)
+    /// is covered by `commands::serve::tests::test_inherit_listener_hands_off_socket`
+    /// in the `jit` crate, and the whole handoff by the `serve_cli_tests` that
+    /// start a server through `jit serve`.
     #[test]
-    #[cfg(unix)]
-    fn test_resolve_listener_adopts_inherited_fd() {
-        use std::os::unix::io::AsRawFd;
-
-        let mut env = scrubbed_listen_env();
-
-        // Stand in for the parent: bind the real serving socket up front.
+    fn test_listener_from_adopts_inherited_listener() {
         let parent_bound = TcpListener::bind("127.0.0.1:0").unwrap();
         let bound_port = parent_bound.local_addr().unwrap().port();
-        let fd = parent_bound.as_raw_fd();
 
-        // Reproduce the environment the parent publishes for the child.
-        env.set("LISTEN_FDS", "1");
-        env.set("LISTEN_FDS_FIRST_FD", fd.to_string());
-
-        let (listener, source) = resolve_listener("127.0.0.1:0").unwrap();
+        let (listener, source) = listener_from(Some(parent_bound), "127.0.0.1:0").unwrap();
         assert_eq!(source, ListenerSource::Inherited);
         assert_eq!(
             listener.local_addr().unwrap().port(),
             bound_port,
             "must adopt the exact already-bound port, never re-bind a fresh one"
         );
-
-        // `take_tcp_listener` built a new owner over the same descriptor; leak
-        // the original handle so its Drop does not close the fd twice.
-        std::mem::forget(parent_bound);
     }
 }
