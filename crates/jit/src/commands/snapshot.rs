@@ -791,8 +791,8 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create a couple of issues
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
-        let issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
+        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -806,7 +806,7 @@ mod tests {
     fn test_enumerate_issues_single() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Test Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -824,21 +824,21 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create issues with epic labels
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         // Create issue with different epic
-        let mut issue3 = crate::domain::fixture_issue("Issue 3".to_string(), String::new());
+        let mut issue3 = crate::test_utils::fixture_issue("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue3.clone());
 
         // Create unrelated issue
-        let issue4 = crate::domain::fixture_issue("Issue 4".to_string(), String::new());
+        let issue4 = crate::test_utils::fixture_issue("Issue 4".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue4.clone());
 
         let exporter = exporter(&storage);
@@ -859,11 +859,11 @@ mod tests {
     fn test_enumerate_issues_label_milestone() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -883,7 +883,7 @@ mod tests {
     fn test_enumerate_issues_label_no_matches() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Issue".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let exporter = exporter(&storage);
@@ -901,11 +901,11 @@ mod tests {
     fn test_extract_documents() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(document_reference("docs/design.md"));
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(document_reference("docs/impl.md"));
         // Duplicate document reference
         issue2.documents.push(document_reference("docs/design.md"));
@@ -1048,7 +1048,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         let exporter = exporter(&storage);
         let staging = tempfile::tempdir().unwrap();
-        let mut issue = crate::domain::fixture_issue("Issue".into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Issue".into(), String::new());
         issue.id = "../../../escaped".into();
 
         assert!(exporter.copy_jit_state(staging.path(), &[issue]).is_err());
