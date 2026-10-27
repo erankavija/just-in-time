@@ -138,6 +138,34 @@ fn acquire_selected_linked_lease(
 }
 
 #[test]
+fn test_issue_release() {
+    let temp = setup_repo();
+    let id = create_issue(temp.path(), "Task");
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "claim", &id, "agent:worker-1"])
+        .assert()
+        .success();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "release", &id, "timeout"])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &id, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).unwrap();
+    assert!(json["assignee"].is_null());
+}
+
+#[test]
 fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() {
     let primary = setup_repo();
     let issue_id = create_issue(primary.path(), "Selected linked claim");
