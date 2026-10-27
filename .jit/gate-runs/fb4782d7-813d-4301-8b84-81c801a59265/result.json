@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-2a6bc44c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9c0bdda7d147102e6d228160cc79222090a8aba7",
+  "completed_at": "2026-10-27T22:23:27.014861849Z",
+  "duration_ms": 76008,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five scoped criteria are satisfied in the attributable current tree; required gates have no recorded runs.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2a6bc44c-459e-4837-baf9-0022778b0870",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fb4782d7-813d-4301-8b84-81c801a59265",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:22:11.006521021Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9c0bdda7d, 71e7e7f29, 32b455b6c\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/issue/c780514e/requirement/REQ-09, REQ-11, REQ-13 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json)\nGate evidence: cargo-ci pending, no recorded run or exit code; code-review pending, no recorded run\nTruncation recovery: partitioned the implementation patch and current fixture code into bounded reads; restricted symbol searches excluded historical benchmark and planning records\n\n1. No findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five scoped criteria are satisfied in the attributable current tree; required gates have no recorded runs.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
