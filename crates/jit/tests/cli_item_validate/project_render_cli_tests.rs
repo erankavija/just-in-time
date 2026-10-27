@@ -5,17 +5,8 @@
 //! into its configured target. Covers region-mode byte-preservation, `--name`
 //! selection, and the unknown-name error path.
 
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    crate::setup_repo_with_default_vocabulary()
-}
 
 const INVARIANTS_TOML: &str = r#"
 [[invariants]]
@@ -32,8 +23,8 @@ kind = "advisory"
 
 /// Append a `[projection.<name>]` table to the package-provided config (which
 /// already declares `[item_kinds.invariant]`), preserving the package kinds.
-fn append_projection(temp: &TempDir, table: &str) {
-    let path = temp.path().join(".jit/config.toml");
+fn append_projection(cli: &JitCli, table: &str) {
+    let path = cli.root().join(".jit/config.toml");
     let mut config = std::fs::read_to_string(&path).unwrap();
     config.push('\n');
     config.push_str(table);
@@ -42,25 +33,26 @@ fn append_projection(temp: &TempDir, table: &str) {
 
 #[test]
 fn test_project_render_region_mode_byte_preserves_surroundings() {
-    let temp = setup_test_repo();
-    std::fs::write(temp.path().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
 
     let begin = "<!-- jit:invariants:begin -->";
     let end = "<!-- jit:invariants:end -->";
     let prefix = "# Architecture\n\nHand-written intro the user owns.\n\n";
     let suffix = "\n\n## Other sections\n\nMore hand-written prose.\n";
     let original = format!("{prefix}{begin}\nstale placeholder\n{end}{suffix}");
-    std::fs::write(temp.path().join("ARCHITECTURE.md"), &original).unwrap();
+    std::fs::write(cli.root().join("ARCHITECTURE.md"), &original).unwrap();
 
     append_projection(
-        &temp,
+        &cli,
         "[projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\n\
          target = \"ARCHITECTURE.md\"\nstyle = \"id-anchor\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["project", "render", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["project", "render", "--json"])
         .output()
         .unwrap();
     assert!(
@@ -76,7 +68,7 @@ fn test_project_render_region_mode_byte_preserves_surroundings() {
     );
     assert_eq!(json["projections"][0]["mode"].as_str().unwrap(), "region");
 
-    let updated = std::fs::read_to_string(temp.path().join("ARCHITECTURE.md")).unwrap();
+    let updated = std::fs::read_to_string(cli.root().join("ARCHITECTURE.md")).unwrap();
     // Content OUTSIDE the delimiters is byte-preserved.
     assert!(
         updated.starts_with(&format!("{prefix}{begin}")),
@@ -93,17 +85,18 @@ fn test_project_render_region_mode_byte_preserves_surroundings() {
 
 #[test]
 fn test_project_render_named_selects_single_projection() {
-    let temp = setup_test_repo();
-    std::fs::write(temp.path().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
     append_projection(
-        &temp,
+        &cli,
         "[projection.invariants]\nkind = \"invariant\"\nmode = \"separate-file\"\n\
          target = \".jit/invariants.md\"\nstyle = \"id-anchor\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["project", "render", "--name", "invariants", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["project", "render", "--name", "invariants", "--json"])
         .output()
         .unwrap();
     assert!(
@@ -118,7 +111,7 @@ fn test_project_render_named_selects_single_projection() {
         "invariants"
     );
 
-    let written = std::fs::read_to_string(temp.path().join(".jit/invariants.md")).unwrap();
+    let written = std::fs::read_to_string(cli.root().join(".jit/invariants.md")).unwrap();
     assert!(written.contains("- **sample-invariant** — "));
 }
 
@@ -128,22 +121,23 @@ fn test_project_render_json_projection_error_exits_validation_failed() {
     // exit 4, matching the non-JSON classification (jit:450db193 review F1,
     // round 5). A region-mode target missing its begin marker fails the splice
     // with a typed ProjectionError.
-    let temp = setup_test_repo();
-    std::fs::write(temp.path().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    std::fs::write(cli.root().join(".jit/invariants.toml"), INVARIANTS_TOML).unwrap();
     std::fs::write(
-        temp.path().join("ARCHITECTURE.md"),
+        cli.root().join("ARCHITECTURE.md"),
         "# Architecture\n\nNo region markers here.\n",
     )
     .unwrap();
     append_projection(
-        &temp,
+        &cli,
         "[projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\n\
          target = \"ARCHITECTURE.md\"\nstyle = \"id-anchor\"\n",
     );
 
-    let output = Command::new(jit_binary())
-        .args(["project", "render", "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["project", "render", "--json"])
         .output()
         .unwrap();
     assert_eq!(
@@ -159,10 +153,11 @@ fn test_project_render_json_projection_error_exits_validation_failed() {
 
 #[test]
 fn test_project_render_unknown_name_errors() {
-    let temp = setup_test_repo();
-    let output = Command::new(jit_binary())
-        .args(["project", "render", "--name", "does-not-exist"])
-        .current_dir(temp.path())
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
+    );
+    let output = cli
+        .command(["project", "render", "--name", "does-not-exist"])
         .output()
         .unwrap();
     assert!(

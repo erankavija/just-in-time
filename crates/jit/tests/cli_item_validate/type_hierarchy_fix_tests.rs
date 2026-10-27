@@ -8,7 +8,7 @@ fn jit_binary() -> &'static str {
 }
 
 fn setup_test_repo() -> TempDir {
-    crate::setup_repo_with_default_vocabulary()
+    jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap()
 }
 
 fn run_jit(temp: &TempDir, args: &[&str]) -> std::process::Output {
