@@ -2195,33 +2195,22 @@ mod tests {
         );
     }
 
-    /// Seeds blocker `bbbb2222` (Ready) and backlog dependent `aaaa1111`
-    /// depending on it; returns an executor plus a reader over the same storage.
-    fn blocked_dependent_fixture() -> (
-        CommandExecutor<crate::storage::InMemoryStorage>,
-        crate::storage::InMemoryStorage,
-    ) {
-        let storage = crate::storage::InMemoryStorage::new();
+    fn seed_blocked_dependent(storage: &crate::storage::InMemoryStorage) {
         let mut dependent = create_test_issue(
             &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
             State::Backlog,
             vec!["type:task"],
         );
         dependent.dependencies = vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")];
-        crate::commands::test_helpers::seed_issue(&storage, dependent);
+        crate::commands::test_helpers::seed_issue(storage, dependent);
         crate::commands::test_helpers::seed_issue(
-            &storage,
+            storage,
             create_test_issue(
                 &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
                 State::Ready,
                 vec!["type:task"],
             ),
         );
-        let reader = storage.clone();
-        (
-            crate::commands::test_helpers::memory_executor(storage),
-            reader,
-        )
     }
 
     /// REQ-01, REQ-02, REQ-04: a bulk move to either terminal state promotes the
@@ -2231,7 +2220,10 @@ mod tests {
         use crate::storage::IssueStore;
 
         for target in [State::Done, State::Rejected] {
-            let (mut bulk, bulk_reader) = blocked_dependent_fixture();
+            let bulk_storage = crate::storage::InMemoryStorage::new();
+            seed_blocked_dependent(&bulk_storage);
+            let bulk_reader = bulk_storage.clone();
+            let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
             let filter = QueryFilter::parse("state:ready").unwrap();
             let ops = UpdateOperations {
                 state: Some(target),
@@ -2243,7 +2235,10 @@ mod tests {
                 vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")]
             );
 
-            let (single, single_reader) = blocked_dependent_fixture();
+            let single_storage = crate::storage::InMemoryStorage::new();
+            seed_blocked_dependent(&single_storage);
+            let single_reader = single_storage.clone();
+            let single = crate::commands::test_helpers::memory_executor(single_storage);
             single
                 .issues()
                 .update_issue(
@@ -2282,7 +2277,10 @@ mod tests {
     fn test_apply_bulk_update_non_terminal_state_leaves_dependent_unchanged() {
         use crate::storage::IssueStore;
 
-        let (mut executor, reader) = blocked_dependent_fixture();
+        let storage = crate::storage::InMemoryStorage::new();
+        seed_blocked_dependent(&storage);
+        let reader = storage.clone();
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::InProgress),

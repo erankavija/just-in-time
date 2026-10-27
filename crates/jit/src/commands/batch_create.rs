@@ -645,19 +645,6 @@ mod tests {
         }
     }
 
-    fn executor() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        storage.add_data_file(
-            "config.toml",
-            &format!(
-                "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                crate::test_taxonomy::test_taxonomy().config_fragment()
-            ),
-        );
-        crate::commands::test_helpers::memory_executor(storage)
-    }
-
     #[test]
     fn test_detect_cycle_finds_simple_cycle() {
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
@@ -688,7 +675,17 @@ mod tests {
 
     #[test]
     fn test_collect_problems_duplicate_key() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &[]), def("a", &[])];
         let problems = exec.collect_batch_problems(&defs).unwrap();
         assert!(problems
@@ -698,7 +695,17 @@ mod tests {
 
     #[test]
     fn test_collect_problems_unknown_dependency() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["ghost"])];
         let problems = exec.collect_batch_problems(&defs).unwrap();
         assert!(problems.iter().any(|p| matches!(
@@ -713,7 +720,17 @@ mod tests {
         // A malformed label is now caught by the full write-time validation
         // (`label-format`, origin = "default"), surfaced as a WriteValidation
         // problem.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
         d.labels = vec!["NoColon".to_string()];
         let problems = exec.collect_batch_problems(&[d]).unwrap();
@@ -729,7 +746,17 @@ mod tests {
         // (`namespace-unique-type`, origin = "default"). This is the
         // write-time-only violation that previously slipped past the batch's
         // validation report.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         // Two distinct kinds the fixture repository declares, read from the
         // declaration it was configured from.
         let taxonomy = crate::test_taxonomy::test_taxonomy();
@@ -744,7 +771,17 @@ mod tests {
 
     #[test]
     fn test_collect_problems_unknown_gate() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
         d.gates = vec!["nonexistent-gate".to_string()];
         let problems = exec.collect_batch_problems(&[d]).unwrap();
@@ -757,7 +794,17 @@ mod tests {
     fn test_collect_problems_unknown_type_with_hierarchy() {
         // The fixture repository declares a type hierarchy, so type validity
         // is enforced against it.
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let mut d = def("a", &[]);
         d.r#type = Some("widget".to_string());
         let problems = exec.collect_batch_problems(&[d]).unwrap();
@@ -768,14 +815,34 @@ mod tests {
 
     #[test]
     fn test_collect_problems_valid_batch_is_empty() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["b"]), def("b", &[])];
         assert!(exec.collect_batch_problems(&defs).unwrap().is_empty());
     }
 
     #[test]
     fn test_batch_create_valid_creates_issues_and_edges() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
         let outcome = exec.batch_create_from_json(defs).unwrap();
         let map = outcome.as_map();
@@ -791,7 +858,17 @@ mod tests {
 
     #[test]
     fn test_validate_batch_from_json_has_no_issue_or_event_side_effects() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
         let before_events = exec.storage().read_events().unwrap();
         let outcome = exec.validate_batch_from_json(&defs).unwrap();
@@ -812,7 +889,19 @@ mod tests {
 
     #[test]
     fn test_validate_batch_from_json_empty_batch_returns_zero_counts() {
-        let outcome = executor().validate_batch_from_json(&[]).unwrap();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let outcome = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        )
+        .validate_batch_from_json(&[])
+        .unwrap();
         assert_eq!(outcome.issue_count, 0);
         assert_eq!(outcome.dependency_count, 0);
         assert!(outcome.keys.is_empty());
@@ -845,25 +934,45 @@ mod tests {
         ))
         .unwrap();
         for case in suite.cases {
-            let actual = executor()
-                .collect_batch_problems(&case.issues)
-                .unwrap()
-                .into_iter()
-                .filter_map(|problem| match problem {
-                    BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
-                    BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
-                    BatchValidationProblem::Cycle { .. } => Some("cycle"),
-                    _ => None,
-                })
-                .map(str::to_string)
-                .collect::<Vec<_>>();
+            let config = format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                crate::test_taxonomy::test_taxonomy().config_fragment()
+            );
+            let actual = crate::commands::test_helpers::memory_executor_declaring(
+                InMemoryStorage::new(),
+                crate::commands::test_helpers::MemoryDeclarations {
+                    config: Some(&config),
+                    ..Default::default()
+                },
+            )
+            .collect_batch_problems(&case.issues)
+            .unwrap()
+            .into_iter()
+            .filter_map(|problem| match problem {
+                BatchValidationProblem::DuplicateKey { .. } => Some("duplicate-key"),
+                BatchValidationProblem::UnknownDependency { .. } => Some("unknown-dependency"),
+                BatchValidationProblem::Cycle { .. } => Some("cycle"),
+                _ => None,
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>();
             assert_eq!(actual, case.expected, "shared case '{}'", case.name);
         }
     }
 
     #[test]
     fn test_batch_create_validation_failure_creates_nothing() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &[]), def("a", &[])]; // duplicate key
         let err = exec.batch_create_from_json(defs).unwrap_err();
         assert!(err.downcast_ref::<BatchValidationError>().is_some());
@@ -873,7 +982,17 @@ mod tests {
 
     #[test]
     fn test_batch_create_unknown_dependency_returns_typed_error_without_writes() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let err = exec
             .batch_create_from_json(vec![def("a", &["ghost"])])
             .unwrap_err();
@@ -884,20 +1003,6 @@ mod tests {
                 if key == "a" && missing == "ghost"
         )));
         assert!(exec.storage().list_issues().unwrap().is_empty());
-    }
-
-    /// An executor whose rules credit a story-level container's criteria through
-    /// `satisfies` labels on its dependency closure.
-    fn coverage_executor() -> CommandExecutor<InMemoryStorage> {
-        let exec = executor();
-        let rules = format!(
-            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
-             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
-            crate::test_taxonomy::test_taxonomy().type_at_level(3)
-        );
-        std::fs::write(exec.storage().root().join("rules.toml"), &rules).unwrap();
-        exec.storage().add_data_file("rules.toml", &rules);
-        exec
     }
 
     fn typed_def(key: &str, level: u8, deps: &[&str]) -> BatchIssueDef {
@@ -913,7 +1018,23 @@ mod tests {
 
     #[test]
     fn test_batch_create_key_reference_credits_container_created_in_same_manifest() {
-        let exec = coverage_executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let rules = format!(
+            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
+            crate::test_taxonomy::test_taxonomy().type_at_level(3)
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(&rules),
+                ..Default::default()
+            },
+        );
         let mut story = typed_def("story", 3, &["task"]);
         story.description = "## Success Criteria\n\n- [hard] REQ-01: works\n".to_string();
         let mut task = typed_def("task", 4, &[]);
@@ -938,7 +1059,23 @@ mod tests {
 
     #[test]
     fn test_batch_create_unknown_label_key_returns_typed_error_without_writes() {
-        let exec = coverage_executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let rules = format!(
+            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
+            crate::test_taxonomy::test_taxonomy().type_at_level(3)
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(&rules),
+                ..Default::default()
+            },
+        );
         let mut task = def("task", &[]);
         task.labels = vec!["satisfies:{ghost.short_id}/REQ-01".to_string()];
         let err = exec.batch_create_from_json(vec![task]).unwrap_err();
@@ -953,7 +1090,17 @@ mod tests {
 
     #[test]
     fn test_batch_create_cycle_creates_nothing() {
-        let exec = executor();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            InMemoryStorage::new(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
         let err = exec.batch_create_from_json(defs).unwrap_err();
         let verr = err.downcast_ref::<BatchValidationError>().unwrap();
