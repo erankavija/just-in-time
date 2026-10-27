@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e0e87e1f31b77b67314af43c96d7131fa4ef4a5",
+  "completed_at": "2026-10-27T00:59:16.378185631Z",
+  "duration_ms": 146160,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/item.rs",
+        "id": "F1",
+        "line": 1024,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e21ca76d/requirement/REQ-02",
+          "@/issue/c780514e/requirement/REQ-07"
+        ],
+        "severity": "high",
+        "summary": "REQ-02 leaves nonshipped literal kinds undocumented as custom in path-safety, initialization, and ambiguity tests."
+      }
+    ],
+    "summary": "REQ-02 remains unmet because several custom test-kind literals are not identified as custom.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e21ca76d-3404-4881-b58d-d2952298f295",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "67fffe15-aa3a-4d96-a1e8-b1b2f485ff95",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:56:50.218144783Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 27809 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17adc-25d4-7013-8ea6-5a54d147aeb7\n--------\nuser\n--- 27796 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 93ae31bd2, 8b3737e92, 8a105a0fc, 3e0e87e1f (all `jit:e21ca76d`; merge inspection limited to the item-kind impact cone)\nPolicy sources: AGENTS.md; profiles/jit-default/manifest.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/e21ca76d/requirement/REQ-02, @/issue/e21ca76d/requirement/REQ-03, @/issue/c780514e/requirement/REQ-07, @/charter/D-18, @/invariant/single-source-prose, @/invariant/shared-test-contracts\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T00:55:12Z)\nTruncation recovery: narrowed merge and commit patches to affected source paths; inspected per-file diffs and current fixtures after broad merge output truncated\n\n1. [blocking][issue-impact] `REQ-02` remains unmet. Several literal, nonshipped test kinds neither include “custom” in their name nor have a comment identifying them as custom: the `glossary` fixtures in `crates/jit/src/commands/item.rs:1024` and `:1052`, `race` in `crates/jit/src/commands/init.rs:1312`, and `alpha`/`beta` in `crates/jit/src/domain/item.rs:2737` and `:2751`. Rename them or add concise custom-kind comments. References: `@/issue/e21ca76d/requirement/REQ-02`, `@/issue/c780514e/requirement/REQ-07`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 remains unmet because several custom test-kind literals are not identified as custom.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-02 leaves nonshipped literal kinds undocumented as custom in path-safety, initialization, and ambiguity tests.\",\"file\":\"crates/jit/src/commands/item.rs\",\"line\":1024,\"references\":[\"@/issue/e21ca76d/requirement/REQ-02\",\"@/issue/c780514e/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -8,6 +8,7 @@
   ],
   "description": "Remove the item-kind copies from command and domain unit tests.\n\n## Background\n\n`CANONICAL_ITEM_KINDS` is hand-copied in the test modules of `crates/jit/src/commands/item.rs` (`:570`, with its `D-[0-9]+` pattern at `:581`) and `crates/jit/src/commands/validate.rs` (`:2975`, pattern at `:2986`). `crates/jit/src/domain/item.rs` tests hard-code the decision kind's `D-[0-9]+` pattern (`:1633`, `:2087`). Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Unit tests in `commands/item.rs`, `commands/validate.rs` and `domain/item.rs` that need shipped kinds take them from the shared derivation.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No unit test under `crates/jit/src` restates a shipped kind's declaration or its id pattern.\n",
   "documents": [],
+  "done_at": "2026-10-27T19:56:43.787450266Z",
   "first_ready_at": "2026-10-22T16:07:09.080280692Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "bfa51480-19ef-41f6-b90f-a6789263bde9",
+      "run_id": "738a6d88-52f5-4327-b9db-e5a69ff77a3e",
       "status": "passed",
-      "updated_at": "2026-10-27T00:56:39.932594576Z",
+      "updated_at": "2026-10-27T01:08:30.455804839Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "67fffe15-aa3a-4d96-a1e8-b1b2f485ff95",
-      "status": "failed",
-      "updated_at": "2026-10-27T00:59:16.643307413Z",
+      "run_id": "ff4cf242-3157-470e-bacf-eab1538b1d1b",
+      "status": "passed",
+      "updated_at": "2026-10-27T01:13:03.210338763Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-27T00:59:16.643307413Z"
+  "updated_at": "2026-10-27T19:56:43.787450266Z"
 }
