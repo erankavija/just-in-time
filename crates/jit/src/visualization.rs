@@ -5,10 +5,6 @@
 //! Issue fields like title and state for rendering.
 
 use crate::domain::identity::IssueId;
-#[allow(
-    unused_imports,
-    reason = "Only the temporary String alias needs this trait."
-)]
 use crate::domain::identity::IssueIdStaging;
 use crate::domain::{Issue, Priority, State};
 use crate::graph::hierarchy::NodeHierarchy;

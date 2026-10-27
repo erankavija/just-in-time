@@ -17,10 +17,6 @@ pub mod failure;
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::IssueId;
-#[allow(
-    unused_imports,
-    reason = "Only the temporary String alias needs this trait."
-)]
 use crate::domain::identity::IssueIdStaging;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::store_divergence::StoreDivergence;

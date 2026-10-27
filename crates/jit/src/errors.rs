@@ -11,10 +11,6 @@ use std::fmt;
 
 use crate::declarations::GateMode;
 use crate::domain::identity::IssueId;
-#[allow(
-    unused_imports,
-    reason = "Only the temporary String alias needs this trait."
-)]
 use crate::domain::identity::IssueIdStaging;
 use crate::domain::{GateStatus, Issue, State};
 
