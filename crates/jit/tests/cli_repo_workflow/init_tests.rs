@@ -16,24 +16,6 @@ use tempfile::TempDir;
 /// usable, including the development-area classification.
 const DEFAULT_PACKAGE: &str = "jit-default";
 
-/// Worktree-relative directory the fixture publishes an obtained package into.
-///
-/// Application records the package's worktree-relative location and refuses a
-/// package read from outside the worktree, so a repository that applies one
-/// holds it inside itself — which is where an adopter puts an obtained set.
-const PACKAGE_LOCATION: &str = "packages";
-
-/// Initialize `cli`'s repository with this repository's default vocabulary
-/// package applied, assembled from the checkout into its own worktree first.
-fn init_with_default_package(cli: &JitCli) -> std::process::Output {
-    let location = format!("{PACKAGE_LOCATION}/{DEFAULT_PACKAGE}");
-    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &cli.root().join(&location))
-        .expect("this repository's default package captures");
-    cli.command(["init", "--profile", &location])
-        .output()
-        .expect("failed to run jit init")
-}
-
 // ---------------------------------------------------------------------------
 // Basic init
 // ---------------------------------------------------------------------------
@@ -636,7 +618,12 @@ fn classified_areas(policy: &DocumentationConfig) -> Vec<String> {
 #[test]
 fn test_init_with_the_default_package_classifies_every_development_area() {
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let policy = packaged_documentation_policy(cli.root());
@@ -681,7 +668,12 @@ fn test_init_with_the_default_package_classifies_every_development_area() {
 #[test]
 fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys() {
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
@@ -718,7 +710,12 @@ fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys(
 #[test]
 fn test_init_with_the_default_package_classifies_root_files_as_exact_path_entries() {
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let policy = packaged_documentation_policy(cli.root());
@@ -763,7 +760,12 @@ fn test_init_documentation_policy_is_the_default_package_declaration() {
     // package declares, compared against that manifest rather than against a
     // second copy of the lists.
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let policy = packaged_documentation_policy(cli.root());
@@ -827,7 +829,12 @@ fn declared_set(manifest: &ProfilePackageModel, target: SetStringTarget) -> Vec<
 #[test]
 fn test_init_with_the_default_package_authors_an_issue_scoped_registry_the_query_accepts() {
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let policy = packaged_documentation_policy(cli.root());
@@ -862,7 +869,12 @@ fn test_init_with_the_default_package_authors_an_issue_scoped_registry_the_query
 #[test]
 fn test_init_with_the_default_package_plans_archival_under_a_configured_policy() {
     let cli = JitCli::uninitialised().unwrap();
-    let out = init_with_default_package(&cli);
+    let package = jit::test_utils::stage_repository_packages(cli.root(), DEFAULT_PACKAGE);
+    let out = cli
+        .command(["init", "--profile"])
+        .arg(&package)
+        .output()
+        .unwrap();
     assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let policy = packaged_documentation_policy(cli.root());
