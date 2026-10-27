@@ -628,12 +628,8 @@ mod tests {
     #[should_panic(expected = "tracks no file")]
     fn test_tracked_repository_paths_panics_when_the_listing_is_empty() {
         let empty = TempDir::new().unwrap();
-        let initialized = Command::new("git")
-            .current_dir(empty.path())
-            .args(["init", "-q"])
-            .status()
-            .unwrap();
-        assert!(initialized.success(), "the fixture repository initializes");
+        let initialized = crate::test_cli::init_git_repository(empty.path());
+        assert!(initialized.is_ok(), "the fixture repository initializes");
 
         let _ = tracked_repository_paths(empty.path());
     }

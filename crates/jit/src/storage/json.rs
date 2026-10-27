@@ -1634,12 +1634,8 @@ mod tests {
         );
     }
 
-    fn retained_storage() -> (
-        TempDir,
-        RepositoryLayout,
-        JsonFileStorage,
-        RetainedMutationSessionGuard,
-    ) {
+    #[test]
+    fn test_external_process_reopens_retained_canonical_session() {
         let (temp, storage, _taxonomy) =
             crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let data = temp.path().join(".jit");
@@ -1647,12 +1643,6 @@ mod tests {
         let retained = storage
             .open_and_retain_mutation_session(layout.clone())
             .unwrap();
-        (temp, layout, storage, retained)
-    }
-
-    #[test]
-    fn test_external_process_reopens_retained_canonical_session() {
-        let (temp, _, storage, retained) = retained_storage();
 
         let competing = RepoWriteLock::for_lock_path(
             temp.path().join(".jit-bootstrap.lock"),
@@ -1714,7 +1704,13 @@ mod tests {
     #[test]
     fn test_retained_session_rejects_other_layout_and_thread() {
         let other_worktree = TempDir::new().unwrap();
-        let (_temp, _, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         let other_layout =
             crate::storage::discover_repository_layout(other_worktree.path(), storage.root())
@@ -1756,7 +1752,13 @@ mod tests {
 
     #[test]
     fn test_nested_external_process_fails_typed_without_deadlock() {
-        let (_temp, _, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         storage
             .run_external_process(|| {
@@ -1773,7 +1775,13 @@ mod tests {
 
     #[test]
     fn test_external_process_panic_does_not_leave_stale_owner() {
-        let (_temp, layout, storage, retained) = retained_storage();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
 
         let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _: Result<()> = storage.run_external_process(|| panic!("checker panic"));
@@ -1784,10 +1792,6 @@ mod tests {
         let session = storage.open_mutation_session(layout).unwrap();
         drop(session);
         assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
-    }
-
-    fn setup_storage() -> (TempDir, JsonFileStorage) {
-        crate::test_utils::setup_test_repo().unwrap()
     }
 
     #[test]
@@ -1862,7 +1866,7 @@ mod tests {
     fn test_list_gate_runs_errors_on_corrupt_result() {
         // A corrupt result.json must surface a contextual error (naming the
         // offending path), not be silently dropped from the listing.
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
         let run_dir = storage
             .path_layout()
@@ -1900,7 +1904,7 @@ mod tests {
 
     #[test]
     fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
         let nested = storage
             .path_layout()
             .unwrap()
@@ -1954,7 +1958,7 @@ mod tests {
 
     #[test]
     fn test_gate_run_readers_reject_non_file_result_object() {
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
         fs::create_dir_all(
             storage
                 .path_layout()
@@ -1978,7 +1982,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_gate_run_readers_reject_symlinked_result_object() {
-        let (_temp, storage) = setup_storage();
+        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
         let run_dir = storage
             .path_layout()
             .unwrap()
@@ -2128,33 +2132,6 @@ mod tests {
         use std::fs;
         use std::process::Command;
 
-        fn setup_git_repo() -> (TempDir, PathBuf, JsonFileStorage) {
-            let (temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = temp_dir.path().to_path_buf();
-
-            // Initialize git repository
-            Command::new("git")
-                .args(["init"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.name", "Test"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["config", "user.email", "test@example.com"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            (temp_dir, repo_path, storage)
-        }
-
         fn add_secondary_worktree(repo_path: &Path) -> (TempDir, PathBuf) {
             use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2242,7 +2219,10 @@ mod tests {
 
         #[test]
         fn test_read_exact_store_excludes_primary_only_records_without_writing_selected_store() {
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let add = Command::new("git")
                 .args(["add", "."])
                 .current_dir(&repo_path)
@@ -2342,7 +2322,7 @@ mod tests {
         #[test]
         fn test_load_issue_from_local_first() {
             // Setup: Create a local .jit directory
-            let (_temp, storage) = setup_storage();
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
             // Create and save an issue locally
             let issue = crate::test_utils::fixture_issue(
@@ -2380,7 +2360,7 @@ mod tests {
         #[test]
         fn test_load_issue_creates_no_per_issue_sidecar_lock() {
             // REQ-01: reading an issue must not create a `<id>.lock` sidecar.
-            let (_temp, storage) = setup_storage();
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
             let issue = crate::test_utils::fixture_issue(
                 "Sidecar-free".to_string(),
                 "Description".to_string(),
@@ -2407,26 +2387,28 @@ mod tests {
         fn test_read_all_lock_file_count_is_independent_of_issue_count() {
             // REQ-02: after a read-all, the number of lock files is O(1) in the
             // issue count — the surviving fixed lock set does not grow with N.
-            fn lock_count_after_reading_all(issue_count: usize) -> usize {
-                let (temp, storage) = setup_storage();
+            fn seed_issues(storage: &JsonFileStorage, issue_count: usize) {
                 for i in 0..issue_count {
                     let issue = crate::test_utils::fixture_issue(
                         format!("Issue {i}"),
                         "Description".to_string(),
                     );
-                    seed_issue_preimage(&storage, &issue);
+                    seed_issue_preimage(storage, &issue);
                 }
-
-                let loaded = storage.list_issues().unwrap();
-                assert_eq!(loaded.len(), issue_count, "every seeded issue must load");
-
-                // Count over the whole worktree so any per-issue sidecar would be
-                // caught wherever it is written.
-                count_lock_files(temp.path())
             }
 
-            let few = lock_count_after_reading_all(3);
-            let many = lock_count_after_reading_all(12);
+            let (few_temp, few_storage) = crate::test_utils::setup_test_repo().unwrap();
+            seed_issues(&few_storage, 3);
+            let few_loaded = few_storage.list_issues().unwrap();
+            assert_eq!(few_loaded.len(), 3, "every seeded issue must load");
+            // Count over the whole worktree so any per-issue sidecar would be
+            // caught wherever it is written.
+            let few = count_lock_files(few_temp.path());
+            let (many_temp, many_storage) = crate::test_utils::setup_test_repo().unwrap();
+            seed_issues(&many_storage, 12);
+            let many_loaded = many_storage.list_issues().unwrap();
+            assert_eq!(many_loaded.len(), 12, "every seeded issue must load");
+            let many = count_lock_files(many_temp.path());
             assert_eq!(
                 few, many,
                 "lock-file count must be independent of issue count \
@@ -2436,7 +2418,7 @@ mod tests {
 
         #[test]
         fn test_list_issues_changes_no_file_other_than_the_index_lock() {
-            let (_temp, storage) = setup_storage();
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
             let issue = crate::test_utils::fixture_issue(
                 "Listed without writes".to_string(),
                 "Description".to_string(),
@@ -2456,7 +2438,10 @@ mod tests {
         #[test]
         fn test_load_issue_from_git_when_not_local() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let jit_dir = repo_path.join(".jit");
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
@@ -2505,7 +2490,10 @@ mod tests {
         #[test]
         fn test_load_issue_from_main_worktree_when_not_in_git() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create an issue in main worktree (not committed)
             let issue = crate::test_utils::fixture_issue(
@@ -2551,7 +2539,10 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_includes_git_issues() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let jit_dir = repo_path.join(".jit");
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
@@ -2596,7 +2587,10 @@ mod tests {
 
         #[test]
         fn test_load_aggregated_index_rejects_invalid_git_index() {
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let jit_dir = repo_path.join(".jit");
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
 
@@ -2625,7 +2619,10 @@ mod tests {
 
         #[test]
         fn test_local_membership_overrides_git_membership_in_both_states() {
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             seed_index_preimage(
                 &storage,
@@ -2665,7 +2662,10 @@ mod tests {
 
         #[test]
         fn test_git_membership_overrides_main_worktree_in_both_states() {
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             seed_index_preimage(
                 &main_storage,
                 &Index {
@@ -2718,7 +2718,10 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_includes_main_worktree_issues() {
             // Setup: Create git repo with main worktree
-            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let (_temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create issue in main worktree (not committed)
             let issue = crate::test_utils::fixture_issue(
@@ -2762,7 +2765,10 @@ mod tests {
 
         #[test]
         fn test_aggregated_index_propagates_main_worktree_failures() {
-            let (_temp_dir, repo_path, _main_storage) = setup_git_repo();
+            let (_temp_dir, _main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let main_jit = repo_path.join(".jit");
             let main_jit_layout = crate::test_utils::repository_layout_for_data_root(&main_jit);
             let add = Command::new("git")
@@ -2807,7 +2813,10 @@ mod tests {
         #[test]
         fn test_load_aggregated_index_deduplicates() {
             // Setup: Create git repo
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create and commit issue
             let issue =
@@ -2841,7 +2850,10 @@ mod tests {
         #[test]
         fn test_load_issue_prefers_local_over_git() {
             // Setup: Create git repo with committed issue
-            let (_temp_dir, repo_path, storage) = setup_git_repo();
+            let (_temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
 
             // Create and commit an issue
             let mut issue =
@@ -2874,7 +2886,7 @@ mod tests {
 
         #[test]
         fn test_load_issue_fails_when_not_found_anywhere() {
-            let (_temp, storage) = setup_storage();
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
 
             let fake_id = "00000000-0000-0000-0000-000000000000";
             let result = storage.load_issue(fake_id);
@@ -2887,7 +2899,10 @@ mod tests {
         #[test]
         fn test_load_issue_from_git_handles_invalid_json() {
             // Setup: Create git repo with invalid JSON committed
-            let (_temp_dir, repo_path, _storage) = setup_git_repo();
+            let (_temp_dir, _storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            let repo_path = _temp_dir.path().to_path_buf();
+            crate::test_cli::init_git_repository(&repo_path).unwrap();
             let jit_dir = repo_path.join(".jit");
             let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
             let storage = JsonFileStorage::new(&jit_dir);
@@ -2938,7 +2953,7 @@ mod tests {
 
         #[test]
         fn test_index_v2_save_and_load() {
-            let (_temp_dir, storage) = setup_storage();
+            let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
 
             // Create index with deleted IDs
             let index = Index {
@@ -3169,22 +3184,6 @@ mod tests {
         use super::*;
         use crate::storage::RepositoryFormatTooNewError;
 
-        /// Write a raw `index.json` carrying an explicit `schema_version` into a
-        /// freshly-created `.jit`, returning the storage handle.
-        fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
-            let data = temp.path().join(".jit");
-            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
-            fs::create_dir(&data).unwrap();
-            let storage = JsonFileStorage::new(&data);
-            configure_test_layout(&storage, temp.path(), &data);
-            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
-            let raw = format!(
-                "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
-            );
-            fs::write(&index_path, raw).unwrap();
-            storage
-        }
-
         // REQ-01: the constant is the single authoritative marker — a new index is
         // stamped with SUPPORTED_INDEX_SCHEMA_VERSION.
         #[test]
@@ -3194,7 +3193,7 @@ mod tests {
                 SUPPORTED_INDEX_SCHEMA_VERSION
             );
 
-            let (_temp_dir, storage) = setup_storage();
+            let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
             assert_eq!(
                 storage.load_index().unwrap().schema_version,
                 SUPPORTED_INDEX_SCHEMA_VERSION
@@ -3208,7 +3207,16 @@ mod tests {
         fn test_newer_repo_format_refused_on_direct_load() {
             let temp_dir = TempDir::new().unwrap();
             let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
-            let storage = storage_with_index_version(&temp_dir, newer);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!(
+                "{{\n  \"schema_version\": {newer},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
 
             let err = storage
                 .load_index()
@@ -3237,7 +3245,16 @@ mod tests {
         fn test_newer_repo_format_refused_on_aggregated_read() {
             let temp_dir = TempDir::new().unwrap();
             let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
-            let storage = storage_with_index_version(&temp_dir, newer);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!(
+                "{{\n  \"schema_version\": {newer},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
 
             let err = storage
                 .list_issues()
@@ -3286,7 +3303,16 @@ mod tests {
         #[test]
         fn test_equal_version_operates_normally() {
             let temp_dir = TempDir::new().unwrap();
-            let storage = storage_with_index_version(&temp_dir, SUPPORTED_INDEX_SCHEMA_VERSION);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!(
+                "{{\n  \"schema_version\": {SUPPORTED_INDEX_SCHEMA_VERSION},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
             assert!(storage.load_index().is_ok());
             assert!(storage.list_issues().is_ok());
         }
@@ -3297,7 +3323,16 @@ mod tests {
         fn test_older_version_operates_normally() {
             let temp_dir = TempDir::new().unwrap();
             let older = SUPPORTED_INDEX_SCHEMA_VERSION - 1;
-            let storage = storage_with_index_version(&temp_dir, older);
+            let data = temp_dir.path().join(".jit");
+            let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
+            fs::create_dir(&data).unwrap();
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, temp_dir.path(), &data);
+            let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
+            let raw = format!(
+                "{{\n  \"schema_version\": {older},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
             let index = storage.load_index().expect("older format must still load");
             assert_eq!(index.schema_version, older);
             assert!(storage.list_issues().is_ok());

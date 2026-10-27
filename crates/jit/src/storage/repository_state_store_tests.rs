@@ -2666,43 +2666,6 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
 }
 
 #[cfg(unix)]
-fn capture_git_fixture() -> (TempDir, PathBuf, GitStandIn, String) {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let run_git = |args: &[&str]| {
-        let output = Command::new("git")
-            .current_dir(worktree.path())
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "git {args:?} failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    };
-    run_git(&["init"]);
-    run_git(&["config", "user.name", "Test User"]);
-    run_git(&["config", "user.email", "test@example.com"]);
-    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
-    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
-    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
-    run_git(&["add", "-A"]);
-    run_git(&["commit", "-m", "first"]);
-    let first = {
-        let output = Command::new("git")
-            .current_dir(worktree.path())
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
-    };
-    (worktree, data, GitStandIn::new(), first)
-}
-
-#[cfg(unix)]
 fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> CaptureSpec {
     let mut spec = CaptureSpec::new([], budget()).unwrap();
     paths
@@ -2715,7 +2678,37 @@ fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> Capture
 #[cfg(unix)]
 #[test]
 fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
-    let (worktree, data, stand_in, _) = capture_git_fixture();
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let _revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
     let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
@@ -2759,7 +2752,37 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
 #[cfg(unix)]
 #[test]
 fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
-    let (worktree, data, stand_in, first) = capture_git_fixture();
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let first = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
     let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
@@ -2808,7 +2831,37 @@ fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
 #[cfg(unix)]
 #[test]
 fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing() {
-    let (worktree, data, stand_in, revision) = capture_git_fixture();
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
     let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
@@ -2838,7 +2891,37 @@ fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing(
 
 #[test]
 fn test_json_capture_retains_only_pairs_used_by_the_most_recent_capture() {
-    let (worktree, data, stand_in, revision) = capture_git_fixture();
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
     let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();

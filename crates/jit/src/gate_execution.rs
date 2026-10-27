@@ -718,26 +718,6 @@ mod tests {
         assert!(branch.is_none() || !branch.unwrap().is_empty());
     }
 
-    /// Initialize a git repo at `dir` with one commit; returns nothing but leaves
-    /// a committed `seed.txt`. Panics on any git failure so a broken environment
-    /// surfaces loudly rather than as a misleading assertion.
-    fn init_committed_repo(dir: &Path) {
-        let git = |args: &[&str]| {
-            let status = Command::new("git")
-                .args(args)
-                .current_dir(dir)
-                .status()
-                .expect("git runs");
-            assert!(status.success(), "git {args:?} failed");
-        };
-        git(&["init", "-q"]);
-        git(&["config", "user.name", "Test"]);
-        git(&["config", "user.email", "test@example.com"]);
-        std::fs::write(dir.join("seed.txt"), "seed\n").expect("write seed");
-        git(&["add", "."]);
-        git(&["commit", "-q", "-m", "seed"]);
-    }
-
     /// A worktree with `src/` and `docs/` beneath a git repository, where
     /// `src/generated/` is ignored.
     fn worktree_with_declared_inputs() -> tempfile::TempDir {
@@ -748,9 +728,20 @@ mod tests {
         std::fs::write(root.join(".gitignore"), "src/generated/\n").expect("write ignore");
         std::fs::write(root.join("src/lib.rs"), "fn main() {}\n").expect("write source");
         std::fs::write(root.join("docs/guide.md"), "guide\n").expect("write doc");
-        // Commits everything staged above, so the sources start tracked and the
-        // ignored directory starts absent from git's inventory.
-        init_committed_repo(root);
+        std::fs::write(root.join("seed.txt"), "seed\n").expect("write seed");
+        crate::test_cli::init_git_repository(root).expect("initialize git repository");
+        let added = Command::new("git")
+            .args(["add", "."])
+            .current_dir(root)
+            .status()
+            .expect("git add runs");
+        assert!(added.success(), "git add failed");
+        let committed = Command::new("git")
+            .args(["commit", "-q", "-m", "seed"])
+            .current_dir(root)
+            .status()
+            .expect("git commit runs");
+        assert!(committed.success(), "git commit failed");
         temp
     }
 
@@ -1106,7 +1097,20 @@ mod tests {
     #[test]
     fn test_execute_gate_checker_records_head_commit() {
         let temp = tempfile::TempDir::new().unwrap();
-        init_committed_repo(temp.path());
+        crate::test_cli::init_git_repository(temp.path()).unwrap();
+        std::fs::write(temp.path().join("seed.txt"), "seed\n").expect("write seed");
+        let added = Command::new("git")
+            .args(["add", "."])
+            .current_dir(temp.path())
+            .status()
+            .expect("git add runs");
+        assert!(added.success(), "git add failed");
+        let committed = Command::new("git")
+            .args(["commit", "-q", "-m", "seed"])
+            .current_dir(temp.path())
+            .status()
+            .expect("git commit runs");
+        assert!(committed.success(), "git commit failed");
 
         let checker = GateChecker::Exec {
             command: "true".to_string(),
