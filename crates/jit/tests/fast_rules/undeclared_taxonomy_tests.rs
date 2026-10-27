@@ -9,28 +9,10 @@
 //! sets come from the declaration the test itself wrote, so a test fails exactly
 //! when a repository receives something it did not declare.
 
-use jit::commands::CommandExecutor;
-use jit::storage::JsonFileStorage;
+use jit::test_utils::setup_test_repo_with_config;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use tempfile::TempDir;
-
-/// Initialize a repository whose `config.toml` is exactly `config_toml`.
-fn scaffold_declaring(config_toml: &str) -> (TempDir, std::path::PathBuf) {
-    jit::test_mode::enable();
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    fs::create_dir(&jit_dir).unwrap();
-    fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
-    CommandExecutor::new(storage)
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), None)
-        .unwrap();
-    (temp, jit_dir)
-}
 
 /// The rule names the scaffold wrote into `.jit/rules.toml`, in file order.
 fn scaffolded_rule_names(jit_dir: &Path) -> Vec<String> {
@@ -126,7 +108,8 @@ const DECLARES_NOTHING: &str = "[version]\nschema = 2\n";
 /// label grammar alone, and exactly the one projection that rule references.
 #[test]
 fn test_scaffold_declaring_no_taxonomy_writes_the_label_grammar_alone() {
-    let (_temp, jit_dir) = scaffold_declaring(DECLARES_NOTHING);
+    let (temp, _) = setup_test_repo_with_config(DECLARES_NOTHING).unwrap();
+    let jit_dir = temp.path().join(".jit");
     let references = schema_references(&jit_dir);
 
     assert_eq!(scaffolded_rule_names(&jit_dir), vec!["label-format"]);
@@ -151,7 +134,8 @@ fn test_scaffold_declaring_no_taxonomy_writes_the_label_grammar_alone() {
 /// artefact the scaffold derived from the taxonomy.
 #[test]
 fn test_scaffold_declaring_no_taxonomy_names_nothing_the_repository_did_not_declare() {
-    let (_temp, jit_dir) = scaffold_declaring(DECLARES_NOTHING);
+    let (temp, _) = setup_test_repo_with_config(DECLARES_NOTHING).unwrap();
+    let jit_dir = temp.path().join(".jit");
     let derived = derived_artefacts(&jit_dir);
     let taxonomy = jit::test_taxonomy::test_taxonomy();
 
@@ -175,9 +159,7 @@ fn test_scaffold_declaring_no_taxonomy_names_nothing_the_repository_did_not_decl
 /// REQ-05: a repository declaring neither table is still a valid repository.
 #[test]
 fn test_scaffold_declaring_no_taxonomy_still_validates() {
-    let (temp, jit_dir) = scaffold_declaring(DECLARES_NOTHING);
-    let layout = jit::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
-    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir)).with_layout(layout);
+    let (_temp, executor) = setup_test_repo_with_config(DECLARES_NOTHING).unwrap();
 
     let report = executor
         .validate_repository_report()
@@ -195,7 +177,7 @@ fn test_scaffold_declaring_no_taxonomy_still_validates() {
 /// it declared — every projected name comes from its own declaration.
 #[test]
 fn test_scaffold_declaring_a_taxonomy_receives_exactly_what_it_declared() {
-    let (_temp, jit_dir) = scaffold_declaring(
+    let (temp, _) = setup_test_repo_with_config(
         r#"
 [version]
 schema = 2
@@ -212,7 +194,9 @@ unique = true
 description = "Owning squad"
 unique = false
 "#,
-    );
+    )
+    .unwrap();
+    let jit_dir = temp.path().join(".jit");
 
     assert_eq!(
         projected_types(&jit_dir),
@@ -237,7 +221,7 @@ unique = false
 /// no rule or projection enumerating type names.
 #[test]
 fn test_scaffold_declaring_namespaces_alone_receives_no_type_hierarchy_rule() {
-    let (_temp, jit_dir) = scaffold_declaring(
+    let (temp, _) = setup_test_repo_with_config(
         r#"
 [version]
 schema = 2
@@ -246,7 +230,9 @@ schema = 2
 description = "Owning squad"
 unique = true
 "#,
-    );
+    )
+    .unwrap();
+    let jit_dir = temp.path().join(".jit");
     let rule_names = scaffolded_rule_names(&jit_dir);
 
     assert_eq!(projected_namespaces(&jit_dir), names(&["squad"]));
@@ -265,7 +251,7 @@ unique = true
 /// no rule or projection enumerating namespaces.
 #[test]
 fn test_scaffold_declaring_a_type_hierarchy_alone_receives_no_namespace_rule() {
-    let (_temp, jit_dir) = scaffold_declaring(
+    let (temp, _) = setup_test_repo_with_config(
         r#"
 [version]
 schema = 2
@@ -273,7 +259,9 @@ schema = 2
 [type_hierarchy]
 types = { objective = 1, action = 2 }
 "#,
-    );
+    )
+    .unwrap();
+    let jit_dir = temp.path().join(".jit");
     let rule_names = scaffolded_rule_names(&jit_dir);
 
     assert_eq!(projected_types(&jit_dir), names(&["objective", "action"]));

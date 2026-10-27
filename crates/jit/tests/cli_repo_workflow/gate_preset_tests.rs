@@ -10,24 +10,6 @@
 use assert_cmd::prelude::*;
 use jit::test_cli::JitCli;
 
-/// Run a jit command, assert success, and parse its JSON stdout.
-fn jit_json(cli: &JitCli, args: &[&str]) -> serde_json::Value {
-    let out = cli
-        .command(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
 /// REQ-02: a project-defined preset is created from an issue's gates, then
 /// listed, shown, and applied — the full mechanism against a project-declared
 /// bundle, with no undeclared preset in play.
@@ -86,7 +68,7 @@ fn test_project_defined_preset_create_list_show_apply() {
     // `list` reports exactly what the project declares. The planning-bracket
     // names are checked beside it because a listing that carried presets from
     // the binary would carry those.
-    let list = jit_json(&cli, &["gate", "preset", "list", "--json"]);
+    let list = cli.run_json(["gate", "preset", "list"]).unwrap();
     let presets = list["presets"].as_array().expect("presets array");
     assert_eq!(
         presets
@@ -110,7 +92,7 @@ fn test_project_defined_preset_create_list_show_apply() {
     }
 
     // `show` reports the bundled gates.
-    let show = jit_json(&cli, &["gate", "preset", "show", "ci", "--json"]);
+    let show = cli.run_json(["gate", "preset", "show", "ci"]).unwrap();
     assert_eq!(show["name"], "ci");
     let keys: Vec<&str> = show["gates"]
         .as_array()
@@ -126,7 +108,9 @@ fn test_project_defined_preset_create_list_show_apply() {
 
     // `apply` attaches the bundled gates to a fresh issue.
     let target = cli.create_issue(["--title", "Feature issue"]).unwrap();
-    let applied = jit_json(&cli, &["gate", "preset", "apply", "ci", &target, "--json"]);
+    let applied = cli
+        .run_json(["gate", "preset", "apply", "ci", &target])
+        .unwrap();
     let added: Vec<&str> = applied["success"][0]["gates_added"]
         .as_array()
         .expect("gates_added array")
@@ -137,7 +121,7 @@ fn test_project_defined_preset_create_list_show_apply() {
     assert!(added.contains(&"code-review"));
 
     // The target issue now requires both gates.
-    let status = jit_json(&cli, &["issue", "show", &target, "--json"]);
+    let status = cli.run_json(["issue", "show", &target]).unwrap();
     let required: Vec<&str> = status["gates"]
         .as_array()
         .expect("gates array")

@@ -1690,7 +1690,7 @@ fn schema_source_from_bytes(
 mod tests {
     use super::*;
     use crate::domain::{Issue, State};
-    use crate::test_utils::document_reference;
+    use crate::test_utils::{document_reference, fixture_issue};
 
     fn parse(content: &str) -> Result<RuleSet, RuleConfigError> {
         RuleSet::parse(content, None, [])
@@ -1701,7 +1701,7 @@ mod tests {
     }
 
     fn issue_with(labels: &[&str], state: State) -> Issue {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = fixture_issue("t".to_string(), String::new());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
         issue
@@ -2889,13 +2889,14 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 
     // --- label-coverage `kind =` sugar (REQ-02, REQ-03) --------------------
 
-    /// Build explicit captured configuration for `kind =` expansion.
+    /// Build explicit captured configuration declaring a custom kind for
+    /// `kind =` expansion.
     fn item_kind_config() -> JitConfig {
         toml::from_str(
             r#"
-[item_kinds.requirement]
+[item_kinds.custom-requirement]
 section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+id-pattern = "CR-[0-9]+"
 markers = ["[hard]"]
 link-namespaces = ["satisfies"]
 scope = "issue"
@@ -2921,14 +2922,14 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_coverage_kind_sugar_expands_to_inline_triple() {
-        // A `kind = "requirement"` rule lowers to the configuration an
+        // A `kind = "custom-requirement"` rule lowers to the configuration an
         // equivalent inline `(section, marker, id-pattern)` rule carries.
         let sugared = rule_from_config(
             r#"
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
-assert = { label-coverage = { kind = "requirement", child-state = "done" } }
+assert = { label-coverage = { kind = "custom-requirement", child-state = "done" } }
 "#,
         );
         let inline = rule_from_config(
@@ -2936,7 +2937,7 @@ assert = { label-coverage = { kind = "requirement", child-state = "done" } }
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "[A-Z][A-Z0-9]*-[0-9]+", child-state = "done" } }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "CR-[0-9]+", child-state = "done" } }
 "#,
         );
         // Kind sugar and inline criteria have identical effective configuration.
@@ -2974,7 +2975,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "[A-Z][A-Z0-9]*-[0-9]+", kind = "requirement" } }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "CR-[0-9]+", kind = "custom-requirement" } }
 "#,
             "'kind'",
         );
@@ -2988,7 +2989,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
-assert = { label-coverage = { kind = "requirement", child-state = "done" } }
+assert = { label-coverage = { kind = "custom-requirement", child-state = "done" } }
 "#,
         );
         let cfg = coverage_config(&sugared);
@@ -2999,7 +3000,7 @@ assert = { label-coverage = { kind = "requirement", child-state = "done" } }
     #[test]
     fn test_label_coverage_kind_sugar_unknown_kind_is_error() {
         // The constraint: an undeclared `kind` used as the sole triple source is a
-        // typed config error. The registry declares `requirement` completely (so it
+        // typed config error. The registry declares `custom-requirement` completely (so it
         // loads), but `decision` is absent.
         let config = item_kind_config();
         let err = RuleSet::parse(
@@ -3032,7 +3033,7 @@ assert = { label-coverage = { kind = "decision" } }
 [[rules]]
 name = "coverage"
 when = { type = "epic" }
-assert = { label-coverage = { kind = "requirement" } }
+assert = { label-coverage = { kind = "custom-requirement" } }
 "#,
             None,
             [],

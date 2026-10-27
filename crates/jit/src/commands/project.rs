@@ -22,8 +22,8 @@ use super::*;
 use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
 
 /// The result of rendering ONE projection, serialized as an element of
-/// [`ProjectRenderResult::projections`].
-#[derive(Debug, Serialize)]
+/// [`ProjectRenderResult`].
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ProjectionRenderReport {
     /// The projection name (its `[projection.<name>]` table key).
     pub name: String,
@@ -39,17 +39,16 @@ pub struct ProjectionRenderReport {
     pub count: usize,
 }
 
-/// The result of a `jit project render` run over one or all projections.
-///
-/// Serialized as the `--json` payload with the list envelope
-/// `{"count": N, "projections": [...]}`.
-#[derive(Debug, Serialize)]
-pub struct ProjectRenderResult {
-    /// The number of projections rendered (mirrors `projections.len()`).
-    pub count: usize,
-    /// Per-projection reports, in projection-name order.
-    pub projections: Vec<ProjectionRenderReport>,
+/// Collection key of [`ProjectRenderResult`].
+pub enum ProjectionsKey {}
+
+impl CollectionKey for ProjectionsKey {
+    const KEY: &'static str = "projections";
 }
+
+/// The result of a `jit project render` run over one or all projections: one
+/// report per projection, in projection-name order.
+pub type ProjectRenderResult = ListEnvelope<ProjectionsKey, ProjectionRenderReport>;
 
 /// Preserve validation-class producer sources at the command's anyhow transport
 /// boundary so callers can downcast the concrete typed error.
@@ -199,10 +198,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .collect::<Result<Vec<_>>>()?;
             Ok(SessionStep::Apply(
                 plan,
-                ProjectRenderResult {
-                    count: projections.len(),
-                    projections,
-                },
+                ProjectRenderResult::new(projections),
             ))
         })
     }

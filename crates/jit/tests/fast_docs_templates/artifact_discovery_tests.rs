@@ -8,10 +8,9 @@ use jit::domain::artifact_inventory::{
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
 use jit::domain::{Issue, State};
-use jit::storage::{
-    discover_archive_artifacts, discover_repository_layout, IssueStore, JsonFileStorage,
-};
-use jit::test_utils::document_reference_at;
+use jit::storage::{discover_archive_artifacts, JsonFileStorage};
+use jit::test_utils::{document_reference_at, setup_test_repo_with_config};
+use jit::CommandExecutor;
 use std::fs;
 use tempfile::TempDir;
 
@@ -51,28 +50,23 @@ fn test_terminal_evidence_closes_without_parsing_or_more_needs() {
     }
 }
 
-#[derive(Clone)]
 struct Repo {
-    _temp: std::sync::Arc<TempDir>,
+    _temp: TempDir,
     root: std::path::PathBuf,
     storage: JsonFileStorage,
 }
 
-impl Repo {
-    fn new() -> Self {
-        let temp = std::sync::Arc::new(TempDir::new().unwrap());
-        let root = temp.path().to_path_buf();
-        fs::create_dir(root.join(".jit")).unwrap();
-        let storage = JsonFileStorage::new(root.join(".jit"));
-        let layout = discover_repository_layout(&root, storage.root()).unwrap();
-        storage.configure_repository_layout(&layout);
+impl From<(TempDir, CommandExecutor<JsonFileStorage>)> for Repo {
+    fn from((temp, executor): (TempDir, CommandExecutor<JsonFileStorage>)) -> Self {
         Self {
+            root: temp.path().to_path_buf(),
+            storage: executor.storage().clone(),
             _temp: temp,
-            storage,
-            root,
         }
     }
+}
 
+impl Repo {
     fn write(&self, path: &str, content: &str) {
         let target = self.root.join(path);
         fs::create_dir_all(target.parent().unwrap()).unwrap();
@@ -116,7 +110,7 @@ impl Repo {
 
 #[test]
 fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_its_descendants() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("dev/active/plan.md", "[hub](../../README.md)");
     repo.write("README.md", "[guide](docs/guide.md)");
     repo.write("docs/guide.md", "[deeper](reference/deeper.md)");
@@ -163,7 +157,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_it
 
 #[test]
 fn test_recursive_discovery_reaches_html_css_import_url_figure_and_script_src() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(
         "slides/index.html",
         r#"<link rel="stylesheet" href="theme.css"><script src="js/app.js"></script>"#,
@@ -230,7 +224,7 @@ fn test_recursive_discovery_reaches_html_css_import_url_figure_and_script_src() 
 
 #[test]
 fn test_markdown_links_preserve_relative_and_root_relative_edge_metadata() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(
         "notes/readme.md",
         "[Sibling](guide.md) ![Logo](/assets/logo.png) [Web](https://example.test/x)",
@@ -309,7 +303,7 @@ fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability()
 
 #[test]
 fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(
         "docs/index.html",
         r#"<img src="../../outside.png"><img src="missing.png">"#,
@@ -348,7 +342,7 @@ fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
 
 #[test]
 fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_artifact() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("docs/index.md", "[section](section/) [guide](guide.md)");
     repo.write("docs/guide.md", "guide");
     repo.write("docs/section/child.md", "child");
@@ -392,7 +386,7 @@ fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_a
 fn test_symlinked_directory_link_target_is_inventoried_rather_than_skipped_as_navigation() {
     use std::os::unix::fs::symlink;
 
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("docs/index.md", "[plain](plain/) [linked](linked/)");
     repo.write("docs/plain/child.md", "child");
     repo.write("referents/bundle/secret.md", "must not be discovered");
@@ -615,7 +609,7 @@ fn test_markdown_code_and_prose_dynamic_loading_patterns_warn_textually() {
 }
 
 fn assert_dynamic_loading_warning(path: &str, content: &str) {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(path, content);
     let discovered = repo.discover(path);
     let entry = &discovered.artifacts[0];
@@ -635,7 +629,7 @@ fn assert_dynamic_loading_warning(path: &str, content: &str) {
 }
 
 fn assert_no_dynamic_loading_warning(path: &str, content: &str) {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(path, content);
     let discovered = repo.discover(path);
     let entry = &discovered.artifacts[0];
@@ -678,7 +672,7 @@ fn pinned_issue() -> Issue {
 
 #[test]
 fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_working_tree() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("docs/history.html", r#"<img src="working-tree-bait.png">"#);
     repo.write("docs/working-tree-bait.png", "bait");
     let issues = [pinned_issue()];
@@ -709,7 +703,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
 
 #[test]
 fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallback() {
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("docs/history.html", "working-tree fallback bait");
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
@@ -739,7 +733,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
 fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
     use std::os::unix::fs::symlink;
 
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(
         "referents/root.md",
         "[referent-only child](secret/child.html)",
@@ -773,7 +767,7 @@ fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
 fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
     use std::os::unix::fs::symlink;
 
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write(
         "referents/bundle/root.md",
         "[referent-only child](secret.html)",
@@ -807,7 +801,7 @@ fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
 fn test_symlinked_embedded_artifact_is_not_traversed_into_referent_closure() {
     use std::os::unix::fs::symlink;
 
-    let repo = Repo::new();
+    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
     repo.write("docs/root.html", r#"<link href="theme.css">"#);
     repo.write(
         "referents/theme.css",

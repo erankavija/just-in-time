@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:40:37.140504475Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Retire the private file-backed setups of the `fast_rules` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration, an executor over a file-backed root, and a temporary declaration directory. The profiled setup in `cli_warnings_integration_tests.rs` is already gone.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs`: `executor` (`:18`), `setup_initialized_repo` (`:28`).\n- `crates/jit/tests/fast_rules/effective_rules_tests.rs`: `repo` (`:16`), `executor` (`:36`).\n- `crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs`: `executor` (`:10`), `setup_initialized_repo` (`:16`).\n- `crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs`: `scaffold_declaring` (`:20`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in `fast_rules` defines a function that creates a file-backed repository or opens a file-backed executor.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:48:59.773025342Z",
   "first_ready_at": "2026-10-22T20:22:57.983395271Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "431289b1-ae15-48c7-ab41-5061fe58cc01",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:40:42.818455476Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "733252f1-36d3-4380-8c5e-c1bf2c23c00c",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:44:46.996300566Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7801f623-3865-4ee2-8891-16652e443faf",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "fast_rules file-backed tests use the shared constructors",
-  "updated_at": "2026-10-22T20:22:57.983395271Z"
+  "updated_at": "2026-10-27T00:48:59.773025342Z"
 }

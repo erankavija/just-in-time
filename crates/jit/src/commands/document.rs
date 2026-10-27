@@ -244,11 +244,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .flat_map(|(_, documents)| documents)
             .collect::<Vec<_>>();
 
-        Ok(crate::commands::DocumentListResult {
-            issue_id: full_id,
-            count: documents.len(),
+        Ok(crate::commands::DocumentListResult::with_extras(
             documents,
-        })
+            crate::commands::DocumentListScope { issue_id: full_id },
+        ))
     }
 
     /// Resolve the canonical artifact directory `issue_id` owns in `area`.
@@ -943,20 +942,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|a| a.asset_type == AssetType::Missing)
             .count();
 
-        Ok(crate::commands::AssetListResult {
-            issue_id: full_id,
-            document_path: path.to_string(),
-            count: total,
+        Ok(crate::commands::AssetListResult::with_extras(
             assets,
-            summary: crate::commands::AssetSummary {
-                total,
-                per_doc: per_doc_count,
-                shared: shared_count,
-                external: external_count,
-                missing: missing_count,
+            crate::commands::AssetListScope {
+                issue_id: full_id,
+                document_path: path.to_string(),
+                summary: crate::commands::AssetSummary {
+                    total,
+                    per_doc: per_doc_count,
+                    shared: shared_count,
+                    external: external_count,
+                    missing: missing_count,
+                },
+                warnings,
             },
-            warnings,
-        })
+        ))
     }
 
     /// Rescan one unpinned document from a coherent captured image and publish
@@ -1937,20 +1937,60 @@ mod tests {
         let first = executor
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
-        assert_eq!(first.assets.len(), 1);
-        assert_eq!(
-            first.assets[0].asset_type,
-            crate::document::AssetType::Local
-        );
+        assert_eq!(first.items.len(), 1);
+        assert_eq!(first.items[0].asset_type, crate::document::AssetType::Local);
         let event_count = storage.read_events().unwrap().len();
         let updated_at = storage.load_issue(&id).unwrap().updated_at;
 
         let second = executor
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
-        assert_eq!(second.assets, first.assets);
+        assert_eq!(second.items, first.items);
         assert_eq!(storage.read_events().unwrap().len(), event_count);
         assert_eq!(storage.load_issue(&id).unwrap().updated_at, updated_at);
+    }
+
+    #[test]
+    fn test_list_document_references_serializes_the_issue_beside_its_documents() {
+        let storage = InMemoryStorage::new();
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let listed = executor.list_document_references(&id).unwrap();
+        let value = serde_json::to_value(&listed).unwrap();
+
+        assert_eq!(value["issue_id"], id.as_str());
+        assert_eq!(value["documents"][0]["path"], "docs/guide.md");
+    }
+
+    #[test]
+    fn test_list_document_assets_serializes_its_scope_and_summary_beside_the_assets() {
+        let storage = InMemoryStorage::new();
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
+        storage.add_worktree_file("docs/logo.png", "png bytes");
+        let layout = storage.repository_layout();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let listed = executor
+            .list_document_assets(&id, "docs/guide.md", true)
+            .unwrap();
+        let value = serde_json::to_value(&listed).unwrap();
+
+        assert_eq!(value["issue_id"], id.as_str());
+        assert_eq!(value["document_path"], "docs/guide.md");
+        assert_eq!(
+            value["summary"]["total"],
+            value["assets"].as_array().unwrap().len()
+        );
+        assert!(value["warnings"].is_array());
     }
 
     #[test]

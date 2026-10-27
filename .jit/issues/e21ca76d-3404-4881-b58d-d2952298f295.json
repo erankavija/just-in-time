@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:05:38.795457671Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -12,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bfa51480-19ef-41f6-b90f-a6789263bde9",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:56:39.932594576Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "67fffe15-aa3a-4d96-a1e8-b1b2f485ff95",
+      "status": "failed",
+      "updated_at": "2026-10-27T00:59:16.643307413Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e21ca76d-3404-4881-b58d-d2952298f295",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-22T16:07:09.080280692Z"
+  "updated_at": "2026-10-27T00:59:16.643307413Z"
 }

@@ -920,7 +920,7 @@ pub fn unqualified_link_message(
 /// Carries the *derived* qualified id alongside the source self-id, the owning
 /// scope prefix (an issue short-id or `@`), the kind name, and the raw item text.
 /// Nothing here is stored — it is recomputed on demand by the indexers (REQ-05).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,
@@ -1487,66 +1487,22 @@ mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
 
-    // The canonical kinds supplied by the package, rebuilt here from their exact
-    // field shape so the domain layer can pin that those fields project as
-    // expected. They are not baked into the engine (a repo with no `[item_kinds]`
-    // table has no kinds); these helpers stand in for the config-authored table.
+    use crate::test_utils::shipped_item_kind;
+
     fn req_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec!["[hard]".to_string()]),
-            link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("requirement")
     }
 
     fn decision_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("decisions".to_string()),
-            id_pattern: Some("D-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("decision")
     }
 
     fn risk_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("risks".to_string()),
-            id_pattern: Some("RISK-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["mitigates".to_string(), "resolves".to_string()]),
-            scope: Some(KindScope::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("risk")
     }
 
     fn invariant_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::Project),
-            source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
-                toml: ".jit/invariants.toml".to_string(),
-                table: "invariants".to_string(),
-                id_field: "id".to_string(),
-                text_field: "statement".to_string(),
-                link_fields: std::collections::BTreeMap::new(),
-            })),
-            source_of_truth: Some(SourceOfTruth::RegistryFirst),
-            aliases: None,
-        }
+        shipped_item_kind("invariant")
     }
 
     fn req_kind() -> ItemKind {
@@ -1621,7 +1577,7 @@ mod tests {
     fn test_qualified_id_is_derived() {
         // REQ-01: qualified id is the uniform kind-segmented address, a pure
         // projection over (scope, kind, self-id).
-        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496"
             .parse::<crate::domain::identity::IssueId>()
             .unwrap();
@@ -1666,7 +1622,7 @@ mod tests {
 
     #[test]
     fn test_index_items_projects_requirements() {
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n".to_string(),
         );
@@ -1692,7 +1648,7 @@ mod tests {
     #[test]
     fn test_index_items_graceful_degradation() {
         // REQ-06: a list line with no self-id is plain prose, not an error.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: real\n- [hard] just prose, no id\n"
                 .to_string(),
@@ -1705,7 +1661,7 @@ mod tests {
     #[test]
     fn test_index_items_marker_filters_prose() {
         // An unmarked criterion line is ignored by a marker-gated kind.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: hard one\n- REQ-99: soft, no marker\n"
                 .to_string(),
@@ -1744,7 +1700,7 @@ mod tests {
         // jit:16402e14 REQ-01/REQ-02: a GitHub task-list checkbox ahead of the
         // marker (`- [ ] [hard] ...`, `- [x] [hard] ...`) does not hide the
         // criterion from the item projection.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n\
              - [ ] [hard] REQ-01: unchecked box\n\
@@ -1764,7 +1720,7 @@ mod tests {
     #[test]
     fn test_index_items_duplicate_self_id_is_error() {
         // REQ-02: self-id uniqueness within an issue is validated.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n- [hard] REQ-01: dup\n".to_string(),
         );
@@ -1778,7 +1734,7 @@ mod tests {
         // distinct items — uniqueness is keyed on (self_id, kind), not self_id
         // alone, so this is no longer a collision.
         let other = ItemKind::from_config(
-            "decision",
+            "custom-decision",
             &ItemKindConfig {
                 // Read the SAME section so both kinds see REQ-01.
                 section: Some("success_criteria".to_string()),
@@ -1792,28 +1748,28 @@ mod tests {
             },
         )
         .unwrap();
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
         );
-        // The marker-gated requirement kind and the unmarked `decision` kind both
+        // The marker-gated requirement kind and the unmarked `custom-decision` kind both
         // claim REQ-01 from the same line; both are returned.
         let items = index_items(&issue, &[req_kind(), other], &MarkdownContentParser).unwrap();
         assert_eq!(items.len(), 2);
         assert!(items.iter().all(|item| item.self_id == "REQ-01"));
         let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
-        assert_eq!(kinds, HashSet::from(["requirement", "decision"]));
+        assert_eq!(kinds, HashSet::from(["requirement", "custom-decision"]));
         // The kind is a segment of the minted id, so the two coexisting items derive
         // DISTINCT qualified ids that differ only by that segment.
         assert_ne!(items[0].qualified_id, items[1].qualified_id);
         let qids: HashSet<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
         assert!(qids.iter().any(|q| q.ends_with("/requirement/REQ-01")));
-        assert!(qids.iter().any(|q| q.ends_with("/decision/REQ-01")));
+        assert!(qids.iter().any(|q| q.ends_with("/custom-decision/REQ-01")));
     }
 
     #[test]
     fn test_index_items_missing_section_is_empty() {
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Other\n\n- nothing here\n".to_string(),
         );
@@ -1827,24 +1783,24 @@ mod tests {
         // heard of) indexes purely from its four-tuple, proving no kind name is
         // hardcoded in indexing logic.
         let cfg = ItemKindConfig {
-            section: Some("decisions".to_string()),
-            id_pattern: Some("D-\\d+".to_string()),
+            section: Some("choices".to_string()),
+            id_pattern: Some("CH-\\d+".to_string()),
             markers: Some(vec![]),
-            link_namespaces: Some(vec!["per".to_string()]),
+            link_namespaces: Some(vec!["picks".to_string()]),
             scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
         };
-        let kind = ItemKind::from_config("decision", &cfg).unwrap();
-        let issue = crate::domain::fixture_issue(
+        let kind = ItemKind::from_config("custom-choice", &cfg).unwrap();
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
-            "## Decisions\n\n- D-1: use json\n- D-2: atomic writes\n".to_string(),
+            "## Choices\n\n- CH-1: use json\n- CH-2: atomic writes\n".to_string(),
         );
         let items = index_items(&issue, &[kind], &MarkdownContentParser).unwrap();
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0].kind, "decision");
-        assert_eq!(items[0].self_id, "D-1");
+        assert_eq!(items[0].kind, "custom-choice");
+        assert_eq!(items[0].self_id, "CH-1");
     }
 
     #[test]
@@ -1876,7 +1832,10 @@ mod tests {
         let (section, marker, pattern) = kind.as_triple();
         assert_eq!(section, "success_criteria");
         assert_eq!(marker, Some("[hard]"));
-        assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
+        assert_eq!(
+            pattern,
+            crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN
+        );
     }
 
     #[test]
@@ -1965,7 +1924,7 @@ mod tests {
 
     #[test]
     fn test_decision_kind_tuple() {
-        // The canonical decision kind: section `decisions`, D-NN ids, no marker,
+        // The shipped decision kind: section `decisions`, no marker,
         // `per` link namespace, issue-scoped, markdown-first.
         let decision = decision_kind();
         assert_eq!(decision.name(), "decision");
@@ -1976,12 +1935,12 @@ mod tests {
         let (section, marker, pattern) = decision.as_triple();
         assert_eq!(section, "decisions");
         assert_eq!(marker, None);
-        assert_eq!(pattern, "D-[0-9]+");
+        assert_eq!(Some(pattern), decision_cfg().id_pattern.as_deref());
     }
 
     #[test]
     fn test_invariant_kind_is_project_scope_registry_first() {
-        // The canonical invariant kind: project-scoped, registry-first, `enforces`
+        // The shipped invariant kind: project-scoped, registry-first, `enforces`
         // link namespace, and NO markdown `source` file (items come from the toml
         // registry named by its descriptor).
         let inv = invariant_kind();
@@ -1998,9 +1957,10 @@ mod tests {
         // registry-first project kind must declare a toml `source` descriptor, or it
         // is rejected at resolution with a typed MissingProjectSource — never a
         // silent empty result.
+        // A custom `policy` kind, absent from the default package.
         let base = |source: Option<ItemKindSource>| ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("POL-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
             scope: Some(KindScope::Project),
@@ -2060,14 +2020,10 @@ mod tests {
         // accepted because the engine hardcodes no domain concept.
         let cfg =
             |scope: KindScope, sot: SourceOfTruth, source: Option<ItemKindSource>| ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[a-z][a-z0-9-]*".to_string()),
-                markers: Some(vec![]),
-                link_namespaces: Some(vec!["enforces".to_string()]),
                 scope: Some(scope),
                 source,
                 source_of_truth: Some(sot),
-                aliases: None,
+                ..invariant_cfg()
             };
 
         // Markdown-first project `invariant` with a source: once a reserved-name
@@ -2097,10 +2053,11 @@ mod tests {
 
     #[test]
     fn test_markdown_first_project_kind_still_requires_source() {
-        // The guard still fires for a markdown-first project kind with no source.
+        // The guard still fires for a markdown-first project kind with no source;
+        // `doc-req` is a custom kind.
         let cfg = ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("DOC-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
             scope: Some(KindScope::Project),
@@ -2286,7 +2243,7 @@ name = \"bare\"
     fn test_index_items_projects_decisions_with_canonical_kinds() {
         // The canonical kind set indexes a `## Decisions`
         // section's D-NN lines through the same generic parse path as requirements.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Decisions\n\n- D-01: use json\n- D-02: atomic writes\n".to_string(),
         );
@@ -2303,19 +2260,7 @@ name = \"bare\"
     fn test_resolve_item_kinds_uses_registry() {
         let mut map = HashMap::new();
         map.insert("requirement".to_string(), req_cfg());
-        map.insert(
-            "decision".to_string(),
-            ItemKindConfig {
-                section: Some("decisions".to_string()),
-                id_pattern: Some("D-\\d+".to_string()),
-                markers: Some(vec![]),
-                link_namespaces: Some(vec!["per".to_string()]),
-                scope: Some(KindScope::Issue),
-                source: None,
-                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        map.insert("decision".to_string(), decision_cfg());
         let kinds = resolve_item_kinds(Some(&map)).unwrap();
         // Returned in name order.
         assert_eq!(kinds.len(), 2);
@@ -2328,19 +2273,7 @@ name = \"bare\"
         // REQ-02: expanding a named kind yields the SAME triple as_triple exposes,
         // so the `kind=` sugar and the inline form resolve identically.
         let mut registry = HashMap::new();
-        registry.insert(
-            "requirement".to_string(),
-            ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                id_pattern: Some("REQ-\\d+".to_string()),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScope::Issue),
-                source: None,
-                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        registry.insert("requirement".to_string(), req_cfg());
         let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
         let kind = ItemKind::from_config("requirement", &registry["requirement"]).unwrap();
         let (section, marker, pattern) = kind.as_triple();
@@ -2354,7 +2287,7 @@ name = \"bare\"
         // A declared kind expands with the values its configuration supplies.
         let mut registry = HashMap::new();
         registry.insert(
-            "requirement".to_string(),
+            "custom-requirement".to_string(),
             ItemKindConfig {
                 section: Some("criteria".to_string()),
                 id_pattern: Some("C-[0-9]+".to_string()),
@@ -2366,7 +2299,7 @@ name = \"bare\"
                 aliases: None,
             },
         );
-        let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let triple = expand_kind_triple(Some(&registry), "custom-requirement").unwrap();
         assert_eq!(triple.section, "criteria");
         assert_eq!(triple.id_pattern, "C-[0-9]+");
         // No markers declared -> no marker in the triple.
@@ -2734,7 +2667,7 @@ name = \"bare\"
     fn test_same_self_id_distinct_across_scopes() {
         // REQ-04: the SAME self-id under two different scopes does not conflict and
         // yields two distinct qualified ids.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: issue one\n".to_string(),
         );

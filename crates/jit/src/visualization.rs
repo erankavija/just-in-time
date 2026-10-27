@@ -288,7 +288,7 @@ mod tests {
     use super::*;
 
     fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
-        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
         issue.labels = vec![format!(
             "type:{}",
             crate::test_taxonomy::test_taxonomy().type_at_level(level)
@@ -298,10 +298,14 @@ mod tests {
 
     #[test]
     fn test_export_dot_format() {
-        let issue1 =
-            crate::domain::fixture_issue("API Design".to_string(), "Design REST API".to_string());
-        let mut issue2 =
-            crate::domain::fixture_issue("Backend".to_string(), "Implement backend".to_string());
+        let issue1 = crate::test_utils::fixture_issue(
+            "API Design".to_string(),
+            "Design REST API".to_string(),
+        );
+        let mut issue2 = crate::test_utils::fixture_issue(
+            "Backend".to_string(),
+            "Implement backend".to_string(),
+        );
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -320,9 +324,10 @@ mod tests {
 
     #[test]
     fn test_export_mermaid_format() {
-        let issue1 = crate::domain::fixture_issue("Setup".to_string(), "Initial setup".to_string());
+        let issue1 =
+            crate::test_utils::fixture_issue("Setup".to_string(), "Initial setup".to_string());
         let mut issue2 =
-            crate::domain::fixture_issue("Deploy".to_string(), "Deploy to prod".to_string());
+            crate::test_utils::fixture_issue("Deploy".to_string(), "Deploy to prod".to_string());
         issue2.dependencies.push(issue1.id.clone());
 
         let issues = vec![&issue1, &issue2];
@@ -344,8 +349,10 @@ mod tests {
             .into_iter()
             .enumerate()
             .map(|(i, state)| {
-                let mut issue =
-                    crate::domain::fixture_issue(format!("Issue {i}"), "State fixture".to_string());
+                let mut issue = crate::test_utils::fixture_issue(
+                    format!("Issue {i}"),
+                    "State fixture".to_string(),
+                );
                 issue.state = state;
                 issue
             })
@@ -379,11 +386,13 @@ mod tests {
     #[test]
     fn test_export_dot_with_different_states() {
         let mut issue1 =
-            crate::domain::fixture_issue("Done Action".to_string(), "Completed".to_string());
+            crate::test_utils::fixture_issue("Done Action".to_string(), "Completed".to_string());
         issue1.state = State::Done;
 
-        let mut issue2 =
-            crate::domain::fixture_issue("In Progress".to_string(), "Working on it".to_string());
+        let mut issue2 = crate::test_utils::fixture_issue(
+            "In Progress".to_string(),
+            "Working on it".to_string(),
+        );
         issue2.state = State::InProgress;
 
         let issues = vec![&issue1, &issue2];
@@ -397,8 +406,10 @@ mod tests {
 
     #[test]
     fn test_export_handles_special_characters() {
-        let issue =
-            crate::domain::fixture_issue("Title with \"quotes\"".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue(
+            "Title with \"quotes\"".to_string(),
+            "Test".to_string(),
+        );
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -412,7 +423,8 @@ mod tests {
     /// the six documented keys and nothing else — no full-record fields leak in.
     #[test]
     fn test_export_json_summary_node_has_exactly_summary_keys() {
-        let issue = crate::domain::fixture_issue("Summary".to_string(), "Body text".to_string());
+        let issue =
+            crate::test_utils::fixture_issue("Summary".to_string(), "Body text".to_string());
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
 
@@ -440,7 +452,8 @@ mod tests {
     #[test]
     fn test_export_json_full_node_is_complete_record() {
         use crate::domain::{GateState, GateStatus, State};
-        let mut issue = crate::domain::fixture_issue("Full".to_string(), "Body text".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Full".to_string(), "Body text".to_string());
         issue.state = State::Done;
         issue.gates_required.push("tests".to_string());
         issue.gates_status.insert(
@@ -480,8 +493,8 @@ mod tests {
     /// contents.
     #[test]
     fn test_export_json_shapes_share_edges() {
-        let dep = crate::domain::fixture_issue("Dep".to_string(), String::new());
-        let mut issue = crate::domain::fixture_issue("Root".to_string(), String::new());
+        let dep = crate::test_utils::fixture_issue("Dep".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Root".to_string(), String::new());
         issue.dependencies.push(dep.id.clone());
 
         let issues = vec![&dep, &issue];
@@ -630,10 +643,10 @@ mod tests {
 
     #[test]
     fn test_export_json_scope_members_depending_only_on_outside_issues_all_appear() {
-        let outside = crate::domain::fixture_issue("Outside".into(), String::new());
-        let mut task = crate::domain::fixture_issue("Task".into(), String::new());
+        let outside = crate::test_utils::fixture_issue("Outside".into(), String::new());
+        let mut task = crate::test_utils::fixture_issue("Task".into(), String::new());
         task.dependencies.push(outside.id.clone());
-        let mut epic = crate::domain::fixture_issue("Epic".into(), String::new());
+        let mut epic = crate::test_utils::fixture_issue("Epic".into(), String::new());
         epic.dependencies.push(task.id.clone());
 
         let scope = vec![&task, &epic];
@@ -655,7 +668,7 @@ mod tests {
         ) {
             let mut issues: Vec<Issue> = masks
                 .iter()
-                .map(|_| crate::domain::fixture_issue("N".into(), String::new()))
+                .map(|_| crate::test_utils::fixture_issue("N".into(), String::new()))
                 .collect();
             let ids: Vec<IssueId> = issues.iter().map(|i| i.id.as_str().parse::<IssueId>().unwrap()).collect();
             for (index, mask) in masks.iter().enumerate() {

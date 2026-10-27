@@ -1597,7 +1597,7 @@ mod tests {
     }
 
     fn issue(title: &str, labels: &[&str]) -> Issue {
-        let mut i = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut i = crate::test_utils::fixture_issue(title.to_string(), String::new());
         i.labels = labels.iter().map(|s| s.to_string()).collect();
         i
     }
@@ -1611,7 +1611,7 @@ mod tests {
     fn typed_issue(title: &str, level: u8, extra_labels: &[&str]) -> Issue {
         let mut labels = vec![format!("type:{}", test_type(level))];
         labels.extend(extra_labels.iter().map(|label| (*label).to_string()));
-        let mut issue = crate::domain::fixture_issue(title.to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
         issue.labels = labels;
         issue
     }
@@ -1787,22 +1787,13 @@ assert = { label-coverage = { satisfies-namespace = "off-ns" } }
         initiative
     }
 
-    /// Load a single rule from `rule_toml` against a config that declares a
-    /// `requirement` item kind matching the coverage defaults, so a
-    /// `kind = "requirement"` rule can expand. The rule carries no schema
-    /// reference, so parse purely over an empty captured schema set with the
-    /// explicit config.
+    /// Load a single rule from `rule_toml` against a config that declares the
+    /// shipped `requirement` item kind, so a `kind = "requirement"` rule can
+    /// expand. The rule carries no schema reference, so parse purely over an
+    /// empty captured schema set with the explicit config.
     fn rule_from_repo(rule_toml: &str) -> Rule {
-        let config_toml = r#"
-[item_kinds.requirement]
-section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
-link-namespaces = ["satisfies"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#;
-        let config = toml::from_str::<crate::config::JitConfig>(config_toml).unwrap();
+        let config_toml = crate::test_utils::shipped_item_kind_tables(&["requirement"]);
+        let config = toml::from_str::<crate::config::JitConfig>(&config_toml).unwrap();
         let set = crate::declarations::rules::RuleSet::parse(rule_toml, Some(&config), []).unwrap();
         set.rules.into_iter().next().unwrap()
     }
@@ -1878,7 +1869,7 @@ source-of-truth = "markdown-first"
         let mut container = initiative_with_criteria(&["REQ-01"]);
         // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
         // credits the container's criterion.
-        let mut impl_node = crate::domain::fixture_issue(
+        let mut impl_node = crate::test_utils::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );
@@ -1891,19 +1882,9 @@ source-of-truth = "markdown-first"
         // The two qualified ids are distinct by scope even though the self-id is
         // shared, so neither shadows the other in any index.
         let parser = crate::document::MarkdownContentParser;
-        // The canonical `requirement` kind, built from config (no baked defaults).
         let kinds = vec![crate::domain::item::ItemKind::from_config(
             "requirement",
-            &crate::config::ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(crate::domain::item::KindScope::Issue),
-                source: None,
-                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
+            &crate::test_utils::shipped_item_kind("requirement"),
         )
         .unwrap()];
         let container_items =
@@ -3874,10 +3855,17 @@ source-of-truth = "markdown-first"
              kind = \"requirement\", child-state = \"done\" }} }}\n",
             test_type(2)
         ));
-        let inline_rule = coverage_rule(
-            "criteria-section = \"success_criteria\", marker = \"[hard]\", \
-             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\", child-state = \"done\"",
-        );
+        let registry: HashMap<_, _> = crate::test_utils::shipped_item_kinds()
+            .into_iter()
+            .collect();
+        let triple =
+            crate::domain::item::expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let inline_rule = coverage_rule(&format!(
+            "criteria-section = \"{}\", marker = \"{}\", id-pattern = '{}', child-state = \"done\"",
+            triple.section,
+            triple.marker.unwrap(),
+            triple.id_pattern,
+        ));
 
         let eval = |rule: &Rule, issues: &[Issue]| {
             evaluate_graph(
@@ -3941,25 +3929,13 @@ source-of-truth = "markdown-first"
 
         use crate::config::ItemKindConfig;
         use crate::domain::item::expand_kind_triple;
-        use crate::domain::item::KindScope;
         use std::collections::HashMap;
 
-        // Declare `requirement` in a registry with its full six-tuple, exactly as
-        // a project's config.toml would, then EXPAND it to the consumed triple.
-        let mut registry: HashMap<String, ItemKindConfig> = HashMap::new();
-        registry.insert(
-            "requirement".to_string(),
-            ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScope::Issue),
-                source: None,
-                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        // Declare the shipped kinds in a registry, then EXPAND `requirement` to
+        // the consumed triple.
+        let registry: HashMap<String, ItemKindConfig> = crate::test_utils::shipped_item_kinds()
+            .into_iter()
+            .collect();
         let declared = expand_kind_triple(Some(&registry), "requirement").unwrap();
         let kind_section = declared.section.as_str();
         let kind_marker = declared.marker.as_deref();

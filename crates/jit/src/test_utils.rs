@@ -1380,17 +1380,39 @@ pub fn shipped_item_kinds() -> BTreeMap<String, ItemKindConfig> {
     item_kinds_contributed_by(&manifest)
 }
 
+/// The shipped declaration of kind `name`.
+///
+/// Panics when the default package ships no such kind.
+pub fn shipped_item_kind(name: &str) -> ItemKindConfig {
+    shipped_item_kinds()
+        .remove(name)
+        .unwrap_or_else(|| panic!("the default package ships no '{name}' kind"))
+}
+
 /// The shipped item kinds as the `[item_kinds.<kind>]` tables of a repository
 /// `config.toml`, serialized from [`shipped_item_kinds`].
 pub fn shipped_item_kinds_toml() -> String {
+    item_kinds_toml(shipped_item_kinds())
+}
+
+/// The `[item_kinds.<kind>]` tables of the named shipped kinds only.
+///
+/// Panics when the default package ships no kind of one of the names.
+pub fn shipped_item_kind_tables(names: &[&str]) -> String {
+    item_kinds_toml(
+        names
+            .iter()
+            .map(|name| (name.to_string(), shipped_item_kind(name)))
+            .collect(),
+    )
+}
+
+fn item_kinds_toml(item_kinds: BTreeMap<String, ItemKindConfig>) -> String {
     #[derive(Serialize)]
     struct ConfigKinds {
         item_kinds: BTreeMap<String, ItemKindConfig>,
     }
-    toml::to_string(&ConfigKinds {
-        item_kinds: shipped_item_kinds(),
-    })
-    .expect("a declared item kind serializes to TOML")
+    toml::to_string(&ConfigKinds { item_kinds }).expect("a declared item kind serializes to TOML")
 }
 
 #[cfg(test)]

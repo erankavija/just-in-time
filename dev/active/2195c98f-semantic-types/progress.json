@@ -513,7 +513,7 @@
           "short_id": "8acca4f4",
           "title": "Errors and output carry typed issue ids",
           "classification": "implementation",
-          "status": "rework"
+          "status": "blocked_escalation"
         }
       ]
     },
@@ -633,14 +633,21 @@
       "short_id": "f8021e35",
       "title": "The server watcher recognises .jit files through VirtualPath",
       "reason": "Story 5dd29767 holistic-review F1: watcher.rs raw-matches well-known .jit names (story REQ-01).",
-      "status": "in_progress"
+      "status": "done"
     },
     {
       "id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
       "short_id": "e1940fcf",
       "title": "The validation schema test derives priority tokens from the vocabulary",
       "reason": "Story 83d04069 holistic-review F1: engine.rs test hardcodes Priority tokens (story REQ-02).",
-      "status": "in_progress"
+      "status": "done"
+    },
+    {
+      "id": "10ae7776-7840-4fbc-937b-ce2cc371e07b",
+      "short_id": "10ae7776",
+      "title": "Declared vocabularies are never restated as token lists or Debug names",
+      "reason": "Story 83d04069 holistic-review round 2: State token list in rules.rs test; Debug-rendered vocabularies in output.rs. Written as a class sweep to end per-instance rounds. Depends on 8acca4f4 (output.rs overlap).",
+      "status": "pending"
     }
   ],
   "escalations": [
@@ -695,6 +702,20 @@
         "B: lead rewrites .jit/events.jsonl to drop or convert the 8 retired-tag lines (history rewrite)"
       ],
       "gates": "cargo-ci passed; holistic-review failed (run recorded)"
+    },
+    {
+      "issue": "8acca4f4",
+      "status": "open",
+      "reason": "Rework limit reached (2/2). Rework 2 (branch worktree-agent-8acca4f4) fixes the code-review findings (typed BatchTarget for gate evaluate-many; no stringified IssueIds into identity fields) but re-adds #[allow(unused_imports)] on the IssueIdStaging import in errors.rs, output.rs and visualization.rs, which rework 1 explicitly required removing.",
+      "options": [
+        "A (recommended): lead removes the three allow attributes (mechanical, plain `use` as in sibling modules), then runs code-review and cargo-ci and lands",
+        "B: one more worker rework with a reset counter",
+        "C: other guidance"
+      ],
+      "blocks": [
+        "10ae7776 (vocabulary sweep, output.rs overlap)",
+        "story 83d04069 via 10ae7776"
+      ]
     }
   ],
   "rework_counts": {
@@ -706,17 +727,18 @@
     "91081bd3": 2,
     "d72bf093": 1,
     "f265e748": 2,
-    "8acca4f4": 1
+    "8acca4f4": 2
   },
   "external_blockers": {
-    "c780514e test-topology (paused)": [
-      "0af95f14",
+    "c780514e test-topology (led by session just-in-time-b4)": [
+      "0af95f14 (upstream ends c780514e wave 5)",
+      "5fac48b8 (upstream ends wave 6)",
       "13190465",
       "19d9bd7d",
-      "5fac48b8",
       "b45a2865",
       "b73b3e5a",
-      "c797b59b -> 7abcc22d"
+      "c797b59b -> 7abcc22d",
+      "641bd14e"
     ]
   },
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1301,6 +1323,13 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One test derives tokens from Priority::ALL; alternation slot Codex."
+    },
+    {
+      "issue": "8acca4f4",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Code-review rework 2 (final): typed batch target for gate evaluate-many; no stringified IssueIds into identity fields."
     }
   ],
   "surfaced_pitfalls": [
@@ -1352,13 +1381,20 @@
     "Briefs must not exempt sites a criterion covers: e1a6c8c2 REQ-01 covers well-known directories, so '.jit/issues' literals are in scope even though issue_record() comes later. Also: brief Codex to run cargo test -p jit-server whenever loaders the server uses change.",
     "Code-review applies 'no literal in the listed files' to test modules too; brief file-scoped literal criteria as whole-file.",
     "A Claude worker can stall when the auto-mode classifier errors on every tool call; preserve its WIP with a lead-preserve commit and continue on Codex.",
-    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership."
+    "Do not exclude a site from a task because a sibling owns its type: 91081bd3's brief exempted archive/document scopes (c1c86312), and code-review failed REQ-01 on them. Split by what each criterion names, not by enum ownership.",
+    "An alias-flip cargo check stops at lib errors and never type-checks cfg(test); grep the changed API's call sites and comparisons in all test modules too (f265e748, 3 review rounds).",
+    "Unresolved request text is not an IssueId; error/DTO carriers of it stay strings (8acca4f4).",
+    "Codex re-adds #[allow(...)] even when a rework item forbids it; grep the diff for #[allow before review.",
+    "Write story-review gap tasks as class sweeps over the whole crate, not single sites (83d04069 needed 3 rounds)."
   ],
-  "session_note": "Session 3 in progress.",
+  "session_note": "Session 3 handoff written as handoff-2.md; see it for next actions.",
   "decisions": [
     {
       "issue": "8acca4f4",
       "decision": "Error/DTO carriers of unresolved CLI request text (DependencyBatchRejectedError.rejected, JsonError::issue_not_found) hold request text as &str/String, not IssueId; request text is a parsing-boundary value, not an issue id."
     }
+  ],
+  "stories_done": [
+    "5dd29767"
   ]
 }

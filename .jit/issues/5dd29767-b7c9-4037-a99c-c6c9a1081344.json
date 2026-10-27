@@ -11,6 +11,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: well-known files, schema paths and reserved targets go through VirtualPath, and ProfileId lives in the domain.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Well-known `.jit` files and schema paths come only from `VirtualPath` constants and constructors.\n- [hard] REQ-02: Reserved application targets are recognised by one `VirtualPath` predicate after classification.\n- [hard] REQ-03: `ProfileId` is a domain type, and profile dependency resolution compares `ProfileId` values.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:05:02.274832403Z",
   "first_ready_at": "2026-10-25T10:59:43.340186138Z",
   "gates_required": [
     "cargo-ci",
@@ -18,15 +19,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ddb10269-1736-4e68-b687-0206c02c6243",
+      "run_id": "3a0b992e-b189-46aa-829f-916e0bf27213",
       "status": "passed",
-      "updated_at": "2026-10-26T23:41:04.457194783Z",
+      "updated_at": "2026-10-27T00:04:54.255127258Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "b483297b-a2f4-4837-b419-fcefcdd09d5f",
-      "status": "failed",
-      "updated_at": "2026-10-26T23:36:09.451562404Z",
+      "run_id": "47fe80cd-ca4c-47c8-bb85-98ea2ad978b1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:01:18.701450204Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,7 +43,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository paths and profile identity are typed",
-  "updated_at": "2026-10-26T23:41:52.130412147Z"
+  "updated_at": "2026-10-27T00:05:02.274832403Z"
 }

@@ -226,7 +226,7 @@ fn issue_creation_spec(issue_id: &str) -> CaptureSpec {
 /// would have gone unnoticed; this pins that parity.
 #[test]
 fn test_session_published_issue_reads_back_typed_on_both_backends() {
-    let issue = crate::domain::fixture_issue("Crossing".to_string(), "body".to_string());
+    let issue = crate::test_utils::fixture_issue("Crossing".to_string(), "body".to_string());
     let issue_bytes = serialize_issue(&issue).unwrap();
 
     // Memory backend.
@@ -334,7 +334,7 @@ fn test_conformance_resolve_issue_id_resolves_prefixes_alike_on_both_backends() 
     use crate::domain::identity::IssueIdPrefix;
 
     fn issue_with_id(id: &str) -> Issue {
-        let mut issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Resolve".to_string(), String::new());
         issue.id = id.to_string();
         issue
     }
@@ -1856,7 +1856,7 @@ fn req01_instant() -> chrono::DateTime<chrono::Utc> {
 }
 
 fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-    let mut issue = crate::domain::fixture_issue("Determinism".into(), "Body".into());
+    let mut issue = crate::test_utils::fixture_issue("Determinism".into(), "Body".into());
     issue.id = id.to_string();
     issue.assignee = assignee;
     issue.created_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
@@ -1867,7 +1867,8 @@ fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
 }
 
 fn req01_map_issue(reverse: bool) -> Issue {
-    let mut issue = crate::domain::fixture_issue("Canonical backend retry".into(), "Body".into());
+    let mut issue =
+        crate::test_utils::fixture_issue("Canonical backend retry".into(), "Body".into());
     issue.id = "11111111-1111-4111-8111-111111111111".into();
     let order = if reverse { [1, 0] } else { [0, 1] };
     let context = [("alpha", "one"), ("zeta", "two")];
@@ -2584,7 +2585,7 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
     let events = VirtualPath::data("events.jsonl").unwrap();
     let index_bytes = crate::repository_state::fresh_index_bytes().unwrap();
 
-    let mut draft = crate::domain::fixture_issue("New".into(), "Body".into());
+    let mut draft = crate::test_utils::fixture_issue("New".into(), "Body".into());
     draft.state = crate::domain::State::Ready;
     let intents = || {
         [

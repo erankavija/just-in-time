@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f0d7a6ed0455553d7335db597d90f80cdaf119d",
+  "completed_at": "2026-10-27T00:46:17.038738352Z",
+  "duration_ms": 326138,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The four migrated CLI test modules use the shared JitCli fixture, scope JIT_LOCK_TIMEOUT through it, and retain their assertions; recorded cargo-ci evidence passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "07a1728d-4ade-4fad-9d21-d2aebbe3c8a8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6287a60d-7c54-4972-a423-d9fc8de099f2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:40:50.900336501Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 056835c9f; 6f0d7a6ed (scoped merge content matches 056835c9f)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-10-27T00:40:49Z; exit code unavailable); code-review pending\nTruncation recovery: Read per-path patches for all four scoped files; verified the merge’s scoped tree equals 056835c9f.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The four migrated CLI test modules use the shared JitCli fixture, scope JIT_LOCK_TIMEOUT through it, and retain their assertions; recorded cargo-ci evidence passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

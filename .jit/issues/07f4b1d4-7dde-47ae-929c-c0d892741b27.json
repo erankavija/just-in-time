@@ -30,7 +30,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Profiled-repository fixture keyed only on its inputs",
-  "updated_at": "2026-10-22T15:59:45.925648812Z"
+  "updated_at": "2026-10-27T00:51:01.417138504Z"
 }

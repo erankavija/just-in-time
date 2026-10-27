@@ -13,6 +13,7 @@
   ],
   "description": "Delete the `pub(crate)` issue-construction fixture in `domain/types.rs` once no library test calls it.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`; the unit tests in that module itself are its last callers.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/domain/types.rs` defines no issue-construction fixture, and no production module does.\n- [hard] REQ-02: The unit tests in `domain/types.rs` call the shared fixture and assert what they asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T01:01:07.013771398Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -30,7 +31,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "The library's own issue-construction fixture is deleted",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T01:01:07.013771398Z"
 }

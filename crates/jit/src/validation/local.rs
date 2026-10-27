@@ -386,14 +386,14 @@ fn schema_needs_sections(schema: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use crate::domain::Issue;
-    use crate::test_utils::document_reference_typed;
+    use crate::test_utils::{document_reference_typed, fixture_issue};
 
     fn rules_from(toml: &str) -> RuleSet {
         RuleSet::parse(toml, None, []).unwrap()
     }
 
     fn epic_without_req() -> Issue {
-        let mut issue = crate::domain::fixture_issue("An epic".to_string(), String::new());
+        let mut issue = fixture_issue("An epic".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string()];
         issue
     }
@@ -729,7 +729,7 @@ enforce = true
 assert = { require-doc-type = { doc-type = "design" } }
 "#,
         );
-        let mut task = crate::domain::fixture_issue("A task".to_string(), String::new());
+        let mut task = fixture_issue("A task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         // No design doc -> blocks.
         assert!(evaluate_local(&task, &rules, ContentFormat::Markdown)

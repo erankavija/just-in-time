@@ -8,43 +8,17 @@
 //! long after `jit init` baked the registry schema, and the first `enforces:`
 //! label failed `namespace-registry` against the frozen file.
 
-use jit::commands::CommandExecutor;
 use jit::domain::{ContentFormat, Issue, Priority};
-use jit::storage::{IssueStore, JsonFileStorage};
+use jit::test_utils::{file_executor, setup_test_repo_with_config};
 use jit::validation::evaluate_local;
 use std::fs;
-use tempfile::TempDir;
 
-fn executor(jit_dir: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
-    let storage = JsonFileStorage::new(jit_dir);
-    let layout =
-        jit::storage::discover_repository_layout(jit_dir.parent().unwrap(), storage.root())
-            .unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
-/// A freshly-`jit init`ed repo: `config.toml` with a single `type` namespace,
-/// plus the scaffolded `rules.toml` + baked `schemas/default-*.json`.
-fn setup_initialized_repo() -> (TempDir, std::path::PathBuf) {
-    jit::test_mode::enable();
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    fs::create_dir(&jit_dir).unwrap();
-    let config_toml = r#"
+/// A freshly initialised repo whose `config.toml` declares a single `type` namespace.
+const TYPE_ONLY_CONFIG: &str = r#"
 [namespaces.type]
 description = "Issue type"
 unique = true
 "#;
-    fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let initial_layout =
-        jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(initial_layout)
-        .initialize_fresh_repository(temp.path(), None)
-        .unwrap();
-    (temp, jit_dir)
-}
 
 /// Hand-declare an additional `enforces` namespace by REWRITING config.toml (the
 /// analogue of a human editing the registry). No `jit` command runs, so no
@@ -99,10 +73,11 @@ fn test_new_unique_namespace_enforces_uniqueness_without_regeneration() {
     // REQ-01 membership: a hand-declared UNIQUE namespace materializes its
     // `namespace-unique-*` rule from config at load, so a duplicate label in it
     // blocks — with no `rules.toml`/schema write in between.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
+    let jit_dir = temp.path().join(".jit");
     declare_unique_squad_namespace(&jit_dir);
 
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let rules = exec.effective_rules().unwrap();
     assert!(
         rules
@@ -130,7 +105,8 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
     // REQ-04: declare `enforces` in config.toml, apply an `enforces:` label, and
     // the label-validation path `jit validate` runs produces NO error finding —
     // with no regeneration step in between.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
+    let jit_dir = temp.path().join(".jit");
     declare_enforces_namespace(&jit_dir);
 
     // Precondition: the on-disk projection is STALE — its pattern does not admit
@@ -150,7 +126,7 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
     // path `jit validate <id>` uses (`run_rules`), on a FRESH executor so the
     // config cache reflects the hand edit — REQ-04's literal scenario.
     let issue = issue_with_label("enforces:gate-semantics");
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let id = exec
         .issues()
         .create_issue(
@@ -178,9 +154,9 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
 fn test_undeclared_namespace_still_fails_validation() {
     // Boundary: a namespace NOT in the registry still fails `namespace-registry`,
     // so derive-at-load did not blanket-accept every namespace.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
 
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let rules = exec.effective_rules().unwrap();
     let eval = evaluate_local(
         &issue_with_label("undeclared:x"),
@@ -202,10 +178,11 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
     // End-to-end through the store: create an issue carrying the new-namespace
     // label (never blocked — namespace-registry is enforce=false), then confirm
     // re-loading and evaluating it yields no namespace error.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
+    let jit_dir = temp.path().join(".jit");
     declare_enforces_namespace(&jit_dir);
 
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let (id, _warnings) = exec
         .issues()
         .create_issue(
@@ -220,7 +197,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
         )
         .unwrap();
 
-    let reloaded = executor(&jit_dir);
+    let reloaded = file_executor(temp.path()).unwrap();
     let issue = reloaded.get_issue(&id).unwrap();
     let rules = reloaded.effective_rules().unwrap();
     let eval = evaluate_local(&issue, rules, ContentFormat::Markdown).unwrap();
@@ -245,11 +222,12 @@ fn namespace_registry_projection(jit_dir: &std::path::Path) -> std::path::PathBu
 fn test_missing_default_schema_still_validates_and_enforces() {
     // F1: a DELETED default projection must not break validation — the default
     // rules derive from config, so `effective_rules` loads and they still enforce.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
+    let jit_dir = temp.path().join(".jit");
     let taxonomy = jit::test_taxonomy::test_taxonomy();
     std::fs::remove_file(namespace_registry_projection(&jit_dir)).unwrap();
 
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let rules = exec
         .effective_rules()
         .expect("a missing default projection must not fail rule loading");
@@ -285,10 +263,11 @@ fn test_missing_default_schema_still_validates_and_enforces() {
 #[test]
 fn test_corrupt_default_schema_still_validates_and_enforces() {
     // F1: a MALFORMED default projection is likewise non-fatal.
-    let (_temp, jit_dir) = setup_initialized_repo();
+    let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
+    let jit_dir = temp.path().join(".jit");
     std::fs::write(namespace_registry_projection(&jit_dir), "{ not valid json").unwrap();
 
-    let exec = executor(&jit_dir);
+    let exec = file_executor(temp.path()).unwrap();
     let rules = exec
         .effective_rules()
         .expect("a malformed default projection must not fail rule loading");

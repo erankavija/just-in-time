@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
+    "10ae7776-7840-4fbc-937b-ce2cc371e07b",
     "1622756a-d805-40b4-a5af-37dadcc6a683",
     "179dcef9-71f8-41d0-a871-696c989d0ee4",
     "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
@@ -31,15 +32,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1b63fe53-ef0c-4efd-ade7-531d6f518588",
+      "run_id": "bd2eca27-ebe2-4251-9bca-c07087c2ab5d",
       "status": "passed",
-      "updated_at": "2026-10-26T23:41:04.754599074Z",
+      "updated_at": "2026-10-27T00:08:33.479566499Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "688386cf-b081-4e83-be5a-cbfe806c301e",
+      "run_id": "9d45dccb-9140-46bb-a6c1-8a9a3b6ee051",
       "status": "failed",
-      "updated_at": "2026-10-26T23:36:13.281815302Z",
+      "updated_at": "2026-10-27T00:06:19.396480739Z",
       "updated_by": "auto:executor"
     }
   },
@@ -59,5 +60,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Closed vocabularies state their wire spelling once",
-  "updated_at": "2026-10-26T23:41:52.512490161Z"
+  "updated_at": "2026-10-27T00:08:57.312168054Z"
 }

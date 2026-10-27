@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e0e87e1f31b77b67314af43c96d7131fa4ef4a5",
+  "completed_at": "2026-10-27T00:58:21.466790765Z",
+  "duration_ms": 91897,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied; no blocking or advisory findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "53f78490-ca3e-4bb4-aa18-503d2e04df97",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "04495760-82dd-48cd-8750-2b58352c6691",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:56:49.569280945Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0a218b15 (substantive); 3e0e87e (merge, no combined-diff resolution)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/semantic-types (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-04 (.jit issue markdown); @/gate/cargo-ci, @/gate/mcp-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable); mcp-ci passed (exit 0)\nTruncation recovery: partitioned tagged patch reads by path; inspected merge with --cc; narrowed AGENTS discovery to tracked repository paths\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied; no blocking or advisory findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

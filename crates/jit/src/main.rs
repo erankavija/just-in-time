@@ -1203,7 +1203,7 @@ fn run_item_inner<S: IssueStore>(
     fn print_list(result: &ItemListResult, json: bool, quiet: bool) -> Result<()> {
         let output_ctx = OutputContext::new(quiet, json);
         if json {
-            let msg = format!("Found {} item(s)", result.count);
+            let msg = format!("Found {} item(s)", result.count());
             let output = JsonOutput::success(result).with_message(msg);
             println!("{}", output.to_json_string()?);
         } else if result.items.is_empty() {
@@ -1276,7 +1276,7 @@ fn run_invariant_inner<S: IssueStore>(
             let output_ctx = OutputContext::new(quiet, json);
             if json {
                 let msg = if exit_nonzero {
-                    format!("Enforcement drift: {} finding(s)", result.count)
+                    format!("Enforcement drift: {} finding(s)", result.count())
                 } else {
                     "No enforcement drift".to_string()
                 };
@@ -1288,15 +1288,15 @@ fn run_invariant_inner<S: IssueStore>(
                 }
                 let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
-            } else if result.findings.is_empty() {
+            } else if result.items.is_empty() {
                 output_ctx.print_data("No enforcement drift".to_string())?;
             } else {
-                for finding in &result.findings {
+                for finding in &result.items {
                     // Every finding is declared-but-unenforced (the sole drift
                     // direction); the message names that direction inline.
                     println!("error: {}", finding.message());
                 }
-                eprintln!("Enforcement drift: {} finding(s)", result.count);
+                eprintln!("Enforcement drift: {} finding(s)", result.count());
             }
             // Exit non-zero (4) when any drift is present, matching the project's
             // validation-failed convention. Done AFTER emitting output so `--json`
@@ -1354,13 +1354,13 @@ fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
             let result = executor.project_render(name.as_deref())?;
             let output_ctx = OutputContext::new(quiet, json);
             if json {
-                let msg = format!("Rendered {} projection(s)", result.count);
+                let msg = format!("Rendered {} projection(s)", result.count());
                 let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
-            } else if result.projections.is_empty() {
+            } else if result.items.is_empty() {
                 output_ctx.print_data("No projections declared".to_string())?;
             } else {
-                for projection in &result.projections {
+                for projection in &result.items {
                     output_ctx.print_data(format!(
                         "Rendered projection '{}' to {} ({} mode, {} style)",
                         projection.name, projection.target, projection.mode, projection.style
@@ -4888,20 +4888,20 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let result = executor.list_document_references(&id)?;
 
                 if json {
-                    let msg = format!("{} document(s) attached", result.count);
+                    let msg = format!("{} document(s) attached", result.count());
                     let output = JsonOutput::success(&result).with_message(msg);
                     println!("{}", output.to_json_string()?);
-                } else if result.documents.is_empty() {
+                } else if result.items.is_empty() {
                     output_ctx.print_data(format!(
                         "No document references for issue {}",
-                        result.issue_id
+                        result.extras.issue_id
                     ))?;
                 } else {
                     output_ctx.print_data(format!(
                         "Document references for issue {}:",
-                        result.issue_id
+                        result.extras.issue_id
                     ))?;
-                    for doc in &result.documents {
+                    for doc in &result.items {
                         let mut line = format!("  - {}", doc.path);
                         if let Some(ref label) = doc.label {
                             line.push_str(&format!(" ({})", label));
@@ -4916,7 +4916,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
                         output_ctx.print_data(line)?;
                     }
-                    output_ctx.print_data(format!("\nTotal: {}", result.count))?;
+                    output_ctx.print_data(format!("\nTotal: {}", result.count()))?;
                 }
             }
             DocCommands::Remove { id, path } => {
@@ -5114,12 +5114,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let result = executor.list_document_assets(&id, &path, rescan)?;
 
                     // Print warnings first if any
-                    for warning in &result.warnings {
+                    for warning in &result.extras.warnings {
                         output_ctx.print_warning(warning)?;
                     }
 
                     if json {
-                        let msg = format!("{} assets found", result.summary.total);
+                        let msg = format!("{} assets found", result.extras.summary.total);
                         let output = JsonOutput::success(&result).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
@@ -5127,16 +5127,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                         output_ctx.print_data(format!(
                             "Assets for document {} (issue {}):",
-                            result.document_path,
-                            result.issue_id.short_id()
+                            result.extras.document_path,
+                            result.extras.issue_id.short_id()
                         ))?;
 
-                        if result.assets.is_empty() {
+                        if result.items.is_empty() {
                             output_ctx.print_data("  No assets found for this document")?;
                         } else {
                             // Categorize and check existence
                             let per_doc: Vec<_> = result
-                                .assets
+                                .items
                                 .iter()
                                 .filter(|a| !a.is_shared && a.asset_type == AssetType::Local)
                                 .map(|a| {
@@ -5149,7 +5149,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 })
                                 .collect();
                             let shared: Vec<_> = result
-                                .assets
+                                .items
                                 .iter()
                                 .filter(|a| a.is_shared && a.asset_type == AssetType::Local)
                                 .map(|a| {
@@ -5162,12 +5162,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 })
                                 .collect();
                             let external: Vec<_> = result
-                                .assets
+                                .items
                                 .iter()
                                 .filter(|a| a.asset_type == AssetType::External)
                                 .collect();
                             let missing: Vec<_> = result
-                                .assets
+                                .items
                                 .iter()
                                 .filter(|a| a.asset_type == AssetType::Missing)
                                 .collect();
@@ -5229,11 +5229,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                             output_ctx.print_data(format!(
                                 "\nSummary: {} total ({} per-doc, {} shared, {} external, {} missing)",
-                                result.summary.total,
-                                result.summary.per_doc,
-                                result.summary.shared,
-                                result.summary.external,
-                                result.summary.missing
+                                result.extras.summary.total,
+                                result.extras.summary.per_doc,
+                                result.extras.summary.shared,
+                                result.extras.summary.external,
+                                result.extras.summary.missing
                             ))?;
                         }
                     }

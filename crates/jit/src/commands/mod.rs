@@ -106,6 +106,7 @@ use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::identity::IssueId;
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::{
     is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
     LabelNamespaces, Priority, ReadinessCorrection, State,
@@ -115,6 +116,7 @@ use crate::labels as label_utils;
 use crate::storage::IssueStore;
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
+use schemars::JsonSchema;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::sync::OnceLock;
@@ -1834,12 +1836,21 @@ pub struct StatusSummary {
     pub total: usize,
 }
 
+/// Collection key of [`DocumentListResult`].
+pub enum DocumentsKey {}
+
+impl CollectionKey for DocumentsKey {
+    const KEY: &'static str = "documents";
+}
+
 /// Result of listing document references for an issue
-#[derive(Debug, Serialize)]
-pub struct DocumentListResult {
+pub type DocumentListResult =
+    ListEnvelope<DocumentsKey, crate::domain::DocumentReference, DocumentListScope>;
+
+/// The issue a [`DocumentListResult`] lists documents of.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DocumentListScope {
     pub issue_id: IssueId,
-    pub documents: Vec<crate::domain::DocumentReference>,
-    pub count: usize,
 }
 
 /// Git history for a document
@@ -1849,14 +1860,21 @@ pub struct DocumentHistory {
     pub commits: Vec<CommitInfo>,
 }
 
+/// Collection key of [`AssetListResult`].
+pub enum AssetsKey {}
+
+impl CollectionKey for AssetsKey {
+    const KEY: &'static str = "assets";
+}
+
 /// Result of listing assets for a document
-#[derive(Debug, Serialize)]
-pub struct AssetListResult {
+pub type AssetListResult = ListEnvelope<AssetsKey, crate::document::Asset, AssetListScope>;
+
+/// Fields of an [`AssetListResult`] beside its `assets`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct AssetListScope {
     pub issue_id: IssueId,
     pub document_path: String,
-    /// Number of assets in `assets` (list envelope `count`; equals `assets.len()`).
-    pub count: usize,
-    pub assets: Vec<crate::document::Asset>,
     pub summary: AssetSummary,
     pub warnings: Vec<String>,
 }
@@ -1898,7 +1916,7 @@ pub struct DocumentRemoveResult {
 }
 
 /// Summary of asset counts by category
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct AssetSummary {
     pub total: usize,
     pub per_doc: usize,
@@ -3485,7 +3503,7 @@ mod tests {
 
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let type_name = taxonomy.type_at_level(4).to_string();
-        let mut issue = crate::domain::fixture_issue("Transition".into(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Transition".into(), String::new());
         issue.labels = vec![format!("type:{type_name}")];
 
         let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
@@ -3736,7 +3754,7 @@ mod tests {
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        let mut issue = crate::domain::fixture_issue("checked".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("checked".to_string(), String::new());
         issue.state = State::Ready;
         issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
         issue.gates_status.insert(
@@ -3886,7 +3904,7 @@ mod tests {
         use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
 
         let storage = InMemoryStorage::new();
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "captured-retry-issue".to_string(),
             "Captured retry".to_string(),
         );
@@ -3946,7 +3964,7 @@ mod tests {
 
     #[test]
     fn test_captured_issue_idempotent_retry_derives_true_noop() {
-        let mut issue = crate::domain::fixture_issue(
+        let mut issue = crate::test_utils::fixture_issue(
             "captured-noop-issue".to_string(),
             "Captured no-op".to_string(),
         );
@@ -3982,7 +4000,7 @@ mod tests {
                 &storage,
                 &manual_gate_registry("review"),
             );
-            let mut issue = crate::domain::fixture_issue(
+            let mut issue = crate::test_utils::fixture_issue(
                 format!("repeat-{status:?}"),
                 "Repeated evidence".to_string(),
             );
@@ -4086,7 +4104,7 @@ mod tests {
 
     #[test]
     fn test_manual_gate_pending_status_is_rejected_before_other_validation() {
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "pending-precedence".to_string(),
             "Pending precedence".to_string(),
         );
@@ -4126,8 +4144,10 @@ mod tests {
             &storage,
             &manual_gate_registry("review"),
         );
-        let issue =
-            crate::domain::fixture_issue("registry-race".to_string(), "Registry race".to_string());
+        let issue = crate::test_utils::fixture_issue(
+            "registry-race".to_string(),
+            "Registry race".to_string(),
+        );
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
@@ -4339,7 +4359,7 @@ assert = {}
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4366,7 +4386,7 @@ enforce_leases = "off"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4387,7 +4407,7 @@ enforce_leases = "off"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4418,7 +4438,7 @@ enforce_leases = "strict"
         let storage = InMemoryStorage::new();
 
         // Create a test issue
-        let issue = crate::domain::fixture_issue("test-issue".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -4478,13 +4498,7 @@ enforce_leases = "strict"
 
         let repo = tempfile::TempDir::new().unwrap();
         std::fs::create_dir(repo.path().join(".jit")).unwrap();
-        assert!(std::process::Command::new("git")
-            .arg("init")
-            .arg("-q")
-            .arg(repo.path())
-            .status()
-            .unwrap()
-            .success());
+        crate::test_cli::init_git_repository(repo.path()).unwrap();
         let paths = WorktreePaths::detect_from(repo.path()).unwrap();
         let coordinator = ClaimCoordinator::new(
             paths.clone(),

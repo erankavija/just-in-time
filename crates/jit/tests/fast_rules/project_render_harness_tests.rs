@@ -157,9 +157,9 @@ style = "id-anchor"
 
     let executor = render_executor(&storage);
     let result = executor.project_render(Some("charter")).unwrap();
-    assert_eq!(result.count, 1);
-    assert_eq!(result.projections[0].target, "AGENTS.md");
-    assert_eq!(result.projections[0].count, 2);
+    assert_eq!(result.count(), 1);
+    assert_eq!(result.items[0].target, "AGENTS.md");
+    assert_eq!(result.items[0].count, 2);
 
     let updated = storage.read_repo_file("AGENTS.md").unwrap().unwrap();
     // The self-id prefix (`D-1: `) is stripped, not doubled (REQ-06 shape).
@@ -218,8 +218,8 @@ style = "id-anchor"
         .expect("prime the executor's stale config cache");
     let result = executor.project_render(Some("charter")).unwrap();
 
-    assert_eq!(result.projections[0].target, "CAPTURED.md");
-    assert_eq!(result.projections[0].count, 1);
+    assert_eq!(result.items[0].target, "CAPTURED.md");
+    assert_eq!(result.items[0].count, 1);
     assert_eq!(
         storage.read_repo_file("CAPTURED.md").unwrap().unwrap(),
         "- **D-1** — Captured authority\n"
