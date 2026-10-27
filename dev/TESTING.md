@@ -580,7 +580,10 @@ Three environment behaviors matter when writing tests:
   environment; tests that spawn the binary pass the variable with `Command::env`.
 - **Process-wide state** (environment variables, working directory) is changed only through
   `EnvGuard` and `CurrentDirGuard` in `test_utils.rs`, which serialise access and restore the
-  prior value. `scratch_build/process_state_policy_tests.rs` rejects any other call.
+  prior value. `scratch_build/process_state_policy_tests.rs` rejects any other call. A test whose
+  code reads a variable some test sets holds `EnvGuard` across the read; prefer passing the value
+  explicitly (`Command::env`, a function parameter), which needs no guard. No other lock
+  serialises this state.
 - **Selected doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`.
   Keep them for non-obvious workflows and material contracts, not as one-per-public-API
   coverage: each snippet carries a separate rustdoc compilation cost. When an example is

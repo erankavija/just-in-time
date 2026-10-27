@@ -1047,19 +1047,15 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_scrubs_inherited_listen_pid() {
-        let mut env = crate::test_utils::EnvGuard::acquire();
-
-        // Simulate a parent process environment that already carries a
-        // foreign LISTEN_PID — e.g. jit itself was launched under a
-        // socket-activation manager, or a stale exported shell variable
-        // lingers. `Command` inherits the parent's environment by default,
-        // so without an explicit removal this would reach the child
-        // unchanged and cause listenfd to reject our LISTEN_FDS on a PID
-        // mismatch, falling back to a re-bind (the race REQ-2 forbids).
-        env.set("LISTEN_PID", "1");
-
+        // A foreign LISTEN_PID reaching the child — e.g. jit itself was
+        // launched under a socket-activation manager, or a stale exported
+        // shell variable lingers — makes listenfd reject our LISTEN_FDS on a
+        // PID mismatch, falling back to a re-bind (the race REQ-2 forbids).
+        // The command carries it explicitly, so the test never changes the
+        // process environment other tests' children inherit.
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("true");
+        cmd.env("LISTEN_PID", "1");
         let result = inherit_listener(&mut cmd, &listener);
 
         result.unwrap();
@@ -1068,7 +1064,7 @@ mod tests {
         // value means an explicit `env_remove`, which unconditionally wins
         // over whatever the parent process's real environment carries at
         // spawn time — this is the property that makes the fix correct
-        // regardless of the ambient LISTEN_PID set above.
+        // regardless of an inherited LISTEN_PID.
         let envs: std::collections::HashMap<String, Option<String>> = cmd
             .get_envs()
             .map(|(k, v)| {
@@ -1098,16 +1094,13 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_child_never_sees_inherited_listen_pid() {
-        let mut env = crate::test_utils::EnvGuard::acquire();
-
         // End-to-end version of the assertion above: actually spawn a child
         // and inspect the environment it received, so the test fails if
         // `Command`'s override semantics ever change out from under the
         // `get_envs`-only assertion in the sibling test.
-        env.set("LISTEN_PID", "999999");
-
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("env");
+        cmd.env("LISTEN_PID", "999999");
         let inherit_result = inherit_listener(&mut cmd, &listener);
         let output = inherit_result.and_then(|()| {
             cmd.output()
@@ -1119,8 +1112,8 @@ mod tests {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !stdout.lines().any(|line| line.starts_with("LISTEN_PID=")),
-            "child must not see a LISTEN_PID inherited from the parent's own \
-             environment; got env:\n{stdout}"
+            "child must not see a LISTEN_PID that reached its command before \
+             the handoff; got env:\n{stdout}"
         );
         assert!(
             stdout.lines().any(|line| line == "LISTEN_FDS=1"),
