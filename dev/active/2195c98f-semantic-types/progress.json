@@ -729,7 +729,8 @@
   "91081bd3": 2,
   "d72bf093": 1,
   "f265e748": 2,
-  "8acca4f4": 2
+  "8acca4f4": 2,
+  "10ae7776": 1
  },
  "external_blockers": {
   "c780514e test-topology (led by session just-in-time-4f)": [
@@ -1332,6 +1333,12 @@
    "model": "gpt-6.1-sol",
    "effort": "high",
    "reason": "Code-review rework 2 (final): typed batch target for gate evaluate-many; no stringified IssueIds into identity fields."
+  },
+  {
+   "issue": "10ae7776",
+   "vendor": "claude",
+   "model": "opus",
+   "reason": "whole-crate vocabulary sweep; rework 1 after code-review F1 (multi-token lists in rustdoc/fixtures)"
   }
  ],
  "surfaced_pitfalls": [
@@ -1395,6 +1402,10 @@
   {
    "issue": "8acca4f4",
    "decision": "Error/DTO carriers of unresolved CLI request text (DependencyBatchRejectedError.rejected, JsonError::issue_not_found) hold request text as &str/String, not IssueId; request text is a parsing-boundary value, not an issue id."
+  },
+  {
+   "issue": "10ae7776",
+   "decision": "Invoker: REQ-01 stays literal; no exemption for canonical contract suites (archive-plan schema-v1 golden token pins removed)."
   }
  ],
  "stories_done": [
