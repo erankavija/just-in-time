@@ -4,54 +4,22 @@
 //! exit by default, and `--reduce` makes it succeed while leaving `jit validate`
 //! clean.
 
-use std::process::Command;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
-
-fn create_issue(dir: &std::path::Path, title: &str) -> String {
-    let out = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title])
-        .current_dir(dir)
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn dep_add(dir: &std::path::Path, from: &str, to: &str, extra: &[&str]) -> std::process::Output {
-    let mut args = vec!["dep", "add", from, to];
-    args.extend_from_slice(extra);
-    Command::new(jit_binary())
-        .args(&args)
-        .current_dir(dir)
-        .output()
-        .unwrap()
-}
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::setup_test_repo_with_taxonomy;
 
 /// REQ-01: a redundant `jit dep add` exits nonzero and names the offending pair.
 #[test]
 fn test_cli_dep_add_redundant_edge_rejected_nonzero() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let x = create_issue(dir, "X");
-    let y = create_issue(dir, "Y");
-    let z = create_issue(dir, "Z");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let x = cli.create_issue(["-t", "X"]).unwrap();
+    let y = cli.create_issue(["-t", "Y"]).unwrap();
+    let z = cli.create_issue(["-t", "Z"]).unwrap();
 
-    assert!(dep_add(dir, &x, &y, &[]).status.success());
-    assert!(dep_add(dir, &x, &z, &[]).status.success());
+    cli.run(["dep", "add", &x, &y]).unwrap();
+    cli.run(["dep", "add", &x, &z]).unwrap();
 
     // Adding Y → Z makes the pre-existing X → Z redundant: rejected, nonzero.
-    let out = dep_add(dir, &y, &z, &[]);
+    let out = cli.command(["dep", "add", &y, &z]).output().unwrap();
     assert!(!out.status.success(), "redundant add must exit nonzero");
     assert_eq!(
         out.status.code(),
@@ -65,11 +33,7 @@ fn test_cli_dep_add_redundant_edge_rejected_nonzero() {
     );
 
     // The write did not happen: validate is still clean.
-    let val = Command::new(jit_binary())
-        .args(["validate"])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    let val = cli.command(["validate"]).output().unwrap();
     assert!(
         val.status.success(),
         "no partial write should have occurred"
@@ -79,16 +43,18 @@ fn test_cli_dep_add_redundant_edge_rejected_nonzero() {
 /// REQ-01 (JSON): the rejection surfaces as a VALIDATION_FAILED JSON error, exit 4.
 #[test]
 fn test_cli_dep_add_redundant_edge_json_error() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let x = create_issue(dir, "X");
-    let y = create_issue(dir, "Y");
-    let z = create_issue(dir, "Z");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let x = cli.create_issue(["-t", "X"]).unwrap();
+    let y = cli.create_issue(["-t", "Y"]).unwrap();
+    let z = cli.create_issue(["-t", "Z"]).unwrap();
 
-    assert!(dep_add(dir, &x, &y, &[]).status.success());
-    assert!(dep_add(dir, &x, &z, &[]).status.success());
+    cli.run(["dep", "add", &x, &y]).unwrap();
+    cli.run(["dep", "add", &x, &z]).unwrap();
 
-    let out = dep_add(dir, &y, &z, &["--json"]);
+    let out = cli
+        .command(["dep", "add", &y, &z, "--json"])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(4));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -101,23 +67,21 @@ fn test_cli_dep_add_redundant_edge_json_error() {
 /// leaves `jit validate` clean.
 #[test]
 fn test_cli_dep_add_reduce_succeeds_and_validate_clean() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let x = create_issue(dir, "X");
-    let y = create_issue(dir, "Y");
-    let z = create_issue(dir, "Z");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let x = cli.create_issue(["-t", "X"]).unwrap();
+    let y = cli.create_issue(["-t", "Y"]).unwrap();
+    let z = cli.create_issue(["-t", "Z"]).unwrap();
 
-    assert!(dep_add(dir, &x, &y, &[]).status.success());
-    assert!(dep_add(dir, &x, &z, &[]).status.success());
+    cli.run(["dep", "add", &x, &y]).unwrap();
+    cli.run(["dep", "add", &x, &z]).unwrap();
 
-    let out = dep_add(dir, &y, &z, &["--reduce"]);
-    assert!(out.status.success(), "--reduce add must succeed");
-
-    let val = Command::new(jit_binary())
-        .args(["validate"])
-        .current_dir(dir)
+    let out = cli
+        .command(["dep", "add", &y, &z, "--reduce"])
         .output()
         .unwrap();
+    assert!(out.status.success(), "--reduce add must succeed");
+
+    let val = cli.command(["validate"]).output().unwrap();
     assert!(
         val.status.success(),
         "validate must be clean after --reduce add: {}",
@@ -134,22 +98,17 @@ fn test_cli_dep_add_reduce_succeeds_and_validate_clean() {
 /// together, not one at a time.
 #[test]
 fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let a = create_issue(dir, "A");
-    let b = create_issue(dir, "B");
-    let c = create_issue(dir, "C");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let a = cli.create_issue(["-t", "A"]).unwrap();
+    let b = cli.create_issue(["-t", "B"]).unwrap();
+    let c = cli.create_issue(["-t", "C"]).unwrap();
 
     // Pre-existing B -> C, so a later A -> C is redundant once A -> B is added.
-    assert!(dep_add(dir, &b, &c, &[]).status.success());
+    cli.run(["dep", "add", &b, &c]).unwrap();
 
     // Variadic: A -> B (valid alone) and A -> C (redundant only in
     // combination with A -> B).
-    let out = Command::new(jit_binary())
-        .args(["dep", "add", &a, &b, &c])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    let out = cli.command(["dep", "add", &a, &b, &c]).output().unwrap();
     assert!(
         !out.status.success(),
         "a redundant edge among the targets must fail the command; stdout={} stderr={}",
@@ -164,9 +123,8 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
 
     // All-or-nothing: A -> B must NOT have been persisted either, even though
     // it would have succeeded on its own.
-    let show = Command::new(jit_binary())
-        .args(["issue", "show", &a, "--json"])
-        .current_dir(dir)
+    let show = cli
+        .command(["issue", "show", &a, "--json"])
         .output()
         .unwrap();
     assert!(show.status.success());
@@ -180,9 +138,8 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
 
     // Nothing was written, so the pre-existing B -> C edge is exactly as it
     // was: still direct, not shadowed by any A edge.
-    let show_b = Command::new(jit_binary())
-        .args(["issue", "show", &b, "--json"])
-        .current_dir(dir)
+    let show_b = cli
+        .command(["issue", "show", &b, "--json"])
         .output()
         .unwrap();
     assert!(show_b.status.success());
@@ -201,20 +158,18 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
 /// the not-found code (3), names only the unresolved id, and writes nothing.
 #[test]
 fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let a = create_issue(dir, "A");
-    let b = create_issue(dir, "B");
-    let c = create_issue(dir, "C");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let a = cli.create_issue(["-t", "A"]).unwrap();
+    let b = cli.create_issue(["-t", "B"]).unwrap();
+    let c = cli.create_issue(["-t", "C"]).unwrap();
 
     // A -> B -> C exist, so a direct A -> C is self-redundant.
-    assert!(dep_add(dir, &a, &b, &[]).status.success());
-    assert!(dep_add(dir, &b, &c, &[]).status.success());
+    cli.run(["dep", "add", &a, &b]).unwrap();
+    cli.run(["dep", "add", &b, &c]).unwrap();
 
     // Text mode: exit 3 (not found).
-    let out = Command::new(jit_binary())
-        .args(["dep", "add", &a, &c, "zzzz"])
-        .current_dir(dir)
+    let out = cli
+        .command(["dep", "add", &a, &c, "zzzz"])
         .output()
         .unwrap();
     assert!(!out.status.success());
@@ -233,9 +188,8 @@ fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
 
     // JSON mode: same exit code, ISSUE_NOT_FOUND at top level, only the
     // unresolved id in details.rejected.
-    let out_json = Command::new(jit_binary())
-        .args(["dep", "add", &a, &c, "zzzz", "--json"])
-        .current_dir(dir)
+    let out_json = cli
+        .command(["dep", "add", &a, &c, "zzzz", "--json"])
         .output()
         .unwrap();
     assert_eq!(out_json.status.code(), Some(3));
@@ -250,9 +204,8 @@ fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
     assert_eq!(codes, vec!["ISSUE_NOT_FOUND"], "{rejected:?}");
 
     // Nothing was written.
-    let show = Command::new(jit_binary())
-        .args(["issue", "show", &a, "--json"])
-        .current_dir(dir)
+    let show = cli
+        .command(["issue", "show", &a, "--json"])
         .output()
         .unwrap();
     let json_a: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
@@ -272,23 +225,18 @@ fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
 /// nothing gets written.
 #[test]
 fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
-    let temp = setup_test_repo();
-    let dir = temp.path();
-    let a = create_issue(dir, "A");
-    let b = create_issue(dir, "B");
-    let c = create_issue(dir, "C");
-    let d = create_issue(dir, "D");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let a = cli.create_issue(["-t", "A"]).unwrap();
+    let b = cli.create_issue(["-t", "B"]).unwrap();
+    let c = cli.create_issue(["-t", "C"]).unwrap();
+    let d = cli.create_issue(["-t", "D"]).unwrap();
 
-    assert!(dep_add(dir, &a, &b, &[]).status.success());
-    assert!(dep_add(dir, &b, &c, &[]).status.success());
-    assert!(dep_add(dir, &d, &a, &[]).status.success());
+    cli.run(["dep", "add", &a, &b]).unwrap();
+    cli.run(["dep", "add", &b, &c]).unwrap();
+    cli.run(["dep", "add", &d, &a]).unwrap();
 
     // Text mode: both edges named.
-    let out = Command::new(jit_binary())
-        .args(["dep", "add", &a, &d, &c])
-        .current_dir(dir)
-        .output()
-        .unwrap();
+    let out = cli.command(["dep", "add", &a, &d, &c]).output().unwrap();
     assert!(!out.status.success());
     assert_eq!(out.status.code(), Some(4));
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -302,9 +250,8 @@ fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
     );
 
     // JSON mode: both edges present in details.rejected with their own codes.
-    let out_json = Command::new(jit_binary())
-        .args(["dep", "add", &a, &d, &c, "--json"])
-        .current_dir(dir)
+    let out_json = cli
+        .command(["dep", "add", &a, &d, &c, "--json"])
         .output()
         .unwrap();
     assert_eq!(out_json.status.code(), Some(4));
@@ -320,9 +267,8 @@ fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
     assert_eq!(by_to.get(c.as_str()), Some(&"VALIDATION_FAILED"));
 
     // Nothing was written.
-    let show = Command::new(jit_binary())
-        .args(["issue", "show", &a, "--json"])
-        .current_dir(dir)
+    let show = cli
+        .command(["issue", "show", &a, "--json"])
         .output()
         .unwrap();
     let json_a: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
