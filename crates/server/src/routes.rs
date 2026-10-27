@@ -1080,6 +1080,7 @@ async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl 
 mod tests {
     use super::*;
     use axum_test::TestServer;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
     use jit::storage::{InMemoryStorage, RepositoryStateStore};
 
@@ -1112,15 +1113,6 @@ mod tests {
         }
     }
 
-    fn write_test_config(storage: &jit::storage::InMemoryStorage, config: &str) {
-        let path = test_repository_layout(storage)
-            .resolve(&jit::repository_state::VirtualPath::CONFIG)
-            .unwrap();
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, config).unwrap();
-        storage.add_data_file("config.toml", config);
-    }
-
     fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
     where
         S: IssueStore + RepositoryStateStore,
@@ -1129,22 +1121,23 @@ mod tests {
         Arc::new(CommandExecutor::new(storage).with_layout(layout))
     }
 
-    fn test_memory_storage() -> InMemoryStorage {
-        let storage = InMemoryStorage::new();
-        // The taxonomy the taxonomy-serving routes answer with, declared by this
-        // repository. The config-reading routes resolve it through a
-        // `ConfigManager` rooted at the store, so it is written there as well as
-        // into the memory image.
-        let config = format!(
+    /// The taxonomy the taxonomy-serving routes answer with, declared by this
+    /// repository.
+    fn taxonomy_config() -> String {
+        format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             jit::test_taxonomy::test_taxonomy().config_fragment()
-        );
-        write_test_config(&storage, &config);
-        storage.add_data_file(
-            "index.json",
-            r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,
-        );
-        storage
+        )
+    }
+
+    fn test_app(executor: CommandExecutor<InMemoryStorage>) -> TestServer {
+        let state = AppState {
+            executor: Arc::new(executor),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        TestServer::new(create_routes(state)).unwrap()
     }
 
     fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
@@ -1159,23 +1152,15 @@ mod tests {
             .unwrap();
     }
 
-    fn create_test_app() -> TestServer {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let app = create_routes(state);
-        TestServer::new(app).unwrap()
-    }
-
     #[tokio::test]
     async fn test_health_check() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/health").await;
         response.assert_status_ok();
         let body: serde_json::Value = response.json();
@@ -1187,7 +1172,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_issues_empty() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/issues").await;
         response.assert_status_ok();
         let issues: Vec<Issue> = response.json();
@@ -1196,22 +1187,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_issue_not_found() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/issues/nonexistent").await;
         response.assert_status(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
     async fn test_get_issue_rejects_too_short_id_prefix() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/issues/abc").await;
         response.assert_status(StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
     async fn test_list_issues_with_data() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         // Create test issues
         let (_id1, _) = executor
@@ -1259,9 +1267,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_graph() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         // Create issues with dependencies
         let (id1, _) = executor
@@ -1314,17 +1326,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_graph_returns_server_error_for_invalid_hierarchy() {
-        let storage = test_memory_storage();
-        let config = jit::test_taxonomy::invalid_hierarchy_config_fragment();
-        write_test_config(&storage, &config);
-
-        let state = AppState {
-            executor: test_executor(storage),
-            tracker: Arc::new(ChangeTracker::new(16)),
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let server = TestServer::new(create_routes(state)).unwrap();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&jit::test_taxonomy::invalid_hierarchy_config_fragment()),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         server
             .get("/graph")
@@ -1336,9 +1345,13 @@ mod tests {
     /// `nodes` rather than `edges` (which differ in number here).
     #[tokio::test]
     async fn test_get_graph_body_carries_node_count() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let new = |title: &str| {
             executor
                 .issues()
@@ -1381,9 +1394,13 @@ mod tests {
     /// type value, so the client derives none of them.
     #[tokio::test]
     async fn test_get_graph_nodes_carry_resolved_hierarchy() {
-        let storage = test_memory_storage();
-
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let new = |title: &str, labels: Vec<String>| {
             executor
                 .issues()
@@ -1449,14 +1466,20 @@ mod tests {
     /// A node with no `type:` label reports a null type and an orphan resolution.
     #[tokio::test]
     async fn test_get_graph_untyped_node_has_null_type() {
-        let storage = test_memory_storage();
+        let storage = InMemoryStorage::new();
         // The repository declares a default type, so an issue reaches the store
         // without a `type:` label only when it is seeded rather than created.
         let mut untyped = jit::domain::Issue::draft("Untyped".to_string(), String::new());
         untyped.id = "untyped-node".to_string();
         storage.seed_issue_fixture(&untyped);
 
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1479,8 +1502,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_status() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
 
         let (_id, _) = executor
             .issues()
@@ -1515,7 +1543,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_endpoint_requires_query() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/search").await;
         // Should fail without query parameter
         assert!(response.status_code() != StatusCode::OK);
@@ -1523,7 +1557,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_endpoint_empty_results() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Search for something that doesn't exist
         let response = server.get("/search?q=nonexistent").await;
 
@@ -1538,7 +1578,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_response_structure() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/search?q=test&limit=10").await;
 
         if response.status_code() == StatusCode::OK {
@@ -1555,14 +1601,26 @@ mod tests {
         // This test verifies that search is restricted to issue documents
         // by checking that get_issue_document_paths is called
         // (implementation detail test - would need integration test for full verification)
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let _response = server.get("/search?q=test").await;
         // If it doesn't panic or error, the issue-document logic is being used
     }
 
     #[tokio::test]
     async fn test_get_strategic_types() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/strategic-types").await;
         response.assert_status_ok();
         let data: StrategicTypesResponse = response.json();
@@ -1572,7 +1630,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_hierarchy() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/hierarchy").await;
         response.assert_status_ok();
         let data: HierarchyResponse = response.json();
@@ -1600,7 +1664,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_namespaces() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/config/namespaces").await;
         response.assert_status_ok();
         let data: NamespacesResponse = response.json();
@@ -1666,7 +1736,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_missing_param() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/documents").await;
         // Should fail without path parameter
         assert!(response.status_code() != StatusCode::OK);
@@ -1674,7 +1750,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_nonexistent() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/documents?path=nonexistent.md").await;
         // Should return 404 for file that doesn't exist
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
@@ -2060,7 +2142,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_by_path_not_found() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server
             .get("/documents/raw")
             .add_query_param("path", "no_such_file.html")
@@ -2070,7 +2158,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_changes_returns_version() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/changes").await;
         response.assert_status_ok();
         let data: ChangesResponse = response.json();
@@ -2079,8 +2173,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_changes_reflects_tracker_state() {
-        let storage = test_memory_storage();
-        let executor = test_executor(storage);
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Simulate a change
@@ -2134,7 +2233,13 @@ unique = false
     /// missing file (relying on typed dispatch, not string-matching).
     #[tokio::test]
     async fn test_get_document_by_path_not_found_returns_404() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents")
@@ -2147,7 +2252,13 @@ unique = false
     /// missing file (relying on typed dispatch, not string-matching).
     #[tokio::test]
     async fn test_get_document_raw_by_path_returns_404_for_missing() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         // Repo-relative path (absolute paths are rejected as InvalidPath → 400).
         let response = server
             .get("/documents/raw")
@@ -2803,7 +2914,13 @@ unique = false
         // The normalised path `bar` doesn't exist, so the expected status is
         // 404 (not 400).  Any 4xx response is acceptable; 400 from the storage
         // validator would also be fine.
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/foo/../bar").await;
         assert!(
             response.status_code().is_client_error(),
@@ -2816,7 +2933,13 @@ unique = false
     async fn test_get_raw_wildcard_rejects_embedded_dotdot() {
         // Same normalisation behaviour as the above test: `/raw/a/../b` → `/raw/b`.
         // The file doesn't exist, so we get 404.  Any 4xx is the invariant.
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/a/../b").await;
         assert!(
             response.status_code().is_client_error(),
@@ -2827,7 +2950,13 @@ unique = false
 
     #[tokio::test]
     async fn test_get_raw_wildcard_404_for_missing_file() {
-        let server = create_test_app();
+        let server = test_app(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
         let response = server.get("/raw/definitely/does/not/exist.svg").await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
     }
