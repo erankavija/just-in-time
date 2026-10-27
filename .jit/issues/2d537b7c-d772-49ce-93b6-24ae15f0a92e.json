@@ -9,6 +9,7 @@
   ],
   "description": "Delete the harness demonstration suite, whose remaining cases re-prove properties owned elsewhere.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/harness_demo.rs` re-proves queries, blocking, cycle rejection and gates, which their domain, graph and gate tests own; its unique cases already have owners. `fast_docs_templates/main.rs` declares it, and `dev/TESTING.md` (`:86`, `:161`, `:166`, `:562`, `:615`, `:716`, `:747`) cites it as a worked example.\n\n## Success Criteria\n\n- [hard] REQ-01: `harness_demo.rs` no longer exists, and `fast_docs_templates/main.rs` does not declare it.\n- [hard] REQ-02: Each property it re-proved has an owning test elsewhere.\n- [hard] REQ-03: `dev/TESTING.md` cites owning tests as worked examples where it cited the demonstration.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T22:15:14.487143540Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -40,7 +41,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "The harness demonstration suite is deleted",
-  "updated_at": "2026-10-27T21:50:48.574369061Z"
+  "updated_at": "2026-10-27T22:15:14.487143540Z"
 }
