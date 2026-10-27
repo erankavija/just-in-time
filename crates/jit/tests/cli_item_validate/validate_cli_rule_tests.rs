@@ -11,7 +11,6 @@ use serde_json::Value;
 use std::fs;
 use std::process::Command;
 
-/// Append `rules_toml` to the profiled repository's `.jit/rules.toml`.
 fn append_rules(cli: &JitCli, rules_toml: &str) {
     let rules_path = cli.root().join(".jit/rules.toml");
     let mut rules = fs::read_to_string(&rules_path).unwrap();
