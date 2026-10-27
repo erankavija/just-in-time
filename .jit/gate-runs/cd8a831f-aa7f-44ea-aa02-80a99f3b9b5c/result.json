@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-55e3d3fd",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "3bd4abb0cf8f379245bc55d4827dbc051b492b3d",
+  "completed_at": "2026-10-27T21:34:16.063087478Z",
+  "duration_ms": 5008,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "6338fb53f8236f7ac22a4279dfa597efe76d2d75cdfd6e068e9e51b60dc70536",
+  "issue_id": "55e3d3fd-4fe9-4c16-a2f4-e463b9994f41",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cd8a831f-aa7f-44ea-aa02-80a99f3b9b5c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:34:11.054616705Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nerror[E0463]: can't find crate for `axum_core`\nerror[E0463]: can't find crate for `serde`\nerror[E0432]: unresolved imports `super::rejection::FailedToResolveHost`, `super::rejection::HostRejection`\nerror[E0432]: unresolved import `super::rejection::NestedPathRejection`\nerror: could not compile `axum` (lib) due to 4 previous errors\nwarning: build failed, waiting for other jobs to finish...\nerror[E0463]: can't find crate for `chrono`\nerror[E0463]: can't find crate for `serde_json`\nerror[E0463]: can't find crate for `serde`\nerror[E0463]: can't find crate for `jsonschema`\nerror[E0463]: can't find crate for `schemars`\nerror[E0463]: can't find crate for `uuid`\nerror[E0463]: can't find crate for `toml_edit`\nerror: could not compile `jit` (lib) due to 7 previous errors\n--- suite-build output ---\ninfo: experimental features enabled: setup-scripts\n   Compiling jit v1.0.0 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-55e3d3fd/crates/jit)\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nwarning: ignoring -C extra-filename flag due to -o flag\n\nerror[E0463]: can't find crate for `uuid`\n  --> crates/jit/src/domain/identity.rs:11:5\n   |\n11 | use uuid::Uuid;\n   |     ^^^^ can't find crate\n\nerror[E0463]: can't find crate for `jsonschema`\n  --> crates/jit/src/validation/engine.rs:46:5\n   |\n46 | use jsonschema::error::ValidationErrorKind;\n   |     ^^^^^^^^^^ can't find crate\n\nFor more information about this error, try `rustc --explain E0463`.\nwarning: `jit` (lib) generated 1 warning\nerror: could not compile `jit` (lib) due to 2 previous errors; 1 warning emitted\nerror: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101\n--- test failures ---\ninfo: experimental features enabled: setup-scripts\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\n   Compiling jit v1.0.0 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-55e3d3fd/crates/jit)\nwarning: ignoring -C extra-filename flag due to -o flag\n\nerror[E0463]: can't find crate for `uuid`\n  --> crates/jit/src/domain/identity.rs:11:5\n   |\n11 | use uuid::Uuid;\n   |     ^^^^ can't find crate\n\nerror[E0463]: can't find crate for `jsonschema`\n  --> crates/jit/src/validation/engine.rs:46:5\n   |\n46 | use jsonschema::error::ValidationErrorKind;\n   |     ^^^^^^^^^^ can't find crate\n\nFor more information about this error, try `rustc --explain E0463`.\nwarning: `jit` (lib) generated 1 warning\nerror: could not compile `jit` (lib) due to 2 previous errors; 1 warning emitted\nerror: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101\n--- doctest failures ---\n--- excluded-tests output ---\ncargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement\n--- budget diagnostics ---\ncat: /tmp/tmp.fdmpvfDFAz/suite-artifacts.json: No such file or directory\n--- suite-clock scope ---\nsuite-clock 1718 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: error: command `/home/vkaskivuo/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101.\n  ✓ fmt: ok (1559 ms)\n  ✗ clippy: FAILED (exit 101) (612 ms)\n  ✗ suite-build: FAILED (exit 1) (975 ms)\n  ✗ test: FAILED (exit 101) (961 ms)\n  ✗ doctest: FAILED (exit 101) (748 ms)\n  ✓ suite-clock: 1718 ms\n  ✗ excluded-tests: FAILED (exit 1) (4 ms)\n  ✗ budget: FAILED (exit 1) (58 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}
