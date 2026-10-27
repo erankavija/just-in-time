@@ -35,50 +35,23 @@
 //!   parallel structured store is written under `.jit/`.
 //! - REQ-04: every test below runs under `cargo test`.
 
-use jit::commands::CommandExecutor;
-use jit::storage::{IssueStore, JsonFileStorage};
-use serde_json::Value;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
+use jit::test_utils::setup_test_repo_with_config;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Build a fresh repo from the shared taxonomy fixture and declare `risk`.
-fn setup_test_repo() -> TempDir {
-    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    let config_path = temp.path().join(".jit/config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap();
-    config.push_str(
-        "\n[item_kinds.risk]\n\
+/// The shared taxonomy configuration plus the `risk` kind declaration (the
+/// engine bakes in no kinds). The declaration mirrors the one the package
+/// supplies, so the tests exercise the shipped kind shape.
+fn risk_config() -> String {
+    format!(
+        "{}\n[item_kinds.risk]\n\
          section = \"risks\"\n\
          id-pattern = \"RISK-[0-9]+\"\n\
          markers = []\n\
          link-namespaces = [\"mitigates\", \"resolves\"]\n\
          scope = \"issue\"\n\
          source-of-truth = \"markdown-first\"\n",
-    );
-    std::fs::write(config_path, config).unwrap();
-    temp
-}
-
-/// Create an issue with `body` through the real CLI and return its 8-char short id.
-fn create_issue(repo: &Path, title: &str, body: &str) -> String {
-    let output = Command::new(jit_binary())
-        .args(["issue", "create", "-t", title, "-d", body, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue create failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let full_id = json["id"].as_str().expect("created issue has an id");
-    full_id.chars().take(8).collect()
+        jit::test_taxonomy::test_taxonomy().config_fragment()
+    )
 }
 
 #[test]
@@ -86,25 +59,18 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
     // REQ-01: in a fixture-initialized repo with the configured `risk` kind, `jit item list
     // --kind risk` returns risk items parsed from an issue's `## Risks` section
     // — exercised through the actual binary.
-    let temp = setup_test_repo();
-    let short = create_issue(
-        temp.path(),
-        "Migration plan",
-        "## Risks\n\n- RISK-01: data loss during migration\n- RISK-02: performance regression\n",
-    );
+    let cli = JitCli::with_repository(setup_test_repo_with_config(&risk_config()).unwrap().0);
+    let short = cli
+        .create_issue([
+            "-t",
+            "Migration plan",
+            "-d",
+            "## Risks\n\n- RISK-01: data loss during migration\n- RISK-02: performance regression\n",
+        ])
+        .unwrap()[..8]
+        .to_owned();
 
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "risk", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "item list --kind risk failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 2);
     let items = json["items"].as_array().unwrap();
     for item in items {
@@ -118,64 +84,17 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
     assert!(qids.contains(&format!("@/issue/{short}/risk/RISK-02").as_str()));
 }
 
-/// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
-/// `config.toml` declares the `risk` kind (the engine bakes in no kinds), seed
-/// `issues`, and return it paired with the seeded issues' short ids in insertion
-/// order.
-///
-/// The declared `risk` kind brings the `mitigates` and `resolves` link namespaces;
-/// this declaration mirrors the one the package supplies, so the test exercises the
-/// shipped kind shape, not an arbitrary override.
-fn default_executor_with(
-    repo: &Path,
-    issues: Vec<(&str, &str)>,
-) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let jit_dir = repo.join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-    std::fs::write(
-        jit_dir.join("config.toml"),
-        format!(
-            "{}[item_kinds.risk]\n\
-         section = \"risks\"\n\
-         id-pattern = \"RISK-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"mitigates\", \"resolves\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-            taxonomy.config_fragment()
-        ),
-    )
-    .unwrap();
-    let storage = JsonFileStorage::new(&jit_dir);
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(repo, None)
-        .unwrap();
-    let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
-    let mut shorts = Vec::new();
-    for (title, body) in issues {
-        shorts.push(crate::create_issue(&executor, title, body));
-    }
-    (executor, shorts)
-}
-
 #[test]
 fn test_default_repo_mitigates_label_resolves_risk() {
     // REQ-02 (mitigates): a `mitigates:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `mitigates` namespace.
-    let temp = TempDir::new().unwrap();
-    let (exec, shorts) = default_executor_with(
-        temp.path(),
-        vec![(
-            "Migration plan",
-            "## Risks\n\n- RISK-01: data loss during migration\n",
-        )],
+    let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
+    let short = &crate::create_issue(
+        &exec,
+        "Migration plan",
+        "## Risks\n\n- RISK-01: data loss during migration\n",
     );
-    let short = &shorts[0];
 
     let label = format!("mitigates:{short}/RISK-01");
     let resolved = exec
@@ -201,15 +120,12 @@ fn test_default_repo_resolves_label_resolves_risk() {
     // REQ-02 (resolves): a `resolves:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `resolves` namespace.
-    let temp = TempDir::new().unwrap();
-    let (exec, shorts) = default_executor_with(
-        temp.path(),
-        vec![(
-            "Migration plan",
-            "## Risks\n\n- RISK-01: data loss during migration\n",
-        )],
+    let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
+    let short = &crate::create_issue(
+        &exec,
+        "Migration plan",
+        "## Risks\n\n- RISK-01: data loss during migration\n",
     );
-    let short = &shorts[0];
 
     let label = format!("resolves:{short}/RISK-01");
     let resolved = exec
@@ -236,29 +152,23 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
     // index is a pure projection — there is no parallel structured store — so
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no risk store file is written under `.jit/`.
-    let temp = setup_test_repo();
-    let short = create_issue(
-        temp.path(),
-        "Migration plan",
-        "## Risks\n\n- RISK-01: data loss during migration\n",
-    );
+    let cli = JitCli::with_repository(setup_test_repo_with_config(&risk_config()).unwrap().0);
+    let short = cli
+        .create_issue([
+            "-t",
+            "Migration plan",
+            "-d",
+            "## Risks\n\n- RISK-01: data loss during migration\n",
+        ])
+        .unwrap()[..8]
+        .to_owned();
 
-    let count_risks = |repo: &Path| -> u64 {
-        let output = Command::new(jit_binary())
-            .args(["item", "list", "--kind", "risk", "--json"])
-            .current_dir(repo)
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-        json["count"].as_u64().unwrap()
-    };
-
-    assert_eq!(count_risks(temp.path()), 1);
+    let listed = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
+    assert_eq!(listed["count"].as_u64().unwrap(), 1);
 
     // No parallel structured store: nothing under `.jit/` persists risks; the
     // ONLY place RISK-01 appears is the issue's own JSON description.
-    let jit_dir = temp.path().join(".jit");
+    let jit_dir = cli.root().join(".jit");
     for entry in std::fs::read_dir(&jit_dir).unwrap() {
         let path = entry.unwrap().path();
         if !path.is_file() {
@@ -293,30 +203,17 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
 
     // Editing the markdown description (the sole source) changes the index: drop
     // RISK-01, add RISK-02 and RISK-03.
-    let output = Command::new(jit_binary())
-        .args([
-            "issue",
-            "update",
-            &short,
-            "-d",
-            "## Risks\n\n- RISK-02: schema drift\n- RISK-03: timeline overrun\n",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "issue update failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    cli.run([
+        "issue",
+        "update",
+        &short,
+        "-d",
+        "## Risks\n\n- RISK-02: schema drift\n- RISK-03: timeline overrun\n",
+    ])
+    .unwrap();
 
     // The index now reflects ONLY the edited markdown.
-    let output = Command::new(jit_binary())
-        .args(["item", "list", "--kind", "risk", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 2);
     let self_ids: Vec<&str> = json["items"]
         .as_array()
