@@ -400,7 +400,7 @@ jit query blocked --full --json | jq
 unpassed gate):
 ```
 Blocked issues:
-  abc123 | Feature Integration | High
+  abc123 | Feature Integration | high
     - dependency:def456 (Unit Tests:in_progress)
     - dependency:ghi789 (API Documentation:backlog)
 
