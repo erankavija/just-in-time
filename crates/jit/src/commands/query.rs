@@ -94,26 +94,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority_filter: Option<Priority>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
-        let mut issues = self.storage.list_issues()?;
-
-        // Apply filters
-        if let Some(state) = state_filter {
-            issues.retain(|i| i.state == state);
-        }
-        if let Some(assignee) = assignee_filter {
-            issues.retain(|i| i.assignee.as_ref().is_some_and(|a| a == assignee));
-        }
-        if let Some(priority) = priority_filter {
-            issues.retain(|i| i.priority == priority);
-        }
-        if !label_filters.is_empty() {
-            let label_matches = self.query_by_labels(label_filters)?;
-            let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| i.id.as_str()).collect();
-            issues.retain(|i| label_ids.contains(i.id.as_str()));
-        }
-
-        Ok(issues)
+        let issues = self.storage.list_issues()?;
+        label_filters
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        Ok(crate::domain::queries::query_all(
+            &issues,
+            crate::domain::queries::AllFilter {
+                state: state_filter,
+                assignee: assignee_filter,
+                priority: priority_filter,
+                labels: label_filters,
+            },
+        ))
     }
 
     /// Query available issues with optional filters (unassigned + state=ready + unblocked)

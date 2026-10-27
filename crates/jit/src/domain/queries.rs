@@ -8,6 +8,39 @@ use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
+/// Optional restrictions on all issues; every supplied filter must match.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct AllFilter<'a> {
+    pub state: Option<State>,
+    pub assignee: Option<&'a str>,
+    pub priority: Option<Priority>,
+    pub labels: &'a [String],
+}
+
+/// Return issues admitted by every filter, preserving input order.
+pub fn query_all(issues: &[Issue], filter: AllFilter<'_>) -> Vec<Issue> {
+    issues
+        .iter()
+        .filter(|issue| {
+            filter.state.is_none_or(|state| issue.state == state)
+                && filter.assignee.is_none_or(|assignee| {
+                    issue
+                        .assignee
+                        .as_ref()
+                        .is_some_and(|value| value == assignee)
+                })
+                && filter
+                    .priority
+                    .is_none_or(|priority| issue.priority == priority)
+                && filter
+                    .labels
+                    .iter()
+                    .all(|pattern| crate::labels::matches_pattern(&issue.labels, pattern))
+        })
+        .cloned()
+        .collect()
+}
+
 /// Optional restrictions on available work; label patterns are AND-combined.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AvailableFilter<'a> {
@@ -393,6 +426,173 @@ mod tests {
     use super::*;
 
     use proptest::prelude::*;
+
+    fn all_filter_issues() -> Vec<Issue> {
+        (0..16)
+            .map(|bits| {
+                let mut issue = state_issue(
+                    bits,
+                    if bits & 1 == 0 {
+                        State::Ready
+                    } else {
+                        State::Done
+                    },
+                );
+                issue.assignee = Some(
+                    if bits & 2 == 0 { "agent:a" } else { "agent:b" }
+                        .parse()
+                        .unwrap(),
+                );
+                issue.priority = if bits & 4 == 0 {
+                    Priority::High
+                } else {
+                    Priority::Low
+                };
+                issue.labels = vec![if bits & 8 == 0 {
+                    "component:api"
+                } else {
+                    "component:web"
+                }
+                .into()];
+                issue
+            })
+            .collect()
+    }
+
+    fn assert_query_all_intersects(
+        filter: AllFilter<'_>,
+        first: impl Fn(&[Issue]) -> Vec<Issue>,
+        second: impl Fn(&[Issue]) -> Vec<Issue>,
+    ) {
+        let issues = all_filter_issues();
+        assert_eq!(
+            ids_of(&query_all(&issues, filter)),
+            ids_of(&second(&first(&issues))),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_state_and_assignee() {
+        assert_query_all_intersects(
+            AllFilter {
+                state: Some(State::Ready),
+                assignee: Some("agent:a"),
+                ..AllFilter::default()
+            },
+            |issues| query_by_state(issues, State::Ready),
+            |issues| query_by_assignee(issues, "agent:a"),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_state_and_priority() {
+        assert_query_all_intersects(
+            AllFilter {
+                state: Some(State::Ready),
+                priority: Some(Priority::High),
+                ..AllFilter::default()
+            },
+            |issues| query_by_state(issues, State::Ready),
+            |issues| query_by_priority(issues, Priority::High),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_state_and_labels() {
+        let labels = ["component:api".into()];
+        assert_query_all_intersects(
+            AllFilter {
+                state: Some(State::Ready),
+                labels: &labels,
+                ..AllFilter::default()
+            },
+            |issues| query_by_state(issues, State::Ready),
+            |issues| query_by_labels(issues, &labels),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_assignee_and_priority() {
+        assert_query_all_intersects(
+            AllFilter {
+                assignee: Some("agent:a"),
+                priority: Some(Priority::High),
+                ..AllFilter::default()
+            },
+            |issues| query_by_assignee(issues, "agent:a"),
+            |issues| query_by_priority(issues, Priority::High),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_assignee_and_labels() {
+        let labels = ["component:api".into()];
+        assert_query_all_intersects(
+            AllFilter {
+                assignee: Some("agent:a"),
+                labels: &labels,
+                ..AllFilter::default()
+            },
+            |issues| query_by_assignee(issues, "agent:a"),
+            |issues| query_by_labels(issues, &labels),
+        );
+    }
+
+    #[test]
+    fn test_query_all_composes_priority_and_labels() {
+        let labels = ["component:api".into()];
+        assert_query_all_intersects(
+            AllFilter {
+                priority: Some(Priority::High),
+                labels: &labels,
+                ..AllFilter::default()
+            },
+            |issues| query_by_priority(issues, Priority::High),
+            |issues| query_by_labels(issues, &labels),
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn test_query_all_returns_exactly_issues_admitted_by_every_filter(
+            entries in proptest::collection::vec(
+                (0..State::ALL.len(), 0usize..3, 0..Priority::ALL.len(), 0u8..8), 0..40,
+            ),
+            state_index in proptest::option::of(0..State::ALL.len()),
+            assignee_index in proptest::option::of(0usize..3),
+            priority_index in proptest::option::of(0..Priority::ALL.len()),
+            label_indexes in proptest::collection::vec(0usize..5, 0..4),
+        ) {
+            let issue_labels = ["component:api", "component:web", "epic:auth"];
+            let patterns = ["component:api", "component:*", "epic:auth", "epic:*", "component:absent"];
+            let assignees = ["agent:a", "agent:b", "agent:absent"];
+            let issues: Vec<_> = entries.into_iter().enumerate().map(|(index, (s, a, p, labels))| {
+                let mut issue = state_issue(index, State::ALL[s]);
+                issue.assignee = (a < 2).then(|| assignees[a].parse().unwrap());
+                issue.priority = Priority::ALL[p];
+                issue.labels = issue_labels.iter().enumerate()
+                    .filter(|(bit, _)| labels & (1 << bit) != 0)
+                    .map(|(_, label)| (*label).to_string()).collect();
+                issue
+            }).collect();
+            let state = state_index.map(|index| State::ALL[index]);
+            let assignee = assignee_index.map(|index| assignees[index]);
+            let priority = priority_index.map(|index| Priority::ALL[index]);
+            let labels: Vec<_> = label_indexes.into_iter().map(|index| patterns[index].into()).collect();
+            let admitted = [
+                state.map(|state| query_by_state(&issues, state)),
+                assignee.map(|assignee| query_by_assignee(&issues, assignee)),
+                priority.map(|priority| query_by_priority(&issues, priority)),
+                Some(query_by_labels(&issues, &labels)),
+            ];
+            let expected: Vec<_> = issues.iter()
+                .filter(|issue| admitted.iter().flatten()
+                    .all(|matches| matches.iter().any(|candidate| candidate.id == issue.id)))
+                .map(|issue| issue.id.as_str()).collect();
+            let actual = query_all(&issues, AllFilter { state, assignee, priority, labels: &labels });
+            prop_assert_eq!(ids_of(&actual), expected);
+        }
+    }
 
     fn available_issue(index: usize, priority: Priority, labels: &[&str]) -> Issue {
         let mut issue = labeled_issue(&format!("Issue {index}"), labels);
@@ -849,6 +1049,16 @@ mod tests {
         assert!(query_by_labels(&[], &patterns).is_empty());
         assert!(query_strategic(&[], &["epic".to_string()]).is_empty());
         assert!(query_available(&[], AvailableFilter::default()).is_empty());
+    }
+
+    #[test]
+    fn test_query_ready_includes_ready_issue_with_unpassed_required_gates() {
+        let mut issue = state_issue(0, State::Ready);
+        issue.gates_required = vec!["tests".into()];
+        assert_eq!(
+            ids_of(&query_ready(std::slice::from_ref(&issue))),
+            [issue.id.as_str()]
+        );
     }
 
     #[test]
