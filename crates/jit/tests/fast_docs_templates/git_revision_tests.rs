@@ -1,4 +1,5 @@
 use jit::storage::{GitRevisionError, GitRevisionResolver};
+use jit::test_cli::init_git_repository;
 #[cfg(unix)]
 use jit::test_harness::git::GitStandIn;
 use std::collections::BTreeMap;
@@ -16,9 +17,7 @@ impl Repo {
     fn new() -> Self {
         let temp = TempDir::new().unwrap();
         let root = temp.path().to_path_buf();
-        git(&root, &["init"]);
-        git(&root, &["config", "user.name", "Test User"]);
-        git(&root, &["config", "user.email", "test@example.com"]);
+        init_git_repository(&root).unwrap();
         Self { _temp: temp, root }
     }
 
