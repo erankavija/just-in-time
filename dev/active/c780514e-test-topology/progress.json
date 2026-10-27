@@ -1266,6 +1266,13 @@
       "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
       "reason": "user-approved option A for the session-2 JitCli capability escalation",
       "wired": "depends on 2b49f95b; 870e8e46, 9c3b9da2, 8e69776c depend on it"
+    },
+    {
+      "session": 4,
+      "id": "ea5ffaba",
+      "title": "Domain owners for query-all filter composition and gated readiness",
+      "reason": "3f15b95c REQ-01/REQ-02 gap: query_all composition lives in commands/query.rs and gated-ready had no domain owner; upstream owner task 1d52a376 left them uncovered",
+      "wired": "3f15b95c depends on it"
     }
   ],
   "escalations": [
@@ -2007,7 +2014,8 @@
     "077937f5-s4": "lead PASS e648f9cb8 (Codex luna); lib suite verified outside sandbox",
     "harness-s4": "lead PASS 50b800bb cce28f9fe, 2d537b7c 36fb35636; cargo-ci + code-review pass both; :314 owners accepted (resolve_link_label in commands/item.rs, triple in domain/item.rs); dev/benchmarks harness_demo mentions kept as recorded evidence",
     "b7078f0d-r2-s4": "lead PASS b6fabbf18; cargo-ci + code-review 80443928 pass; closed",
-    "529f621d-r1-s4": "lead PASS eb68c7ff2 (Codex sol): delete + dependency-removal cascades apply issues_becoming_ready; new delete-event-order owner"
+    "529f621d-r1-s4": "lead PASS eb68c7ff2 (Codex sol): delete + dependency-removal cascades apply issues_becoming_ready; new delete-event-order owner",
+    "querygraph-s4": "lead PASS 14d95c74 883e6282e, 28373fb7 053f04103, 37c169ad 0379fe956, 8da3f7f5 cf5e548c2; 3f15b95c 87e5e404a partial (4 semantic cases + misfiled test_issue_release remain) pending ea5ffaba"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [

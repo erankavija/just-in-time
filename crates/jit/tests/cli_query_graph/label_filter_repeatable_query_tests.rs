@@ -12,91 +12,19 @@
 //! - A multi-label filter with no matching issue returns an empty result,
 //!   not an error.
 
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::{
+    membership_label, setup_test_repo_with_taxonomy, type_label, TaxonomyRepo,
+};
 use serde_json::Value;
-use std::process::Command;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> crate::TaxonomyRepo {
-    crate::setup_test_repo_with_taxonomy()
-}
 
 /// Create an issue with the given labels, returning its id.
-fn create_issue<L: AsRef<str>>(dir: &std::path::Path, title: &str, labels: &[L]) -> String {
-    let mut args: Vec<String> = vec![
-        "issue".into(),
-        "create".into(),
-        "--title".into(),
-        title.into(),
-        "--description".into(),
-        format!("Description for {title}"),
-    ];
-    for label in labels {
-        args.push("--label".into());
-        args.push(label.as_ref().into());
-    }
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(&args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "create failed for {title}\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string()
-}
-
-fn set_state(dir: &std::path::Path, id: &str, state: &str) {
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(["issue", "update", id, "--state", state])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "state update to {state} failed for {id}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-fn add_dep(dir: &std::path::Path, from_id: &str, to_id: &str) {
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(["dep", "add", from_id, to_id])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "dep add failed: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-fn run_json<A: AsRef<std::ffi::OsStr> + std::fmt::Debug>(
-    dir: &std::path::Path,
-    args: &[A],
-) -> Value {
-    let out = Command::new(jit_binary())
-        .current_dir(dir)
-        .args(args.iter().map(AsRef::as_ref))
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "command failed for args {args:?}\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    serde_json::from_slice(&out.stdout).unwrap()
+fn create_labeled_issue<L: AsRef<str>>(cli: &JitCli, title: &str, labels: &[L]) -> String {
+    let description = format!("Description for {title}");
+    let args = ["--title", title, "--description", &description]
+        .into_iter()
+        .chain(labels.iter().flat_map(|label| ["--label", label.as_ref()]));
+    cli.create_issue(args).unwrap()
 }
 
 fn ids(json: &Value) -> Vec<String> {
@@ -112,58 +40,53 @@ fn ids(json: &Value) -> Vec<String> {
 
 #[test]
 fn test_query_all_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
-    create_issue(temp.path(), "ComponentOnly", &["component:api"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
+    create_labeled_issue(&cli, "ComponentOnly", &["component:api"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "query",
             "all",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_all_repeatable_label_zero_match() {
-    let temp = setup_test_repo();
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
-    create_issue(temp.path(), "ComponentOnly", &["component:api"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
+    create_labeled_issue(&cli, "ComponentOnly", &["component:api"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "query",
             "all",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(json["count"], 0);
     assert!(ids(&json).is_empty());
 }
 
 #[test]
 fn test_query_all_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
 
-    let json = run_json(
-        temp.path(),
-        &["query", "all", "--label", "epic:auth", "--json"],
-    );
+    let json = cli
+        .run_json(["query", "all", "--label", "epic:auth"])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -171,35 +94,32 @@ fn test_query_all_single_label_regression() {
 
 #[test]
 fn test_query_available_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "query",
             "available",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_available_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
 
-    let json = run_json(
-        temp.path(),
-        &["query", "available", "--label", "epic:auth", "--json"],
-    );
+    let json = cli
+        .run_json(["query", "available", "--label", "epic:auth"])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -207,45 +127,42 @@ fn test_query_available_single_label_regression() {
 
 #[test]
 fn test_query_blocked_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let parent = create_issue(temp.path(), "Parent", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let parent = create_labeled_issue(&cli, "Parent", &[] as &[&str]);
 
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    add_dep(temp.path(), &both, &parent);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    cli.run(["dep", "add", &both, &parent]).unwrap();
 
-    let epic_only = create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
-    add_dep(temp.path(), &epic_only, &parent);
+    let epic_only = create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
+    cli.run(["dep", "add", &epic_only, &parent]).unwrap();
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "query",
             "blocked",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_blocked_single_label_regression() {
-    let temp = setup_test_repo();
-    let parent = create_issue(temp.path(), "Parent", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let parent = create_labeled_issue(&cli, "Parent", &[] as &[&str]);
 
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    add_dep(temp.path(), &tagged, &parent);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    cli.run(["dep", "add", &tagged, &parent]).unwrap();
 
-    let untagged = create_issue(temp.path(), "Untagged", &[] as &[&str]);
-    add_dep(temp.path(), &untagged, &parent);
+    let untagged = create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
+    cli.run(["dep", "add", &untagged, &parent]).unwrap();
 
-    let json = run_json(
-        temp.path(),
-        &["query", "blocked", "--label", "epic:auth", "--json"],
-    );
+    let json = cli
+        .run_json(["query", "blocked", "--label", "epic:auth"])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -253,54 +170,43 @@ fn test_query_blocked_single_label_regression() {
 
 #[test]
 fn test_query_strategic_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let strategic = crate::type_label(&temp.taxonomy, 2);
-    let component = crate::membership_label(&temp.taxonomy, 3, "api");
-    let team = crate::membership_label(&temp.taxonomy, 1, "backend");
-    let both = create_issue(
-        temp.path(),
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let strategic = type_label(&taxonomy, 2);
+    let component = membership_label(&taxonomy, 3, "api");
+    let team = membership_label(&taxonomy, 1, "backend");
+    let both = create_labeled_issue(
+        &cli,
         "Both",
         &[strategic.clone(), component.clone(), team.clone()],
     );
-    create_issue(
-        temp.path(),
-        "ComponentOnly",
-        &[strategic, component.clone()],
-    );
+    create_labeled_issue(&cli, "ComponentOnly", &[strategic, component.clone()]);
 
-    let args = vec![
-        "query".to_string(),
-        "strategic".to_string(),
-        "--label".to_string(),
-        component,
-        "--label".to_string(),
-        team,
-        "--json".to_string(),
-    ];
-    let json = run_json(temp.path(), &args);
+    let json = cli
+        .run_json([
+            "query",
+            "strategic",
+            "--label",
+            &component,
+            "--label",
+            &team,
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_strategic_single_label_regression() {
-    let temp = setup_test_repo();
-    let strategic = crate::type_label(&temp.taxonomy, 2);
-    let component = crate::membership_label(&temp.taxonomy, 3, "api");
-    let tagged = create_issue(
-        temp.path(),
-        "Tagged",
-        &[strategic.clone(), component.clone()],
-    );
-    create_issue(temp.path(), "Untagged", &[strategic]);
+    let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
+    let cli = JitCli::with_repository(temp);
+    let strategic = type_label(&taxonomy, 2);
+    let component = membership_label(&taxonomy, 3, "api");
+    let tagged = create_labeled_issue(&cli, "Tagged", &[strategic.clone(), component.clone()]);
+    create_labeled_issue(&cli, "Untagged", &[strategic]);
 
-    let args = vec![
-        "query".to_string(),
-        "strategic".to_string(),
-        "--label".to_string(),
-        component,
-        "--json".to_string(),
-    ];
-    let json = run_json(temp.path(), &args);
+    let json = cli
+        .run_json(["query", "strategic", "--label", &component])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -308,39 +214,40 @@ fn test_query_strategic_single_label_regression() {
 
 #[test]
 fn test_query_closed_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    set_state(temp.path(), &both, "done");
-    let epic_only = create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
-    set_state(temp.path(), &epic_only, "done");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    cli.run(["issue", "update", &both, "--state", "done"])
+        .unwrap();
+    let epic_only = create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
+    cli.run(["issue", "update", &epic_only, "--state", "done"])
+        .unwrap();
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "query",
             "closed",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_closed_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    set_state(temp.path(), &tagged, "done");
-    let untagged = create_issue(temp.path(), "Untagged", &[] as &[&str]);
-    set_state(temp.path(), &untagged, "done");
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    cli.run(["issue", "update", &tagged, "--state", "done"])
+        .unwrap();
+    let untagged = create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
+    cli.run(["issue", "update", &untagged, "--state", "done"])
+        .unwrap();
 
-    let json = run_json(
-        temp.path(),
-        &["query", "closed", "--label", "epic:auth", "--json"],
-    );
+    let json = cli
+        .run_json(["query", "closed", "--label", "epic:auth"])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -348,35 +255,32 @@ fn test_query_closed_single_label_regression() {
 
 #[test]
 fn test_issue_list_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
+    let json = cli
+        .run_json([
             "issue",
             "list",
             "--label",
             "epic:auth",
             "--label",
             "component:api",
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_issue_list_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
 
-    let json = run_json(
-        temp.path(),
-        &["issue", "list", "--label", "epic:auth", "--json"],
-    );
+    let json = cli
+        .run_json(["issue", "list", "--label", "epic:auth"])
+        .unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -384,31 +288,23 @@ fn test_issue_list_single_label_regression() {
 
 #[test]
 fn test_top_level_list_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
-            "list",
-            "--label",
-            "epic:auth",
-            "--label",
-            "component:api",
-            "--json",
-        ],
-    );
+    let json = cli
+        .run_json(["list", "--label", "epic:auth", "--label", "component:api"])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_top_level_list_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
 
-    let json = run_json(temp.path(), &["list", "--label", "epic:auth", "--json"]);
+    let json = cli.run_json(["list", "--label", "epic:auth"]).unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -416,30 +312,22 @@ fn test_top_level_list_single_label_regression() {
 
 #[test]
 fn test_query_bare_repeatable_label_ands() {
-    let temp = setup_test_repo();
-    let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
-    create_issue(temp.path(), "EpicOnly", &["epic:auth"]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let both = create_labeled_issue(&cli, "Both", &["epic:auth", "component:api"]);
+    create_labeled_issue(&cli, "EpicOnly", &["epic:auth"]);
 
-    let json = run_json(
-        temp.path(),
-        &[
-            "query",
-            "--label",
-            "epic:auth",
-            "--label",
-            "component:api",
-            "--json",
-        ],
-    );
+    let json = cli
+        .run_json(["query", "--label", "epic:auth", "--label", "component:api"])
+        .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_bare_single_label_regression() {
-    let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[] as &[&str]);
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let tagged = create_labeled_issue(&cli, "Tagged", &["epic:auth"]);
+    create_labeled_issue(&cli, "Untagged", &[] as &[&str]);
 
-    let json = run_json(temp.path(), &["query", "--label", "epic:auth", "--json"]);
+    let json = cli.run_json(["query", "--label", "epic:auth"]).unwrap();
     assert_eq!(ids(&json), vec![tagged]);
 }

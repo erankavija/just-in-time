@@ -235,6 +235,14 @@ Reserve this layer for what only it can see: user-facing command contracts, `--j
 shapes, flag combinations, and regression tests for reported CLI bugs. Workflow coverage
 belongs in the harness layer, where it runs faster and fails more legibly.
 
+`crates/jit/tests/cli_query_graph/query_tests.rs` shows the reduced shape: each `query`
+subcommand and flag has one wiring case that proves the command reaches the domain query
+and applies its filter. Selection, priority order and blocked reasons belong to the pure
+functions in `crates/jit/src/domain/queries.rs`, including `query all` filter conjunction
+and readiness with unpassed required gates. The CLI cases use `JitCli`, the shared
+`TaxonomyRepo`, and issue ids from JSON output; alias and flag-placement cases cover parsing
+boundaries. Claim and release commands live in `cli_repo_workflow/claim_integration_tests.rs`.
+
 `crates/server/tests/` holds the equivalent layer for the web UI server crate, organized
 the same way: one `server_integration` suite whose `main.rs` declares the modules, covering
 both the in-process API cases and the real-process shutdown cases that spawn the compiled

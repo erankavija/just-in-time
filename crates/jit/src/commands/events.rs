@@ -52,8 +52,7 @@ mod tests {
     use crate::domain::LinkedCheckoutWriteStance;
     use crate::storage::InMemoryStorage;
 
-    fn seeded_override_executor() -> (CommandExecutor<InMemoryStorage>, Event) {
-        let storage = InMemoryStorage::new();
+    fn seed_override_event(storage: &InMemoryStorage) -> Event {
         let event = EventTag::LinkedCheckoutWriteOverridden.sample();
         let bytes = crate::repository_state::serialize_event(&event)
             .expect("the override event serializes");
@@ -62,14 +61,16 @@ mod tests {
             String::from_utf8(bytes).expect("serialized event is UTF-8")
         );
         storage.add_data_file("events.jsonl", &line);
-        (CommandExecutor::new(storage), event)
+        event
     }
 
     /// REQ-03: an override-audit record in the log is read back and reported by
     /// the event query, and its event-type filter selects it by its stable tag.
     #[test]
     fn test_query_events_reports_linked_checkout_write_override_record() {
-        let (executor, expected) = seeded_override_executor();
+        let storage = InMemoryStorage::new();
+        let expected = seed_override_event(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let events = executor
             .query_events(Some(EventTag::LinkedCheckoutWriteOverridden), None, 10)
             .expect("the event query succeeds");
@@ -91,7 +92,9 @@ mod tests {
     /// it while an issue-id filter never does.
     #[test]
     fn test_query_events_excludes_repository_scoped_override_record_from_issue_filter() {
-        let (executor, expected) = seeded_override_executor();
+        let storage = InMemoryStorage::new();
+        let expected = seed_override_event(&storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         assert_eq!(
             executor
                 .query_events(None, None, 10)

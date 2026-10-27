@@ -846,41 +846,48 @@ mod tests {
     use crate::storage::{IssueStore, JsonFileStorage};
     use std::path::PathBuf;
 
-    fn fixture() -> tempfile::TempDir {
-        let (repo, _storage, _taxonomy) =
-            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-        std::fs::write(
-            data_path(&repo, &VirtualPath::CONFIG),
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        executor(&repo).validate_with_fix(true, false).unwrap();
-        executor(&repo)
+    fn seed_fixture_issue(
+        executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
+        title: &str,
+        description: &str,
+        labels: Vec<String>,
+    ) {
+        executor
             .issues()
             .create_issue(
-                "Root".to_string(),
-                "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n".to_string(),
+                title.to_string(),
+                description.to_string(),
                 crate::domain::Priority::Normal,
                 Vec::new(),
-                vec!["type:task".to_string()],
+                labels,
                 None,
                 None,
                 false,
             )
             .unwrap();
-        repo
     }
 
     #[test]
     fn test_validate_repository_preserves_invalid_hierarchy_error() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
+        std::fs::write(
+            data_path(&executor, &VirtualPath::CONFIG),
+            config.as_bytes(),
+        )
+        .unwrap();
 
-        let failure = executor(&repo)
-            .validate_repository_report()
-            .unwrap()
-            .unwrap_err();
+        let failure = executor.validate_repository_report().unwrap().unwrap_err();
         let (error, _report) = failure.into_parts();
 
         assert_eq!(
@@ -889,20 +896,11 @@ mod tests {
         );
     }
 
-    /// A file-backed executor with the fixture's canonical layout, used to capture
-    /// whole-repository validation images through a mutation session.
-    fn executor(repo: &tempfile::TempDir) -> crate::commands::CommandExecutor<JsonFileStorage> {
-        let data = repo.path().join(".jit");
-        let layout = crate::storage::discover_repository_layout(repo.path(), &data).unwrap();
-        crate::commands::CommandExecutor::new(JsonFileStorage::new(&data)).with_layout(layout)
-    }
-
-    fn data_path(repo: &tempfile::TempDir, path: &VirtualPath) -> PathBuf {
-        executor(repo)
-            .require_layout()
-            .unwrap()
-            .resolve(path)
-            .unwrap()
+    fn data_path(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        path: &VirtualPath,
+    ) -> PathBuf {
+        executor.require_layout().unwrap().resolve(path).unwrap()
     }
 
     fn issue_path(id: &IssueId) -> VirtualPath {
@@ -915,8 +913,11 @@ mod tests {
     }
 
     /// Read a repo-relative fixture file's bytes, or `None` when absent.
-    fn read_fixture(repo: &tempfile::TempDir, repo_rel: &str) -> Option<Vec<u8>> {
-        let layout = executor(repo).require_layout().unwrap();
+    fn read_fixture(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        repo_rel: &str,
+    ) -> Option<Vec<u8>> {
+        let layout = executor.require_layout().unwrap();
         let path = layout
             .resolve(&layout.classify_repository_relative(repo_rel).unwrap())
             .unwrap();
@@ -925,17 +926,16 @@ mod tests {
 
     /// Capture and validate the live fixture repository.
     fn validate_live(
-        repo: &tempfile::TempDir,
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
     ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-        executor(repo).validate_repository_report().unwrap()
+        executor.validate_repository_report().unwrap()
     }
 
     /// Capture and validate the fixture overlaid with proposed final bytes/absence.
     fn validate_overlaid<P: Into<PathBuf>>(
-        repo: &tempfile::TempDir,
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
     ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-        let executor = executor(repo);
         let overrides = crate::commands::overrides_from_repo_changes(
             &executor.require_layout().unwrap(),
             changes
@@ -950,10 +950,9 @@ mod tests {
     /// Validate a semantic proposal together with the exact coupled derived-state
     /// writes the canonical materializer would publish for that proposal.
     fn validate_materialized_overlaid<P: Into<PathBuf>>(
-        repo: &tempfile::TempDir,
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
     ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-        let executor = executor(repo);
         let layout = executor.require_layout().unwrap();
         let mut overrides = crate::commands::overrides_from_repo_changes(
             &layout,
@@ -983,30 +982,50 @@ mod tests {
 
     #[test]
     fn test_live_and_identity_overlay_preserve_validation_results() {
-        let repo = fixture();
-        let plain = validate_live(&repo).unwrap();
-        let planned = validate_overlaid::<&str>(&repo, []).unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let plain = validate_live(&executor).unwrap();
+        let planned = validate_overlaid::<&str>(&executor, []).unwrap();
         assert_eq!(plain, planned);
         assert_eq!(plain.passes.len(), 8);
     }
 
     #[test]
     fn test_unloadable_rules_preserve_rules_file_and_enforcement_drift_findings() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         std::fs::write(
-            data_path(&repo, &VirtualPath::RULES),
+            data_path(&executor, &VirtualPath::RULES),
             "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
              assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
         )
         .unwrap();
         std::fs::write(
-            data_path(&repo, &VirtualPath::INVARIANTS),
+            data_path(&executor, &VirtualPath::INVARIANTS),
             "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
              enforced-by = \"@/rule/bad-rule\"\n",
         )
         .unwrap();
 
-        let report = validate_live(&repo).unwrap();
+        let report = validate_live(&executor).unwrap();
         assert!(report.rule_report.findings.iter().any(
             |finding| finding.rule == "rules-file" && finding.message.contains("config error")
         ));
@@ -1022,10 +1041,20 @@ mod tests {
 
     #[test]
     fn test_overlay_config_ignores_disagreeing_live_bytes() {
-        let repo = fixture();
-        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), "not toml = [").unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        std::fs::write(data_path(&executor, &VirtualPath::CONFIG), "not toml = [").unwrap();
         assert!(validate_overlaid(
-            &repo,
+            &executor,
             [put(VirtualPath::CONFIG.repository_relative(), "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n")],
         )
         .is_ok());
@@ -1033,30 +1062,54 @@ mod tests {
 
     #[test]
     fn test_overlay_templates_ignore_disagreeing_live_bytes() {
-        let repo = fixture();
-        std::fs::write(data_path(&repo, &VirtualPath::TEMPLATES), "not toml = [").unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        std::fs::write(
+            data_path(&executor, &VirtualPath::TEMPLATES),
+            "not toml = [",
+        )
+        .unwrap();
         assert!(validate_overlaid(
-            &repo,
+            &executor,
             [put(
                 VirtualPath::TEMPLATES.repository_relative(),
                 "templates = []\n"
             )]
         )
         .is_ok());
-        assert!(validate_live(&repo).is_err());
+        assert!(validate_live(&executor).is_err());
     }
 
     #[test]
     fn test_overlay_rules_ignore_disagreeing_live_bytes() {
-        let repo = fixture();
-        let rules = read_fixture(&repo, &VirtualPath::RULES.repository_relative()).unwrap();
-        std::fs::write(data_path(&repo, &VirtualPath::RULES), "not toml = [").unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let rules = read_fixture(&executor, &VirtualPath::RULES.repository_relative()).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::RULES), "not toml = [").unwrap();
         assert!(validate_overlaid(
-            &repo,
+            &executor,
             [(VirtualPath::RULES.repository_relative(), Some(rules))]
         )
         .is_ok());
-        assert!(validate_live(&repo)
+        assert!(validate_live(&executor)
             .unwrap()
             .rule_report
             .findings
@@ -1066,24 +1119,34 @@ mod tests {
 
     #[test]
     fn test_overlay_rules_and_referenced_schema_ignore_disagreeing_live_schema() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let schema_path = VirtualPath::schema("planned.json").unwrap();
         let rules = format!(
             "[[rules]]\nname = \"planned-schema\"\nseverity = \"error\"\nassert = {{ json-schema = {:?} }}\n",
             schema_path.relative().as_str(),
         );
-        std::fs::create_dir_all(data_path(&repo, &VirtualPath::SCHEMAS)).unwrap();
-        std::fs::write(data_path(&repo, &VirtualPath::RULES), &rules).unwrap();
-        std::fs::write(data_path(&repo, &schema_path), "not json").unwrap();
+        std::fs::create_dir_all(data_path(&executor, &VirtualPath::SCHEMAS)).unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::RULES), &rules).unwrap();
+        std::fs::write(data_path(&executor, &schema_path), "not json").unwrap();
         assert!(validate_materialized_overlaid(
-            &repo,
+            &executor,
             [
                 put(VirtualPath::RULES.repository_relative(), &rules),
                 put(schema_path.repository_relative(), "{}"),
             ],
         )
         .is_ok());
-        assert!(validate_live(&repo)
+        assert!(validate_live(&executor)
             .unwrap()
             .rule_report
             .findings
@@ -1094,23 +1157,45 @@ mod tests {
 
     #[test]
     fn test_overlay_gate_registry_ignores_disagreeing_live_registry() {
-        let repo = fixture();
-        std::fs::write(data_path(&repo, &VirtualPath::GATES), "not toml = [").unwrap();
-        assert!(
-            validate_overlaid(&repo, [put(VirtualPath::GATES.repository_relative(), "")]).is_ok()
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
         );
+        std::fs::write(data_path(&executor, &VirtualPath::GATES), "not toml = [").unwrap();
+        assert!(validate_overlaid(
+            &executor,
+            [put(VirtualPath::GATES.repository_relative(), "")]
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_overlay_index_events_and_issue_records_ignore_disagreeing_live_bytes() {
-        let repo = fixture();
-        let index = read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let index = read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap();
         let events =
-            read_fixture(&repo, &VirtualPath::EVENTS.repository_relative()).unwrap_or_default();
-        std::fs::write(data_path(&repo, &VirtualPath::INDEX), "not json").unwrap();
-        std::fs::write(data_path(&repo, &VirtualPath::EVENTS), "not jsonl").unwrap();
+            read_fixture(&executor, &VirtualPath::EVENTS.repository_relative()).unwrap_or_default();
+        std::fs::write(data_path(&executor, &VirtualPath::INDEX), "not json").unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl").unwrap();
         assert!(validate_overlaid(
-            &repo,
+            &executor,
             [
                 (VirtualPath::INDEX.repository_relative(), Some(index)),
                 (VirtualPath::EVENTS.repository_relative(), Some(events)),
@@ -1121,8 +1206,19 @@ mod tests {
 
     #[test]
     fn test_overlay_records_dag_and_gate_integrity_judge_planned_bytes() {
-        let repo = fixture();
-        let index_bytes = read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let index_bytes =
+            read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap();
         let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
             .unwrap()
             .all_ids
@@ -1130,7 +1226,7 @@ mod tests {
             .parse::<IssueId>()
             .unwrap();
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &issue_path(&id).repository_relative()).unwrap(),
+            &read_fixture(&executor, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.dependencies = vec!["9dbccee5-4241-57f2-ba6b-7bb89e05938a"
@@ -1141,7 +1237,7 @@ mod tests {
         let error = format!(
             "{:#}",
             validate_overlaid(
-                &repo,
+                &executor,
                 [
                     (issue_path(&id).repository_relative(), Some(bad)),
                     (
@@ -1161,9 +1257,19 @@ mod tests {
 
     #[test]
     fn test_overlay_namespace_and_hierarchy_judge_planned_config() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let report = validate_materialized_overlaid(
-            &repo,
+            &executor,
             [put(
                 VirtualPath::CONFIG.repository_relative(),
                 "[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
@@ -1180,9 +1286,19 @@ mod tests {
 
     #[test]
     fn test_repository_view_keeps_non_enforced_rule_error_reportable() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let report = validate_materialized_overlaid(
-            &repo,
+            &executor,
             [put(
                 VirtualPath::RULES.repository_relative(),
                 "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
@@ -1197,9 +1313,19 @@ mod tests {
 
     #[test]
     fn test_repository_failure_retains_partial_rule_report() {
-        let repo = fixture();
-        let store = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout = crate::storage::discover_repository_layout(repo.path(), store.root()).unwrap();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let store = executor.storage();
+        let layout = executor.require_layout().unwrap();
         store.configure_repository_layout(&layout);
         let mut issue = store.list_issues().unwrap().remove(0);
         issue.dependencies.push(
@@ -1210,10 +1336,10 @@ mod tests {
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
-        let live = validate_live(&repo).unwrap();
+        let live = validate_live(&executor).unwrap();
         assert!(!live.rule_report.has_errors());
         let failure = validate_materialized_overlaid(
-            &repo,
+            &executor,
             [
                 (
                     VirtualPath::RULES.repository_relative().to_string(),
@@ -1236,37 +1362,51 @@ mod tests {
 
     #[test]
     fn test_overlay_item_links_judge_planned_registry_deletion() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let config = format!(
             "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
             crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
-        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
-        std::fs::write(data_path(&repo, &VirtualPath::INVARIANTS), invariants).unwrap();
+        std::fs::write(
+            data_path(&executor, &VirtualPath::CONFIG),
+            config.as_bytes(),
+        )
+        .unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::INVARIANTS), invariants).unwrap();
         let index: RepositoryIndex = serde_json::from_slice(
-            &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
+            &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
         let id = &index.all_ids[0].parse::<IssueId>().unwrap();
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
+            &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue
             .labels
             .push("enforces:@/invariant/planned".to_string());
         std::fs::write(
-            data_path(&repo, &issue_path(id)),
+            data_path(&executor, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
 
-        executor(&repo).validate_with_fix(true, false).unwrap();
-        let live = validate_live(&repo).unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        let live = validate_live(&executor).unwrap();
         assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
         let planned = validate_materialized_overlaid(
-            &repo,
+            &executor,
             [(VirtualPath::INVARIANTS.repository_relative(), None)],
         )
         .unwrap();
@@ -1279,30 +1419,44 @@ mod tests {
 
     #[test]
     fn test_validate_live_reports_unqualified_item_link() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let config = format!(
             "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
             crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
-        std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
-        executor(&repo).validate_with_fix(true, false).unwrap();
+        std::fs::write(
+            data_path(&executor, &VirtualPath::CONFIG),
+            config.as_bytes(),
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
         let index: RepositoryIndex = serde_json::from_slice(
-            &read_fixture(&repo, &VirtualPath::INDEX.repository_relative()).unwrap(),
+            &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
         let id = &index.all_ids[0].parse::<IssueId>().unwrap();
         let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&repo, &issue_path(id).repository_relative()).unwrap(),
+            &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )
         .unwrap();
         issue.labels.push("enforces:planned".to_string());
         std::fs::write(
-            data_path(&repo, &issue_path(id)),
+            data_path(&executor, &issue_path(id)),
             serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
 
-        let live = validate_live(&repo).unwrap();
+        let live = validate_live(&executor).unwrap();
         assert!(live.rule_report.findings.iter().any(|finding| {
             finding.rule == crate::commands::DANGLING_LINK_RULE
                 && finding.message.contains("'enforces:@/invariant/planned'")
@@ -1311,7 +1465,17 @@ mod tests {
 
     #[test]
     fn test_overlay_projection_rejects_stale_planned_target_despite_live_state() {
-        let repo = fixture();
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
         let config = format!(
             "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n{}\n\
              [projection.invariants]\nkind = \"invariant\"\ntarget = \"INVARIANTS.md\"\nmode = \"separate-file\"\nstyle = \"full\"\n",
@@ -1319,7 +1483,7 @@ mod tests {
         );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         let error = validate_overlaid(
-            &repo,
+            &executor,
             [
                 put(VirtualPath::CONFIG.repository_relative(), &config),
                 put(VirtualPath::INVARIANTS.repository_relative(), invariants),
