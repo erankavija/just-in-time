@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "39ff8564-1375-464d-ba41-8e7d6ad2aacb",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:34:04.411375722Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5fe08c45-8218-4e20-8a8e-e6f87d0c9091",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:35:56.047897934Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8da3f7f5-3551-4111-a68a-4d4d4b093617",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The cli_query_graph suite root drops its taxonomy repository copy",
-  "updated_at": "2026-10-27T22:17:11.333442469Z"
+  "updated_at": "2026-10-27T22:35:56.047897934Z"
 }

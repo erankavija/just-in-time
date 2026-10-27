@@ -10,6 +10,7 @@
   ],
   "description": "Retire the private in-process repository and executor setups of the `cli_query_graph` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own. `executor_with_rules_and_templates` builds a memory executor; the others build file-backed executors.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_query_graph/label_constraints_tests.rs`: `setup_repo` (`:20`).\n- `crates/jit/tests/cli_query_graph/scope_validation_tests.rs`: `executor_with_rules_and_templates` (`:161`), `executor` (`:1118`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this entry's footprint defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T22:39:39.082225714Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -28,7 +29,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "cli_query_graph in-process tests use the shared constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:39:39.082225714Z"
 }
