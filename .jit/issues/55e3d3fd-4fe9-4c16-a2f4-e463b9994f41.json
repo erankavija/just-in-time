@@ -12,6 +12,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "3ad16fdd-ce77-4a59-9c68-8504476bb56d",
+      "status": "failed",
+      "updated_at": "2026-10-27T21:27:50.523396500Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "d7795ea3-a929-44c3-9c9d-e3f5fd0f1993",
       "status": "passed",
@@ -30,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Mutation and repair captures read only the documents their passes consume",
-  "updated_at": "2026-10-27T21:24:57.722831995Z"
+  "updated_at": "2026-10-27T21:27:50.523396500Z"
 }
