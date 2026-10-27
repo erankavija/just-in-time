@@ -6,7 +6,7 @@
 //! issues; created edges are asserted via `jit issue show --json`.
 
 use jit::test_cli::JitCli;
-use jit::test_taxonomy::{type_label, TaxonomyRepo, TestTaxonomy};
+use jit::test_taxonomy::{type_label, TestTaxonomy};
 
 /// The declared leaf type, the one a manifest entry names when it wants the
 /// most granular kind of work.
@@ -36,16 +36,8 @@ fn count_issues(temp: &JitCli) -> usize {
 
 #[test]
 fn test_batch_create_valid_creates_issues_and_edges() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let (container, leaf) = (
         container_type(&taxonomy.taxonomy),
         leaf_type(&taxonomy.taxonomy),
@@ -124,16 +116,8 @@ fn test_batch_create_valid_creates_issues_and_edges() {
 
 #[test]
 fn test_batch_create_duplicate_key_exits_2_zero_created() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -159,16 +143,8 @@ fn test_batch_create_duplicate_key_exits_2_zero_created() {
 
 #[test]
 fn test_batch_create_unknown_dependency_exits_2_zero_created() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -196,16 +172,8 @@ fn test_batch_create_unknown_dependency_exits_2_zero_created() {
 
 #[test]
 fn test_batch_create_cycle_exits_2_zero_created() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -236,16 +204,8 @@ fn test_batch_create_cycle_exits_2_zero_created() {
 
 #[test]
 fn test_batch_create_invalid_label_exits_2() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -273,16 +233,8 @@ fn test_batch_create_invalid_label_exits_2() {
 
 #[test]
 fn test_batch_create_unknown_gate_exits_2() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -307,16 +259,8 @@ fn test_batch_create_unknown_gate_exits_2() {
 
 #[test]
 fn test_batch_create_unknown_type_exits_2() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     // The repository's own `[type_hierarchy]` declaration is what a type is
     // judged against, so a name it does not carry is rejected.
     let file = write_batch(
@@ -343,16 +287,8 @@ fn test_batch_create_unknown_type_exits_2() {
 
 #[test]
 fn test_batch_create_enumerates_multiple_problems() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     // Two independent problems: a duplicate key AND an unknown dependency.
     let file = write_batch(
         &temp,
@@ -381,16 +317,8 @@ fn test_batch_create_enumerates_multiple_problems() {
 
 #[test]
 fn test_batch_create_write_time_violation_in_later_entry_zero_created() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     // The FIRST entry is valid. The SECOND has a write-time-only violation: a
     // `type` field PLUS an explicit `type:*` label yields two `type:` labels,
     // which namespace-uniqueness validation rejects only at write time. Without
@@ -429,16 +357,8 @@ fn test_batch_create_write_time_violation_in_later_entry_zero_created() {
 
 #[test]
 fn test_batch_create_human_output_lists_key_to_id() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let leaf = leaf_type(&taxonomy.taxonomy);
     let file = write_batch(
         &temp,
@@ -465,16 +385,8 @@ fn test_batch_create_human_output_lists_key_to_id() {
 
 #[test]
 fn test_batch_create_dry_run_reports_manifest_without_mutating_repository() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let file = write_batch(
         &temp,
         r#"[
@@ -535,16 +447,8 @@ fn test_batch_create_dry_run_reports_manifest_without_mutating_repository() {
 
 #[test]
 fn test_batch_create_dry_run_human_output_and_validation_error_match_creation() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
-    temp.run(["init"]).unwrap();
     let valid = write_batch(&temp, r#"[{"key":"only","title":"Only"}]"#);
     let output = temp
         .command([

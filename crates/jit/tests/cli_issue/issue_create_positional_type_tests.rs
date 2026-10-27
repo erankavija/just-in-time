@@ -6,7 +6,7 @@
 //!         `type:<kind>` label, and reject a kind not declared in config.
 
 use jit::test_cli::JitCli;
-use jit::test_taxonomy::{type_label, TaxonomyRepo};
+use jit::test_taxonomy::type_label;
 
 fn first_issue_id(repo: &JitCli) -> String {
     repo.run_json(["issue", "list"]).unwrap()["issues"][0]["id"]
@@ -22,16 +22,8 @@ fn first_issue_id(repo: &JitCli) -> String {
 /// The canonical new form: `jit issue create "Title"` (no --title flag).
 #[test]
 fn test_create_positional_title_succeeds() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let out = repo
         .command(["issue", "create", "Positional Title Here"])
         .output()
@@ -50,16 +42,8 @@ fn test_create_positional_title_succeeds() {
 /// Legacy `--title` flag must still work.
 #[test]
 fn test_create_flag_title_still_works() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let out = repo
         .command(["issue", "create", "--title", "Flag Title"])
         .output()
@@ -77,16 +61,8 @@ fn test_create_flag_title_still_works() {
 /// Short `-t` alias must still work.
 #[test]
 fn test_create_short_t_title_still_works() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let out = repo
         .command(["issue", "create", "-t", "Short Flag Title"])
         .output()
@@ -108,16 +84,8 @@ fn test_create_short_t_title_still_works() {
 /// `--type <declared>` writes the matching `type:<declared>` label.
 #[test]
 fn test_create_type_flag_writes_label() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let leaf = taxonomy_repo.taxonomy.type_at_level(4).to_string();
     let out = repo
         .command(["issue", "create", "Type Label Test", "--type", &leaf])
@@ -146,16 +114,8 @@ fn test_create_type_flag_writes_label() {
 /// (exits non-zero).
 #[test]
 fn test_create_unknown_type_is_rejected() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let out = repo
         .command([
             "issue",
@@ -181,16 +141,8 @@ fn test_create_unknown_type_is_rejected() {
 /// `issue update <id> --type <declared>` writes the matching label.
 #[test]
 fn test_update_type_flag_writes_label() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     // Create without explicit type (gets default).
     let out = repo
         .command(["issue", "create", "Update Type Test"])
@@ -230,16 +182,8 @@ fn test_update_type_flag_writes_label() {
 /// one `type:` label.
 #[test]
 fn test_update_type_flag_replaces_existing_type_label() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     // Create without explicit type (gets the configured default type label).
     let out = repo
         .command(["issue", "create", "Replace Type Test"])
@@ -278,16 +222,8 @@ fn test_update_type_flag_replaces_existing_type_label() {
 /// second `type:*` label.
 #[test]
 fn test_create_type_flag_overrides_default_type() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let strategic = taxonomy_repo.taxonomy.type_at_level(2).to_string();
     assert_ne!(strategic, taxonomy_repo.taxonomy.default_type);
     let out = repo
@@ -324,16 +260,8 @@ fn test_create_type_flag_overrides_default_type() {
 /// `issue update <id> --type <undeclared>` is rejected.
 #[test]
 fn test_update_unknown_type_is_rejected() {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let declaration =
-        jit::test_utils::declaration_dir(&[(".jit/config.toml", &taxonomy.config_fragment())])
-            .unwrap();
-    let taxonomy_repo = TaxonomyRepo {
-        temp: declaration,
-        taxonomy,
-    };
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let repo = JitCli::with_repository(taxonomy_repo.temp);
-    repo.run(["init"]).unwrap();
     let out = repo
         .command(["issue", "create", "Update Unknown Type Test"])
         .output()
