@@ -12,6 +12,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c276c80-cc30-482b-b12d-57675125bef1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:01:11.876524265Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "fcdecdb2-53db-4361-89b9-6c768342073a",
       "status": "passed",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The validation schema test derives priority tokens from the vocabulary",
-  "updated_at": "2026-10-26T23:51:57.210978867Z"
+  "updated_at": "2026-10-27T00:01:11.876524265Z"
 }
