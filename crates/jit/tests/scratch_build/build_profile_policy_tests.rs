@@ -198,17 +198,14 @@ fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() 
     );
 }
 
-/// jit:0708d692: nothing the measured suite runs may compile, because the suite
-/// clock the `budget` step judges is defined over an already-built target.
-/// cargo-nextest runs its setup scripts inside that clock, and Cargo unifies
-/// features over the packages one invocation selects — so a setup script
-/// selecting a single package resolves a second variant of the whole dependency
-/// graph and builds it mid-suite. Measured on a target freshly built by
-/// `cargo test --workspace --no-run`, the one setup script that invokes Cargo
-/// compiled 60 crates in 24,677 ms under `-p jit --test cli_issue` and was
-/// fresh in 131 ms under `--workspace --test cli_issue`.
+/// jit:0708d692: the recorded-failure-corpus setup script runs inside the
+/// measured suite clock. It must use the workspace's Cargo resolution, or a
+/// package-scoped invocation resolves a second feature-unification variant and
+/// builds it mid-suite. The remaining setup script ran fresh in 131 ms under
+/// `--workspace --test cli_issue`, while `-p jit --test cli_issue` compiled 60
+/// crates in 24,677 ms on the same target.
 #[test]
-fn test_nextest_setup_scripts_reuse_the_workspace_build_resolution() {
+fn test_nextest_remaining_setup_reuses_the_workspace_build_resolution() {
     const BUILDING_SUBCOMMANDS: [&str; 5] = ["test", "build", "check", "run", "nextest"];
 
     let root = workspace_root();
@@ -221,6 +218,25 @@ fn test_nextest_setup_scripts_reuse_the_workspace_build_resolution() {
         .and_then(|scripts| scripts.get("setup"))
         .and_then(toml::Value::as_table)
         .expect(".config/nextest.toml must declare its setup scripts under [scripts.setup]");
+
+    assert_eq!(
+        declared.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["recorded-failure-corpus"],
+        "the recorded-failure corpus is the only remaining nextest setup script"
+    );
+    let profile_scripts = config
+        .get("profile")
+        .and_then(|profile| profile.get("default"))
+        .and_then(|default| default.get("scripts"))
+        .and_then(toml::Value::as_array)
+        .expect(".config/nextest.toml must retain its default profile script filter");
+    assert!(
+        !profile_scripts.is_empty()
+            && profile_scripts.iter().all(|script| {
+                script.get("setup").and_then(toml::Value::as_str) == Some("recorded-failure-corpus")
+            }),
+        "the default profile must filter only the remaining recorded-failure-corpus setup"
+    );
 
     let repository_scripts = declared.iter().filter_map(|(name, declaration)| {
         let command = declaration.get("command")?;
