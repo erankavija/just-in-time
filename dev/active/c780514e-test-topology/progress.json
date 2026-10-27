@@ -233,7 +233,7 @@
           "key": "cli-apply-template-spawn-migration",
           "title": "apply, preset and template tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "e230e621-1d27-46e2-90bc-cefc2ad50730",
@@ -281,7 +281,7 @@
           "key": "cli-issue-create-spawn-migration",
           "title": "issue create and batch tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "b5faab2f-7eaa-4a10-8443-3764d2ff8ea5",
@@ -305,7 +305,7 @@
           "key": "cli-issue-output-mode-spawn-migration",
           "title": "output-mode and export tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "7bf48536-02ba-4fc5-99df-c242ef272368",
@@ -321,7 +321,7 @@
           "key": "cli-issue-update-spawn-migration",
           "title": "issue search and update tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "bac4423b-ee4a-4747-90e9-6808ae929ecf",
@@ -329,7 +329,7 @@
           "key": "cli-item-kind-spawn-migration",
           "title": "item-kind tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "37218dff-534d-40e5-b70d-f7c9fa60bea3",
@@ -361,7 +361,7 @@
           "key": "cli-serve-artifact-spawn-migration",
           "title": "serve and artifact tests spawn jit through the shared process fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "717f9c2f-b151-4803-b8bf-dc86df694fbc",
@@ -417,7 +417,7 @@
           "key": "fixture-issue-commands-b-adoption",
           "title": "Gate-check, issue, item, executor and snapshot command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "9964af3f-46ff-455a-b9b6-ce55d778aff4",
@@ -425,7 +425,7 @@
           "key": "fixture-issue-commands-c-adoption",
           "title": "Template, validate and worktree command unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "58dbb1a0-3eb1-4d34-8ebc-44eb080348b3",
@@ -441,7 +441,7 @@
           "key": "fixture-issue-domain-query-adoption",
           "title": "Domain query, item and output unit tests use the shared issue fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "7995aa5c-7d47-43f0-91c4-5924c1ae67a8",
@@ -465,7 +465,7 @@
           "key": "harness-shipped-item-kinds",
           "title": "Harness and test taxonomy take shipped item kinds from the derivation",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "07f4b1d4-7dde-47ae-929c-c0d892741b27",
@@ -497,7 +497,7 @@
           "key": "command-list-output-types",
           "title": "Command-layer list results become typed list envelopes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "f4deb00a-22ae-4505-9bc3-27ed5d816604",
@@ -505,7 +505,7 @@
           "key": "fast-docs-templates-file-setup-adoption",
           "title": "fast_docs_templates file-backed tests use the shared constructors",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
@@ -513,7 +513,7 @@
           "key": "fast-docs-templates-git-fixture-adoption",
           "title": "Git revision tests initialise git through the shared helper",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "7801f623-3865-4ee2-8891-16652e443faf",
@@ -521,7 +521,7 @@
           "key": "fast-rules-file-setup-adoption",
           "title": "fast_rules file-backed tests use the shared constructors",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "b511222f-b441-4f91-8533-9b8baeb4936c",
@@ -529,7 +529,7 @@
           "key": "library-command-git-fixture-adoption",
           "title": "Command unit tests initialise git through the shared helper",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "id": "64f04da6-c24f-49b8-891d-e8c4245cfe03",
@@ -1325,7 +1325,8 @@
     "5f4daf6b": 2,
     "7bf48536": 1,
     "c9442f7f": 2,
-    "e7764cb1": 1
+    "e7764cb1": 1,
+    "e21ca76d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1955,7 +1956,10 @@
     "1590d056-s3": "lead PASS 1aa4aa9a2",
     "7995aa5c-s3": "lead PASS",
     "b612cde1/2f717d93/1d52a376-s3": "lead PASS",
-    "suite-fixture x5-s3": "lead PASS"
+    "suite-fixture x5-s3": "lead PASS",
+    "commands-batch-s3": "lead PASS 74b2a0d3 ff47fbe47, 9964af3f 9d61fdf33, b511222f 7e55772ca (hooks.rs/archive.rs keep inline git add/commit runner: JIT_AGENT_ID env / no TempDir), 5876e131 e2679eea1 (out-of-footprint harness_demo.rs edit forced by shipped set incl. rule/gate kinds)",
+    "e21ca76d-r0-s3": "lead FAIL: REQ-03 crate-wide; restatements remain in ~9 src modules",
+    "reworks-s3-s3": "lead PASS e7764cb1 3609a2b08, fec9b43b 97116d05d, 5f4daf6b 24f34ca33, c9442f7f fea725838"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2107,6 +2111,30 @@
         "c9442f7f"
       ],
       "reason": "code-review fails 948cee43/8d6fe32b/77ad1d39 and lead re-review of c9442f7f r1 (CARGO_BIN_EXE_jit x4, inline declaration_dir+init x8); three final attempts -> strongest tier"
+    },
+    {
+      "session": 3,
+      "slot": "A agent-22355a56 branch worktree-agent-w3-spawn",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "7801f623",
+        "f4deb00a",
+        "8b6285a6",
+        "bac4423b",
+        "07a1728d"
+      ],
+      "reason": "integration-target spawn/file-setup migrations disjoint from slot B"
+    },
+    {
+      "session": 3,
+      "slot": "B agent-de880d9c branch worktree-agent-w3-envelopes (from w3-commands)",
+      "worker": "Claude Opus",
+      "issues": [
+        "e21ca76d",
+        "19136324",
+        "53f78490"
+      ],
+      "reason": "e21ca76d crate-wide REQ-03 rework; 19136324/53f78490 released by 2195c98f lead (8acca4f4 escalated); 53f78490 is contract-setting (schema/MCP)"
     }
   ],
   "checkpoint": {
@@ -2140,6 +2168,10 @@
         "7995aa5c": "until 1c5da41d merges (validation/)"
       },
       "then": "dispatch 7995aa5c and 19136324 first: upstream of 0af95f14"
+    },
+    {
+      "session": 3,
+      "note": "2195c98f lead released 19136324/53f78490 holds: 8acca4f4 blocked on user escalation; they will merge main into worktree-agent-8acca4f4 later"
     }
   ],
   "landings": [
@@ -2160,6 +2192,20 @@
       "merge": "320a12bba",
       "issues": "e230e621 c9442f7f 37218dff 8e69776c(partial)",
       "cargo_ci": "all passed"
+    },
+    {
+      "session": 3,
+      "merge": "2b6635372",
+      "issues": "e7764cb1 fec9b43b 5f4daf6b c9442f7f",
+      "cargo_ci": "all passed",
+      "code_review": "all passed"
+    },
+    {
+      "session": 3,
+      "merge": "land-commands",
+      "issues": "74b2a0d3 9964af3f b511222f 5876e131 e21ca76d(partial)",
+      "cargo_ci": "all passed",
+      "code_review": "4 passed; e21ca76d in rework"
     }
   ]
 }
