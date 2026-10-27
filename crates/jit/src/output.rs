@@ -16,7 +16,12 @@ pub mod failure;
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
+#[allow(
+    unused_imports,
+    reason = "Only the temporary String alias needs this trait."
+)]
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::store_divergence::StoreDivergence;
 use crate::domain::vocabulary::wire_vocabulary;
@@ -418,7 +423,7 @@ mod issue_list_render_tests {
 
     fn issue(id: IssueId, title: &str) -> Issue {
         let mut issue = Issue::draft(title.into(), String::new());
-        issue.id = id.to_string();
+        issue.id = id;
         issue
     }
 
@@ -521,7 +526,9 @@ mod archive_render_tests {
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_format("markdown")
         .with_owners(vec![ArtifactOwner {
-            issue: "12345678-1234-1234-1234-123456789abc".to_string(),
+            issue: "12345678-1234-1234-1234-123456789abc"
+                .parse::<IssueId>()
+                .unwrap(),
             document_index: 2,
             state: State::Done,
             archived_from: None,
@@ -1602,8 +1609,8 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 ///     type_name: Some("epic".into()),
 ///     hierarchy: NodeHierarchy {
 ///         parent: None,
-///         children: vec![task_id.to_string()],
-///         cluster: Some(epic_id.to_string()),
+///         children: vec![task_id.clone()],
+///         cluster: Some(epic_id.clone()),
 ///         rank: 1,
 ///     },
 /// };
@@ -1653,9 +1660,9 @@ pub struct HierarchyNodeView {
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
 ///         hierarchy: NodeHierarchy {
-///             parent: Some(epic_id.to_string()),
+///             parent: Some(epic_id.clone()),
 ///             children: vec![],
-///             cluster: Some(epic_id.to_string()),
+///             cluster: Some(epic_id.clone()),
 ///             rank: 0,
 ///         },
 ///     }],
@@ -2390,6 +2397,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 /// use chrono::Utc;
 /// use jit::declarations::GateStage;
+/// use jit::domain::identity::IssueId;
 /// use jit::domain::{GateEvaluationStability, GateRunResult, GateRunStatus, GateVerdictOrigin};
 /// use jit::output::GateRunSummary;
 ///
@@ -2398,7 +2406,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     run_id: "r1".into(),
 ///     gate_key: "tests".into(),
 ///     stage: GateStage::Postcheck,
-///     issue_id: "12345678-0000-4000-8000-000000000001".to_string(),
+///     issue_id: "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap(),
 ///     commit: None,
 ///     branch: None,
 ///     status: GateRunStatus::Passed,
@@ -2564,12 +2572,28 @@ pub struct GateCheckSummary {
     pub all_passed: bool,
 }
 
+/// A resolved issue id or the request text that failed lookup, serialized as a string.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum BatchTarget {
+    Resolved(IssueId),
+    Unresolved(String),
+}
+
+impl BatchTarget {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Resolved(id) => id.as_str(),
+            Self::Unresolved(requested) => requested.as_str(),
+        }
+    }
+}
+
 /// One per-issue result from `jit gate evaluate-many`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateEvaluateManyResult {
-    /// Requested text on lookup failure; resolved id text otherwise.
     #[serde(rename = "issue_id")]
-    pub requested: String,
+    pub target: BatchTarget,
     /// Gate key evaluated for this issue.
     pub key: String,
     /// `passed` when a verdict was recorded as passing, otherwise `failed`.
@@ -2852,6 +2876,20 @@ mod tests {
     use std::collections::BTreeSet;
 
     #[test]
+    fn test_batch_target_serializes_resolved_and_unresolved_as_plain_strings() {
+        let id = "12345678-0000-4000-8000-000000000001"
+            .parse::<IssueId>()
+            .unwrap();
+        for target in [
+            BatchTarget::Resolved(id),
+            BatchTarget::Unresolved("missing-prefix".into()),
+        ] {
+            let expected = serde_json::to_string(target.as_str()).unwrap();
+            assert_eq!(serde_json::to_string(&target).unwrap(), expected);
+        }
+    }
+
+    #[test]
     fn test_render_gate_run_status_never_run_and_passed_name_gate_and_issue() {
         let never = render_gate_run_status(GateRunLine::NeverRun, "tests", "abc123");
         let passed = render_gate_run_status(GateRunLine::Passed, "tests", "abc123");
@@ -2992,7 +3030,9 @@ mod tests {
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
         let issue = crate::domain::MinimalIssue {
-            id: "aaaaaaaa-0000-4000-8000-000000000001".to_string(),
+            id: "aaaaaaaa-0000-4000-8000-000000000001"
+                .parse::<IssueId>()
+                .unwrap(),
             title: "Archived dep".to_string(),
             state: State::Archived,
             priority: Priority::Normal,
@@ -3187,7 +3227,7 @@ mod tests {
         let dangling_id = "22222222-0000-4000-8000-000000000002"
             .parse::<IssueId>()
             .unwrap();
-        issue.dependencies = vec![resolved_dep.id.clone(), dangling_id.to_string()];
+        issue.dependencies = vec![resolved_dep.id.clone(), dangling_id.clone()];
         let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
 
         let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);

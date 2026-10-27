@@ -4,7 +4,12 @@
 //! like DOT (Graphviz) and Mermaid. These functions are Issue-specific and access
 //! Issue fields like title and state for rendering.
 
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
+#[allow(
+    unused_imports,
+    reason = "Only the temporary String alias needs this trait."
+)]
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::{Issue, Priority, State};
 use crate::graph::hierarchy::NodeHierarchy;
 use crate::graph::DependencyGraph;
@@ -520,7 +525,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .find(|n| n["id"] == serde_json::Value::String(id.to_string()))
+                .find(|n| n["id"] == id.as_str())
                 .unwrap()
                 .clone()
         };
@@ -592,7 +597,7 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .find(|n| n["id"] == serde_json::Value::String(action.id.to_string()))
+            .find(|n| n["id"] == action.id.as_str())
             .unwrap();
         let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&action)
             .unwrap()
@@ -660,7 +665,7 @@ mod tests {
             for (index, mask) in masks.iter().enumerate() {
                 issues[index].dependencies = (0..index)
                     .filter(|earlier| mask & (1 << earlier) != 0)
-                    .map(|earlier| ids[earlier].to_string())
+                    .map(|earlier| ids[earlier].clone())
                     .collect();
             }
             let selected: Vec<&Issue> = issues

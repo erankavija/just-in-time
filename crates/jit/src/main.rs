@@ -336,7 +336,7 @@ fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::Json
 fn print_apply_result(
     storage: &JsonFileStorage,
     result: &jit::commands::TemplateApplyResult,
-    container: &str,
+    container: &IssueId,
     quiet: bool,
     json: bool,
 ) -> Result<()> {
@@ -352,7 +352,7 @@ fn print_apply_result(
             .collect::<Result<_>>()?;
         let response = jit::output::TemplateApplyResponse {
             template: result.template.clone(),
-            container: container.to_string(),
+            container: container.clone(),
             anchor_bindings: result.anchor_bindings.clone(),
             created_node_ids_by_role: result.created_node_ids_by_role.clone(),
             anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
@@ -4190,6 +4190,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 by,
                 force,
             } => {
+                use jit::output::BatchTarget;
+
                 let output_ctx = OutputContext::new(quiet, json);
                 // An id that does not resolve fails its own entry, in argument
                 // order, like an evaluation failure.
@@ -4213,14 +4215,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .filter_map(|(requested, id)| match id {
                         Ok(_) => evaluated
                             .next()
-                            .map(|entry| (entry.issue_id.to_string(), entry.result)),
-                        Err(error) => Some((requested, Err(error))),
+                            .map(|entry| (BatchTarget::Resolved(entry.issue_id), entry.result)),
+                        Err(error) => Some((BatchTarget::Unresolved(requested), Err(error))),
                     })
                     .collect();
                 let mut exit_code = None;
                 let mut results = Vec::with_capacity(entries.len());
 
-                for (requested, result) in entries {
+                for (target, result) in entries {
                     match result {
                         Ok(outcome) => {
                             if !json {
@@ -4230,11 +4232,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 output_ctx.print_success(jit::output::render_gate_run_status(
                                     jit::output::GateRunLine::Passed,
                                     &gate_key,
-                                    &requested,
+                                    target.as_str(),
                                 ))?;
                             }
                             results.push(jit::output::GateEvaluateManyResult {
-                                requested,
+                                target,
                                 key: gate_key.clone(),
                                 status: "passed".to_string(),
                                 verdict: Some("pass".to_string()),
@@ -4243,7 +4245,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             });
                         }
                         Err(error) => {
-                            let json_error = gate_pass_json_error(&error, &requested);
+                            let json_error = gate_pass_json_error(&error, target.as_str());
                             exit_code.get_or_insert(json_error.exit_code().code());
                             let warnings = error
                                 .downcast_ref::<jit::commands::GatePassFailed>()
@@ -4255,7 +4257,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 }
                                 eprintln!(
                                     "Failed gate '{}' for issue {}: {}",
-                                    gate_key, requested, error
+                                    gate_key,
+                                    target.as_str(),
+                                    error
                                 );
                             }
                             let error_value = serde_json::to_value(&json_error.error)?;
@@ -4267,7 +4271,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 .and_then(serde_json::Value::as_str)
                                 .map(str::to_string);
                             results.push(jit::output::GateEvaluateManyResult {
-                                requested,
+                                target,
                                 key: gate_key.clone(),
                                 status: "failed".to_string(),
                                 verdict,
