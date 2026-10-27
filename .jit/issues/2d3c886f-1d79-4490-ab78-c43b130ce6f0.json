@@ -9,6 +9,7 @@
   ],
   "description": "Delete the `TaxonomyRepo` copy and its label helpers from the `cli_issue` suite root once no test in the suite calls them.\n\n## Background\n\nShared test support defines `TaxonomyRepo`, its constructor and its label helpers. `crates/jit/tests/cli_issue/main.rs` still defines its own copy, which the suite's modules call until their migrations move them to the shared one.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli_issue/main.rs` defines no taxonomy repository type, constructor or label helper.\n- [hard] REQ-02: No test in the suite refers to a suite-root taxonomy helper, and each asserts what it asserted before.\n",
   "documents": [],
+  "first_ready_at": "2026-10-27T00:29:06.585994019Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "The cli_issue suite root drops its taxonomy repository copy",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T00:29:06.585994019Z"
 }

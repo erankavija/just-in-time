@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7065eeb9-2e10-40f5-90bb-1a097bb43a87",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:02.846749563Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "838c5a13-c1af-49c8-b16c-20b73a7c39d2",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:28:27.526620937Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b511222f-b441-4f91-8533-9b8baeb4936c",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Command unit tests initialise git through the shared helper",
-  "updated_at": "2026-10-27T00:05:38.931240373Z"
+  "updated_at": "2026-10-27T00:28:27.526620937Z"
 }

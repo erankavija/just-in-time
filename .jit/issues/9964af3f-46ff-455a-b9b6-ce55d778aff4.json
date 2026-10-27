@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "14281b82-5d32-484b-a689-e22a90894737",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:02.611114533Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9964af3f-46ff-455a-b9b6-ce55d778aff4",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Template, validate and worktree command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-27T00:05:38.679996269Z"
+  "updated_at": "2026-10-27T00:27:02.611114533Z"
 }

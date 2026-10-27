@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5e67fd04-5c90-494f-8eb2-033da4650bc1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:02.373501201Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Gate-check, issue, item, executor and snapshot command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-27T00:05:38.572334673Z"
+  "updated_at": "2026-10-27T00:27:02.373501201Z"
 }

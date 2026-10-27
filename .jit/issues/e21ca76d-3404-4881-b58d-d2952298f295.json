@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f82c9257-5896-4242-9861-e3e8cb244e2c",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:03.316185421Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e21ca76d-3404-4881-b58d-d2952298f295",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Command unit tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-27T00:05:38.795457671Z"
+  "updated_at": "2026-10-27T00:27:03.316185421Z"
 }
