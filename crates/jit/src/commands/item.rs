@@ -1068,7 +1068,7 @@ mod tests {
         );
     }
 
-    /// Build an executor that declares a NON-invariant, registry-first project
+    /// Build an executor that declares a custom registry-first project
     /// kind `policy` backed by a custom `.toml` through a structured `source`
     /// descriptor (`toml`/`table`/`id-field`/`text-field`/`link-fields`). The
     /// descriptor's toml file is served through the in-memory repo-file map (the
@@ -1284,9 +1284,8 @@ enforce = true
     }
 
     /// Build an executor whose synthetic repo carries `.jit/gates.toml` with
-    /// `gates_toml` and a standalone `[item_kinds.gate]` declaration, exercising the
-    /// registry-first gate path the same way [`registry_exec_with_rules`] does for
-    /// rules.
+    /// `gates_toml` and the shipped item kinds, exercising the registry-first gate
+    /// path the same way [`registry_exec_with_rules`] does for rules.
     fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();

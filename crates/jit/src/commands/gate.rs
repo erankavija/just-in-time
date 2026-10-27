@@ -2020,35 +2020,12 @@ enforce_leases = "off"
     #[test]
     fn test_gate_definition_updates_configured_projection_in_same_mutation() {
         let storage = InMemoryStorage::new();
-        seed_repo_file(
-            &storage,
-            ".jit/config.toml",
-            r#"
-[item_kinds.gate]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = []
-scope = "project"
-source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
-source-of-truth = "registry-first"
-
-[item_kinds.rule]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = []
-scope = "project"
-source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
-source-of-truth = "registry-first"
-
-[projection.gates]
-kind = ["rule", "gate"]
-mode = "separate-file"
-target = "gates.md"
-style = "full"
-"#,
+        let config = format!(
+            "{}\n[projection.gates]\nkind = [\"rule\", \"gate\"]\nmode = \"separate-file\"\n\
+             target = \"gates.md\"\nstyle = \"full\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["gate", "rule"])
         );
+        seed_repo_file(&storage, ".jit/config.toml", &config);
         seed_repo_file(&storage, ".jit/rules.toml", "");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout);

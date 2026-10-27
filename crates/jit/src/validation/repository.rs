@@ -1250,12 +1250,9 @@ mod tests {
     #[test]
     fn test_overlay_item_links_judge_planned_registry_deletion() {
         let repo = fixture();
-        let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-            ";
-        let config = config.replace(
-            "__INVARIANTS_PATH__",
-            &VirtualPath::INVARIANTS.repository_relative(),
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
@@ -1296,9 +1293,10 @@ mod tests {
     #[test]
     fn test_validate_live_reports_unqualified_item_link() {
         let repo = fixture();
-        let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-            ";
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        );
         std::fs::write(data_path(&repo, &VirtualPath::CONFIG), config.as_bytes()).unwrap();
         executor(&repo).validate_with_fix(true, false).unwrap();
         let index: RepositoryIndex = serde_json::from_slice(
@@ -1327,29 +1325,10 @@ mod tests {
     #[test]
     fn test_overlay_projection_rejects_stale_planned_target_despite_live_state() {
         let repo = fixture();
-        let config = "\
-[type_hierarchy.types]
-task = 4
-[namespaces.type]
-description = \"Issue type\"
-unique = true
-[item_kinds.invariant]
-section = \"success_criteria\"
-id-pattern = \"[a-z][a-z0-9-]*\"
-markers = []
-link-namespaces = [\"enforces\"]
-scope = \"project\"
-source = { toml = \"__INVARIANTS_PATH__\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
-source-of-truth = \"registry-first\"
-[projection.invariants]
-kind = \"invariant\"
-target = \"INVARIANTS.md\"
-mode = \"separate-file\"
-style = \"full\"
-";
-        let config = config.replace(
-            "__INVARIANTS_PATH__",
-            &VirtualPath::INVARIANTS.repository_relative(),
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n{}\n\
+             [projection.invariants]\nkind = \"invariant\"\ntarget = \"INVARIANTS.md\"\nmode = \"separate-file\"\nstyle = \"full\"\n",
+            crate::test_utils::shipped_item_kind_tables(&["invariant"])
         );
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
         let error = validate_overlaid(

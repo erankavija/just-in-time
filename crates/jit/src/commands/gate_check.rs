@@ -2983,25 +2983,17 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_rule_validation_checker_ignores_unrelated_validation_failures() {
         let executor = setup();
-        let config = r#"
-[worktree]
-enforce_leases = "off"
-
-[item_kinds.requirement]
-section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
-link-namespaces = ["satisfies"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#;
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::test_utils::shipped_item_kind_tables(&["requirement"])
+        );
         let config_path = executor
             .repository_layout()
             .unwrap()
             .resolve(&crate::repository_state::VirtualPath::CONFIG)
             .unwrap();
-        std::fs::write(config_path, config).unwrap();
-        seed_repo_file(&executor.storage, ".jit/config.toml", config);
+        std::fs::write(config_path, &config).unwrap();
+        seed_repo_file(&executor.storage, ".jit/config.toml", &config);
         seed_rule_validation_rules(&executor);
 
         let mut container = crate::test_utils::fixture_issue(
