@@ -513,7 +513,7 @@
           "short_id": "8acca4f4",
           "title": "Errors and output carry typed issue ids",
           "classification": "implementation",
-          "status": "rework"
+          "status": "blocked_escalation"
         }
       ]
     },
@@ -702,6 +702,20 @@
         "B: lead rewrites .jit/events.jsonl to drop or convert the 8 retired-tag lines (history rewrite)"
       ],
       "gates": "cargo-ci passed; holistic-review failed (run recorded)"
+    },
+    {
+      "issue": "8acca4f4",
+      "status": "open",
+      "reason": "Rework limit reached (2/2). Rework 2 (branch worktree-agent-8acca4f4) fixes the code-review findings (typed BatchTarget for gate evaluate-many; no stringified IssueIds into identity fields) but re-adds #[allow(unused_imports)] on the IssueIdStaging import in errors.rs, output.rs and visualization.rs, which rework 1 explicitly required removing.",
+      "options": [
+        "A (recommended): lead removes the three allow attributes (mechanical, plain `use` as in sibling modules), then runs code-review and cargo-ci and lands",
+        "B: one more worker rework with a reset counter",
+        "C: other guidance"
+      ],
+      "blocks": [
+        "10ae7776 (vocabulary sweep, output.rs overlap)",
+        "story 83d04069 via 10ae7776"
+      ]
     }
   ],
   "rework_counts": {
