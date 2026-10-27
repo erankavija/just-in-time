@@ -1,12 +1,13 @@
 //! Tests for label-based query functionality (Phase 1.4)
 
+use jit::commands::test_helpers::memory_executor;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 
 #[test]
 fn test_query_by_label_exact_match() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issues with various labels
     let (milestone_id, _) = executor
@@ -63,7 +64,7 @@ fn test_query_by_label_exact_match() {
 #[test]
 fn test_query_by_label_wildcard_namespace() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issues with various milestones
     let (v1_id, _) = executor
@@ -120,7 +121,7 @@ fn test_query_by_label_wildcard_namespace() {
 #[test]
 fn test_query_by_label_no_matches() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issue without the queried label
     let (_id, _) = executor
@@ -146,7 +147,7 @@ fn test_query_by_label_no_matches() {
 #[test]
 fn test_query_by_label_empty_repo() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Query with no issues
     let results = executor.query_by_label("milestone:v1.0").unwrap();
@@ -157,7 +158,7 @@ fn test_query_by_label_empty_repo() {
 #[test]
 fn test_query_by_label_wildcard_matches_all_in_namespace() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issues with multiple types
     let (task_id, _) = executor
@@ -215,7 +216,7 @@ fn test_query_by_label_wildcard_matches_all_in_namespace() {
 #[test]
 fn test_query_by_label_case_sensitive() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issue with specific case
     let (_id, _) = executor
@@ -250,7 +251,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
     // a widened-grammar `@`-prefixed value is compared whole, never re-split
     // further.
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     let (matching_id, _) = executor
         .issues()
@@ -289,7 +290,7 @@ fn test_query_by_label_at_prefixed_value_matches_whole() {
 #[test]
 fn test_query_by_label_invalid_pattern() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Invalid pattern (no colon)
     let result = executor.query_by_label("invalidlabel");
@@ -303,7 +304,7 @@ fn test_query_by_label_invalid_pattern() {
 #[test]
 fn test_query_by_label_multiple_labels_per_issue() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Create issue with multiple labels
     let (multi_id, _) = executor
@@ -361,7 +362,7 @@ fn create_labeled(
 
 #[test]
 fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set() {
-    let executor = crate::memory_executor(InMemoryStorage::new());
+    let executor = memory_executor(InMemoryStorage::new());
     create_labeled(&executor, "Task one", &["type:task"]);
     create_labeled(&executor, "Epic one", &["type:epic", "area:auth"]);
     create_labeled(&executor, "Unlabelled-ish", &["area:auth"]);
@@ -383,7 +384,7 @@ fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set
 
 #[test]
 fn test_search_issues_with_filters_wildcard_still_applies_text_query() {
-    let executor = crate::memory_executor(InMemoryStorage::new());
+    let executor = memory_executor(InMemoryStorage::new());
     let wanted = create_labeled(&executor, "Billing task", &["type:task"]);
     create_labeled(&executor, "Auth task", &["type:task"]);
     create_labeled(&executor, "Billing note", &["area:billing"]);
@@ -398,7 +399,7 @@ fn test_search_issues_with_filters_wildcard_still_applies_text_query() {
 
 #[test]
 fn test_search_issues_with_filters_malformed_pattern_is_invalid_label_pattern() {
-    let executor = crate::memory_executor(InMemoryStorage::new());
+    let executor = memory_executor(InMemoryStorage::new());
     // Search goes through the shared validator, so it rejects malformed exact
     // labels as well as malformed wildcards; `labels` owns the full matrix.
     for bad in ["type", ":*", "type:", "type:a:b"] {

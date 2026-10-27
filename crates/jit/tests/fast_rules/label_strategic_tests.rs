@@ -1,31 +1,9 @@
 //! Tests for strategic queries (Phase 3)
 
-use jit::commands::CommandExecutor;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
-
-/// An executor over a repository that declares the type hierarchy these tests
-/// classify against, together with the declaration it was configured from:
-/// every type name below is read from that value rather than repeated.
-/// `query_strategic` reads the declaration through a `ConfigManager` bound to
-/// the selected layout, so the fixture writes it there and into the memory image.
-fn strategic_executor() -> (CommandExecutor<InMemoryStorage>, TestTaxonomy) {
-    let taxonomy = test_taxonomy();
-    let storage = InMemoryStorage::new();
-    let config = format!(
-        "[worktree]\nenforce_leases = \"off\"\n\n{}",
-        taxonomy.config_fragment()
-    );
-    let config_path = storage
-        .repository_layout()
-        .resolve(&jit::repository_state::VirtualPath::CONFIG)
-        .unwrap();
-    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-    std::fs::write(config_path, &config).unwrap();
-    storage.add_data_file("config.toml", &config);
-    (crate::memory_executor(storage), taxonomy)
-}
 
 /// The `type:<name>` label for a declared type.
 fn type_label(name: &str) -> String {
@@ -43,7 +21,17 @@ fn membership_label(taxonomy: &TestTaxonomy, type_name: &str, value: &str) -> St
 
 #[test]
 fn test_query_strategic_returns_top_level_issues() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
     let top = taxonomy.type_at_level(1);
 
     // Create issues with strategic types
@@ -84,7 +72,17 @@ fn test_query_strategic_returns_top_level_issues() {
 
 #[test]
 fn test_query_strategic_returns_second_level_issues() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
     let container = taxonomy.type_at_level(2);
 
     let (container_id, _) = executor
@@ -112,7 +110,17 @@ fn test_query_strategic_returns_second_level_issues() {
 
 #[test]
 fn test_query_strategic_returns_every_declared_strategic_type() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let strategic_ids: Vec<String> = taxonomy
         .strategic_types
@@ -161,7 +169,17 @@ fn test_query_strategic_returns_every_declared_strategic_type() {
 
 #[test]
 fn test_query_strategic_excludes_tactical_only() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // Create only tactical issues
     executor
@@ -199,7 +217,17 @@ fn test_query_strategic_excludes_tactical_only() {
 
 #[test]
 fn test_query_strategic_includes_mixed_labels() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
     let top = taxonomy.type_at_level(1);
 
     // Issue with both strategic type and tactical labels
@@ -229,7 +257,17 @@ fn test_query_strategic_includes_mixed_labels() {
 
 #[test]
 fn test_query_strategic_ignores_membership_label_without_strategic_type() {
-    let (executor, taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
     let top = taxonomy.type_at_level(1);
     let container = taxonomy.type_at_level(2);
 
@@ -276,7 +314,17 @@ fn test_query_strategic_ignores_membership_label_without_strategic_type() {
 
 #[test]
 fn test_query_strategic_empty_repo() {
-    let (executor, _taxonomy) = strategic_executor();
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            )),
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let strategic = executor.query_strategic().unwrap();
 
