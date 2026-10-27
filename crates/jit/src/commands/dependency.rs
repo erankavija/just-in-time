@@ -540,7 +540,7 @@ fn derive_dependency_removal(
         .iter_mut()
         .find(|candidate| candidate.id == source_id)
         .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))? = issue.clone();
-    let resolved = crate::domain::queries::build_issue_map(&candidate);
+    let ready_ids = crate::domain::queries::issues_becoming_ready(&candidate);
     let mut intents = vec![MutationIntent::RecordEvent {
         phase: 1,
         event: Box::new(EventBody::draft_issue_updated(
@@ -549,7 +549,7 @@ fn derive_dependency_removal(
             vec!["dependencies".to_string()],
         )),
     }];
-    if issue.should_auto_transition_to_ready(&resolved) {
+    if ready_ids.contains(&source_id) {
         match super::derive_state_transition(issue.clone(), State::Ready, false, evidence)? {
             super::DerivedStateTransition::Applied {
                 issue: transitioned,
