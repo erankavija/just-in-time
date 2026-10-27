@@ -426,11 +426,7 @@ impl ClaimCoordinator {
 
             bail!(
                 "{}",
-                errors::already_claimed(
-                    issue_id.as_str(),
-                    &existing.agent_id.to_string(),
-                    &expires_info
-                )
+                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
             );
         }
 
@@ -528,11 +524,7 @@ impl ClaimCoordinator {
 
             bail!(
                 "{}",
-                errors::already_claimed(
-                    issue_id.as_str(),
-                    &existing.agent_id.to_string(),
-                    &expires_info
-                )
+                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
             );
         }
 
@@ -676,7 +668,7 @@ impl ClaimCoordinator {
                 bail!(
                     "{}",
                     errors::already_claimed(
-                        issue_id.as_str(),
+                        issue_id,
                         &existing.agent_id.to_string(),
                         &expires_info
                     )

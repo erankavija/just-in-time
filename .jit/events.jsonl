@@ -20548,6 +20548,8 @@
 {"from":"in_progress","id":"e669cc6f-8c9a-4b87-aaf6-86affa1ba128","issue_id":"7bf48536-02ba-4fc5-99df-c242ef272368","timestamp":"2026-10-26T23:44:08.768556062Z","to":"done","type":"issue_state_changed"}
 {"id":"bc5e48d1-c4de-4b38-b798-36dfaa79fe21","issue_id":"7bf48536-02ba-4fc5-99df-c242ef272368","timestamp":"2026-10-26T23:44:08.768556062Z","type":"issue_completed"}
 {"from":"backlog","id":"eb427288-4c39-4c00-b8b9-e2b082fe502e","issue_id":"6bd02fa4-c44e-49f4-a729-59eae4edf400","timestamp":"2026-10-26T23:44:08.907079725Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"e45f1558-2c00-4cfa-a238-5b751c7d9c0c","issue_id":"8acca4f4-af5d-4dd8-b135-5f4a87eb1311","timestamp":"2026-10-26T23:50:29.721448784Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"dd0e1d71-1e45-454e-ad2a-b43422b781bd","issue_id":"8acca4f4-af5d-4dd8-b135-5f4a87eb1311","timestamp":"2026-10-26T23:52:14.047214799Z","type":"gate_failed","updated_by":"auto:executor"}
 {"assignee":"agent:jit-execution-lead","id":"e86157da-dedd-4b46-8269-65c41b935e5b","issue_id":"e1940fcf-c673-4b12-8a68-2c919b6bee42","timestamp":"2026-10-26T23:49:56.668585264Z","type":"issue_claimed"}
 {"gate_key":"code-review","id":"c1eb9f9e-8c50-48d9-bbd5-df10544ff730","issue_id":"e1940fcf-c673-4b12-8a68-2c919b6bee42","timestamp":"2026-10-26T23:51:57.210978867Z","type":"gate_passed","updated_by":"auto:executor"}
 {"assignee":"agent:jit-execution-lead","id":"68b8d727-1782-4991-91b7-ffe1775ff020","issue_id":"f8021e35-cf67-4142-a1f3-5fa810fb7fc8","timestamp":"2026-10-26T23:49:11.032593197Z","type":"issue_claimed"}
@@ -20738,6 +20740,7 @@
 {"gate_key":"code-review","id":"e92d45f6-d2ef-4db3-88b4-809d7520ad9a","issue_id":"e21ca76d-3404-4881-b58d-d2952298f295","timestamp":"2026-10-27T01:13:03.210338763Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"10a8ce46-2a13-4c66-8d38-7e804c94c787","issue_id":"8e69776c-443e-4842-b818-c6af28fc73c9","timestamp":"2026-10-27T01:13:23.926813801Z","type":"gate_passed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"2ed4c3bd-a9ac-48ab-9769-8dd82a24a2f5","issue_id":"8c40d01b-145e-4974-8f22-41676a158aa0","timestamp":"2026-10-27T19:51:33.215222382Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"code-review","id":"586704bf-c619-41fa-bbd3-46f797aa167b","issue_id":"8acca4f4-af5d-4dd8-b135-5f4a87eb1311","timestamp":"2026-10-27T19:59:20.517100658Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"9480a897-f2da-4652-961f-7338b8944930","issue_id":"8c40d01b-145e-4974-8f22-41676a158aa0","timestamp":"2026-10-27T19:54:23.971040198Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"ee90686c-04cf-4f7f-847d-79088362955f","issue_id":"e21ca76d-3404-4881-b58d-d2952298f295","timestamp":"2026-10-27T19:56:43.787450266Z","to":"done","type":"issue_state_changed"}
 {"id":"4d91b72c-3992-403e-b126-e288112bd664","issue_id":"e21ca76d-3404-4881-b58d-d2952298f295","timestamp":"2026-10-27T19:56:43.787450266Z","type":"issue_completed"}
@@ -20745,3 +20748,5 @@
 {"id":"80b04845-7684-4787-9596-050a2a9b32b5","issue_id":"8e69776c-443e-4842-b818-c6af28fc73c9","timestamp":"2026-10-27T19:57:03.471058810Z","type":"issue_completed"}
 {"from":"ready","id":"1c05c04e-d24a-4f29-a1a2-936cff0f2f97","issue_id":"ad1e6d0e-ec8a-4178-91a2-434ab80845c8","timestamp":"2026-10-27T19:58:57.199024213Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"c975d1b1-2c3b-4a30-832a-16046c69f47d","issue_id":"ad1e6d0e-ec8a-4178-91a2-434ab80845c8","timestamp":"2026-10-27T19:58:57.199024213Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"7fa78b6c-56e5-475d-9e34-5bce1e25525c","issue_id":"8acca4f4-af5d-4dd8-b135-5f4a87eb1311","timestamp":"2026-10-27T20:01:53.719463667Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"eab89fbf-ab89-4b75-abff-2d4c2775982c","issue_id":"8acca4f4-af5d-4dd8-b135-5f4a87eb1311","timestamp":"2026-10-27T20:06:48.306128223Z","type":"gate_passed","updated_by":"auto:executor"}
