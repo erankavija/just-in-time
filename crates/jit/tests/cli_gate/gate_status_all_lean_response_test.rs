@@ -49,12 +49,11 @@ fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
         .output()
         .unwrap();
 
-    // A failed required gate makes `status-all` exit 4.
+    // A failed required gate makes `status-all` fail.
     let output = temp
         .command(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();

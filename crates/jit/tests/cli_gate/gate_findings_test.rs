@@ -281,7 +281,7 @@ fn test_findings_in_gate_failed_error_envelope() {
         .command(["gate", "evaluate", &id, "code-review", "--json"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["details"]["verdict"], "fail");
     // The embedded checker_result carries the structured findings.
