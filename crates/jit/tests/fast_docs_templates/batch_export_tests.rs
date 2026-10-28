@@ -11,6 +11,7 @@
 
 use jit::commands::BatchIssueDef;
 use jit::declarations::GateMode;
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -84,7 +85,7 @@ fn new_issue(
     priority: Priority,
     gates: &[&str],
     labels: &[&str],
-) -> String {
+) -> IssueId {
     h.executor
         .issues()
         .create_issue(
@@ -101,19 +102,19 @@ fn new_issue(
         .0
 }
 
-fn short(id: &str) -> String {
-    id.chars().take(8).collect()
+fn short(id: &IssueId) -> String {
+    id.short_id().to_string()
 }
 
 struct Scenario {
-    e: String,
+    e: IssueId,
     #[allow(dead_code)]
-    e2: String,
-    p: String,
-    b: String,
-    c1: String,
-    c2: String,
-    ext: String,
+    e2: IssueId,
+    p: IssueId,
+    b: IssueId,
+    c1: IssueId,
+    c2: IssueId,
+    ext: IssueId,
 }
 
 /// Build the bracketed-epic scenario and return the full ids.
@@ -185,7 +186,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
     }
 }
 
-fn def_for<'a>(defs: &'a [BatchIssueDef], id: &str) -> &'a BatchIssueDef {
+fn def_for<'a>(defs: &'a [BatchIssueDef], id: &IssueId) -> &'a BatchIssueDef {
     defs.iter()
         .find(|d| d.key == short(id))
         .unwrap_or_else(|| panic!("no def for {}", short(id)))

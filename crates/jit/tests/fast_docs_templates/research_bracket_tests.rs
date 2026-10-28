@@ -37,6 +37,7 @@ use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
 use jit::domain::{ContentFormat, Issue, State};
+use jit::test_utils::issue_id;
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
@@ -104,6 +105,7 @@ fn goal_body() -> String {
 /// The breakable container `C` (a research goal) declaring `hyp:H-1`.
 fn breakable_container() -> Issue {
     let mut goal = crate::fixture_issue("Improve accuracy".to_string(), goal_body());
+    goal.id = issue_id(1);
     goal.labels = vec!["type:goal".to_string(), "hyp:H-1".to_string()];
     goal
 }
@@ -235,9 +237,11 @@ fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
 
     let mut container = breakable_container();
     let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
+    experiment.id = issue_id(2);
     experiment.labels = vec!["type:experiment".to_string()]; // does NOT test H-1
     experiment.state = State::Backlog;
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -272,8 +276,10 @@ fn test_research_preview_silent_while_breakdown_node_in_backlog() {
 
     let mut container = breakable_container();
     let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
+    experiment.id = issue_id(2);
     experiment.labels = vec!["type:experiment".to_string()]; // does NOT test H-1
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -304,12 +310,14 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
 
     let mut container = breakable_container();
     let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
+    experiment.id = issue_id(2);
     experiment.labels = vec![
         "type:experiment".to_string(),
         format!("tests:{}/H-1", container.short_id()),
     ];
     experiment.state = State::Backlog; // NOT done
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -341,8 +349,10 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
 
     let mut container = breakable_container();
     let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
+    experiment.id = issue_id(2);
     experiment.labels = vec!["type:experiment".to_string()]; // no tests: here
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(3);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -352,6 +362,7 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     breakdown.state = State::InProgress;
     // P, beyond the boundary, is the only carrier of tests:<C>/H-1.
     let mut plan = crate::fixture_issue("plan".to_string(), String::new());
+    plan.id = issue_id(4);
     plan.labels = vec![
         "type:planning".to_string(),
         format!("tests:{}/H-1", container.short_id()),
@@ -382,13 +393,16 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
 
     let mut container = breakable_container();
     let mut exp_a = crate::fixture_issue("exp a (sink)".to_string(), String::new());
+    exp_a.id = issue_id(2);
     exp_a.labels = vec!["type:experiment".to_string()];
     let mut exp_b = crate::fixture_issue("exp b (interior)".to_string(), String::new());
+    exp_b.id = issue_id(3);
     exp_b.labels = vec![
         "type:experiment".to_string(),
         format!("tests:{}/H-1", container.short_id()),
     ];
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
+    breakdown.id = issue_id(4);
     breakdown.labels = vec![
         "type:breakdown".to_string(),
         format!("brackets:{}", container.short_id()),
@@ -429,6 +443,7 @@ fn test_research_closure_rule_still_requires_done_experiment() {
     goal.state = State::Done;
     // An experiment testing H-1 but still in backlog (not done).
     let mut experiment = crate::fixture_issue("experiment".to_string(), String::new());
+    experiment.id = issue_id(2);
     experiment.labels = vec![
         "type:experiment".to_string(),
         format!("tests:{}/H-1", goal.short_id()),

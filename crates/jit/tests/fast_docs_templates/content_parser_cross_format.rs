@@ -15,6 +15,7 @@ use jit::document::{
     ContentParser, HtmlContentParser, MarkdownContentParser, ParsedContent, XmlContentParser,
 };
 use jit::domain::projection::project;
+use jit::test_utils::issue_id;
 use jit::validation::engine::{Finding, SchemaEngine};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -206,7 +207,8 @@ fn hard_criterion_rule() -> Rule {
 fn projection_json(parser: &dyn ContentParser, body: &str) -> Value {
     // The body is what the projection parses; the issue carries it as its
     // description, exactly as in production.
-    let issue = crate::fixture_issue("Plan".to_string(), body.to_string());
+    let mut issue = crate::fixture_issue("Plan".to_string(), body.to_string());
+    issue.id = issue_id(1);
     let projection = project(&issue).with_sections(&issue.description, parser);
     serde_json::to_value(&projection).expect("projection serializes")
 }
