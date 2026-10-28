@@ -131,9 +131,10 @@ mod tests {
 
     #[test]
     fn test_to_pretty_bytes_rejects_invalid_membership() {
+        let id = crate::test_utils::issue_id(1);
         let index = RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: vec!["duplicate".into(), "duplicate".into()],
+            all_ids: vec![id.clone(), id.clone()],
             deleted_ids: Vec::new(),
         };
 
@@ -141,6 +142,6 @@ mod tests {
             .to_pretty_bytes()
             .unwrap_err()
             .to_string()
-            .contains("duplicate active issue id 'duplicate'"));
+            .contains(&format!("duplicate active issue id '{id}'")));
     }
 }

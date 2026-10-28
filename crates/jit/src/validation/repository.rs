@@ -1229,9 +1229,9 @@ mod tests {
             &read_fixture(&executor, &issue_path(&id).repository_relative()).unwrap(),
         )
         .unwrap();
-        issue.dependencies = vec!["9dbccee5-4241-57f2-ba6b-7bb89e05938a"
-            .parse::<IssueId>()
-            .unwrap()];
+        issue.dependencies = vec![crate::test_utils::issue_id(
+            0x424157f2ba6b7bb89e05938a9dbccee5,
+        )];
         issue.gates_required = vec!["planned".to_string()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
         let error = format!(
@@ -1250,7 +1250,7 @@ mod tests {
         );
         assert!(
             error.contains("repository-integrity")
-                && error.contains("9dbccee5-4241-57f2-ba6b-7bb89e05938a"),
+                && error.contains(issue.dependencies[0].as_str()),
             "{error}"
         );
     }
@@ -1328,11 +1328,9 @@ mod tests {
         let layout = executor.require_layout().unwrap();
         store.configure_repository_layout(&layout);
         let mut issue = store.list_issues().unwrap().remove(0);
-        issue.dependencies.push(
-            "5a1f6645-96bf-59db-932e-7f49ee5cc6bb"
-                .parse::<IssueId>()
-                .unwrap(),
-        );
+        issue.dependencies.push(crate::test_utils::issue_id(
+            0x96bf59db932e7f49ee5cc6bb5a1f6645,
+        ));
         let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";

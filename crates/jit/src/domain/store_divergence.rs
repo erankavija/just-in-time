@@ -150,9 +150,9 @@ mod tests {
     use crate::test_utils::fixture_issue;
 
     /// An event carrying `id`, associated with `issue_id`.
-    fn event(id: &str, issue_id: &str, title: &str) -> Event {
+    fn event(id: &str, issue_id: &crate::domain::identity::IssueId, title: &str) -> Event {
         let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
-        issue.id = issue_id.to_string();
+        issue.id = issue_id.clone();
         crate::test_utils::stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             id,
@@ -205,9 +205,21 @@ mod tests {
 
     #[test]
     fn test_compare_stores_names_event_records_held_by_one_log_in_each_direction() {
-        let shared = event("shared-event", "issue-a", "Both logs hold it");
-        let here = event("local-event", "issue-b", "Only the local log");
-        let there = event("reference-event", "issue-c", "Only the reference log");
+        let shared = event(
+            "shared-event",
+            &crate::test_utils::issue_id(153),
+            "Both logs hold it",
+        );
+        let here = event(
+            "local-event",
+            &crate::test_utils::issue_id(154),
+            "Only the local log",
+        );
+        let there = event(
+            "reference-event",
+            &crate::test_utils::issue_id(155),
+            "Only the reference log",
+        );
 
         let local = [shared.clone(), here.clone()];
         let reference = [shared.clone(), there.clone()];
@@ -236,8 +248,16 @@ mod tests {
         there.description = "The reference value".to_string();
         here.title = "Diverged locally".to_string();
 
-        let local_event = event("shared-event", "issue-a", "The local value");
-        let reference_event = event("shared-event", "issue-a", "The reference value");
+        let local_event = event(
+            "shared-event",
+            &crate::test_utils::issue_id(153),
+            "The local value",
+        );
+        let reference_event = event(
+            "shared-event",
+            &crate::test_utils::issue_id(153),
+            "The reference value",
+        );
 
         let one_sided = fixture_issue("One sided".to_string(), "Local store only".to_string());
 
@@ -278,8 +298,8 @@ mod tests {
             fixture_issue("Second".to_string(), "Held by both".to_string()),
         ];
         let events = [
-            event("event-1", "issue-a", "Held by both"),
-            event("event-2", "issue-b", "Held by both"),
+            event("event-1", &crate::test_utils::issue_id(153), "Held by both"),
+            event("event-2", &crate::test_utils::issue_id(154), "Held by both"),
         ];
 
         assert_eq!(
@@ -296,8 +316,8 @@ mod tests {
             fixture_issue("A".to_string(), "Local only".to_string()),
         ];
         let events = [
-            event("event-b", "issue-a", "Local only"),
-            event("event-a", "issue-b", "Local only"),
+            event("event-b", &crate::test_utils::issue_id(153), "Local only"),
+            event("event-a", &crate::test_utils::issue_id(154), "Local only"),
         ];
 
         let divergences = compare_stores(side(&issues, &events), side(&[], &[]));
@@ -329,7 +349,11 @@ mod tests {
 
     #[test]
     fn test_compare_stores_reports_an_unmatched_repeated_identity_as_a_conflict() {
-        let repeated = event("event-1", "issue-a", "Recorded twice locally");
+        let repeated = event(
+            "event-1",
+            &crate::test_utils::issue_id(153),
+            "Recorded twice locally",
+        );
         let local = [repeated.clone(), repeated.clone()];
         let reference = [repeated.clone()];
 

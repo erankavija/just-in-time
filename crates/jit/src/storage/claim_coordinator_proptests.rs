@@ -51,7 +51,7 @@ fn io_config() -> ProptestConfig {
 
 // Generator for valid issue IDs
 fn issue_id_strategy() -> impl Strategy<Value = IssueId> {
-    "[a-z]{3}-[0-9]{3}".prop_map(|label| test_issue_id(&label))
+    any::<u128>().prop_map(crate::test_utils::issue_id)
 }
 
 // Generator for TTL values (mix of finite and indefinite)
@@ -334,7 +334,7 @@ proptest! {
         let now = chrono::Utc::now();
         let lease = Lease {
             lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
-            issue_id: test_issue_id("test"),
+            issue_id: crate::test_utils::issue_id(53),
             agent_id: "agent:test".parse().unwrap(),
             worktree_id: "wt:test".parse().unwrap(),
             branch: None,
@@ -364,7 +364,7 @@ proptest! {
         let now = chrono::Utc::now();
         let lease = Lease {
             lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
-            issue_id: test_issue_id("test"),
+            issue_id: crate::test_utils::issue_id(53),
             agent_id: "agent:test".parse().unwrap(),
             worktree_id: "wt:test".parse().unwrap(),
             branch: None,

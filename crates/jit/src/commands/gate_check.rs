@@ -1564,7 +1564,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::{compact_run_history_for_context, omit_current_gate_projection};
-    use crate::commands::test_helpers::fixture_id;
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
@@ -1726,7 +1725,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             run_id: run_id.to_string(),
             gate_key: gate_key.to_string(),
             stage: GateStage::Postcheck,
-            issue_id: fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2"),
+            issue_id: crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
             status: GateRunStatus::Failed,
@@ -1822,7 +1821,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     #[test]
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
         let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
-        issue.id = fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2");
+        issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
         issue.gates_required = vec!["first".into(), "second".into()];
         let mut run = prior_run("", "first", 10, None);
         run.status = GateRunStatus::Passed;
@@ -2744,7 +2743,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "true".to_string(),
             Some("../../outside".to_string()),
         );
-        let unrelated = fixture_id("00000000-0000-4000-8000-000000000001");
+        let unrelated = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000);
         std::fs::write(
             repo.path().join(format!(".jit/issues/{unrelated}.json")),
             [],
@@ -2899,9 +2898,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }));
 
         let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
-        planned_issue
-            .dependencies
-            .push(fixture_id("5a1f6645-96bf-59db-932e-7f49ee5cc6bb"));
+        planned_issue.dependencies.push(crate::test_utils::issue_id(
+            0x96bf59db932e7f49ee5cc6bb5a1f6645,
+        ));
         let overrides = crate::commands::overrides_from_repo_changes(
             live_image.layout(),
             [
@@ -3171,7 +3170,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "type:task".to_string(),
             "satisfies:@/requirement/missing".to_string(),
         ];
-        local_failure.dependencies = vec![fixture_id("04d64f1d-4c96-5feb-9570-9e34e4c85810")];
+        local_failure.dependencies = vec![crate::test_utils::issue_id(
+            0x4c965feb95709e34e4c8581004d64f1d,
+        )];
         local_failure.gates_required = vec!["unrelated-pending".to_string()];
         seed_issue(&executor.storage, local_failure);
 
@@ -3241,12 +3242,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let ambiguous_executor = setup();
         seed_rule_validation_rules(&ambiguous_executor);
         for id in [
-            "deadbeef-0000-4000-8000-000000000001",
-            "deadbeef-0000-4000-8000-000000000002",
+            crate::test_utils::issue_id(0xdead_beef),
+            crate::test_utils::issue_id(0x1_deadbeef),
         ] {
             let mut target =
                 crate::test_utils::fixture_issue(format!("Ambiguous target {id}"), String::new());
-            target.id = fixture_id(id);
+            target.id = id;
             target.labels = vec!["type:epic".to_string()];
             seed_issue(&ambiguous_executor.storage, target);
         }
@@ -4826,8 +4827,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let created_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
-        let replacement_id = fixture_id("0f0e0d0c-ffff-4fff-8fff-ffffffffffff");
+        let issue_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
+        let replacement_id = crate::test_utils::issue_id(0xffff_4fff_8fff_ffff_ffff_ffff_0f0e_0d0c);
         let mut original = executor.storage.load_issue(&created_id).unwrap();
         original.id = issue_id.clone();
         std::fs::remove_file(repo.path().join(format!(".jit/issues/{created_id}.json"))).unwrap();
@@ -4943,7 +4944,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        concurrent.issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000002");
+        concurrent.issue_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0002_0f0e_0d0c);
         std::fs::write(
             repo.path().join("concurrent-run.json"),
             serde_json::to_vec_pretty(&concurrent).unwrap(),

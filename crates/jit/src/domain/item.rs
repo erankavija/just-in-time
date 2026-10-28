@@ -1578,16 +1578,14 @@ mod tests {
         // REQ-01: qualified id is the uniform kind-segmented address, a pure
         // projection over (scope, kind, self-id).
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
-        issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496"
-            .parse::<crate::domain::identity::IssueId>()
-            .unwrap();
+        issue.id = crate::test_utils::issue_id(0xfd6e_4929_a61e_ffb1_a310_4496_56ab_0224);
         assert_eq!(
             qualified_id(
                 &Scope::parse(&issue.short_id()).unwrap(),
                 "requirement",
                 "REQ-01"
             ),
-            "@/issue/56ab0224/requirement/REQ-01"
+            format!("@/issue/{}/requirement/REQ-01", issue.short_id())
         );
         assert_eq!(
             qualified_id(&Scope::Project, "invariant", "sample-invariant"),

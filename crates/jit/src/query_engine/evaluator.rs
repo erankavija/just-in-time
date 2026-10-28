@@ -69,7 +69,6 @@ impl QueryEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::{Priority, State};
 
     fn create_issue(
@@ -106,7 +105,7 @@ mod tests {
     #[test]
     fn test_eval_state_condition() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             None,
@@ -126,7 +125,7 @@ mod tests {
     #[test]
     fn test_eval_priority_condition() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::High,
             None,
@@ -146,7 +145,7 @@ mod tests {
     #[test]
     fn test_eval_label_exact_match() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             None,
@@ -166,7 +165,7 @@ mod tests {
     #[test]
     fn test_eval_label_wildcard() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             None,
@@ -186,7 +185,7 @@ mod tests {
     #[test]
     fn test_eval_assignee_condition() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
@@ -206,7 +205,7 @@ mod tests {
     #[test]
     fn test_eval_unassigned_condition() {
         let assigned = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             Some("agent:worker-1"),
@@ -214,7 +213,7 @@ mod tests {
             vec![],
         );
         let unassigned = create_issue(
-            &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+            &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
             State::Ready,
             Priority::Normal,
             None,
@@ -240,7 +239,7 @@ mod tests {
     #[test]
     fn test_eval_blocked_condition() {
         let dep = create_issue(
-            &fixture_id("f4a698f0-7af7-5d08-8331-30d305c22da0"),
+            &crate::test_utils::issue_id(0x7af7_5d08_8331_30d3_05c2_2da0_f4a6_98f0),
             State::Ready,
             Priority::Normal,
             None,
@@ -248,15 +247,17 @@ mod tests {
             vec![],
         );
         let blocked = create_issue(
-            &fixture_id("3e9688bd-a715-50ab-b754-0cce3ea8599e"),
+            &crate::test_utils::issue_id(0xa715_50ab_b754_0cce_3ea8_599e_3e96_88bd),
             State::Backlog,
             Priority::Normal,
             None,
             vec![],
-            vec![fixture_id("f4a698f0-7af7-5d08-8331-30d305c22da0")],
+            vec![crate::test_utils::issue_id(
+                0x7af75d08833130d305c22da0f4a698f0,
+            )],
         );
         let not_blocked = create_issue(
-            &fixture_id("c646cd52-320a-5274-a9f2-3a1aa166a253"),
+            &crate::test_utils::issue_id(0x320a_5274_a9f2_3a1a_a166_a253_c646_cd52),
             State::Ready,
             Priority::Normal,
             None,
@@ -282,7 +283,7 @@ mod tests {
     #[test]
     fn test_eval_and_expression() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::High,
             None,
@@ -305,7 +306,7 @@ mod tests {
     #[test]
     fn test_eval_or_expression() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             None,
@@ -326,7 +327,7 @@ mod tests {
     #[test]
     fn test_eval_not_expression() {
         let issue = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
             None,
@@ -344,7 +345,7 @@ mod tests {
     #[test]
     fn test_eval_complex_expression() {
         let issue1 = create_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::High,
             None,
@@ -352,7 +353,7 @@ mod tests {
             vec![],
         );
         let issue2 = create_issue(
-            &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+            &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
             State::Done,
             Priority::Normal,
             None,
@@ -360,7 +361,7 @@ mod tests {
             vec![],
         );
         let issue3 = create_issue(
-            &fixture_id("b309dea0-e93c-56db-9922-c57f00081a4f"),
+            &crate::test_utils::issue_id(0xe93c_56db_9922_c57f_0008_1a4f_b309_dea0),
             State::InProgress,
             Priority::Low,
             None,

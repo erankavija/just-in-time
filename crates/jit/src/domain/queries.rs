@@ -339,36 +339,37 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 /// ```rust
 /// use jit::domain::queries::bracket_scope_ids;
 /// use jit::domain::Issue;
+/// use jit::test_utils::issue_id;
 ///
 /// // A spine `C -> I -> B -> P`: container, an impl task, a breakdown node,
 /// // and the plan upstream of the breakdown. Edges point dependent -> dependency.
 /// let mut c = Issue::draft("container".to_string(), String::new());
-/// c.id = "C".to_string();
+/// c.id = issue_id(1);
 /// c.labels = vec!["type:epic".to_string()];
-/// c.dependencies = vec!["I".to_string()];
+/// c.dependencies = vec![issue_id(2)];
 ///
 /// let mut i = Issue::draft("impl".to_string(), String::new());
-/// i.id = "I".to_string();
-/// i.dependencies = vec!["B".to_string()];
+/// i.id = issue_id(2);
+/// i.dependencies = vec![issue_id(3)];
 ///
 /// let mut b = Issue::draft("breakdown".to_string(), String::new());
-/// b.id = "B".to_string();
+/// b.id = issue_id(3);
 /// b.labels = vec!["type:breakdown".to_string()];
-/// b.dependencies = vec!["P".to_string()];
+/// b.dependencies = vec![issue_id(4)];
 ///
 /// let mut p = Issue::draft("plan".to_string(), String::new());
-/// p.id = "P".to_string();
+/// p.id = issue_id(4);
 ///
 /// let issues = vec![c, i, b, p];
 ///
 /// // The walk halts AT the breakdown node: C, I and B are in scope, P is not.
-/// let ids = bracket_scope_ids("C", &issues, Some("breakdown"));
-/// assert!(ids.contains("C") && ids.contains("I") && ids.contains("B"));
-/// assert!(!ids.contains("P"));
+/// let ids = bracket_scope_ids(&issue_id(1), &issues, Some("breakdown"));
+/// assert!(ids.contains(&issue_id(1)) && ids.contains(&issue_id(2)) && ids.contains(&issue_id(3)));
+/// assert!(!ids.contains(&issue_id(4)));
 ///
 /// // With no configured boundary the walk descends the full closure.
-/// let full = bracket_scope_ids("C", &issues, None);
-/// assert!(full.contains("P"));
+/// let full = bracket_scope_ids(&issue_id(1), &issues, None);
+/// assert!(full.contains(&issue_id(4)));
 /// ```
 pub fn bracket_scope_ids(
     container_id: &str,
@@ -424,6 +425,8 @@ pub fn bracket_scope_ids(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueId;
+    use crate::test_utils::issue_id;
 
     use proptest::prelude::*;
 
@@ -596,7 +599,7 @@ mod tests {
 
     fn available_issue(index: usize, priority: Priority, labels: &[&str]) -> Issue {
         let mut issue = labeled_issue(&format!("Issue {index}"), labels);
-        issue.id = index.to_string();
+        issue.id = issue_id(index as u128);
         issue.state = State::Ready;
         issue.priority = priority;
         issue
@@ -661,7 +664,7 @@ mod tests {
         let actual = query_available(&issues, AvailableFilter::default());
         assert_eq!(
             actual.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
-            ["4", "9", "2", "7"]
+            [&issues[2].id, &issues[0].id, &issues[3].id, &issues[1].id]
         );
     }
 
@@ -804,11 +807,11 @@ mod tests {
     }
 
     /// Build an issue with the given id, type label, and dependency ids.
-    fn scope_issue(id: &str, type_: &str, deps: &[&str]) -> Issue {
+    fn scope_issue(id: IssueId, type_: &str, deps: &[IssueId]) -> Issue {
         let mut issue = crate::test_utils::fixture_issue(format!("issue {id}"), String::new());
-        issue.id = id.to_string();
+        issue.id = id;
         issue.labels = vec![crate::labels::type_label(type_)];
-        issue.dependencies = deps.iter().map(|s| s.to_string()).collect();
+        issue.dependencies = deps.to_vec();
         issue
     }
 
@@ -817,24 +820,24 @@ mod tests {
     /// depends on the ones before it close).
     fn bracket_spine() -> Vec<Issue> {
         vec![
-            scope_issue("C0000000", "epic", &["I1000000"]),
-            scope_issue("I1000000", "task", &["I2000000"]),
-            scope_issue("I2000000", "task", &["B0000000"]),
-            scope_issue("B0000000", "breakdown", &["P0000000"]),
-            scope_issue("P0000000", "planning", &["U0000000"]),
-            scope_issue("U0000000", "epic", &[]),
+            scope_issue(issue_id(200), "epic", &[issue_id(201)]),
+            scope_issue(issue_id(201), "task", &[issue_id(202)]),
+            scope_issue(issue_id(202), "task", &[issue_id(203)]),
+            scope_issue(issue_id(203), "breakdown", &[issue_id(204)]),
+            scope_issue(issue_id(204), "planning", &[issue_id(205)]),
+            scope_issue(issue_id(205), "epic", &[]),
         ]
     }
 
     #[test]
     fn test_bracket_scope_includes_container_impl_and_breakdown() {
         let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert!(ids.contains("C0000000"), "container is in scope");
-        assert!(ids.contains("I1000000"), "impl source is in scope");
-        assert!(ids.contains("I2000000"), "impl sink is in scope");
+        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        assert!(ids.contains(&issue_id(200)), "container is in scope");
+        assert!(ids.contains(&issue_id(201)), "impl source is in scope");
+        assert!(ids.contains(&issue_id(202)), "impl sink is in scope");
         assert!(
-            ids.contains("B0000000"),
+            ids.contains(&issue_id(203)),
             "breakdown node B is in scope (its rule fires)"
         );
     }
@@ -842,13 +845,13 @@ mod tests {
     #[test]
     fn test_bracket_scope_stops_at_breakdown_excludes_plan_and_upstream() {
         let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
+        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
         assert!(
-            !ids.contains("P0000000"),
+            !ids.contains(&issue_id(204)),
             "walk halts at B; plan P is out of scope"
         );
         assert!(
-            !ids.contains("U0000000"),
+            !ids.contains(&issue_id(205)),
             "upstream beyond B is out of scope"
         );
         assert_eq!(ids.len(), 4, "exactly C + 2 impl + B");
@@ -860,25 +863,25 @@ mod tests {
         // CUSTOM type `synthesis`, not the literal "breakdown". The walk must
         // halt at the `type:synthesis` node and exclude its upstream.
         let issues = vec![
-            scope_issue("C0000000", "goal", &["I1000000"]),
-            scope_issue("I1000000", "task", &["S0000000"]),
-            scope_issue("S0000000", "synthesis", &["P0000000"]),
-            scope_issue("P0000000", "planning", &["U0000000"]),
-            scope_issue("U0000000", "goal", &[]),
+            scope_issue(issue_id(200), "goal", &[issue_id(201)]),
+            scope_issue(issue_id(201), "task", &[issue_id(206)]),
+            scope_issue(issue_id(206), "synthesis", &[issue_id(204)]),
+            scope_issue(issue_id(204), "planning", &[issue_id(205)]),
+            scope_issue(issue_id(205), "goal", &[]),
         ];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("synthesis"));
-        assert!(ids.contains("C0000000"), "container is in scope");
-        assert!(ids.contains("I1000000"), "impl is in scope");
+        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("synthesis"));
+        assert!(ids.contains(&issue_id(200)), "container is in scope");
+        assert!(ids.contains(&issue_id(201)), "impl is in scope");
         assert!(
-            ids.contains("S0000000"),
+            ids.contains(&issue_id(206)),
             "the custom-named boundary node is in scope"
         );
         assert!(
-            !ids.contains("P0000000"),
+            !ids.contains(&issue_id(204)),
             "walk halts at the synthesis boundary; plan is out of scope"
         );
         assert!(
-            !ids.contains("U0000000"),
+            !ids.contains(&issue_id(205)),
             "upstream beyond the synthesis boundary is out of scope"
         );
         assert_eq!(ids.len(), 3, "exactly C + impl + synthesis boundary");
@@ -891,9 +894,11 @@ mod tests {
         // transitive closure: even a node that WOULD be a boundary under a
         // configured type does not halt it.
         let issues = bracket_spine();
-        let ids = bracket_scope_ids("C0000000", &issues, None);
+        let ids = bracket_scope_ids(&issue_id(200), &issues, None);
         assert!(
-            ids.contains("B0000000") && ids.contains("P0000000") && ids.contains("U0000000"),
+            ids.contains(&issue_id(203))
+                && ids.contains(&issue_id(204))
+                && ids.contains(&issue_id(205)),
             "without a configured boundary the walk descends the whole closure: {ids:?}"
         );
         assert_eq!(ids.len(), 6, "all six spine nodes are reachable");
@@ -901,22 +906,22 @@ mod tests {
 
     #[test]
     fn test_bracket_scope_lone_container_is_just_itself() {
-        let issues = vec![scope_issue("C0000000", "epic", &[])];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
+        let issues = vec![scope_issue(issue_id(200), "epic", &[])];
+        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
         assert_eq!(ids.len(), 1);
-        assert!(ids.contains("C0000000"));
+        assert!(ids.contains(&issue_id(200)));
     }
 
     #[test]
     fn test_query_blocked_dependency_reason_is_typed() {
         let mut dep = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
-        dep.id = "dep1".to_string();
+        dep.id = crate::test_utils::issue_id(63);
         dep.state = State::InProgress;
 
         let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
-        blocked.id = "blocked1".to_string();
+        blocked.id = crate::test_utils::issue_id(64);
         blocked.state = State::Backlog;
-        blocked.dependencies = vec!["dep1".to_string()];
+        blocked.dependencies = vec![issue_id(63)];
 
         let issues = vec![dep, blocked];
         let result = query_blocked(&issues);
@@ -925,7 +930,7 @@ mod tests {
         assert_eq!(
             result[0].1,
             vec![BlockingReason::Dependency {
-                id: "dep1".to_string(),
+                id: issue_id(63),
                 title: "Upstream".to_string(),
                 state: State::InProgress,
             }]
@@ -933,7 +938,7 @@ mod tests {
         // Display renders the canonical reason string.
         assert_eq!(
             result[0].1[0].to_string(),
-            "dependency:dep1 (Upstream:in_progress)"
+            format!("dependency:{} (Upstream:in_progress)", issue_id(63))
         );
     }
 
@@ -941,17 +946,17 @@ mod tests {
     fn test_query_blocked_omits_rejected_dependency_from_reasons() {
         // A Rejected dependency is met: only the in_progress one is a reason.
         let mut rejected = crate::test_utils::fixture_issue("Abandoned".to_string(), String::new());
-        rejected.id = "dep1".to_string();
+        rejected.id = crate::test_utils::issue_id(63);
         rejected.state = State::Rejected;
 
         let mut pending = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
-        pending.id = "dep2".to_string();
+        pending.id = crate::test_utils::issue_id(65);
         pending.state = State::InProgress;
 
         let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
-        blocked.id = "blocked1".to_string();
+        blocked.id = crate::test_utils::issue_id(64);
         blocked.state = State::Backlog;
-        blocked.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
+        blocked.dependencies = vec![issue_id(63), issue_id(65)];
 
         let issues = vec![rejected, pending, blocked];
         let result = query_blocked(&issues);
@@ -960,7 +965,7 @@ mod tests {
         assert_eq!(
             result[0].1,
             vec![BlockingReason::Dependency {
-                id: "dep2".to_string(),
+                id: issue_id(65),
                 title: "Upstream".to_string(),
                 state: State::InProgress,
             }]
@@ -974,13 +979,13 @@ mod tests {
         // A Backlog issue with an unmet dependency keeps it blocked; a required
         // gate with no recorded status contributes a Pending gate reason.
         let mut dep = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
-        dep.id = "dep1".to_string();
+        dep.id = crate::test_utils::issue_id(63);
         dep.state = State::InProgress;
 
         let mut blocked = crate::test_utils::fixture_issue("Downstream".to_string(), String::new());
-        blocked.id = "blocked1".to_string();
+        blocked.id = crate::test_utils::issue_id(64);
         blocked.state = State::Backlog;
-        blocked.dependencies = vec!["dep1".to_string()];
+        blocked.dependencies = vec![issue_id(63)];
         blocked.gates_required = vec!["never-run".to_string(), "failed".to_string()];
         blocked.gates_status.insert(
             "failed".to_string(),
@@ -1017,12 +1022,9 @@ mod tests {
     fn test_bracket_scope_ignores_dangling_dependency() {
         // Container depends on an id absent from the store; the walk must not
         // panic and must not include the missing id.
-        let issues = vec![scope_issue("C0000000", "epic", &["MISSING0"])];
-        let ids = bracket_scope_ids("C0000000", &issues, Some("breakdown"));
-        assert_eq!(
-            ids,
-            std::collections::HashSet::from(["C0000000".to_string()])
-        );
+        let issues = vec![scope_issue(issue_id(200), "epic", &[issue_id(207)])];
+        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        assert_eq!(ids, std::collections::HashSet::from([issue_id(200)]));
     }
 
     fn ids_of(issues: &[Issue]) -> Vec<&str> {
@@ -1031,7 +1033,7 @@ mod tests {
 
     fn state_issue(index: usize, state: State) -> Issue {
         let mut issue = labeled_issue(&format!("Issue {index}"), &[]);
-        issue.id = index.to_string();
+        issue.id = issue_id(index as u128);
         issue.state = state;
         issue
     }
@@ -1064,9 +1066,9 @@ mod tests {
     #[test]
     fn test_query_ready_requires_ready_state_unassigned_and_met_dependencies() {
         let mut done_dep = state_issue(100, State::Done);
-        done_dep.id = "done-dep".into();
+        done_dep.id = crate::test_utils::issue_id(66);
         let mut open_dep = state_issue(101, State::InProgress);
-        open_dep.id = "open-dep".into();
+        open_dep.id = crate::test_utils::issue_id(67);
         let mut issues: Vec<Issue> = State::ALL
             .into_iter()
             .enumerate()
@@ -1075,9 +1077,9 @@ mod tests {
         let mut assigned = state_issue(50, State::Ready);
         assigned.assignee = Some("agent:a".parse().unwrap());
         let mut after_done = state_issue(51, State::Ready);
-        after_done.dependencies = vec!["done-dep".into()];
+        after_done.dependencies = vec![issue_id(66)];
         let mut after_open = state_issue(52, State::Ready);
-        after_open.dependencies = vec!["open-dep".into()];
+        after_open.dependencies = vec![issue_id(67)];
         issues.extend([done_dep, open_dep, assigned, after_done, after_open]);
 
         let ready_ids = ids_of(&query_ready(&issues))
@@ -1088,9 +1090,11 @@ mod tests {
         let ready_state_index = State::ALL
             .into_iter()
             .position(|state| state == State::Ready)
-            .unwrap()
-            .to_string();
-        assert_eq!(ready_ids, [ready_state_index, "51".to_string()]);
+            .unwrap();
+        assert_eq!(
+            ready_ids,
+            [issue_id(ready_state_index as u128), issue_id(51)]
+        );
     }
 
     proptest! {
@@ -1140,8 +1144,14 @@ mod tests {
             assigned(3, None),
         ];
 
-        assert_eq!(ids_of(&query_by_assignee(&issues, "agent:a")), ["0", "2"]);
-        assert_eq!(ids_of(&query_by_assignee(&issues, "agent:b")), ["1"]);
+        assert_eq!(
+            ids_of(&query_by_assignee(&issues, "agent:a")),
+            [&issues[0].id, &issues[2].id]
+        );
+        assert_eq!(
+            ids_of(&query_by_assignee(&issues, "agent:b")),
+            [&issues[1].id]
+        );
         assert!(query_by_assignee(&issues, "agent:c").is_empty());
         assert!(query_by_assignee(&issues, "agent").is_empty());
     }
@@ -1163,7 +1173,10 @@ mod tests {
             archived(6, None),
         ];
 
-        assert_eq!(ids_of(&query_closed(&issues)), ["0", "1", "4"]);
+        assert_eq!(
+            ids_of(&query_closed(&issues)),
+            [&issues[0].id, &issues[1].id, &issues[4].id]
+        );
     }
 
     #[test]
@@ -1256,14 +1269,16 @@ mod tests {
     fn test_issues_becoming_ready_promotes_a_dependent_whose_dependency_is_done() {
         let dependency = state_issue(0, State::Done);
         let dependent = dependent_of(1, &[&dependency]);
-        assert_eq!(issues_becoming_ready(&[dependency, dependent]), ["1"]);
+        let expected = dependent.id.clone();
+        assert_eq!(issues_becoming_ready(&[dependency, dependent]), [expected]);
     }
 
     #[test]
     fn test_issues_becoming_ready_promotes_a_dependent_whose_dependency_is_rejected() {
         let dependency = state_issue(0, State::Rejected);
         let dependent = dependent_of(1, &[&dependency]);
-        assert_eq!(issues_becoming_ready(&[dependency, dependent]), ["1"]);
+        let expected = dependent.id.clone();
+        assert_eq!(issues_becoming_ready(&[dependency, dependent]), [expected]);
     }
 
     #[test]
@@ -1279,7 +1294,11 @@ mod tests {
         let done = state_issue(0, State::Done);
         let rejected = state_issue(1, State::Rejected);
         let dependent = dependent_of(2, &[&done, &rejected]);
-        assert_eq!(issues_becoming_ready(&[done, rejected, dependent]), ["2"]);
+        let expected = dependent.id.clone();
+        assert_eq!(
+            issues_becoming_ready(&[done, rejected, dependent]),
+            [expected]
+        );
     }
 
     #[test]
@@ -1304,7 +1323,7 @@ mod tests {
     #[test]
     fn test_issues_becoming_ready_holds_a_dependent_of_an_unresolved_dependency() {
         let mut dependent = state_issue(0, State::Backlog);
-        dependent.dependencies = vec!["absent".to_string()];
+        dependent.dependencies = vec![issue_id(137)];
         assert!(issues_becoming_ready(&[dependent]).is_empty());
     }
 
@@ -1323,7 +1342,7 @@ mod tests {
             let issues: Vec<_> = nodes.iter().enumerate().map(|(index, (state, archived_from, dependencies))| {
                 let mut issue = state_issue(index, State::ALL[*state]);
                 issue.archived_from = archived_from.map(|from| State::ALL[from]);
-                issue.dependencies = dependencies.iter().map(usize::to_string).collect();
+                issue.dependencies = dependencies.iter().map(|&index| issue_id(index as u128)).collect();
                 issue
             }).collect();
             let resolved = build_issue_map(&issues);

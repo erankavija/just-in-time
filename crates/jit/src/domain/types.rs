@@ -1843,9 +1843,7 @@ mod tests {
     #[test]
     fn test_stamped_event_reads_back_its_body_and_identity() {
         let body = EventBody::draft_gate_added(
-            "00000000-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
             "tests".to_string(),
         );
         let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
@@ -1883,7 +1881,7 @@ mod tests {
                 .finish();
         let attestor: Assignee = "human:reviewer".parse().unwrap();
         let mut attested = GateRunResult::attestation(
-            "issue",
+            &crate::test_utils::issue_id(160),
             "review",
             GateStage::Postcheck,
             GateStatus::Passed,
@@ -1897,7 +1895,7 @@ mod tests {
     #[test]
     fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
         let mut run = GateRunResult::attestation(
-            "issue",
+            &crate::test_utils::issue_id(160),
             "review",
             GateStage::Postcheck,
             GateStatus::Passed,
@@ -2069,8 +2067,8 @@ mod tests {
         // none of the three keys. It must deserialize (fields default to None)
         // and re-serialize WITHOUT introducing the keys, so old files round-trip
         // byte-stable (skip_serializing_if = Option::is_none).
-        let json = r#"{
-            "id": "11111111-2222-3333-4444-555555555555",
+        let json = serde_json::json!({
+            "id": crate::test_utils::issue_id(1),
             "title": "Legacy",
             "description": "",
             "state": "ready",
@@ -2084,9 +2082,9 @@ mod tests {
             "labels": [],
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-01T00:00:00Z"
-        }"#;
+        });
 
-        let issue: Issue = serde_json::from_str(json).unwrap();
+        let issue: Issue = serde_json::from_value(json).unwrap();
         assert_eq!(issue.first_ready_at, None);
         assert_eq!(issue.claimed_at, None);
         assert_eq!(issue.done_at, None);
@@ -2835,8 +2833,8 @@ mod tests {
     fn test_issue_loads_legacy_offset_timestamp() {
         // Issue files predating the DateTime migration store `+00:00` offsets
         // rather than chrono's `Z`; both are RFC 3339 and must still load.
-        let json = r#"{
-            "id": "11111111-2222-3333-4444-555555555555",
+        let json = serde_json::json!({
+            "id": crate::test_utils::issue_id(1),
             "title": "Legacy",
             "description": "Body",
             "state": "backlog",
@@ -2850,9 +2848,9 @@ mod tests {
             "labels": [],
             "created_at": "2026-06-22T21:59:04.464226946+00:00",
             "updated_at": "2026-06-22T21:59:04.464226946+00:00"
-        }"#;
+        });
 
-        let issue: Issue = serde_json::from_str(json).unwrap();
+        let issue: Issue = serde_json::from_value(json).unwrap();
         assert_eq!(issue.assignee.unwrap().to_string(), "agent:copilot");
         assert_eq!(issue.created_at.timezone(), Utc);
     }
@@ -2865,9 +2863,7 @@ mod tests {
         fn test_issue_claimed_assignee_serde_round_trips_as_string() {
             let actor = Assignee::from_str("agent:copilot").unwrap();
             let event = EventBody::draft_issue_claimed(
-                "00000000-0000-4000-8000-000000000001"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
                 actor,
             );
 
@@ -2882,9 +2878,7 @@ mod tests {
         fn test_issue_released_assignee_serde_round_trips_as_string() {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
             let event = EventBody::draft_issue_released(
-                "00000000-0000-4000-8000-000000000001"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
                 prev,
                 "timeout".to_string(),
             );
@@ -2900,9 +2894,7 @@ mod tests {
         fn test_gate_event_updated_by_serde_round_trips_as_string() {
             let by = Assignee::from_str("ci:runner").unwrap();
             let event = EventBody::draft_gate_passed(
-                "00000000-0000-4000-8000-000000000001"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
                 "tests".to_string(),
                 Some(by),
             );
@@ -2926,8 +2918,12 @@ mod tests {
 
         #[test]
         fn test_event_deserialize_rejects_malformed_assignee() {
-            let json = r#"{"type":"issue_claimed","id":"e1","issue_id":"00000000-0000-4000-8000-000000000001","timestamp":"2026-01-01T00:00:00Z","assignee":"nocolon"}"#;
-            assert!(serde_json::from_str::<Event>(json).is_err());
+            let json = serde_json::json!({
+                "type": "issue_claimed", "id": "e1", "issue_id": crate::test_utils::issue_id(1),
+                "timestamp": "2026-01-01T00:00:00Z", "assignee": "nocolon",
+            })
+            .to_string();
+            assert!(serde_json::from_str::<Event>(&json).is_err());
         }
     }
 }

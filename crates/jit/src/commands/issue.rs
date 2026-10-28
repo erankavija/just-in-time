@@ -879,9 +879,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{
-        fixture_id, memory_executor_declaring, MemoryDeclarations,
-    };
+    use crate::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use crate::domain::EventBody;
@@ -1602,7 +1600,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             },
         );
         let mut issue = crate::test_utils::fixture_issue("Target".to_string(), String::new());
-        issue.id = fixture_id("abcd1111-1111-1111-1111-111111111111");
+        issue.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_abcd_1111);
         issue.state = State::InProgress;
         crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
@@ -1611,7 +1609,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
         let mut collision =
             crate::test_utils::fixture_issue("Collision".to_string(), String::new());
-        collision.id = fixture_id("abcd2222-2222-2222-2222-222222222222");
+        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_abcd_2222);
         crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
         executor.run_postchecks(&outcome.target_id).unwrap();
@@ -2282,7 +2280,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let result = executor
             .issues()
-            .confirm_deletion_allowed(&fixture_id("abc12345-0000-0000-0000-000000000000"), false);
+            .confirm_deletion_allowed(&crate::test_utils::issue_id(0xabc1_2345), false);
 
         let err = result.expect_err("must refuse without confirmation");
         assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
@@ -2303,7 +2301,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert!(executor
             .issues()
-            .confirm_deletion_allowed(&fixture_id("abc12345-0000-0000-0000-000000000000"), true)
+            .confirm_deletion_allowed(&crate::test_utils::issue_id(0xabc1_2345), true)
             .is_ok());
     }
 
@@ -2359,8 +2357,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
         let dependent_ids = [
-            fixture_id("00000001-0000-0000-0000-000000000000"),
-            fixture_id("00000002-0000-0000-0000-000000000000"),
+            crate::test_utils::issue_id(1),
+            crate::test_utils::issue_id(2),
         ];
         for id in dependent_ids.iter().rev() {
             let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
@@ -2558,10 +2556,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut target = crate::test_utils::fixture_issue("Target".into(), String::new());
-        target.id = fixture_id("22221111-1111-1111-1111-111111111111");
+        target.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_2222_1111);
         crate::commands::test_helpers::seed_issue(&storage, target.clone());
         let mut collision = crate::test_utils::fixture_issue("Collision".into(), String::new());
-        collision.id = fixture_id("22222222-2222-2222-2222-222222222222");
+        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_2222_2222);
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
@@ -3016,7 +3014,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mut issue = crate::test_utils::fixture_issue("Parent".to_string(), "Test".to_string());
         issue.dependencies = vec![
             dep_id.clone(),
-            fixture_id("592c59ad-7b54-5f2b-8415-68e1de5a3bf9"),
+            crate::test_utils::issue_id(0x7b54_5f2b_8415_68e1_de5a_3bf9_592c_59ad),
         ];
 
         let resolved = executor.issues().get_dependencies_enriched(&issue);

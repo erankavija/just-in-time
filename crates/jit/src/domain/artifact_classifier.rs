@@ -1885,9 +1885,9 @@ mod tests {
         ContentIdentity::from_bytes(bytes)
     }
 
-    fn owner(issue: &str, state: State, inside: bool) -> ArtifactOwner {
+    fn owner(issue: crate::domain::identity::IssueId, state: State, inside: bool) -> ArtifactOwner {
         ArtifactOwner {
-            issue: issue.to_string(),
+            issue,
             document_index: 0,
             state,
             archived_from: None,
@@ -1897,7 +1897,11 @@ mod tests {
         }
     }
 
-    fn archived_owner(issue: &str, archived_from: Option<State>, inside: bool) -> ArtifactOwner {
+    fn archived_owner(
+        issue: crate::domain::identity::IssueId,
+        archived_from: Option<State>,
+        inside: bool,
+    ) -> ArtifactOwner {
         ArtifactOwner {
             archived_from,
             ..owner(issue, State::Archived, inside)
@@ -1909,11 +1913,29 @@ mod tests {
         // An owner archived from a terminal state is effectively terminal (its
         // documents can be archived); one archived from a non-terminal state, or
         // is not — it still counts as an active owner.
-        assert!(archived_owner("owner", Some(State::Done), true).is_effectively_terminal());
-        assert!(archived_owner("owner", Some(State::Rejected), true).is_effectively_terminal());
-        assert!(!archived_owner("owner", Some(State::InProgress), true).is_effectively_terminal());
-        assert!(owner("owner", State::Done, true).is_effectively_terminal());
-        assert!(!owner("owner", State::InProgress, true).is_effectively_terminal());
+        assert!(
+            archived_owner(crate::test_utils::issue_id(175), Some(State::Done), true)
+                .is_effectively_terminal()
+        );
+        assert!(archived_owner(
+            crate::test_utils::issue_id(175),
+            Some(State::Rejected),
+            true
+        )
+        .is_effectively_terminal());
+        assert!(!archived_owner(
+            crate::test_utils::issue_id(175),
+            Some(State::InProgress),
+            true
+        )
+        .is_effectively_terminal());
+        assert!(
+            owner(crate::test_utils::issue_id(175), State::Done, true).is_effectively_terminal()
+        );
+        assert!(
+            !owner(crate::test_utils::issue_id(175), State::InProgress, true)
+                .is_effectively_terminal()
+        );
     }
 
     #[test]
@@ -1961,7 +1983,7 @@ mod tests {
             assert_eq!(
                 ArchiveLayout::new(
                     &PlanTarget::Container {
-                        id: CONTAINER.to_string(),
+                        id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                     },
                     "dev/archive/abcdef12-platform",
                     &policy,
@@ -1977,7 +1999,7 @@ mod tests {
     fn test_archive_layout_destination_preserves_nonmatching_owner_directories_and_document_paths()
     {
         let container = PlanTarget::Container {
-            id: CONTAINER.to_string(),
+            id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
         };
         let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive")
             .with_issue_scoped_areas(vec!["dev/active".into(), "dev/presentations".into()]);
@@ -2015,7 +2037,7 @@ mod tests {
             "dev/team/active/plan.md".to_string(),
         ]);
         let target = PlanTarget::Container {
-            id: CONTAINER.to_string(),
+            id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
         };
         let policy = ArtifactClassificationPolicy::configured(
             "dev",
@@ -2041,7 +2063,12 @@ mod tests {
 
         let artifacts = sources
             .iter()
-            .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
+            .map(|source| {
+                explicit(
+                    source,
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )
+            })
             .collect();
         let facts = locations(&[
             (
@@ -2088,9 +2115,12 @@ mod tests {
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(
                 PlanTarget::Container {
-                    id: CONTAINER.to_string(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
-                vec![explicit(source, vec![owner("i", State::Done, true)])],
+                vec![explicit(
+                    source,
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )],
                 Vec::new(),
             )
             .with_destination_root("dev/archive/abcdef12-platform"),
@@ -2124,9 +2154,12 @@ mod tests {
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(
                 PlanTarget::Container {
-                    id: CONTAINER.to_string(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
-                vec![explicit(source, vec![owner("i", State::Done, true)])],
+                vec![explicit(
+                    source,
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )],
                 Vec::new(),
             )
             .with_destination_root("dev/archive/abcdef12-platform"),
@@ -2188,13 +2221,12 @@ mod tests {
             sources
                 .iter()
                 .map(|source| {
-                    let owners = std::iter::once(owner("i", State::Done, true))
-                        .chain(
-                            shared
-                                .contains(source)
-                                .then(|| owner("o", State::Done, false)),
-                        )
-                        .collect();
+                    let owners =
+                        std::iter::once(owner(crate::test_utils::issue_id(176), State::Done, true))
+                            .chain(shared.contains(source).then(|| {
+                                owner(crate::test_utils::issue_id(177), State::Done, false)
+                            }))
+                            .collect();
                     explicit(source, owners).with_edges(
                         edges
                             .iter()
@@ -2249,12 +2281,19 @@ mod tests {
         // The reference does not reach the target it names from any layout.
         let plan = container(
             vec![
-                explicit(parent, vec![owner("i", State::Done, true)]).with_edges(vec![edge(
+                explicit(
+                    parent,
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )
+                .with_edges(vec![edge(
                     "../elsewhere.md",
                     target,
                     EdgeResolutionMode::Relative,
                 )]),
-                explicit(target, vec![owner("i", State::Done, true)]),
+                explicit(
+                    target,
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                ),
             ],
             locations(&present),
         );
@@ -2567,7 +2606,7 @@ mod tests {
         ]);
         assert!(classification_facts_from_evidence(
             &PlanTarget::Container {
-                id: CONTAINER.into()
+                id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12)
             },
             "archive",
             &[artifact],
@@ -2608,7 +2647,7 @@ mod tests {
             ]);
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {
-                    id: CONTAINER.into(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
                 "archive",
                 std::slice::from_ref(&artifact),
@@ -2681,7 +2720,7 @@ mod tests {
             }
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {
-                    id: CONTAINER.into(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
                 "archive",
                 std::slice::from_ref(&artifact),
@@ -2704,7 +2743,7 @@ mod tests {
         assert_eq!(
             classification_facts_from_evidence(
                 &PlanTarget::Container {
-                    id: CONTAINER.into()
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12)
                 },
                 "archive",
                 &[artifact],
@@ -2723,11 +2762,11 @@ mod tests {
         let result = classify_artifacts(
             ArtifactClassificationInventory::new(
                 PlanTarget::Container {
-                    id: CONTAINER.into(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
                 vec![explicit(
                     "dev/active/doc.md",
-                    vec![owner("i", State::Done, true)],
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
                 )],
                 Vec::new(),
             ),
@@ -2825,7 +2864,7 @@ mod tests {
             .with_evidence(evidence);
             let plan = ArtifactPlan::new(
                 PlanTarget::Container {
-                    id: CONTAINER.into(),
+                    id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
                 },
                 "dev/archive/abcdef12",
                 PolicyStatus::Configured,
@@ -3098,7 +3137,7 @@ mod tests {
         classify_with_policy(
             policy,
             PlanTarget::Container {
-                id: CONTAINER.into(),
+                id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
             },
             artifacts,
             facts,
@@ -3121,7 +3160,10 @@ mod tests {
     }
 
     fn selected_root(path: &str) -> Vec<ArtifactPlanEntry> {
-        vec![explicit(path, vec![owner("i", State::Done, true)])]
+        vec![explicit(
+            path,
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )]
     }
 
     fn raises_unmanaged_selected_root(plan: &ArtifactPlan) -> bool {
@@ -3154,7 +3196,7 @@ mod tests {
 
     fn container_issue(title: &str, labels: &[&str]) -> Issue {
         let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
-        issue.id = CONTAINER.into();
+        issue.id = crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12);
         issue.labels = labels.iter().map(|label| (*label).to_string()).collect();
         issue
     }
@@ -3274,7 +3316,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/active/plan.md",
-                vec![owner("i", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
             )],
             locations(&[(
                 "dev/active/plan.md",
@@ -3299,9 +3341,9 @@ mod tests {
             vec![explicit(
                 "dev/active/shared.md",
                 vec![
-                    owner("inside", State::Done, true),
-                    owner("outside", State::Done, false),
-                    owner("active", State::InProgress, true),
+                    owner(crate::test_utils::issue_id(178), State::Done, true),
+                    owner(crate::test_utils::issue_id(179), State::Done, false),
+                    owner(crate::test_utils::issue_id(180), State::InProgress, true),
                 ],
             )],
             locations(&[(
@@ -3319,12 +3361,15 @@ mod tests {
 
     #[test]
     fn test_relative_edge_to_dependency_copies_when_dependency_needs_source() {
-        let parent = explicit("dev/active/page.html", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "../shared/figure.png",
-                "dev/shared/figure.png",
-                EdgeResolutionMode::Relative,
-            )]);
+        let parent = explicit(
+            "dev/active/page.html",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "../shared/figure.png",
+            "dev/shared/figure.png",
+            EdgeResolutionMode::Relative,
+        )]);
         let facts = locations(&[
             (
                 "dev/active/page.html",
@@ -3345,12 +3390,15 @@ mod tests {
 
     #[test]
     fn test_relative_edge_moves_managed_dependency_when_nothing_needs_source() {
-        let parent = explicit("dev/active/page.html", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "theme.css",
-                "dev/active/theme.css",
-                EdgeResolutionMode::Relative,
-            )]);
+        let parent = explicit(
+            "dev/active/page.html",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "theme.css",
+            "dev/active/theme.css",
+            EdgeResolutionMode::Relative,
+        )]);
         let facts = locations(&[
             (
                 "dev/active/page.html",
@@ -3371,12 +3419,15 @@ mod tests {
 
     #[test]
     fn test_root_relative_edge_retains_dependency_at_source() {
-        let parent = explicit("dev/active/page.html", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "/dev/active/theme.css",
-                "dev/active/theme.css",
-                EdgeResolutionMode::RootRelative,
-            )]);
+        let parent = explicit(
+            "dev/active/page.html",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "/dev/active/theme.css",
+            "dev/active/theme.css",
+            EdgeResolutionMode::RootRelative,
+        )]);
         let facts = locations(&[
             (
                 "dev/active/page.html",
@@ -3398,12 +3449,15 @@ mod tests {
 
     #[test]
     fn test_relative_dependency_under_archive_root_copies_and_retains_source() {
-        let parent = explicit("dev/active/page.html", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "../archive/theme.css",
-                "dev/archive/theme.css",
-                EdgeResolutionMode::Relative,
-            )]);
+        let parent = explicit(
+            "dev/active/page.html",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "../archive/theme.css",
+            "dev/archive/theme.css",
+            EdgeResolutionMode::Relative,
+        )]);
         let facts = locations(&[
             (
                 "dev/active/page.html",
@@ -3430,7 +3484,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/archive/old.md",
-                vec![owner("i", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
             )],
             locations(&[(
                 "dev/archive/old.md",
@@ -3530,7 +3584,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/active/b/file.md",
-                vec![owner("i", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
             )],
             locations(&[(
                 "dev/active/b/file.md",
@@ -3558,8 +3612,8 @@ mod tests {
             vec![explicit(
                 "dev/active/shared.md",
                 vec![
-                    owner("terminal", State::Done, true),
-                    owner("active", State::InProgress, true),
+                    owner(crate::test_utils::issue_id(181), State::Done, true),
+                    owner(crate::test_utils::issue_id(180), State::InProgress, true),
                 ],
             )],
             locations(&[(
@@ -3581,7 +3635,7 @@ mod tests {
         assert_eq!(
             artifact.reference_changes(),
             &[ReferenceChange {
-                issue: "terminal".to_string(),
+                issue: crate::test_utils::issue_id(181),
                 document_index: 0,
                 from_path: "dev/active/shared.md".to_string(),
                 to_path: mirror,
@@ -3590,7 +3644,7 @@ mod tests {
         let terminal_owner = artifact
             .owners()
             .iter()
-            .find(|owner| owner.issue == "terminal")
+            .find(|owner| owner.issue == crate::test_utils::issue_id(181))
             .unwrap();
         assert!(terminal_owner.selected_for_relink);
     }
@@ -3674,13 +3728,15 @@ mod tests {
         // those relocations untouched.
         let chain = || {
             vec![
-                explicit("dev/active/plan.md", vec![owner("i", State::Done, true)]).with_edges(
-                    vec![edge(
-                        "notes.md",
-                        "dev/active/notes.md",
-                        EdgeResolutionMode::Relative,
-                    )],
-                ),
+                explicit(
+                    "dev/active/plan.md",
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )
+                .with_edges(vec![edge(
+                    "notes.md",
+                    "dev/active/notes.md",
+                    EdgeResolutionMode::Relative,
+                )]),
                 embedded("dev/active/notes.md").with_edges(vec![edge(
                     "figure.png",
                     "dev/active/figure.png",
@@ -3796,7 +3852,7 @@ mod tests {
         facts.embedded_owners.push(EmbeddedArtifactOwner {
             artifact: "dev/active/figure.png".into(),
             root: "dev/active/outside.md".into(),
-            issue: "outside".into(),
+            issue: crate::test_utils::issue_id(179),
             state: State::Done,
             archived_from: None,
             inside_subtree: false,
@@ -3804,7 +3860,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/active/figure.png",
-                vec![owner("inside", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(178), State::Done, true)],
             )],
             facts,
         );
@@ -3818,8 +3874,14 @@ mod tests {
         let same = identity(b"same");
         let plan = container(
             vec![
-                explicit("dev/active/a/file.md", vec![owner("i", State::Done, true)]),
-                explicit("dev/active/b/file.md", vec![owner("i", State::Done, true)]),
+                explicit(
+                    "dev/active/a/file.md",
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                ),
+                explicit(
+                    "dev/active/b/file.md",
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                ),
             ],
             locations(&[
                 (
@@ -3851,13 +3913,18 @@ mod tests {
     fn test_missing_root_uses_existing_mirror_or_blocks_when_both_absent() {
         let plan = container(
             vec![
-                explicit("dev/active/adopt.md", vec![owner("i", State::Done, true)]).with_blockers(
-                    vec![PlanBlocker::new(
-                        BlockerCode::MissingSource,
-                        Some("dev/active/adopt.md"),
-                    )],
+                explicit(
+                    "dev/active/adopt.md",
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                )
+                .with_blockers(vec![PlanBlocker::new(
+                    BlockerCode::MissingSource,
+                    Some("dev/active/adopt.md"),
+                )]),
+                explicit(
+                    "dev/active/missing.md",
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
                 ),
-                explicit("dev/active/missing.md", vec![owner("i", State::Done, true)]),
             ],
             locations(&[
                 (
@@ -3885,16 +3952,19 @@ mod tests {
 
     #[test]
     fn test_missing_embedded_target_adds_no_destination_constraint_or_blocker() {
-        let parent = explicit("dev/active/page.md", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "missing.png",
-                "dev/active/missing.png",
-                EdgeResolutionMode::Relative,
-            )])
-            .with_warnings(vec![crate::domain::artifact_plan::PlanWarning::new(
-                WarningCode::MissingEdgeTarget,
-                Some("dev/active/missing.png"),
-            )]);
+        let parent = explicit(
+            "dev/active/page.md",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "missing.png",
+            "dev/active/missing.png",
+            EdgeResolutionMode::Relative,
+        )])
+        .with_warnings(vec![crate::domain::artifact_plan::PlanWarning::new(
+            WarningCode::MissingEdgeTarget,
+            Some("dev/active/missing.png"),
+        )]);
         let plan = container(
             vec![parent, embedded("dev/active/missing.png")],
             locations(&[
@@ -3926,7 +3996,7 @@ mod tests {
         facts.embedded_owners.push(EmbeddedArtifactOwner {
             artifact: "dev/active/doc.md".into(),
             root: "dev/active/active-parent.md".into(),
-            issue: "active".into(),
+            issue: crate::test_utils::issue_id(180),
             state: State::InProgress,
             archived_from: None,
             inside_subtree: false,
@@ -3937,7 +4007,7 @@ mod tests {
             },
             vec![explicit(
                 "dev/active/doc.md",
-                vec![owner("done", State::Done, false)],
+                vec![owner(crate::test_utils::issue_id(182), State::Done, false)],
             )],
             facts,
         );
@@ -3960,7 +4030,7 @@ mod tests {
         facts.embedded_owners.push(EmbeddedArtifactOwner {
             artifact: "dev/active/unrelated.png".into(),
             root: "dev/active/unrelated.md".into(),
-            issue: "active".into(),
+            issue: crate::test_utils::issue_id(180),
             state: State::InProgress,
             archived_from: None,
             inside_subtree: false,
@@ -3971,7 +4041,7 @@ mod tests {
             },
             vec![explicit(
                 "dev/active/doc.md",
-                vec![owner("done", State::Done, false)],
+                vec![owner(crate::test_utils::issue_id(182), State::Done, false)],
             )],
             facts,
         );
@@ -3991,12 +4061,15 @@ mod tests {
 
     #[test]
     fn test_document_target_treats_its_own_embedded_closure_as_selected() {
-        let parent = explicit("dev/active/doc.md", vec![owner("done", State::Done, false)])
-            .with_edges(vec![edge(
-                "figure.png",
-                "dev/active/figure.png",
-                EdgeResolutionMode::Relative,
-            )]);
+        let parent = explicit(
+            "dev/active/doc.md",
+            vec![owner(crate::test_utils::issue_id(182), State::Done, false)],
+        )
+        .with_edges(vec![edge(
+            "figure.png",
+            "dev/active/figure.png",
+            EdgeResolutionMode::Relative,
+        )]);
         let mut facts = locations(&[
             (
                 "dev/active/doc.md",
@@ -4012,7 +4085,7 @@ mod tests {
         facts.embedded_owners.push(EmbeddedArtifactOwner {
             artifact: "dev/active/figure.png".into(),
             root: "dev/active/doc.md".into(),
-            issue: "done".into(),
+            issue: crate::test_utils::issue_id(182),
             state: State::Done,
             archived_from: None,
             inside_subtree: false,
@@ -4045,7 +4118,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/active/doc.md",
-                vec![owner("i", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
             )],
             facts,
         );
@@ -4067,7 +4140,7 @@ mod tests {
             container(
                 vec![explicit(
                     "dev/active/doc.md",
-                    vec![owner("i", State::Done, true)],
+                    vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
                 )],
                 facts,
             )
@@ -4090,7 +4163,10 @@ mod tests {
     #[test]
     fn test_non_regular_source_and_destination_use_distinct_blockers() {
         let plan = container(
-            vec![explicit("dev/active", vec![owner("i", State::Done, true)])],
+            vec![explicit(
+                "dev/active",
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+            )],
             locations(&[(
                 "dev/active",
                 ArtifactLocation::Unsupported,
@@ -4120,7 +4196,7 @@ mod tests {
         let plan = container(
             vec![explicit(
                 "dev/active/doc.md",
-                vec![owner("i", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
             )],
             facts,
         );
@@ -4132,12 +4208,15 @@ mod tests {
 
     #[test]
     fn test_supported_edge_missing_from_inventory_blocks_unpreservable_layout() {
-        let parent = explicit("dev/active/page.html", vec![owner("i", State::Done, true)])
-            .with_edges(vec![edge(
-                "theme.css",
-                "dev/active/theme.css",
-                EdgeResolutionMode::Relative,
-            )]);
+        let parent = explicit(
+            "dev/active/page.html",
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+        )
+        .with_edges(vec![edge(
+            "theme.css",
+            "dev/active/theme.css",
+            EdgeResolutionMode::Relative,
+        )]);
         let plan = container(
             vec![parent],
             locations(&[(
@@ -4265,7 +4344,10 @@ mod tests {
     fn test_classify_artifacts_warns_once_per_occurrence_of_a_moving_artifact_path_in_scanned_text()
     {
         let files = citation_fixture();
-        let plan = scanned_plan(vec![owner("i", State::Done, true)], &files);
+        let plan = scanned_plan(
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+            &files,
+        );
         let artifact = entry(&plan, CITED_SOURCE);
         assert_eq!(artifact.action(), ArtifactAction::Move);
         let located = cited_locations(artifact);
@@ -4312,7 +4394,10 @@ mod tests {
     ) -> ArtifactPlan {
         container_with_policy(
             policy,
-            vec![explicit(source, vec![owner("i", State::Done, true)])],
+            vec![explicit(
+                source,
+                vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+            )],
             ArtifactClassificationFacts {
                 citations: citations(&[source], files),
                 ..present_source(source)
@@ -4335,7 +4420,12 @@ mod tests {
         container(
             sources
                 .iter()
-                .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
+                .map(|source| {
+                    explicit(
+                        source,
+                        vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+                    )
+                })
                 .collect(),
             ArtifactClassificationFacts {
                 citations: citations(sources, files),
@@ -4707,7 +4797,10 @@ mod tests {
     fn test_classify_artifacts_reports_citations_in_code_comments_inline_code_spans_and_shell_scripts(
     ) {
         let files = citation_fixture();
-        let plan = scanned_plan(vec![owner("i", State::Done, true)], &files);
+        let plan = scanned_plan(
+            vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
+            &files,
+        );
         let located = cited_locations(entry(&plan, CITED_SOURCE));
         let reported = |citing: &str| {
             located
@@ -4757,18 +4850,22 @@ mod tests {
         let files = [("dev/studies/tooling.md", "See `dev/active/plan.md`.\n")];
         let arms = [
             (
-                vec![owner("inside", State::Done, true)],
+                vec![owner(crate::test_utils::issue_id(178), State::Done, true)],
                 ArtifactAction::Move,
             ),
             (
                 vec![
-                    owner("inside", State::Done, true),
-                    owner("outside", State::Done, false),
+                    owner(crate::test_utils::issue_id(178), State::Done, true),
+                    owner(crate::test_utils::issue_id(179), State::Done, false),
                 ],
                 ArtifactAction::Copy,
             ),
             (
-                vec![owner("active", State::InProgress, true)],
+                vec![owner(
+                    crate::test_utils::issue_id(180),
+                    State::InProgress,
+                    true,
+                )],
                 ArtifactAction::Retain,
             ),
         ];
@@ -4795,7 +4892,7 @@ mod tests {
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_owners(vec![ArtifactOwner {
             pinned: true,
-            ..owner("i", State::Done, true)
+            ..owner(crate::test_utils::issue_id(176), State::Done, true)
         }]);
         let plan = container(vec![pinned], no_facts());
         let artifact = entry(&plan, "dev/active/history.md");

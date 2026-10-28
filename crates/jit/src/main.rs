@@ -7487,7 +7487,7 @@ mod gate_findings_text_tests {
             run_id: "run-1".to_string(),
             gate_key: "review".to_string(),
             stage: GateStage::Postcheck,
-            issue_id: "issue-1".to_string(),
+            issue_id: jit::test_utils::issue_id(7),
             commit: None,
             branch: None,
             status: GateRunStatus::Failed,

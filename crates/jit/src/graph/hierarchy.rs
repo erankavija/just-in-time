@@ -108,13 +108,13 @@
 //!
 //! // milestone → epic → task (each container depends on what it contains)
 //! let mut milestone = Issue::draft("Release".into(), String::new());
-//! milestone.id = "milestone".into();
+//! milestone.id = jit::test_utils::issue_id(56);
 //! milestone.labels = vec!["type:milestone".into()];
 //! let mut epic = Issue::draft("Auth".into(), String::new());
-//! epic.id = "epic".into();
+//! epic.id = jit::test_utils::issue_id(57);
 //! epic.labels = vec!["type:epic".into()];
 //! let mut task = Issue::draft("Login".into(), String::new());
-//! task.id = "task".into();
+//! task.id = jit::test_utils::issue_id(58);
 //! task.labels = vec!["type:task".into()];
 //!
 //! milestone.dependencies = vec![epic.id.clone()];

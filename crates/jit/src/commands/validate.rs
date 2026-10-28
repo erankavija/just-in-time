@@ -2530,7 +2530,7 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{fixture_id, seed_issue, MemoryDeclarations};
+    use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2580,15 +2580,15 @@ depends_on = ["planning"]
 
         let mut container =
             crate::test_utils::fixture_issue("container".to_string(), String::new());
-        container.id = fixture_id("69cf16b3-cd81-56d8-b74a-832a97365c98");
+        container.id = crate::test_utils::issue_id(0xcd81_56d8_b74a_832a_9736_5c98_69cf_16b3);
 
         let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
-        planning.id = fixture_id("d8936a00-b4cb-51e2-ab13-a1422f784c62");
+        planning.id = crate::test_utils::issue_id(0xb4cb_51e2_ab13_a142_2f78_4c62_d893_6a00);
         planning.labels = vec!["type:planning".to_string()];
 
         let mut breakdown =
             crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
-        breakdown.id = fixture_id("e8f20edc-3573-5a7e-98c3-97b9ba5646af");
+        breakdown.id = crate::test_utils::issue_id(0x3573_5a7e_98c3_97b9_ba56_46af_e8f2_0edc);
         breakdown.labels = vec![
             "type:breakdown".to_string(),
             format!("scaffold:{}", container.short_id()),

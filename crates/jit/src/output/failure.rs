@@ -505,7 +505,7 @@ mod exit_code_projection_tests {
             run_id: "run-1".to_string(),
             gate_key: "tests".to_string(),
             stage: GateStage::Precheck,
-            issue_id: "abc123".to_string(),
+            issue_id: crate::test_utils::issue_id(85),
             commit: None,
             branch: None,
             status,
@@ -524,7 +524,7 @@ mod exit_code_projection_tests {
             evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
         crate::commands::GatePassFailed {
-            issue_id: "abc123".to_string(),
+            issue_id: crate::test_utils::issue_id(85),
             gate_key: "tests".to_string(),
             status,
             exit_code: Some(1),
@@ -595,7 +595,7 @@ mod exit_code_projection_tests {
             ),
             (
                 crate::commands::GateNotRequiredError {
-                    issue_id: "abc123".to_string(),
+                    issue_id: crate::test_utils::issue_id(85),
                     gate_key: "tests".to_string(),
                 }
                 .into(),

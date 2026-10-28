@@ -180,9 +180,9 @@ fn initialized() -> Vec<(VirtualPath, String)> {
     )]
 }
 
-fn issue_with_id(id: &str) -> Issue {
+fn issue_with_id(id: crate::domain::identity::IssueId) -> Issue {
     let mut issue = crate::test_utils::fixture_issue("Conformance".to_string(), String::new());
-    issue.id = id.to_string();
+    issue.id = id;
     issue
 }
 
@@ -192,7 +192,7 @@ fn event_line(event: &Event) -> String {
 
 fn issue_created(id: &str) -> Event {
     let mut issue = Issue::draft("Known".to_string(), String::new());
-    issue.id = "issue-id".to_string();
+    issue.id = crate::test_utils::issue_id(50);
     crate::test_utils::stamped_event(
         EventBody::draft_issue_created(&issue),
         id,
@@ -204,7 +204,7 @@ fn issue_created(id: &str) -> Event {
 /// the epoch.
 fn executed_run(
     run_id: &str,
-    issue_id: &str,
+    issue_id: &crate::domain::identity::IssueId,
     gate_key: &str,
     second: i64,
     digest: Option<InputsDigest>,
@@ -371,8 +371,12 @@ fn test_load_issue_or_not_found_separates_an_absent_issue_from_an_unreadable_one
 /// prefix is not found, and a prefix two ids share is ambiguous.
 fn test_resolve_issue_id_resolves_prefixes_alike<B: Backend>() {
     let issues = [
-        issue_with_id("b53beeba-32f2-4671-a407-2d94e4d13d41"),
-        issue_with_id("b53beeba-0000-4000-8000-000000000000"),
+        issue_with_id(crate::test_utils::issue_id(
+            0x32f24671a4072d94e4d13d41b53beeba,
+        )),
+        issue_with_id(crate::test_utils::issue_id(
+            0x4000_8000_0000_0000_0000_b53b_eeba,
+        )),
     ];
     let repository = Repository::<B>::empty();
     repository.publish_issues(&issues);
@@ -496,7 +500,13 @@ fn test_read_artifact_archive_events_keeps_only_archive_executions<B: Backend>()
 }
 
 fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B: Backend>() {
-    let run = executed_run("run-one", "issue-one", "tests", 10, None);
+    let run = executed_run(
+        "run-one",
+        &crate::test_utils::issue_id(163),
+        "tests",
+        10,
+        None,
+    );
     let recorded = Repository::<B>::seeded(&gate_run_seed(std::slice::from_ref(&run)));
     let empty = Repository::<B>::empty();
 
@@ -514,9 +524,27 @@ fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B
 
 fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
     let runs = [
-        executed_run("run-a1", "issue-a", "tests", 10, None),
-        executed_run("run-a2", "issue-a", "lint", 20, None),
-        executed_run("run-b1", "issue-b", "tests", 30, None),
+        executed_run(
+            "run-a1",
+            &crate::test_utils::issue_id(153),
+            "tests",
+            10,
+            None,
+        ),
+        executed_run(
+            "run-a2",
+            &crate::test_utils::issue_id(153),
+            "lint",
+            20,
+            None,
+        ),
+        executed_run(
+            "run-b1",
+            &crate::test_utils::issue_id(154),
+            "tests",
+            30,
+            None,
+        ),
     ];
     let repository = Repository::<B>::seeded(&gate_run_seed(&runs));
     let listed = |issue: &str| {
@@ -530,13 +558,13 @@ fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
     };
 
     assert_eq!(
-        listed("issue-a"),
+        listed(&crate::test_utils::issue_id(153)),
         BTreeSet::from(["run-a1".to_string(), "run-a2".to_string()])
     );
-    assert!(listed("issue-unrecorded").is_empty());
+    assert!(listed(&crate::test_utils::issue_id(164)).is_empty());
     assert!(Repository::<B>::empty()
         .store
-        .list_gate_runs_for_issue("issue-a")
+        .list_gate_runs_for_issue(&crate::test_utils::issue_id(153))
         .unwrap()
         .is_empty());
 }
@@ -547,23 +575,59 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     let (digest, other) = (digest_of(b"current"), digest_of(b"moved"));
     let errored = GateRunResult {
         status: GateRunStatus::Error,
-        ..executed_run("errored", "issue-a", "tests", 50, Some(digest.clone()))
+        ..executed_run(
+            "errored",
+            &crate::test_utils::issue_id(153),
+            "tests",
+            50,
+            Some(digest.clone()),
+        )
     };
     let attested = GateRunResult {
         origin: GateVerdictOrigin::Attested,
-        ..executed_run("attested", "issue-a", "tests", 40, Some(digest.clone()))
+        ..executed_run(
+            "attested",
+            &crate::test_utils::issue_id(153),
+            "tests",
+            40,
+            Some(digest.clone()),
+        )
     };
     let failed = GateRunResult {
         status: GateRunStatus::Failed,
-        ..executed_run("failed", "issue-b", "tests", 30, Some(digest.clone()))
+        ..executed_run(
+            "failed",
+            &crate::test_utils::issue_id(154),
+            "tests",
+            30,
+            Some(digest.clone()),
+        )
     };
     let runs = [
-        executed_run("older", "issue-a", "tests", 10, Some(digest.clone())),
+        executed_run(
+            "older",
+            &crate::test_utils::issue_id(153),
+            "tests",
+            10,
+            Some(digest.clone()),
+        ),
         failed.clone(),
         attested,
         errored,
-        executed_run("other-digest", "issue-a", "tests", 60, Some(other)),
-        executed_run("other-gate", "issue-a", "lint", 70, Some(digest.clone())),
+        executed_run(
+            "other-digest",
+            &crate::test_utils::issue_id(153),
+            "tests",
+            60,
+            Some(other),
+        ),
+        executed_run(
+            "other-gate",
+            &crate::test_utils::issue_id(153),
+            "lint",
+            70,
+            Some(digest.clone()),
+        ),
     ];
     let repository = Repository::<B>::seeded(&gate_run_seed(&runs));
 

@@ -878,7 +878,6 @@ impl CommandExecutor<JsonFileStorage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::artifact_plan::EvidenceCode;
     use crate::domain::identity::{IssueId, IssueIdStaging};
     use crate::domain::State;
@@ -1010,19 +1009,19 @@ mod tests {
             };
         let issues = vec![
             issue(
-                &fixture_id("3073ec9d-481e-5d93-bcbd-8d3a829604ea"),
+                &crate::test_utils::issue_id(0x481e_5d93_bcbd_8d3a_8296_04ea_3073_ec9d),
                 State::Done,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                &fixture_id("c81ca1b2-8274-5bc5-ab45-4bcdc90631e7"),
+                &crate::test_utils::issue_id(0x8274_5bc5_ab45_4bcd_c906_31e7_c81c_a1b2),
                 State::Rejected,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                &fixture_id("58a2e44c-2115-5819-bd02-0be9e12b79b2"),
+                &crate::test_utils::issue_id(0x2115_5819_bd02_0be9_e12b_79b2_58a2_e44c),
                 State::InProgress,
                 None,
                 Some("portfolio"),
@@ -1030,7 +1029,7 @@ mod tests {
             // Archived from a terminal state is effectively terminal, so it is a
             // reconcilable candidate — same as the direct archive path accepts.
             issue(
-                &fixture_id("8f2e6a1f-4078-5d9c-b05c-90bf43cf08c2"),
+                &crate::test_utils::issue_id(0x4078_5d9c_b05c_90bf_43cf_08c2_8f2e_6a1f),
                 State::Archived,
                 Some(State::Done),
                 Some("portfolio"),
@@ -1038,25 +1037,25 @@ mod tests {
             // Archived from a non-terminal state is not effectively terminal, so
             // it is excluded.
             issue(
-                &fixture_id("ef2490cc-b561-527e-9bdf-3a3c1258a630"),
+                &crate::test_utils::issue_id(0xb561_527e_9bdf_3a3c_1258_a630_ef24_90cc),
                 State::Archived,
                 Some(State::InProgress),
                 Some("portfolio"),
             ),
             issue(
-                &fixture_id("907a9f01-03f8-54fa-b8d7-66a8b06627fe"),
+                &crate::test_utils::issue_id(0x3f8_54fa_b8d7_66a8_b066_27fe_907a_9f01),
                 State::Done,
                 None,
                 Some("unit"),
             ),
             issue(
-                &fixture_id("64938dc3-1cd3-507f-a34c-91686888506d"),
+                &crate::test_utils::issue_id(0x1cd3_507f_a34c_9168_6888_506d_6493_8dc3),
                 State::Done,
                 None,
                 Some("epic"),
             ),
             issue(
-                &fixture_id("748fd8b6-c7e4-5c20-9543-1654446a06ac"),
+                &crate::test_utils::issue_id(0xc7e4_5c20_9543_1654_446a_06ac_748f_d8b6),
                 State::Done,
                 None,
                 None,

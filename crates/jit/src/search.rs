@@ -238,19 +238,15 @@ mod tests {
     fn test_extract_issue_id_from_issue_file() {
         assert_eq!(
             extract_issue_id("issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"),
-            Some(
-                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
-                    .parse::<IssueId>()
-                    .unwrap()
-            )
+            Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2
+            ))
         );
         assert_eq!(
             extract_issue_id(".jit/issues/8fde4411-626f-5466-82f0-605630dfc6ee.json"),
-            Some(
-                "8fde4411-626f-5466-82f0-605630dfc6ee"
-                    .parse::<IssueId>()
-                    .unwrap()
-            )
+            Some(crate::test_utils::issue_id(
+                0x626f546682f0605630dfc6ee8fde4411
+            ))
         );
     }
 
@@ -274,11 +270,9 @@ mod tests {
     #[test]
     fn test_search_result_serialization() {
         let result = SearchResult {
-            issue_id: Some(
-                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
-                    .parse::<IssueId>()
-                    .unwrap(),
-            ),
+            issue_id: Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2,
+            )),
             path: "issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json".to_string(),
             line_number: 5,
             line_text: "  \"title\": \"Test Issue\",\n".to_string(),
@@ -305,15 +299,13 @@ mod tests {
         let result = &results[0];
         assert_eq!(
             result.issue_id,
-            Some(
-                "fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b"
-                    .parse::<IssueId>()
-                    .unwrap()
-            )
+            Some(crate::test_utils::issue_id(
+                0xffbd5dbd9531bdc92f12bb6bfb90f3d2
+            ))
         );
         assert_eq!(
             result.path,
-            "issues/fb90f3d2-ffbd-5dbd-9531-bdc92f12bb6b.json"
+            format!("issues/{}.json", result.issue_id.as_ref().unwrap())
         );
         assert_eq!(result.line_number, 3);
         assert!(result.line_text.contains("Test"));
@@ -345,11 +337,11 @@ mod tests {
     #[test]
     fn test_parse_ripgrep_json_respects_max_results() {
         let json = [
-            "0f0e0d0c-0000-4000-8000-000000000001",
-            "0f0e0d0c-0000-4000-8000-000000000002",
-            "0f0e0d0c-0000-4000-8000-000000000003",
+            0x400080000000000000010f0e0d0c,
+            0x400080000000000000020f0e0d0c,
+            0x400080000000000000030f0e0d0c,
         ]
-        .map(|literal| literal.parse::<IssueId>().unwrap())
+        .map(crate::test_utils::issue_id)
         .iter()
         .map(|id| {
             serde_json::json!({

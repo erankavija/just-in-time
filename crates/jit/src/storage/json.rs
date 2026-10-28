@@ -2244,7 +2244,7 @@ mod tests {
             .unwrap();
             let mut linked_issue =
                 crate::domain::Issue::draft("Only in linked event log".to_string(), String::new());
-            linked_issue.id = "linked-issue".to_string();
+            linked_issue.id = crate::test_utils::issue_id(55);
             let linked_event = crate::test_utils::stamped_event(
                 crate::domain::EventBody::draft_issue_created(&linked_issue),
                 "linked-event",
@@ -2588,8 +2588,8 @@ mod tests {
                 &storage,
                 &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["deleted-locally".to_string()],
-                    deleted_ids: vec!["restored-locally".to_string()],
+                    all_ids: vec![crate::test_utils::issue_id(171)],
+                    deleted_ids: vec![crate::test_utils::issue_id(172)],
                 },
             );
             let add = Command::new("git")
@@ -2609,14 +2609,14 @@ mod tests {
                 &storage,
                 &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["restored-locally".to_string()],
-                    deleted_ids: vec!["deleted-locally".to_string()],
+                    all_ids: vec![crate::test_utils::issue_id(172)],
+                    deleted_ids: vec![crate::test_utils::issue_id(171)],
                 },
             );
 
             assert_eq!(
                 storage.load_aggregated_index().unwrap().all_ids,
-                vec!["restored-locally"]
+                vec![crate::test_utils::issue_id(172)]
             );
         }
 
@@ -2630,8 +2630,8 @@ mod tests {
                 &main_storage,
                 &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["active-in-head".to_string()],
-                    deleted_ids: vec!["deleted-in-head".to_string()],
+                    all_ids: vec![crate::test_utils::issue_id(173)],
+                    deleted_ids: vec![crate::test_utils::issue_id(174)],
                 },
             );
             let add = Command::new("git")
@@ -2658,8 +2658,8 @@ mod tests {
                 &main_storage,
                 &Index {
                     schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec!["deleted-in-head".to_string()],
-                    deleted_ids: vec!["active-in-head".to_string()],
+                    all_ids: vec![crate::test_utils::issue_id(174)],
+                    deleted_ids: vec![crate::test_utils::issue_id(173)],
                 },
             );
 
@@ -2671,7 +2671,7 @@ mod tests {
             );
             assert_eq!(
                 secondary_storage.load_aggregated_index().unwrap().all_ids,
-                vec!["active-in-head"]
+                vec![crate::test_utils::issue_id(173)]
             );
         }
 
@@ -2856,7 +2856,7 @@ mod tests {
             let storage = JsonFileStorage::new(&jit_dir);
 
             // Create invalid JSON file
-            let issue_id = "11111111-1111-1111-1111-111111111111";
+            let issue_id = &crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_1111_1111);
             let issue_path = jit_dir_layout
                 .resolve(&VirtualPath::ISSUES)
                 .unwrap()
@@ -2906,8 +2906,11 @@ mod tests {
             // Create index with deleted IDs
             let index = Index {
                 schema_version: 2,
-                all_ids: vec!["issue-1".to_string(), "issue-2".to_string()],
-                deleted_ids: vec!["issue-3".to_string()],
+                all_ids: vec![
+                    crate::test_utils::issue_id(7),
+                    crate::test_utils::issue_id(43),
+                ],
+                deleted_ids: vec![crate::test_utils::issue_id(44)],
             };
 
             fs::write(
@@ -2925,10 +2928,12 @@ mod tests {
 
             assert_eq!(loaded.schema_version, 2);
             assert_eq!(loaded.all_ids.len(), 2);
-            assert!(loaded.all_ids.contains(&"issue-1".to_string()));
-            assert!(loaded.all_ids.contains(&"issue-2".to_string()));
+            assert!(loaded.all_ids.contains(&crate::test_utils::issue_id(7)));
+            assert!(loaded.all_ids.contains(&crate::test_utils::issue_id(43)));
             assert_eq!(loaded.deleted_ids.len(), 1);
-            assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
+            assert!(loaded
+                .deleted_ids
+                .contains(&crate::test_utils::issue_id(44)));
         }
     }
 
@@ -3072,20 +3077,21 @@ mod tests {
 
         #[test]
         fn test_aggregated_read_rejects_every_invalid_local_index_shape() {
+            let id = crate::test_utils::issue_id(1);
             let cases = [
                 (
-                    r#"{"schema_version":2,"all_ids":["a","a"],"deleted_ids":[]}"#,
-                    "duplicate active issue id 'a'",
+                    serde_json::json!({"schema_version": 2, "all_ids": [id, id], "deleted_ids": []}).to_string(),
+                    format!("duplicate active issue id '{id}'"),
                 ),
                 (
-                    r#"{"schema_version":2,"all_ids":[],"deleted_ids":["a","a"]}"#,
-                    "duplicate deleted issue id 'a'",
+                    serde_json::json!({"schema_version": 2, "all_ids": [], "deleted_ids": [id, id]}).to_string(),
+                    format!("duplicate deleted issue id '{id}'"),
                 ),
                 (
-                    r#"{"schema_version":2,"all_ids":["a"],"deleted_ids":["a"]}"#,
-                    "both active and deleted",
+                    serde_json::json!({"schema_version": 2, "all_ids": [id], "deleted_ids": [id]}).to_string(),
+                    "both active and deleted".to_string(),
                 ),
-                ("{ invalid json", "failed to parse index"),
+                ("{ invalid json".to_string(), "failed to parse index".to_string()),
             ];
 
             for (raw, expected) in cases {
@@ -3100,7 +3106,7 @@ mod tests {
                     .load_aggregated_index()
                     .expect_err("invalid local index must abort aggregation");
                 assert!(
-                    error.to_string().contains(expected),
+                    error.to_string().contains(&expected),
                     "expected {expected:?} in {error:#}"
                 );
             }

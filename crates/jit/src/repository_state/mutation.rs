@@ -1418,9 +1418,9 @@ mod tests {
         }
     }
 
-    fn seeded_issue(id: &str, assignee: Option<Assignee>) -> Issue {
+    fn seeded_issue(id: &IssueId, assignee: Option<Assignee>) -> Issue {
         let mut issue = crate::test_utils::fixture_issue("Title".into(), "Body".into());
-        issue.id = id.to_string();
+        issue.id = id.clone();
         issue.assignee = assignee;
         issue.created_at = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
             .unwrap()
@@ -1431,7 +1431,7 @@ mod tests {
 
     fn map_order_draft(reverse: bool) -> Issue {
         let mut issue = crate::test_utils::fixture_issue("Canonical".into(), "Body".into());
-        issue.id = "11111111-1111-4111-8111-111111111111".into();
+        issue.id = crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111);
         let context_entries = [("alpha", "one"), ("zeta", "two")];
         let gate_entries = [
             (
@@ -1712,7 +1712,10 @@ mod tests {
         // documented no-transition property holds: no delta, no identity, no time,
         // and therefore no override record either.
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("55555555-5555-4555-8555-555555555555", Some(agent.clone()));
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x5555_4555_8555_5555_5555_5555_5555_5555),
+            Some(agent.clone()),
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
             EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
@@ -1914,7 +1917,7 @@ mod tests {
         assert!(!issue_bytes.ends_with(b"\n"));
 
         let gate_run = GateRunResult::attestation(
-            "issue-1",
+            &crate::test_utils::issue_id(7),
             "cargo-ci",
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
@@ -1977,7 +1980,7 @@ mod tests {
 
     #[test]
     fn test_update_issue_stamps_changed_gate_state_from_mutation_context() {
-        let id = "11111111-1111-4111-8111-111111111111";
+        let id = &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111);
         let old_time = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
@@ -2030,7 +2033,7 @@ mod tests {
 
     #[test]
     fn test_update_issue_gate_state_names_the_run_recorded_with_it() {
-        let id = "11111111-1111-4111-8111-111111111111";
+        let id = &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111);
         let preimage = seeded_issue(id, None);
         let mut updated = preimage.clone();
         updated.gates_status.insert(
@@ -2123,7 +2126,10 @@ mod tests {
     #[test]
     fn test_claim_noop_when_issue_and_event_reflect_claim_samples_nothing() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", Some(agent.clone()));
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
+            Some(agent.clone()),
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
             EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
@@ -2162,7 +2168,10 @@ mod tests {
         // and a clock that panics on use, a fully-reflected claim acquire draws
         // neither the random source (the seed stays undrawn) nor the clock.
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("44444444-4444-4444-8444-444444444444", Some(agent.clone()));
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x4444_4444_8444_4444_4444_4444_4444_4444),
+            Some(agent.clone()),
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let event = crate::test_utils::stamped_event(
             EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
@@ -2199,7 +2208,10 @@ mod tests {
     fn test_claim_missing_event_only_emits_event() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         // Issue already assigned but the event log is empty (crash after save).
-        let issue = seeded_issue("22222222-2222-4222-8222-222222222222", Some(agent.clone()));
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+            Some(agent.clone()),
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
@@ -2224,7 +2236,10 @@ mod tests {
     #[test]
     fn test_claim_fresh_emits_issue_and_event() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue("33333333-3333-4333-8333-333333333333", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x3333_4333_8333_3333_3333_3333_3333_3333),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
             (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
@@ -2322,7 +2337,7 @@ mod tests {
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let draft = GateRunResult::attestation(
-            "issue-1",
+            &crate::test_utils::issue_id(7),
             "cargo-ci",
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
@@ -2489,12 +2504,15 @@ mod tests {
 
     #[test]
     fn test_delete_issue_removes_record_and_moves_index_membership() {
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = canonical_json(
             &RepositoryIndex {
                 schema_version: 2,
-                all_ids: vec![issue.id.clone(), "other".to_string()],
+                all_ids: vec![issue.id.clone(), crate::test_utils::issue_id(49)],
                 deleted_ids: Vec::new(),
             },
             true,
@@ -2529,7 +2547,7 @@ mod tests {
             panic!("expected index write");
         };
         let index: RepositoryIndex = serde_json::from_slice(bytes).unwrap();
-        assert_eq!(index.all_ids, ["other"]);
+        assert_eq!(index.all_ids, [crate::test_utils::issue_id(49)]);
         assert_eq!(index.deleted_ids, [issue.id]);
     }
 
@@ -2569,12 +2587,15 @@ mod tests {
 
     #[test]
     fn test_delete_issue_rejects_duplicate_deleted_index_without_a_plan() {
-        let issue = seeded_issue("11111111-1111-4111-8111-111111111111", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
+            None,
+        );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = serde_json::to_vec(&serde_json::json!({
             "schema_version": 2,
             "all_ids": [issue.id],
-            "deleted_ids": ["deleted", "deleted"]
+            "deleted_ids": [crate::test_utils::issue_id(1), crate::test_utils::issue_id(1)]
         }))
         .unwrap();
         let image = image_with(vec![
@@ -2596,7 +2617,10 @@ mod tests {
 
     #[test]
     fn test_update_issue_stamps_transition_lifecycle_from_one_mutation_time() {
-        let issue = seeded_issue("22222222-2222-4222-8222-222222222222", None);
+        let issue = seeded_issue(
+            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+            None,
+        );
         let created_at = issue.created_at;
         let mut updated = issue.clone();
         updated.state = State::Done;
@@ -2728,11 +2752,18 @@ mod tests {
         )
     }
 
-    const TORN_LOG: &[u8] = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti";
+    fn torn_log() -> Vec<u8> {
+        let event = crate::test_utils::stamped_event(
+            EventBody::draft_issue_completed(crate::test_utils::issue_id(1)),
+            "e0",
+            fixed_instant(),
+        );
+        [serialize_event(&event).unwrap().as_slice(), b"\n{\"parti"].concat()
+    }
 
     /// A captured events.jsonl whose final line is a malformed, unterminated tail.
     fn torn_tail_image() -> RepositoryImage {
-        image_with(vec![(VirtualPath::EVENTS, file_entry(TORN_LOG))])
+        image_with(vec![(VirtualPath::EVENTS, file_entry(&torn_log()))])
     }
 
     #[test]
@@ -2741,7 +2772,7 @@ mod tests {
         // torn tail would produce a log the reader rejects, so finalize refuses and
         // composes nothing, also when the torn line is longer than the tail window.
         let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize;
-        let long_torn = [TORN_LOG, &vec![b'x'; 2 * window]].concat();
+        let long_torn = [torn_log().as_slice(), &vec![b'x'; 2 * window]].concat();
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
         for image in [torn_tail_image(), long_image] {
             let event = EventBody::draft_gate_definition_created("cargo-ci".into());
@@ -2768,7 +2799,7 @@ mod tests {
             }],
         );
 
-        assert_eq!(offset, TORN_LOG.len() as u64);
+        assert_eq!(offset, torn_log().len() as u64);
         let first_line = std::str::from_utf8(&appended)
             .unwrap()
             .strip_prefix('\n')
@@ -2781,7 +2812,7 @@ mod tests {
                 ..
             }
         ));
-        let whole = [TORN_LOG, &appended].concat();
+        let whole = [torn_log().as_slice(), &appended].concat();
         assert!(
             crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
                 .is_ok(),
@@ -2794,9 +2825,7 @@ mod tests {
         let (repository_scoped, _) =
             event_identities(&EventBody::draft_gate_definition_created("g".to_string()));
         let (issue_scoped, _) = event_identities(&EventBody::draft_issue_deleted(
-            "0f0e0d0c-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c),
         ));
 
         assert!(repository_scoped < issue_scoped);

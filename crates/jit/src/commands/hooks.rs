@@ -147,7 +147,6 @@ mod tests {
         assert_eq!(content, "existing hook");
     }
 
-    const ISSUE_ID: &str = "514df7d3-caa6-40bb-9fba-d250e1bb756d";
     const AGENT: &str = "agent:holder";
     const STRICT_CONFIG: &str = "[worktree]\nenforce_leases = \"strict\"\n";
 
@@ -189,7 +188,7 @@ mod tests {
 
     fn grant_lease(repo: &Path, holder: &str) {
         let index = serde_json::json!({ "leases": [{
-            "lease_id": "00000000-0000-4000-8000-000000000001", "issue_id": ISSUE_ID, "agent_id": holder, "stale": false
+            "lease_id": "00000000-0000-4000-8000-000000000001", "issue_id": crate::test_utils::issue_id(1), "agent_id": holder, "stale": false
         }] });
         write(repo, ".git/jit/claims.index.json", &index.to_string());
     }
@@ -208,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_pre_commit_hook_blocks_issue_file_without_lease_in_strict_mode() {
-        let issue = format!(".jit/issues/{ISSUE_ID}.json");
+        let issue = format!(".jit/issues/{}.json", crate::test_utils::issue_id(1));
         let (no_index, _) = crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
         seed_diverged_history(no_index.path());
         assert!(!commit_succeeds(no_index.path(), &issue, "{}"));
@@ -227,7 +226,7 @@ mod tests {
         grant_lease(temp.path(), AGENT);
         assert!(commit_succeeds(
             temp.path(),
-            &format!(".jit/issues/{ISSUE_ID}.json"),
+            &format!(".jit/issues/{}.json", crate::test_utils::issue_id(1)),
             "{}"
         ));
     }

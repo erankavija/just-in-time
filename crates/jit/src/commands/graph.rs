@@ -635,7 +635,6 @@ fn collect_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::identity::IssueIdStaging;
     use crate::domain::{Priority, State};
     use crate::output::DependencyTreeNode;
@@ -675,15 +674,15 @@ mod tests {
     fn test_compute_dependency_summary_keys_by_state_enum() {
         let tree = vec![
             make_node(
-                &fixture_id("9a3beda4-9e53-59a5-8c6f-d2b0438f8263"),
+                &crate::test_utils::issue_id(0x9e53_59a5_8c6f_d2b0_438f_8263_9a3b_eda4),
                 State::Done,
             ),
             make_node(
-                &fixture_id("89c1f9f1-1a8b-5963-9831-82d71ca2a3a0"),
+                &crate::test_utils::issue_id(0x1a8b_5963_9831_82d7_1ca2_a3a0_89c1_f9f1),
                 State::Done,
             ),
             make_node(
-                &fixture_id("b23c207c-daac-5d84-92d4-d5f9ba8732e3"),
+                &crate::test_utils::issue_id(0xdaac_5d84_92d4_d5f9_ba87_32e3_b23c_207c),
                 State::InProgress,
             ),
         ];
@@ -700,18 +699,18 @@ mod tests {
     fn test_compute_dependency_summary_deduplicates_shared_ids() {
         // Same ID appearing as both a direct and nested dep should count once.
         let mut child = make_node(
-            &fixture_id("5bd55d8a-315a-50d0-9915-32285331aff3"),
+            &crate::test_utils::issue_id(0x315a_50d0_9915_3228_5331_aff3_5bd5_5d8a),
             State::Done,
         );
         child.level = 2;
         let mut parent = make_node(
-            &fixture_id("fa69be22-3ce2-5e38-8dd9-a1a8fe34cc5c"),
+            &crate::test_utils::issue_id(0x3ce2_5e38_8dd9_a1a8_fe34_cc5c_fa69_be22),
             State::InProgress,
         );
         parent.children = vec![child];
         let tree = vec![
             make_node(
-                &fixture_id("5bd55d8a-315a-50d0-9915-32285331aff3"),
+                &crate::test_utils::issue_id(0x315a_50d0_9915_3228_5331_aff3_5bd5_5d8a),
                 State::Done,
             ),
             parent,
@@ -728,11 +727,11 @@ mod tests {
         // Regression guard: keys must be "in_progress" not "inprogress".
         let tree = vec![
             make_node(
-                &fixture_id("f6b286c5-54d5-5acd-bd26-cc734e2292e3"),
+                &crate::test_utils::issue_id(0x54d5_5acd_bd26_cc73_4e22_92e3_f6b2_86c5),
                 State::Done,
             ),
             make_node(
-                &fixture_id("3ba09e56-907e-5586-9d02-2c3d23d4d8ae"),
+                &crate::test_utils::issue_id(0x907e_5586_9d02_2c3d_23d4_d8ae_3ba0_9e56),
                 State::InProgress,
             ),
         ];

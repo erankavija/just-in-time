@@ -1393,7 +1393,6 @@ fn project_planned_issue(planned: &PlannedNode) -> Issue {
 mod tests {
     use super::*;
     use crate::commands::template_expand::test_declarations as declared;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::artifact_directory::ArtifactDirectoryError;
 
     #[test]
@@ -1475,7 +1474,9 @@ mod tests {
 
     #[test]
     fn test_template_document_paths_name_the_documents_the_apply_engine_writes() {
-        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         // Declarations spanning what a capture path has to resolve: the artifact
         // directory alone, the directory beside another container field, and a
         // flat declaration naming no area at all.
@@ -1514,7 +1515,9 @@ mod tests {
 
     #[test]
     fn test_template_document_paths_reject_an_area_the_registry_does_not_declare() {
-        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{}-drafts", declared::AREA);
@@ -1562,7 +1565,9 @@ mod tests {
 
     #[test]
     fn test_derive_template_refresh_reconciles_prose_to_the_apply_engine_description() {
-        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let roles = RoleBindings::default();
 
         for (declaration, area) in [
@@ -1605,7 +1610,9 @@ mod tests {
 
     #[test]
     fn test_derive_template_refresh_rejects_an_area_the_registry_does_not_declare() {
-        let container = declared::container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let undeclared = format!("{}-drafts", declared::AREA);
         let (issues, _planning_id, breakdown_id) = applied_bracket(&container);
 
@@ -1639,7 +1646,9 @@ mod tests {
 
     #[test]
     fn test_find_captured_breakdown_uses_declared_label_namespace() {
-        let container = declared::container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x345600000000000000000000abcdef12,
+        ));
         let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
         let breakdown_node = template
             .nodes
@@ -1669,7 +1678,9 @@ mod tests {
 
     #[test]
     fn test_find_captured_breakdown_reports_missing_declared_label() {
-        let container = declared::container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
+        let container = declared::container(&crate::test_utils::issue_id(
+            0x345600000000000000000000abcdef12,
+        ));
         let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
         let breakdown_node = template
             .nodes
@@ -1711,7 +1722,7 @@ mod tests {
     fn test_resolve_endpoint_maps_roles_and_passes_ids_through() {
         let created = BTreeMap::from([(
             "planning".to_string(),
-            fixture_id("6f26f517-7bac-5c4c-b358-eeee73cfc166"),
+            crate::test_utils::issue_id(0x7bac_5c4c_b358_eeee_73cf_c166_6f26_f517),
         )]);
         assert_eq!(
             resolve_endpoint(
@@ -1719,15 +1730,17 @@ mod tests {
                 &created
             )
             .unwrap(),
-            fixture_id("6f26f517-7bac-5c4c-b358-eeee73cfc166")
+            crate::test_utils::issue_id(0x7bac_5c4c_b358_eeee_73cf_c166_6f26_f517)
         );
         assert_eq!(
             resolve_endpoint(
-                &DeltaEndpoint::ExistingIssue(fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+                &DeltaEndpoint::ExistingIssue(crate::test_utils::issue_id(
+                    0x9129512fbefc1e8508dc79631590ce6c
+                )),
                 &created
             )
             .unwrap(),
-            fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")
+            crate::test_utils::issue_id(0x9129_512f_befc_1e85_08dc_7963_1590_ce6c)
         );
         assert!(
             resolve_endpoint(&DeltaEndpoint::CreatedRole("missing".to_string()), &created).is_err()

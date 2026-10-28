@@ -1390,7 +1390,8 @@ mod tests {
                 RepositoryEntry::Absent,
             ),
             (
-                VirtualPath::data("issues/missing.json").unwrap(),
+                VirtualPath::data(format!("issues/{}.json", crate::test_utils::issue_id(75)))
+                    .unwrap(),
                 RepositoryEntry::Absent,
             ),
         ]);
@@ -1406,7 +1407,7 @@ mod tests {
                 registry: Box::new(GateRegistry::default()),
             },
             MutationIntent::ClaimIssue {
-                issue_id: "missing".to_string(),
+                issue_id: crate::test_utils::issue_id(75),
                 agent: "agent:tester".parse().unwrap(),
             },
         ];
@@ -1416,7 +1417,7 @@ mod tests {
         match error {
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::Mutation(
                 MutationError::MissingIssue(id),
-            )) => assert_eq!(id, "missing"),
+            )) => assert_eq!(id, crate::test_utils::issue_id(75)),
             other => panic!("expected a typed missing-issue mutation error, got {other:?}"),
         }
     }
