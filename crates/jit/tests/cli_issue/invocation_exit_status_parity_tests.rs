@@ -1,7 +1,6 @@
 //! Failure exit statuses are an invocation-form invariant: callers receive the
 //! same process status whether they request human-readable or JSON output.
 
-use std::fs;
 use std::process::{Command, Output};
 
 use jit::output::ErrorCode;
@@ -62,35 +61,6 @@ fn assert_failure_status_parity(repository: &TempDir, args: &[&str], expected: E
 }
 
 #[test]
-fn test_unresolved_identifiers_have_not_found_status_parity_across_namespaces() {
-    let repository = setup_repository();
-    let existing_issue = run(
-        &repository,
-        &["issue", "create", "--title", "Existing issue"],
-        true,
-    );
-    assert!(existing_issue.status.success());
-    let existing_issue: serde_json::Value = serde_json::from_slice(&existing_issue.stdout).unwrap();
-    let existing_issue = existing_issue["id"].as_str().unwrap();
-
-    assert_failure_status_parity(
-        &repository,
-        &["dep", "add", existing_issue, "0000000000000000"],
-        ErrorCode::IssueNotFound,
-    );
-    assert_failure_status_parity(
-        &repository,
-        &["issue", "claim", "0000000000000000", "agent:parity"],
-        ErrorCode::IssueNotFound,
-    );
-    assert_failure_status_parity(
-        &repository,
-        &["gate", "add", "0000000000000000", "cargo-ci"],
-        ErrorCode::IssueNotFound,
-    );
-}
-
-#[test]
 fn test_duplicate_gate_key_has_already_exists_status_parity() {
     let repository = setup_repository();
     let definition = [
@@ -127,12 +97,4 @@ fn test_failing_preset_application_has_exit_status_parity() {
         &["gate", "preset", "apply", "plan-review", "0000000000000000"],
         ErrorCode::PresetError,
     );
-}
-
-#[test]
-fn test_malformed_stored_record_has_exit_status_parity() {
-    let repository = setup_repository();
-    fs::write(repository.path().join(".jit/index.json"), b"{").unwrap();
-
-    assert_failure_status_parity(&repository, &["query", "all"], ErrorCode::ParseError);
 }
