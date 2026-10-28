@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T23:07:35.509455404Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a8a43598-361e-48ff-95cb-a878efab190a",
+      "status": "failed",
+      "updated_at": "2026-10-28T23:12:03.228883332Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
@@ -37,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exit-code projection suite proves a binding behind each row",
-  "updated_at": "2026-10-28T23:07:35.509455404Z"
+  "updated_at": "2026-10-28T23:12:03.228883332Z"
 }
