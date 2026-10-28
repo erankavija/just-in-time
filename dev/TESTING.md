@@ -51,6 +51,10 @@ what those modules exist to do. When a behavior in `domain/` or `graph/` is hard
 without a filesystem, that is a signal that side effects have leaked out of the storage
 boundary.
 
+A property of the `IssueStore` contract is a case in
+`crates/jit/src/storage/issue_store_conformance.rs`, which runs every case against every
+backend; a backend's own tests cover only what that backend adds.
+
 Run them with `cargo test --lib`.
 
 ### Property-Based Tests

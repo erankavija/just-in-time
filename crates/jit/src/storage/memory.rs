@@ -1212,52 +1212,6 @@ mod tests {
     }
 
     #[test]
-    fn test_read_repo_file_present_absent_and_path_safety() {
-        let storage = InMemoryStorage::new();
-        // Present -> Some(content).
-        storage.add_worktree_file("project-items.md", "hello");
-        assert_eq!(
-            storage
-                .read_repo_file("project-items.md")
-                .unwrap()
-                .as_deref(),
-            Some("hello")
-        );
-        // Absent -> None (graceful).
-        assert!(storage.read_repo_file("missing.md").unwrap().is_none());
-        // Path-safety: empty, absolute, and `..`-traversal are typed InvalidPath.
-        assert!(matches!(
-            storage.read_repo_file(""),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-        assert!(matches!(
-            storage.read_repo_file("/etc/passwd"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-        assert!(matches!(
-            storage.read_repo_file("../escape.md"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-    }
-
-    #[test]
-    fn test_load_nonexistent_issue_fails() {
-        let storage = InMemoryStorage::new();
-
-        let result = storage.load_issue("nonexistent");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
-    }
-
-    #[test]
-    fn test_list_issues_empty() {
-        let storage = InMemoryStorage::new();
-
-        let issues = storage.list_issues().unwrap();
-        assert_eq!(issues.len(), 0);
-    }
-
-    #[test]
     fn test_new_minted_root_is_removed_when_the_last_clone_drops() {
         let storage = InMemoryStorage::new();
         let clone = storage.clone();
@@ -1270,71 +1224,12 @@ mod tests {
         drop(clone);
         assert!(!root.exists(), "the minted root outlived every clone");
     }
-
-    #[test]
-    fn test_read_path_bytes_missing_file_returns_not_found() {
-        use crate::storage::PathReadError;
-
-        let storage = InMemoryStorage::new();
-
-        // Pass a repo-relative path that does not exist on disk.  The synthetic
-        // root points at `/tmp/jit-test-{uuid}` which normally doesn't exist,
-        // so the read fails with NotFound.
-        let result = storage.read_path_bytes("nonexistent/path/file.md", None);
-        assert!(
-            result.is_err(),
-            "reading a missing file should return an error"
-        );
-        assert!(
-            matches!(result.unwrap_err(), PathReadError::NotFound(_)),
-            "missing file should yield PathReadError::NotFound, not Other"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_absolute_path() {
-        use crate::storage::PathReadError;
-
-        let storage = InMemoryStorage::new();
-
-        let result = storage.read_path_bytes("/etc/passwd", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "absolute path must be rejected as InvalidPath"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_dotdot_segment() {
-        use crate::storage::PathReadError;
-
-        let storage = InMemoryStorage::new();
-
-        let result = storage.read_path_bytes("../etc/passwd", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "`..` traversal must be rejected as InvalidPath"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_empty_path() {
-        use crate::storage::PathReadError;
-
-        let storage = InMemoryStorage::new();
-
-        let result = storage.read_path_bytes("", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "empty path must be rejected as InvalidPath"
-        );
-    }
 }
 
 /// This backend's own record fixtures, beside the file backend's in
-/// [`test_fixtures`](crate::storage::redo_apply::test_fixtures), so the shared
-/// conformance suite and this module's tests seed and read one backend the same
-/// way (`@/inv/shared-test-contracts`).
+/// [`test_fixtures`](crate::storage::redo_apply::test_fixtures), so the
+/// `redo_conformance` matrix and this module's tests seed and read one backend
+/// the same way (`@/inv/shared-test-contracts`).
 #[cfg(test)]
 pub(crate) mod test_fixtures {
     use super::*;
