@@ -2,6 +2,7 @@
 use jit::declarations::GateMode;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::issue_id;
 
 // ========================================
 // GATE BULK OPERATIONS TESTS
@@ -197,17 +198,18 @@ fn test_add_dependencies_atomic_failure_nonexistent() {
     let h = TestHarness::new();
     let from = h.create_issue("Parent");
     let to1 = h.create_issue("Dep 1");
+    let absent = issue_id(1);
 
     let result = h
         .executor
-        .add_dependencies(&from, &[to1.clone(), "nonexistent".to_string()]);
+        .add_dependencies(&from, &[to1.clone(), absent.clone()]);
 
     let err = result.expect_err("an unresolvable target must fail the whole batch");
     let batch = err
         .downcast_ref::<jit::errors::DependencyBatchRejectedError>()
         .expect("must be a typed DependencyBatchRejectedError");
     assert_eq!(batch.rejected().len(), 1);
-    assert_eq!(batch.rejected()[0].0, "nonexistent");
+    assert_eq!(batch.rejected()[0].0, absent);
     assert!(batch.rejected()[0].1.to_string().contains("not found"));
 
     // Nothing was persisted, including the sibling edge that would have

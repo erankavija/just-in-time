@@ -7,6 +7,7 @@
 //! (REQ-04), and over arbitrary dependency edits (REQ-06).
 
 use jit::commands::BatchIssueDef;
+use jit::domain::identity::IssueId;
 use jit::domain::{queries::build_issue_map, Issue, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -236,7 +237,7 @@ proptest! {
         edits in dependency_edits(5)
     ) {
         let h = TestHarness::new();
-        let ids: Vec<String> = (0..5)
+        let ids: Vec<IssueId> = (0..5)
             .map(|index| h.create_issue(&format!("Issue {index}")))
             .collect();
 
