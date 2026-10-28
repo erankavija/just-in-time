@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a29e64c1dfaa5afa1fcff72127373f695ec3bd88",
+  "completed_at": "2026-10-27T22:47:24.735571071Z",
+  "duration_ms": 246759,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
+        "id": "F1",
+        "line": 141,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "Moved release test directly spawns jit instead of using JitCli."
+      }
+    ],
+    "summary": "The moved release CLI test bypasses the required shared subprocess fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3f15b95c-0a30-4a55-9dc2-489a736fb5be",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "37c2f3d8-cd02-480e-8306-014041316b2e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T22:43:17.976084856Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17437 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17f88-3ffb-7570-a173-a05497bfb5b8\n--------\nuser\n--- 17424 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 87e5e404a, dbad5652f, 9361ddd19 (partial), a29e64c1d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-02 and REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit code none; 2026-10-27T22:43:17Z)\nTruncation recovery: Re-read patches per commit and path; excluded non-query files from 9361ddd19 as outside the issue impact cone.\n\n1. **[blocking][issue-impact]** The moved `test_issue_release` bypasses the shared `JitCli` fixture: it uses local repository setup and three direct `cargo_bin!(\"jit\")` spawns. This new migrated CLI case violates the shared-fixture requirement and reintroduces the convention the issue is intended to remove. Use `JitCli` (including its git setup support) for this test. References: @/issue/c780514e/requirement/REQ-05, @/invariant/shared-test-contracts. [crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:141](crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:141)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The moved release CLI test bypasses the required shared subprocess fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Moved release test directly spawns jit instead of using JitCli.\",\"file\":\"crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs\",\"line\":141,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
