@@ -1350,6 +1350,12 @@
       "category": "criteria wording after 55043636 deleted EnvGuard/CurrentDirGuard",
       "status": "resolved: reword all three (user, 2026-10-28)",
       "decision": "tests never change process-wide state; varied values pass explicitly (67da5ac49)"
+    },
+    {
+      "session": 4,
+      "issue": "2d342676, f0bee761",
+      "category": "shared test infrastructure (policy 7): absent declarations and wrapper-store executors",
+      "status": "resolved: extend shared fixture (user, 2026-10-29)"
     }
   ],
   "rework_counts": {
@@ -1370,7 +1376,12 @@
     "173d98d5": 1,
     "529f621d": 1,
     "b469f36d": 1,
-    "b7078f0d": 2
+    "b7078f0d": 2,
+    "4b5b8f4a": 1,
+    "5001b556": 1,
+    "7208e568": 1,
+    "2d342676": 1,
+    "f0bee761": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2030,7 +2041,10 @@
     "ea5ffaba-3f15b95c-s4": "lead PASS 58c4e17c5/dbad5652f (Codex sol); 3f15b95c code-review 37c2f3d8 F1 (moved release test spawned jit directly; lead brief told it to follow file conventions) -> lead fix f0f12615e; closed with 8da3f7f5",
     "adoptD-s4": "lead PASS 5a93e443, 9e411075, ca5eb7ee (Claude Sonnet); gates pass; closed",
     "2cbe3ed8-s4": "lead PASS c25d5733f (Codex luna); closed",
-    "173d98d5-r1-s4": "lead rework 7985a3918 applied on cherry-pick ff3755054; cli_repo_workflow 408/408; landing"
+    "173d98d5-r1-s4": "lead rework 7985a3918 applied on cherry-pick ff3755054; cli_repo_workflow 408/408; landing",
+    "ids-from-json-s4": "6bd02fa4,c211f14c,c6cd250d,b305e55e,6a5de806,a057a4f5,b0fa5e5d already met by earlier migrations; gates pass; closed. 5001b556 (880f01fb F1) and 7208e568 (efb778d0 F1) fail -> rework 1 in brief-G",
+    "4b5b8f4a-s4": "lead rework b6456de73 after 1906ca79 F1; gates pass; closed",
+    "fastseed-s4": "Codex partial: 3ca153c7 complete; 2d342676/f0bee761 gaps -> fixture extension (brief-G, Claude Opus)"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2342,6 +2356,27 @@
         "3ca153c7",
         "f0bee761"
       ]
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-crw-docs",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "26cbc32e",
+        "aadae7cd"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "A branch worktree-agent-w4-fastseed",
+      "worker": "Claude Opus",
+      "issues": [
+        "2d342676",
+        "f0bee761",
+        "5001b556",
+        "7208e568"
+      ],
+      "reason": "shared fixture extension + reworks"
     }
   ],
   "checkpoint": {
