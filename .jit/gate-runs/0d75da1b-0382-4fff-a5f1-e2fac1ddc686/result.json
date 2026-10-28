@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8a47b701ad4a5f233ae1f4677fea4653baa317f5",
+  "completed_at": "2026-10-28T21:45:56.161557950Z",
+  "duration_ms": 162442,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The duplicate domain fixture is removed and affected tests use the shared fixture without changing assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a93e443-6dfb-49e6-ba9f-89641e11f3f2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0d75da1b-0382-4fff-a5f1-e2fac1ddc686",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T21:43:13.718927170Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: add4c58c0 and 8a47b701a (merge, parent-relative fixture patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-06 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T21:41:42Z); code-review pending (exit none)\nTruncation recovery: re-read the tagged types.rs patch and merge-parent comparisons separately; narrowed fixture and policy reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The duplicate domain fixture is removed and affected tests use the shared fixture without changing assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
