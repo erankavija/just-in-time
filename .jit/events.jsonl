@@ -21122,3 +21122,4 @@
 {"from":"backlog","id":"c35d4004-8288-441c-b5f1-6502fae7ce93","issue_id":"94bbdbd6-31ab-4e65-873b-77e56ec6e47c","timestamp":"2026-10-28T22:29:09.888833022Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"2b2692b5-f870-4356-b533-c01a87251d89","issue_id":"0af95f14-ce17-497b-9420-be71325ec0a5","timestamp":"2026-10-28T22:29:25.385916556Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"6d87344b-c7b3-4a1b-926d-6f425e14e582","issue_id":"0af95f14-ce17-497b-9420-be71325ec0a5","timestamp":"2026-10-28T22:49:57.497993919Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"7fdd5337-3c8b-437c-86e0-e2a4b89e4706","issue_id":"0af95f14-ce17-497b-9420-be71325ec0a5","timestamp":"2026-10-28T22:54:15.535549087Z","type":"gate_passed","updated_by":"auto:executor"}

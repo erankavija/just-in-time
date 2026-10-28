@@ -31,6 +31,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T22:49:57.497993919Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "04b1c070-5008-413e-af16-ca46d0044ba5",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:54:15.535549087Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0af95f14-ce17-497b-9420-be71325ec0a5",
@@ -47,5 +53,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Library unit tests take canonical issue ids from one fixture",
-  "updated_at": "2026-10-28T22:49:57.497993919Z"
+  "updated_at": "2026-10-28T22:54:15.535549087Z"
 }
