@@ -18,9 +18,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "cb4bffd4-8b9e-4431-90a7-683ae536ea5e",
+      "run_id": "14833235-b972-436d-8dcc-7501b135bcf0",
       "status": "passed",
-      "updated_at": "2026-10-28T23:38:01.955604773Z",
+      "updated_at": "2026-10-28T23:49:26.985990483Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_issue suite carries typed canonical issue ids",
-  "updated_at": "2026-10-28T23:41:59.938975525Z"
+  "updated_at": "2026-10-28T23:49:26.985990483Z"
 }
