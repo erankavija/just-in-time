@@ -444,10 +444,7 @@ fn template_operation_capture_paths(
         paths.extend(
             (0..template.nodes.len())
                 .map(|index| {
-                    VirtualPath::data(format!(
-                        "issues/{}.json",
-                        context.identifier_at(index as u64)
-                    ))
+                    VirtualPath::data(format!("issues/{}.json", context.issue_id_at(index as u64)))
                 })
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         );
@@ -1022,7 +1019,7 @@ fn derive_fresh_template(
     events: &mut Vec<(u8, EventBody)>,
 ) -> Result<FreshTemplateDerivation> {
     let created_order = (0..delta.creates.len())
-        .map(|index| context.identifier_at(index as u64))
+        .map(|index| context.issue_id_at(index as u64))
         .collect::<Vec<_>>();
     let created = delta
         .creates
@@ -1038,8 +1035,7 @@ fn derive_fresh_template(
     let mut lease_targets = Vec::new();
 
     for (planned, id) in delta.creates.iter().zip(&created_order) {
-        let mut issue = project_planned_issue(planned);
-        issue.id = id.clone();
+        let mut issue = project_planned_issue(planned, id.clone());
         attach_captured_gates(
             &planned.gates,
             &mut issue,
@@ -1379,8 +1375,8 @@ fn resolve_endpoint(
 /// for a node that always carries a `type:` label and has no dependencies at
 /// creation: fields set, then auto-promoted to [`State::Ready`] (so a state-keyed
 /// rule sees the persisted shape).
-fn project_planned_issue(planned: &PlannedNode) -> Issue {
-    let mut issue = Issue::draft(planned.title.clone(), planned.description.clone());
+fn project_planned_issue(planned: &PlannedNode, id: IssueId) -> Issue {
+    let mut issue = Issue::draft(id, planned.title.clone(), planned.description.clone());
     issue.priority = planned.priority;
     issue.labels = planned.labels.clone();
     // A freshly-created issue with no dependencies is auto-promoted to Ready
@@ -1711,7 +1707,7 @@ mod tests {
             gates: vec![],
             priority: Priority::High,
         };
-        let projected = project_planned_issue(&planned);
+        let projected = project_planned_issue(&planned, crate::test_utils::issue_id(1));
         assert_eq!(projected.title, "planning: Epic");
         assert_eq!(projected.priority, Priority::High);
         assert_eq!(projected.state, State::Ready);

@@ -2414,8 +2414,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         )
     }
 
+    /// Publish `draft`, whose id `context` derived, as a new issue.
     fn publish_issue_creation(
         &self,
+        context: &crate::repository_state::MutationContext,
         draft: Issue,
         explicit_type: bool,
         force: bool,
@@ -2426,9 +2428,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
-        let context = production_mutation_context();
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
-            let issue_id = context.identifier_at(0);
+            let issue_id = draft.id.clone();
             let Some(crate::commands::validate::MutationBase { image, .. }) = self
                 .capture_mutation_base(
                     session,
@@ -2490,7 +2491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }),
             )
             .collect::<Vec<_>>();
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, context, &intents)?;
             Ok(SessionStep::Apply(plan, (issue_id, validation)))
         })
     }

@@ -419,9 +419,7 @@ mod issue_list_render_tests {
     use super::*;
 
     fn issue(id: IssueId, title: &str) -> Issue {
-        let mut issue = Issue::draft(title.into(), String::new());
-        issue.id = id;
-        issue
+        Issue::draft(id, title.into(), String::new())
     }
 
     #[test]
@@ -1927,8 +1925,8 @@ impl IssueShowResponse {
 /// use jit::domain::{GateStatus, Issue, State};
 /// use jit::output::{IssueShowResponse, IssueStatusResponse};
 ///
-/// let mut issue = Issue::draft("Build parser".into(), "Body".into());
-/// issue.id = jit::test_utils::issue_id(1);
+/// let id = jit::test_utils::issue_id(1);
+/// let mut issue = Issue::draft(id, "Build parser".into(), "Body".into());
 /// issue.state = State::Ready;
 /// issue.gates_required = vec!["tests".into()];
 /// let show = IssueShowResponse::from_issue(issue, vec![], &[]);

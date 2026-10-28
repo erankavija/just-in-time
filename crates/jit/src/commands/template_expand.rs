@@ -149,8 +149,8 @@ pub struct TemplateDelta {
 /// let registry = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
 /// let template = registry.get("plan").unwrap();
 ///
-/// let mut container = Issue::draft("Auth epic".to_string(), String::new());
-/// container.id = jit::test_utils::issue_id(1);
+/// let id = jit::test_utils::issue_id(1);
+/// let mut container = Issue::draft(id, "Auth epic".to_string(), String::new());
 /// container.labels = vec!["type:epic".to_string()];
 /// let bindings = BTreeMap::from([("container".to_string(), container.id.clone())]);
 /// let snapshots = BTreeMap::from([("container".to_string(), vec![])]);

@@ -13,8 +13,9 @@
 //! - **Pre-validation** is atomic: on ANY validation failure ZERO issues are
 //!   created and a [`BatchValidationError`] enumerating every offending entry is
 //!   returned (mapped to exit code 2, `InvalidArgument`).
-//! - **Publication is atomic.** The finalizer allocates all ids, resolves every
-//!   symbolic edge, and publishes issues, index membership, and audit events in
+//! - **Publication is atomic.** Each draft carries the id the mutation context
+//!   derived for its entry; the finalizer resolves every symbolic edge to those
+//!   ids and publishes issues, index membership, and audit events in
 //!   one recoverable repository delta.
 
 use super::*;
@@ -292,9 +293,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect::<HashMap<_, _>>();
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
-        let created_issue_ids = (0..defs.len())
-            .map(|index| context.identifier_at(index as u64))
-            .collect::<Vec<_>>();
+        let created_issue_ids = batch_issue_ids(&context, defs.len());
         let mut issue_paths = created_issue_ids
             .iter()
             .map(|id| VirtualPath::data(format!("issues/{id}.json")))
@@ -308,7 +307,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(SessionStep::Retry);
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let problems = Self::collect_batch_problems_from_declarations(&defs, &declarations)?;
+            let problems = Self::collect_batch_problems_from_declarations(
+                &defs,
+                &created_issue_ids,
+                &declarations,
+            )?;
             if !problems.is_empty() {
                 return Err(BatchValidationError { problems }.into());
             }
@@ -333,7 +336,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let drafts = defs
                 .iter()
-                .map(|def| {
+                .zip(&created_issue_ids)
+                .map(|(def, id)| {
                     let def = &BatchIssueDef {
                         labels: resolve_labels(def, &credit, short_id_of).map_err(|_| {
                             anyhow!("validated batch contains an unresolved label key")
@@ -343,6 +347,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let priority = def.priority.unwrap_or(Priority::Normal);
                     Ok(Self::batch_candidate_issue(
                         def,
+                        id.clone(),
                         priority,
                         declarations.config(),
                     ))
@@ -370,8 +375,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// first). Returns an empty vec when the whole batch is valid.
     ///
     /// Reads the gate registry and config (type hierarchy) once for the batch.
+    /// Each entry is validated as the issue with its position's id in `ids`.
     fn collect_batch_problems_from_declarations(
         defs: &[BatchIssueDef],
+        ids: &[IssueId],
         declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     ) -> Result<Vec<BatchValidationProblem>> {
         let mut problems = Vec::new();
@@ -391,18 +398,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
 
         // 2a. Unknown keys referenced by coverage-credit labels. Each known key
-        //     resolves to a shape-valid placeholder here: ids are allocated only
-        //     at creation, and write validation below needs the final label shape.
+        //     resolves to its entry's short id, so write validation below sees the
+        //     final label shape.
         let credit = Self::batch_credit_namespaces(declarations)?;
-        let placeholder = Issue::draft(String::new(), String::new())
-            .id
-            .short_id()
-            .to_string();
+        let short_ids = defs
+            .iter()
+            .zip(ids)
+            .map(|(def, id)| (def.key.as_str(), id.short_id()))
+            .collect::<HashMap<_, _>>();
         let resolved_labels: Vec<Option<Vec<String>>> = defs
             .iter()
             .map(|def| {
                 resolve_labels(def, &credit, |key| {
-                    defined.contains(key).then(|| placeholder.clone())
+                    short_ids.get(key).map(|short_id| short_id.to_string())
                 })
                 .map_err(|unknown| {
                     problems.extend(unknown.into_iter().map(|(label, missing)| {
@@ -451,7 +459,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
         let gate_registry = declarations.gates();
 
-        for (def, labels) in defs.iter().zip(resolved_labels) {
+        for ((def, labels), id) in defs.iter().zip(resolved_labels).zip(ids) {
             let priority = def.priority.unwrap_or(Priority::Normal);
 
             // Type validity: only enforced when the project configures a type
@@ -491,7 +499,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 labels,
                 ..def.clone()
             };
-            let candidate = Self::batch_candidate_issue(&resolved, priority, declarations.config());
+            let candidate =
+                Self::batch_candidate_issue(&resolved, id.clone(), priority, declarations.config());
             if let Err(err) =
                 derive_write_validation(&candidate, declarations, declarations.config(), false)
             {
@@ -511,7 +520,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// default `type:<t>` label applied when the entry carries no `type:` label,
     /// the requested priority / gates / labels / content format, and the state
     /// implied by its declared dependencies.
-    fn batch_candidate_issue(def: &BatchIssueDef, priority: Priority, config: &JitConfig) -> Issue {
+    fn batch_candidate_issue(
+        def: &BatchIssueDef,
+        id: IssueId,
+        priority: Priority,
+        config: &JitConfig,
+    ) -> Issue {
         // Assemble labels as the write path does: the `type` field becomes a
         // `type:<t>` label, followed by the entry's explicit labels.
         let mut labels: Vec<String> = def
@@ -535,7 +549,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let mut issue = Issue::draft(def.title.clone(), def.description.clone());
+        let mut issue = Issue::draft(id, def.title.clone(), def.description.clone());
         issue.priority = priority;
         issue.gates_required = def.gates.clone();
         issue.labels = labels;
@@ -573,8 +587,23 @@ impl<S: IssueStore> CommandExecutor<S> {
             .ok_or_else(|| anyhow!("batch validation capture conflicted"))?
             .image;
         let declarations = crate::repository_state::declarations_from_image(&image)?;
-        Self::collect_batch_problems_from_declarations(defs, &declarations)
+        let ids = batch_issue_ids(
+            &crate::repository_state::MutationContext::preview(),
+            defs.len(),
+        );
+        Self::collect_batch_problems_from_declarations(defs, &ids, &declarations)
     }
+}
+
+/// The ids `context` derives for a batch of `count` created issues, in entry
+/// order.
+fn batch_issue_ids(
+    context: &crate::repository_state::MutationContext,
+    count: usize,
+) -> Vec<IssueId> {
+    (0..count as u64)
+        .map(|index| context.issue_id_at(index))
+        .collect()
 }
 
 /// `def`'s labels with every manifest-key reference in a `credit` namespace

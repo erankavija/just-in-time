@@ -104,17 +104,15 @@
 //! ```
 //! use jit::domain::Issue;
 //! use jit::graph::hierarchy::resolve_hierarchy;
+//! use jit::test_utils::issue_id;
 //! use jit::domain::type_taxonomy::HierarchyConfig;
 //!
 //! // milestone → epic → task (each container depends on what it contains)
-//! let mut milestone = Issue::draft("Release".into(), String::new());
-//! milestone.id = jit::test_utils::issue_id(56);
+//! let mut milestone = Issue::draft(issue_id(56), "Release".into(), String::new());
 //! milestone.labels = vec!["type:milestone".into()];
-//! let mut epic = Issue::draft("Auth".into(), String::new());
-//! epic.id = jit::test_utils::issue_id(57);
+//! let mut epic = Issue::draft(issue_id(57), "Auth".into(), String::new());
 //! epic.labels = vec!["type:epic".into()];
-//! let mut task = Issue::draft("Login".into(), String::new());
-//! task.id = jit::test_utils::issue_id(58);
+//! let mut task = Issue::draft(issue_id(58), "Login".into(), String::new());
 //! task.labels = vec!["type:task".into()];
 //!
 //! milestone.dependencies = vec![epic.id.clone()];

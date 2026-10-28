@@ -678,15 +678,17 @@ mod tests {
         assert!(cleared[GateRunField::Commit.as_str()].is_null());
     }
 
-    /// REQ-01: an issue's stored id is a UUID v4, and the short id is the first
-    /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
+    /// REQ-01: a mutation derives each new issue's id as a UUID v4, and the short
+    /// id is the first `SHORT_ID_LENGTH` characters of an id — derived on read,
+    /// never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
-
-        let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
+        let id = crate::repository_state::MutationContext::preview().issue_id_at(0);
+        let parsed = Uuid::parse_str(&id).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));
-        assert_eq!(parsed.hyphenated().to_string(), issue.id);
+        assert_eq!(parsed.hyphenated().to_string(), id);
+
+        let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
         assert_eq!(issue.short_id().len(), SHORT_ID_LENGTH);
         assert!(issue.id.starts_with(&issue.short_id()));
