@@ -9,6 +9,7 @@
   ],
   "description": "Remove the decision-kind copies from the projection-render harness tests.\n\n## Background\n\n`fast_rules/project_render_harness_tests.rs` (`:133`, `:189`, `:467`) restates the decision kind and its `D-[0-9]+` id pattern. Shared test support derives the shipped item kinds from `profiles/jit-default/manifest.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Tests in these files that need a shipped kind take it from the shared derivation of the default package.\n- [hard] REQ-02: A test that needs a kind the package does not ship declares a minimal literal, and its name or comment says the kind is custom.\n- [hard] REQ-03: No test in these files restates a shipped kind's declaration or its id pattern.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:34:10.873834835Z",
   "first_ready_at": "2026-10-28T23:10:10.507776998Z",
   "gates_required": [
     "cargo-ci",
@@ -41,7 +42,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Projection-render tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-28T23:30:59.025486973Z"
+  "updated_at": "2026-10-28T23:34:10.873834835Z"
 }
