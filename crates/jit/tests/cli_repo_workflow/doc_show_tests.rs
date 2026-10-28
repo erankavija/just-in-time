@@ -13,7 +13,7 @@
 
 use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
-use jit::test_utils::setup_test_repo_with_config;
+use jit::test_utils::declaration_dir;
 use std::collections::HashSet;
 use std::fs;
 use std::process::Output;
@@ -176,11 +176,12 @@ fn assert_json_rejection_agrees(
     });
 }
 
-/// The directory `doc dir` names for `id` in `area`, requiring the run to
-/// succeed.
 #[test]
 fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_declared_area() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let (issue_type, namespace) = membership_type_and_namespace();
     let membership = "artifact-layout";
@@ -242,7 +243,10 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
 
 #[test]
 fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let issue = cli.create_issue(["--title", "Undeclared area"]).unwrap();
 
@@ -296,7 +300,10 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
 #[test]
 fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let declared = declared_area();
     let authored = undeclared_area();
     let issue = cli
@@ -355,7 +362,10 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
 
 #[test]
 fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_directory() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let (issue_type, namespace) = membership_type_and_namespace();
     let issue = cli
@@ -416,7 +426,10 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
 
 #[test]
 fn test_doc_dir_rejects_an_unknown_issue_identifier() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
     let known = cli.create_issue(["--title", "Known issue"]).unwrap();
     let unknown = "deadbeef";

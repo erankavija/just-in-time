@@ -8,7 +8,7 @@ use crate::doc_show_tests::{declared_area, declared_config};
 use crate::linked_checkout_write_policy_tests::store_bytes;
 use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
-use jit::test_utils::setup_test_repo_with_config;
+use jit::test_utils::declaration_dir;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -46,7 +46,10 @@ fn listed_paths(cli: &JitCli, id: &str) -> Vec<String> {
 
 #[test]
 fn test_doc_list_includes_every_file_under_the_issue_artifact_directory_without_a_link() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
@@ -78,7 +81,10 @@ fn test_doc_list_includes_every_file_under_the_issue_artifact_directory_without_
 
 #[test]
 fn test_doc_check_links_checks_and_tracks_a_derived_document() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
@@ -121,7 +127,10 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
 
 #[test]
 fn test_doc_show_displays_a_derived_document() {
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
