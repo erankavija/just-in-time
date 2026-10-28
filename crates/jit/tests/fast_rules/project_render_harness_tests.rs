@@ -7,13 +7,14 @@
 //! the two migrated projections (`invariants` id-anchor, `rules-and-gates` full),
 //! each bound to the live renderer code rather than a committed mirror.
 
-use jit::commands::CommandExecutor;
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::declarations::invariants::InvariantRegistry;
 use jit::declarations::rules::RuleSet;
 use jit::declarations::GateRegistry;
 use jit::declarations::{GateDefinition, GateMode, GateStage};
 use jit::repository_state::render_invariants_markdown;
 use jit::repository_state::render_rules_and_gates_markdown;
+use jit::repository_state::VirtualPath;
 use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::HashMap;
 
@@ -72,32 +73,6 @@ source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-fie
 source-of-truth = "registry-first"
 "#;
 
-/// Build an `InMemoryStorage` whose aggregate repository image carries
-/// `config.toml` and the given registry files.
-fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    storage.add_data_file("config.toml", config_toml);
-    for (name, content) in registries {
-        storage.add_data_file(name, content);
-    }
-    storage
-}
-
-/// Construct a render executor over the storage's canonical layout: the on-disk
-/// data root and its parent worktree, exactly as the CLI wires the executor at
-/// startup. The session the render opens captures from the seeded aggregate image.
-fn render_executor(storage: &InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    let data = storage.root().to_path_buf();
-    let worktree = data
-        .parent()
-        .expect("test data root has a parent worktree")
-        .to_path_buf();
-    let layout = jit::storage::discover_repository_layout(worktree, data)
-        .expect("test layout is discoverable");
-    CommandExecutor::new(storage.clone()).with_layout(layout)
-}
-
 fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
     GateDefinition {
         version: 1,
@@ -141,7 +116,7 @@ mode = "region"
 target = "AGENTS.md"
 style = "id-anchor"
 "#;
-    let storage = storage_with(config, &[]);
+    let storage = InMemoryStorage::new();
     // The markdown source: a decision-log section whose bullets repeat their id.
     storage.add_worktree_file(
         "charter.md",
@@ -155,7 +130,14 @@ style = "id-anchor"
     let original = format!("{prefix}{begin}\nstale\n{end}{suffix}");
     storage.add_worktree_file("AGENTS.md", &original);
 
-    let executor = render_executor(&storage);
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(config),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.project_render(Some("charter")).unwrap();
     assert_eq!(result.count(), 1);
     assert_eq!(result.items[0].target, "AGENTS.md");
@@ -204,15 +186,21 @@ mode = "separate-file"
 target = "STALE.md"
 style = "id-anchor"
 "#;
-    let storage = storage_with(captured_config, &[]);
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("config.toml"), stale_config).unwrap();
+    let storage = InMemoryStorage::new();
     storage.add_worktree_file(
         "charter.md",
         "## Decision Log\n\n- D-1: Captured authority\n",
     );
 
-    let executor = render_executor(&storage);
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(captured_config),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
+    std::fs::write(storage.root().join("config.toml"), stale_config).unwrap();
     executor
         .effective_rules()
         .expect("prime the executor's stale config cache");
@@ -236,11 +224,16 @@ fn test_invariants_projection_parity_with_typed_render() {
         "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
          mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"id-anchor\"\n"
     );
-    let storage = storage_with(&config, &[]);
-    // The id-anchor path reads the descriptor's registry through `read_repo_file`
-    // (the repo-file map), so seed it there, not only on the config root.
-    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            invariants: Some(INVARIANTS_TOML),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     executor.project_render(Some("invariants")).unwrap();
     let written = storage
@@ -265,24 +258,23 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
         "{RULE_GATE_KINDS}\n[projection.rules-and-gates]\nkind = [\"rule\", \"gate\"]\n\
          mode = \"separate-file\"\ntarget = \".jit/rules-and-gates.md\"\nstyle = \"full\"\n"
     );
-    let storage = storage_with(&config, &[("rules.toml", RULES_TOML)]);
-    // Full style guards its declared registry sources (`.jit/rules.toml`,
-    // `.jit/gates.toml`) for existence over the `read_repo_file` boundary before
-    // rendering, so seed both there (the bytes are probed for presence; the render
-    // itself reads the effective rules and the seeded gate registry).
-    storage.add_data_file("rules.toml", RULES_TOML);
-    storage.add_data_file(
-        "gates.toml",
-        "[[gates]]\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\ndescription = \"fmt + clippy\"\nstage = \"postcheck\"\nmode = \"manual\"\n",
-    );
+    let gates_toml = "[[gates]]\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\ndescription = \"fmt + clippy\"\nstage = \"postcheck\"\nmode = \"manual\"\n";
+    let storage = InMemoryStorage::new();
     let mut registry = GateRegistry::default();
     registry.gates.insert(
         "cargo-ci".to_string(),
         manual_gate("cargo-ci", "Cargo CI", "fmt + clippy"),
     );
-    jit::test_harness::seed_memory_gate_registry(&storage, &registry);
-
-    let executor = render_executor(&storage);
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            rules: Some(RULES_TOML),
+            gates: Some(gates_toml),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     executor.project_render(Some("rules-and-gates")).unwrap();
     let written = storage
         .read_repo_file(".jit/rules-and-gates.md")
@@ -312,8 +304,15 @@ mode = \"separate-file\"
 target = \".jit/out.md\"
 style = \"id-anchor\"
 ";
-    let storage = storage_with(config, &[]);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(config),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let err = executor.project_render(Some("bad")).unwrap_err();
     assert!(
         err.to_string().contains("bad") || err.chain().any(|c| c.to_string().contains("unknown")),
@@ -331,9 +330,16 @@ fn test_missing_target_is_typed_error_naming_projection() {
     let config = format!(
         "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\nstyle = \"id-anchor\"\n"
     );
-    let storage = storage_with(&config, &[]);
-    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            invariants: Some(INVARIANTS_TOML),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
@@ -366,8 +372,7 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
          [projection.b-bad]\nkind = \"invariant\"\nmode = \"region\"\n\
          target = \"SECOND.md\"\nstyle = \"id-anchor\"\n"
     );
-    let storage = storage_with(&config, &[]);
-    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
+    let storage = InMemoryStorage::new();
     // FIRST.md carries `a-good`'s default region markers (rendering succeeds);
     // SECOND.md carries NONE, so `b-bad` fails on its absent begin marker.
     let first_original =
@@ -376,7 +381,15 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     storage.add_worktree_file("FIRST.md", first_original);
     storage.add_worktree_file("SECOND.md", second_original);
 
-    let executor = render_executor(&storage);
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            invariants: Some(INVARIANTS_TOML),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
     // fails — yet phase 2 never runs, so nothing is written anywhere.
     let err = executor.project_render(None).unwrap_err();
@@ -432,9 +445,16 @@ source-of-truth = "registry-first"
     // store on the filesystem root — seed it there. The pre-write source-existence
     // guard probes the same store over `read_repo_file`, so seed the repo-file map
     // too.
-    let storage = storage_with(&config, &[("invariants.toml", INVARIANTS_TOML)]);
-    storage.add_data_file("invariants.toml", INVARIANTS_TOML);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            invariants: Some(INVARIANTS_TOML),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     executor.project_render(Some("house")).unwrap();
     let written = storage
@@ -472,8 +492,15 @@ source-of-truth = "markdown-first"
         "{issue_scoped_kind}\n[projection.decisions]\nkind = \"decision\"\n\
          mode = \"separate-file\"\ntarget = \".jit/decisions.md\"\nstyle = \"full\"\n"
     );
-    let storage = storage_with(&config, &[]);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let err = executor.project_render(Some("decisions")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
@@ -503,11 +530,19 @@ fn test_full_style_missing_registry_source_errors_pre_write() {
         "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
          mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"full\"\n"
     );
-    // The `.jit/invariants.toml` store is seeded NOWHERE: config.invariants loads
+    // The `.jit/invariants.toml` store is absent: config.invariants loads
     // empty (a missing store is indistinguishable from an empty one at render
     // time), and the pre-write existence probe over `read_repo_file` finds nothing.
-    let storage = storage_with(&config, &[]);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            after_initialization: true,
+            absent: &[VirtualPath::INVARIANTS],
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();

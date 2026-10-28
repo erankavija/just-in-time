@@ -23,11 +23,3 @@ mod template_apply_atomicity_tests;
 mod template_apply_tests;
 mod template_binding_tests;
 mod templates_loader_tests;
-
-fn seed_memory_data_file(storage: &jit::storage::InMemoryStorage, name: &str, content: &str) {
-    let virtual_path = jit::repository_state::VirtualPath::data(name).unwrap();
-    let host_path = storage.repository_layout().resolve(&virtual_path).unwrap();
-    std::fs::create_dir_all(host_path.parent().unwrap()).unwrap();
-    std::fs::write(host_path, content).unwrap();
-    storage.add_data_file(name, content);
-}

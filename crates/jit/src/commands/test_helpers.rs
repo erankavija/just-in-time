@@ -172,6 +172,9 @@ pub struct MemoryDeclarations<'a> {
     /// Install the supplied declarations verbatim after initialization, which
     /// then neither validates nor rejects them (such as malformed rules).
     pub after_initialization: bool,
+    /// Declarations removed from the store and its host mirror after
+    /// initialization and installation, for a scenario that needs them absent.
+    pub absent: &'a [VirtualPath],
 }
 
 impl MemoryDeclarations<'_> {
@@ -186,6 +189,13 @@ impl MemoryDeclarations<'_> {
         .into_iter()
         .filter_map(|(path, body)| body.map(|body| (path, body)))
         .for_each(|(path, body)| seed_repo_file(storage, &path.repository_relative(), body));
+    }
+
+    fn remove_absent(&self, storage: &InMemoryStorage) {
+        let mut state = storage.repository_state();
+        self.absent.iter().for_each(|path| {
+            state.entries.remove(path);
+        });
     }
 }
 
@@ -207,6 +217,17 @@ pub fn memory_executor_declaring(
     storage: InMemoryStorage,
     declarations: MemoryDeclarations<'_>,
 ) -> CommandExecutor<InMemoryStorage> {
+    memory_executor_wrapping(storage, declarations, std::convert::identity)
+}
+
+/// [`memory_executor_declaring`] over the store `wrap` builds from the
+/// initialized `storage`, such as a failure-injection wrapper; initialization
+/// runs on `storage` itself, so the wrapper observes none of it.
+pub fn memory_executor_wrapping<W: IssueStore>(
+    storage: InMemoryStorage,
+    declarations: MemoryDeclarations<'_>,
+    wrap: impl FnOnce(InMemoryStorage) -> W,
+) -> CommandExecutor<W> {
     if !declarations.after_initialization {
         declarations.install(&storage);
     }
@@ -261,8 +282,9 @@ pub fn memory_executor_declaring(
     if declarations.after_initialization {
         declarations.install(&storage);
     }
+    declarations.remove_absent(&storage);
     mirror_memory_declarations(&storage, &layout);
-    CommandExecutor::new(storage).with_layout(layout)
+    CommandExecutor::new(wrap(storage)).with_layout(layout)
 }
 
 fn mirror_memory_declarations(
@@ -467,6 +489,74 @@ mod tests {
             Some(malformed)
         );
         assert!(executor.rules().is_err());
+    }
+
+    #[test]
+    fn test_memory_executor_declaring_removes_absent_declaration_from_store_and_host_mirror() {
+        let path = VirtualPath::RULES;
+        let storage = InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                absent: std::slice::from_ref(&path),
+                ..MemoryDeclarations::default()
+            },
+        );
+
+        let reference = InMemoryStorage::new();
+        memory_executor(reference.clone());
+        let relative = path.repository_relative();
+        assert!(reference.read_repo_file(&relative).unwrap().is_some());
+        assert_eq!(storage.read_repo_file(&relative).unwrap(), None);
+        let host = storage.repository_layout().resolve(&path).unwrap();
+        assert!(!host.exists(), "{}", host.display());
+        assert!(executor
+            .storage()
+            .read_repo_file(&relative)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_memory_executor_wrapping_wraps_the_declared_initialized_store() {
+        let declarations = MemoryDeclarations {
+            config: Some(DECLARED_CONFIG),
+            ..MemoryDeclarations::default()
+        };
+        let reference = InMemoryStorage::new();
+        memory_executor_declaring(reference.clone(), declarations);
+
+        let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
+        let counter = SessionOpenCounter::new();
+        let mut wrapped_image = None;
+        let executor = memory_executor_wrapping(
+            InMemoryStorage::rooted_at(reference.root()),
+            declarations,
+            |initialized| {
+                wrapped_image = Some(image(&initialized));
+                initialized.with_mutation_interruption_view(counter.clone())
+            },
+        );
+
+        assert_eq!(wrapped_image, Some(image(&reference)));
+        assert_eq!(counter.count(), 0, "initialization bypasses the wrapper");
+        executor
+            .issues()
+            .create_issue(
+                "through the wrapper".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        assert!(
+            counter.count() > 0,
+            "the executor mutates through the wrapper"
+        );
     }
 
     #[test]

@@ -19,6 +19,7 @@
 //! the binding map these tests pass explicitly — and is covered against the real
 //! binary in `template_binding_cli_tests.rs`.
 
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority};
 use jit::storage::{InMemoryStorage, IssueStore};
@@ -99,30 +100,6 @@ applies_to  = ["epic"]
   role = "planning"
 "#;
 
-/// An executor over an isolated repository whose `.jit/templates.toml` holds
-/// `templates_toml`. The neutral `config.toml` makes the captured repository
-/// complete; the bindings and bracket vocabulary still come entirely from the
-/// template registry.
-fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    crate::seed_memory_data_file(&storage, "config.toml", "");
-    crate::seed_memory_data_file(&storage, "templates.toml", templates_toml);
-    // A template's gate entries resolve against the repository's own presets
-    // and its own gate registry, so the keys this registry names are declared
-    // in that registry too.
-    let unchecked_hierarchy: [&str; 0] = [];
-    for template in
-        jit::templates::TemplateRegistry::from_toml_str(templates_toml, &unchecked_hierarchy)
-            .expect("the seeded template registry parses")
-            .templates
-    {
-        jit::test_harness::seed_memory_template_gates(&storage, &template);
-    }
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Create a breakable container, returning its id.
 fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) -> String {
     executor
@@ -153,7 +130,32 @@ fn type_of(issue: &Issue) -> Option<String> {
 
 #[test]
 fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
-    let executor = executor_with_templates(RENAMED_BINDINGS_TEMPLATE);
+    jit::test_mode::enable();
+    let storage = InMemoryStorage::new();
+    let unchecked_hierarchy: [&str; 0] = [];
+    for template in jit::templates::TemplateRegistry::from_toml_str(
+        RENAMED_BINDINGS_TEMPLATE,
+        &unchecked_hierarchy,
+    )
+    .expect("the template registry parses")
+    .templates
+    {
+        jit::test_harness::seed_memory_template_gates(&storage, &template);
+    }
+    let gates_toml = String::from_utf8(
+        jit::declarations::serialize_gate_registry(&storage.load_gate_registry().unwrap()).unwrap(),
+    )
+    .unwrap();
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            templates: Some(RENAMED_BINDINGS_TEMPLATE),
+            gates: Some(&gates_toml),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
 
     // The auto-bound anchor is the repository's, not a compiled-in name. This is
     // the binding `jit apply <template> <container>` fills from its positional
@@ -215,7 +217,32 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
 
 #[test]
 fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
-    let executor = executor_with_templates(DEFAULT_BINDINGS_TEMPLATE);
+    jit::test_mode::enable();
+    let storage = InMemoryStorage::new();
+    let unchecked_hierarchy: [&str; 0] = [];
+    for template in jit::templates::TemplateRegistry::from_toml_str(
+        DEFAULT_BINDINGS_TEMPLATE,
+        &unchecked_hierarchy,
+    )
+    .expect("the template registry parses")
+    .templates
+    {
+        jit::test_harness::seed_memory_template_gates(&storage, &template);
+    }
+    let gates_toml = String::from_utf8(
+        jit::declarations::serialize_gate_registry(&storage.load_gate_registry().unwrap()).unwrap(),
+    )
+    .unwrap();
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            templates: Some(DEFAULT_BINDINGS_TEMPLATE),
+            gates: Some(&gates_toml),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     assert_eq!(executor.container_anchor().unwrap(), "container");
 
     let container = create_container(&executor, "Auth epic");
@@ -241,8 +268,6 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 #[test]
 fn test_container_anchor_defaults_without_a_templates_file() {
     jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
     assert_eq!(executor.container_anchor().unwrap(), "container");
 }
