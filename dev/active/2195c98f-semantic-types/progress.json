@@ -738,7 +738,8 @@
     "f265e748": 2,
     "8acca4f4": 2,
     "10ae7776": 1,
-    "55043636": 1
+    "55043636": 1,
+    "2c9badcd": 1
   },
   "external_blockers": {
     "c780514e test-topology (led by just-in-time-4f)": [
@@ -1370,6 +1371,25 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "c780514e task taken over with user approval; well-specified test deletion"
+    },
+    {
+      "issue": "2c9badcd",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "c780514e task taken over with user approval; conformance-suite design across both backends"
+    },
+    {
+      "issue": "2c9badcd",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "rework 1: code-review F1, in-memory working-tree path reads bypass the image"
+    },
+    {
+      "issue": "0af95f14",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "29-file unit-test id sweep with judgment calls (REQ-03/04) and a shared fixture contract"
     }
   ],
   "surfaced_pitfalls": [
@@ -1477,6 +1497,8 @@
       "issue": "55e3d3fd",
       "state": "done",
       "merge": "7aa7ed622"
-    }
+    },
+    "e2eb8862 (landed d273d0962, closed 8b9fccb1d)",
+    "2c9badcd (landed 8b1d10d66 after rework 1)"
   ]
 }

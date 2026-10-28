@@ -1343,6 +1343,13 @@
       "category": "same finding twice (REQ-02 post-construction declaration writes); shared test infrastructure change (policy 7)",
       "status": "resolved: extend shared fixture (user, 2026-10-28)",
       "decision": "MemoryDeclarations gains invariants/gates and post-initialization installation; 18 item/validate sites and invariant.rs write_invariants converge onto it. Rework 2 of 2 (Claude Opus)."
+    },
+    {
+      "session": 4,
+      "issue": "c780514e REQ-09, 3f8da8c4 REQ-03, @/invariant/orthogonal-tests",
+      "category": "criteria wording after 55043636 deleted EnvGuard/CurrentDirGuard",
+      "status": "resolved: reword all three (user, 2026-10-28)",
+      "decision": "tests never change process-wide state; varied values pass explicitly (67da5ac49)"
     }
   ],
   "rework_counts": {
@@ -1410,7 +1417,10 @@
     "s4: Codex in sandbox cannot run serve/socket tests; nextest stops early there. Lead re-runs the lib suite outside the sandbox before committing Codex work.",
     "s4: Codex adoption edits wandered outside retired helpers (rewrote a JsonFileStorage config path; duplicated an owner entry). Diff-review every changed path/list literal, not just helper names.",
     "s4: sccache server started inside a gate's scratch TMPDIR dies host-wide when that dir is removed (error 'Failed to create temp dir'); restart with TMPDIR=/tmp and force-rerun the gate.",
-    "s4: InMemoryStorage::new() roots under /tmp/jit-test-<uuid>; leaks exhausted /tmp inodes (fixed 022a46af6)."
+    "s4: InMemoryStorage::new() roots under /tmp/jit-test-<uuid>; leaks exhausted /tmp inodes (fixed 022a46af6).",
+    "s4: briefs must not tell a worker to follow a target file's existing conventions when that file is not yet migrated; it copies the old locator/setup (3f15b95c F1).",
+    "s4: jit issue create rewrites .jit/index.json, which land.sh treats as dirt; commit it before landing.",
+    "s4: a hook blocks wait loops on pgrep -f; land.sh already waits on the exclusive lock."
   ],
   "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
@@ -2015,7 +2025,12 @@
     "harness-s4": "lead PASS 50b800bb cce28f9fe, 2d537b7c 36fb35636; cargo-ci + code-review pass both; :314 owners accepted (resolve_link_label in commands/item.rs, triple in domain/item.rs); dev/benchmarks harness_demo mentions kept as recorded evidence",
     "b7078f0d-r2-s4": "lead PASS b6fabbf18; cargo-ci + code-review 80443928 pass; closed",
     "529f621d-r1-s4": "lead PASS eb68c7ff2 (Codex sol): delete + dependency-removal cascades apply issues_becoming_ready; new delete-event-order owner",
-    "querygraph-s4": "lead PASS 14d95c74 883e6282e, 28373fb7 053f04103, 37c169ad 0379fe956, 8da3f7f5 cf5e548c2; 3f15b95c 87e5e404a partial (4 semantic cases + misfiled test_issue_release remain) pending ea5ffaba"
+    "querygraph-s4": "lead PASS 14d95c74 883e6282e, 28373fb7 053f04103, 37c169ad 0379fe956, 8da3f7f5 cf5e548c2; 3f15b95c 87e5e404a partial (4 semantic cases + misfiled test_issue_release remain) pending ea5ffaba",
+    "adoptC-s4": "lead PASS 155d8c3c, 64f04da6, 44b40ce1 (Codex luna); gates pass; closed",
+    "ea5ffaba-3f15b95c-s4": "lead PASS 58c4e17c5/dbad5652f (Codex sol); 3f15b95c code-review 37c2f3d8 F1 (moved release test spawned jit directly; lead brief told it to follow file conventions) -> lead fix f0f12615e; closed with 8da3f7f5",
+    "adoptD-s4": "lead PASS 5a93e443, 9e411075, ca5eb7ee (Claude Sonnet); gates pass; closed",
+    "2cbe3ed8-s4": "lead PASS c25d5733f (Codex luna); closed",
+    "173d98d5-r1-s4": "lead rework 7985a3918 applied on cherry-pick ff3755054; cli_repo_workflow 408/408; landing"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2290,6 +2305,43 @@
         "8da3f7f5"
       ],
       "reason": "5fac48b8 upstream; one integration target, sequential"
+    },
+    {
+      "session": 4,
+      "slot": "A",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "2cbe3ed8"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-adoptD",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "5a93e443",
+        "9e411075",
+        "ca5eb7ee"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-serverfile",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "4b5b8f4a"
+      ],
+      "reason": "server tests bind sockets; Codex sandbox cannot run them"
+    },
+    {
+      "session": 4,
+      "slot": "A branch worktree-agent-w4-fastseed",
+      "worker": "Codex gpt-6-luna xhigh",
+      "issues": [
+        "2d342676",
+        "3ca153c7",
+        "f0bee761"
+      ]
     }
   ],
   "checkpoint": {
@@ -2336,6 +2388,15 @@
         "55043636"
       ],
       "note": "Peer executes under c780514e gates/conventions with user approval; lead excludes them from its queue. Peer's blocked tasks: 0af95f14 (upstream 155d8c3c,44b40ce1,2c9badcd<-e2eb8862<-64f04da6,55043636<-2a6bc44c,50b800bb<-b7078f0d) and 5fac48b8 (also 5a93e443,9e411075,2cbe3ed8,4b5b8f4a,8da3f7f5,529f621d). Notify on each becoming fully terminal."
+    },
+    {
+      "session": 4,
+      "peer": "just-in-time-c2",
+      "executed_by_peer": [
+        "e2eb8862",
+        "2c9badcd"
+      ],
+      "note": "user-approved; c2 paused after dispatching e2eb8862 (handoff dev/active/2195c98f-semantic-types/handoff-3.md). Notify just-in-time-c2 or its successor when 0af95f14 / 5fac48b8 upstream is terminal."
     }
   ],
   "landings": [

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:50:08.405678158Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "fast_rules memory-backed tests use the shared seeding",
-  "updated_at": "2026-10-28T21:48:19.775543470Z"
+  "updated_at": "2026-10-28T21:50:08.617298748Z"
 }

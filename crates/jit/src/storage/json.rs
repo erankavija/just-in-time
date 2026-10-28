@@ -1616,10 +1616,6 @@ mod tests {
         let foreign =
             crate::storage::discover_repository_layout(other_worktree.path(), &data).unwrap();
         storage.configure_repository_layout(&foreign);
-        assert_eq!(
-            storage.configured_layout().unwrap().worktree_root(),
-            worktree.path()
-        );
         assert!(matches!(
             storage.open_mutation_session(foreign),
             Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
@@ -1792,42 +1788,6 @@ mod tests {
         let session = storage.open_mutation_session(layout).unwrap();
         drop(session);
         assert!(crate::storage::guard_order::CoordinationOrderGuard::enter().is_ok());
-    }
-
-    #[test]
-    fn test_read_repo_file_present_absent_and_path_safety() {
-        // Repo root is the parent of the .jit dir, so create storage at temp/.jit.
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        fs::create_dir(storage.root()).unwrap();
-        configure_test_layout(&storage, temp.path(), storage.root());
-
-        // Absent -> None (graceful).
-        assert!(storage
-            .read_repo_file("project-items.md")
-            .unwrap()
-            .is_none());
-
-        // Present -> Some(content).
-        std::fs::write(temp.path().join("project-items.md"), "hello").unwrap();
-        assert_eq!(
-            storage
-                .read_repo_file("project-items.md")
-                .unwrap()
-                .as_deref(),
-            Some("hello")
-        );
-
-        // Path-safety: absolute and `..`-traversal are typed InvalidPath, never a
-        // read outside the repository.
-        assert!(matches!(
-            storage.read_repo_file("/etc/passwd"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
-        assert!(matches!(
-            storage.read_repo_file("../escape.md"),
-            Err(crate::storage::PathReadError::InvalidPath(_))
-        ));
     }
 
     #[test]
@@ -2885,18 +2845,6 @@ mod tests {
         }
 
         #[test]
-        fn test_load_issue_fails_when_not_found_anywhere() {
-            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
-
-            let fake_id = "00000000-0000-0000-0000-000000000000";
-            let result = storage.load_issue(fake_id);
-
-            assert!(result.is_err());
-            let err_msg = result.unwrap_err().to_string();
-            assert!(err_msg.contains("not found") || err_msg.contains("Issue"));
-        }
-
-        #[test]
         fn test_load_issue_from_git_handles_invalid_json() {
             // Setup: Create git repo with invalid JSON committed
             let (_temp_dir, _storage, _taxonomy) =
@@ -2982,142 +2930,6 @@ mod tests {
             assert_eq!(loaded.deleted_ids.len(), 1);
             assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
         }
-    }
-
-    #[test]
-    fn test_read_path_bytes_working_tree_resolves_against_repo_root() {
-        // Create a temp dir that acts as the repo root, with a .jit subdir.
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // A name no process working directory holds, so a naive fs::read(path)
-        // relative to it would find nothing.
-        let file_name = "read-path-bytes-from-repository-root.md";
-        let expected = b"# Hello from repo root";
-        fs::write(repo_root.path().join(file_name), expected).unwrap();
-
-        // Build storage rooted at .jit (root = .jit dir, repo root = its parent).
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes(file_name, None);
-
-        let (bytes, label) =
-            result.expect("read_path_bytes should succeed even when CWD != repo root");
-        assert_eq!(bytes, expected, "file contents should match");
-        assert_eq!(label, "working-tree");
-    }
-
-    #[test]
-    fn test_read_path_bytes_missing_file_returns_not_found() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("does_not_exist.md", None);
-        assert!(
-            result.is_err(),
-            "reading a missing file should return an error"
-        );
-        assert!(
-            matches!(result.unwrap_err(), PathReadError::NotFound(_)),
-            "missing file should yield PathReadError::NotFound, not Other"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_empty_path() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "empty path must be rejected with InvalidPath"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_absolute_path() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes("/etc/passwd", None);
-        assert!(
-            matches!(result, Err(PathReadError::InvalidPath(_))),
-            "absolute path must be rejected with InvalidPath (both at working-tree and git-commit read paths)"
-        );
-    }
-
-    #[test]
-    fn test_read_path_bytes_rejects_dotdot_traversal() {
-        use crate::storage::PathReadError;
-
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        for bad in &["../etc/passwd", "a/../b", "foo/..", "a/../../b"] {
-            let result = storage.read_path_bytes(bad, None);
-            assert!(
-                matches!(result, Err(PathReadError::InvalidPath(_))),
-                "`..` traversal must be rejected with InvalidPath: {bad}"
-            );
-        }
-    }
-
-    /// Path validation must ALLOW legitimate filenames that contain `..` as
-    /// part of a segment (e.g. `foo..bar.txt`).  Only `..` as a *whole segment*
-    /// is forbidden — dots *inside* a segment are fine.  This is explicitly
-    /// called out in the issue acceptance criteria and protects against over-
-    /// zealous validators that reject filenames like `archive..2024.tar.gz`.
-    #[test]
-    fn test_read_path_bytes_allows_dots_inside_segment() {
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // Create the fixture file with `..` inside the segment name.
-        let expected = b"legitimate file contents";
-        fs::write(repo_root.path().join("foo..bar.txt"), expected).unwrap();
-        // Also cover a nested variant to be sure the segment-walker doesn't
-        // mis-classify a middle segment with embedded dots.
-        let nested_dir = repo_root.path().join("docs");
-        fs::create_dir_all(&nested_dir).unwrap();
-        fs::write(nested_dir.join("archive..2024.md"), expected).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let (bytes, label) = storage
-            .read_path_bytes("foo..bar.txt", None)
-            .expect("filename with dots INSIDE a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
-
-        let (bytes, label) = storage
-            .read_path_bytes("docs/archive..2024.md", None)
-            .expect("nested path with dots inside a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
     }
 
     #[cfg(unix)]

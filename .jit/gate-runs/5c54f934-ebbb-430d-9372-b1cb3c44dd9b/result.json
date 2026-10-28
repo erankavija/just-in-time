@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-2c9badcd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "265c5a05159e9f25a0e0689e4b8442481b6e6acd",
+  "completed_at": "2026-10-28T22:17:39.517269383Z",
+  "duration_ms": 199541,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/issue_store_conformance.rs",
+        "id": "F1",
+        "line": 662,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2c9badcd/requirement/REQ-01",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "The shared path-read case tests only errors, leaving InMemoryStorage's real-filesystem read instead of repository-image behavior undiscovered."
+      }
+    ],
+    "summary": "The conformance suite omits successful path-read behavior and therefore misses an in-memory backend divergence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2c9badcd-07b8-4489-9ca0-4ef70e5e6980",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5c54f934-ebbb-430d-9372-b1cb3c44dd9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:14:19.975689539Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8856 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-2c9badcd\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a18494-16ea-7711-ba62-7bd7e82beb35\n--------\nuser\n--- 8843 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7f0473a36, 1209740f3, 265c5a051\nPolicy sources: AGENTS.md\nResolved items: @/issue/2c9badcd/requirement/REQ-01 (.jit/issues/2c9badcd-07b8-4489-9ca0-4ef70e5e6980.json); @/invariant/shared-test-contracts (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review failed (exit 1, prior F1 superseded by cargo-ci)\nTruncation recovery: reread the conformance module, trait, backend implementations, and individual patches in bounded path and line ranges\n\n1. High — blocking, issue-impact: The conformance case for `read_path_bytes`/`read_path_text` tests only missing and invalid paths at [issue_store_conformance.rs:662](crates/jit/src/storage/issue_store_conformance.rs:662); it never reads a seeded working-tree file. Consequently it misses that `InMemoryStorage::read_path_bytes` still ignores its repository image and reads `root_path` from the real filesystem at [memory.rs:997](crates/jit/src/storage/memory.rs:997). A normal reader contract cannot pass identically across both backends, so hard REQ-01 is not met. References: `@/issue/2c9badcd/requirement/REQ-01`, `@/invariant/shared-test-contracts`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The conformance suite omits successful path-read behavior and therefore misses an in-memory backend divergence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shared path-read case tests only errors, leaving InMemoryStorage's real-filesystem read instead of repository-image behavior undiscovered.\",\"file\":\"crates/jit/src/storage/issue_store_conformance.rs\",\"line\":662,\"references\":[\"@/issue/2c9badcd/requirement/REQ-01\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
