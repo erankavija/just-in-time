@@ -738,7 +738,8 @@
     "f265e748": 2,
     "8acca4f4": 2,
     "10ae7776": 1,
-    "55043636": 1
+    "55043636": 1,
+    "2c9badcd": 1
   },
   "external_blockers": {
     "c780514e test-topology (led by just-in-time-4f)": [
@@ -1376,6 +1377,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "c780514e task taken over with user approval; conformance-suite design across both backends"
+    },
+    {
+      "issue": "2c9badcd",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "rework 1: code-review F1, in-memory working-tree path reads bypass the image"
     }
   ],
   "surfaced_pitfalls": [
