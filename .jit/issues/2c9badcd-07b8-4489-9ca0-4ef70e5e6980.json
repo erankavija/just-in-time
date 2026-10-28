@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "5c54f934-ebbb-430d-9372-b1cb3c44dd9b",
-      "status": "failed",
-      "updated_at": "2026-10-28T22:17:39.748174206Z",
+      "run_id": "952ac609-62f1-418c-83d8-248f3f34f191",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:28:37.123132868Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Shared IssueStore conformance suite runs against both backends",
-  "updated_at": "2026-10-28T22:25:09.439888394Z"
+  "updated_at": "2026-10-28T22:28:37.123132868Z"
 }
