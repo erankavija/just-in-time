@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c5158652-bcc3-4e5b-aea2-9bd90e4cb8e7",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:03:41.043472871Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3ca153c7-0ae8-4411-a11b-ee4c0940b422",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "fast_issue memory-backed tests use the shared seeding",
-  "updated_at": "2026-10-28T21:50:09.035395618Z"
+  "updated_at": "2026-10-28T23:03:41.043472871Z"
 }
