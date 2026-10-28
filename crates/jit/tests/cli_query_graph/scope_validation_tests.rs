@@ -12,6 +12,7 @@
 //! These are in-process tests over `CommandExecutor::validate_scope` (fast and
 //! deterministic); the exit-4 CLI contract is covered by a subprocess test.
 
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
@@ -148,36 +149,6 @@ labels = ["brackets:{container.short_id}"]
 depends_on = ["planning"]
 "#;
 
-/// Build an executor whose `.jit/rules.toml` holds exactly `rules_toml` and whose
-/// `.jit/templates.toml` declares an inline `plan` bracket, so the `--scope` walk
-/// halts at `type:breakdown` nodes. NO flat planning-config block is written: the
-/// boundary and breakable types come purely from the template registry.
-fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    executor_with_rules_and_templates(rules_toml, PLAN_TEMPLATE_INLINE)
-}
-
-/// Build an executor with explicit declaration files. The empty `config.toml`
-/// keeps the fixture compatible with closed-image validation capture; the
-/// boundary/breakable-types/doc-location are still derived entirely from the
-/// template registry.
-fn executor_with_rules_and_templates(
-    rules_toml: &str,
-    templates_toml: &str,
-) -> CommandExecutor<InMemoryStorage> {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage.add_data_file("config.toml", "");
-    storage.add_data_file("templates.toml", templates_toml);
-    storage.add_data_file("rules.toml", rules_toml);
-    let layout =
-        jit::storage::discover_repository_layout(storage.root().parent().unwrap(), storage.root())
-            .unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Seed an exact issue preimage into the in-memory aggregate, returning its id.
 /// The deterministic id [`seed`] assigns, so a child can name its container's
 /// short id before the container exists.
@@ -304,7 +275,14 @@ assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", cont
 
 #[test]
 fn test_rule_validation_uses_selected_issue_and_repository_context() {
-    let executor = executor_with_rules(SELECTED_RULE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(SELECTED_RULE),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (selected, _container) = selected_rule_fixture(&executor);
 
     // Keep an unrelated historical application and a rejected target in the
@@ -350,9 +328,16 @@ fn test_rule_validation_uses_selected_issue_and_repository_context() {
 
 #[test]
 fn test_rule_validation_selection_errors_are_non_vacuous() {
-    let executor = executor_with_rules(&format!(
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(&format!(
         "{SELECTED_RULE}\n[[rules]]\nname = \"disabled-rule\"\nwhen = {{ type = \"breakdown\" }}\nseverity = \"off\"\nenforce = false\nassert = {{ label-coverage = {{ }} }}\n"
-    ));
+    )),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (selected, _container) = selected_rule_fixture(&executor);
     let task = seed(&executor, "nonmatching task", &["type:task"], "", &[]);
 
@@ -383,7 +368,14 @@ fn test_rule_validation_selection_errors_are_non_vacuous() {
 
 #[test]
 fn test_rule_validation_reports_selected_container_errors_precisely() {
-    let executor = executor_with_rules(SELECTED_RULE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(SELECTED_RULE),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     let missing = seed(
         &executor,
@@ -431,7 +423,14 @@ fn test_rule_validation_reports_selected_container_errors_precisely() {
 
 #[test]
 fn test_rule_validation_resolves_rejected_selected_container() {
-    let executor = executor_with_rules(SELECTED_RULE);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(SELECTED_RULE),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (selected, container) = selected_rule_fixture(&executor);
     let mut rejected = executor.storage().load_issue(&container).unwrap();
     rejected.state = State::Rejected;
@@ -449,7 +448,14 @@ fn test_rule_validation_resolves_rejected_selected_container() {
 
 #[test]
 fn test_scope_fires_breakdown_rule_and_fails_on_uncovered_criterion() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -476,7 +482,14 @@ fn test_scope_fires_breakdown_rule_and_fails_on_uncovered_criterion() {
 
 #[test]
 fn test_scope_passes_when_criterion_is_covered() {
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, true);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -500,7 +513,14 @@ when = { type = "task" }
 severity = "error"
 assert = { label-uniqueness = { namespace = "key", scope = "all" } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     let b = seed(&executor, "breakdown", &["type:breakdown"], "", &[]);
     let t1 = seed(
@@ -548,7 +568,14 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { } }
 "#;
-    let executor = executor_with_rules(rules);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     let p = seed(
         &executor,
@@ -633,7 +660,14 @@ severity = "error"
 enforce = true
 assert = { label-coverage = { } }
 "#;
-    let executor = executor_with_rules_and_templates(rules, templates);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(rules),
+            templates: Some(templates),
+            ..Default::default()
+        },
+    );
 
     // P (planning) declares an uncovered criterion: it is BEYOND the boundary, so
     // its rule must not fire.
@@ -736,7 +770,14 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
     // recognized and B2's coverage is simply not the requested bracket — no false
     // missing-pointer finding. Before the fix, resolving `brackets:C2` against the
     // partial slice found nothing and raised a spurious `config error`.
-    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_VIA_BRACKETS),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
 
     // C2 lives OUTSIDE the scoped container's closure (unreachable from C1).
     let c2 = seed(
@@ -787,7 +828,14 @@ fn test_scope_dangling_brackets_pointer_still_fails_precisely() {
     // pointer names no issue ANYWHERE (not merely outside the slice) is a genuine
     // configuration error and must still fail with the precise finding. Full-index
     // resolution must not mask a truly dangling pointer.
-    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_VIA_BRACKETS),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let b1 = seed_breakdown_bracketing(&executor, "deadbeef", State::Done, &[]);
     let c1 = seed(
         &executor,
@@ -897,7 +945,14 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
     // satisfy it -> the engine must read the FILE and report it uncovered. This
     // is the failing-before-the-wiring case: with the resolver unwired the engine
     // reads the (criteria-free) body and the scope is spuriously clean.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let c = container_with_external_plan(&executor, false);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -918,7 +973,14 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
 fn test_scope_reads_criteria_from_external_plan_covered_clean() {
     // Same external-plan criterion, now satisfied by the child -> clean. Proves
     // the file content (not the empty body) drove coverage.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let c = container_with_external_plan(&executor, true);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -937,7 +999,14 @@ fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
     // planning node has NOT completed -> the plan is legitimately not authored
     // yet, so the boundary skips it rather than erroring. This is the
     // freshly-applied-bracket case: validate must stay clean before the plan exists.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
         &executor,
@@ -968,7 +1037,14 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
     // Once the bracket's planning node is `done`, the plan it references MUST
     // exist (downstream coverage reads it). A still-missing plan file then
     // surfaces as a contextual error rather than silently passing.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
 
     let c = seed(
         &executor,
@@ -1000,7 +1076,14 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
     // `dev/active/{id}-plan.md` default. Validate must read the criteria from the
     // re-linked path (proving the template path is not consulted at validation
     // time). The criterion there is uncovered, so the scope must fail naming it.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(&executor, "impl", &["type:task"], "", &[]);
     let c = seed(
         &executor,
@@ -1033,7 +1116,14 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     // The same re-linked archived plan, now with its criterion satisfied by the
     // child, leaves the scope clean — a moved/archived + re-linked plan keeps
     // `jit validate` green with no leniency.
-    let executor = executor_with_rules_and_templates(COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_EPIC),
+            templates: Some(PLAN_TEMPLATE_EXTERNAL),
+            ..Default::default()
+        },
+    );
     let impl_id = seed(
         &executor,
         "impl",
@@ -1072,7 +1162,14 @@ fn test_inline_template_still_validates_from_body() {
     // With a `plan` template whose planning node declares no `doc` (an inline
     // plan), the engine must keep reading the issue body: the empty plan-content
     // map reproduces the legacy behavior.
-    let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
+    let executor = memory_executor_declaring(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            rules: Some(COVERAGE_ON_BREAKDOWN),
+            templates: Some(PLAN_TEMPLATE_INLINE),
+            ..Default::default()
+        },
+    );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
     let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -1097,28 +1194,19 @@ mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
     use jit::domain::State;
-    use jit::storage::{IssueStore, JsonFileStorage};
+    use jit::storage::JsonFileStorage;
+    use jit::test_utils::setup_test_repo_with_config;
     use tempfile::TempDir;
 
-    /// Build a `JsonFileStorage`-backed executor rooted at `<tmp>/.jit`, with the
-    /// rule set and the external-`doc` `plan` template written into `.jit/` (NO
-    /// flat planning-config block: the doc location comes from the template registry).
-    /// Returns the temp dir (kept alive = the repo root) and the executor.
-    fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
-        jit::test_mode::enable();
-        let repo_root = jit::test_taxonomy::setup_test_repo_with_taxonomy().temp;
+    const CONFIG: &str =
+        "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n";
+
+    /// Declares the external-`doc` `plan` template and the coverage rule in
+    /// the repository's `.jit/` (the doc location comes from the template registry).
+    fn declare_external_plan(repo_root: &TempDir) {
         let jit_dir = repo_root.path().join(".jit");
-        std::fs::write(
-            jit_dir.join("config.toml"),
-            "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n",
-        )
-        .unwrap();
         std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        let layout =
-            jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
-        (repo_root, CommandExecutor::new(storage).with_layout(layout))
     }
 
     fn seed(
@@ -1185,7 +1273,8 @@ mod file_backed_external_plan {
         // `storage.root()` base dir the file under `.jit/dev/active` is absent, so
         // resolution errored (or the criterion was never seen) — this test FAILS
         // before the fix.
-        let (repo_root, executor) = executor();
+        let (repo_root, executor) = setup_test_repo_with_config(CONFIG).unwrap();
+        declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, false);
 
         let report = executor.validate_scope(&c).expect("scope validation runs");
@@ -1207,7 +1296,8 @@ mod file_backed_external_plan {
         // Same repo-root plan criterion, now satisfied by the child -> clean,
         // proving the file content (not the empty body) drove coverage AND that
         // the file was found at the repo root rather than under `.jit/`.
-        let (repo_root, executor) = executor();
+        let (repo_root, executor) = setup_test_repo_with_config(CONFIG).unwrap();
+        declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, true);
 
         let report = executor.validate_scope(&c).expect("scope validation runs");
