@@ -689,6 +689,38 @@ fn test_read_path_reports_a_missing_file_and_refuses_unsafe_paths<B: Backend>() 
     }
 }
 
+/// Working-tree reads only; see the module documentation.
+fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[
+        (
+            VirtualPath::worktree("docs/archive..2024.md").unwrap(),
+            "# Archive\n".to_string(),
+        ),
+        (VirtualPath::data("notes.md").unwrap(), "data".to_string()),
+    ]);
+    let store = &repository.store;
+
+    for (path, content) in [
+        ("docs/archive..2024.md", "# Archive\n"),
+        (".jit/notes.md", "data"),
+    ] {
+        assert_eq!(
+            store.read_path_bytes(path, None).unwrap(),
+            (content.as_bytes().to_vec(), "working-tree".to_string()),
+            "bytes of {path}"
+        );
+        assert_eq!(
+            store.read_path_text(path, None).unwrap(),
+            (content.to_string(), "working-tree".to_string()),
+            "text of {path}"
+        );
+    }
+    assert!(matches!(
+        store.read_path_bytes("docs", None),
+        Err(PathReadError::OutsideRepoRoot(_))
+    ));
+}
+
 /// Runs every case against every backend, one `#[test]` per pair, in a module
 /// named for the backend.
 macro_rules! conformance_suite {
@@ -729,5 +761,6 @@ conformance_suite!(
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
         test_gate_presets_list_and_get_the_declared_presets,
         test_read_path_reports_a_missing_file_and_refuses_unsafe_paths,
+        test_read_path_reads_a_seeded_file_and_refuses_a_directory,
     ]
 );

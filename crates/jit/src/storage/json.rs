@@ -2932,67 +2932,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_read_path_bytes_working_tree_resolves_against_repo_root() {
-        // Create a temp dir that acts as the repo root, with a .jit subdir.
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // A name no process working directory holds, so a naive fs::read(path)
-        // relative to it would find nothing.
-        let file_name = "read-path-bytes-from-repository-root.md";
-        let expected = b"# Hello from repo root";
-        fs::write(repo_root.path().join(file_name), expected).unwrap();
-
-        // Build storage rooted at .jit (root = .jit dir, repo root = its parent).
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let result = storage.read_path_bytes(file_name, None);
-
-        let (bytes, label) =
-            result.expect("read_path_bytes should succeed even when CWD != repo root");
-        assert_eq!(bytes, expected, "file contents should match");
-        assert_eq!(label, "working-tree");
-    }
-
-    /// Path validation must ALLOW legitimate filenames that contain `..` as
-    /// part of a segment (e.g. `foo..bar.txt`).  Only `..` as a *whole segment*
-    /// is forbidden — dots *inside* a segment are fine.  This is explicitly
-    /// called out in the issue acceptance criteria and protects against over-
-    /// zealous validators that reject filenames like `archive..2024.tar.gz`.
-    #[test]
-    fn test_read_path_bytes_allows_dots_inside_segment() {
-        let repo_root = TempDir::new().unwrap();
-        let jit_dir = repo_root.path().join(".jit");
-        fs::create_dir_all(&jit_dir).unwrap();
-
-        // Create the fixture file with `..` inside the segment name.
-        let expected = b"legitimate file contents";
-        fs::write(repo_root.path().join("foo..bar.txt"), expected).unwrap();
-        // Also cover a nested variant to be sure the segment-walker doesn't
-        // mis-classify a middle segment with embedded dots.
-        let nested_dir = repo_root.path().join("docs");
-        fs::create_dir_all(&nested_dir).unwrap();
-        fs::write(nested_dir.join("archive..2024.md"), expected).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        configure_test_layout(&storage, repo_root.path(), &jit_dir);
-
-        let (bytes, label) = storage
-            .read_path_bytes("foo..bar.txt", None)
-            .expect("filename with dots INSIDE a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
-
-        let (bytes, label) = storage
-            .read_path_bytes("docs/archive..2024.md", None)
-            .expect("nested path with dots inside a segment must be allowed");
-        assert_eq!(bytes, expected);
-        assert_eq!(label, "working-tree");
-    }
-
     #[cfg(unix)]
     #[test]
     fn test_read_path_bytes_accepts_symlink_inside_repo() {

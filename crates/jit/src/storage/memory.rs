@@ -966,47 +966,29 @@ impl IssueStore for InMemoryStorage {
     fn read_path_bytes(
         &self,
         path: &str,
-        _at_commit: Option<&str>,
+        at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        // InMemoryStorage has no filesystem or git backing of its own, but it
-        // must enforce the same repo-relative path contract as JsonFileStorage
-        // so that every IssueStore implementation uniformly rejects empty,
-        // absolute, or `..`-bearing paths.  Containment against a real repo
-        // root is not meaningful here (the synthetic root doesn't correspond
-        // to an on-disk directory), but the shape-level checks still apply.
-        if path.is_empty() {
-            return Err(PathReadError::InvalidPath(
-                "path must not be empty".to_string(),
-            ));
+        let vpath = self.repo_file_vpath(path)?;
+        if at_commit.is_some() {
+            // Commit-pinned reads have no image of their own yet, so they still
+            // read the synthetic root on disk.
+            return std::fs::read(self.root_path.join(path))
+                .map(|bytes| (bytes, "working-tree".to_string()))
+                .map_err(|e| match e.kind() {
+                    std::io::ErrorKind::NotFound => PathReadError::NotFound(path.to_string()),
+                    _ => PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e)),
+                });
         }
-        if path.starts_with('/') {
-            return Err(PathReadError::InvalidPath(format!(
-                "absolute paths are not permitted: {}",
-                path
-            )));
-        }
-        for segment in path.split('/') {
-            if segment == ".." {
-                return Err(PathReadError::InvalidPath(format!(
-                    "'..' segment not permitted: {}",
-                    path
-                )));
+        // A non-file entry is refused as the file backend's confined read
+        // refuses one.
+        match self.repository_state().entries.get(&vpath) {
+            Some(RepositoryEntry::File { content, .. }) => {
+                Ok((content.bytes().to_vec(), "working-tree".to_string()))
             }
+            None | Some(RepositoryEntry::Absent) => Err(PathReadError::NotFound(path.to_string())),
+            Some(_) => Err(PathReadError::OutsideRepoRoot(path.to_string())),
         }
-        // The InMemoryStorage root is a synthetic path and usually does not
-        // exist on disk, so reads will normally fail with NotFound.  Tests
-        // that need real file I/O use `JsonFileStorage` pointed at a tempdir.
-        let joined = self.root_path.join(path);
-        std::fs::read(&joined)
-            .map(|bytes| (bytes, "working-tree".to_string()))
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    PathReadError::NotFound(path.to_string())
-                } else {
-                    PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e))
-                }
-            })
     }
 }
 
