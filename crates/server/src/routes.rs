@@ -2648,7 +2648,6 @@ unique = false
 
     // ── GET /raw/*path integration tests ─────────────────────────────────────
 
-    /// Writes `content` at `rel_path` under `worktree`, creating parent directories.
     fn seed_worktree_file(worktree: &std::path::Path, rel_path: &str, content: &[u8]) {
         let path = worktree.join(rel_path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
