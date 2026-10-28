@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "041817be-7efd-41f0-bfd9-2e7d38c1c50c",
+      "run_id": "8bcf038b-d7f7-41b3-8744-39aeb5d37f71",
       "status": "passed",
-      "updated_at": "2026-10-28T23:15:42.790986199Z",
+      "updated_at": "2026-10-28T23:29:00.791523342Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "95787d44-08f5-4b80-bed6-b09a56dd19e8",
-      "status": "failed",
-      "updated_at": "2026-10-28T23:19:38.028625682Z",
+      "run_id": "6a1bf2cb-3af1-4af3-a61f-1b1eab311c45",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:30:14.787835051Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "profile tests read created ids from JSON output",
-  "updated_at": "2026-10-28T23:19:38.028625682Z"
+  "updated_at": "2026-10-28T23:30:14.787835051Z"
 }

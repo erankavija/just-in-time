@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1c8f644c-e6dd-4afe-bb7a-c1288f7556ca",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:29:47.517762400Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ce097844-5f62-4dce-bd75-2af8159f7920",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Projection-render tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-28T23:15:19.813006188Z"
+  "updated_at": "2026-10-28T23:29:47.517762400Z"
 }

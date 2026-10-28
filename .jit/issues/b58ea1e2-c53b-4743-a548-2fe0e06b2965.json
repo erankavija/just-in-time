@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c5950f6e-82a6-4ed0-b0c5-bd35fdb8b12b",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:29:28.067450970Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b58ea1e2-c53b-4743-a548-2fe0e06b2965",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Label and strategic executor tests keep one wiring case each",
-  "updated_at": "2026-10-28T23:15:19.365392420Z"
+  "updated_at": "2026-10-28T23:29:28.067450970Z"
 }
