@@ -1390,7 +1390,10 @@
     "f0bee761": 1,
     "26cbc32e": 1,
     "53d582ab": 1,
-    "f1c1acc8": 2
+    "f1c1acc8": 2,
+    "8f87e366": 2,
+    "e5166159": 1,
+    "c5c933f2": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2058,7 +2061,9 @@
     "fastseed-2-s4": "lead PASS cf8edf39c/60ef8b2ff/c1f2e248c/2745ee30e/5630d0e78 (Claude Opus): MemoryDeclarations.absent + memory_executor_wrapping; 2d342676,3ca153c7,f0bee761,5001b556 closed; 7208e568 code-review aef6aa40 F1/F2 -> lead fix 092b81b0b (rework 2 of 2)",
     "crw-docs-s4": "aadae7cd closed; 26cbc32e 198b66e7 F1 (in-process setup) -> lead fix 2e12ac4c3; closed",
     "trio-s4": "d7c26016 closed; 53d582ab 587b6e1c F1 -> lead deleted re-proof test 4de6a05be; f1c1acc8 a8a43598 F1 -> lead removed duplicate parity cases f5f49e6c3",
-    "f1c1acc8-r2-s4": "c93f8ccd F1 (cfg unix completeness) + F2 advisory: completeness test cfg(unix); parity file deleted (all cases owned by projection suite); 823834d34"
+    "f1c1acc8-r2-s4": "c93f8ccd F1 (cfg unix completeness) + F2 advisory: completeness test cfg(unix); parity file deleted (all cases owned by projection suite); 823834d34",
+    "exitcodes-s4": "e5166159 bea46484 F1 stale comment -> 779c18e3a; 8f87e366 6f18faf7/d3bd09d8 GATE_FAILED class -> 31261a8bb, f17c1c197; both closed",
+    "c5c933f2-s4": "42bdf5aea + lead 1d583ebf9 (one ALLOW_LINKED_WRITES); 19646106 F1 in-process test -> rework 1 (move to commands/mod.rs unit tests, Claude Sonnet slot B)"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2409,6 +2414,24 @@
       "issues": [
         "b58ea1e2",
         "ce097844"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "A branch worktree-agent-w4-owners",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "2916a306",
+        "9a313a88",
+        "55cd1ae4"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-c5c-rework",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "c5c933f2"
       ]
     }
   ],
