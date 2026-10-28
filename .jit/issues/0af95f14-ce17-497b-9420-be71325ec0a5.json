@@ -25,7 +25,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bf2a1405-b8f3-4580-88c0-a6f3245097e7",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:49:57.497993919Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0af95f14-ce17-497b-9420-be71325ec0a5",
   "labels": [
     "type:task",
@@ -40,5 +47,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Library unit tests take canonical issue ids from one fixture",
-  "updated_at": "2026-10-28T22:29:25.385916556Z"
+  "updated_at": "2026-10-28T22:49:57.497993919Z"
 }
