@@ -1389,6 +1389,13 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "contract change: Issue::draft takes IssueId; finalizer stops allocating issue ids (determinism-critical)"
+    },
+    {
+      "issue": "b73b3e5a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical suite id retyping with literal criteria"
     }
   ],
   "surfaced_pitfalls": [
