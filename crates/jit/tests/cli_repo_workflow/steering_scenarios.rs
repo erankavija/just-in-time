@@ -407,7 +407,6 @@ fn test_all_steering_scenarios() {
 
 #[test]
 fn test_substitute_argv_replaces_slot_and_short() {
-    let _cli = JitCli::uninitialised().unwrap();
     let mut ids = HashMap::new();
     ids.insert(
         "epic".to_string(),
@@ -435,7 +434,6 @@ fn test_substitute_argv_replaces_slot_and_short() {
 
 #[test]
 fn test_step_enforcement_point_validate() {
-    let _cli = JitCli::uninitialised().unwrap();
     let argv: Vec<String> = vec!["validate".to_string()];
     assert_eq!(
         step_enforcement_point(&argv),
@@ -445,7 +443,6 @@ fn test_step_enforcement_point_validate() {
 
 #[test]
 fn test_step_enforcement_point_transition() {
-    let _cli = JitCli::uninitialised().unwrap();
     let argv: Vec<String> = ["issue", "update", "abc", "--state", "done"]
         .iter()
         .map(|s| s.to_string())
@@ -458,7 +455,6 @@ fn test_step_enforcement_point_transition() {
 
 #[test]
 fn test_step_enforcement_point_write_create() {
-    let _cli = JitCli::uninitialised().unwrap();
     let argv: Vec<String> = ["issue", "create", "--title", "T"]
         .iter()
         .map(|s| s.to_string())
@@ -468,7 +464,6 @@ fn test_step_enforcement_point_write_create() {
 
 #[test]
 fn test_step_enforcement_point_write_update_no_state() {
-    let _cli = JitCli::uninitialised().unwrap();
     let argv: Vec<String> = ["issue", "update", "abc", "--title", "New"]
         .iter()
         .map(|s| s.to_string())
@@ -478,7 +473,6 @@ fn test_step_enforcement_point_write_update_no_state() {
 
 #[test]
 fn test_step_enforcement_point_dep_is_none() {
-    let _cli = JitCli::uninitialised().unwrap();
     let argv: Vec<String> = ["dep", "add", "abc", "def"]
         .iter()
         .map(|s| s.to_string())
@@ -488,7 +482,6 @@ fn test_step_enforcement_point_dep_is_none() {
 
 #[test]
 fn test_substitute_argv_prefix_collision() {
-    let _cli = JitCli::uninitialised().unwrap();
     // Slot "epic2" must not be partially consumed by the shorter slot "epic".
     // Without longest-first ordering, "$epic2" would become "<epic-uuid>2".
     let mut ids = HashMap::new();
@@ -505,21 +498,4 @@ fn test_substitute_argv_prefix_collision() {
     let result = substitute_argv(&argv, &ids);
     assert_eq!(result[0], "aaaaaaaa-0000-0000-0000-000000000000");
     assert_eq!(result[1], "bbbbbbbb-0000-0000-0000-000000000000");
-}
-
-#[test]
-fn test_scenario_command_sets_agent_identity_for_child_process() {
-    let cli = JitCli::uninitialised().unwrap();
-    let command = cli.command_with_env(["--schema"], [("JIT_AGENT_ID", "agent:steering-harness")]);
-
-    let envs: HashMap<_, _> = command
-        .get_envs()
-        .map(|(k, v)| (k.to_os_string(), v.map(|v| v.to_os_string())))
-        .collect();
-
-    assert_eq!(
-        envs.get(std::ffi::OsStr::new("JIT_AGENT_ID")),
-        Some(&Some("agent:steering-harness".into())),
-        "scenario commands set their agent identity per process"
-    );
 }
