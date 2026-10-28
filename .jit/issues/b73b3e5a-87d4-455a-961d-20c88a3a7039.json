@@ -16,7 +16,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "322d49cf-b86c-4b1e-8c43-72a089c1f38f",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:42:24.124763491Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b73b3e5a-87d4-455a-961d-20c88a3a7039",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_docs_templates suite carries typed canonical issue ids",
-  "updated_at": "2026-10-28T23:15:09.934469256Z"
+  "updated_at": "2026-10-28T23:42:24.124763491Z"
 }
