@@ -21236,3 +21236,4 @@
 {"from":"in_progress","id":"debf7b6c-eb68-4430-af9e-a40828db8ece","issue_id":"ce097844-5f62-4dce-bd75-2af8159f7920","timestamp":"2026-10-28T23:34:10.873834835Z","to":"done","type":"issue_state_changed"}
 {"id":"2622d92f-96a0-4d5f-9adb-2218db4f1564","issue_id":"ce097844-5f62-4dce-bd75-2af8159f7920","timestamp":"2026-10-28T23:34:10.873834835Z","type":"issue_completed"}
 {"from":"backlog","id":"1b4e0860-d673-41a6-bb7a-e635d57f3ff8","issue_id":"b45a2865-2fa4-44d4-a2ef-01e661d61486","timestamp":"2026-10-28T23:34:11.002772010Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"7dc0d394-e7fa-460a-9128-440bc12aa3e2","issue_id":"b45a2865-2fa4-44d4-a2ef-01e661d61486","timestamp":"2026-10-28T23:34:48.801656263Z","type":"issue_claimed"}
