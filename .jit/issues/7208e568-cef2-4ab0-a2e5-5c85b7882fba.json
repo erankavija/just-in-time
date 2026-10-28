@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:24.830185712Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -12,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2b21ac79-ee70-4008-a041-6cc6c3b19962",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:06:36.648635162Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "efb778d0-af25-44a7-a1f2-1664bd01bc3b",
+      "status": "failed",
+      "updated_at": "2026-10-28T22:08:38.840942164Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "profile tests read created ids from JSON output",
-  "updated_at": "2026-10-26T23:39:00.944179871Z"
+  "updated_at": "2026-10-28T22:08:38.840942164Z"
 }

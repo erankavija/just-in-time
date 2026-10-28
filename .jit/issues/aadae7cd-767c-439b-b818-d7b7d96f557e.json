@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:43.992011318Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "cli_repo_workflow in-process tests use the shared constructors",
-  "updated_at": "2026-10-26T23:39:01.035607306Z"
+  "updated_at": "2026-10-28T22:06:44.188846393Z"
 }
