@@ -741,14 +741,7 @@
     "55043636": 1,
     "2c9badcd": 1
   },
-  "external_blockers": {
-    "c780514e test-topology (led by just-in-time-4f)": [
-      "0af95f14 waits only on 2c9badcd (<- e2eb8862 <- 64f04da6, 4f slot B)",
-      "5fac48b8 waits on 0af95f14 plus 529f621d, 5a93e443, 9e411075, 2cbe3ed8, 4b5b8f4a, 8da3f7f5",
-      "13190465, 19d9bd7d, b45a2865, b73b3e5a follow 0af95f14",
-      "c797b59b -> 7abcc22d and 641bd14e follow 5fac48b8"
-    ]
-  },
+  "external_blockers": "19d9bd7d waits on c780514e 3f01cb72, 6a13eeac, 8f87e366; 13190465 on 3ca153c7, 53d582ab; b45a2865 on b58ea1e2, ce097844; b73b3e5a on f0bee761 (just-in-time-4f).",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
   "dispatch_log": [
     {
@@ -1499,6 +1492,7 @@
       "merge": "7aa7ed622"
     },
     "e2eb8862 (landed d273d0962, closed 8b9fccb1d)",
-    "2c9badcd (landed 8b1d10d66 after rework 1)"
+    "2c9badcd (landed 8b1d10d66 after rework 1)",
+    "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)"
   ]
 }
