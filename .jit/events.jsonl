@@ -21177,3 +21177,4 @@
 {"gate_key":"code-review","id":"7258318c-8568-4cae-9139-b1e7dffef966","issue_id":"f1c1acc8-4440-409d-9a8b-e2fa070befc2","timestamp":"2026-10-28T23:12:03.228883332Z","type":"gate_failed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"aea8def7-f52c-4a55-a61e-46d173d4a704","issue_id":"d7c26016-7b28-497e-89ce-061e252cbf26","timestamp":"2026-10-28T23:14:28.723882253Z","to":"done","type":"issue_state_changed"}
 {"id":"4422bc8f-a671-468c-ba7e-505c45b1eadf","issue_id":"d7c26016-7b28-497e-89ce-061e252cbf26","timestamp":"2026-10-28T23:14:28.723882253Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"8ff07f1f-30d8-4f78-8842-a5c64189ea4a","issue_id":"b73b3e5a-87d4-455a-961d-20c88a3a7039","timestamp":"2026-10-28T23:15:09.934469256Z","type":"issue_claimed"}
