@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T22:52:20.605547221Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "198b66e7-8223-405b-8d20-aa0b8ee789f3",
+      "status": "failed",
+      "updated_at": "2026-10-28T22:56:54.096609803Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "26cbc32e-975d-472c-8d5c-27689577b253",
@@ -36,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "document and archive tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-28T22:52:20.605547221Z"
+  "updated_at": "2026-10-28T22:56:54.096609803Z"
 }
