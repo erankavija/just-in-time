@@ -603,18 +603,12 @@ mod sdd_criteria_label_match {
 
 mod sdd_lifecycle {
     use super::*;
-    use jit::commands::test_helpers::memory_executor;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::errors::TransitionBlockedError;
     use jit::storage::{InMemoryStorage, IssueStore};
 
-    /// Seed the SDD example ruleset and its schemas from disk into `storage`
-    /// so the executor over it picks them up as the operative set.
-    fn seed_sdd_example(storage: &InMemoryStorage) {
+    fn seed_sdd_schemas(storage: &InMemoryStorage) {
         let sdd_dir = example_dir("sdd");
-        storage.add_data_file(
-            "rules.toml",
-            &std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap(),
-        );
         for entry in std::fs::read_dir(sdd_dir.join("schemas")).unwrap() {
             let entry = entry.unwrap();
             storage.add_data_file(
@@ -677,17 +671,21 @@ mod sdd_lifecycle {
     // the executor must be blocked with TransitionBlockedError (exit 4).
     #[test]
     fn test_sdd_premature_done_blocked_by_coverage_rule() {
-        let storage = InMemoryStorage::new();
-        seed_sdd_example(&storage);
-        let executor = memory_executor(storage);
-
-        // Seed an epic with a well-formed spec body and req:REQ-01, but NO child
-        // that satisfies it. The epic is in-progress.
+        let rules_toml = std::fs::read_to_string(example_dir("sdd").join("rules.toml")).unwrap();
         let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
+        let storage = InMemoryStorage::new();
+        seed_sdd_schemas(&storage);
+        jit::test_harness::seed_memory_issue(&storage, &epic);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(&rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Attempt to transition to done: must be blocked.
         let result = executor.issues().update_issue(
@@ -780,18 +778,12 @@ mod sdd_lifecycle {
     // must be able to transition to done without being blocked.
     #[test]
     fn test_sdd_happy_path_done_transition_succeeds() {
-        let storage = InMemoryStorage::new();
-        seed_sdd_example(&storage);
-        let executor = memory_executor(storage);
-
-        // Seed the epic.
+        let rules_toml = std::fs::read_to_string(example_dir("sdd").join("rules.toml")).unwrap();
         let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
 
-        // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
         child.labels = vec![
             "type:task".to_string(),
@@ -799,7 +791,18 @@ mod sdd_lifecycle {
         ];
         child.state = State::Done;
         let child_id = child.id.clone();
-        jit::test_harness::seed_memory_issue(executor.storage(), &child);
+
+        let storage = InMemoryStorage::new();
+        seed_sdd_schemas(&storage);
+        jit::test_harness::seed_memory_issue(&storage, &epic);
+        jit::test_harness::seed_memory_issue(&storage, &child);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                rules: Some(&rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
         // Wire containment: the epic depends on its child.
         executor.add_dependency(&epic_id, &child_id).unwrap();
 

@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bb9916be-4f91-4514-806f-1651181ecc3e",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:07:24.721110079Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "587b6e1c-c333-45f0-8a7c-42907d753b76",
+      "status": "failed",
+      "updated_at": "2026-10-28T23:08:59.852381743Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "53d582ab-f36d-4ed0-a8e2-7fa902717c9a",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Lifecycle harness tests stop re-proving the auto-transition cascade",
-  "updated_at": "2026-10-28T22:57:01.157060082Z"
+  "updated_at": "2026-10-28T23:08:59.852381743Z"
 }

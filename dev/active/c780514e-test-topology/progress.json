@@ -1379,9 +1379,12 @@
     "b7078f0d": 2,
     "4b5b8f4a": 1,
     "5001b556": 1,
-    "7208e568": 1,
+    "7208e568": 2,
     "2d342676": 1,
-    "f0bee761": 1
+    "f0bee761": 1,
+    "26cbc32e": 1,
+    "53d582ab": 1,
+    "f1c1acc8": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2044,7 +2047,10 @@
     "173d98d5-r1-s4": "lead rework 7985a3918 applied on cherry-pick ff3755054; cli_repo_workflow 408/408; landing",
     "ids-from-json-s4": "6bd02fa4,c211f14c,c6cd250d,b305e55e,6a5de806,a057a4f5,b0fa5e5d already met by earlier migrations; gates pass; closed. 5001b556 (880f01fb F1) and 7208e568 (efb778d0 F1) fail -> rework 1 in brief-G",
     "4b5b8f4a-s4": "lead rework b6456de73 after 1906ca79 F1; gates pass; closed",
-    "fastseed-s4": "Codex partial: 3ca153c7 complete; 2d342676/f0bee761 gaps -> fixture extension (brief-G, Claude Opus)"
+    "fastseed-s4": "Codex partial: 3ca153c7 complete; 2d342676/f0bee761 gaps -> fixture extension (brief-G, Claude Opus)",
+    "fastseed-2-s4": "lead PASS cf8edf39c/60ef8b2ff/c1f2e248c/2745ee30e/5630d0e78 (Claude Opus): MemoryDeclarations.absent + memory_executor_wrapping; 2d342676,3ca153c7,f0bee761,5001b556 closed; 7208e568 code-review aef6aa40 F1/F2 -> lead fix 092b81b0b (rework 2 of 2)",
+    "crw-docs-s4": "aadae7cd closed; 26cbc32e 198b66e7 F1 (in-process setup) -> lead fix 2e12ac4c3; closed",
+    "trio-s4": "d7c26016 closed; 53d582ab 587b6e1c F1 -> lead deleted re-proof test 4de6a05be; f1c1acc8 a8a43598 F1 -> lead removed duplicate parity cases f5f49e6c3"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2377,6 +2383,25 @@
         "7208e568"
       ],
       "reason": "shared fixture extension + reworks"
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-trio",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "53d582ab",
+        "d7c26016",
+        "f1c1acc8"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "A branch worktree-agent-w4-rulesowners",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "b58ea1e2",
+        "ce097844"
+      ]
     }
   ],
   "checkpoint": {

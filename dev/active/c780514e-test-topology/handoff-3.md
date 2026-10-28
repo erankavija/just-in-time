@@ -89,3 +89,21 @@ None.
   - `brief-adopt-common.md` (in-memory/file-backed adoption template), `batch-template.md` (CLI spawn migrations).
 - Peer handoff: `dev/active/2195c98f-semantic-types/handoff-3.md`.
 - Shared fixtures: `crates/jit/src/commands/test_helpers.rs`, `crates/jit/src/test_utils.rs`, `crates/jit/src/test_cli.rs`, `crates/jit/src/test_taxonomy.rs`, `dev/TESTING.md`.
+
+## Addendum (later in session 4)
+
+- Closed since the handoff above: 173d98d5, 4b5b8f4a, 5a93e443, 9e411075, ca5eb7ee, 2cbe3ed8, 6bd02fa4, c211f14c, c6cd250d, b305e55e, 6a5de806, a057a4f5, b0fa5e5d, 26cbc32e, aadae7cd, 2d342676, 3ca153c7, f0bee761, 5001b556, d7c26016.
+- Seven of the "read created ids from JSON output" tasks were already satisfied by earlier spawn migrations. Gates passed with no change; close those on gates when criteria verify.
+- The shared fixture now also has `MemoryDeclarations.absent: &[VirtualPath]` and `memory_executor_wrapping(storage, declarations, wrap)` for failure-injection wrapper stores (user decision).
+- c2 completed 0af95f14 and is running 5fac48b8 plus its retyping wave (13190465, b45a2865, b73b3e5a, 19d9bd7d). Its remaining waits on this epic:
+  - 53d582ab (for 13190465);
+  - b58ea1e2 and ce097844 (for b45a2865);
+  - 3f01cb72, 6a13eeac, 8f87e366 (for 19d9bd7d), which wait on 168a9c16, 966d0627, e5166159, f1c1acc8, 56eec47b and c5c933f2.
+  Message `just-in-time-c2` as each completes.
+- In flight at this addendum:
+  - Re-gating 7208e568, 53d582ab and f1c1acc8 after lead fixes. 7208e568 is at rework 2 of 2, so another failure escalates.
+  - Slot A: Claude Sonnet on `worktree-agent-w4-rulesowners` (b58ea1e2, ce097844).
+  - Slot B: free. Next for it: 56eec47b and c5c933f2 (ready; upstream of 966d0627 → 6a13eeac).
+- Traps added:
+  - Code review counts `setup_test_repo_with_config` wrapped in `JitCli::with_repository` as in-process setup in CLI spawn migrations. Use `JitCli::with_repository(declaration_dir(..))` plus `cli.run(["init", "--json"])`.
+  - A test left asserting only what holds before its action fails review. Delete a re-proof whose sole distinct property moved elsewhere.

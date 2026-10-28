@@ -7,45 +7,8 @@
 //! ruleset, selects graph-scope rules, runs them over the store's issues, and
 //! folds error-severity findings into validation failure.
 
-use jit::commands::CommandExecutor;
-use jit::storage::{InMemoryStorage, IssueStore};
-
-/// Build a fresh in-memory store whose on-disk root (used only for `rules.toml`)
-/// holds the supplied rules file contents.
-fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    let config: jit::config::JitConfig = toml::from_str("").unwrap();
-    let namespaces = jit::config_manager::namespaces_from_config(&config);
-    let defaults = jit::repository_state::serialize_ruleset(
-        &jit::repository_state::default_ruleset(&namespaces),
-    )
-    .unwrap();
-    let rules = format!("{}{}", defaults.rules_toml, rules_toml);
-    std::fs::write(storage.root().join("rules.toml"), &rules).unwrap();
-    storage.add_data_file("rules.toml", &rules);
-    for schema in defaults.schema_files {
-        storage.add_data_file(format!("schemas/{}", schema.name), &schema.content);
-    }
-    storage.add_data_file("config.toml", "");
-    storage
-}
-
-fn executor_for(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    let mut ids = storage
-        .list_issues()
-        .unwrap()
-        .into_iter()
-        .map(|issue| issue.id)
-        .collect::<Vec<_>>();
-    ids.sort();
-    storage.add_data_file(
-        "index.json",
-        &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []}).to_string(),
-    );
-    jit::commands::test_helpers::memory_executor(storage)
-}
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+use jit::storage::InMemoryStorage;
 
 /// A `dependency-shape` graph rule: every `type:task` must depend on a
 /// `type:story`. Error severity.
@@ -59,8 +22,6 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
 
 #[test]
 fn test_validate_fails_on_error_severity_graph_rule_violation() {
-    let storage = store_with_rules(SHAPE_RULES);
-
     // A story exists, and a task that does NOT depend on it -> violation.
     let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
@@ -70,10 +31,19 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     // check, so make the story depend on the task. This does NOT satisfy the
     // shape rule (which requires task -> story), so the graph rule still fires.
     story.dependencies = vec![task.id.clone()];
+    let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &story);
     jit::test_harness::seed_memory_issue(&storage, &task);
 
-    let executor = executor_for(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(SHAPE_RULES),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.validate_silent();
 
     assert!(
@@ -93,18 +63,25 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
 
 #[test]
 fn test_validate_passes_when_graph_rule_is_satisfied() {
-    let storage = store_with_rules(SHAPE_RULES);
-
     // The task DOES depend on the story -> rule satisfied.
     let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     task.dependencies = vec![story.id.clone()];
+    let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &story);
     jit::test_harness::seed_memory_issue(&storage, &task);
 
-    let executor = executor_for(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(SHAPE_RULES),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.validate_silent();
 
     assert!(
@@ -123,17 +100,24 @@ when = { type = "task" }
 severity = "warn"
 assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
 "#;
-    let storage = store_with_rules(warn_rules);
-
     let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     story.dependencies = vec![task.id.clone()]; // connect, but don't satisfy rule
+    let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &story);
     jit::test_harness::seed_memory_issue(&storage, &task);
 
-    let executor = executor_for(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(warn_rules),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.validate_silent();
 
     assert!(
@@ -152,8 +136,6 @@ when = { type = "epic" }
 severity = "error"
 assert = { label-coverage = { } }
 "#;
-    let storage = store_with_rules(coverage_rules);
-
     let mut epic = crate::fixture_issue(
         "epic".to_string(),
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n".to_string(),
@@ -163,10 +145,19 @@ assert = { label-coverage = { } }
     let mut child = crate::fixture_issue("child".to_string(), String::new());
     child.labels = vec!["type:task".to_string()];
     child.dependencies = vec![epic.id.clone()];
+    let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &epic);
     jit::test_harness::seed_memory_issue(&storage, &child);
 
-    let executor = executor_for(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(coverage_rules),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.validate_silent();
 
     assert!(
@@ -191,20 +182,23 @@ when = { type = "epic" }
 severity = "error"
 assert = { label-coverage = { child-link = "bogus" } }
 "#;
-    let storage = store_with_rules("");
-
     let mut epic = crate::fixture_issue(
         "epic".to_string(),
         "## Success Criteria\n\n- [hard] REQ-01: x\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
+    let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &epic);
 
-    let executor = executor_for(storage.clone());
-    // Initialization refuses a malformed registry, so the
-    // malformed rule is declared over the initialized repository.
-    let rules = storage.read_repo_file(".jit/rules.toml").unwrap().unwrap();
-    storage.add_data_file("rules.toml", &format!("{rules}{bad_rules}"));
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            config: Some(""),
+            rules: Some(bad_rules),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+    );
     let result = executor.validate_silent();
 
     assert!(result.is_err(), "rule load error must fail validation");

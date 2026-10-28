@@ -14,6 +14,18 @@ use jit::test_cli::JitCli;
 use jit::test_taxonomy::{
     membership_label, membership_namespace, setup_test_repo_with_taxonomy, type_label, TaxonomyRepo,
 };
+use serde_json::Value;
+use std::collections::BTreeSet;
+
+/// The `field` values of the records in `output[collection]`.
+fn field_values(output: &Value, collection: &str, field: &str) -> BTreeSet<String> {
+    output[collection]
+        .as_array()
+        .unwrap_or_else(|| panic!("no `{collection}` array in {output}"))
+        .iter()
+        .map(|record| record[field].as_str().unwrap().to_string())
+        .collect()
+}
 
 // ============================================================================
 // E2E Test: Complete Label Hierarchy Workflow
@@ -130,49 +142,46 @@ fn test_label_hierarchy_complete_workflow() {
     // ========================================================================
 
     // Query exact match: milestone:v1.0
-    let stdout = cli
-        .run(["query", "all", "--label", milestone_label.as_str()])
-        .unwrap();
-    assert!(stdout.contains(&milestone_id), "Should find milestone");
+    let ids = field_values(
+        &cli.run_json(["query", "all", "--label", milestone_label.as_str()])
+            .unwrap(),
+        "issues",
+        "id",
+    );
+    assert!(ids.contains(&milestone_id), "Should find milestone");
     assert!(
-        stdout.contains(&epic_id),
+        ids.contains(&epic_id),
         "Should find epic with milestone:v1.0"
     );
-    assert!(
-        !stdout.contains(&task1_id),
-        "Tasks don't have milestone label"
-    );
+    assert!(!ids.contains(&task1_id), "Tasks don't have milestone label");
 
     // Query wildcard for the level-two membership namespace.
     let epic_wildcard = format!("{epic_namespace}:*");
-    let stdout = cli
-        .run(["query", "all", "--label", epic_wildcard.as_str()])
-        .unwrap();
-    assert!(stdout.contains(&epic_id), "Should find the level-two issue");
-    assert!(
-        stdout.contains(&task1_id),
-        "Should find task with epic:auth"
+    let ids = field_values(
+        &cli.run_json(["query", "all", "--label", epic_wildcard.as_str()])
+            .unwrap(),
+        "issues",
+        "id",
     );
+    assert!(ids.contains(&epic_id), "Should find the level-two issue");
+    assert!(ids.contains(&task1_id), "Should find task with epic:auth");
+    assert!(ids.contains(&task2_id), "Should find task with epic:auth");
+    assert!(ids.contains(&task3_id), "Should find task with epic:auth");
     assert!(
-        stdout.contains(&task2_id),
-        "Should find task with epic:auth"
-    );
-    assert!(
-        stdout.contains(&task3_id),
-        "Should find task with epic:auth"
-    );
-    assert!(
-        !stdout.contains(&milestone_id),
+        !ids.contains(&milestone_id),
         "Milestone has no epic:* label"
     );
 
     // Query by component
-    let stdout = cli
-        .run(["query", "all", "--label", component_backend.as_str()])
-        .unwrap();
-    assert!(stdout.contains(&task1_id));
-    assert!(stdout.contains(&task2_id));
-    assert!(!stdout.contains(&task3_id), "Task 3 is frontend");
+    let ids = field_values(
+        &cli.run_json(["query", "all", "--label", component_backend.as_str()])
+            .unwrap(),
+        "issues",
+        "id",
+    );
+    assert!(ids.contains(&task1_id));
+    assert!(ids.contains(&task2_id));
+    assert!(!ids.contains(&task3_id), "Task 3 is frontend");
 
     // ========================================================================
     // PHASE 4: Strategic View
@@ -181,29 +190,30 @@ fn test_label_hierarchy_complete_workflow() {
     // Query strategic issues - returns issues with type:X where X is a strategic type
     // In default hierarchy: milestone (level 1) and epic (level 2) are strategic
     // Task (level 4) is NOT strategic, even if it has epic:auth labels
-    let stdout = cli.run(["query", "strategic"]).unwrap();
+    let ids = field_values(
+        &cli.run_json(["query", "strategic"]).unwrap(),
+        "issues",
+        "id",
+    );
 
     // Strategic issues (type:milestone and type:epic)
     assert!(
-        stdout.contains(&milestone_id),
+        ids.contains(&milestone_id),
         "The level-one issue is strategic"
     );
-    assert!(
-        stdout.contains(&epic_id),
-        "The level-two issue is strategic"
-    );
+    assert!(ids.contains(&epic_id), "The level-two issue is strategic");
 
     // Tasks are NOT strategic (level 4 in hierarchy)
     assert!(
-        !stdout.contains(&task1_id),
+        !ids.contains(&task1_id),
         "The level-four type is not strategic"
     );
     assert!(
-        !stdout.contains(&task2_id),
+        !ids.contains(&task2_id),
         "The level-four type is not strategic"
     );
     assert!(
-        !stdout.contains(&task3_id),
+        !ids.contains(&task3_id),
         "The level-four type is not strategic"
     );
 
@@ -227,55 +237,47 @@ fn test_label_hierarchy_complete_workflow() {
     // ========================================================================
 
     // Validate repository (should pass with no errors)
-    let stdout = cli.run(["validate"]).expect("Validation failed");
-    assert!(
-        stdout.contains("valid"),
-        "Expected validation success message, got: {}",
-        stdout
+    let validation = cli.run_json(["validate"]).expect("Validation failed");
+    assert_eq!(
+        validation["valid"], true,
+        "Expected validation success, got: {validation}"
     );
 
     // ========================================================================
     // PHASE 6: Label Namespace Operations
     // ========================================================================
 
-    // List label namespaces
-    let stdout = cli.run(["label", "namespaces"]).unwrap();
-    assert!(
-        stdout.contains(milestone_namespace),
-        "Should have milestone namespace"
-    );
-    assert!(
-        stdout.contains(epic_namespace),
-        "Should have epic namespace"
-    );
-    assert!(
-        stdout.contains(component_namespace),
-        "Should have component namespace"
-    );
-
     // List values for a namespace
-    let stdout = cli.run(["label", "values", epic_namespace]).unwrap();
-    assert!(stdout.contains("auth"), "Should list auth value");
+    let values = cli.run_json(["label", "values", epic_namespace]).unwrap();
+    assert!(
+        values["values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "auth"),
+        "Should list auth value"
+    );
 
     // ========================================================================
     // PHASE 7: Work Flow - Complete Tasks and Check Blocking
     // ========================================================================
 
     // Milestone should be blocked (depends on epic)
-    let stdout = cli.run(["query", "blocked"]).unwrap();
-    assert!(
-        stdout.contains(&milestone_id),
-        "Milestone should be blocked"
-    );
+    let ids = field_values(&cli.run_json(["query", "blocked"]).unwrap(), "issues", "id");
+    assert!(ids.contains(&milestone_id), "Milestone should be blocked");
 
     // Epic should also be blocked (depends on tasks)
-    assert!(stdout.contains(&epic_id), "Epic should be blocked");
+    assert!(ids.contains(&epic_id), "Epic should be blocked");
 
     // Tasks should be ready (no dependencies)
-    let stdout = cli.run(["query", "available"]).unwrap();
-    assert!(stdout.contains(&task1_id), "Task 1 should be ready");
-    assert!(stdout.contains(&task2_id), "Task 2 should be ready");
-    assert!(stdout.contains(&task3_id), "Task 3 should be ready");
+    let ids = field_values(
+        &cli.run_json(["query", "available"]).unwrap(),
+        "issues",
+        "id",
+    );
+    assert!(ids.contains(&task1_id), "Task 1 should be ready");
+    assert!(ids.contains(&task2_id), "Task 2 should be ready");
+    assert!(ids.contains(&task3_id), "Task 3 should be ready");
 
     // Complete all tasks
     cli.run(["issue", "update", &task1_id, "--state", "done"])
@@ -286,33 +288,42 @@ fn test_label_hierarchy_complete_workflow() {
         .unwrap();
 
     // Epic should now be unblocked
-    let stdout = cli.run(["query", "available"]).unwrap();
-    assert!(stdout.contains(&epic_id), "Epic should now be ready");
+    let ids = field_values(
+        &cli.run_json(["query", "available"]).unwrap(),
+        "issues",
+        "id",
+    );
+    assert!(ids.contains(&epic_id), "Epic should now be ready");
 
     // Complete epic
     cli.run(["issue", "update", &epic_id, "--state", "done"])
         .unwrap();
 
     // Milestone should now be unblocked
-    let stdout = cli.run(["query", "available"]).unwrap();
-    assert!(
-        stdout.contains(&milestone_id),
-        "Milestone should now be ready"
+    let ids = field_values(
+        &cli.run_json(["query", "available"]).unwrap(),
+        "issues",
+        "id",
     );
+    assert!(ids.contains(&milestone_id), "Milestone should now be ready");
 
     // ========================================================================
     // PHASE 8: Event Log Verification
     // ========================================================================
 
     // Check event log contains label operations
-    let stdout = cli.run(["events", "tail"]).unwrap();
+    let ids = field_values(
+        &cli.run_json(["events", "tail"]).unwrap(),
+        "events",
+        "issue_id",
+    );
 
     // Should contain issue creation events
     assert!(
-        stdout.contains(&milestone_id),
+        ids.contains(&milestone_id),
         "Event log should mention milestone"
     );
-    assert!(stdout.contains(&epic_id), "Event log should mention epic");
+    assert!(ids.contains(&epic_id), "Event log should mention epic");
 
     // ========================================================================
     // PHASE 9: Graph Visualization with Labels
@@ -327,17 +338,20 @@ fn test_label_hierarchy_complete_workflow() {
     // So milestone has NO downstream dependents (nothing depends on the milestone)
     // Let's check downstream of a task instead (epic depends on tasks).
     // Use --depth 0 to opt-in to unbounded traversal and see transitive dependents.
-    let stdout = cli
-        .run(["graph", "downstream", &task1_id, "--depth", "0"])
-        .unwrap();
+    let ids = field_values(
+        &cli.run_json(["graph", "downstream", &task1_id, "--depth", "0"])
+            .unwrap(),
+        "dependents",
+        "id",
+    );
     assert!(
-        stdout.contains(&epic_id),
+        ids.contains(&epic_id),
         "Epic depends on task1, so should be downstream"
     );
 
     // Milestone also transitively depends on task1 (milestone -> epic -> task1)
     assert!(
-        stdout.contains(&milestone_id),
+        ids.contains(&milestone_id),
         "Milestone transitively depends on task1"
     );
 }

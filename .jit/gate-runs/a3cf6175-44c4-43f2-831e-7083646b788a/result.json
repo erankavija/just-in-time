@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3558721b078d7b4e778c128e047fe48b813bbf96",
+  "completed_at": "2026-10-28T23:07:02.600553616Z",
+  "duration_ms": 200144,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable shared-seeding migration satisfies the issue's hard criteria with no unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3ca153c7-0ae8-4411-a11b-ee4c0940b422",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a3cf6175-44c4-43f2-831e-7083646b788a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:03:42.455769950Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b04dbed84, 3558721b0 (jit:3ca153c7)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-06 (issue description)\nGate evidence: cargo-ci passed at 2026-10-28T23:03:41Z; exit code unavailable\nTruncation recovery: re-read each affected commit patch by path, the merge helper patch, and current transition test in bounded line ranges\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable shared-seeding migration satisfies the issue's hard criteria with no unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
