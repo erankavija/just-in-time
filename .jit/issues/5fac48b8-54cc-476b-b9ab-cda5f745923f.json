@@ -23,7 +23,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f32b0af7-c597-4c83-b48d-605fb916a448",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:23:00.822066236Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
   "labels": [
     "type:task",
@@ -38,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Issue drafts carry their pre-derived identifier",
-  "updated_at": "2026-10-28T22:56:07.397820035Z"
+  "updated_at": "2026-10-28T23:23:00.822066236Z"
 }
