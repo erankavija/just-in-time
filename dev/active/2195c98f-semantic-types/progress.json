@@ -1415,6 +1415,12 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "mechanical suite id retyping with literal criteria"
+    },
+    {
+      "issue": "13190465",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "mechanical fast_issue suite id retyping"
     }
   ],
   "surfaced_pitfalls": [
