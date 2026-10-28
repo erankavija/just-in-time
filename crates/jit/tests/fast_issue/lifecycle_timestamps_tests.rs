@@ -24,38 +24,6 @@ fn test_create_dependency_free_issue_stamps_first_ready() {
     assert!(issue.done_at.is_none());
 }
 
-/// A dependent promoted through the chokepoint carries `first_ready_at`.
-///
-/// (A harness-created issue is dependency-free and therefore born Ready — hence
-/// already stamped — before `add_dependency` reverts it to Backlog; the
-/// first-occurrence chokepoint stamp is exercised precisely by
-/// `test_backlog_to_ready_transition_stamps_first_ready` below.)
-#[test]
-fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
-    let h = TestHarness::new();
-    let dep = h.create_issue("Dependency");
-    let blocked = h.create_issue("Blocked");
-    h.executor.add_dependency(&blocked, &dep).unwrap();
-
-    h.executor
-        .issues()
-        .update_issue(
-            &dep,
-            None,
-            None,
-            None,
-            Some(State::Done),
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    assert!(h.get_issue(&blocked).first_ready_at.is_some());
-}
-
 /// A precise chokepoint check: an issue that has NEVER been Ready (forced into
 /// Backlog with the stamp cleared) gets `first_ready_at` set the first time
 /// `update_issue_state` lands it in Ready.
