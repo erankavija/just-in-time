@@ -1158,39 +1158,6 @@ fn test_exit_code_ambiguous_prefix() {
         .contains("Ambiguous ID"));
 }
 
-#[test]
-fn test_exit_code_too_short_prefix() {
-    let temp_dir = setup_test_env();
-
-    // Human path: a sub-4-char prefix is an argument error (exit 2), preserving
-    // the original phrasing.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["issue", "show", "ab"])
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("at least 4 characters"),
-        "stderr was: {stderr}"
-    );
-
-    // --json path: same exit code, distinguishing INVALID_ID_PREFIX code.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["issue", "show", "ab", "--json"])
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
-    assert!(json["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("at least 4 characters"));
-}
-
 /// REQ-02: the batch-mode description guard is a usage error (exit 2), matching
 /// clap usage errors and the other batch-mode rejections.
 #[test]

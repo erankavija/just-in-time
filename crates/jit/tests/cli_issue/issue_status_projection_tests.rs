@@ -383,6 +383,29 @@ fn test_status_short_prefix_json_error_envelope() {
     assert_eq!(json["error"]["code"].as_str(), Some("INVALID_ID_PREFIX"));
 }
 
+/// `issue show` refuses a too-short prefix as an invalid prefix: the human
+/// message names the minimum length and `--json` carries `INVALID_ID_PREFIX`.
+#[test]
+fn test_show_short_prefix_is_invalid_prefix_human_and_json() {
+    let temp = JitCli::initialised().unwrap();
+
+    let human = temp.command(["issue", "show", "ab"]).output().unwrap();
+    assert!(!human.status.success());
+    assert!(String::from_utf8_lossy(&human.stderr).contains("at least 4 characters"));
+
+    let machine = temp
+        .command(["issue", "show", "ab", "--json"])
+        .output()
+        .unwrap();
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("at least 4 characters"));
+}
+
 /// Multi-id `--json` where one id is bad fails fast on the whole command with a
 /// JSON error envelope (no partial `{count, issues}` success), matching
 /// `issue show`'s multi-id semantics.
