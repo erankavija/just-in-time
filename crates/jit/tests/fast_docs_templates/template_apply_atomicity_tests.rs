@@ -378,8 +378,8 @@ applies_to = ["{container_type}"]
         .clone()
 }
 
-fn bindings(container: &IssueId) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), container.as_str().to_string())])
+fn bindings(container: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), container.clone())])
 }
 
 fn fixture<S: IssueStore + RepositoryStateStore>(

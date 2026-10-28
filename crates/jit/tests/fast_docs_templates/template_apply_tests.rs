@@ -149,8 +149,8 @@ fn create_epic(h: &TestHarness, title: &str) -> IssueId {
     id
 }
 
-fn container_binding(id: &IssueId) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), id.as_str().to_string())])
+fn container_binding(id: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), id.clone())])
 }
 
 #[test]
@@ -452,7 +452,7 @@ fn test_apply_rejects_anchor_bound_to_missing_issue() {
 
     let before = h.all_issues().len();
     let missing_id = issue_id(1);
-    let bindings = BTreeMap::from([("container".to_string(), missing_id.as_str().to_string())]);
+    let bindings = BTreeMap::from([("container".to_string(), missing_id.clone())]);
     let err = h
         .executor
         .apply_template_with(&template, &epic, &bindings, false)
