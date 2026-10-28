@@ -13,6 +13,7 @@ use jit::storage::{
     RedoPoint,
 };
 use jit::test_cli::JitCli;
+use jit::test_utils::file_executor;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -104,13 +105,6 @@ pub(super) fn executor_with_interruptions(
     CommandExecutor::new(storage).with_layout(layout)
 }
 
-pub(super) fn ordinary_executor(repository: &Path) -> CommandExecutor<JsonFileStorage> {
-    let data = repository.join(".jit");
-    let storage = JsonFileStorage::new(&data);
-    let layout = discover_repository_layout(repository, &data).unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 fn write_package(repository: &Path, version: &str) {
     let package = repository.join(PACKAGE_LOCATION);
     let assets = package.join("assets");
@@ -142,7 +136,8 @@ fn write_package(repository: &Path, version: &str) {
 /// beside it, and answer the state before 2.0.0 is applied.
 pub(super) fn prepare_changed_profile(repository: &JitCli) -> LifecycleState {
     write_package(repository.root(), "1.0.0");
-    let initial = ordinary_executor(repository.root())
+    let initial = file_executor(repository.root())
+        .unwrap()
         .apply_profile(&[selector()])
         .unwrap();
     assert_eq!(
