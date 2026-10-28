@@ -8,13 +8,13 @@
 //! each bound to the live renderer code rather than a committed mirror.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
-use jit::commands::CommandExecutor;
 use jit::declarations::invariants::InvariantRegistry;
 use jit::declarations::rules::RuleSet;
 use jit::declarations::GateRegistry;
 use jit::declarations::{GateDefinition, GateMode, GateStage};
 use jit::repository_state::render_invariants_markdown;
 use jit::repository_state::render_rules_and_gates_markdown;
+use jit::repository_state::VirtualPath;
 use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::HashMap;
 
@@ -72,32 +72,6 @@ scope = "project"
 source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
 source-of-truth = "registry-first"
 "#;
-
-/// Build an `InMemoryStorage` whose aggregate repository image carries
-/// `config.toml` and the given registry files.
-fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    storage.add_data_file("config.toml", config_toml);
-    for (name, content) in registries {
-        storage.add_data_file(name, content);
-    }
-    storage
-}
-
-/// Construct a render executor over the storage's canonical layout: the on-disk
-/// data root and its parent worktree, exactly as the CLI wires the executor at
-/// startup. The session the render opens captures from the seeded aggregate image.
-fn render_executor(storage: &InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-    let data = storage.root().to_path_buf();
-    let worktree = data
-        .parent()
-        .expect("test data root has a parent worktree")
-        .to_path_buf();
-    let layout = jit::storage::discover_repository_layout(worktree, data)
-        .expect("test layout is discoverable");
-    CommandExecutor::new(storage.clone()).with_layout(layout)
-}
 
 fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
     GateDefinition {
@@ -556,11 +530,19 @@ fn test_full_style_missing_registry_source_errors_pre_write() {
         "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
          mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"full\"\n"
     );
-    // The `.jit/invariants.toml` store is seeded NOWHERE: config.invariants loads
+    // The `.jit/invariants.toml` store is absent: config.invariants loads
     // empty (a missing store is indistinguishable from an empty one at render
     // time), and the pre-write existence probe over `read_repo_file` finds nothing.
-    let storage = storage_with(&config, &[]);
-    let executor = render_executor(&storage);
+    let storage = InMemoryStorage::new();
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(&config),
+            after_initialization: true,
+            absent: &[VirtualPath::INVARIANTS],
+            ..MemoryDeclarations::default()
+        },
+    );
 
     let err = executor.project_render(Some("invariants")).unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();

@@ -11,7 +11,9 @@
 //! - the batch path (`apply_bulk_update`) is also enforced.
 
 use jit::commands::bulk_update::UpdateOperations;
-use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+use jit::commands::test_helpers::{
+    memory_executor_declaring, memory_executor_wrapping, MemoryDeclarations,
+};
 use jit::commands::CommandExecutor;
 use jit::domain::{Event, EventBody, Issue, Priority, State};
 use jit::query_engine::QueryFilter;
@@ -804,29 +806,16 @@ fn test_no_bypass_event_when_publication_fails() {
     // A storage whose mutation publication always fails. A forced create that bypasses an
     // enforce rule must NOT leave a LocalRuleBypassed entry when the write fails,
     // because the bypass event is now emitted only after a successful save.
-    let inner = InMemoryStorage::new();
-    std::fs::create_dir_all(inner.root()).unwrap();
-    let config = "[worktree]\nenforce_leases = \"off\"\n";
-    std::fs::write(inner.root().join("config.toml"), config).unwrap();
-    std::fs::write(inner.root().join("rules.toml"), EPIC_NEEDS_REQ_ENFORCE).unwrap();
-    inner.add_data_file("config.toml", config);
-    inner.add_data_file("rules.toml", EPIC_NEEDS_REQ_ENFORCE);
-
-    let storage = FailingMutationStorage::new(inner);
-    let layout = jit::repository_state::RepositoryLayout::new(
-        jit::repository_state::RepositoryRootEvidence::new(
-            "/jit-failing-memory-worktree",
-            "failing-memory-worktree",
-            true,
-        ),
-        jit::repository_state::RepositoryRootEvidence::new(
-            "/jit-failing-memory-worktree/.jit",
-            "failing-memory-data",
-            true,
-        ),
-    )
-    .unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n"),
+            rules: Some(EPIC_NEEDS_REQ_ENFORCE),
+            after_initialization: true,
+            ..MemoryDeclarations::default()
+        },
+        FailingMutationStorage::new,
+    );
 
     let result = executor.issues().create_issue(
         "An epic".to_string(),
