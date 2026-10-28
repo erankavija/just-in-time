@@ -1383,6 +1383,12 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "29-file unit-test id sweep with judgment calls (REQ-03/04) and a shared fixture contract"
+    },
+    {
+      "issue": "5fac48b8",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "contract change: Issue::draft takes IssueId; finalizer stops allocating issue ids (determinism-critical)"
     }
   ],
   "surfaced_pitfalls": [
