@@ -1370,6 +1370,12 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "c780514e task taken over with user approval; well-specified test deletion"
+    },
+    {
+      "issue": "2c9badcd",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "c780514e task taken over with user approval; conformance-suite design across both backends"
     }
   ],
   "surfaced_pitfalls": [
@@ -1477,6 +1483,7 @@
       "issue": "55e3d3fd",
       "state": "done",
       "merge": "7aa7ed622"
-    }
+    },
+    "e2eb8862 (landed d273d0962, closed 8b9fccb1d)"
   ]
 }
