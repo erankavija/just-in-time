@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:40:27.414776691Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -30,5 +31,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Storage tests stop re-proving mutation finalization",
-  "updated_at": "2026-10-27T22:46:58.578460906Z"
+  "updated_at": "2026-10-28T21:40:27.414776691Z"
 }
