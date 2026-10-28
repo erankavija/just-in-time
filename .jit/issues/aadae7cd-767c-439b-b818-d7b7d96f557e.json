@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "07be95e7-84fe-4a1e-b884-4417ffda8135",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:52:20.850027553Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3c8be21a-ed4e-4fd1-8b68-497754ed55f0",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:53:13.744034265Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aadae7cd-767c-439b-b818-d7b7d96f557e",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cli_repo_workflow in-process tests use the shared constructors",
-  "updated_at": "2026-10-28T22:06:44.188846393Z"
+  "updated_at": "2026-10-28T22:53:13.744034265Z"
 }

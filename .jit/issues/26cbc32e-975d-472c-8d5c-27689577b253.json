@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e5321bd0-d488-40bb-b6e1-1d7506a65407",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:52:20.605547221Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "26cbc32e-975d-472c-8d5c-27689577b253",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "document and archive tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-28T22:06:43.876609163Z"
+  "updated_at": "2026-10-28T22:52:20.605547221Z"
 }
