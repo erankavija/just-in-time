@@ -13,6 +13,7 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::{Event, EventBody, State};
 use jit::errors::TransitionBlockedError;
 use jit::storage::{InMemoryStorage, IssueStore};
@@ -23,7 +24,7 @@ fn seed_issue(
     title: &str,
     labels: &[&str],
     state: State,
-) -> String {
+) -> IssueId {
     let (id, _) = executor
         .issues()
         .create_issue(
