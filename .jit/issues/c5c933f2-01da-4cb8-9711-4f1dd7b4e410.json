@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T23:16:06.456767435Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "claim and worktree tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-28T23:06:00.460147725Z"
+  "updated_at": "2026-10-28T23:16:06.653950127Z"
 }
