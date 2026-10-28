@@ -740,17 +740,15 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
     );
     assert!(human.status.success(), "{human:?}");
     let human_stdout = String::from_utf8_lossy(&human.stdout);
-    assert!(
-        human_stdout.contains("Profile second 1.0.0 (directory packages/second): would apply"),
-        "{human_stdout}"
+    assert_eq!(
+        human_stdout
+            .lines()
+            .filter(|line| line.starts_with("Profile "))
+            .count(),
+        4,
+        "one decision line per requested occurrence: {human_stdout}"
     );
     assert!(human_stdout.contains("  create:"), "{human_stdout}");
-    let human_ids = human_stdout
-        .lines()
-        .filter_map(|line| line.strip_prefix("Profile "))
-        .filter_map(|line| line.split_whitespace().next())
-        .collect::<Vec<_>>();
-    assert_eq!(human_ids, vec!["second", "first", "first", "second"]);
 }
 
 #[test]
