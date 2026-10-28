@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:26.556569680Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Library unit tests take canonical issue ids from one fixture",
-  "updated_at": "2026-10-28T22:29:09.813649069Z"
+  "updated_at": "2026-10-28T22:29:25.385916556Z"
 }
