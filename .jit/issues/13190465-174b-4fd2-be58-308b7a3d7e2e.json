@@ -22,6 +22,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T23:38:01.955604773Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4ac7f362-3d93-46dc-a7ee-8c767ee4219f",
+      "status": "failed",
+      "updated_at": "2026-10-28T23:41:59.938975525Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "13190465-174b-4fd2-be58-308b7a3d7e2e",
@@ -39,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_issue suite carries typed canonical issue ids",
-  "updated_at": "2026-10-28T23:38:01.955604773Z"
+  "updated_at": "2026-10-28T23:41:59.938975525Z"
 }
