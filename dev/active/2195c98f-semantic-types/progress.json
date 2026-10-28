@@ -725,6 +725,24 @@
       "reason": "Take over the last two c780514e blockers of 0af95f14 while the c780514e lead waits on the invoker? Prior approval covered only 2a6bc44c and 55043636.",
       "recommendation": "Take them (A).",
       "resolution": "Invoker (session 5): take them. just-in-time-4f agreed."
+    },
+    {
+      "issue": "5fac48b8",
+      "status": "open",
+      "reason": "code-review F1 [high, blocking] on REQ-01 (\"no code path creates an issue whose id is empty\"): IssueId is still the String alias (identity.rs:15), so Issue::draft accepts an empty id and the type cannot guarantee REQ-01. The plan stages issue ids behind that alias until the flip 7abcc22d, which is downstream of 5fac48b8 (5fac48b8 → 641bd14e → 89e7a273 → 3ee3a4d1 → 7abcc22d). No production or test path builds an empty id after the change (branch worktree-agent-5fac48b8, 4608d2843; cargo-ci passed).",
+      "options": [
+        "A (recommended): amend 5fac48b8 REQ-01 to state that no code path creates an empty issue id, with the type-level guarantee delivered by the flip 7abcc22d; re-run code-review",
+        "B: rework Issue::draft to take ValidatedIssueId now (callers convert at the draft), departing from the alias-staging contract that staging entries compile unchanged at the flip",
+        "C: other guidance"
+      ],
+      "blocks": [
+        "641bd14e",
+        "89e7a273",
+        "3ee3a4d1",
+        "7abcc22d",
+        "c797b59b (via 13190465 path unaffected)",
+        "all post-flip tasks"
+      ]
     }
   ],
   "rework_counts": {
@@ -739,7 +757,8 @@
     "8acca4f4": 2,
     "10ae7776": 1,
     "55043636": 1,
-    "2c9badcd": 1
+    "2c9badcd": 1,
+    "5fac48b8": 0
   },
   "external_blockers": "19d9bd7d waits on c780514e 3f01cb72, 6a13eeac, 8f87e366; 13190465 on 3ca153c7, 53d582ab; b45a2865 on b58ea1e2, ce097844; b73b3e5a on f0bee761 (just-in-time-4f).",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1389,6 +1408,26 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "contract change: Issue::draft takes IssueId; finalizer stops allocating issue ids (determinism-critical)"
+    },
+    {
+      "issue": "b73b3e5a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical suite id retyping with literal criteria"
+    },
+    {
+      "issue": "13190465",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "mechanical fast_issue suite id retyping"
+    },
+    {
+      "issue": "b45a2865",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical fast_rules suite id retyping"
     }
   ],
   "surfaced_pitfalls": [

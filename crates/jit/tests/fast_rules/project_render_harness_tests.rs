@@ -16,6 +16,7 @@ use jit::repository_state::render_invariants_markdown;
 use jit::repository_state::render_rules_and_gates_markdown;
 use jit::repository_state::VirtualPath;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_utils::shipped_item_kind_tables;
 use std::collections::HashMap;
 
 const INVARIANTS_TOML: &str = r#"
@@ -38,39 +39,6 @@ description = "Every label is namespace:value."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "type:*" } }
-"#;
-
-/// The registry-first `invariant` item kind over `.jit/invariants.toml`.
-const INVARIANT_KIND: &str = r#"
-[item_kinds.invariant]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-"#;
-
-/// The registry-first `rule` + `gate` item kinds over their `.jit` registries.
-const RULE_GATE_KINDS: &str = r#"
-[item_kinds.rule]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
-source-of-truth = "registry-first"
-
-[item_kinds.gate]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
-source-of-truth = "registry-first"
 "#;
 
 fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
@@ -100,10 +68,11 @@ fn region_body(content: &str, begin: &str, end: &str) -> String {
 /// rows into a region, and everything OUTSIDE the markers is byte-preserved.
 #[test]
 fn test_markdown_first_projection_round_trip_and_byte_exactness() {
+    // `charter` is a custom project-scope markdown-first kind; the default package ships none.
     let config = r#"
 [item_kinds.charter]
 section = "decision_log"
-id-pattern = "D-[0-9]+"
+id-pattern = "[A-Z]-[0-9]+"
 markers = []
 link-namespaces = ["per"]
 scope = "project"
@@ -163,10 +132,11 @@ style = "id-anchor"
 /// another command has already populated the executor's filesystem config cache.
 #[test]
 fn test_project_render_uses_captured_config_when_executor_cache_is_stale() {
+    // `charter` is a custom project-scope markdown-first kind; the default package ships none.
     let captured_config = r#"
 [item_kinds.charter]
 section = "decision_log"
-id-pattern = "D-[0-9]+"
+id-pattern = "[A-Z]-[0-9]+"
 markers = []
 link-namespaces = ["per"]
 scope = "project"
@@ -221,8 +191,9 @@ style = "id-anchor"
 #[test]
 fn test_invariants_projection_parity_with_typed_render() {
     let config = format!(
-        "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
-         mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"id-anchor\"\n"
+        "{kinds}\n[projection.invariants]\nkind = \"invariant\"\n\
+         mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"id-anchor\"\n",
+        kinds = shipped_item_kind_tables(&["invariant"])
     );
     let storage = InMemoryStorage::new();
     let executor = memory_executor_declaring(
@@ -255,8 +226,9 @@ fn test_invariants_projection_parity_with_typed_render() {
 #[test]
 fn test_rules_and_gates_projection_parity_with_typed_render() {
     let config = format!(
-        "{RULE_GATE_KINDS}\n[projection.rules-and-gates]\nkind = [\"rule\", \"gate\"]\n\
-         mode = \"separate-file\"\ntarget = \".jit/rules-and-gates.md\"\nstyle = \"full\"\n"
+        "{kinds}\n[projection.rules-and-gates]\nkind = [\"rule\", \"gate\"]\n\
+         mode = \"separate-file\"\ntarget = \".jit/rules-and-gates.md\"\nstyle = \"full\"\n",
+        kinds = shipped_item_kind_tables(&["rule", "gate"])
     );
     let gates_toml = "[[gates]]\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\ndescription = \"fmt + clippy\"\nstage = \"postcheck\"\nmode = \"manual\"\n";
     let storage = InMemoryStorage::new();
@@ -328,7 +300,8 @@ style = \"id-anchor\"
 #[test]
 fn test_missing_target_is_typed_error_naming_projection() {
     let config = format!(
-        "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\nstyle = \"id-anchor\"\n"
+        "{kinds}\n[projection.invariants]\nkind = \"invariant\"\nstyle = \"id-anchor\"\n",
+        kinds = shipped_item_kind_tables(&["invariant"])
     );
     let storage = InMemoryStorage::new();
     let executor = memory_executor_declaring(
@@ -366,11 +339,12 @@ fn test_missing_target_is_typed_error_naming_projection() {
 #[test]
 fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     let config = format!(
-        "{INVARIANT_KIND}\n\
+        "{kinds}\n\
          [projection.a-good]\nkind = \"invariant\"\nmode = \"region\"\n\
          target = \"FIRST.md\"\nstyle = \"id-anchor\"\n\
          [projection.b-bad]\nkind = \"invariant\"\nmode = \"region\"\n\
-         target = \"SECOND.md\"\nstyle = \"id-anchor\"\n"
+         target = \"SECOND.md\"\nstyle = \"id-anchor\"\n",
+        kinds = shipped_item_kind_tables(&["invariant"])
     );
     let storage = InMemoryStorage::new();
     // FIRST.md carries `a-good`'s default region markers (rendering succeeds);
@@ -425,18 +399,10 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
 /// to rename the kind.
 #[test]
 fn test_full_style_dispatches_on_registry_source_not_kind_name() {
-    // `house-rules` is a renamed invariant kind: a different NAME, the SAME
-    // registry source (`.jit/invariants.toml`).
-    let renamed_kind = r#"
-[item_kinds.house-rules]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-"#;
+    // `house-rules` is a custom kind name over the shipped invariant declaration:
+    // a different NAME, the SAME registry source (`.jit/invariants.toml`).
+    let renamed_kind = shipped_item_kind_tables(&["invariant"])
+        .replace("item_kinds.invariant", "item_kinds.house-rules");
     let config = format!(
         "{renamed_kind}\n[projection.house]\nkind = \"house-rules\"\n\
          mode = \"separate-file\"\ntarget = \".jit/house.md\"\nstyle = \"full\"\n"
@@ -479,15 +445,7 @@ source-of-truth = "registry-first"
 fn test_full_style_issue_scoped_kind_is_typed_error_and_writes_nothing() {
     // `decision` is an issue-scoped markdown-first kind: it has no project-scope
     // registry, so it cannot back a full-style projection.
-    let issue_scoped_kind = r#"
-[item_kinds.decision]
-section = "decision_log"
-id-pattern = "D-[0-9]+"
-markers = []
-link-namespaces = ["per"]
-scope = "issue"
-source-of-truth = "markdown-first"
-"#;
+    let issue_scoped_kind = shipped_item_kind_tables(&["decision"]);
     let config = format!(
         "{issue_scoped_kind}\n[projection.decisions]\nkind = \"decision\"\n\
          mode = \"separate-file\"\ntarget = \".jit/decisions.md\"\nstyle = \"full\"\n"
@@ -527,8 +485,9 @@ source-of-truth = "markdown-first"
 #[test]
 fn test_full_style_missing_registry_source_errors_pre_write() {
     let config = format!(
-        "{INVARIANT_KIND}\n[projection.invariants]\nkind = \"invariant\"\n\
-         mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"full\"\n"
+        "{kinds}\n[projection.invariants]\nkind = \"invariant\"\n\
+         mode = \"separate-file\"\ntarget = \".jit/invariants.md\"\nstyle = \"full\"\n",
+        kinds = shipped_item_kind_tables(&["invariant"])
     );
     // The `.jit/invariants.toml` store is absent: config.invariants loads
     // empty (a missing store is indistinguishable from an empty one at render

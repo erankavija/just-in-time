@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "63ae9e05067f2c641df5e998be6273bab9254b0a",
+  "completed_at": "2026-10-28T23:08:59.553016972Z",
+  "duration_ms": 78480,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs",
+        "id": "F1",
+        "line": 56,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "medium",
+        "summary": "The sole post-update timestamp assertion is already true before the update, leaving the test unable to detect a missing transition or timestamp effect."
+      }
+    ],
+    "summary": "The revised lifecycle timestamp test has a vacuous postcondition and no longer verifies its claimed behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "53d582ab-f36d-4ed0-a8e2-7fa902717c9a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "587b6e1c-c333-45f0-8a7c-42907d753b76",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:07:41.072434346Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3349 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184c4-ef55-7083-821c-0c2f3397125a\n--------\nuser\n--- 3336 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: dc27d35fd and shared merge 63ae9e05067f2c641df5e998be6273bab9254b0a\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-02 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:07:00Z); code-review pending\nTruncation recovery: Re-read the shared merge per parent and its affected-path patch, then current lifecycle, bulk wiring, domain-owner, and command-cascade ranges.\n\n1. [blocking][issue-impact] `crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs:56` now has only an assertion that was already true before the operation: the file documents that `create_issue` stamps `first_ready_at` before `add_dependency` (lines 29–30). With the cascade-state assertions removed, this test passes if completing the dependency performs no transition at all, so it no longer verifies the claimed timestamp behavior. Make the timestamp effect observable from a pre-operation absent value, or remove/replace the now-vacuous case. References: @/invariant/semantic-test-assertions.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised lifecycle timestamp test has a vacuous postcondition and no longer verifies its claimed behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The sole post-update timestamp assertion is already true before the update, leaving the test unable to detect a missing transition or timestamp effect.\",\"file\":\"crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs\",\"line\":56,\"references\":[\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

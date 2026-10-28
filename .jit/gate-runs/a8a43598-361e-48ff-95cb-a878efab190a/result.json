@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "63ae9e05067f2c641df5e998be6273bab9254b0a",
+  "completed_at": "2026-10-28T23:12:02.770725556Z",
+  "duration_ms": 262020,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+        "id": "F1",
+        "line": 216,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f1c1acc8/requirement/REQ-02",
+          "@/issue/c780514e/requirement/REQ-01",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The projection suite duplicates the requested unresolved-identifier and malformed-record exit-status parity cases instead of becoming their sole owner."
+      }
+    ],
+    "summary": "The requested parity cases were added to the projection suite but remain duplicated in the legacy parity suite.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a8a43598-361e-48ff-95cb-a878efab190a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:07:40.750203345Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 14 of 6041 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\n2026-10-28T23:07:41.628265Z ERROR codex_models_manager::manager: failed to load models cache: EOF while parsing a value at line 1 column 0\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184c4-ee6a-7eb2-b961-2839516b7832\n--------\nuser\n--- 6027 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 38c745cd; 63ae9e05 merge (same test-file patch; sibling-tagged paths excluded)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/issues/f1c1acc8-4440-409d-9a8b-e2fa070befc2.json; .jit/issues/c780514e-8491-40a7-8844-3974bba91257.json; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/f1c1acc8/requirement/REQ-01–REQ-03; @/issue/c780514e/requirement/REQ-01,REQ-05; @/charter/D-18; @/invariant/orthogonal-tests, @/invariant/single-source-prose, @/invariant/essential-code-prose; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit code not recorded, 2026-10-28T23:07:35Z); code-review pending\nTruncation recovery: narrowed item sources, merge-parent attribution, schema rows, current callers, and the full 1,324-line tagged patch\n\n1. [blocking][issue-impact] The new projection bindings duplicate, rather than take ownership of, the two specified parity properties. [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:216) and [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:237) now test malformed storage and unresolved identifiers in both forms, but [invocation_exit_status_parity_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/invocation_exit_status_parity_tests.rs:65) and [invocation_exit_status_parity_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/invocation_exit_status_parity_tests.rs:133) still assert the same status parity and mapped codes. This leaves two owners for the properties, contrary to the parent’s “only by the exit-code projection suite” criterion and the orthogonal-test invariant. References: @/issue/f1c1acc8/requirement/REQ-02, @/issue/c780514e/requirement/REQ-01, @/invariant/orthogonal-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The requested parity cases were added to the projection suite but remain duplicated in the legacy parity suite.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The projection suite duplicates the requested unresolved-identifier and malformed-record exit-status parity cases instead of becoming their sole owner.\",\"file\":\"crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs\",\"line\":216,\"references\":[\"@/issue/f1c1acc8/requirement/REQ-02\",\"@/issue/c780514e/requirement/REQ-01\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

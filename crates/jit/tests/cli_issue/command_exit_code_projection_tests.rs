@@ -787,7 +787,9 @@ fn test_command_exit_codes_serve_foreground_is_passthrough() {
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one
 /// binding case in [`row_bindings!`]. A row added without a binding, or bound
-/// twice, fails here.
+/// twice, fails here. Unix-only: the `*`/5 and `serve --fg` rows are bound by
+/// cases that need Unix permissions and signals.
+#[cfg(unix)]
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {
     let mut bound: Vec<(String, Option<i32>)> = BOUND_ROWS

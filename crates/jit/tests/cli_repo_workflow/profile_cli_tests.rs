@@ -740,17 +740,24 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
     );
     assert!(human.status.success(), "{human:?}");
     let human_stdout = String::from_utf8_lossy(&human.stdout);
-    preview["profiles"]
+    let expected = preview["profiles"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|profile| format!("Profile {}", profile["id"].as_str().unwrap()))
-        .fold(human_stdout.as_ref(), |rest, decision| {
-            let at = rest.find(&decision).unwrap_or_else(|| {
-                panic!("{decision} is not rendered in preview order: {human_stdout}")
-            });
-            &rest[at + decision.len()..]
-        });
+        .map(|profile| format!("Profile {} ", profile["id"].as_str().unwrap()))
+        .collect::<Vec<_>>();
+    let headings = human_stdout
+        .lines()
+        .filter(|line| line.starts_with("Profile "))
+        .collect::<Vec<_>>();
+    assert!(
+        headings.len() == expected.len()
+            && headings
+                .iter()
+                .zip(&expected)
+                .all(|(heading, prefix)| heading.starts_with(prefix.as_str())),
+        "human headings must render the JSON decisions exactly, in order: {expected:?} vs {headings:?}"
+    );
     assert!(human_stdout.contains("  create:"), "{human_stdout}");
 }
 

@@ -7,6 +7,7 @@
   ],
   "description": "Remove the CLI test that re-proves dependency cycle rejection.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`). `crates/jit/tests/cli_repo_workflow/integration_test.rs:616` re-proves cycle rejection through the CLI; the cycle exit code is bound by the exit-code projection suite.\n\n## Success Criteria\n\n- [hard] REQ-01: `integration_test.rs` holds no dependency cycle re-proof.\n- [hard] REQ-02: The cycle property it covered has an owning test in `crates/jit/src/graph/`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-28T23:24:34.412163935Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/dag-acyclic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Workflow CLI tests stop re-proving dependency cycle rejection",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:24:34.412163935Z"
 }

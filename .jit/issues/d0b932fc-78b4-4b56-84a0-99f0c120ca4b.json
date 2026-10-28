@@ -8,6 +8,7 @@
   ],
   "description": "Cut the CLI re-proofs of dependency auto-transitions to one wiring case.\n\n## Background\n\n`crates/jit/tests/cli_repo_workflow/workflow_tests.rs` re-proves dependency auto-transitions in four subprocess tests (`:529`, `:577`, `:646`, `:698`). A pure domain function owns the rules, with unit and property tests.\n\n## Success Criteria\n\n- [hard] REQ-01: `workflow_tests.rs` holds one auto-transition case, which shows that completing a dependency through the CLI readies its dependent; the other three cases no longer exist.\n- [hard] REQ-02: Each removed case's rule has an owning test of the domain function before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n",
   "documents": [],
+  "first_ready_at": "2026-10-28T23:24:34.323392772Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Workflow CLI tests keep one auto-transition wiring case",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:24:34.323392772Z"
 }

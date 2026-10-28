@@ -131,3 +131,33 @@ fn test_project_defined_preset_create_list_show_apply() {
     assert!(required.contains(&"tests"));
     assert!(required.contains(&"code-review"));
 }
+
+#[test]
+fn test_gate_preset_create_missing_registry_gate_names_the_gate() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "mygate",
+        "--title",
+        "My gate",
+        "--description",
+        "My gate",
+    ])
+    .unwrap();
+    let issue = cli.create_issue(["--title", "Has gate"]).unwrap();
+    cli.run(["gate", "add", &issue, "mygate"]).unwrap();
+    cli.run(["gate", "remove", "mygate"]).unwrap();
+
+    let output = cli
+        .command(["gate", "preset", "create", &issue, "mypreset"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Gate not found in registry: mygate"),
+        "stderr was: {stderr}"
+    );
+}
