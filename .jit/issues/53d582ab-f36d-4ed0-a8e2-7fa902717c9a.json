@@ -8,6 +8,7 @@
   ],
   "description": "Leave one harness owner of the cascade wiring by removing the cascade re-proof from the lifecycle timestamp tests.\n\n## Background\n\nHarness-level tests at `crates/jit/src/commands/bulk_update.rs:2001` and `crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs:89` both drive the command cascade to dependents. A pure domain function owns the cascade's rules, and the `bulk_update.rs` test is the harness owner of its wiring.\n\n## Success Criteria\n\n- [hard] REQ-01: `lifecycle_timestamps_tests.rs` asserts no cascade rule; a test there keeps the timestamp properties it asserts.\n- [hard] REQ-02: The `bulk_update.rs` test remains the one harness test that asserts the cascade's wiring.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:20:38.370614131Z",
   "first_ready_at": "2026-10-27T22:22:20.976157430Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "bb9916be-4f91-4514-806f-1651181ecc3e",
+      "run_id": "0446859b-c528-4955-8a62-68a77b3e9032",
       "status": "passed",
-      "updated_at": "2026-10-28T23:07:24.721110079Z",
+      "updated_at": "2026-10-28T23:16:01.068164391Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "587b6e1c-c333-45f0-8a7c-42907d753b76",
-      "status": "failed",
-      "updated_at": "2026-10-28T23:08:59.852381743Z",
+      "run_id": "f52b08bc-83b4-49f1-aac9-bdc44cdcaa52",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:17:11.469164786Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Lifecycle harness tests stop re-proving the auto-transition cascade",
-  "updated_at": "2026-10-28T23:08:59.852381743Z"
+  "updated_at": "2026-10-28T23:20:38.370614131Z"
 }

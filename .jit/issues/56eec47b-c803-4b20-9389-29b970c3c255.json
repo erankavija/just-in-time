@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "43a64187-c16e-4951-a968-561214f27b4a",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:16:52.610858612Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6008b1b1-1260-4ac9-9d9c-b9382c7e8532",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:20:33.625074737Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "56eec47b-c803-4b20-9389-29b970c3c255",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "workflow and integration tests read created ids from JSON output",
-  "updated_at": "2026-10-28T23:16:07.103384585Z"
+  "updated_at": "2026-10-28T23:20:33.625074737Z"
 }

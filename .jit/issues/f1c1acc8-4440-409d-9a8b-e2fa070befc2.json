@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "3e6330d4-aee1-412f-a1e6-b835e9776cb6",
+      "run_id": "24d5c693-53b4-41af-83e8-942ff1a7701e",
       "status": "passed",
-      "updated_at": "2026-10-28T23:07:35.509455404Z",
+      "updated_at": "2026-10-28T23:16:01.314015551Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "a8a43598-361e-48ff-95cb-a878efab190a",
+      "run_id": "c93f8ccd-e9ec-409d-881c-f033e4048bd0",
       "status": "failed",
-      "updated_at": "2026-10-28T23:12:03.228883332Z",
+      "updated_at": "2026-10-28T23:19:47.386578375Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exit-code projection suite proves a binding behind each row",
-  "updated_at": "2026-10-28T23:12:03.228883332Z"
+  "updated_at": "2026-10-28T23:19:47.386578375Z"
 }
