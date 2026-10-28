@@ -758,7 +758,9 @@
     "10ae7776": 1,
     "55043636": 1,
     "2c9badcd": 1,
-    "5fac48b8": 0
+    "5fac48b8": 0,
+    "13190465": 1,
+    "b73b3e5a": 1
   },
   "external_blockers": "19d9bd7d waits on c780514e 3f01cb72, 6a13eeac, 8f87e366; 13190465 on 3ca153c7, 53d582ab; b45a2865 on b58ea1e2, ce097844; b73b3e5a on f0bee761 (just-in-time-4f).",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1428,6 +1430,19 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "mechanical fast_rules suite id retyping"
+    },
+    {
+      "issue": "13190465",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "rework 1: code-review F1, direct IssueId slices in fast_issue"
+    },
+    {
+      "issue": "b73b3e5a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "rework 1: code-review F1, String-valued binding maps"
     }
   ],
   "surfaced_pitfalls": [

@@ -2,7 +2,10 @@
 //!
 //! Validates that partial UUID prefixes work like git short hashes. Short
 //! prefixes enter through the CLI, which resolves each issue-id argument once.
+use jit::domain::identity::IssueId;
+use jit::domain::SHORT_ID_LENGTH;
 use jit::test_cli::JitCli;
+use jit::test_utils::issue_id;
 
 /// The issue commands accept a unique short prefix and act on the issue it names.
 #[test]
@@ -16,7 +19,7 @@ fn test_cli_issue_id_arguments_resolve_a_unique_short_prefix() {
 
     cli.run(["issue", "update", &short(&from), "--title", "Renamed"])
         .unwrap();
-    let updated = cli.run_json(["issue", "show", &from]).unwrap();
+    let updated = cli.run_json(["issue", "show", from.as_str()]).unwrap();
     assert_eq!(updated["title"], "Renamed");
 
     let deleted = cli
@@ -27,7 +30,7 @@ fn test_cli_issue_id_arguments_resolve_a_unique_short_prefix() {
         .output()
         .unwrap();
     assert!(deleted.status.success(), "{deleted:?}");
-    assert!(cli.run(["issue", "show", &to]).is_err());
+    assert!(cli.run(["issue", "show", to.as_str()]).is_err());
 }
 
 #[test]
@@ -114,14 +117,14 @@ fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_record
         "not an issue record",
     )
     .unwrap();
-    let short = &full[..jit::domain::identity::IssueIdPrefix::MIN_ID_PREFIX_LENGTH - 1];
+    let short = &full.as_str()[..jit::domain::identity::IssueIdPrefix::MIN_ID_PREFIX_LENGTH - 1];
     let refusal = jit::domain::identity::InvalidIdPrefixError::new(short).to_string();
 
     let unrefused: Vec<String> = invocations
         .iter()
         .map(|args| {
             args.iter()
-                .map(|arg| arg.replace(SHORT, short).replace(FULL, &full))
+                .map(|arg| arg.replace(SHORT, short).replace(FULL, full.as_str()))
                 .collect::<Vec<_>>()
         })
         .filter(|args| {
@@ -146,7 +149,7 @@ fn test_cli_every_issue_id_argument_rejects_a_short_prefix_before_reading_record
 fn test_cli_issue_show_resolves_noncanonical_full_ids() {
     let cli = JitCli::initialised().unwrap();
     let id = cli.create_issue(["Canonical"]).unwrap();
-    for spelling in [id.to_uppercase(), id.replace('-', "")] {
+    for spelling in [id.as_str().to_uppercase(), id.as_str().replace('-', "")] {
         assert_eq!(
             cli.run_json(["issue", "show", &spelling]).unwrap()["id"],
             id
@@ -154,8 +157,8 @@ fn test_cli_issue_show_resolves_noncanonical_full_ids() {
     }
 }
 
-fn short(id: &str) -> String {
-    id[..8].to_string()
+fn short(id: &IssueId) -> String {
+    id.as_str()[..SHORT_ID_LENGTH].to_string()
 }
 
 /// `jit args --json` with `{short}` naming a too-short prefix refuses it as an
@@ -188,10 +191,10 @@ fn test_cli_dep_add_targets_resolve_short_prefixes() {
     let other = cli.create_issue(["Other"]).unwrap();
 
     let added = cli
-        .run_json(["dep", "add", &from, &short(&to), &short(&other)])
+        .run_json(["dep", "add", from.as_str(), &short(&to), &short(&other)])
         .unwrap();
     assert_eq!(added["added"], serde_json::json!([to, other]));
-    assert_rejects_too_short_prefix(&cli, &["dep", "add", &from, &to, "{short}"]);
+    assert_rejects_too_short_prefix(&cli, &["dep", "add", from.as_str(), to.as_str(), "{short}"]);
 }
 
 /// `dep rm` parses each target prefix at the CLI and removes the edge it names.
@@ -200,12 +203,12 @@ fn test_cli_dep_rm_targets_resolve_short_prefixes() {
     let cli = JitCli::initialised().unwrap();
     let from = cli.create_issue(["From"]).unwrap();
     let to = cli.create_issue(["To"]).unwrap();
-    cli.run(["dep", "add", &from, &to]).unwrap();
+    cli.run(["dep", "add", from.as_str(), to.as_str()]).unwrap();
 
-    cli.run(["dep", "rm", &from, &short(&to)]).unwrap();
-    let shown = cli.run_json(["issue", "show", &from]).unwrap();
+    cli.run(["dep", "rm", from.as_str(), &short(&to)]).unwrap();
+    let shown = cli.run_json(["issue", "show", from.as_str()]).unwrap();
     assert_eq!(shown["dependencies"], serde_json::json!([]));
-    assert_rejects_too_short_prefix(&cli, &["dep", "rm", &from, "{short}"]);
+    assert_rejects_too_short_prefix(&cli, &["dep", "rm", from.as_str(), "{short}"]);
 }
 
 /// `dep rm` resolves a target prefix against the source's own stored edges, so
@@ -214,16 +217,18 @@ fn test_cli_dep_rm_targets_resolve_short_prefixes() {
 fn test_cli_dep_rm_removes_a_dangling_dependency_by_short_prefix() {
     let cli = JitCli::initialised().unwrap();
     let from = cli.create_issue(["From"]).unwrap();
-    let to = "abcdef12-0000-4000-8000-000000000001";
+    let to = issue_id(1);
     let record = cli.root().join(format!(".jit/issues/{from}.json"));
     let mut issue: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
     issue["dependencies"] = serde_json::json!([to]);
     std::fs::write(&record, serde_json::to_vec(&issue).unwrap()).unwrap();
 
-    let removed = cli.run_json(["dep", "rm", &from, &short(to)]).unwrap();
+    let removed = cli
+        .run_json(["dep", "rm", from.as_str(), &short(&to)])
+        .unwrap();
     assert_eq!(removed["removed"], serde_json::json!([to]));
-    let shown = cli.run_json(["issue", "show", &from]).unwrap();
+    let shown = cli.run_json(["issue", "show", from.as_str()]).unwrap();
     assert_eq!(shown["dependencies"], serde_json::json!([]));
 }
 
@@ -234,10 +239,10 @@ fn test_cli_dep_rm_reports_a_repeated_target_as_not_found() {
     let cli = JitCli::initialised().unwrap();
     let from = cli.create_issue(["From"]).unwrap();
     let to = cli.create_issue(["To"]).unwrap();
-    cli.run(["dep", "add", &from, &to]).unwrap();
+    cli.run(["dep", "add", from.as_str(), to.as_str()]).unwrap();
 
     let removed = cli
-        .run_json(["dep", "rm", &from, &to, &short(&to)])
+        .run_json(["dep", "rm", from.as_str(), to.as_str(), &short(&to)])
         .unwrap();
     assert_eq!(removed["removed"], serde_json::json!([to]));
     assert_eq!(removed["not_found"], serde_json::json!([short(&to)]));
@@ -260,7 +265,7 @@ fn test_cli_validate_resolves_short_prefixes() {
             args.push(id);
             cli.run_json(args).unwrap()
         };
-        assert_eq!(by(&short(&id)), by(&id), "{args:?}");
+        assert_eq!(by(&short(&id)), by(id.as_str()), "{args:?}");
     }
 }
 
@@ -272,11 +277,15 @@ fn test_cli_events_query_issue_filter_resolves_short_prefix_and_any_spelling() {
     let id = cli.create_issue(["Filtered"]).unwrap();
     cli.create_issue(["Unrelated"]).unwrap();
 
-    let events = events_of(&cli, &id);
-    assert!(events
-        .as_array()
-        .is_some_and(|events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id)));
-    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+    let events = events_of(&cli, id.as_str());
+    assert!(events.as_array().is_some_and(
+        |events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id.as_str())
+    ));
+    for spelling in [
+        short(&id),
+        id.as_str().to_uppercase(),
+        id.as_str().replace('-', ""),
+    ] {
         assert_eq!(events_of(&cli, &spelling), events, "{spelling}");
     }
     assert_rejects_too_short_prefix(&cli, &["events", "query", "--issue-id", "{short}"]);
@@ -289,15 +298,18 @@ fn test_cli_events_query_issue_filter_matches_a_deleted_issue_in_any_spelling() 
     let cli = JitCli::initialised().unwrap();
     let id = cli.create_issue(["Deleted"]).unwrap();
     let deleted = cli
-        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
+        .command_with_env(
+            ["issue", "delete", id.as_str()],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
         .output()
         .unwrap();
     assert!(deleted.status.success(), "{deleted:?}");
 
-    let events = events_of(&cli, &id.to_uppercase());
-    assert!(events
-        .as_array()
-        .is_some_and(|events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id)));
+    let events = events_of(&cli, &id.as_str().to_uppercase());
+    assert!(events.as_array().is_some_and(
+        |events| !events.is_empty() && events.iter().all(|e| e["issue_id"] == id.as_str())
+    ));
 }
 
 /// `doc check-links --scope issue:<prefix>` resolves the scope's issue at the CLI.
@@ -320,7 +332,7 @@ fn test_cli_snapshot_export_issue_scope_resolves_short_prefix() {
     let cli = JitCli::initialised().unwrap();
     let from = cli.create_issue(["From"]).unwrap();
     let to = cli.create_issue(["To"]).unwrap();
-    cli.run(["dep", "add", &from, &to]).unwrap();
+    cli.run(["dep", "add", from.as_str(), to.as_str()]).unwrap();
 
     let out = cli.root().join("snapshot");
     let scope = format!("issue:{}", short(&from));
@@ -440,13 +452,19 @@ fn test_cli_gate_evaluation_and_run_loading_resolve_issue_spellings() {
     ])
     .unwrap();
     let id = cli.create_issue(["Gated", "--gate", "verified"]).unwrap();
-    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+    for spelling in [
+        short(&id),
+        id.as_str().to_uppercase(),
+        id.as_str().replace('-', ""),
+    ] {
         cli.run(["gate", "evaluate", &spelling, "verified"])
             .unwrap();
         let run = cli
             .run_json(["gate", "status", &spelling, "verified"])
             .unwrap();
-        let canonical = cli.run_json(["gate", "status", &id, "verified"]).unwrap();
+        let canonical = cli
+            .run_json(["gate", "status", id.as_str(), "verified"])
+            .unwrap();
         assert_eq!(run, canonical);
     }
 }
@@ -456,9 +474,15 @@ fn test_cli_document_reads_resolve_issue_spellings() {
     let cli = JitCli::initialised().unwrap();
     let id = cli.create_issue(["Documented"]).unwrap();
     std::fs::write(cli.root().join("document.md"), "# Document\n").unwrap();
-    cli.run(["doc", "add", &id, "document.md"]).unwrap();
-    let canonical = cli.run_json(["doc", "show", &id, "document.md"]).unwrap();
-    for spelling in [short(&id), id.to_uppercase(), id.replace('-', "")] {
+    cli.run(["doc", "add", id.as_str(), "document.md"]).unwrap();
+    let canonical = cli
+        .run_json(["doc", "show", id.as_str(), "document.md"])
+        .unwrap();
+    for spelling in [
+        short(&id),
+        id.as_str().to_uppercase(),
+        id.as_str().replace('-', ""),
+    ] {
         assert_eq!(
             cli.run_json(["doc", "show", &spelling, "document.md"])
                 .unwrap(),

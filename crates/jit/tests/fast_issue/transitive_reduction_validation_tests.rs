@@ -2,6 +2,7 @@
 //!
 //! Ensures the dependency DAG maintains its transitive reduction form with no
 //! redundant edges. Tests detection, auto-fix, and edge cases.
+use jit::domain::SHORT_ID_LENGTH;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -325,7 +326,8 @@ fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
     let msg = err.to_string();
     // The offending edge pair (A → C) must be named.
     assert!(
-        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        msg.contains(&a.as_str()[..SHORT_ID_LENGTH])
+            && msg.contains(&c.as_str()[..SHORT_ID_LENGTH]),
         "error must name the shadowed edge A→C, got: {msg}"
     );
     assert!(
@@ -361,7 +363,8 @@ fn test_dep_add_rejects_self_redundant_edge() {
         .expect_err("self-redundant add must be rejected");
     let msg = err.to_string();
     assert!(
-        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        msg.contains(&a.as_str()[..SHORT_ID_LENGTH])
+            && msg.contains(&c.as_str()[..SHORT_ID_LENGTH]),
         "error must name the redundant edge A→C, got: {msg}"
     );
 

@@ -4,6 +4,7 @@
 //! `Rejected`). Every surface reads that one rule: state transitions, the
 //! blocked query's reasons, `issue show` rendering, and the Ready-issue
 //! demotion that guards a newly added edge.
+use jit::domain::identity::IssueId;
 use jit::domain::queries::{query_blocked, BlockingReason};
 use jit::domain::State;
 use jit::output::IssueShowResponse;
@@ -11,7 +12,7 @@ use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
 /// Reject an issue outright, the way `jit issue update --state rejected` does.
-fn reject(h: &TestHarness, id: &jit::domain::identity::IssueId) {
+fn reject(h: &TestHarness, id: &IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::Rejected)

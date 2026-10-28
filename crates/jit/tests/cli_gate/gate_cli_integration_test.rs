@@ -220,6 +220,7 @@ fn test_gate_evaluate_json_failure_suggests_run_history_view() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["error"]["code"], "GATE_FAILED");
     assert!(
         json["error"]["suggestions"]
             .as_array()
@@ -265,6 +266,7 @@ fn test_gate_evaluate_json_failure_includes_lease_warnings() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["error"]["code"], "GATE_FAILED");
     let warnings = json["error"]["details"]["warnings"].as_array().unwrap();
     assert!(
         warnings
