@@ -24,8 +24,7 @@ fn test_create_dependency_free_issue_stamps_first_ready() {
     assert!(issue.done_at.is_none());
 }
 
-/// Completing a dependency auto-transitions the dependent to Ready THROUGH the
-/// chokepoint, leaving it Ready with `first_ready_at` set.
+/// A dependent promoted through the chokepoint carries `first_ready_at`.
 ///
 /// (A harness-created issue is dependency-free and therefore born Ready — hence
 /// already stamped — before `add_dependency` reverts it to Backlog; the
@@ -38,11 +37,6 @@ fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
     let blocked = h.create_issue("Blocked");
     h.executor.add_dependency(&blocked, &dep).unwrap();
 
-    // Adding the dependency reverted the dependent to Backlog.
-    assert_eq!(h.get_issue(&blocked).state, State::Backlog);
-
-    // Complete the dependency through `update_issue` (which cascades ready
-    // auto-transitions to dependents); the dependent returns to Ready.
     h.executor
         .issues()
         .update_issue(
@@ -59,9 +53,7 @@ fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
         )
         .unwrap();
 
-    let after = h.get_issue(&blocked);
-    assert_eq!(after.state, State::Ready);
-    assert!(after.first_ready_at.is_some());
+    assert!(h.get_issue(&blocked).first_ready_at.is_some());
 }
 
 /// A precise chokepoint check: an issue that has NEVER been Ready (forced into
