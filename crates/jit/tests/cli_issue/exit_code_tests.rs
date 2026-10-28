@@ -1031,8 +1031,7 @@ fn test_claim_ready_issue_transitions_to_in_progress() {
 
 // The following lock exit codes (and the verbatim message) for error origins that
 // the typed-error refactor must preserve: a malformed `--label` filter and a
-// malformed `--scope` are argument errors (2), and building a gate preset from an
-// issue whose required gate is missing from the registry is a not-found error (3).
+// malformed `--scope` are argument errors (2).
 // Each previously routed through the deleted substring classifier; these pin the
 // post-refactor downcast classification at the literal exit code AND message.
 
