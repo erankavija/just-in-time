@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "efb778d0-af25-44a7-a1f2-1664bd01bc3b",
+      "run_id": "aef6aa40-c9a7-483c-9528-9ed7acb70b9b",
       "status": "failed",
-      "updated_at": "2026-10-28T22:08:38.840942164Z",
+      "updated_at": "2026-10-28T23:07:18.207345405Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "profile tests read created ids from JSON output",
-  "updated_at": "2026-10-28T23:03:41.793033897Z"
+  "updated_at": "2026-10-28T23:07:18.207345405Z"
 }

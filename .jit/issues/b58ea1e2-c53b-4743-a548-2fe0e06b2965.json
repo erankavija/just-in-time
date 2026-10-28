@@ -8,6 +8,7 @@
   ],
   "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n",
   "documents": [],
+  "first_ready_at": "2026-10-28T23:10:10.417138952Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Label and strategic executor tests keep one wiring case each",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:10:10.417138952Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3558721b078d7b4e778c128e047fe48b813bbf96",
+  "completed_at": "2026-10-28T23:05:46.972986161Z",
+  "duration_ms": 123887,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed JSON-output migration satisfies the issue criteria and addresses the prior blocking finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5001b556-bf9a-42a0-b82e-bcbfaafd622e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "efda1593-a5c5-4344-813a-9e88eab85696",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:03:43.085677206Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2745ee30e, 3558721b (jit:5001b556)\nPolicy sources: AGENTS.md\nResolved items: @/issue/5001b556/requirement/REQ-01, REQ-02; @/issue/c780514e/requirement/REQ-05, REQ-06 (issue descriptions, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, semantic-test-assertions, orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed at 2026-10-28T23:03:41Z (exit code unavailable)\nTruncation recovery: recovered the initially truncated hierarchy patch with bounded per-commit/path reads and inspected current scoped files.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed JSON-output migration satisfies the issue criteria and addresses the prior blocking finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

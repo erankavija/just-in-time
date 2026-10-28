@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dd7dc610-70d2-474a-b318-d9cad355b3e8",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:07:30.803356491Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d3e2af2c-8ae9-4ec6-b923-b6e754f146ad",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:11:43.563761485Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d7c26016-7b28-497e-89ce-061e252cbf26",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cli_query_graph in-process tests use the shared constructors",
-  "updated_at": "2026-10-28T22:57:06.830094427Z"
+  "updated_at": "2026-10-28T23:11:43.563761485Z"
 }

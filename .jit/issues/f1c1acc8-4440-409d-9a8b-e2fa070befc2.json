@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3e6330d4-aee1-412f-a1e6-b835e9776cb6",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:07:35.509455404Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exit-code projection suite proves a binding behind each row",
-  "updated_at": "2026-10-28T22:57:07.532896161Z"
+  "updated_at": "2026-10-28T23:07:35.509455404Z"
 }
