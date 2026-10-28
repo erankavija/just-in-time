@@ -503,7 +503,7 @@ mod tests {
         let executor = memory_executor_declaring(
             storage.clone(),
             MemoryDeclarations {
-                absent: &[path.clone()],
+                absent: std::slice::from_ref(&path),
                 ..MemoryDeclarations::default()
             },
         );
