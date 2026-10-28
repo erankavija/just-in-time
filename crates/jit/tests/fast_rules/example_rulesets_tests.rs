@@ -603,40 +603,25 @@ mod sdd_criteria_label_match {
 
 mod sdd_lifecycle {
     use super::*;
-    use jit::commands::CommandExecutor;
+    use jit::commands::test_helpers::memory_executor;
     use jit::errors::TransitionBlockedError;
     use jit::storage::{InMemoryStorage, IssueStore};
 
-    /// Load the SDD example ruleset from disk and write it into an executor's
-    /// in-memory storage root so the executor picks it up as the operative set.
-    fn executor_with_sdd_example() -> CommandExecutor<InMemoryStorage> {
-        jit::test_mode::enable();
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), "").unwrap();
-        storage.add_data_file("config.toml", "");
-
-        // Read the example rules.toml and copy the schemas/ dir into the storage root.
+    /// Seed the SDD example ruleset and its schemas from disk into `storage`
+    /// so the executor over it picks them up as the operative set.
+    fn seed_sdd_example(storage: &InMemoryStorage) {
         let sdd_dir = example_dir("sdd");
-        let rules_toml = std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap();
-        std::fs::write(storage.root().join("rules.toml"), &rules_toml).unwrap();
-        storage.add_data_file("rules.toml", &rules_toml);
-
-        // Copy the schemas/ directory so json-schema references resolve.
-        let schemas_src = sdd_dir.join("schemas");
-        let schemas_dst = storage.root().join("schemas");
-        std::fs::create_dir_all(&schemas_dst).unwrap();
-        for entry in std::fs::read_dir(&schemas_src).unwrap() {
+        storage.add_data_file(
+            "rules.toml",
+            &std::fs::read_to_string(sdd_dir.join("rules.toml")).unwrap(),
+        );
+        for entry in std::fs::read_dir(sdd_dir.join("schemas")).unwrap() {
             let entry = entry.unwrap();
-            let content = std::fs::read_to_string(entry.path()).unwrap();
-            std::fs::write(schemas_dst.join(entry.file_name()), &content).unwrap();
             storage.add_data_file(
                 format!("schemas/{}", entry.file_name().to_string_lossy()),
-                &content,
+                &std::fs::read_to_string(entry.path()).unwrap(),
             );
         }
-
-        crate::memory_executor(storage)
     }
 
     /// A well-formed SDD spec body: Requirements, Scenarios, and Success Criteria.
@@ -692,7 +677,9 @@ mod sdd_lifecycle {
     // the executor must be blocked with TransitionBlockedError (exit 4).
     #[test]
     fn test_sdd_premature_done_blocked_by_coverage_rule() {
-        let executor = executor_with_sdd_example();
+        let storage = InMemoryStorage::new();
+        seed_sdd_example(&storage);
+        let executor = memory_executor(storage);
 
         // Seed an epic with a well-formed spec body and req:REQ-01, but NO child
         // that satisfies it. The epic is in-progress.
@@ -793,7 +780,9 @@ mod sdd_lifecycle {
     // must be able to transition to done without being blocked.
     #[test]
     fn test_sdd_happy_path_done_transition_succeeds() {
-        let executor = executor_with_sdd_example();
+        let storage = InMemoryStorage::new();
+        seed_sdd_example(&storage);
+        let executor = memory_executor(storage);
 
         // Seed the epic.
         let mut epic = crate::fixture_issue("Feature X".to_string(), sdd_spec_body());
@@ -1261,6 +1250,7 @@ mod cross_epic {
 
 mod research {
     use super::*;
+    use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 
     // -----------------------------------------------------------------------
     // Shared fixtures
@@ -1518,30 +1508,6 @@ mod research {
     // 5. Done-scoped coverage rule blocks transition via executor
     // -----------------------------------------------------------------------
 
-    /// Build an in-memory executor whose rules.toml is the research coverage
-    /// rule only (local schema rules are omitted to keep the test self-contained;
-    /// coverage is the graph rule under test here).
-    fn research_coverage_executor() -> CommandExecutor<InMemoryStorage> {
-        jit::test_mode::enable();
-        let storage = InMemoryStorage::new();
-        std::fs::create_dir_all(storage.root()).unwrap();
-        std::fs::write(storage.root().join("config.toml"), "").unwrap();
-        storage.add_data_file("config.toml", "");
-        // Write only the done-scoped coverage rule: no local schema rules needed
-        // because the graph test does not write through the write-path validator.
-        let rules_toml = r#"
-[[rules]]
-name = "research-hard-hypotheses-covered-at-done"
-when = { type = "goal", state = "done" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
-"#;
-        std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-        storage.add_data_file("rules.toml", rules_toml);
-        crate::memory_executor(storage)
-    }
-
     /// Seed an exact issue preimage at a given state, bypassing validation.
     fn seed(
         executor: &CommandExecutor<InMemoryStorage>,
@@ -1564,7 +1530,23 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         // but NO done experiment that tests it. The done transition must be
         // blocked by the enforcing coverage rule (exit 4 semantics via
         // TransitionBlockedError).
-        let executor = research_coverage_executor();
+        // Only the done-scoped coverage rule: no local schema rules are needed
+        // because the graph test does not write through the write-path validator.
+        let rules_toml = r#"
+[[rules]]
+name = "research-hard-hypotheses-covered-at-done"
+when = { type = "goal", state = "done" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies" } }
+"#;
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                rules: Some(rules_toml),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let goal_id = seed(
             &executor,

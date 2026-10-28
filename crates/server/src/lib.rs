@@ -97,21 +97,6 @@ mod recovery_startup_tests {
     use jit::storage::{PutFile, RedoRecord};
     use tempfile::TempDir;
 
-    /// A repository whose index the leftover `record` restores, so startup
-    /// validation passes only if the record was applied before it ran.
-    fn repository_missing_its_index(temp: &TempDir, record: impl FnOnce(&[u8]) -> RedoRecord) {
-        let data = temp.path().join(".jit");
-        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        CommandExecutor::new(JsonFileStorage::new(&data))
-            .with_layout(layout)
-            .initialize_fresh_repository(temp.path(), None)
-            .expect("a repository the server can serve");
-        let index = data.join("index.json");
-        let bytes = std::fs::read(&index).unwrap();
-        std::fs::remove_file(&index).unwrap();
-        record(&bytes).commit(&data).unwrap();
-    }
-
     /// REQ-02, REQ-03, REQ-04: a spelling through `..` components and the
     /// normalized one bind the same layout, so reads through either serve the
     /// repository's issues. Resolving a relative `--data-dir` against the
@@ -164,22 +149,25 @@ mod recovery_startup_tests {
 
     #[test]
     fn test_server_startup_applies_the_leftover_record_before_validation() {
-        let temp = TempDir::new().unwrap();
-        repository_missing_its_index(&temp, |bytes| {
-            RedoRecord::new(
-                Vec::new(),
-                vec![PutFile {
-                    path: VirtualPath::data("index.json").unwrap(),
-                    bytes: bytes.to_vec(),
-                    mode: FileMode::Regular,
-                }],
-                Vec::new(),
-                None,
-            )
-            .unwrap()
-        });
-
+        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
         let data = temp.path().join(".jit");
+        let index = data.join("index.json");
+        let bytes = std::fs::read(&index).unwrap();
+        std::fs::remove_file(&index).unwrap();
+        RedoRecord::new(
+            Vec::new(),
+            vec![PutFile {
+                path: VirtualPath::data("index.json").unwrap(),
+                bytes,
+                mode: FileMode::Regular,
+            }],
+            Vec::new(),
+            None,
+        )
+        .unwrap()
+        .commit(&data)
+        .unwrap();
+
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let (_storage, session) =
             prepare_server_storage(layout).expect("startup applies the record first");

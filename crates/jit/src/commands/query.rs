@@ -261,7 +261,7 @@ mod tests {
     fn test_query_available_delegates_filters_to_domain() {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
-        let mut issue = crate::domain::fixture_issue("Available".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Available".to_string(), String::new());
         issue.state = State::Ready;
         issue.priority = Priority::High;
         issue.labels = vec!["component:api".to_string()];

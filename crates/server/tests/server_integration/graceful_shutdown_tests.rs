@@ -16,11 +16,11 @@ use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::storage::{IssueStore, JsonFileStorage};
+use jit::storage::JsonFileStorage;
+use jit::test_utils::{file_executor, setup_test_repo};
 use jit_server::shutdown::{DRAIN_DEADLINE_MS_ENV, GRACEFUL_DRAIN_TIMEOUT};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
-use tempfile::TempDir;
 
 /// Longest the fixture waits for a freshly spawned server to report its port.
 ///
@@ -76,26 +76,10 @@ const CONFIGURED_DRAIN_DEADLINE: Duration = Duration::from_secs(1);
 /// well inside the observation's own [`EXCHANGE_BUDGET`].
 const STOPPED_OBSERVATION_WINDOW: Duration = Duration::from_secs(1);
 
-// ── Repository fixture ──────────────────────────────────────────────────────
-
-/// Builds the valid repository the server requires at startup.
-fn initialize_repository(worktree_root: &Path) {
-    executor_for(worktree_root)
-        .initialize_fresh_repository(worktree_root, None)
-        .expect("initialize the fixture repository");
-}
-
-fn executor_for(worktree_root: &Path) -> CommandExecutor<JsonFileStorage> {
-    let storage = JsonFileStorage::new(worktree_root.join(".jit"));
-    let layout = jit::storage::discover_repository_layout(worktree_root, storage.root())
-        .expect("discover the fixture repository layout");
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Writes a graph-relevant change into the watched repository, which the
 /// server's file watcher turns into an SSE `change` event.
-fn record_repository_change(worktree_root: &Path) {
-    executor_for(worktree_root)
+fn record_repository_change(executor: &CommandExecutor<JsonFileStorage>) {
+    executor
         .issues()
         .create_issue(
             "Live change".to_string(),
@@ -546,8 +530,8 @@ fn assert_survivor_drained_to_the_deadline(log: &str, deadline: Duration) {
 
 #[test]
 fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
+    let executor = file_executor(repository.path()).expect("open the fixture repository");
     let mut server = start_server_draining_for(
         repository.path(),
         "127.0.0.1:0",
@@ -563,7 +547,7 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     let mut stalled = open_registered_stalled_connection(server.port);
     let mut first_stream = open_event_stream(server.port);
     let mut second_stream = open_event_stream(server.port);
-    record_repository_change(repository.path());
+    record_repository_change(&executor);
     read_until(&mut first_stream, "event: change", EXCHANGE_BUDGET);
     read_until(&mut second_stream, "event: change", EXCHANGE_BUDGET);
     let mut completed = open_completed_connection(server.port);
@@ -640,8 +624,7 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
 /// close having happened.
 #[test]
 fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server_draining_for(
         repository.path(),
         "127.0.0.1:0",
@@ -677,8 +660,7 @@ fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
 /// the timeout out.
 #[test]
 fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_configured() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server(repository.path(), "127.0.0.1:0", "default.log");
 
     let signalled_at = Instant::now();
@@ -704,8 +686,7 @@ fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_confi
 /// test fails. Resuming the process is what lets the observation complete.
 #[test]
 fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut server = start_server(repository.path(), "127.0.0.1:0", "stopped.log");
 
     send_signal(server.pid(), Signal::SIGSTOP);
@@ -743,8 +724,7 @@ fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
 
 #[test]
 fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
-    let repository = TempDir::new().expect("create the fixture repository directory");
-    initialize_repository(repository.path());
+    let (repository, _storage) = setup_test_repo().expect("create the fixture repository");
     let mut first = start_server(repository.path(), "127.0.0.1:0", "first.log");
     let port = first.port;
 

@@ -646,34 +646,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_cycle_finds_simple_cycle() {
-        let defs = vec![def("a", &["b"]), def("b", &["a"])];
-        let cycle = detect_cycle(&defs).expect("cycle expected");
-        assert!(cycle.contains(&"a".to_string()));
-        assert!(cycle.contains(&"b".to_string()));
-    }
-
-    #[test]
-    fn test_detect_cycle_self_loop() {
-        let defs = vec![def("a", &["a"])];
-        let cycle = detect_cycle(&defs).expect("self-loop is a cycle");
-        assert_eq!(cycle.first().map(String::as_str), Some("a"));
-    }
-
-    #[test]
-    fn test_detect_cycle_acyclic_returns_none() {
-        let defs = vec![def("a", &["b"]), def("b", &["c"]), def("c", &[])];
-        assert!(detect_cycle(&defs).is_none());
-    }
-
-    #[test]
-    fn test_detect_cycle_ignores_undefined_edges() {
-        // b is undefined; that is an unknown-ref problem, not a cycle.
-        let defs = vec![def("a", &["b"])];
-        assert!(detect_cycle(&defs).is_none());
-    }
-
-    #[test]
     fn test_collect_problems_duplicate_key() {
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",

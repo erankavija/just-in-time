@@ -16,8 +16,9 @@ ruleset = "sdd"
 # Each step is a table with:
 #   argv     — jit subcommand + arguments as a string array (required).
 #              The "jit" binary itself is omitted; write ["issue", "create", ...]
-#   capture  — "id" (default) | "none" — "id" means extract the UUID from this
-#              step's output and store it in the slot named by `id_slot`.
+#   capture  — "id" (default) | "none" — "id" runs the step with `--json` and
+#              stores the created issue's `id` in the slot named by `id_slot`;
+#              the step must be a command whose JSON output carries that id.
 #              Use "none" for steps that do not create an issue.
 #   id_slot  — name of the variable that receives the captured UUID (string).
 #              Captured ids are referenced in later steps as "$<slot>", e.g.
@@ -29,7 +30,7 @@ ruleset = "sdd"
 #
 [[steps]]
 argv = ["issue", "create", "--title", "My Epic", "--label", "type:epic"]
-capture = "id"          # extract UUID from output
+capture = "id"          # read the created id from --json output
 id_slot = "epic"        # store as "$epic"
 # expect omitted -> exit 0 is asserted implicitly
 
