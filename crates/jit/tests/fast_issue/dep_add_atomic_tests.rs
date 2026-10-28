@@ -8,6 +8,7 @@
 use jit::errors::DependencyBatchRejectedError;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::issue_id;
 
 /// REQ-01 / REQ-03: `dep add A D C` where D is a valid new edge and C is
 /// self-redundant (already reachable through A's other dependencies) rejects
@@ -70,10 +71,11 @@ fn test_multiple_invalid_edges_are_all_named() {
     // is also requested, but here we pair it with an entirely different
     // failure class (an unresolvable id) to prove both get named.
     h.executor.add_dependency(&b, &c).unwrap();
+    let absent = issue_id(1);
 
     let result = h.executor.add_dependencies_with_policy(
         &a,
-        &[b.clone(), c.clone(), "nonexistent".to_string()],
+        &[b.clone(), c.clone(), absent.clone()],
         jit::commands::RedundancyPolicy::Reject,
     );
 
@@ -84,7 +86,7 @@ fn test_multiple_invalid_edges_are_all_named() {
 
     let named: Vec<&str> = batch.rejected().iter().map(|(to, _)| to.as_str()).collect();
     assert!(
-        named.contains(&"nonexistent"),
+        named.contains(&absent.as_str()),
         "the unresolvable id must be named: {named:?}"
     );
     assert!(
@@ -111,12 +113,13 @@ fn test_mixed_batch_rejections_preserve_request_order() {
     let cycle_target = h.create_issue("Cycle target");
 
     h.executor.add_dependency(&cycle_target, &a).unwrap();
+    let absent = issue_id(1);
 
     let error = h
         .executor
         .add_dependencies_with_policy(
             &a,
-            &[cycle_target.clone(), "zzzz".to_string()],
+            &[cycle_target.clone(), absent.clone()],
             jit::commands::RedundancyPolicy::Reject,
         )
         .expect_err("both the earlier cycle and later unresolved id must reject the batch");
@@ -128,7 +131,7 @@ fn test_mixed_batch_rejections_preserve_request_order() {
         .map(|(target, _)| target.as_str())
         .collect::<Vec<_>>();
 
-    assert_eq!(rejected, vec![cycle_target.as_str(), "zzzz"]);
+    assert_eq!(rejected, vec![cycle_target.as_str(), absent.as_str()]);
 }
 
 /// REQ-02 precision: a shadow-type redundancy must be attributed ONLY to the
