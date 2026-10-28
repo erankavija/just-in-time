@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "aeae8148-5f10-4f05-a328-19b1ffcff134",
+      "run_id": "839f4fb0-0bba-4db7-92be-42d95b86f577",
       "status": "passed",
-      "updated_at": "2026-10-28T22:14:09.086684414Z",
+      "updated_at": "2026-10-28T22:25:09.439888394Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Shared IssueStore conformance suite runs against both backends",
-  "updated_at": "2026-10-28T22:17:39.748174206Z"
+  "updated_at": "2026-10-28T22:25:09.439888394Z"
 }
