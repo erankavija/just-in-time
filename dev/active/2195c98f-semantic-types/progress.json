@@ -1421,6 +1421,13 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "mechanical fast_issue suite id retyping"
+    },
+    {
+      "issue": "b45a2865",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical fast_rules suite id retyping"
     }
   ],
   "surfaced_pitfalls": [
