@@ -178,13 +178,6 @@ fn assert_json_rejection_agrees(
 
 /// The directory `doc dir` names for `id` in `area`, requiring the run to
 /// succeed.
-pub(crate) fn resolve_directory(cli: &JitCli, id: &str, area: &str) -> String {
-    cli.run(["doc", "dir", id, area])
-        .unwrap()
-        .trim()
-        .to_string()
-}
-
 #[test]
 fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_declared_area() {
     let cli = JitCli::with_repository(setup_test_repo_with_config(&declared_config()).unwrap().0);
@@ -206,8 +199,16 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
         .create_issue(["--title", "Issue naming no membership value"])
         .unwrap();
 
-    let member_directory = resolve_directory(&cli, member.short_id(), area);
-    let bare_directory = resolve_directory(&cli, bare.short_id(), area);
+    let member_directory = cli
+        .run(["doc", "dir", member.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
+    let bare_directory = cli
+        .run(["doc", "dir", bare.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     [(&member, &member_directory), (&bare, &bare_directory)]
         .iter()
@@ -247,7 +248,11 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
     // The same repository resolves a declared area, so a rejection below is the
     // registry talking rather than the command being absent.
-    let declared_directory = resolve_directory(&cli, issue.short_id(), area);
+    let declared_directory = cli
+        .run(["doc", "dir", issue.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     [
         (
@@ -339,7 +344,11 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
         "an authored registry replaces the configured one"
     );
     assert!(
-        resolve_directory(&cli, issue.short_id(), authored).starts_with(&format!("{authored}/")),
+        cli.run(["doc", "dir", issue.short_id(), authored])
+            .unwrap()
+            .trim()
+            .to_string()
+            .starts_with(&format!("{authored}/")),
         "the resolved directory sits in the area the authored registry declares"
     );
 }
@@ -360,7 +369,11 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
         ])
         .unwrap();
 
-    let printed = resolve_directory(&cli, issue.short_id(), area);
+    let printed = cli
+        .run(["doc", "dir", issue.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
     let output = cli
         .command(["doc", "dir", issue.short_id(), area, "--json"])
         .output()
@@ -415,7 +428,10 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
 
     // The same area resolves for an issue that exists, so the rejection below
     // is the identifier and not the area.
-    resolve_directory(&cli, known.short_id(), area);
+    cli.run(["doc", "dir", known.short_id(), area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     let args = ["doc", "dir", unknown, area];
     let output = cli.command(args).output().unwrap();

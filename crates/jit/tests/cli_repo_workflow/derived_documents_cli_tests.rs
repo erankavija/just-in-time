@@ -4,7 +4,7 @@
 //! `doc_show_tests` module, and each owned directory is whatever `jit doc dir`
 //! resolves, so no expectation here restates the naming rule.
 
-use crate::doc_show_tests::{declared_area, declared_config, resolve_directory};
+use crate::doc_show_tests::{declared_area, declared_config};
 use crate::linked_checkout_write_policy_tests::store_bytes;
 use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
@@ -50,7 +50,11 @@ fn test_doc_list_includes_every_file_under_the_issue_artifact_directory_without_
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
-    let directory = resolve_directory(&cli, issue.short_id(), declared_area());
+    let directory = cli
+        .run(["doc", "dir", issue.short_id(), declared_area()])
+        .unwrap()
+        .trim()
+        .to_string();
     let owned = [
         format!("{directory}/plan.md"),
         format!("{directory}/notes/sketch.txt"),
@@ -78,7 +82,11 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
-    let directory = resolve_directory(&cli, issue.short_id(), declared_area());
+    let directory = cli
+        .run(["doc", "dir", issue.short_id(), declared_area()])
+        .unwrap()
+        .trim()
+        .to_string();
     let plan = format!("{directory}/plan.md");
     let design = format!("{directory}/design.md");
     write_file(
@@ -117,7 +125,11 @@ fn test_doc_show_displays_a_derived_document() {
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap();
-    let directory = resolve_directory(&cli, issue.short_id(), declared_area());
+    let directory = cli
+        .run(["doc", "dir", issue.short_id(), declared_area()])
+        .unwrap()
+        .trim()
+        .to_string();
     let plan = format!("{directory}/plan.md");
     write_file(cli.root(), &plan, "derived plan body\n");
 
@@ -147,7 +159,10 @@ fn test_doc_list_includes_artifacts_merged_from_a_linked_worktree_without_a_trac
         .unwrap();
     let artifact = format!(
         "{}/report.md",
-        resolve_directory(&primary, issue.short_id(), area)
+        primary
+            .run(["doc", "dir", issue.short_id(), area])
+            .unwrap()
+            .trim()
     );
 
     write_file(linked.root(), &artifact, "# worker report\n");
