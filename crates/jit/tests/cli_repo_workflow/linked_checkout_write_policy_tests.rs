@@ -13,6 +13,7 @@ use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
 use jit::domain::{EventBody, LinkedCheckoutWriteStance, Priority};
 use jit::storage::IssueStore;
+use jit::test_cli::{created_issue_id, JitCli};
 use std::path::Path;
 
 fn override_annotation(repository: &Path) -> jit::repository_state::MutationContextAnnotation {
@@ -143,68 +144,6 @@ const WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 /// can observe is then the policy's own (jit:1b6925a9).
 const ALLOW_DELETION_ENV: &str = "JIT_ALLOW_DELETION";
 
-/// A repository whose primary checkout has a linked non-primary checkout beside
-/// it, declaring no write stance, so the refusing default applies in the linked
-/// one.
-///
-/// Answers the temporary directory holding both checkouts (kept alive by the
-/// caller), the primary checkout's root, and the linked checkout's root.
-pub(crate) fn linked_checkout_fixture(
-) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
-    let temp = tempfile::TempDir::new().expect("create a temporary directory");
-    let primary = temp.path().join("main");
-    std::fs::create_dir(&primary).expect("create the primary checkout directory");
-
-    for arguments in [
-        vec!["init", "-q"],
-        vec!["config", "user.email", "fixture@example.com"],
-        vec!["config", "user.name", "Fixture"],
-    ] {
-        std::process::Command::new("git")
-            .current_dir(&primary)
-            .args(&arguments)
-            .assert()
-            .success();
-    }
-    std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&primary)
-        .arg("init")
-        .assert()
-        .success();
-    // The machine-local runtime state a live store carries under `.jit/` is
-    // gitignored in a tracked repository, and it is exactly the set the storage
-    // format reference names. `jit init` writes no ignore file, so the fixture
-    // states it before the base commit — and before the linked checkout exists,
-    // so both checkouts inherit it and neither commits the other's locks or
-    // worktree identity.
-    std::fs::write(
-        primary.join(".gitignore"),
-        ".jit/**/*.lock\n.jit/worktree.json\n.jit/server.log\n.jit/server.pid.json\n.jit/tmp/\n.jit-bootstrap.lock\n",
-    )
-    .expect("state the repository's machine-local ignores");
-    for arguments in [vec!["add", "-A"], vec!["commit", "-qm", "track with jit"]] {
-        std::process::Command::new("git")
-            .current_dir(&primary)
-            .args(&arguments)
-            .assert()
-            .success();
-    }
-
-    let linked = temp.path().join("feature");
-    std::process::Command::new("git")
-        .current_dir(&primary)
-        .args([
-            "worktree",
-            "add",
-            "-q",
-            linked.to_str().expect("utf-8 path"),
-        ])
-        .assert()
-        .success();
-
-    (temp, primary, linked)
-}
-
 /// Declare `stance` as `checkout`'s repository-level linked-checkout write stance,
 /// changing nothing else about the repository.
 ///
@@ -214,10 +153,10 @@ pub(crate) fn linked_checkout_fixture(
 /// keeps the declaration's only effect the one it is named for, so a test that
 /// declares a stance does not silently acquire lease enforcement it never asked
 /// for.
-fn declare_stance(checkout: &Path, stance: LinkedCheckoutWriteStance) {
+fn declare_stance(checkout: &JitCli, stance: LinkedCheckoutWriteStance) {
     let token = serde_json::to_value(stance).expect("the stance vocabulary serializes");
     let token = token.as_str().expect("a stance serializes as its token");
-    let config = checkout.join(".jit/config.toml");
+    let config = checkout.root().join(".jit/config.toml");
     let declared = std::fs::read_to_string(&config).expect("read the repository configuration")
         + &format!("\n[worktree]\nenforce_leases = \"off\"\nwrite_policy = \"{token}\"\n");
     std::fs::write(&config, declared).expect("declare the repository's write stance");
@@ -238,57 +177,16 @@ fn events_tagged<'a>(events: &'a [serde_json::Value], tag: &str) -> Vec<&'a serd
     events.iter().filter(|event| event["type"] == tag).collect()
 }
 
-/// Create one issue titled `title` in `checkout`, optionally supplying an
-/// invocation stance.
-pub(crate) fn create_issue_in(
-    checkout: &Path,
-    title: &str,
-    invocation_stance: Option<&str>,
-) -> assert_cmd::assert::Assert {
-    let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command.current_dir(checkout).args([
-        "issue",
-        "create",
-        title,
-        "-d",
-        "Created by the linked-checkout coverage",
-        "--json",
-    ]);
-    match invocation_stance {
-        Some(stance) => command.env(WRITE_STANCE_ENV, stance),
-        None => command.env_remove(WRITE_STANCE_ENV),
-    };
-    command.assert()
-}
+/// Arguments creating one issue in a checkout.
+const CREATE_ISSUE: [&str; 4] = ["issue", "create", "Permitted mutation", "--json"];
 
-/// The identifier of the issue a successful [`create_issue_in`] reported.
-pub(crate) fn created_issue_id(assert: assert_cmd::assert::Assert) -> String {
-    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
-    serde_json::from_str::<serde_json::Value>(&stdout)
-        .unwrap_or_else(|error| panic!("the creation prints one JSON document ({error}): {stdout}"))
-        ["id"]
-        .as_str()
-        .unwrap_or_else(|| panic!("the creation names the issue it created: {stdout}"))
-        .to_owned()
-}
-
-/// Delete `issue` in `checkout` with operator confirmation supplied, optionally
-/// supplying an invocation stance.
-fn delete_issue_in(
-    checkout: &Path,
-    issue: &str,
-    invocation_stance: Option<&str>,
-) -> assert_cmd::assert::Assert {
-    let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    command
-        .current_dir(checkout)
-        .env(ALLOW_DELETION_ENV, "1")
-        .args(["issue", "delete", issue, "--json"]);
-    match invocation_stance {
-        Some(stance) => command.env(WRITE_STANCE_ENV, stance),
-        None => command.env_remove(WRITE_STANCE_ENV),
-    };
-    command.assert()
+/// The id of the issue a successful creation reported.
+fn created_id(assert: assert_cmd::assert::Assert) -> String {
+    let stdout = &assert.get_output().stdout;
+    created_issue_id(
+        &serde_json::from_slice(stdout).expect("the creation prints one JSON document"),
+    )
+    .expect("the creation names the issue it created")
 }
 
 /// The event of `tag` naming `issue`, of which there must be exactly one.
@@ -313,10 +211,13 @@ fn issue_event<'a>(
 fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with_its_mutation() {
     // The repository declares nothing, so the refusing default is what the
     // invocation's own stance outranks — the only shape that warrants a record.
-    let (_temp, _primary, linked) = linked_checkout_fixture();
-    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    linked
+        .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, "allow")])
+        .assert()
+        .success();
 
-    let events = durable_events(&linked);
+    let events = durable_events(linked.root());
     let records = events_tagged(&events, "linked_checkout_write_overridden");
     assert_eq!(
         records.len(),
@@ -338,7 +239,7 @@ fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with
     .expect("the recorded checkout exists");
     assert_eq!(
         recorded_checkout,
-        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        std::fs::canonicalize(linked.root()).expect("the linked checkout exists"),
         "the record must name the linked checkout the invocation actually mutated"
     );
 
@@ -357,11 +258,11 @@ fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with
 fn test_linked_checkout_mutation_without_env_override_records_no_audit_event() {
     // Permitted by the declaration this test states for itself, so the
     // invocation supplies no override and there is none to record.
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
-    create_issue_in(&linked, "Permitted mutation", None).success();
+    linked.command(CREATE_ISSUE).assert().success();
 
-    let events = durable_events(&linked);
+    let events = durable_events(linked.root());
     assert!(
         events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
         "an invocation supplying no override must record none; events: {events:?}"
@@ -377,12 +278,15 @@ fn test_linked_checkout_mutation_permitted_by_declared_stance_records_no_audit_e
     // The repository's own declaration permits the mutation, so no override
     // outranked a refusal and the record's "stance that would have refused" has
     // no referent.
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
 
-    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
+    linked
+        .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, "allow")])
+        .assert()
+        .success();
 
-    let events = durable_events(&linked);
+    let events = durable_events(linked.root());
     assert!(
         events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
         "a mutation permitted by the declared stance records no override; events: {events:?}"
@@ -397,11 +301,9 @@ fn test_linked_checkout_mutation_permitted_by_declared_stance_records_no_audit_e
 fn test_invalid_env_write_stance_token_fails_the_invocation_naming_accepted_tokens() {
     // The stance is parsed before any repository work, so an unusable token
     // fails the invocation rather than being silently dropped.
-    let temp = tempfile::TempDir::new().expect("create a temporary directory");
-    let output = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env(WRITE_STANCE_ENV, "sometimes")
-        .arg("list")
+    let output = JitCli::uninitialised()
+        .unwrap()
+        .command_with_env(["list"], [(WRITE_STANCE_ENV, "sometimes")])
         .output()
         .expect("spawn the jit process");
 
@@ -470,13 +372,13 @@ fn refusal_envelope(assert: assert_cmd::assert::Assert) -> serde_json::Value {
 #[test]
 fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_event_log_untouched(
 ) {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
-    let before = store_bytes(&linked);
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    let before = store_bytes(linked.root());
 
-    create_issue_in(&linked, "Permitted mutation", None).failure();
+    linked.command(CREATE_ISSUE).assert().failure();
 
     assert_eq!(
-        store_bytes(&linked),
+        store_bytes(linked.root()),
         before,
         "a refused invocation runs before the repository mutation session opens, so not one \
          byte of the linked checkout's store — its issue records, its event log, or its \
@@ -486,9 +388,9 @@ fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_
 
 #[test]
 fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_to_permit() {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
 
-    let error = refusal_envelope(create_issue_in(&linked, "Permitted mutation", None).failure());
+    let error = refusal_envelope(linked.command(CREATE_ISSUE).assert().failure());
     let message = error["message"]
         .as_str()
         .expect("refusal carries an error message");
@@ -502,7 +404,7 @@ fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_t
     let diagnostic = format!("{message}\n{}\n{suggestions}", error["details"]["stance"]);
 
     assert!(
-        diagnostic.contains(&linked.display().to_string()),
+        diagnostic.contains(&linked.root().display().to_string()),
         "the refusal must name the linked checkout it refused in; error: {error}"
     );
     assert!(
@@ -520,9 +422,9 @@ fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_t
 
 #[test]
 fn test_linked_checkout_refusal_json_carries_the_checkout_the_refusing_stance_and_how_to_permit() {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
 
-    let error = refusal_envelope(create_issue_in(&linked, "Permitted mutation", None).failure());
+    let error = refusal_envelope(linked.command(CREATE_ISSUE).assert().failure());
 
     let named_checkout = std::fs::canonicalize(
         error["details"]["checkout"]
@@ -532,7 +434,7 @@ fn test_linked_checkout_refusal_json_carries_the_checkout_the_refusing_stance_an
     .expect("the named checkout exists");
     assert_eq!(
         named_checkout,
-        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        std::fs::canonicalize(linked.root()).expect("the linked checkout exists"),
         "the machine-readable refusal must name the same linked checkout the rendered one does"
     );
     assert_eq!(
@@ -558,13 +460,11 @@ fn test_linked_checkout_refusal_json_carries_the_checkout_the_refusing_stance_an
 
 #[test]
 fn test_read_only_invocation_in_a_linked_checkout_succeeds_under_either_stance() {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
 
     for stance in ["refuse", "allow"] {
-        std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(&linked)
-            .env(WRITE_STANCE_ENV, stance)
-            .args(["list", "--json"])
+        linked
+            .command_with_env(["list", "--json"], [(WRITE_STANCE_ENV, stance)])
             .assert()
             .success();
     }
@@ -572,10 +472,13 @@ fn test_read_only_invocation_in_a_linked_checkout_succeeds_under_either_stance()
 
 #[test]
 fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance() {
-    let (_temp, primary, _linked) = linked_checkout_fixture();
+    let (primary, _linked) = JitCli::linked_checkouts().unwrap();
 
     for stance in ["refuse", "allow"] {
-        create_issue_in(&primary, "Permitted mutation", Some(stance)).success();
+        primary
+            .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, stance)])
+            .assert()
+            .success();
     }
 }
 
@@ -586,12 +489,24 @@ fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance
 
 #[test]
 fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_before_any_write() {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
-    let issue =
-        created_issue_id(create_issue_in(&linked, "Permitted mutation", Some("allow")).success());
-    let before = store_bytes(&linked);
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue = created_id(
+        linked
+            .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, "allow")])
+            .assert()
+            .success(),
+    );
+    let before = store_bytes(linked.root());
 
-    let error = refusal_envelope(delete_issue_in(&linked, &issue, None).failure());
+    let error = refusal_envelope(
+        linked
+            .command_with_env(
+                ["issue", "delete", &issue, "--json"],
+                [(ALLOW_DELETION_ENV, "1")],
+            )
+            .assert()
+            .failure(),
+    );
 
     assert_eq!(
         error["code"],
@@ -607,7 +522,7 @@ fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_befo
     .expect("the named checkout exists");
     assert_eq!(
         named_checkout,
-        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        std::fs::canonicalize(linked.root()).expect("the linked checkout exists"),
         "the refusal must name the linked checkout the deletion would have mutated"
     );
     assert_eq!(
@@ -616,7 +531,7 @@ fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_befo
         "the refusal must name the stance that refused the deletion; error: {error}"
     );
     assert_eq!(
-        store_bytes(&linked),
+        store_bytes(linked.root()),
         before,
         "a refused deletion runs before the repository mutation session opens, so not one byte \
          of the linked checkout's store — the issue it targeted, the event log, or the index — \
@@ -626,22 +541,27 @@ fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_befo
 
 #[test]
 fn test_delete_issue_in_a_linked_checkout_permitted_by_the_declared_stance_removes_the_issue() {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
-    let issue = created_issue_id(create_issue_in(&linked, "Permitted mutation", None).success());
+    let issue = created_id(linked.command(CREATE_ISSUE).assert().success());
 
-    delete_issue_in(&linked, &issue, None).success();
+    linked
+        .command_with_env(
+            ["issue", "delete", &issue, "--json"],
+            [(ALLOW_DELETION_ENV, "1")],
+        )
+        .assert()
+        .success();
 
-    let events = durable_events(&linked);
+    let events = durable_events(linked.root());
     issue_event(&events, "issue_deleted", &issue);
     assert!(
         events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
         "a deletion permitted by the declared stance overrode no refusal, so it records none; \
          events: {events:?}"
     );
-    std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&linked)
-        .args(["issue", "show", &issue, "--json"])
+    linked
+        .command(["issue", "show", &issue, "--json"])
         .assert()
         .failure();
 }
@@ -652,15 +572,28 @@ fn test_delete_issue_in_a_linked_checkout_under_an_invocation_override_records_t
     // The repository declares nothing, so the refusing default is what the
     // invocation's own stance outranks — and a permitted deletion owes the same
     // audit record every other permitted override does.
-    let (_temp, _primary, linked) = linked_checkout_fixture();
-    let issue =
-        created_issue_id(create_issue_in(&linked, "Permitted mutation", Some("allow")).success());
-    let overrides_before =
-        events_tagged(&durable_events(&linked), "linked_checkout_write_overridden").len();
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue = created_id(
+        linked
+            .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, "allow")])
+            .assert()
+            .success(),
+    );
+    let overrides_before = events_tagged(
+        &durable_events(linked.root()),
+        "linked_checkout_write_overridden",
+    )
+    .len();
 
-    delete_issue_in(&linked, &issue, Some("allow")).success();
+    linked
+        .command_with_env(
+            ["issue", "delete", &issue, "--json"],
+            [(ALLOW_DELETION_ENV, "1"), (WRITE_STANCE_ENV, "allow")],
+        )
+        .assert()
+        .success();
 
-    let events = durable_events(&linked);
+    let events = durable_events(linked.root());
     let deletion = issue_event(&events, "issue_deleted", &issue);
     let records = events_tagged(&events, "linked_checkout_write_overridden");
     assert_eq!(
@@ -687,18 +620,17 @@ fn test_delete_issue_in_a_linked_checkout_under_an_invocation_override_records_t
 #[test]
 fn test_mutating_invocation_outside_version_control_succeeds_under_either_stance() {
     for stance in ["refuse", "allow"] {
-        let temp = tempfile::TempDir::new().expect("create a temporary directory");
+        let cli = JitCli::uninitialised().unwrap();
         assert!(
-            !temp.path().join(".git").exists(),
+            !cli.root().join(".git").exists(),
             "the fixture models a repository outside version control"
         );
-        std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-            .current_dir(temp.path())
-            .env(WRITE_STANCE_ENV, stance)
-            .arg("init")
+        cli.command_with_env(["init"], [(WRITE_STANCE_ENV, stance)])
             .assert()
             .success();
-        create_issue_in(temp.path(), "Permitted mutation", Some(stance)).success();
+        cli.command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, stance)])
+            .assert()
+            .success();
     }
 }
 
@@ -712,8 +644,8 @@ fn test_mutating_invocation_outside_version_control_succeeds_under_either_stance
 // of the field incident this policy exists to prevent), and that a stance
 // change the adopter declares between invocations takes effect on an
 // already-existing checkout without recreating it.
-fn redeclare_stance(checkout: &Path, base_config: &str, stance: LinkedCheckoutWriteStance) {
-    let config = checkout.join(".jit/config.toml");
+fn redeclare_stance(checkout: &JitCli, base_config: &str, stance: LinkedCheckoutWriteStance) {
+    let config = checkout.root().join(".jit/config.toml");
     let declared = format!(
         "{base_config}\n[worktree]\nwrite_policy = \"{}\"\n",
         stance.as_token()
@@ -724,18 +656,18 @@ fn redeclare_stance(checkout: &Path, base_config: &str, stance: LinkedCheckoutWr
 #[test]
 fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_then_override_permit_on_one_checkout(
 ) {
-    let (_temp, _primary, linked) = linked_checkout_fixture();
-    let config_path = linked.join(".jit/config.toml");
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    let config_path = linked.root().join(".jit/config.toml");
     let base_config =
         std::fs::read_to_string(&config_path).expect("read the base repository configuration");
 
     // Leg 1: no declared stance (the refusing default), no invocation
     // override. The invocation is refused and the checkout's store is
     // byte-identical afterward.
-    let before_refusal = store_bytes(&linked);
-    create_issue_in(&linked, "Permitted mutation", None).failure();
+    let before_refusal = store_bytes(linked.root());
+    linked.command(CREATE_ISSUE).assert().failure();
     assert_eq!(
-        store_bytes(&linked),
+        store_bytes(linked.root()),
         before_refusal,
         "a refused invocation must leave no partial state on the checkout for a later, \
          permitted mutation on the same checkout to inherit"
@@ -744,8 +676,8 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     // Leg 2: the checkout now declares the permitting stance. The same
     // invocation, needing no override, lands cleanly and records no override.
     redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Allow);
-    create_issue_in(&linked, "Permitted mutation", None).success();
-    let events_after_declared_permit = durable_events(&linked);
+    linked.command(CREATE_ISSUE).assert().success();
+    let events_after_declared_permit = durable_events(linked.root());
     assert!(
         events_tagged(
             &events_after_declared_permit,
@@ -767,8 +699,11 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     // invocation's own override can permit the next mutation on this same
     // checkout.
     redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Refuse);
-    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
-    let events_after_override = durable_events(&linked);
+    linked
+        .command_with_env(CREATE_ISSUE, [(WRITE_STANCE_ENV, "allow")])
+        .assert()
+        .success();
+    let events_after_override = durable_events(linked.root());
     let override_records =
         events_tagged(&events_after_override, "linked_checkout_write_overridden");
     assert_eq!(
@@ -792,7 +727,7 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     .expect("the recorded checkout exists");
     assert_eq!(
         recorded_checkout,
-        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        std::fs::canonicalize(linked.root()).expect("the linked checkout exists"),
         "the record must name the very checkout that carried all three legs of the journey"
     );
     assert_eq!(

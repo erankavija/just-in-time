@@ -95,3 +95,8 @@ pub(crate) fn install_templates(cli: &jit::test_cli::JitCli, templates_toml: &st
             .unwrap();
         });
 }
+
+pub(crate) const ALLOW_LINKED_WRITES: (&str, &str) = (
+    jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV,
+    jit::domain::LinkedCheckoutWriteStance::Allow.as_token(),
+);
