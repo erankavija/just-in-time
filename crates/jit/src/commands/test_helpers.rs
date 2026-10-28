@@ -344,11 +344,6 @@ pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
 }
 
-/// Decode an issue identity at the fixture boundary.
-pub(crate) fn fixture_id(value: &str) -> IssueId {
-    value.parse().expect("fixture issue id is a canonical UUID")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

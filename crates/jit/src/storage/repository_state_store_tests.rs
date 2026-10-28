@@ -1578,7 +1578,7 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
         run_id: run_id.to_string(),
         gate_key: "cargo-ci".to_string(),
         stage: crate::declarations::GateStage::Postcheck,
-        issue_id: "issue-1".to_string(),
+        issue_id: crate::test_utils::issue_id(7),
         commit: Some("abc123".to_string()),
         branch: Some("main".to_string()),
         status: crate::domain::GateRunStatus::Passed,

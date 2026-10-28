@@ -183,9 +183,7 @@ mod tests {
             severity: Severity::Error,
             message: "some message".into(),
         };
-        let issue_id = "1c5da41d-e1b3-475c-818d-324f57dd716b"
-            .parse::<IssueId>()
-            .unwrap();
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
         let reported = ReportedFinding::new(Some(issue_id.clone()), &finding);
         let serialized = serde_json::to_string(&reported).unwrap();
         let back: serde_json::Value = serde_json::from_str(&serialized).unwrap();
@@ -280,9 +278,7 @@ mod tests {
             passed,
             messages: if passed { Vec::new() } else { vec!["m".into()] },
         };
-        let issue_id = "1c5da41d-e1b3-475c-818d-324f57dd716b"
-            .parse::<IssueId>()
-            .unwrap();
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
         let warn_fail = ExplainReport {
             issue_id: issue_id.clone(),
             outcomes: vec![outcome_with(Severity::Warn, false)],

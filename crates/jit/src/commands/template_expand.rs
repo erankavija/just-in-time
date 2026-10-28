@@ -150,6 +150,7 @@ pub struct TemplateDelta {
 /// let template = registry.get("plan").unwrap();
 ///
 /// let mut container = Issue::draft("Auth epic".to_string(), String::new());
+/// container.id = jit::test_utils::issue_id(1);
 /// container.labels = vec!["type:epic".to_string()];
 /// let bindings = BTreeMap::from([("container".to_string(), container.id.clone())]);
 /// let snapshots = BTreeMap::from([("container".to_string(), vec![])]);
@@ -820,7 +821,6 @@ applies_to = ["epic"]
 mod tests {
     use super::test_declarations::*;
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
 
     fn plan_template() -> GraphTemplate {
         template_from(
@@ -855,12 +855,18 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_produces_creates_edges_and_removals() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
-            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
+            &snapshots(&[crate::test_utils::issue_id(
+                0xe43d5fd0be09872b0a8d7d56be970bc3,
+            )]),
         )
         .unwrap();
 
@@ -885,15 +891,15 @@ applies_to = ["epic"]
                     dependency: DeltaEndpoint::CreatedRole("planning".to_string()),
                 },
                 DeltaEdge {
-                    dependent: DeltaEndpoint::ExistingIssue(fixture_id(
-                        "1590ce6c-9129-512f-befc-1e8508dc7963"
+                    dependent: DeltaEndpoint::ExistingIssue(crate::test_utils::issue_id(
+                        0x9129512fbefc1e8508dc79631590ce6c
                     )),
                     dependency: DeltaEndpoint::CreatedRole("breakdown".to_string()),
                 },
                 DeltaEdge {
                     dependent: DeltaEndpoint::CreatedRole("planning".to_string()),
-                    dependency: DeltaEndpoint::ExistingIssue(fixture_id(
-                        "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                    dependency: DeltaEndpoint::ExistingIssue(crate::test_utils::issue_id(
+                        0xe43d5fd0be09872b0a8d7d56be970bc3
                     )),
                 },
             ]
@@ -903,11 +909,11 @@ applies_to = ["epic"]
         assert_eq!(
             delta.remove_edges,
             vec![DeltaEdge {
-                dependent: DeltaEndpoint::ExistingIssue(fixture_id(
-                    "1590ce6c-9129-512f-befc-1e8508dc7963"
+                dependent: DeltaEndpoint::ExistingIssue(crate::test_utils::issue_id(
+                    0x9129512fbefc1e8508dc79631590ce6c
                 )),
-                dependency: DeltaEndpoint::ExistingIssue(fixture_id(
-                    "be970bc3-e43d-5fd0-be09-872b0a8d7d56"
+                dependency: DeltaEndpoint::ExistingIssue(crate::test_utils::issue_id(
+                    0xe43d5fd0be09872b0a8d7d56be970bc3
                 )),
             }]
         );
@@ -916,7 +922,9 @@ applies_to = ["epic"]
         assert_eq!(
             delta.anchor_gates,
             vec![AnchorGates {
-                anchor_issue_id: fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                anchor_issue_id: crate::test_utils::issue_id(
+                    0x9129_512f_befc_1e85_08dc_7963_1590_ce6c
+                ),
                 gates: vec!["repo-validate".to_string()],
             }]
         );
@@ -926,11 +934,15 @@ applies_to = ["epic"]
     fn test_expand_template_moves_only_pre_apply_upstream_deps() {
         // The transform reads the SNAPSHOT, so an id absent from it is never
         // moved even when the same delta wires an edge to it (APPB-02).
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
             &snapshots(&[]),
         )
         .unwrap();
@@ -951,7 +963,9 @@ applies_to = ["epic"]
             .expect("plan template declares a breakdown node")
             .labels = vec!["custom-anchor:{container.short_id}".to_string()];
 
-        let container = container(&fixture_id("abcdef12-3456-0000-0000-000000000000"));
+        let container = container(&crate::test_utils::issue_id(
+            0x345600000000000000000000abcdef12,
+        ));
         let delta = expand(
             &template,
             &container,
@@ -972,7 +986,9 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_unbound_anchor() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let err = expand(
             &plan_template(),
             &container,
@@ -1015,13 +1031,17 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_declared_document_area_into_the_document_path() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let template = document_template("{container.dir}/plan.md", Some(AREA));
 
         let delta = expand(
             &template,
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1040,7 +1060,9 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_rejects_a_document_area_the_registry_does_not_declare() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         // A sibling of the declared area: close enough that only the registry
         // distinguishes it.
         let undeclared = format!("{AREA}-drafts");
@@ -1049,7 +1071,9 @@ applies_to = ["epic"]
         let error = expand(
             &template,
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
             &snapshots(&[]),
         )
         .unwrap_err();
@@ -1073,7 +1097,9 @@ applies_to = ["epic"]
         assert!(expand(
             &document_template("{container.dir}/plan.md", Some(AREA)),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c
+            )),
             &snapshots(&[]),
         )
         .is_ok());
@@ -1081,14 +1107,18 @@ applies_to = ["epic"]
 
     #[test]
     fn test_expand_template_resolves_a_node_that_declares_no_document_area_without_a_directory() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
 
         // A flat area-plus-prefix declaration resolves from the container tokens
         // alone.
         let flat = expand(
             &document_template("dev/active/{container.short_id}-plan.md", None),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1102,7 +1132,9 @@ applies_to = ["epic"]
         let unscoped = expand(
             &document_template("{container.dir}/plan.md", None),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
             &snapshots(&[]),
         )
         .unwrap();
@@ -1111,20 +1143,31 @@ applies_to = ["epic"]
 
     #[test]
     fn test_validate_delta_acyclic_accepts_the_plan_spine() {
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let delta = expand(
             &plan_template(),
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
-            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
+            &snapshots(&[crate::test_utils::issue_id(
+                0xe43d5fd0be09872b0a8d7d56be970bc3,
+            )]),
         )
         .unwrap();
         let store = BTreeMap::from([
             (
-                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
-                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+                crate::test_utils::issue_id(0x9129_512f_befc_1e85_08dc_7963_1590_ce6c),
+                vec![crate::test_utils::issue_id(
+                    0xe43d5fd0be09872b0a8d7d56be970bc3,
+                )],
             ),
-            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
+            (
+                crate::test_utils::issue_id(0xe43d_5fd0_be09_872b_0a8d_7d56_be97_0bc3),
+                vec![],
+            ),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
     }
@@ -1158,30 +1201,39 @@ applies_to = ["epic"]
 "#,
             "cyclic",
         );
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let bindings = BTreeMap::from([
             (
                 "container".to_string(),
-                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
+                crate::test_utils::issue_id(0x9129_512f_befc_1e85_08dc_7963_1590_ce6c),
             ),
             (
                 "upstream".to_string(),
-                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
+                crate::test_utils::issue_id(0xe43d_5fd0_be09_872b_0a8d_7d56_be97_0bc3),
             ),
         ]);
         let delta = expand(
             &template,
             &container,
             &bindings,
-            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+            &snapshots(&[crate::test_utils::issue_id(
+                0xe43d5fd0be09872b0a8d7d56be970bc3,
+            )]),
         )
         .unwrap();
         let store = BTreeMap::from([
             (
-                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
-                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+                crate::test_utils::issue_id(0x9129_512f_befc_1e85_08dc_7963_1590_ce6c),
+                vec![crate::test_utils::issue_id(
+                    0xe43d5fd0be09872b0a8d7d56be970bc3,
+                )],
             ),
-            (fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"), vec![]),
+            (
+                crate::test_utils::issue_id(0xe43d_5fd0_be09_872b_0a8d_7d56_be97_0bc3),
+                vec![],
+            ),
         ]);
         let err = validate_delta_acyclic(&delta, store).unwrap_err();
         assert!(err.to_string().contains("cycle"), "{err}");
@@ -1208,24 +1260,34 @@ applies_to = ["epic"]
 "#,
             "mover",
         );
-        let container = container(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"));
+        let container = container(&crate::test_utils::issue_id(
+            0x9129512fbefc1e8508dc79631590ce6c,
+        ));
         let delta = expand(
             &template,
             &container,
-            &bindings(&fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")),
-            &snapshots(&[fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")]),
+            &bindings(&crate::test_utils::issue_id(
+                0x9129512fbefc1e8508dc79631590ce6c,
+            )),
+            &snapshots(&[crate::test_utils::issue_id(
+                0xe43d5fd0be09872b0a8d7d56be970bc3,
+            )]),
         )
         .unwrap();
         // u1 depends on c1, and c1 depends on u1: the store is already cyclic
         // EXCEPT that the transform removes c1→u1, leaving u1→c1 and P→u1.
         let store = BTreeMap::from([
             (
-                fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963"),
-                vec![fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56")],
+                crate::test_utils::issue_id(0x9129_512f_befc_1e85_08dc_7963_1590_ce6c),
+                vec![crate::test_utils::issue_id(
+                    0xe43d5fd0be09872b0a8d7d56be970bc3,
+                )],
             ),
             (
-                fixture_id("be970bc3-e43d-5fd0-be09-872b0a8d7d56"),
-                vec![fixture_id("1590ce6c-9129-512f-befc-1e8508dc7963")],
+                crate::test_utils::issue_id(0xe43d_5fd0_be09_872b_0a8d_7d56_be97_0bc3),
+                vec![crate::test_utils::issue_id(
+                    0x9129512fbefc1e8508dc79631590ce6c,
+                )],
             ),
         ]);
         assert!(validate_delta_acyclic(&delta, store).is_ok());
@@ -1251,7 +1313,7 @@ applies_to = ["epic"]
             "Auth epic".to_string(),
             "- [hard] REQ-01: x".to_string(),
         );
-        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
         let node = TemplateNode {
             role: "planning".to_string(),
             type_name: "planning".to_string(),
@@ -1268,8 +1330,8 @@ applies_to = ["epic"]
         let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
         let rendered = node_description(&node, &ctx);
         assert!(rendered.contains("Auth epic"));
-        assert!(rendered.contains("abc123de")); // short id (8 chars)
-        assert!(rendered.contains("dev/active/abc123de-f456-0000-0000-000000000000-plan.md")); // {doc}
+        assert!(rendered.contains(&issue.short_id()));
+        assert!(rendered.contains(&format!("dev/active/{}-plan.md", issue.id)));
         assert!(rendered.contains("[hard] REQ-01: x"));
     }
 
@@ -1321,7 +1383,7 @@ applies_to = ["epic"]
         // templating language: an unsupported `{token}` is left untouched while the
         // known container tokens around it still resolve.
         let mut issue = crate::test_utils::fixture_issue("Auth epic".to_string(), String::new());
-        issue.id = fixture_id("abc123de-f456-0000-0000-000000000000");
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
         let ctx = InterpolationContext::for_container(&issue);
         let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
         assert_eq!(rendered, "Auth epic then {totally.unknown} end");
@@ -1333,7 +1395,9 @@ applies_to = ["epic"]
         // membership labels (NOT the container's own `type:`), the node's own
         // `type:<node.type>`, and its interpolated `labels`. The `{container.short_id}`
         // token in a node label must resolve to the container's short id.
-        let container = container(&fixture_id("abc123de-f456-0000-0000-000000000000"));
+        let container = container(&crate::test_utils::issue_id(
+            0xf45600000000000000000000abc123de,
+        ));
         let short = container.short_id();
 
         let node = TemplateNode {

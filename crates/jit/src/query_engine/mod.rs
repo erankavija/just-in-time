@@ -64,7 +64,6 @@ impl QueryFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::{Issue, Priority, State};
 
     fn create_test_issue(
@@ -130,19 +129,19 @@ mod tests {
     fn test_filter_by_state() {
         let issues = vec![
             create_test_issue(
-                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
                 State::Ready,
                 Priority::Normal,
                 vec![],
             ),
             create_test_issue(
-                &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+                &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
                 State::Done,
                 Priority::Normal,
                 vec![],
             ),
             create_test_issue(
-                &fixture_id("b309dea0-e93c-56db-9922-c57f00081a4f"),
+                &crate::test_utils::issue_id(0xe93c_56db_9922_c57f_0008_1a4f_b309_dea0),
                 State::Ready,
                 Priority::High,
                 vec![],
@@ -161,13 +160,13 @@ mod tests {
     fn test_filter_by_priority() {
         let issues = vec![
             create_test_issue(
-                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
                 State::Ready,
                 Priority::High,
                 vec![],
             ),
             create_test_issue(
-                &fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+                &crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
                 State::Ready,
                 Priority::Normal,
                 vec![],

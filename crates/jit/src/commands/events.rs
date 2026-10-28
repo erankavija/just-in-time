@@ -107,11 +107,9 @@ mod tests {
             executor
                 .query_events(
                     None,
-                    Some(IssueIdPrefix::from(
-                        &"00000000-0000-0000-0000-000000000001"
-                            .parse::<crate::domain::identity::IssueId>()
-                            .unwrap()
-                    )),
+                    Some(IssueIdPrefix::from(&crate::test_utils::issue_id(
+                        0x100000000
+                    ))),
                     10,
                 )
                 .expect("the event query succeeds")

@@ -1044,18 +1044,6 @@ mod tests {
     }
 
     #[test]
-    fn test_copy_jit_state_rejects_malformed_issue_id_without_escape() {
-        let storage = InMemoryStorage::new();
-        let exporter = exporter(&storage);
-        let staging = tempfile::tempdir().unwrap();
-        let mut issue = crate::test_utils::fixture_issue("Issue".into(), String::new());
-        issue.id = "../../../escaped".into();
-
-        assert!(exporter.copy_jit_state(staging.path(), &[issue]).is_err());
-        assert!(!staging.path().join("escaped.json").exists());
-    }
-
-    #[test]
     fn test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors() {
         let temp = tempfile::tempdir().unwrap();
         let repo = git2::Repository::init(temp.path()).unwrap();

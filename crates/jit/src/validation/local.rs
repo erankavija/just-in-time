@@ -221,6 +221,7 @@ impl LocalEvaluation {
 /// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
 /// let mut task = Issue::draft("A task".to_string(), String::new());
+/// task.id = jit::test_utils::issue_id(1);
 /// task.labels = vec!["type:task".to_string()];
 /// let evaluation = evaluate_local(&task, &rules, ContentFormat::Markdown).unwrap();
 /// // A warn rule produces a (non-blocking) finding.

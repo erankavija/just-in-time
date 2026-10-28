@@ -4490,7 +4490,6 @@ enforce_leases = "strict"
 
     #[test]
     fn test_claims_guard_uses_explicit_layout_not_process_cwd() {
-        use crate::commands::test_helpers::fixture_id;
         use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use std::time::Duration;
@@ -4506,7 +4505,7 @@ enforce_leases = "strict"
             "agent:test".parse().unwrap(),
         );
         coordinator.init().unwrap();
-        let issue_id = fixture_id("0f0e0d0c-0000-4000-8000-000000000001");
+        let issue_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
         coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 

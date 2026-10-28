@@ -441,12 +441,8 @@ mod tests {
     #[test]
     fn test_resolve_dependency_id_matches_the_one_stored_dependency_named() {
         let dependencies = vec![
-            "abcd1234-0000-0000-0000-000000000001"
-                .parse::<crate::domain::identity::IssueId>()
-                .unwrap(),
-            "ef012345-0000-0000-0000-000000000002"
-                .parse::<crate::domain::identity::IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x1_abcd_1234),
+            crate::test_utils::issue_id(0x2_ef01_2345),
         ];
         let prefix = "ABCD1234".parse::<IssueIdPrefix>().unwrap();
 
@@ -459,12 +455,8 @@ mod tests {
     #[test]
     fn test_resolve_dependency_id_reports_not_found_and_ambiguous_dependency() {
         let dependencies = vec![
-            "abcd1234-0000-0000-0000-000000000001"
-                .parse::<crate::domain::identity::IssueId>()
-                .unwrap(),
-            "abcd1234-0000-0000-0000-000000000002"
-                .parse::<crate::domain::identity::IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x1_abcd_1234),
+            crate::test_utils::issue_id(0x2_abcd_1234),
         ];
         let resolve = |prefix: &str| {
             resolve_dependency_id(&prefix.parse::<IssueIdPrefix>().unwrap(), &dependencies)

@@ -457,11 +457,12 @@ mod tests {
 
     #[test]
     fn test_report_area_artifacts_reports_an_unresolvable_prefix_as_unattributed() {
-        let owner = issue("artifact-layout");
+        let mut owner = issue("artifact-layout");
+        owner.id = crate::test_utils::issue_id(1);
         let twin = {
             // Two issues sharing a short id: the prefix answers to no single one.
             let mut twin = issue("other-initiative");
-            twin.id = format!("{}{}", owner.short_id(), &twin.id[SHORT_ID_LENGTH..]);
+            twin.id = crate::test_utils::issue_id((1 << 32) | 1);
             twin
         };
         let unknown = format!("{AREA}/deadbeef-plan.md");

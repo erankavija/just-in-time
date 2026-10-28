@@ -1385,18 +1385,6 @@ fn acquire_claim_when_reached(
     }
 }
 
-/// A canonical issue id derived deterministically from a readable `label`.
-/// Named exception to `@/inv/convention-convergence`: replaced by the shared
-/// fixture from 0af95f14.
-#[cfg(test)]
-pub(crate) fn test_issue_id(label: &str) -> IssueId {
-    let hash = label.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
-    });
-    IssueId::try_from(format!("00000000-0000-4000-8000-{:012x}", hash >> 16))
-        .expect("a formatted hyphenated UUID is a canonical issue id")
-}
-
 /// The claimants contending for one coordinator's claims lock, and what they
 /// have achieved against it.
 ///
@@ -1442,7 +1430,7 @@ mod tests {
         let now = Utc::now();
         Lease {
             lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
-            issue_id: test_issue_id("issue-x"),
+            issue_id: crate::test_utils::issue_id(8),
             agent_id: "agent:1".parse().unwrap(),
             worktree_id: "wt:abc123".parse().unwrap(),
             branch: Some("main".to_string()),
@@ -1520,10 +1508,10 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-001"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(9), 600)
             .unwrap();
 
-        assert_eq!(lease.issue_id, test_issue_id("issue-001"));
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(9));
         assert_eq!(lease.agent_id.to_string(), "agent:test");
         assert_eq!(lease.worktree_id.as_str(), "wt:test123");
         assert_eq!(lease.ttl_secs, 600);
@@ -1535,7 +1523,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&test_issue_id("issue-recon"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(10), 600)
             .unwrap();
         // Simulate a crash where the durable log advanced but the derived index was
         // never published.
@@ -1544,14 +1532,14 @@ mod tests {
         // own lease, and never appends a duplicate acquire.
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                &test_issue_id("issue-recon"),
+                &crate::test_utils::issue_id(10),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
                 |_| Ok(()),
             )
             .unwrap();
-        assert_eq!(lease.issue_id, test_issue_id("issue-recon"));
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(10));
         assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
         let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
         assert_eq!(
@@ -1566,12 +1554,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&test_issue_id("issue-first"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(11), 600)
             .unwrap();
         let stale_index =
             std::fs::read(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
         let durable = coordinator
-            .acquire_claim(&test_issue_id("issue-second"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(12), 600)
             .unwrap();
         std::fs::write(
             temp_dir.path().join(".git/jit/claims.index.json"),
@@ -1581,7 +1569,7 @@ mod tests {
 
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                &test_issue_id("issue-second"),
+                &crate::test_utils::issue_id(12),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
@@ -1600,7 +1588,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let owner = setup_coordinator(&temp_dir);
         owner
-            .acquire_claim(&test_issue_id("issue-owned"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(13), 600)
             .unwrap();
         // A different agent cannot acquire the same issue.
         let locker = FileLocker::new(StdDuration::from_secs(
@@ -1619,7 +1607,7 @@ mod tests {
             "agent:other".parse().unwrap(),
         );
         let result = other.acquire_claim_synchronized(
-            &test_issue_id("issue-owned"),
+            &crate::test_utils::issue_id(13),
             600,
             None,
             ClaimAcquireLimits::new(100, 100),
@@ -1638,14 +1626,14 @@ mod tests {
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
         coordinator
-            .acquire_claim(&test_issue_id("deleted-issue"), 1)
+            .acquire_claim(&crate::test_utils::issue_id(14), 1)
             .unwrap();
         clock.set(base + Duration::seconds(2));
         let repository_sync_ran = Cell::new(false);
 
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                &test_issue_id("active-issue"),
+                &crate::test_utils::issue_id(15),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
@@ -1656,11 +1644,11 @@ mod tests {
             )
             .expect("an expired lease on another issue must not block this one");
 
-        assert_eq!(lease.issue_id, test_issue_id("active-issue"));
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(15));
         assert!(repository_sync_ran.get());
         let index = coordinator.load_claims_index().unwrap();
         assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, test_issue_id("active-issue"));
+        assert_eq!(index.leases[0].issue_id, crate::test_utils::issue_id(15));
     }
 
     #[test]
@@ -1669,7 +1657,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         coordinator
-            .acquire_claim(&test_issue_id("issue-004"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(16), 600)
             .unwrap();
 
         // The append-only claim log lives in the shared control plane
@@ -1686,7 +1674,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-002"), 0)
+            .acquire_claim(&crate::test_utils::issue_id(17), 0)
             .unwrap();
 
         assert_eq!(lease.ttl_secs, 0);
@@ -1701,11 +1689,11 @@ mod tests {
 
         // First claim succeeds
         coordinator
-            .acquire_claim(&test_issue_id("issue-003"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(18), 600)
             .unwrap();
 
         // Second claim fails
-        let result = coordinator.acquire_claim(&test_issue_id("issue-003"), 600);
+        let result = coordinator.acquire_claim(&crate::test_utils::issue_id(18), 600);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already claimed"));
     }
@@ -1751,7 +1739,7 @@ mod tests {
                     // All try to claim same issue
                     if let Ok(lease) = acquire_claim_when_reached(
                         &coordinator,
-                        &test_issue_id("issue-race"),
+                        &crate::test_utils::issue_id(19),
                         600,
                         &claimants,
                     ) {
@@ -1785,7 +1773,7 @@ mod tests {
         let held = hold_claims_lock(&temp_dir);
 
         let while_held = coordinator
-            .acquire_claim(&test_issue_id("issue-held"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(20), 600)
             .expect_err("the lock is held, so this caller cannot reach the coordinator");
 
         assert!(
@@ -1796,7 +1784,7 @@ mod tests {
         drop(held);
         assert!(
             coordinator
-                .acquire_claim(&test_issue_id("issue-held"), 600)
+                .acquire_claim(&crate::test_utils::issue_id(20), 600)
                 .is_ok(),
             "the same call is granted once the lock is free, so the expired wait \
              said nothing about the issue"
@@ -1815,7 +1803,7 @@ mod tests {
     fn test_acquire_claim_grants_every_distinct_issue_when_every_lock_wait_expires() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = Arc::new(coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT));
-        let issue_ids: Vec<String> = (0..8).map(|i| format!("iss-{i:03}")).collect();
+        let issue_ids: Vec<IssueId> = (0..8).map(crate::test_utils::issue_id).collect();
         let claimants = Claimants::new();
         let held = hold_claims_lock(&temp_dir);
 
@@ -1866,7 +1854,7 @@ mod tests {
                 thread::spawn(move || {
                     acquire_claim_when_reached(
                         &coordinator,
-                        &test_issue_id("issue-contended"),
+                        &crate::test_utils::issue_id(21),
                         600,
                         &claimants,
                     )
@@ -1902,7 +1890,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let issue_id = test_issue_id("issue-004");
+        let issue_id = crate::test_utils::issue_id(16);
         coordinator.acquire_claim(&issue_id, 600).unwrap();
 
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
@@ -1917,9 +1905,10 @@ mod tests {
     fn test_claim_log_round_trips_existing_lines_byte_for_byte() {
         let header = r#"{"schema_version":1,"seq":1,"timestamp":"2026-01-06T20:00:00Z","op":"#;
         let lease_id = "b53beeba-32f2-4671-a407-2d94e4d13d41";
+        let issue_id = crate::test_utils::issue_id(1);
         let fields = [
             format!(
-                r#""acquire","lease_id":"{lease_id}","issue_id":"00000000-0000-4000-8000-000000000001","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z","stale":false}}"#
+                r#""acquire","lease_id":"{lease_id}","issue_id":"{issue_id}","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z","stale":false}}"#
             ),
             format!(
                 r#""renew","lease_id":"{lease_id}","new_expires_at":null,"new_last_beat":"2026-01-06T20:00:00Z"}}"#
@@ -1952,7 +1941,7 @@ mod tests {
             operation: ClaimOp::Acquire {
                 lease: Lease {
                     lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
-                    issue_id: test_issue_id("issue-1"),
+                    issue_id: crate::test_utils::issue_id(7),
                     agent_id: "agent:valid".parse().unwrap(),
                     worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
@@ -1982,7 +1971,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         coordinator
-            .acquire_claim(&test_issue_id("issue-005"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(22), 600)
             .unwrap();
 
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
@@ -1990,7 +1979,7 @@ mod tests {
 
         let index = coordinator.load_claims_index().unwrap();
         assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, test_issue_id("issue-005"));
+        assert_eq!(index.leases[0].issue_id, crate::test_utils::issue_id(22));
     }
 
     #[test]
@@ -2002,7 +1991,7 @@ mod tests {
         let mut index = coordinator.load_claims_index().unwrap();
         let expired_lease = Lease {
             lease_id: Uuid::new_v4().to_string().parse().unwrap(),
-            issue_id: test_issue_id("issue-006"),
+            issue_id: crate::test_utils::issue_id(23),
             agent_id: "agent:old".parse().unwrap(),
             worktree_id: "wt:old".parse().unwrap(),
             branch: None,
@@ -2017,7 +2006,7 @@ mod tests {
 
         // Now try to claim - should evict expired and succeed
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-006"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(23), 600)
             .unwrap();
         assert_eq!(lease.agent_id.to_string(), "agent:test");
     }
@@ -2043,7 +2032,7 @@ mod tests {
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
         let expired = coordinator
-            .acquire_claim(&test_issue_id("issue-expiring"), 1)
+            .acquire_claim(&crate::test_utils::issue_id(24), 1)
             .unwrap();
         clock.set(base + Duration::seconds(2));
 
@@ -2071,7 +2060,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&test_issue_id("issue-live"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(25), 600)
             .unwrap();
         let before = logged_operations(&temp_dir).len();
 
@@ -2088,7 +2077,7 @@ mod tests {
 
         // Acquire a finite lease
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-007"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(26), 600)
             .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
@@ -2111,7 +2100,7 @@ mod tests {
 
         // Acquire an indefinite lease
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-008"), 0)
+            .acquire_claim(&crate::test_utils::issue_id(27), 0)
             .unwrap();
         let original_heartbeat = lease.last_beat;
 
@@ -2147,7 +2136,7 @@ mod tests {
 
         // Agent 1 acquires lease
         let lease = coordinator1
-            .acquire_claim(&test_issue_id("issue-009"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(28), 600)
             .unwrap();
 
         // Create coordinator for different agent
@@ -2180,17 +2169,17 @@ mod tests {
 
         // Acquire and release
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-010"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(29), 600)
             .unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
 
         // Verify lease is gone from index
         let index = coordinator.load_claims_index().unwrap();
-        assert!(index.find_lease(&test_issue_id("issue-010")).is_none());
+        assert!(index.find_lease(&crate::test_utils::issue_id(29)).is_none());
 
         // Should be able to claim again
         let new_lease = coordinator
-            .acquire_claim(&test_issue_id("issue-010"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(29), 600)
             .unwrap();
         assert_ne!(new_lease.lease_id, lease.lease_id); // Different lease
     }
@@ -2213,7 +2202,7 @@ mod tests {
 
         // Agent 1 acquires lease
         let lease = coordinator1
-            .acquire_claim(&test_issue_id("issue-011"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(30), 600)
             .unwrap();
 
         // Create coordinator for different agent
@@ -2246,7 +2235,7 @@ mod tests {
 
         // Agent 1 acquires lease
         let lease = coordinator1
-            .acquire_claim(&test_issue_id("issue-012"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(31), 600)
             .unwrap();
 
         // Create admin coordinator
@@ -2273,11 +2262,11 @@ mod tests {
 
         // Verify lease is gone
         let index = coordinator1.load_claims_index().unwrap();
-        assert!(index.find_lease(&test_issue_id("issue-012")).is_none());
+        assert!(index.find_lease(&crate::test_utils::issue_id(31)).is_none());
 
         // Should be able to claim again
         coordinator1
-            .acquire_claim(&test_issue_id("issue-012"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(31), 600)
             .unwrap();
     }
 
@@ -2301,7 +2290,7 @@ mod tests {
 
         // Perform various operations
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-013"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(32), 600)
             .unwrap();
         coordinator.renew_lease(&lease.lease_id, 600).unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
@@ -2338,10 +2327,10 @@ mod tests {
 
         // Create some leases
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-1"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(33), 600)
             .unwrap();
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-2"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(34), 600)
             .unwrap();
 
         // Rebuild from log
@@ -2351,11 +2340,11 @@ mod tests {
         assert!(rebuilt
             .leases
             .iter()
-            .any(|l| l.issue_id == test_issue_id("issue-rebuild-1")));
+            .any(|l| l.issue_id == crate::test_utils::issue_id(33)));
         assert!(rebuilt
             .leases
             .iter()
-            .any(|l| l.issue_id == test_issue_id("issue-rebuild-2")));
+            .any(|l| l.issue_id == crate::test_utils::issue_id(34)));
         assert_eq!(rebuilt.last_seq, 2);
     }
 
@@ -2366,7 +2355,7 @@ mod tests {
 
         // Acquire and release
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-3"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(35), 600)
             .unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
 
@@ -2382,7 +2371,7 @@ mod tests {
 
         // Create lease that expires immediately
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-4"), 1)
+            .acquire_claim(&crate::test_utils::issue_id(36), 1)
             .unwrap();
 
         // Wait for expiry
@@ -2399,7 +2388,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-5"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(37), 600)
             .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
@@ -2420,7 +2409,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-6"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(38), 600)
             .unwrap();
 
         // Force evict
@@ -2440,7 +2429,7 @@ mod tests {
 
         // Create indefinite lease
         let lease = coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-7"), 0)
+            .acquire_claim(&crate::test_utils::issue_id(39), 0)
             .unwrap();
 
         // Rebuild
@@ -2460,13 +2449,13 @@ mod tests {
 
         // Multiple operations
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-8"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(40), 600)
             .unwrap();
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-9"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(41), 600)
             .unwrap();
         coordinator
-            .acquire_claim(&test_issue_id("issue-rebuild-10"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(42), 600)
             .unwrap();
 
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
@@ -2491,7 +2480,7 @@ mod tests {
             operation: ClaimOp::Acquire {
                 lease: Lease {
                     lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
-                    issue_id: test_issue_id("issue-1"),
+                    issue_id: crate::test_utils::issue_id(7),
                     agent_id: "agent:test".parse().unwrap(),
                     worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
@@ -2511,7 +2500,7 @@ mod tests {
             operation: ClaimOp::Acquire {
                 lease: Lease {
                     lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
-                    issue_id: test_issue_id("issue-2"),
+                    issue_id: crate::test_utils::issue_id(43),
                     agent_id: "agent:test".parse().unwrap(),
                     worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
@@ -2532,7 +2521,7 @@ mod tests {
             operation: ClaimOp::Acquire {
                 lease: Lease {
                     lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
-                    issue_id: test_issue_id("issue-3"),
+                    issue_id: crate::test_utils::issue_id(44),
                     agent_id: "agent:test".parse().unwrap(),
                     worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
@@ -2585,7 +2574,7 @@ mod tests {
         // Write an index with two active leases for the same issue (corruption).
         let make_lease = |lease_id: LeaseId| Lease {
             lease_id,
-            issue_id: test_issue_id("issue-dup"),
+            issue_id: crate::test_utils::issue_id(45),
             agent_id: "agent:test".parse().unwrap(),
             worktree_id: "wt:main".parse().unwrap(),
             branch: None,
@@ -2615,7 +2604,7 @@ mod tests {
         assert_eq!(
             warnings,
             vec![StorageWarning::DuplicateLease {
-                issue_id: test_issue_id("issue-dup")
+                issue_id: crate::test_utils::issue_id(45)
             }],
             "Duplicate lease must surface a DuplicateLease warning"
         );
@@ -2643,7 +2632,7 @@ mod tests {
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        let issue_id = test_issue_id("guard-probe");
+        let issue_id = crate::test_utils::issue_id(46);
         coordinator
             .acquire_claim_with_reason(&issue_id, 0, Some("probe"), 1, 1)
             .unwrap();
@@ -2667,15 +2656,27 @@ mod tests {
         // Default limit is 2 indefinite leases per agent
         // First two should succeed
         coordinator
-            .acquire_claim_with_reason(&test_issue_id("issue-1"), 0, Some("Manual task 1"), 2, 10)
+            .acquire_claim_with_reason(
+                &crate::test_utils::issue_id(7),
+                0,
+                Some("Manual task 1"),
+                2,
+                10,
+            )
             .unwrap();
         coordinator
-            .acquire_claim_with_reason(&test_issue_id("issue-2"), 0, Some("Manual task 2"), 2, 10)
+            .acquire_claim_with_reason(
+                &crate::test_utils::issue_id(43),
+                0,
+                Some("Manual task 2"),
+                2,
+                10,
+            )
             .unwrap();
 
         // Third should fail - exceeds per-agent limit
         let result = coordinator.acquire_claim_with_reason(
-            &test_issue_id("issue-3"),
+            &crate::test_utils::issue_id(44),
             0,
             Some("Manual task 3"),
             2,
@@ -2691,7 +2692,7 @@ mod tests {
 
         // But finite TTL should still work
         coordinator
-            .acquire_claim(&test_issue_id("issue-4"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(47), 600)
             .unwrap();
     }
 
@@ -2702,7 +2703,7 @@ mod tests {
 
         // TTL=0 without reason should fail
         let result =
-            coordinator.acquire_claim_with_reason(&test_issue_id("issue-1"), 0, None, 2, 10);
+            coordinator.acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, None, 2, 10);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -2714,7 +2715,7 @@ mod tests {
         // TTL=0 with reason should succeed
         coordinator
             .acquire_claim_with_reason(
-                &test_issue_id("issue-1"),
+                &crate::test_utils::issue_id(7),
                 0,
                 Some("Manual oversight"),
                 2,
@@ -2730,7 +2731,7 @@ mod tests {
 
         // Acquire indefinite lease
         let lease = coordinator
-            .acquire_claim_with_reason(&test_issue_id("issue-1"), 0, Some("Long task"), 2, 10)
+            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Long task"), 2, 10)
             .unwrap();
         let original_beat = lease.last_beat;
 
@@ -2758,7 +2759,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim_with_reason(&test_issue_id("issue-1"), 0, Some("Manual"), 2, 10)
+            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Manual"), 2, 10)
             .unwrap();
 
         coordinator.heartbeat(&lease.lease_id).unwrap();
@@ -2776,7 +2777,7 @@ mod tests {
     fn test_claims_mutation_guard_replays_log_and_holds_lock_without_repair() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        let issue_id = test_issue_id("guard-probe");
+        let issue_id = crate::test_utils::issue_id(46);
         coordinator.acquire_claim(&issue_id, 600).unwrap();
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
         fs::remove_file(&index_path).unwrap();
@@ -2800,8 +2801,8 @@ mod tests {
     fn test_claims_mutation_guard_lease_blocks_only_its_own_issue() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        let leased = test_issue_id("leased");
-        let other = test_issue_id("other");
+        let leased = crate::test_utils::issue_id(48);
+        let other = crate::test_utils::issue_id(49);
         coordinator.acquire_claim(&leased, 600).unwrap();
         let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
         let stranger: Assignee = "agent:stranger".parse().unwrap();

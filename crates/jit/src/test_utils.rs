@@ -7,7 +7,7 @@
 use crate::commands::CommandExecutor;
 use crate::commands::ProfileSelector;
 use crate::config::ItemKindConfig;
-use crate::domain::DocumentReference;
+use crate::domain::{identity::IssueId, DocumentReference};
 use crate::profile::{
     capture_package_tree, CapturedFile, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
 };
@@ -99,6 +99,14 @@ pub fn document_reference_typed(
     }
 }
 
+/// A deterministic canonical issue id; distinct numeric seeds yield distinct ids.
+pub fn issue_id(seed: u128) -> IssueId {
+    uuid::Uuid::from_u128(seed.rotate_left(96))
+        .to_string()
+        .parse()
+        .expect("a UUID renders as a canonical issue id")
+}
+
 /// A drafted issue carrying a fresh random id.
 pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
     let mut issue = crate::domain::Issue::draft(title, description);
@@ -119,6 +127,21 @@ pub fn stamped_event(
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;
+
+    proptest::proptest! {
+        #[test]
+        fn test_issue_id_is_canonical_deterministic_and_distinct(
+            first in proptest::prelude::any::<u128>(),
+            second in proptest::prelude::any::<u128>(),
+        ) {
+            use crate::domain::identity::ValidatedIssueId;
+
+            let id = super::issue_id(first);
+            proptest::prop_assert!(ValidatedIssueId::try_from(id.as_str()).is_ok());
+            proptest::prop_assert_eq!(&id, &super::issue_id(first));
+            proptest::prop_assert_eq!(id == super::issue_id(second), first == second);
+        }
+    }
 
     #[test]
     fn test_fixture_issue_carries_title_description_and_distinct_ids() {
@@ -789,7 +812,7 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     while written <= bytes {
         let mut issue =
             crate::domain::Issue::draft(format!("Accumulated history {ordinal}"), String::new());
-        issue.id = format!("00000000-0000-4000-8000-{ordinal:012}");
+        issue.id = issue_id(u128::from(ordinal));
         let line = serde_json::to_string(&stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             format!("01J0000000000000000000{ordinal:04}"),

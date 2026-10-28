@@ -574,7 +574,7 @@ mod tests {
             leases: vec![
                 Lease {
                     lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
-                    issue_id: "issue-1".to_string(),
+                    issue_id: crate::test_utils::issue_id(7),
                     agent_id: "agent:1".parse().unwrap(),
                     worktree_id: "wt:abc123".parse().unwrap(),
                     branch: Some("main".to_string()),
@@ -586,7 +586,7 @@ mod tests {
                 },
                 Lease {
                     lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
-                    issue_id: "issue-2".to_string(),
+                    issue_id: crate::test_utils::issue_id(43),
                     agent_id: "agent:1".parse().unwrap(),
                     worktree_id: "wt:abc123".parse().unwrap(),
                     branch: Some("main".to_string()),
@@ -598,7 +598,7 @@ mod tests {
                 },
                 Lease {
                     lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
-                    issue_id: "issue-3".to_string(),
+                    issue_id: crate::test_utils::issue_id(44),
                     agent_id: "agent:2".parse().unwrap(),
                     worktree_id: "wt:def456".parse().unwrap(),
                     branch: Some("feature/test".to_string()),
@@ -628,11 +628,9 @@ mod tests {
 
         let now = Utc::now();
         let make_lease =
-            |id: crate::domain::identity::LeaseId,
-             ttl_secs: u64,
-             expires_at: Option<chrono::DateTime<Utc>>| Lease {
-                lease_id: id.clone(),
-                issue_id: format!("issue-{id}"),
+            |seed: u128, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
+                lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
+                issue_id: crate::test_utils::issue_id(seed),
                 agent_id: "agent:1".parse().unwrap(),
                 worktree_id: "wt:abc123".parse().unwrap(),
                 branch: Some("main".to_string()),
@@ -650,23 +648,11 @@ mod tests {
             sequence_gaps: Vec::new(),
             leases: vec![
                 // Live: finite TTL, expiry in the future
-                make_lease(
-                    "00000000-0000-4000-8000-000000000001".parse().unwrap(),
-                    600,
-                    Some(now + Duration::seconds(300)),
-                ),
+                make_lease(1, 600, Some(now + Duration::seconds(300))),
                 // Expired: finite TTL, expiry in the past -> must not be counted
-                make_lease(
-                    "00000000-0000-4000-8000-000000000002".parse().unwrap(),
-                    600,
-                    Some(now - Duration::seconds(1)),
-                ),
+                make_lease(2, 600, Some(now - Duration::seconds(1))),
                 // Indefinite: ttl_secs == 0, no expiry -> always live
-                make_lease(
-                    "00000000-0000-4000-8000-000000000003".parse().unwrap(),
-                    0,
-                    None,
-                ),
+                make_lease(3, 0, None),
             ],
         };
 
@@ -734,12 +720,11 @@ mod tests {
         coordinator.init().unwrap();
 
         // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
-        use crate::storage::claim_coordinator::test_issue_id;
         coordinator
-            .acquire_claim(&test_issue_id("issue-short"), 1)
+            .acquire_claim(&crate::test_utils::issue_id(86), 1)
             .unwrap();
         coordinator
-            .acquire_claim(&test_issue_id("issue-long"), 600)
+            .acquire_claim(&crate::test_utils::issue_id(87), 600)
             .unwrap();
 
         let active_total = |clock: &FixedClock| -> usize {
@@ -818,9 +803,9 @@ mod tests {
         }
 
         /// An event carrying `id`, associated with `issue_id`.
-        fn event(id: &str, issue_id: &str, title: &str) -> Event {
+        fn event(id: &str, issue_id: &crate::domain::identity::IssueId, title: &str) -> Event {
             let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
-            issue.id = issue_id.to_string();
+            issue.id = issue_id.clone();
             crate::test_utils::stamped_event(
                 crate::domain::EventBody::draft_issue_created(&issue),
                 id,

@@ -629,7 +629,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::domain::EventBody;
     use crate::domain::{Issue, Priority, State};
 
@@ -709,12 +708,14 @@ mod tests {
     fn test_bulk_update_result_compute_summary() {
         let mut result = BulkUpdateResult::new();
         result.matched = vec![
-            fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
-            fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+            crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
         ];
-        result.modified = vec![fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c")];
+        result.modified = vec![crate::test_utils::issue_id(
+            0x4d6d537d80cc5cce1e28447cf692926d,
+        )];
         result.skipped = vec![(
-            fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
             "no changes".to_string(),
         )];
 
@@ -730,15 +731,18 @@ mod tests {
     fn test_preview_compute_summary() {
         let mut preview = BulkUpdatePreview::new();
         preview.matched = vec![
-            fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
-            fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"),
+            crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
+            crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
         ];
         preview.changes = vec![
             (
-                fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
                 vec!["state change".to_string()],
             ),
-            (fixture_id("6463191f-f80e-59d7-a3b8-cbf857ae21a2"), vec![]), // No changes
+            (
+                crate::test_utils::issue_id(0xf80e_59d7_a3b8_cbf8_57ae_21a2_6463_191f),
+                vec![],
+            ), // No changes
         ];
 
         preview.compute_summary();
@@ -751,7 +755,7 @@ mod tests {
     #[test]
     fn test_compute_changes_state() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -772,7 +776,7 @@ mod tests {
     #[test]
     fn test_compute_changes_labels() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec!["type:task"],
         );
@@ -798,7 +802,7 @@ mod tests {
     #[test]
     fn test_compute_changes_no_changes() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -823,7 +827,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("12c939a1-5a6a-549e-b9fb-2027b699f39d"),
+                &crate::test_utils::issue_id(0x5a6a_549e_b9fb_2027_b699_f39d_12c9_39a1),
                 State::Ready,
                 vec!["type:task"],
             ),
@@ -842,7 +846,9 @@ mod tests {
 
         // claimed_at stamped by the bulk assignment.
         let updated = executor
-            .get_issue(&fixture_id("12c939a1-5a6a-549e-b9fb-2027b699f39d"))
+            .get_issue(&crate::test_utils::issue_id(
+                0x5a6a549eb9fb2027b699f39d12c939a1,
+            ))
             .unwrap();
         assert!(updated.claimed_at.is_some());
 
@@ -864,7 +870,9 @@ mod tests {
         executor.apply_bulk_update(&filter, &ops2, false).unwrap();
         assert_eq!(
             executor
-                .get_issue(&fixture_id("12c939a1-5a6a-549e-b9fb-2027b699f39d"))
+                .get_issue(&crate::test_utils::issue_id(
+                    0x5a6a549eb9fb2027b699f39d12c939a1
+                ))
                 .unwrap()
                 .claimed_at,
             first
@@ -880,7 +888,7 @@ mod tests {
 
         // Create test issue
         let issue = create_test_issue(
-            &fixture_id("12c939a1-5a6a-549e-b9fb-2027b699f39d"),
+            &crate::test_utils::issue_id(0x5a6a_549e_b9fb_2027_b699_f39d_12c9_39a1),
             State::Ready,
             vec!["type:task"],
         );
@@ -903,7 +911,9 @@ mod tests {
 
         // Verify issue was updated
         let updated = executor
-            .get_issue(&fixture_id("12c939a1-5a6a-549e-b9fb-2027b699f39d"))
+            .get_issue(&crate::test_utils::issue_id(
+                0x5a6a549eb9fb2027b699f39d12c939a1,
+            ))
             .unwrap();
         assert_eq!(updated.state, State::Done);
     }
@@ -918,17 +928,17 @@ mod tests {
         // Create test issues
         for issue in [
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec![],
             ),
             create_test_issue(
-                &fixture_id("1598c99b-c56d-5478-ab94-4a28fb3cd51d"),
+                &crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b),
                 State::Ready,
                 vec![],
             ),
             create_test_issue(
-                &fixture_id("61859fa8-a0cb-57d0-ac34-69f2797837c6"),
+                &crate::test_utils::issue_id(0xa0cb_57d0_ac34_69f2_7978_37c6_6185_9fa8),
                 State::InProgress,
                 vec![],
             ),
@@ -952,12 +962,16 @@ mod tests {
 
         // Verify labels added
         let issue1 = executor
-            .get_issue(&fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"))
+            .get_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
             .unwrap();
         assert!(issue1.labels.contains(&"milestone:v1.0".to_string()));
 
         let issue3 = executor
-            .get_issue(&fixture_id("61859fa8-a0cb-57d0-ac34-69f2797837c6"))
+            .get_issue(&crate::test_utils::issue_id(
+                0xa0cb57d0ac3469f2797837c661859fa8,
+            ))
             .unwrap();
         assert!(!issue3.labels.contains(&"milestone:v1.0".to_string()));
     }
@@ -971,7 +985,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
                 State::Done,
                 vec![],
             ),
@@ -1002,7 +1016,7 @@ mod tests {
 
         // Create issue with unpassed gates
         let mut issue = create_test_issue(
-            &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+            &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
             State::Gated,
             vec![],
         );
@@ -1039,14 +1053,14 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec![],
             ),
         );
 
         let mut blocked = create_test_issue(
-            &fixture_id("1598c99b-c56d-5478-ab94-4a28fb3cd51d"),
+            &crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b),
             State::Ready,
             vec![],
         );
@@ -1056,7 +1070,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("61859fa8-a0cb-57d0-ac34-69f2797837c6"),
+                &crate::test_utils::issue_id(0xa0cb_57d0_ac34_69f2_7978_37c6_6185_9fa8),
                 State::Ready,
                 vec![],
             ),
@@ -1079,15 +1093,15 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
 
         // Verify partial success
-        assert!(result
-            .modified
-            .contains(&fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a")));
-        assert!(result
-            .modified
-            .contains(&fixture_id("61859fa8-a0cb-57d0-ac34-69f2797837c6")));
+        assert!(result.modified.contains(&crate::test_utils::issue_id(
+            0xedeb5b73a03a451ec76b0d6a0370f495
+        )));
+        assert!(result.modified.contains(&crate::test_utils::issue_id(
+            0xa0cb57d0ac3469f2797837c661859fa8
+        )));
         assert_eq!(
             result.errors[0].0,
-            fixture_id("1598c99b-c56d-5478-ab94-4a28fb3cd51d")
+            crate::test_utils::issue_id(0xc56d_5478_ab94_4a28_fb3c_d51d_1598_c99b)
         );
     }
 
@@ -1100,7 +1114,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec!["type:task"],
             ),
@@ -1147,7 +1161,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec![&format!("type:{}", taxonomy.type_at_level(4))],
             ),
@@ -1182,7 +1196,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
                 State::Ready,
                 vec![],
             ),
@@ -1215,7 +1229,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec![],
             ),
@@ -1239,7 +1253,9 @@ mod tests {
 
         // Verify assignee set correctly
         let updated = executor
-            .get_issue(&fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"))
+            .get_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
             .unwrap();
         assert_eq!(updated.assignee, Some("agent:copilot".parse().unwrap()));
     }
@@ -1279,12 +1295,9 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let seed = |storage: &InMemoryStorage| {
-            for id in [
-                "aaaa1111-0000-0000-0000-000000000000",
-                "bbbb2222-0000-0000-0000-000000000000",
-            ]
-            .map(fixture_id)
-            .iter()
+            for id in [0xaaaa1111, 0xbbbb2222]
+                .map(crate::test_utils::issue_id)
+                .iter()
             {
                 crate::commands::test_helpers::seed_issue(
                     storage,
@@ -1309,12 +1322,9 @@ mod tests {
         seed(&single_storage);
         let single_reader = single_storage.clone();
         let single = crate::commands::test_helpers::memory_executor(single_storage);
-        for id in [
-            "aaaa1111-0000-0000-0000-000000000000",
-            "bbbb2222-0000-0000-0000-000000000000",
-        ]
-        .map(fixture_id)
-        .iter()
+        for id in [0xaaaa1111, 0xbbbb2222]
+            .map(crate::test_utils::issue_id)
+            .iter()
         {
             single
                 .issues()
@@ -1333,12 +1343,9 @@ mod tests {
                 .unwrap();
         }
 
-        for id in [
-            "aaaa1111-0000-0000-0000-000000000000",
-            "bbbb2222-0000-0000-0000-000000000000",
-        ]
-        .map(fixture_id)
-        .iter()
+        for id in [0xaaaa1111, 0xbbbb2222]
+            .map(crate::test_utils::issue_id)
+            .iter()
         {
             assert_eq!(
                 event_payloads_for(&bulk_reader, id),
@@ -1359,17 +1366,17 @@ mod tests {
             crate::commands::test_helpers::seed_issue(
                 storage,
                 create_test_issue(
-                    &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+                    &crate::test_utils::issue_id(0xaaaa_1111),
                     State::Backlog,
                     vec!["type:task"],
                 ),
             );
             let mut blocked = create_test_issue(
-                &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xbbbb_2222),
                 State::Ready,
                 vec!["type:task"],
             );
-            blocked.dependencies = vec![fixture_id("aaaa1111-0000-0000-0000-000000000000")];
+            blocked.dependencies = vec![crate::test_utils::issue_id(0xaaaa_1111)];
             crate::commands::test_helpers::seed_issue(storage, blocked);
         };
 
@@ -1377,7 +1384,7 @@ mod tests {
         seed(&bulk_storage);
         let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
-            .get_issue(&fixture_id("bbbb2222-0000-0000-0000-000000000000"))
+            .get_issue(&crate::test_utils::issue_id(0xbbbb_2222))
             .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1395,7 +1402,7 @@ mod tests {
         let single_error = single
             .issues()
             .update_issue(
-                &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xbbbb_2222),
                 None,
                 None,
                 None,
@@ -1423,7 +1430,7 @@ mod tests {
 
         let seed = |storage: &InMemoryStorage| {
             let mut gated = create_test_issue(
-                &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xaaaa_1111),
                 State::Ready,
                 vec!["type:task"],
             );
@@ -1435,7 +1442,7 @@ mod tests {
         seed(&bulk_storage);
         let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
-            .get_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1453,7 +1460,7 @@ mod tests {
         let single_error = single
             .issues()
             .update_issue(
-                &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xaaaa_1111),
                 None,
                 None,
                 None,
@@ -1481,7 +1488,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec!["type:task"],
             ),
@@ -1505,7 +1512,9 @@ mod tests {
 
         // Verify labels added
         let updated = executor
-            .get_issue(&fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"))
+            .get_issue(&crate::test_utils::issue_id(
+                0xedeb5b73a03a451ec76b0d6a0370f495,
+            ))
             .unwrap();
         assert!(updated.labels.contains(&"milestone:v1.0".to_string()));
         assert!(updated.labels.contains(&"epic:auth".to_string()));
@@ -1516,7 +1525,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_state_holds_only_at_target_state() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -1538,7 +1547,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_labels_require_adds_present_and_removes_absent() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec!["type:task"],
         );
@@ -1568,7 +1577,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_priority_holds_only_at_target_priority() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -1588,7 +1597,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_gates_require_adds_present_and_removes_absent() {
         let mut issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -1619,7 +1628,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_assignee_holds_at_target_identity_or_absence() {
         let mut issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec![],
         );
@@ -1652,7 +1661,7 @@ mod tests {
     #[test]
     fn test_is_provable_noop_mixed_operations_requires_every_target_to_already_hold() {
         let issue = create_test_issue(
-            &fixture_id("f692926d-4d6d-537d-80cc-5cce1e28447c"),
+            &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             vec!["type:task"],
         );
@@ -1709,7 +1718,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
             create_test_issue(
-                &fixture_id("dccd09a6-bf6f-5def-83ab-82e56d81bb2c"),
+                &crate::test_utils::issue_id(0xbf6f_5def_83ab_82e5_6d81_bb2c_dccd_09a6),
                 State::Ready,
                 vec![],
             ),
@@ -1778,7 +1787,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
             create_test_issue(
-                &fixture_id("dccd09a6-bf6f-5def-83ab-82e56d81bb2c"),
+                &crate::test_utils::issue_id(0xbf6f_5def_83ab_82e5_6d81_bb2c_dccd_09a6),
                 State::Ready,
                 vec![],
             ),
@@ -1874,7 +1883,7 @@ mod tests {
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
 
         let mut issue = create_test_issue(
-            &fixture_id("3e9688bd-a715-50ab-b754-0cce3ea8599e"),
+            &crate::test_utils::issue_id(0xa715_50ab_b754_0cce_3ea8_599e_3e96_88bd),
             State::Gated,
             vec![],
         );
@@ -1925,7 +1934,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("0370f495-edeb-5b73-a03a-451ec76b0d6a"),
+                &crate::test_utils::issue_id(0xedeb_5b73_a03a_451e_c76b_0d6a_0370_f495),
                 State::Ready,
                 vec!["bad_label_no_colon"],
             ),
@@ -1982,7 +1991,7 @@ mod tests {
 
         let seed = |storage: &InMemoryStorage| {
             let mut issue = create_test_issue(
-                &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xaaaa_1111),
                 State::Done,
                 vec!["type:task"],
             );
@@ -2001,7 +2010,7 @@ mod tests {
         seed(&direct_storage);
         let mut direct = crate::commands::test_helpers::memory_executor(direct_storage);
         let issue = direct
-            .get_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let direct_error = direct
             .apply_operations_to_issue(&issue, &ops, false)
@@ -2009,7 +2018,7 @@ mod tests {
             .downcast::<TransitionBlockedError>()
             .expect("direct per-issue path reports a typed transition blocker");
         let direct_final_state = direct
-            .get_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap()
             .state;
         assert_eq!(
@@ -2035,7 +2044,7 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
         assert_eq!(result.errors[0].1, direct_error.to_string());
         assert_eq!(
-            bulk.get_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+            bulk.get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state,
             direct_final_state,
@@ -2071,7 +2080,7 @@ mod tests {
         let storage = InMemoryStorage::new().with_mutation_interruption_view(injector.clone());
 
         let mut noop_issue = create_test_issue(
-            &fixture_id("47a3b00c-da63-513d-8380-c6478f7f4e3c"),
+            &crate::test_utils::issue_id(0xda63_513d_8380_c647_8f7f_4e3c_47a3_b00c),
             State::Ready,
             vec![],
         );
@@ -2080,7 +2089,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("f491534f-fd4e-5e37-a828-861d13bc00c5"),
+                &crate::test_utils::issue_id(0xfd4e_5e37_a828_861d_13bc_00c5_f491_534f),
                 State::Ready,
                 vec![],
             ),
@@ -2113,14 +2122,18 @@ mod tests {
         );
         assert_eq!(
             executor
-                .get_issue(&fixture_id("47a3b00c-da63-513d-8380-c6478f7f4e3c"))
+                .get_issue(&crate::test_utils::issue_id(
+                    0xda63513d8380c6478f7f4e3c47a3b00c
+                ))
                 .unwrap()
                 .priority,
             Priority::High
         );
         assert_eq!(
             executor
-                .get_issue(&fixture_id("f491534f-fd4e-5e37-a828-861d13bc00c5"))
+                .get_issue(&crate::test_utils::issue_id(
+                    0xfd4e5e37a828861d13bc00c5f491534f
+                ))
                 .unwrap()
                 .priority,
             Priority::High
@@ -2152,7 +2165,7 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         let mut noop_issue = create_test_issue(
-            &fixture_id("47a3b00c-da63-513d-8380-c6478f7f4e3c"),
+            &crate::test_utils::issue_id(0xda63_513d_8380_c647_8f7f_4e3c_47a3_b00c),
             State::Ready,
             vec![],
         );
@@ -2188,7 +2201,9 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
         assert_eq!(
             executor
-                .get_issue(&fixture_id("47a3b00c-da63-513d-8380-c6478f7f4e3c"))
+                .get_issue(&crate::test_utils::issue_id(
+                    0xda63513d8380c6478f7f4e3c47a3b00c
+                ))
                 .unwrap()
                 .priority,
             Priority::High
@@ -2197,16 +2212,16 @@ mod tests {
 
     fn seed_blocked_dependent(storage: &crate::storage::InMemoryStorage) {
         let mut dependent = create_test_issue(
-            &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+            &crate::test_utils::issue_id(0xaaaa_1111),
             State::Backlog,
             vec!["type:task"],
         );
-        dependent.dependencies = vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")];
+        dependent.dependencies = vec![crate::test_utils::issue_id(0xbbbb_2222)];
         crate::commands::test_helpers::seed_issue(storage, dependent);
         crate::commands::test_helpers::seed_issue(
             storage,
             create_test_issue(
-                &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xbbbb_2222),
                 State::Ready,
                 vec!["type:task"],
             ),
@@ -2232,7 +2247,7 @@ mod tests {
             let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
             assert_eq!(
                 result.modified,
-                vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")]
+                vec![crate::test_utils::issue_id(0xbbbb_2222)]
             );
 
             let single_storage = crate::storage::InMemoryStorage::new();
@@ -2242,7 +2257,7 @@ mod tests {
             single
                 .issues()
                 .update_issue(
-                    &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
+                    &crate::test_utils::issue_id(0xbbbb_2222),
                     None,
                     None,
                     None,
@@ -2256,14 +2271,14 @@ mod tests {
                 .unwrap();
 
             let bulk_state = bulk_reader
-                .load_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state;
             assert_eq!(bulk_state, State::Ready, "dependent after bulk {target:?}");
             assert_eq!(
                 bulk_state,
                 single_reader
-                    .load_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+                    .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                     .unwrap()
                     .state,
                 "bulk and per-issue {target:?} diverge"
@@ -2290,7 +2305,7 @@ mod tests {
 
         assert_eq!(
             reader
-                .load_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state,
             State::Backlog
@@ -2306,16 +2321,16 @@ mod tests {
 
         let storage = crate::storage::InMemoryStorage::new();
         let mut dependent = create_test_issue(
-            &fixture_id("aaaa1111-0000-0000-0000-000000000000"),
+            &crate::test_utils::issue_id(0xaaaa_1111),
             State::Backlog,
             vec!["type:task"],
         );
-        dependent.dependencies = vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")];
+        dependent.dependencies = vec![crate::test_utils::issue_id(0xbbbb_2222)];
         crate::commands::test_helpers::seed_issue(&storage, dependent);
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                &fixture_id("bbbb2222-0000-0000-0000-000000000000"),
+                &crate::test_utils::issue_id(0xbbbb_2222),
                 State::Done,
                 vec!["type:task"],
             ),
@@ -2331,12 +2346,12 @@ mod tests {
         let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
         assert_eq!(
             result.modified,
-            vec![fixture_id("bbbb2222-0000-0000-0000-000000000000")]
+            vec![crate::test_utils::issue_id(0xbbbb_2222)]
         );
 
         assert_eq!(
             reader
-                .load_issue(&fixture_id("aaaa1111-0000-0000-0000-000000000000"))
+                .load_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state,
             State::Backlog

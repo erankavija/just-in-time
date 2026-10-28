@@ -564,7 +564,6 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::repository_state::{
         gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
@@ -588,7 +587,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -618,7 +617,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -647,7 +646,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -686,7 +685,7 @@ mod tests {
         let start = Instant::now();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1123,7 +1122,7 @@ mod tests {
         };
         let result = execute_gate_checker_with_context(
             "g",
-            &fixture_id("872ff725-c4e9-59a0-b8a4-228d755022a2"),
+            &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             GateStage::Postcheck,
             &checker,
             temp.path(),
@@ -1159,7 +1158,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1189,7 +1188,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            &fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1199,9 +1198,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
-        assert!(result
-            .stdout
-            .contains("ID=9225c066-dd2d-59e0-9bc4-ccb000c24a77"));
+        assert!(result.stdout.contains(&format!("ID={}", result.issue_id)));
         assert!(result.stdout.contains("KEY=my-gate"));
         assert!(result.stdout.contains("STAGE=postcheck"));
     }
@@ -1259,7 +1256,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            &fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1295,7 +1292,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "my-gate",
-            &fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77"),
+            &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1312,7 +1309,7 @@ mod tests {
     fn test_context_file_written_when_context_provided() {
         use crate::domain::GateContext;
 
-        let issue_id = fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77");
+        let issue_id = crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066);
 
         let context = GateContext {
             schema_version: 1,
@@ -1383,7 +1380,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1419,7 +1416,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let result = execute_gate_checker_with_context(
             "test-gate",
-            &fixture_id("a8bb16a7-fb9a-5d7a-9def-7971ebc70df1"),
+            &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
             &checker,
             &temp_dir,
@@ -1436,7 +1433,7 @@ mod tests {
     fn test_context_includes_run_history() {
         use crate::domain::{GateContext, GateRunResult, GateRunStatus as RS};
 
-        let issue_id = fixture_id("9225c066-dd2d-59e0-9bc4-ccb000c24a77");
+        let issue_id = crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066);
 
         let previous_run = GateRunResult {
             schema_version: 1,

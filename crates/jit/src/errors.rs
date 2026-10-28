@@ -1099,10 +1099,9 @@ mod tests {
 
     #[test]
     fn test_graph_rule_block_renders_rule_and_message_and_validation_code() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::graph_rules(
-            "12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            id.clone(),
             State::Done,
             State::InProgress,
             vec![(
@@ -1122,7 +1121,7 @@ mod tests {
         assert!(rendered.contains("epic-done-needs-design-dep"));
         assert!(rendered.contains("must depend on a type:design issue"));
         // The remediation suggests explaining the rule and a forced override.
-        assert!(rendered.contains("jit validate --explain 12345678-1234-4234-8234-123456789abc"));
+        assert!(rendered.contains(&format!("jit validate --explain {id}")));
         assert!(rendered.contains("--force"));
         // It is NOT misreported as a gate or dependency block.
         assert!(!rendered.contains("unmet dependencies"));
@@ -1131,38 +1130,31 @@ mod tests {
 
     #[test]
     fn test_dependency_block_names_assign_in_remediation() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::dependencies(
-            "12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            id.clone(),
             State::InProgress,
             State::Backlog,
             vec![TransitionBlocker::MissingDependency {
-                issue_id: "87654321-1234-4234-8234-123456789abc"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                issue_id: crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_8765_4321),
             }],
         );
 
         let rendered = error.to_string();
-        assert!(
-            rendered.contains("jit issue assign 12345678-1234-4234-8234-123456789abc <assignee>")
-        );
+        assert!(rendered.contains(&format!("jit issue assign {id} <assignee>")));
         assert!(rendered.contains("no state change"));
 
         // The same hint is present in the remediation list (the JSON path).
         assert!(error
             .remediation_commands()
             .iter()
-            .any(|cmd| cmd.contains("jit issue assign 12345678-1234-4234-8234-123456789abc")));
+            .any(|cmd| cmd.contains(&format!("jit issue assign {id}"))));
     }
 
     #[test]
     fn test_gate_block_does_not_name_assign_in_remediation() {
         let error = TransitionBlockedError::gates(
-            "12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678),
             State::Done,
             State::Gated,
             vec![(
@@ -1179,10 +1171,9 @@ mod tests {
     /// `--by` form, since a bare `gate evaluate` on it is now a usage error.
     #[test]
     fn test_gate_block_remediation_names_by_for_manual_gate() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::gates(
-            "12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            id.clone(),
             State::Done,
             State::Gated,
             vec![(
@@ -1195,17 +1186,16 @@ mod tests {
         let commands = error.remediation_commands();
         assert!(commands
             .iter()
-            .any(|cmd| cmd == "jit gate evaluate 12345678-1234-4234-8234-123456789abc code-review --by <attestor>"));
+            .any(|cmd| cmd == &format!("jit gate evaluate {id} code-review --by <attestor>")));
     }
 
     /// The auto-gate counterpart: no `--by` in the remediation, since the
     /// checker supplies the verdict.
     #[test]
     fn test_gate_block_remediation_omits_by_for_auto_gate() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::gates(
-            "12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            id.clone(),
             State::Done,
             State::Gated,
             vec![("tests".to_string(), GateStatus::Pending, GateMode::Auto)],
@@ -1214,7 +1204,7 @@ mod tests {
         let commands = error.remediation_commands();
         assert!(commands
             .iter()
-            .any(|cmd| cmd == "jit gate evaluate 12345678-1234-4234-8234-123456789abc tests"));
+            .any(|cmd| cmd == &format!("jit gate evaluate {id} tests")));
         assert!(!commands.iter().any(|cmd| cmd.contains("--by")));
     }
 
@@ -1230,16 +1220,11 @@ mod tests {
 
     #[test]
     fn test_already_claimed_helper() {
-        let error = already_claimed(
-            &"12345678-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
-            "agent:worker-1",
-            "until 2026-01-15",
-        );
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
+        let error = already_claimed(&id.clone(), "agent:worker-1", "until 2026-01-15");
         let msg = error.to_error_message();
 
-        assert!(msg.contains("Issue 12345678-1234-4234-8234-123456789abc already claimed"));
+        assert!(msg.contains(&format!("Issue {id} already claimed")));
         assert!(msg.contains("agent:worker-1"));
         assert!(msg.contains("jit claim status --issue"));
         assert!(msg.contains("force-evict"));
@@ -1287,17 +1272,14 @@ mod tests {
 
     #[test]
     fn test_deletion_not_confirmed_error_names_issue_and_env_var() {
-        let err = DeletionNotConfirmedError::new(
-            "abc12345-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
-        );
+        let id = crate::test_utils::issue_id(1);
+        let err = DeletionNotConfirmedError::new(id.clone());
         let msg = err.to_string();
 
         assert_eq!(msg, err.message());
         assert!(msg.contains("discouraged"));
         assert!(msg.contains("JIT_ALLOW_DELETION=1"));
-        assert!(msg.contains("jit issue delete abc12345-1234-4234-8234-123456789abc"));
+        assert!(msg.contains(&format!("jit issue delete {id}")));
         // ActionableError's rendering, not a bespoke format: no doubled prefix.
         assert!(!msg.contains("Error:"));
 
@@ -1322,11 +1304,9 @@ mod tests {
     fn test_lease_not_found_error_renders_actionable_message_verbatim() {
         // LeaseNotFoundError captures the full rendered ActionableError text so
         // the rich remediation block is preserved while remaining downcastable.
-        let actionable = no_active_lease(
-            &"abc12345-1234-4234-8234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
-        );
+        let actionable = no_active_lease(&crate::test_utils::issue_id(
+            0x123442348234123456789abcabc12345,
+        ));
         let expected = actionable.to_string();
         let err = LeaseNotFoundError::new(&actionable);
         assert_eq!(err.to_string(), expected);

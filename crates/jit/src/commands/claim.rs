@@ -750,7 +750,6 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::fixture_id;
     use crate::storage::claim_coordinator::Lease;
     // Test helpers below load identity with explicit paths and don't surface
     // warnings; the production paths use the `_with_warnings` variant instead.
@@ -1082,7 +1081,7 @@ mod tests {
         let result = execute_claim_acquire_test(
             &temp,
             &storage,
-            &fixture_id("5a1f6645-96bf-59db-932e-7f49ee5cc6bb"),
+            &crate::test_utils::issue_id(0x96bf_59db_932e_7f49_ee5c_c6bb_5a1f_6645),
             600,
             "agent:test",
         );
@@ -2037,12 +2036,12 @@ mod tests {
         let (temp, storage) = setup_test_repo()?;
         let first_id = create_test_issue_with_id(
             &storage,
-            &fixture_id("abcdef12-3000-4000-8000-000000000001"),
+            &crate::test_utils::issue_id(0x3000_4000_8000_0000_0000_0001_abcd_ef12),
             "First shared-prefix issue",
         )?;
         let second_id = create_test_issue_with_id(
             &storage,
-            &fixture_id("abcdef12-4000-4000-8000-000000000002"),
+            &crate::test_utils::issue_id(0x4000_4000_8000_0000_0000_0002_abcd_ef12),
             "Second shared-prefix issue",
         )?;
         persist_claim(&temp, &first_id, "agent:worker")?;

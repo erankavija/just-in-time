@@ -428,15 +428,11 @@ mod issue_list_render_tests {
     fn test_render_issue_list_indents_rows_and_columns_reasons_and_total_footer() {
         let issues = [
             issue(
-                "aaaaaaaa-0000-4000-8000-000000000001"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
                 "First",
             ),
             issue(
-                "bbbbbbbb-0000-4000-8000-000000000002"
-                    .parse::<IssueId>()
-                    .unwrap(),
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0002_bbbb_bbbb),
                 "Second",
             ),
         ];
@@ -456,7 +452,7 @@ mod issue_list_render_tests {
         assert_eq!(
             rendered,
             format!(
-                "Header:\n  aaaaaaaa-0000-4000-8000-000000000001 | First | {state} | {priority}\n    - waits on x\n  bbbbbbbb-0000-4000-8000-000000000002 | Second | {state} | {priority}\n\nTotal: 2"
+                "Header:\n  {} | First | {state} | {priority}\n    - waits on x\n  {} | Second | {state} | {priority}\n\nTotal: 2", issues[0].id, issues[1].id
             )
         );
     }
@@ -464,9 +460,7 @@ mod issue_list_render_tests {
     #[test]
     fn test_render_issue_list_without_columns_prints_id_and_title_only() {
         let issues = [issue(
-            "aaaaaaaa-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
             "First",
         )];
 
@@ -474,16 +468,14 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            "H\n  aaaaaaaa-0000-4000-8000-000000000001 | First\n\nTotal: 1"
+            format!("H\n  {} | First\n\nTotal: 1", issues[0].id)
         );
     }
 
     #[test]
     fn test_render_issue_list_quiet_keeps_rows_and_drops_header_and_footer() {
         let issues = [issue(
-            "aaaaaaaa-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
             "First",
         )];
 
@@ -496,10 +488,7 @@ mod issue_list_render_tests {
 
         assert_eq!(
             rendered,
-            format!(
-                "  aaaaaaaa-0000-4000-8000-000000000001 | First | {}",
-                issues[0].priority
-            )
+            format!("  {} | First | {}", issues[0].id, issues[0].priority)
         );
     }
 
@@ -521,6 +510,7 @@ mod archive_render_tests {
 
     #[test]
     fn test_human_archive_preview_projects_every_plan_decision_and_diagnostic() {
+        let owner_id = crate::test_utils::issue_id(1);
         let artifact = ArtifactPlanEntry::new(
             "dev/active/page.md",
             ArtifactVersion::WorkingTree,
@@ -529,9 +519,7 @@ mod archive_render_tests {
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_format("markdown")
         .with_owners(vec![ArtifactOwner {
-            issue: "12345678-1234-1234-1234-123456789abc"
-                .parse::<IssueId>()
-                .unwrap(),
+            issue: owner_id.clone(),
             document_index: 2,
             state: State::Done,
             archived_from: None,
@@ -567,6 +555,10 @@ mod archive_render_tests {
         .unwrap();
 
         let human = render_archive_plan(&plan);
+        assert!(human.contains(&format!(
+            "issue={} document-index=2 state=done",
+            owner_id.short_id()
+        )));
         for expected in [
             "Schema version: 1",
             "Policy: configured",
@@ -575,7 +567,6 @@ mod archive_render_tests {
             "format: markdown",
             "provenance: explicit",
             "evidence: permanent-path",
-            "issue=12345678 document-index=2 state=done",
             "supported relative reference=missing.png target=dev/active/missing.png",
             "destination-conflict: dev/archive/page.md",
             "missing-edge-target: dev/active/missing.png",
@@ -1609,12 +1600,12 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// # Examples
 ///
 /// ```
-/// use jit::domain::identity::{IssueId, IssueIdStaging};
+/// use jit::domain::identity::IssueIdStaging;
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::HierarchyNodeView;
 ///
-/// let epic_id = "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap();
-/// let task_id = "87654321-0000-4000-8000-000000000002".parse::<IssueId>().unwrap();
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
 /// let view = HierarchyNodeView {
 ///     id: epic_id.clone(),
 ///     short_id: epic_id.short_id().to_string(),
@@ -1660,12 +1651,12 @@ pub struct HierarchyNodeView {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::identity::{IssueId, IssueIdStaging};
+/// use jit::domain::identity::IssueIdStaging;
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
 ///
-/// let epic_id = "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap();
-/// let task_id = "87654321-0000-4000-8000-000000000002".parse::<IssueId>().unwrap();
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
 /// let response = GraphTreeResponse::with_extras(
 ///     vec![HierarchyNodeView {
 ///         id: task_id.clone(),
@@ -1937,6 +1928,7 @@ impl IssueShowResponse {
 /// use jit::output::{IssueShowResponse, IssueStatusResponse};
 ///
 /// let mut issue = Issue::draft("Build parser".into(), "Body".into());
+/// issue.id = jit::test_utils::issue_id(1);
 /// issue.state = State::Ready;
 /// issue.gates_required = vec!["tests".into()];
 /// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
@@ -2409,7 +2401,6 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 /// use chrono::Utc;
 /// use jit::declarations::GateStage;
-/// use jit::domain::identity::IssueId;
 /// use jit::domain::{GateEvaluationStability, GateRunResult, GateRunStatus, GateVerdictOrigin};
 /// use jit::output::GateRunSummary;
 ///
@@ -2418,7 +2409,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     run_id: "r1".into(),
 ///     gate_key: "tests".into(),
 ///     stage: GateStage::Postcheck,
-///     issue_id: "12345678-0000-4000-8000-000000000001".parse::<IssueId>().unwrap(),
+///     issue_id: jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678),
 ///     commit: None,
 ///     branch: None,
 ///     status: GateRunStatus::Passed,
@@ -2890,9 +2881,7 @@ mod tests {
 
     #[test]
     fn test_batch_target_serializes_resolved_and_unresolved_as_plain_strings() {
-        let id = "12345678-0000-4000-8000-000000000001"
-            .parse::<IssueId>()
-            .unwrap();
+        let id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
         for target in [
             BatchTarget::Resolved(id),
             BatchTarget::Unresolved("missing-prefix".into()),
@@ -2904,13 +2893,14 @@ mod tests {
 
     #[test]
     fn test_render_gate_run_status_never_run_and_passed_name_gate_and_issue() {
-        let never = render_gate_run_status(GateRunLine::NeverRun, "tests", "abc123");
-        let passed = render_gate_run_status(GateRunLine::Passed, "tests", "abc123");
+        let id = crate::test_utils::issue_id(1);
+        let never = render_gate_run_status(GateRunLine::NeverRun, "tests", &id);
+        let passed = render_gate_run_status(GateRunLine::Passed, "tests", &id);
         for line in [&never, &passed] {
-            assert!(line.contains("'tests'") && line.contains("abc123"));
+            assert!(line.contains("'tests'") && line.contains(id.as_str()));
         }
         assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
-        assert_eq!(passed, "Passed gate 'tests' for issue abc123");
+        assert_eq!(passed, format!("Passed gate 'tests' for issue {id}"));
     }
 
     #[test]
@@ -3057,9 +3047,7 @@ mod tests {
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
         let issue = crate::domain::MinimalIssue {
-            id: "aaaaaaaa-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            id: crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
             title: "Archived dep".to_string(),
             state: State::Archived,
             priority: Priority::Normal,
@@ -3251,9 +3239,7 @@ mod tests {
 
         let mut issue = crate::test_utils::fixture_issue("Parent".to_string(), "Body".to_string());
         let resolved_dep = crate::test_utils::fixture_issue("Dep".to_string(), String::new());
-        let dangling_id = "22222222-0000-4000-8000-000000000002"
-            .parse::<IssueId>()
-            .unwrap();
+        let dangling_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0002_2222_2222);
         issue.dependencies = vec![resolved_dep.id.clone(), dangling_id.clone()];
         let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
 
@@ -3404,22 +3390,24 @@ mod tests {
 
     #[test]
     fn test_json_output_success() {
-        let data = json!({"id": "123", "title": "Test"});
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "Test"});
         let output = JsonOutput::success(data);
 
         // success field removed
-        assert_eq!(output.data["id"], "123");
+        assert_eq!(output.data["id"], id);
         // metadata removed
     }
 
     #[test]
     fn test_json_output_serialization() {
-        let data = json!({"id": "123", "title": "test"});
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "test"});
         let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
         // Should contain raw data without envelope
-        assert!(json_str.contains("\"id\": \"123\""));
+        assert!(json_str.contains(&format!("\"id\": \"{id}\"")));
         assert!(json_str.contains("\"title\": \"test\""));
         // Should NOT contain envelope fields
         assert!(!json_str.contains("\"success\""));
@@ -3469,19 +3457,21 @@ mod tests {
 
     #[test]
     fn test_json_output_with_message() {
-        let data = json!({"id": "abc12345", "title": "Test issue"});
-        let output = JsonOutput::success(data).with_message("Created issue abc12345 - Test issue");
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "Test issue"});
+        let message = format!("Created issue {id} - Test issue");
+        let output = JsonOutput::success(data).with_message(&message);
 
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(parsed["message"], "Created issue abc12345 - Test issue");
-        assert_eq!(parsed["id"], "abc12345");
+        assert_eq!(parsed["message"], message);
+        assert_eq!(parsed["id"], id);
         assert_eq!(parsed["title"], "Test issue");
     }
 
     #[test]
     fn test_json_output_without_message() {
-        let data = json!({"id": "123"});
+        let data = json!({"id": crate::test_utils::issue_id(1)});
         let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
@@ -3493,7 +3483,8 @@ mod tests {
     fn test_json_output_with_message_array_payload() {
         // When data serializes to a JSON array (not object), message cannot be injected.
         // Verify the output is still valid JSON (the array), just without message.
-        let data = json!([{"id": "a"}, {"id": "b"}]);
+        let data =
+            json!([{"id": crate::test_utils::issue_id(1)}, {"id": crate::test_utils::issue_id(2)}]);
         let output = JsonOutput::success(data).with_message("Should not appear");
 
         let json_str = output.to_json_string().unwrap();
@@ -3914,7 +3905,7 @@ mod tests {
 
     #[test]
     fn test_event_list_response_serializes_events_under_collection_key() {
-        let issue = crate::domain::Issue::draft("title".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("title".to_string(), String::new());
         let event = crate::test_utils::stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             "e",
@@ -3944,9 +3935,7 @@ mod tests {
         let now = chrono::Utc::now();
         let lease = crate::storage::claim_coordinator::Lease {
             lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
-            issue_id: "aaaaaaaa-0000-4000-8000-000000000001"
-                .parse::<IssueId>()
-                .unwrap(),
+            issue_id: crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
             agent_id: "agent:a".parse().unwrap(),
             worktree_id: "w".parse().unwrap(),
             branch: None,

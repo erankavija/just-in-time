@@ -171,10 +171,10 @@ mod tests {
     #[test]
     fn test_serialize_tags_variant_kind() {
         let warning = StorageWarning::DuplicateLease {
-            issue_id: "abc".to_string(),
+            issue_id: crate::test_utils::issue_id(54),
         };
         let value = serde_json::to_value(&warning).unwrap();
         assert_eq!(value["kind"], "duplicate_lease");
-        assert_eq!(value["issue_id"], "abc");
+        assert_eq!(value["issue_id"], crate::test_utils::issue_id(54));
     }
 }

@@ -601,7 +601,7 @@ mod tests {
         let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
         let labels = vec!["type:acton".to_string()]; // typo
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels);
+        let issues = detect_validation_issues(&config, &crate::test_utils::issue_id(68), &labels);
 
         assert_eq!(issues.len(), 1);
         match &issues[0] {
@@ -610,7 +610,7 @@ mod tests {
                 unknown_type,
                 suggested_fix,
             } => {
-                assert_eq!(issue_id, "01ABC");
+                assert_eq!(issue_id, &crate::test_utils::issue_id(68));
                 assert_eq!(unknown_type, "acton");
                 assert_eq!(suggested_fix, &Some(test_type(4)));
             }
@@ -624,7 +624,7 @@ mod tests {
         let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
         let labels = vec![format!("type:{}", test_type(4))];
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels);
+        let issues = detect_validation_issues(&config, &crate::test_utils::issue_id(68), &labels);
         assert!(issues.is_empty());
     }
 
@@ -663,7 +663,7 @@ mod tests {
         use super::{generate_fixes, ValidationFix, ValidationIssue};
 
         let issues = vec![ValidationIssue::UnknownType {
-            issue_id: "01ABC".to_string(),
+            issue_id: crate::test_utils::issue_id(68),
             unknown_type: "acton".to_string(),
             suggested_fix: Some(test_type(4)),
         }];
@@ -674,7 +674,7 @@ mod tests {
         assert_eq!(
             fixes[0],
             ValidationFix::ReplaceType {
-                issue_id: "01ABC".to_string(),
+                issue_id: crate::test_utils::issue_id(68),
                 old_type: "acton".to_string(),
                 new_type: test_type(4),
             }
@@ -689,7 +689,7 @@ mod tests {
         use super::{generate_fixes, ValidationIssue};
 
         let issues = vec![ValidationIssue::UnknownType {
-            issue_id: "01ABC".to_string(),
+            issue_id: crate::test_utils::issue_id(68),
             unknown_type: "completely_unknown".to_string(),
             suggested_fix: None,
         }];

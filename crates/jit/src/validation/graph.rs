@@ -280,6 +280,7 @@ impl GraphFinding {
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
 /// let mut task = Issue::draft("a task".into(), String::new());
+/// task.id = jit::test_utils::issue_id(1);
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
 /// let findings = evaluate_graph(
@@ -2560,12 +2561,8 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
-        a.id = "abcd1111-0000-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
-        b.id = "abcd2222-0000-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
+        a.id = crate::test_utils::issue_id(0xabcd_1111);
+        b.id = crate::test_utils::issue_id(0xabcd_2222);
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown.labels.push("brackets:abcd".to_string());
 
@@ -2601,12 +2598,8 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         let mut a = initiative_with_criteria(&["REQ-01"]);
         let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
-        a.id = "abcd1234-1111-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
-        b.id = "abcd1234-2222-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
+        a.id = crate::test_utils::issue_id(0x1111_0000_0000_0000_0000_0000_abcd_1234);
+        b.id = crate::test_utils::issue_id(0x2222_0000_0000_0000_0000_0000_abcd_1234);
         assert_eq!(
             a.short_id(),
             b.short_id(),
@@ -3742,12 +3735,8 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         let mut initiative_a = issue("initiative-a", &["req:REQ-42"]);
         let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
-        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
-        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000"
-            .parse::<IssueId>()
-            .unwrap();
+        initiative_a.id = crate::test_utils::issue_id(0xaaaa_0000);
+        initiative_b.id = crate::test_utils::issue_id(0xbbbb_0000);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -4025,9 +4014,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
             severity: Severity::Error,
             message: "criterion uncovered".into(),
         };
-        let issue_id = "1c5da41d-e1b3-475c-818d-324f57dd716b"
-            .parse::<IssueId>()
-            .unwrap();
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
         let gf = GraphFinding::for_issue(issue_id, f);
         assert!(
             !gf.is_config_error(),

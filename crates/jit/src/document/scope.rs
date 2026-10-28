@@ -62,9 +62,7 @@ mod tests {
 
     #[test]
     fn test_document_scope_parse_issue() {
-        let resolved = "0f0e0d0c-0000-4000-8000-000000000001"
-            .parse::<IssueId>()
-            .unwrap();
+        let resolved = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
         let scope = DocumentScope::parse("issue:abc123", |id| {
             assert_eq!(id, "abc123");
             Ok(resolved.clone())
