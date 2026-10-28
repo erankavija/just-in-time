@@ -92,10 +92,8 @@ pub fn prepare_server_storage(
 #[cfg(test)]
 mod recovery_startup_tests {
     use super::*;
-    use jit::commands::CommandExecutor;
     use jit::repository_state::{FileMode, VirtualPath};
     use jit::storage::{PutFile, RedoRecord};
-    use tempfile::TempDir;
 
     /// REQ-02, REQ-03, REQ-04: a spelling through `..` components and the
     /// normalized one bind the same layout, so reads through either serve the
@@ -106,16 +104,10 @@ mod recovery_startup_tests {
     fn test_server_startup_serves_reads_from_relative_data_dir_spellings() {
         use jit::storage::IssueStore;
 
-        let temp = TempDir::new().unwrap();
-        let root = temp.path().canonicalize().unwrap();
-        let data = root.join("repo").join(".jit");
-        std::fs::create_dir_all(&data).unwrap();
-        let layout = jit::storage::discover_repository_layout(root.join("repo"), &data).unwrap();
-        let executor = CommandExecutor::new(JsonFileStorage::new(&data)).with_layout(layout);
-        executor
-            .initialize_fresh_repository(&root.join("repo"), None)
-            .expect("a repository the server can serve");
-        let (id, _) = executor
+        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
+        let repo = temp.path().canonicalize().unwrap();
+        let (id, _) = jit::test_utils::file_executor(&repo)
+            .unwrap()
             .issues()
             .create_issue(
                 "Hello".into(),
@@ -129,12 +121,11 @@ mod recovery_startup_tests {
             )
             .expect("an issue to serve");
 
-        let sibling = root.join("sibling");
+        let sibling = repo.join("sibling");
         std::fs::create_dir(&sibling).unwrap();
-        for spelling in ["../repo/.jit", "../sibling/../repo/.jit"] {
+        for spelling in ["../.jit", "../sibling/../.jit"] {
             let layout =
-                jit::storage::discover_repository_layout(root.join("repo"), sibling.join(spelling))
-                    .unwrap();
+                jit::storage::discover_repository_layout(&repo, sibling.join(spelling)).unwrap();
             let (storage, _session) =
                 prepare_server_storage(layout).expect("startup over a relative data directory");
             let ids: Vec<_> = storage
@@ -178,13 +169,8 @@ mod recovery_startup_tests {
     /// REQ-03 at the count `main` logs on startup.
     #[test]
     fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
-        let temp = TempDir::new().unwrap();
+        let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
         let data = temp.path().join(".jit");
-        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        CommandExecutor::new(JsonFileStorage::new(&data))
-            .with_layout(layout)
-            .initialize_fresh_repository(temp.path(), None)
-            .expect("a repository the server can serve");
         RedoRecord::new(
             Vec::new(),
             vec![PutFile {

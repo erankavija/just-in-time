@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:19.000386280Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -12,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "18ad8eda-a336-4174-a09e-720dd8f22a05",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:06:35.862779252Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "880f01fb-b62d-4b9e-b40a-51a6076b76c6",
+      "status": "failed",
+      "updated_at": "2026-10-28T22:09:56.566963445Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5001b556-bf9a-42a0-b82e-bcbfaafd622e",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "label and query tests read created ids from JSON output",
-  "updated_at": "2026-10-27T22:39:17.054132762Z"
+  "updated_at": "2026-10-28T22:09:56.566963445Z"
 }
