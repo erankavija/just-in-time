@@ -1082,44 +1082,10 @@ mod tests {
     use axum_test::TestServer;
     use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
-    use jit::storage::{InMemoryStorage, RepositoryStateStore};
+    use jit::storage::{InMemoryStorage, JsonFileStorage};
+    use jit::test_utils::setup_test_repo_with_config;
 
     use crate::watcher::ChangeTracker;
-
-    fn test_repository_layout<S>(storage: &S) -> jit::repository_state::RepositoryLayout
-    where
-        S: IssueStore + RepositoryStateStore,
-    {
-        if storage.is_file_backed() {
-            let data_root = storage.root();
-            let worktree_root = data_root
-                .parent()
-                .expect("a file-backed test data root has a worktree parent");
-            jit::storage::discover_repository_layout(worktree_root, data_root).unwrap()
-        } else {
-            jit::repository_state::RepositoryLayout::new(
-                jit::repository_state::RepositoryRootEvidence::new(
-                    storage.root(),
-                    format!("test-worktree:{}", storage.root().display()),
-                    true,
-                ),
-                jit::repository_state::RepositoryRootEvidence::new(
-                    storage.root().join(".jit"),
-                    format!("test-data:{}", storage.root().display()),
-                    true,
-                ),
-            )
-            .unwrap()
-        }
-    }
-
-    fn test_executor<S>(storage: S) -> Arc<CommandExecutor<S>>
-    where
-        S: IssueStore + RepositoryStateStore,
-    {
-        let layout = test_repository_layout(&storage);
-        Arc::new(CommandExecutor::new(storage).with_layout(layout))
-    }
 
     /// The taxonomy the taxonomy-serving routes answer with, declared by this
     /// repository.
@@ -1130,7 +1096,7 @@ mod tests {
         )
     }
 
-    fn test_app(executor: CommandExecutor<InMemoryStorage>) -> TestServer {
+    fn test_app<S: IssueStore + Send + Sync + 'static>(executor: CommandExecutor<S>) -> TestServer {
         let state = AppState {
             executor: Arc::new(executor),
             tracker: Arc::new(ChangeTracker::new(16)),
@@ -1138,18 +1104,6 @@ mod tests {
             shutdown: CancellationToken::new(),
         };
         TestServer::new(create_routes(state)).unwrap()
-    }
-
-    fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
-        use jit::storage::JsonFileStorage;
-
-        let storage = JsonFileStorage::new(worktree_root.join(".jit"));
-        let layout =
-            jit::storage::discover_repository_layout(worktree_root, storage.root()).unwrap();
-        CommandExecutor::new(storage)
-            .with_layout(layout)
-            .initialize_fresh_repository(worktree_root, None)
-            .unwrap();
     }
 
     #[tokio::test]
@@ -1685,16 +1639,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_namespaces_exposes_taxonomy_only() {
-        use jit::storage::JsonFileStorage;
-
         // A file-backed storage with a config.toml carrying the taxonomy keys,
         // so the response contract (mirror of CLI config show --json) stays
         // protected against drift.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        std::fs::write(
-            jit_dir.join("config.toml"),
+        let (_temp, executor) = setup_test_repo_with_config(
             r#"
 [namespaces.type]
 description = "Issue type"
@@ -1706,11 +1654,9 @@ unique = false
 "#,
         )
         .unwrap();
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test".to_string(),
             shutdown: CancellationToken::new(),
@@ -1764,20 +1710,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_success() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // Set up a real tempdir acting as repo root with a .jit subdir.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-
-        // Write a permissive config so the executor is happy.
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // Write the fixture document at a subdirectory path relative to repo root.
         // This exercises the path-resolution fix: storage must resolve against
@@ -1788,16 +1725,13 @@ unique = false
         fs::create_dir_all(doc_abs.parent().unwrap()).unwrap();
         fs::write(&doc_abs, doc_content).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
 
         // Keep tempdir alive for the duration of the test.
         Box::leak(Box::new(temp));
 
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -1855,34 +1789,15 @@ unique = false
 
     // ── /api/issues/:id/documents/:path/raw tests ────────────────────────────
 
-    /// Build a JsonFileStorage-backed server with a real tempdir that has an
-    /// HTML document linked to an issue.  Returns the server, the issue id, and
-    /// the document path string.
-    fn create_test_app_with_html_doc() -> (
-        axum_test::TestServer,
-        String, // issue id
-        String, // doc path relative to repo root
-    ) {
+    const HTML_DOC: &str = "slide.html";
+
+    /// Writes `HTML_DOC` under `worktree` and links it to a new issue, whose id it returns.
+    fn link_html_document(
+        worktree: &std::path::Path,
+        executor: &CommandExecutor<JsonFileStorage>,
+    ) -> String {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
-        use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-
-        // Write a permissive config so the executor is happy.
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-
-        let executor = test_executor(storage);
-
-        // Create an issue.
         let (id, _) = executor
             .issues()
             .create_issue(
@@ -1896,30 +1811,12 @@ unique = false
                 false,
             )
             .unwrap();
-
-        // Write the HTML file relative to repo root (parent of .jit/).
-        let doc_rel = "slide.html";
-        let doc_abs = temp.path().join(doc_rel);
-        fs::write(&doc_abs, "<html><body>hello</body></html>").unwrap();
-
-        // Link the document to the issue (skip_scan=true to avoid git dep).
+        std::fs::write(worktree.join(HTML_DOC), "<html><body>hello</body></html>").unwrap();
+        // skip_scan avoids the git dependency.
         executor
-            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .add_document_reference(&id, HTML_DOC, None, None, None, true)
             .unwrap();
-
-        // Keep tempdir alive for the duration of the test via Box::leak – this
-        // is acceptable in test code; the OS cleans it up.
-        Box::leak(Box::new(temp));
-
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let server = TestServer::new(create_routes(state)).unwrap();
-        (server, id, doc_rel.to_string())
+        id
     }
 
     async fn search_hits(server: &axum_test::TestServer, query: &str) -> Vec<SearchResult> {
@@ -1935,7 +1832,10 @@ unique = false
 
     #[tokio::test]
     async fn test_search_nested_data_root_returns_issue_record_match() {
-        let (server, id, _) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
         let hits = search_hits(&server, "Test issue").await;
         assert!(
             hits.iter().any(|hit| hit.issue_id.as_deref() == Some(&id)),
@@ -1945,7 +1845,11 @@ unique = false
 
     #[tokio::test]
     async fn test_search_nested_data_root_keeps_linked_documents_and_excludes_other_files() {
-        let (server, _, doc) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let _id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let doc = HTML_DOC;
         let hits = search_hits(&server, "hello").await;
         assert!(hits.iter().any(|hit| hit.path.ends_with(&doc)), "{hits:?}");
         assert!(search_hits(&server, "enforce_leases").await.is_empty());
@@ -1953,7 +1857,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_html_returns_200_with_correct_content_type() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -1970,7 +1878,11 @@ unique = false
     /// after the opening `<html>` tag (fixture has no `<head>`).
     #[tokio::test]
     async fn test_get_document_raw_html_injects_base_tag() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -1985,7 +1897,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_has_csp_header() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         let url = format!("/issues/{}/documents/{}/raw", id, path);
         let response = server.get(&url).await;
         response.assert_status_ok();
@@ -2004,7 +1920,11 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_not_found_when_path_not_linked() {
-        let (server, id, _path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let _path = HTML_DOC;
         let url = format!("/issues/{}/documents/nonexistent.html/raw", id);
         let response = server.get(&url).await;
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
@@ -2013,23 +1933,13 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_returns_byte_faithful_for_non_utf8() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // 4-byte sequence that is not valid UTF-8.
         let binary_fixture: &[u8] = b"\xff\xfe\xfd\xfc";
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let (id, _) = executor
             .issues()
@@ -2059,7 +1969,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2082,7 +1992,6 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_raw_by_path_html_returns_correct_content_type() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
         // Build a JsonFileStorage-backed server rooted at a tempdir and write
@@ -2090,26 +1999,18 @@ unique = false
         // longer accepted by the storage layer (they surface as
         // PathReadError::InvalidPath → 400), so every test must use a
         // repo-relative path.
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "slide.html";
         let html_body = "<p>test</p>";
         fs::write(temp.path().join(doc_rel), html_body).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2271,29 +2172,20 @@ unique = false
     /// unsafe path, not passed to `fs::read` as a server-side I/O failure.
     #[tokio::test]
     async fn test_get_document_by_path_rejects_directory() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_rel = "not-a-file";
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         // Keep tempdir alive.
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2311,28 +2203,19 @@ unique = false
     /// The standalone raw endpoint applies the same ordinary-file contract.
     #[tokio::test]
     async fn test_get_document_raw_by_path_rejects_directory() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_rel = "also-not-a-file";
         fs::create_dir_all(temp.path().join(dir_rel)).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         Box::leak(Box::new(temp));
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2351,25 +2234,15 @@ unique = false
     #[tokio::test]
     async fn test_get_document_content_rejects_directory() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_path = temp.path().join("broken-doc");
         fs::create_dir_all(&dir_path).unwrap();
         // Use a relative path so the URL stays clean (no slashes in the segment).
         let doc_rel = "broken-doc";
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
 
         let (id, _) = executor
             .issues()
@@ -2395,7 +2268,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2414,11 +2287,13 @@ unique = false
     #[tokio::test]
     async fn test_document_reads_serve_a_derived_document_without_a_link() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::process::Command;
 
-        let temp = tempfile::tempdir().unwrap();
+        let (temp, executor) = setup_test_repo_with_config(
+            "[worktree]\nenforce_leases = \"off\"\n\n[documentation]\nissue_scoped_areas = [\"notes\"]\n",
+        )
+        .unwrap();
         jit::test_cli::init_git_repository(temp.path()).unwrap();
         let git = |args: &[&str]| {
             let status = Command::new("git")
@@ -2428,14 +2303,6 @@ unique = false
                 .unwrap();
             assert!(status.success(), "git {args:?}");
         };
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n\n[documentation]\nissue_scoped_areas = [\"notes\"]\n",
-        )
-        .unwrap();
-        let executor = test_executor(JsonFileStorage::new(&jit_dir));
         let (id, _) = executor
             .issues()
             .create_issue(
@@ -2468,7 +2335,7 @@ unique = false
             .contains(&doc_rel));
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2497,20 +2364,10 @@ unique = false
     #[tokio::test]
     async fn test_get_document_content_csv_returns_text_csv() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n31,1024,C\n";
@@ -2539,7 +2396,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2561,24 +2418,14 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_rejects_directory() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let dir_path = temp.path().join("broken-raw-doc");
         fs::create_dir_all(&dir_path).unwrap();
         let doc_rel = "broken-raw-doc";
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
 
         let (id, _) = executor
             .issues()
@@ -2602,7 +2449,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2617,20 +2464,10 @@ unique = false
 
     #[tokio::test]
     async fn test_get_document_by_path_csv_returns_text_csv() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let doc_rel = "bench/results.csv";
         let doc_content = "prime,n,kernel\n7,256,F\n";
@@ -2642,7 +2479,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -2811,49 +2648,24 @@ unique = false
 
     // ── GET /raw/*path integration tests ─────────────────────────────────────
 
-    /// Helper: create a JsonFileStorage-backed server with a file at a nested
-    /// path under the repo root.  Returns the server and tempdir (kept alive).
-    fn create_app_with_raw_fixture(
-        rel_path: &str,
-        content: &[u8],
-    ) -> (axum_test::TestServer, tempfile::TempDir) {
-        use jit::storage::JsonFileStorage;
-        use std::fs;
-
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        // Write the fixture file.
-        let abs_path = temp.path().join(rel_path);
-        if let Some(parent) = abs_path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        fs::write(&abs_path, content).unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-        let tracker = Arc::new(ChangeTracker::new(16));
-        let state = AppState {
-            executor,
-            tracker,
-            project_name: "test-project".to_string(),
-            shutdown: CancellationToken::new(),
-        };
-        let server = TestServer::new(create_routes(state)).unwrap();
-        (server, temp)
+    /// Writes `content` at `rel_path` under `worktree`, creating parent directories.
+    fn seed_worktree_file(worktree: &std::path::Path, rel_path: &str, content: &[u8]) {
+        let path = worktree.join(rel_path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
     }
 
     #[tokio::test]
     async fn test_get_raw_wildcard_serves_svg() {
         let svg_content = br#"<svg xmlns="http://www.w3.org/2000/svg"><circle r="5"/></svg>"#;
-        let (server, _temp) =
-            create_app_with_raw_fixture("docs/presentations/figures/fig4.svg", svg_content);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(
+            temp.path(),
+            "docs/presentations/figures/fig4.svg",
+            svg_content,
+        );
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/presentations/figures/fig4.svg").await;
         response.assert_status_ok();
@@ -2874,8 +2686,10 @@ unique = false
     #[tokio::test]
     async fn test_get_raw_wildcard_html_injects_base_tag() {
         let html_content = b"<html><head></head><body></body></html>";
-        let (server, _temp) =
-            create_app_with_raw_fixture("docs/presentations/deck.html", html_content);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(temp.path(), "docs/presentations/deck.html", html_content);
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/presentations/deck.html").await;
         response.assert_status_ok();
@@ -2966,7 +2780,11 @@ unique = false
     /// backends, so we only verify that we reach the injection code path when 200.
     #[tokio::test]
     async fn test_get_document_raw_html_with_commit_param() {
-        let (server, id, path) = create_test_app_with_html_doc();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let server = test_app(executor);
+        let path = HTML_DOC;
         // Pass a fake commit SHA; non-git storage will return 404.
         let url = format!("/issues/{}/documents/{}/raw?commit=abc1234", id, path);
         let response = server.get(&url).await;
@@ -2983,20 +2801,10 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_preserves_existing_base_tag() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
-
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let (id, _) = executor
             .issues()
@@ -3025,7 +2833,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -3047,7 +2855,10 @@ unique = false
     async fn test_get_raw_wildcard_preserves_existing_base_tag() {
         let original =
             br#"<html><head><base href="https://cdn.example.com/"></head><body></body></html>"#;
-        let (server, _temp) = create_app_with_raw_fixture("docs/deck.html", original);
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        seed_worktree_file(temp.path(), "docs/deck.html", original);
+        let server = test_app(executor);
 
         let response = server.get("/raw/docs/deck.html").await;
         response.assert_status_ok();
@@ -3085,18 +2896,11 @@ unique = false
     #[cfg(unix)]
     #[tokio::test]
     async fn test_get_raw_wildcard_rejects_symlink_escape() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // Create a file outside the repo that we'll try to reach via symlink.
         let outside = tempfile::NamedTempFile::new().unwrap();
@@ -3107,11 +2911,9 @@ unique = false
         fs::create_dir_all(link_path.parent().unwrap()).unwrap();
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -3137,18 +2939,11 @@ unique = false
     #[tokio::test]
     async fn test_get_document_raw_rejects_symlink_escape() {
         use jit::domain::Priority;
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         // File outside the repo the attacker wants to read.
         let outside = tempfile::NamedTempFile::new().unwrap();
@@ -3163,8 +2958,6 @@ unique = false
         let link_path = temp.path().join(doc_rel);
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
         let (id, _) = executor
             .issues()
             .create_issue(
@@ -3184,7 +2977,7 @@ unique = false
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
@@ -3208,18 +3001,11 @@ unique = false
     #[cfg(unix)]
     #[tokio::test]
     async fn test_get_document_raw_by_path_rejects_symlink_escape() {
-        use jit::storage::JsonFileStorage;
         use std::fs;
         use std::os::unix::fs as unix_fs;
 
-        let temp = tempfile::tempdir().unwrap();
-        let jit_dir = temp.path().join(".jit");
-        initialize_file_backed_test_repository(temp.path());
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
-        )
-        .unwrap();
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
         let outside = tempfile::NamedTempFile::new().unwrap();
         fs::write(outside.path(), b"secret outside repo").unwrap();
@@ -3230,12 +3016,9 @@ unique = false
         fs::create_dir_all(link_path.parent().unwrap()).unwrap();
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let storage = JsonFileStorage::new(&jit_dir);
-        let executor = test_executor(storage);
-
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
-            executor,
+            executor: Arc::new(executor),
             tracker,
             project_name: "test-project".to_string(),
             shutdown: CancellationToken::new(),
