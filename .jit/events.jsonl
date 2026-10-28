@@ -20991,3 +20991,4 @@
 {"from":"in_progress","id":"5f056087-ea12-4361-aff3-1d448afd50c3","issue_id":"8da3f7f5-3551-4111-a68a-4d4d4b093617","timestamp":"2026-10-28T21:39:49.445919036Z","to":"done","type":"issue_state_changed"}
 {"id":"dc76fd09-efbc-4824-955d-aec80cac185f","issue_id":"8da3f7f5-3551-4111-a68a-4d4d4b093617","timestamp":"2026-10-28T21:39:49.445919036Z","type":"issue_completed"}
 {"assignee":"agent:jit-execution-lead","id":"15acc1f9-582b-4bc0-9f43-c8f49cc0a9d4","issue_id":"e2eb8862-1622-4a58-9bbc-c77a57a87013","timestamp":"2026-10-28T21:40:27.414776691Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"07166583-2d8e-4410-a81e-176b156056ae","issue_id":"e2eb8862-1622-4a58-9bbc-c77a57a87013","timestamp":"2026-10-28T21:52:29.981642366Z","type":"gate_passed","updated_by":"auto:executor"}
