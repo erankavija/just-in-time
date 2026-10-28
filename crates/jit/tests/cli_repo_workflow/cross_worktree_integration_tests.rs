@@ -3,19 +3,12 @@
 //! These tests verify that issues can be read across git worktrees using
 //! the 3-tier fallback chain: local .jit → git HEAD → main worktree .jit
 
-use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
-use jit::domain::LinkedCheckoutWriteStance;
 use jit::test_cli::JitCli;
 
 /// Declared by every mutation inside a linked checkout: this suite initializes
 /// and mutates jit there as setup for the read-visibility properties it asserts
 /// (jit:f52567ed REQ-05). The write policy's own behaviour is covered by
 /// `linked_checkout_write_policy_tests`.
-const ALLOW_LINKED_WRITES: [(&str, &str); 1] = [(
-    LINKED_CHECKOUT_WRITE_STANCE_ENV,
-    LinkedCheckoutWriteStance::Allow.as_token(),
-)];
-
 #[test]
 fn test_issue_show_reads_from_git_in_secondary_worktree() {
     let (primary, linked) = JitCli::linked_checkouts().unwrap();
@@ -23,7 +16,7 @@ fn test_issue_show_reads_from_git_in_secondary_worktree() {
     primary.commit("Add issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -41,7 +34,7 @@ fn test_issue_show_reads_from_main_worktree_uncommitted() {
         .create_issue(["--title", "Uncommitted Issue"])
         .unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -60,14 +53,14 @@ fn test_query_all_shows_issues_from_all_sources() {
     // Issue B stays uncommitted in the primary checkout.
     let id_b = primary.create_issue(["--title", "Issue B"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
     let created_c = linked
         .command_with_env(
             ["issue", "create", "--title", "Issue C", "--json"],
-            ALLOW_LINKED_WRITES,
+            [crate::ALLOW_LINKED_WRITES],
         )
         .output()
         .unwrap();
@@ -109,7 +102,7 @@ fn test_graph_show_works_across_worktrees() {
     primary.commit("Add issues with dependency").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -137,7 +130,7 @@ fn test_partial_id_resolution_across_worktrees() {
     primary.commit("Add issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -156,7 +149,7 @@ fn test_local_overrides_git_and_main() {
     primary.commit("Add original issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .status()
         .unwrap()
         .success());
@@ -171,7 +164,7 @@ fn test_local_overrides_git_and_main() {
                 "--title",
                 "Modified in Secondary",
             ],
-            ALLOW_LINKED_WRITES,
+            [crate::ALLOW_LINKED_WRITES],
         )
         .status()
         .unwrap()

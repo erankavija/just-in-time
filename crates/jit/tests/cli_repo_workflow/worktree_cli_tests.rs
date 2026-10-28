@@ -3,9 +3,7 @@
 //! Tests the full CLI experience for worktree and validate commands.
 
 use assert_cmd::prelude::*;
-use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
 use jit::domain::store_divergence::{DivergenceClass, DivergentRecord};
-use jit::domain::LinkedCheckoutWriteStance;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -13,11 +11,6 @@ use std::fs;
 
 /// Declared by every invocation writing a linked checkout's store: these tests
 /// are about worktree identity, not about the write policy (jit:f52567ed REQ-05).
-const ALLOW_LINKED_WRITES: [(&str, &str); 1] = [(
-    LINKED_CHECKOUT_WRITE_STANCE_ENV,
-    LinkedCheckoutWriteStance::Allow.as_token(),
-)];
-
 // === jit worktree info tests ===
 
 #[test]
@@ -104,7 +97,7 @@ fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() 
             ["init", "--json"],
             [("JIT_DATA_DIR", worktree_path.join(".jit").to_str().unwrap())]
                 .into_iter()
-                .chain(ALLOW_LINKED_WRITES),
+                .chain([crate::ALLOW_LINKED_WRITES]),
         )
         .output()
         .unwrap();
@@ -533,7 +526,7 @@ fn test_init_in_new_worktree_generates_unique_id() {
 
     // Run jit init in the worktree
     linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -568,7 +561,7 @@ fn test_init_is_idempotent_in_worktree() {
 
     // Run jit init first time
     linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -579,7 +572,7 @@ fn test_init_is_idempotent_in_worktree() {
 
     // Run jit init second time
     linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .assert()
         .success();
 
@@ -607,7 +600,7 @@ fn test_worktree_list_shows_distinct_ids() {
 
     [&linked, &second].iter().for_each(|checkout| {
         checkout
-            .command_with_env(["init"], ALLOW_LINKED_WRITES)
+            .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
             .assert()
             .success();
     });
@@ -642,7 +635,7 @@ fn test_worktree_list_shows_distinct_ids() {
 fn test_git_worktree_move_preserves_id() {
     let (cli, linked) = JitCli::linked_checkouts().unwrap();
     linked
-        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .command_with_env(["init"], [crate::ALLOW_LINKED_WRITES])
         .assert()
         .success();
     let id_before = linked.run_json(["worktree", "info"]).unwrap()["worktree_id"].clone();
@@ -687,7 +680,7 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
                 "--title",
                 "Held by the linked checkout alone",
             ],
-            ALLOW_LINKED_WRITES,
+            [crate::ALLOW_LINKED_WRITES],
         )
         .assert()
         .success();

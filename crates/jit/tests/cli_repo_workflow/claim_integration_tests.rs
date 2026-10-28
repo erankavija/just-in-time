@@ -4,8 +4,6 @@
 //! Verifies actual binary execution, exit codes, and output formats.
 
 use assert_cmd::prelude::*;
-use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
-use jit::domain::LinkedCheckoutWriteStance;
 use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
@@ -28,11 +26,6 @@ fn test_issue_release() {
 
 /// Declared by every invocation selecting a linked checkout's store, rather
 /// than inheriting a default (jit:f52567ed REQ-05).
-const ALLOW_LINKED_WRITES: (&str, &str) = (
-    LINKED_CHECKOUT_WRITE_STANCE_ENV,
-    LinkedCheckoutWriteStance::Allow.as_token(),
-);
-
 #[test]
 fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() {
     let (primary, linked) = JitCli::linked_checkouts().unwrap();
@@ -61,7 +54,7 @@ fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() 
             ],
             [
                 ("JIT_DATA_DIR", linked_store.to_str().unwrap()),
-                ALLOW_LINKED_WRITES,
+                crate::ALLOW_LINKED_WRITES,
             ],
         )
         .output()
@@ -129,7 +122,7 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
                 agent_id,
                 "--json",
             ],
-            [selected_store, ALLOW_LINKED_WRITES],
+            [selected_store, crate::ALLOW_LINKED_WRITES],
         )
         .output()
         .unwrap();
@@ -159,7 +152,7 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
             ],
             [
                 selected_store,
-                ALLOW_LINKED_WRITES,
+                crate::ALLOW_LINKED_WRITES,
                 ("JIT_AGENT_ID", agent_id),
             ],
         )
