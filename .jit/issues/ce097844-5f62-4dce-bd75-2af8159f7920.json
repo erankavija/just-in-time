@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T23:29:47.517762400Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d03e3826-bec7-4eb2-9854-de211ffc70c4",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:30:59.025486973Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ce097844-5f62-4dce-bd75-2af8159f7920",
@@ -37,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Projection-render tests take shipped item kinds from the default package",
-  "updated_at": "2026-10-28T23:29:47.517762400Z"
+  "updated_at": "2026-10-28T23:30:59.025486973Z"
 }
