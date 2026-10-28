@@ -280,3 +280,52 @@ fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
         .collect();
     assert_eq!(deps, vec![b.as_str()]);
 }
+
+/// A too-short id prefix in either `dep add` position is refused as an invalid
+/// prefix (human message and `INVALID_ID_PREFIX` under `--json`).
+#[test]
+fn test_cli_dep_add_too_short_prefix_rejected_in_both_positions() {
+    let cli = JitCli::initialised().unwrap();
+    let a = cli.create_issue(["--title", "A"]).unwrap();
+    let b = cli.create_issue(["--title", "B"]).unwrap();
+
+    let short_from = cli.command(["dep", "add", "ab", &b]).output().unwrap();
+    assert!(!short_from.status.success());
+    assert!(String::from_utf8_lossy(&short_from.stderr).contains("at least 4 characters"));
+
+    [
+        ["dep", "add", "ab", &b, "--json"],
+        ["dep", "add", &a, "ab", "--json"],
+    ]
+    .into_iter()
+    .for_each(|args| {
+        let out = cli.command(args).output().unwrap();
+        assert!(!out.status.success(), "{args:?}");
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX", "{args:?}");
+    });
+}
+
+/// `dep rm` validates `<from>` and `<target>` identically: a too-short prefix in
+/// either position fails with the same message, not a silent no-op.
+#[test]
+fn test_cli_dep_rm_validates_both_positions_symmetrically() {
+    let cli = JitCli::initialised().unwrap();
+    let dependent = cli.create_issue(["--title", "Dependent"]).unwrap();
+    let dependency = cli.create_issue(["--title", "Dependency"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
+
+    [
+        ["dep", "rm", "ab", &dependency],
+        ["dep", "rm", &dependent, "ab"],
+    ]
+    .into_iter()
+    .for_each(|args| {
+        let out = cli.command(args).output().unwrap();
+        assert!(!out.status.success(), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("at least 4 characters"),
+            "{args:?}"
+        );
+    });
+}
