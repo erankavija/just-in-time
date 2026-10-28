@@ -2,12 +2,13 @@
 //! session and publication boundary.
 
 use super::profile_publication_tests::{
-    executor_with_interruptions, ordinary_executor, prepare_changed_profile, selector,
-    LifecycleState, PACKAGE_LOCATION,
+    executor_with_interruptions, prepare_changed_profile, selector, LifecycleState,
+    PACKAGE_LOCATION,
 };
 use jit::profile::ProfileApplicationStatus;
 use jit::storage::{MutationInterruptionInjector, MutationPoint, RedoPoint};
 use jit::test_cli::JitCli;
+use jit::test_utils::file_executor;
 use serde_json::Value;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -66,7 +67,8 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     let prior = prepare_changed_profile(&repository);
     let serial_repository = JitCli::initialised().unwrap();
     prepare_changed_profile(&serial_repository);
-    ordinary_executor(serial_repository.root())
+    file_executor(serial_repository.root())
+        .unwrap()
         .apply_profile(&[selector()])
         .unwrap();
     let serial_new = LifecycleState::capture(serial_repository.root());
@@ -139,7 +141,8 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
         after_winner.is_semantically_equivalent_to(&serial_new),
         "the concurrent outcomes must equal the complete serial winner state"
     );
-    let retried = ordinary_executor(repository.root())
+    let retried = file_executor(repository.root())
+        .unwrap()
         .apply_profile(&[selector()])
         .unwrap();
     assert_eq!(
