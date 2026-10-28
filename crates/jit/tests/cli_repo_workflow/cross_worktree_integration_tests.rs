@@ -3,252 +3,80 @@
 //! These tests verify that issues can be read across git worktrees using
 //! the 3-tier fallback chain: local .jit → git HEAD → main worktree .jit
 
-use anyhow::Result;
 use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
 use jit::domain::LinkedCheckoutWriteStance;
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
-/// Setup a git repository with jit initialized
-fn setup_git_repo() -> (TempDir, PathBuf) {
-    let temp_dir = TempDir::new().unwrap();
-    let repo_path = temp_dir.path().to_path_buf();
-
-    // Initialize git repository
-    Command::new("git")
-        .args(["init"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["config", "user.name", "Test User"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["config", "user.email", "test@example.com"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Initial commit to establish HEAD
-    fs::write(repo_path.join("README.md"), "Test repo").unwrap();
-    Command::new("git")
-        .args(["add", "README.md"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Initial commit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    (temp_dir, repo_path)
-}
-
-/// Run jit command and return stdout.
-///
-/// Every invocation declares the allowing linked-checkout write stance: this suite
-/// initializes and mutates jit inside secondary worktrees as setup for the read-
-/// visibility properties it actually asserts, so it states the stance it relies on
-/// rather than inheriting a default (jit:f52567ed REQ-05). The write policy's own
-/// behaviour is covered by `linked_checkout_write_policy_tests`.
-fn run_jit(dir: &PathBuf, args: &[&str]) -> Result<String> {
-    let output = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(args)
-        .current_dir(dir)
-        .env(
-            LINKED_CHECKOUT_WRITE_STANCE_ENV,
-            LinkedCheckoutWriteStance::Allow.as_token(),
-        )
-        .output()?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    if !output.status.success() {
-        eprintln!("Command failed: jit {:?}", args);
-        eprintln!("Stdout: {}", stdout);
-        eprintln!("Stderr: {}", stderr);
-        anyhow::bail!("Command failed: {}", stderr);
-    }
-
-    Ok(stdout)
-}
+/// Declared by every mutation inside a linked checkout: this suite initializes
+/// and mutates jit there as setup for the read-visibility properties it asserts
+/// (jit:f52567ed REQ-05). The write policy's own behaviour is covered by
+/// `linked_checkout_write_policy_tests`.
+const ALLOW_LINKED_WRITES: [(&str, &str); 1] = [(
+    LINKED_CHECKOUT_WRITE_STANCE_ENV,
+    LinkedCheckoutWriteStance::Allow.as_token(),
+)];
 
 #[test]
 fn test_issue_show_reads_from_git_in_secondary_worktree() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create and commit an issue
-    let output = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Issue in Git", "--json"],
-    )
-    .unwrap();
-    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["id"].as_str().unwrap();
-
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Add issue"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue_id = primary.create_issue(["--title", "Issue in Git"]).unwrap();
+    primary.commit("Add issue").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
         .unwrap()
-        .join(format!("secondary-{}", issue_id));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-{}", issue_id),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
+        .success());
 
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
-
-    // Should be able to read issue from git
-    let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
-    let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let loaded = linked.run_json(["issue", "show", &issue_id]).unwrap();
 
     assert_eq!(loaded["title"].as_str().unwrap(), "Issue in Git");
 }
 
 #[test]
 fn test_issue_show_reads_from_main_worktree_uncommitted() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create issue but DON'T commit it
-    let output = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Uncommitted Issue", "--json"],
-    )
-    .unwrap();
-    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["id"].as_str().unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
-        .unwrap()
-        .join(format!("secondary-main-{}", issue_id));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-main-{}", issue_id),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
-        .output()
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    // Created but not committed.
+    let issue_id = primary
+        .create_issue(["--title", "Uncommitted Issue"])
         .unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
+        .unwrap()
+        .success());
 
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
-
-    // Should be able to read uncommitted issue from main worktree
-    let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
-    let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let loaded = linked.run_json(["issue", "show", &issue_id]).unwrap();
 
     assert_eq!(loaded["title"].as_str().unwrap(), "Uncommitted Issue");
 }
 
 #[test]
 fn test_query_all_shows_issues_from_all_sources() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create issue A and commit it
-    let output_a = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Issue A", "--json"],
-    )
-    .unwrap();
-    let json_a: serde_json::Value = serde_json::from_str(&output_a).unwrap();
-    let id_a = json_a["id"].as_str().unwrap();
-
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Add issue A"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create issue B but don't commit
-    let output_b = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Issue B", "--json"],
-    )
-    .unwrap();
-    let json_b: serde_json::Value = serde_json::from_str(&output_b).unwrap();
-    let id_b = json_b["id"].as_str().unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let id_a = primary.create_issue(["--title", "Issue A"]).unwrap();
+    primary.commit("Add issue A").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    // Issue B stays uncommitted in the primary checkout.
+    let id_b = primary.create_issue(["--title", "Issue B"]).unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
         .unwrap()
-        .join(format!("secondary-query-{}", id_a));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-query-{}", id_a),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
+        .success());
+    let created_c = linked
+        .command_with_env(
+            ["issue", "create", "--title", "Issue C", "--json"],
+            ALLOW_LINKED_WRITES,
+        )
         .output()
         .unwrap();
-
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
-
-    // Create issue C locally in secondary
-    let output_c = run_jit(
-        &secondary_path,
-        &["issue", "create", "--title", "Issue C", "--json"],
-    )
-    .unwrap();
-    let json_c: serde_json::Value = serde_json::from_str(&output_c).unwrap();
-    let id_c = json_c["id"].as_str().unwrap();
+    assert!(created_c.status.success(), "{created_c:?}");
+    let id_c = jit::test_cli::created_issue_id(&serde_json::from_slice(&created_c.stdout).unwrap())
+        .unwrap();
 
     // Query all from secondary - should see A (git), B (main), C (local)
-    let output = run_jit(&secondary_path, &["query", "all", "--json"]).unwrap();
-    let result: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let result = linked.run_json(["query", "all"]).unwrap();
     let issues_array = result["issues"].as_array().unwrap();
 
     assert_eq!(issues_array.len(), 3, "Should see all 3 issues");
@@ -258,75 +86,36 @@ fn test_query_all_shows_issues_from_all_sources() {
         .map(|i| i["id"].as_str().unwrap())
         .collect();
 
-    assert!(ids.contains(&id_a), "Should include issue A from git");
     assert!(
-        ids.contains(&id_b),
+        ids.contains(&id_a.as_str()),
+        "Should include issue A from git"
+    );
+    assert!(
+        ids.contains(&id_b.as_str()),
         "Should include issue B from main worktree"
     );
-    assert!(ids.contains(&id_c), "Should include issue C from local");
+    assert!(
+        ids.contains(&id_c.as_str()),
+        "Should include issue C from local"
+    );
 }
 
 #[test]
 fn test_graph_show_works_across_worktrees() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create two issues with dependency and commit
-    let output1 = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Dependency", "--json"],
-    )
-    .unwrap();
-    let json1: serde_json::Value = serde_json::from_str(&output1).unwrap();
-    let id1 = json1["id"].as_str().unwrap();
-
-    let output2 = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Dependent", "--json"],
-    )
-    .unwrap();
-    let json2: serde_json::Value = serde_json::from_str(&output2).unwrap();
-    let id2 = json2["id"].as_str().unwrap();
-
-    run_jit(&repo_path, &["dep", "add", id2, id1]).unwrap();
-
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Add issues with dependency"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let id1 = primary.create_issue(["--title", "Dependency"]).unwrap();
+    let id2 = primary.create_issue(["--title", "Dependent"]).unwrap();
+    primary.run(["dep", "add", &id2, &id1]).unwrap();
+    primary.commit("Add issues with dependency").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
         .unwrap()
-        .join(format!("secondary-graph-{}", id1));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-graph-{}", id1),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
+        .success());
 
     // Graph show should work - verify we can query from secondary
-    let output = run_jit(&secondary_path, &["query", "all", "--json"]).unwrap();
-    let query: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let query = linked.run_json(["query", "all"]).unwrap();
 
     // Should see both issues in the query
     let issues = query["issues"].as_array().unwrap();
@@ -342,56 +131,19 @@ fn test_graph_show_works_across_worktrees() {
 
 #[test]
 fn test_partial_id_resolution_across_worktrees() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create and commit an issue
-    let output = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Find Me", "--json"],
-    )
-    .unwrap();
-    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let full_id = json["id"].as_str().unwrap();
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let full_id = primary.create_issue(["--title", "Find Me"]).unwrap();
     let partial_id = &full_id[..8];
-
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Add issue"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
+    primary.commit("Add issue").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
         .unwrap()
-        .join(format!("secondary-partial-{}", full_id));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-partial-{}", partial_id),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
+        .success());
 
     // Should resolve partial ID from git
-    let output = run_jit(&secondary_path, &["issue", "show", partial_id, "--json"]).unwrap();
-    let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let loaded = linked.run_json(["issue", "show", partial_id]).unwrap();
 
     assert_eq!(loaded["id"].as_str().unwrap(), full_id);
     assert_eq!(loaded["title"].as_str().unwrap(), "Find Me");
@@ -399,74 +151,39 @@ fn test_partial_id_resolution_across_worktrees() {
 
 #[test]
 fn test_local_overrides_git_and_main() {
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit in main worktree
-    run_jit(&repo_path, &["init"]).unwrap();
-
-    // Create and commit an issue
-    let output = run_jit(
-        &repo_path,
-        &["issue", "create", "--title", "Original", "--json"],
-    )
-    .unwrap();
-    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    let issue_id = json["id"].as_str().unwrap();
-
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    Command::new("git")
-        .args(["commit", "-m", "Add original issue"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create secondary worktree with unique name
-    let secondary_path = repo_path
-        .parent()
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let issue_id = primary.create_issue(["--title", "Original"]).unwrap();
+    primary.commit("Add original issue").unwrap();
+    linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
+    assert!(linked
+        .command_with_env(["init"], ALLOW_LINKED_WRITES)
+        .status()
         .unwrap()
-        .join(format!("secondary-override-{}", issue_id));
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            &format!("feature-override-{}", issue_id),
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Initialize jit in secondary worktree
-    run_jit(&secondary_path, &["init"]).unwrap();
+        .success());
 
     // Modify issue in secondary (creates local copy)
-    run_jit(
-        &secondary_path,
-        &[
-            "issue",
-            "update",
-            issue_id,
-            "--title",
-            "Modified in Secondary",
-        ],
-    )
-    .unwrap();
+    assert!(linked
+        .command_with_env(
+            [
+                "issue",
+                "update",
+                &issue_id,
+                "--title",
+                "Modified in Secondary",
+            ],
+            ALLOW_LINKED_WRITES,
+        )
+        .status()
+        .unwrap()
+        .success());
 
     // Should read modified version (local overrides git)
-    let output = run_jit(&secondary_path, &["issue", "show", issue_id, "--json"]).unwrap();
-    let loaded: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let loaded = linked.run_json(["issue", "show", &issue_id]).unwrap();
 
     assert_eq!(loaded["title"].as_str().unwrap(), "Modified in Secondary");
 
     // Main worktree should still see original
-    let output = run_jit(&repo_path, &["issue", "show", issue_id, "--json"]).unwrap();
-    let loaded_main: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let loaded_main = primary.run_json(["issue", "show", &issue_id]).unwrap();
 
     assert_eq!(loaded_main["title"].as_str().unwrap(), "Original");
 }
@@ -479,15 +196,20 @@ fn test_local_overrides_git_and_main() {
 #[test]
 fn test_deletion_requires_env_var() {
     // Phase 3: Deletion in main worktree requires JIT_ALLOW_DELETION=1 to discourage deletion
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit and create issue
-    run_jit(&repo_path, &["init"]).unwrap();
-    let output = run_jit(&repo_path, &["issue", "create", "-t", "Test", "-d", "desc"]).unwrap();
-    let issue_id = extract_issue_id(&output);
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["-t", "Test", "-d", "desc"]).unwrap();
+    let listed_ids = || {
+        cli.run_json(["query", "all"]).unwrap()["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|issue| issue["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
 
     // Try to delete WITHOUT env var - should be blocked
-    let result = run_jit(&repo_path, &["issue", "delete", &issue_id]);
+    let result = cli.run(["issue", "delete", &issue_id]);
     assert!(
         result.is_err(),
         "Deletion should require JIT_ALLOW_DELETION=1"
@@ -500,51 +222,27 @@ fn test_deletion_requires_env_var() {
     );
 
     // Verify issue still exists
-    let query_output = run_jit(&repo_path, &["query", "all"]).unwrap();
     assert!(
-        query_output.contains(&issue_id),
+        listed_ids().contains(&issue_id),
         "Issue should still exist after blocked deletion"
     );
 
     // Delete WITH env var - should succeed
-    let result = run_jit_with_env(
-        &repo_path,
-        &["issue", "delete", &issue_id],
-        &[("JIT_ALLOW_DELETION", "1")],
+    let deleted = cli
+        .command_with_env(
+            ["issue", "delete", &issue_id],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
+        .output()
+        .unwrap();
+    assert!(
+        deleted.status.success(),
+        "Deletion should succeed with env var: {deleted:?}"
     );
-    assert!(result.is_ok(), "Deletion should succeed with env var");
 
     // Verify issue is gone
-    let query_output = run_jit(&repo_path, &["query", "all"]).unwrap();
     assert!(
-        !query_output.contains(&issue_id),
+        !listed_ids().contains(&issue_id),
         "Issue should be deleted after env var check passed"
     );
-}
-
-// Helper functions
-fn extract_issue_id(output: &str) -> String {
-    output.split_whitespace().last().unwrap().to_string()
-}
-
-fn run_jit_with_env(dir: &PathBuf, args: &[&str], env_vars: &[(&str, &str)]) -> Result<String> {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_jit"));
-    cmd.args(args).current_dir(dir);
-
-    for (key, value) in env_vars {
-        cmd.env(key, value);
-    }
-
-    let output = cmd.output()?;
-
-    if !output.status.success() {
-        anyhow::bail!(
-            "Command failed: jit {:?}\nStdout: {}\nStderr: {}",
-            args,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
