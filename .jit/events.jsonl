@@ -21017,3 +21017,4 @@
 {"gate_key":"code-review","id":"ce20827f-f1bf-4e73-83fa-12bec2407679","issue_id":"2cbe3ed8-eb3b-4544-be6f-d19a1fff3851","timestamp":"2026-10-28T21:48:59.312659442Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"885669f6-4572-4ba3-8926-f45036ef0e30","issue_id":"2cbe3ed8-eb3b-4544-be6f-d19a1fff3851","timestamp":"2026-10-28T21:49:29.193554664Z","to":"done","type":"issue_state_changed"}
 {"id":"2106a3f9-c04b-4fae-947f-53e71740639d","issue_id":"2cbe3ed8-eb3b-4544-be6f-d19a1fff3851","timestamp":"2026-10-28T21:49:29.193554664Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"445bcdb2-4fd0-4f05-b3dc-8bbe994c39b3","issue_id":"e2eb8862-1622-4a58-9bbc-c77a57a87013","timestamp":"2026-10-28T21:55:02.827100936Z","type":"gate_passed","updated_by":"auto:executor"}

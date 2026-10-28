@@ -16,6 +16,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "ca4ad699-78dc-4d21-aeef-8103176ddb43",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:55:02.827100936Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "c6e440a3-1e8f-4140-aae1-5ec982ca4cbd",
       "status": "passed",
@@ -38,5 +44,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Storage tests stop re-proving mutation finalization",
-  "updated_at": "2026-10-28T21:52:29.981642366Z"
+  "updated_at": "2026-10-28T21:55:02.827100936Z"
 }
