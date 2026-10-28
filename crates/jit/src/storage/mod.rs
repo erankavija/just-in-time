@@ -25,6 +25,8 @@ pub mod git;
 pub mod git_revision;
 pub mod guard_order;
 pub(crate) mod init_publish;
+#[cfg(test)]
+mod issue_store_conformance;
 pub mod json;
 pub mod lock;
 pub mod lock_cleanup;

@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-2c9badcd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7f0473a3639b6e02c006384f9fbaddec0a8b267f",
+  "completed_at": "2026-10-28T22:13:05.024262736Z",
+  "duration_ms": 271967,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/issue_store_conformance.rs",
+        "id": "F1",
+        "line": 710,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2c9badcd/requirement/REQ-04",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "medium",
+        "summary": "cargo-ci is pending, so hard REQ-04—that both backends pass every conformance case—remains materially unverified."
+      }
+    ],
+    "summary": "The shared conformance suite is present, but required CI evidence has not verified that both backends pass every case.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2c9badcd-07b8-4489-9ca0-4ef70e5e6980",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "52a21ceb-d70e-4772-be9b-1495602a2914",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:08:33.056757036Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8616 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-2c9badcd\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1848e-cbc6-7750-9ee5-17d339f7d976\n--------\nuser\n--- 8603 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7f0473a36 `test(jit:2c9badcd): run one IssueStore conformance suite against both backends`\nPolicy sources: AGENTS.md\nResolved items: @/issue/2c9badcd/requirement/REQ-04 (.jit/issues/2c9badcd-07b8-4489-9ca0-4ef70e5e6980.json); @/issue/c780514e/requirement/REQ-08 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: pending (no recorded exit code)\nTruncation recovery: read the new conformance patch in bounded ranges; narrowed an overbroad REQ-08 search to the governing issue source\n\n1. **Medium — blocking, issue-impact:** The shared macro registers all cases for both backends at `crates/jit/src/storage/issue_store_conformance.rs:710`, but no completed `cargo-ci` evidence establishes that they compile and pass. This materially leaves hard REQ-04 unverified. Run and record the required Rust CI gate. References: `@/issue/2c9badcd/requirement/REQ-04`, `@/gate/cargo-ci`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shared conformance suite is present, but required CI evidence has not verified that both backends pass every case.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci is pending, so hard REQ-04—that both backends pass every conformance case—remains materially unverified.\",\"file\":\"crates/jit/src/storage/issue_store_conformance.rs\",\"line\":710,\"references\":[\"@/issue/2c9badcd/requirement/REQ-04\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
