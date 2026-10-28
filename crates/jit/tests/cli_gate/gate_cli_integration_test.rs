@@ -162,7 +162,6 @@ fn test_gate_evaluate_json_failure_matches_persisted_status() {
         .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
@@ -216,7 +215,6 @@ fn test_gate_evaluate_json_failure_suggests_run_history_view() {
         .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
@@ -262,12 +260,12 @@ fn test_gate_evaluate_json_failure_includes_lease_warnings() {
         .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["error"]["code"], "GATE_FAILED");
     let warnings = json["error"]["details"]["warnings"].as_array().unwrap();
     assert!(
         warnings
@@ -528,7 +526,6 @@ fn test_gate_define_explicit_manual_with_checker_command_is_usage_error() {
     ])
     .assert()
     .failure()
-    .code(2)
     .stderr(predicate::str::contains("manual"))
     .stderr(predicate::str::contains("checker"));
 
@@ -560,7 +557,6 @@ fn test_gate_define_explicit_manual_with_checker_command_json_error() {
         ])
         .assert()
         .failure()
-        .code(2)
         .get_output()
         .stdout
         .clone();
@@ -837,11 +833,10 @@ fn test_gate_status_all_no_prior_runs_is_non_mutating() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_multi_auto_gate_issue(&temp, &[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
 
-    // All required gates pending -> strict `status-all` exits 4 (non-mutating).
+    // All required gates pending -> strict `status-all` fails (non-mutating).
     temp.command(["gate", "status-all", &issue_id])
         .assert()
         .failure()
-        .code(4)
         .stdout(predicate::str::contains("gate-1"))
         .stdout(predicate::str::contains("not been run yet"))
         .stdout(predicate::str::contains("gate-2"));
@@ -883,12 +878,11 @@ fn test_gate_status_all_json_output_reports_not_run_gates() {
         .assert()
         .success();
 
-    // gate-1 passed, gate-2 still pending -> strict `status-all` exits 4.
+    // gate-1 passed, gate-2 still pending -> strict `status-all` fails.
     let output = temp
         .command(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();

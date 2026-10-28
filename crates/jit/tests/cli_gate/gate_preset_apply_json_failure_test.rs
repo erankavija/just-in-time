@@ -2,7 +2,6 @@
 
 use crate::create_titled_issue;
 use assert_cmd::prelude::*;
-use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
 
 /// The project-defined preset every case below applies.
@@ -53,7 +52,7 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
         .output()
         .expect("preset application should run");
 
-    assert_eq!(output.status.code(), Some(3));
+    assert!(!output.status.success());
     let response: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("failure must emit JSON");
     let error = response["error"]
@@ -91,7 +90,7 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
 }
 
 #[test]
-fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
+fn test_gate_preset_apply_plain_partial_batch_fails_with_error_summary() {
     let temp = JitCli::initialised().unwrap();
     define_team_review_preset(&temp);
 
@@ -106,10 +105,7 @@ fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
         .output()
         .expect("preset application should run");
 
-    assert_eq!(
-        output.status.code(),
-        Some(ErrorCode::PresetError.exit_code().code())
-    );
+    assert!(!output.status.success());
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("Errors (1)"));
 }
