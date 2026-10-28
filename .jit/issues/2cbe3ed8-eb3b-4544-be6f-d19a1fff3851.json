@@ -8,6 +8,7 @@
   ],
   "description": "Remove the batch-create unit tests that repeat the keyed graph's cycle tests over an adapter.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`). `crates/jit/src/commands/batch_create.rs:640` adapts keyed detection, and four tests at `:686-707` repeat the keyed tests over that adapter.\n\n## Success Criteria\n\n- [hard] REQ-01: The four adapter tests in `commands/batch_create.rs` no longer exist; at most one test there shows that batch creation rejects a cyclic manifest through the adapter.\n- [hard] REQ-02: Each cycle property the removed tests covered has an owning test in `crates/jit/src/graph/`.\n",
   "documents": [],
+  "done_at": "2026-10-28T21:49:29.193554664Z",
   "first_ready_at": "2026-10-27T22:46:38.005175628Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/dag-acyclic"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Batch-create stops re-proving keyed cycle detection",
-  "updated_at": "2026-10-28T21:48:59.312659442Z"
+  "updated_at": "2026-10-28T21:49:29.193554664Z"
 }
