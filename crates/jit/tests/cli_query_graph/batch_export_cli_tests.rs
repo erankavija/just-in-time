@@ -1,6 +1,7 @@
 //! CLI integration tests for `jit graph export --scope` and `--format batch`
 //! (issue 3e12ffbd), exercised as a subprocess end to end.
 
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::test_cli::JitCli;
 use jit::test_taxonomy::{setup_test_repo_with_taxonomy, type_label, TaxonomyRepo};
 
@@ -30,8 +31,10 @@ fn test_graph_export_batch_emits_parseable_array() {
         .iter()
         .find(|d| d["title"] == "Epic")
         .expect("epic def present");
-    let short_task: String = task.chars().take(8).collect();
-    assert_eq!(epic_def["depends_on"][0], short_task);
+    let task_id: IssueId = task
+        .parse()
+        .expect("the binary prints a canonical issue id");
+    assert_eq!(epic_def["depends_on"][0], task_id.short_id());
 }
 
 #[test]

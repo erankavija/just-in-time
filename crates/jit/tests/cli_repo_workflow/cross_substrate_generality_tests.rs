@@ -31,6 +31,7 @@
 //!   this explicit.
 //! - REQ-03: the test passes under `cargo test`.
 
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use serde_json::Value;
@@ -97,10 +98,12 @@ fn test_all_four_kinds_through_one_generic_path() {
 - D-01: store issues as plain JSON files\n\n\
 ## Risks\n\n\
 - RISK-01: concurrent writers may corrupt state\n";
-    let short = cli
+    let issue: IssueId = cli
         .create_issue(["-t", "Cross-substrate fixture", "-d", issue_body])
-        .unwrap()[..8]
-        .to_owned();
+        .unwrap()
+        .parse()
+        .expect("the binary prints a canonical issue id");
+    let short = issue.short_id();
 
     // --- Fixture: one project-scope, registry-first invariant ---
     write_jit_file(

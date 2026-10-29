@@ -10,6 +10,7 @@
 //! (jit:1b6925a9).
 
 use assert_cmd::prelude::*;
+use jit::domain::identity::IssueId;
 use jit::domain::LinkedCheckoutWriteStance;
 use jit::test_cli::{created_issue_id, JitCli};
 use std::path::Path;
@@ -66,23 +67,25 @@ fn events_tagged<'a>(events: &'a [serde_json::Value], tag: &str) -> Vec<&'a serd
 const CREATE_ISSUE: [&str; 4] = ["issue", "create", "Permitted mutation", "--json"];
 
 /// The id of the issue a successful creation reported.
-fn created_id(assert: assert_cmd::assert::Assert) -> String {
+fn created_id(assert: assert_cmd::assert::Assert) -> IssueId {
     let stdout = &assert.get_output().stdout;
     created_issue_id(
         &serde_json::from_slice(stdout).expect("the creation prints one JSON document"),
     )
     .expect("the creation names the issue it created")
+    .parse()
+    .expect("the creation names a canonical issue id")
 }
 
 /// The event of `tag` naming `issue`, of which there must be exactly one.
 fn issue_event<'a>(
     events: &'a [serde_json::Value],
     tag: &str,
-    issue: &str,
+    issue: &IssueId,
 ) -> &'a serde_json::Value {
     let matching = events_tagged(events, tag)
         .into_iter()
-        .filter(|event| event["issue_id"] == serde_json::json!(issue))
+        .filter(|event| event["issue_id"] == serde_json::json!(issue.as_str()))
         .collect::<Vec<_>>();
     assert_eq!(
         matching.len(),
@@ -386,7 +389,7 @@ fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_befo
     let error = refusal_envelope(
         linked
             .command_with_env(
-                ["issue", "delete", &issue, "--json"],
+                ["issue", "delete", issue.as_str(), "--json"],
                 [(ALLOW_DELETION_ENV, "1")],
             )
             .assert()
@@ -432,7 +435,7 @@ fn test_delete_issue_in_a_linked_checkout_permitted_by_the_declared_stance_remov
 
     linked
         .command_with_env(
-            ["issue", "delete", &issue, "--json"],
+            ["issue", "delete", issue.as_str(), "--json"],
             [(ALLOW_DELETION_ENV, "1")],
         )
         .assert()
@@ -446,7 +449,7 @@ fn test_delete_issue_in_a_linked_checkout_permitted_by_the_declared_stance_remov
          events: {events:?}"
     );
     linked
-        .command(["issue", "show", &issue, "--json"])
+        .command(["issue", "show", issue.as_str(), "--json"])
         .assert()
         .failure();
 }
@@ -472,7 +475,7 @@ fn test_delete_issue_in_a_linked_checkout_under_an_invocation_override_records_t
 
     linked
         .command_with_env(
-            ["issue", "delete", &issue, "--json"],
+            ["issue", "delete", issue.as_str(), "--json"],
             [(ALLOW_DELETION_ENV, "1"), (WRITE_STANCE_ENV, "allow")],
         )
         .assert()

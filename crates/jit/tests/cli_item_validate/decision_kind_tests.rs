@@ -33,6 +33,7 @@
 //!   no parallel structured store is written under `.jit/`.
 //! - REQ-04: every test below runs under `cargo test`.
 
+use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -120,11 +121,12 @@ fn test_default_repo_per_label_resolves_decision() {
     // through the existing generic `resolve_link_label`; the configured `decision`
     // kind declares the `per` namespace.
     let (_temp, exec) = setup_test_repo_with_config(&decision_config()).unwrap();
-    let short = &crate::create_issue(
+    let issue = crate::create_issue(
         &exec,
         "Architecture",
         "## Decisions\n\n- D-01: use json storage\n",
     );
+    let short = issue.short_id();
 
     let label = format!("per:{short}/D-01");
     let resolved = exec
