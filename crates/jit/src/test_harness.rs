@@ -4,6 +4,7 @@
 //! Uses in-memory storage for 10-100x faster test execution.
 
 use crate::commands::CommandExecutor;
+use crate::domain::identity::IssueId;
 use crate::domain::{Issue, Priority, State};
 
 use crate::storage::{InMemoryStorage, IssueStore};
@@ -68,7 +69,7 @@ impl TestHarness {
     // === Fluent API for common operations ===
 
     /// Create an issue with minimal parameters
-    pub fn create_issue(&self, title: &str) -> String {
+    pub fn create_issue(&self, title: &str) -> IssueId {
         let (id, _) = self
             .executor
             .issues()
@@ -87,7 +88,7 @@ impl TestHarness {
     }
 
     /// Create an issue with description
-    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String {
+    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> IssueId {
         let (id, _) = self
             .executor
             .issues()
@@ -106,7 +107,7 @@ impl TestHarness {
     }
 
     /// Create an issue with priority
-    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String {
+    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> IssueId {
         let (id, _) = self
             .executor
             .issues()
@@ -125,7 +126,7 @@ impl TestHarness {
     }
 
     /// Create an issue that's ready to work on
-    pub fn create_ready_issue(&self, title: &str) -> String {
+    pub fn create_ready_issue(&self, title: &str) -> IssueId {
         let id = self.create_issue(title);
         let _ = self
             .executor
@@ -147,7 +148,7 @@ impl TestHarness {
     }
 
     /// Create an issue with gates
-    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String {
+    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> IssueId {
         let (id, _) = self
             .executor
             .issues()
@@ -193,7 +194,7 @@ impl TestHarness {
     }
 
     /// Get issue by ID
-    pub fn get_issue(&self, id: &crate::domain::identity::IssueId) -> Issue {
+    pub fn get_issue(&self, id: &IssueId) -> Issue {
         self.storage.load_issue(id).unwrap()
     }
 }

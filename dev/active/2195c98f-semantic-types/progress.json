@@ -1498,6 +1498,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "storage trait and backends retyping; brief pre-empts the construction-site finding from 641bd14e"
+    },
+    {
+      "issue": "c797b59b",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "default",
+      "reason": "single-file harness retype"
+    },
+    {
+      "issue": "3ee3a4d1",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "domain family retype; brief carries construction-site lessons"
     }
   ],
   "surfaced_pitfalls": [
@@ -1565,7 +1579,8 @@
     "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch.",
     "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure.",
     "Under the alias, construction sites (raw value -> IssueId) fail REQ-03-style criteria just like uses; a generated UUID needs an infallible constructor on both sides of the bridge (IssueId::from_uuid), not a serde round-trip, which Codex tried and the lead removed.",
-    "Read land.sh output before closing: a landing cargo-ci can fail after a passing ci-only (19d9bd7d: crate_source_digest self-check mismatch from a stale shared target). cargo clean -p jit in the worktree and re-land; jit issue update --state done on unpassed gates diverts to gated."
+    "Read land.sh output before closing: a landing cargo-ci can fail after a passing ci-only (19d9bd7d: crate_source_digest self-check mismatch from a stale shared target). cargo clean -p jit in the worktree and re-land; jit issue update --state done on unpassed gates diverts to gated.",
+    "Parallel retypes that touch one test file conflict at landing (89e7a273 vs 19d9bd7d in scope_validation_tests.rs, same retype on both sides); resolve to main and re-land."
   ],
   "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [
