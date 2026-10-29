@@ -18,7 +18,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ea943861-f760-4563-a76e-760e8d07c7f1",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:56:15.899628653Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
   "labels": [
     "type:task",
@@ -34,5 +41,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "CLI suites that use the library carry typed issue ids",
-  "updated_at": "2026-10-29T07:44:04.172728859Z"
+  "updated_at": "2026-10-29T07:56:15.899628653Z"
 }
