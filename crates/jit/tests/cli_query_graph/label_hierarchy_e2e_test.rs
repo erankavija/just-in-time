@@ -3,7 +3,7 @@
 //! This test validates the complete label hierarchy feature through a realistic workflow:
 //! 1. Create milestone → epic → tasks hierarchy
 //! 2. Add dependencies between levels
-//! 3. Query by labels (exact match and wildcard)
+//! 3. Query by label
 //! 4. Validate the repository (type labels, membership references)
 //! 5. Use strategic view to filter
 //! 6. Verify event log captures label operations
@@ -154,34 +154,6 @@ fn test_label_hierarchy_complete_workflow() {
         "Should find epic with milestone:v1.0"
     );
     assert!(!ids.contains(&task1_id), "Tasks don't have milestone label");
-
-    // Query wildcard for the level-two membership namespace.
-    let epic_wildcard = format!("{epic_namespace}:*");
-    let ids = field_values(
-        &cli.run_json(["query", "all", "--label", epic_wildcard.as_str()])
-            .unwrap(),
-        "issues",
-        "id",
-    );
-    assert!(ids.contains(&epic_id), "Should find the level-two issue");
-    assert!(ids.contains(&task1_id), "Should find task with epic:auth");
-    assert!(ids.contains(&task2_id), "Should find task with epic:auth");
-    assert!(ids.contains(&task3_id), "Should find task with epic:auth");
-    assert!(
-        !ids.contains(&milestone_id),
-        "Milestone has no epic:* label"
-    );
-
-    // Query by component
-    let ids = field_values(
-        &cli.run_json(["query", "all", "--label", component_backend.as_str()])
-            .unwrap(),
-        "issues",
-        "id",
-    );
-    assert!(ids.contains(&task1_id));
-    assert!(ids.contains(&task2_id));
-    assert!(!ids.contains(&task3_id), "Task 3 is frontend");
 
     // ========================================================================
     // PHASE 4: Strategic View

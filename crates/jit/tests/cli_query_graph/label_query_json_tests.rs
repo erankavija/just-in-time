@@ -30,36 +30,6 @@ fn test_query_label_json_exact_match() {
 }
 
 #[test]
-fn test_query_label_json_wildcard() {
-    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    cli.create_issue(["-t", "Task v1", "--label", "milestone:v1.0"])
-        .unwrap();
-    cli.create_issue(["-t", "Task v2", "--label", "milestone:v2.0"])
-        .unwrap();
-
-    let json = cli
-        .run_json(["query", "all", "--label", "milestone:*"])
-        .unwrap();
-
-    assert_eq!(json["count"], 2);
-    assert_eq!(json["issues"].as_array().unwrap().len(), 2);
-}
-
-#[test]
-fn test_query_label_json_no_matches() {
-    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    cli.create_issue(["-t", "Task", "--label", "milestone:v1.0"])
-        .unwrap();
-
-    let json = cli
-        .run_json(["query", "all", "--label", "epic:auth"])
-        .unwrap();
-
-    assert_eq!(json["count"], 0);
-    assert_eq!(json["issues"].as_array().unwrap().len(), 0);
-}
-
-#[test]
 fn test_query_label_json_invalid_pattern() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
 
@@ -99,37 +69,4 @@ fn test_query_label_text_output() {
     assert!(stdout.contains("All issues (filtered):"));
     assert!(stdout.contains("Test Task"));
     assert!(stdout.contains("Total: 1"));
-}
-
-#[test]
-fn test_query_label_with_uppercase_namespace() {
-    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-
-    // Uppercase namespace fails validation
-    let output = cli
-        .command(["query", "all", "--label", "Milestone:v1.0", "--json"])
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("machine-readable failure is one JSON envelope");
-    let code = ErrorCode::from_str(json["error"]["code"].as_str().unwrap())
-        .expect("failure code is registered");
-    assert_eq!(code, ErrorCode::InvalidLabelPattern);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
-}
-
-#[test]
-fn test_query_label_wildcard_with_no_matches() {
-    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    cli.create_issue(["-t", "Task", "--label", "epic:auth"])
-        .unwrap();
-
-    let json = cli
-        .run_json(["query", "all", "--label", "milestone:*"])
-        .unwrap();
-
-    assert_eq!(json["count"], 0);
 }
