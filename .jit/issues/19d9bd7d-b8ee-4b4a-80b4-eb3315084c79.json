@@ -45,7 +45,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "gated",
   "title": "CLI suites that use the library carry typed issue ids",
-  "updated_at": "2026-10-29T08:03:48.117949867Z"
+  "updated_at": "2026-10-29T08:03:54.144758934Z"
 }
