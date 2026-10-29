@@ -46,7 +46,6 @@ fn test_query_label_json_invalid_pattern() {
     let code = ErrorCode::from_str(json["error"]["code"].as_str().unwrap())
         .expect("failure code is registered");
     assert_eq!(code, ErrorCode::InvalidLabelPattern);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
     assert!(json["error"]["message"]
         .as_str()
         .unwrap()

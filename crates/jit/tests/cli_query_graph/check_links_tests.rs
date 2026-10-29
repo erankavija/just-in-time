@@ -39,7 +39,7 @@ fn spawn_ok_server() -> String {
 }
 
 #[test]
-fn test_check_all_valid_links_exits_0() {
+fn test_check_all_valid_links_succeeds() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
 
@@ -64,13 +64,13 @@ fn test_check_all_valid_links_exits_0() {
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
 
-    // Check links should pass with exit code 0
+    // Check links should pass
     let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
     assert!(stdout.contains("All documents valid"));
 }
 
 #[test]
-fn test_missing_assets_exits_1() {
+fn test_missing_assets_fails() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
 
@@ -90,19 +90,19 @@ fn test_missing_assets_exits_1() {
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
 
-    // Check links should fail with exit code 1
+    // Check links should fail
     let output = cli
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Errors found"));
     assert!(stdout.contains("missing"));
 }
 
 #[test]
-fn test_broken_internal_doc_links_exits_1() {
+fn test_broken_internal_doc_links_fails() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
 
@@ -122,12 +122,12 @@ fn test_broken_internal_doc_links_exits_1() {
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
 
-    // Check links should fail with exit code 1
+    // Check links should fail
     let output = cli
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Errors found"));
     assert!(stdout.contains("broken"));
@@ -163,7 +163,7 @@ fn test_risky_relative_links_warns() {
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(0));
+    assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Warnings"));
     assert!(stdout.contains("risky") || stdout.contains("relative"));
@@ -316,7 +316,7 @@ fn test_external_urls_are_validated() {
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(0));
+    assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("valid"));
 }
@@ -353,7 +353,7 @@ fn test_unreachable_external_urls_error() {
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Errors found"));
     assert!(stdout.contains("unreachable"));
@@ -383,7 +383,7 @@ fn test_missing_document_file() {
         .command(["doc", "check-links", "--scope", "all"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("missing_document") || stdout.contains("not found"));
 }

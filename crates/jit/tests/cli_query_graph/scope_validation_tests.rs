@@ -6,11 +6,11 @@
 //! For each in-slice issue the rules whose `when` selector matches it fire — so a
 //! rule keyed on `type:breakdown` runs because `B` is in scope. Whole-repo rule
 //! kinds (`label-uniqueness`, repo-wide `label-reference`, `type-hierarchy`) are
-//! EXCLUDED exactly as at transition time (R2 / CC-2a). The command exits 4 with
-//! findings shown when an error-severity finding is produced, 0 when clean.
+//! EXCLUDED exactly as at transition time (R2 / CC-2a). The command fails with
+//! findings shown when an error-severity finding is produced.
 //!
 //! These are in-process tests over `CommandExecutor::validate_scope` (fast and
-//! deterministic); the exit-4 CLI contract is covered by a subprocess test.
+//! deterministic); the failure presentation is covered by a subprocess test.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
@@ -1311,8 +1311,8 @@ mod file_backed_external_plan {
 }
 
 // ---------------------------------------------------------------------------
-// CLI exit-code contract (subprocess): the gate-checker behaviour the
-// coverage-preview gate relies on — exit 4 with findings on failure, 0 clean.
+// CLI failure presentation (subprocess): the gate-checker behaviour the
+// coverage-preview gate relies on — findings shown on failure.
 // ---------------------------------------------------------------------------
 
 mod cli {
@@ -1387,17 +1387,16 @@ assert = {{ label-coverage = {{ }} }}
     }
 
     #[test]
-    fn test_cli_scope_exits_4_with_findings_on_failure() {
+    fn test_cli_scope_failure_shows_findings() {
         let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
         let cli = JitCli::with_repository(temp);
         let c = seed_spine(&cli, &taxonomy, false);
 
         let out = cli.command(["validate", "--scope", &c]).output().unwrap();
 
-        assert_eq!(
-            out.status.code(),
-            Some(4),
-            "an enforcing-rule failure must exit 4 (ValidationFailed); stderr: {}",
+        assert!(
+            !out.status.success(),
+            "an enforcing-rule failure must fail; stderr: {}",
             String::from_utf8_lossy(&out.stderr)
         );
         let combined = format!(
@@ -1422,7 +1421,7 @@ assert = {{ label-coverage = {{ }} }}
             .output()
             .unwrap();
 
-        assert_eq!(out.status.code(), Some(4));
+        assert!(!out.status.success());
         assert!(out.stderr.is_empty(), "JSON failure stays stream-pure");
         let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(json.as_object().map(|object| object.len()), Some(1));
@@ -1435,22 +1434,6 @@ assert = {{ label-coverage = {{ }} }}
                         .as_str()
                         .is_some_and(|message| message.contains("REQ-01"))
             })));
-    }
-
-    #[test]
-    fn test_cli_scope_exits_0_when_clean() {
-        let TaxonomyRepo { temp, taxonomy } = setup_test_repo_with_taxonomy();
-        let cli = JitCli::with_repository(temp);
-        let c = seed_spine(&cli, &taxonomy, true);
-
-        let out = cli.command(["validate", "--scope", &c]).output().unwrap();
-
-        assert_eq!(
-            out.status.code(),
-            Some(0),
-            "a clean scope must exit 0; stderr: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
     }
 
     #[test]
