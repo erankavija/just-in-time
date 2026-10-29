@@ -25,9 +25,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f32b0af7-c597-4c83-b48d-605fb916a448",
+      "run_id": "82f7baf6-f8dc-4ad7-8f62-d44349fdec4d",
       "status": "passed",
-      "updated_at": "2026-10-28T23:23:00.822066236Z",
+      "updated_at": "2026-10-29T06:53:10.910557806Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -51,5 +51,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Issue drafts carry their pre-derived identifier",
-  "updated_at": "2026-10-29T06:48:51.109529142Z"
+  "updated_at": "2026-10-29T06:53:10.910557806Z"
 }
