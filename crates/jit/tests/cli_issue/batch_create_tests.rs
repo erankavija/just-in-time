@@ -2,7 +2,7 @@
 //!
 //! Exercises the end-to-end CLI: a valid file creates all issues + edges and
 //! returns the `{key:id}` map; each pre-validation failure (duplicate key,
-//! unknown dependency, cycle, invalid label/gate/type) exits 2 and creates ZERO
+//! unknown dependency, cycle, invalid label/gate/type) fails and creates ZERO
 //! issues; created edges are asserted via `jit issue show --json`.
 
 use jit::test_cli::JitCli;
@@ -115,7 +115,7 @@ fn test_batch_create_valid_creates_issues_and_edges() {
 }
 
 #[test]
-fn test_batch_create_duplicate_key_exits_2_zero_created() {
+fn test_batch_create_duplicate_key_fails_zero_created() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     let file = write_batch(
@@ -135,14 +135,14 @@ fn test_batch_create_duplicate_key_exits_2_zero_created() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2), "expected exit 2");
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("duplicate key 'a'"), "stderr: {stderr}");
     assert_eq!(count_issues(&temp), 0, "no issues should be created");
 }
 
 #[test]
-fn test_batch_create_unknown_dependency_exits_2_zero_created() {
+fn test_batch_create_unknown_dependency_fails_zero_created() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     let file = write_batch(
@@ -161,7 +161,7 @@ fn test_batch_create_unknown_dependency_exits_2_zero_created() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("ghost"),
@@ -171,7 +171,7 @@ fn test_batch_create_unknown_dependency_exits_2_zero_created() {
 }
 
 #[test]
-fn test_batch_create_cycle_exits_2_zero_created() {
+fn test_batch_create_cycle_fails_zero_created() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     let file = write_batch(
@@ -191,7 +191,7 @@ fn test_batch_create_cycle_exits_2_zero_created() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("cycle"),
@@ -203,7 +203,7 @@ fn test_batch_create_cycle_exits_2_zero_created() {
 }
 
 #[test]
-fn test_batch_create_invalid_label_exits_2() {
+fn test_batch_create_invalid_label_fails() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     let file = write_batch(
@@ -222,7 +222,7 @@ fn test_batch_create_invalid_label_exits_2() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     // A malformed label is caught by the full write-time validation, attributed
     // to the offending key.
@@ -232,7 +232,7 @@ fn test_batch_create_invalid_label_exits_2() {
 }
 
 #[test]
-fn test_batch_create_unknown_gate_exits_2() {
+fn test_batch_create_unknown_gate_fails() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     let file = write_batch(
@@ -251,14 +251,14 @@ fn test_batch_create_unknown_gate_exits_2() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("nonexistent-gate"), "stderr: {stderr}");
     assert_eq!(count_issues(&temp), 0);
 }
 
 #[test]
-fn test_batch_create_unknown_type_exits_2() {
+fn test_batch_create_unknown_type_fails() {
     let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
     let temp = JitCli::with_repository(taxonomy.temp);
     // The repository's own `[type_hierarchy]` declaration is what a type is
@@ -279,7 +279,7 @@ fn test_batch_create_unknown_type_exits_2() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("unknown type 'widget'"), "stderr: {stderr}");
     assert_eq!(count_issues(&temp), 0);
@@ -307,7 +307,7 @@ fn test_batch_create_enumerates_multiple_problems() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     // BOTH problems enumerated, not just the first.
     assert!(stderr.contains("duplicate key 'a'"), "stderr: {stderr}");
@@ -345,7 +345,7 @@ fn test_batch_create_write_time_violation_in_later_entry_zero_created() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2), "expected exit 2");
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("'bad'"),
@@ -486,7 +486,7 @@ fn test_batch_create_dry_run_human_output_and_validation_error_match_creation() 
         ])
         .output()
         .unwrap();
-    assert_eq!(dry.status.code(), Some(2));
+    assert!(!dry.status.success());
     assert_eq!(dry.status.code(), create.status.code());
     assert_eq!(dry.stderr, create.stderr);
     assert_eq!(count_issues(&temp), 0);

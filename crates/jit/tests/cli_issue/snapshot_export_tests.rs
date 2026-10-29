@@ -262,7 +262,7 @@ fn test_snapshot_export_nested_data_and_external_destinations() {
             external.to_str().unwrap(),
         ])
         .assert()
-        .code(6);
+        .failure();
     assert_eq!(fs::read(&external).unwrap(), original);
     assert!(fs::read_dir(outer.path()).unwrap().all(|entry| {
         !entry

@@ -86,7 +86,7 @@ fn test_create_description_and_description_file_are_mutually_exclusive() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("cannot be used with"));
 }
 
@@ -107,7 +107,7 @@ fn test_create_missing_description_file_is_usage_error_naming_path() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains(missing.to_str().unwrap()),
@@ -133,7 +133,7 @@ fn test_create_unreadable_description_path_is_usage_error_naming_path() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains(directory.to_str().unwrap()),

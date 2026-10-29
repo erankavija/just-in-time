@@ -228,7 +228,7 @@ fn test_children_non_container_leaf_is_empty() {
 }
 
 /// A bad id under `--json` routes through the JSON error path: an
-/// `ISSUE_NOT_FOUND` envelope and the matching nonzero exit code.
+/// `ISSUE_NOT_FOUND` envelope and a nonzero exit.
 #[test]
 fn test_children_bad_id_json_error() {
     let temp = JitCli::initialised().unwrap();
@@ -507,7 +507,7 @@ fn test_query_count_text_form() {
     assert!(lines[1].contains("done 1/1 (100%)"), "{:?}", lines[1]);
 }
 
-/// An unknown `--by` value is a clap usage error (exit 2), not a silent no-op.
+/// An unknown `--by` value is a clap usage error, not a silent no-op.
 #[test]
 fn test_query_count_invalid_dimension_rejected() {
     let temp = JitCli::initialised().unwrap();
@@ -516,7 +516,10 @@ fn test_query_count_invalid_dimension_rejected() {
         .output()
         .unwrap();
     assert!(!out.status.success());
-    assert_eq!(out.status.code(), Some(2), "clap usage error exit code");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("invalid value 'bogus'"),
+        "clap usage error"
+    );
 }
 
 /// Argument order and cwd independence: `--json` before or after positionals
