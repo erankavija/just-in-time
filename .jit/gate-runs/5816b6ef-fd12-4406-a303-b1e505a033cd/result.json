@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "261a71c8ebb36cba10b5d5c997b739abcf36495e",
+  "completed_at": "2026-10-29T07:29:51.456301736Z",
+  "duration_ms": 336161,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_query_graph/check_links_tests.rs",
+        "id": "F1",
+        "line": 67,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Repeated pass/fail comments restate adjacent test assertions and add no contract."
+      }
+    ],
+    "summary": "Repeated redundant comments introduced in check-links tests.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3f01cb72-5726-43bd-bb1f-136a640bc0aa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5816b6ef-fd12-4406-a303-b1e505a033cd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:24:15.294646100Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3889 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1868b-8ee8-7da2-8b8f-3496d2ad0628\n--------\nuser\n--- 3876 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 891cf0ba8, 261a71c8e\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-01, REQ-02, REQ-03 (issue description)\nGate evidence: cargo-ci passed (2026-10-29T07:24:14Z; exit code unavailable)\nTruncation recovery: narrowed reads of policy, current changed test ranges, projection bindings, and merge-parent file attribution\n\n1. [blocking][issue-impact] `check_links_tests.rs:67`, `:93`, and `:125` introduce repetitive “Check links should pass/fail” comments that restate the test names and immediate status assertions without adding a contract or rationale. The repeated pattern is attributable to this change and violates `@/invariant/essential-code-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repeated redundant comments introduced in check-links tests.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repeated pass/fail comments restate adjacent test assertions and add no contract.\",\"file\":\"crates/jit/tests/cli_query_graph/check_links_tests.rs\",\"line\":67,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
