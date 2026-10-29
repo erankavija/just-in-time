@@ -1491,6 +1491,13 @@
       "model": "sonnet",
       "effort": "default",
       "reason": "CLI suite retyping, 12 test files; upstream c780514e tasks terminal per 4f"
+    },
+    {
+      "issue": "89e7a273",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "storage trait and backends retyping; brief pre-empts the construction-site finding from 641bd14e"
     }
   ],
   "surfaced_pitfalls": [
