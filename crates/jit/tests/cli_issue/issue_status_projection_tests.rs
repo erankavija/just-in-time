@@ -10,7 +10,7 @@
 //! - projection flags (`--field`/`--fields`) are not accepted on `issue status`
 
 use assert_cmd::prelude::*;
-use jit::test_cli::JitCli;
+use jit::test_cli::{seed_ambiguous_prefix, JitCli};
 
 fn short(id: &str) -> &str {
     &id[0..8]
@@ -381,6 +381,54 @@ fn test_status_short_prefix_json_error_envelope() {
     let json: serde_json::Value = serde_json::from_slice(&out)
         .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {out:?}"));
     assert_eq!(json["error"]["code"].as_str(), Some("INVALID_ID_PREFIX"));
+}
+
+/// `issue show` refuses a too-short prefix as an invalid prefix: the human
+/// message names the minimum length and `--json` carries `INVALID_ID_PREFIX`.
+#[test]
+fn test_show_short_prefix_is_invalid_prefix_human_and_json() {
+    let temp = JitCli::initialised().unwrap();
+
+    let human = temp.command(["issue", "show", "ab"]).output().unwrap();
+    assert!(!human.status.success());
+    assert!(String::from_utf8_lossy(&human.stderr).contains("at least 4 characters"));
+
+    let machine = temp
+        .command(["issue", "show", "ab", "--json"])
+        .output()
+        .unwrap();
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("at least 4 characters"));
+}
+
+/// `issue show` refuses an ambiguous prefix: the human message says "Ambiguous
+/// ID" and `--json` carries `AMBIGUOUS_ID`.
+#[test]
+fn test_show_ambiguous_prefix_is_ambiguous_id_human_and_json() {
+    let temp = JitCli::initialised().unwrap();
+    let (prefix, _) = seed_ambiguous_prefix(&temp).unwrap();
+
+    let human = temp.command(["issue", "show", &prefix]).output().unwrap();
+    assert!(!human.status.success());
+    let stderr = String::from_utf8_lossy(&human.stderr);
+    assert!(stderr.contains("Ambiguous ID"), "stderr was: {stderr}");
+
+    let machine = temp
+        .command(["issue", "show", &prefix, "--json"])
+        .output()
+        .unwrap();
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Ambiguous ID"));
 }
 
 /// Multi-id `--json` where one id is bad fails fast on the whole command with a

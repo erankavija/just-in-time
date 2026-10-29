@@ -1,6 +1,6 @@
 //! The shared CLI process fixture drives the binary of this target.
 
-use jit::test_cli::JitCli;
+use jit::test_cli::{seed_ambiguous_prefix, JitCli};
 use std::path::Path;
 
 #[test]
@@ -98,4 +98,13 @@ fn test_linked_checkouts_share_base_commit_and_both_run_jit_leaving_runtime_stat
         )
         .unwrap();
     assert_eq!(ignored_in_linked.lines().collect::<Vec<_>>(), runtime);
+}
+
+#[test]
+fn test_seed_ambiguous_prefix_returns_prefix_of_at_least_two_ids() {
+    let cli = JitCli::initialised().unwrap();
+
+    let (prefix, ids) = seed_ambiguous_prefix(&cli).unwrap();
+
+    assert!(ids.iter().filter(|id| id.starts_with(&prefix)).count() >= 2);
 }

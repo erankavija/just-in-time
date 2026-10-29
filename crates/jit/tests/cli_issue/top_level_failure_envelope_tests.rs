@@ -243,3 +243,57 @@ fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
     );
     assert!(output.stderr.is_empty());
 }
+
+/// Under `--json` a missing repository is a `REPOSITORY_NOT_FOUND` envelope on
+/// stdout.
+#[test]
+fn test_startup_repository_not_found_json_emits_envelope() {
+    let cli = JitCli::uninitialised().unwrap();
+
+    let output = cli.command(["query", "all", "--json"]).output().unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("startup failure should emit JSON on stdout under --json");
+    assert_eq!(json["error"]["code"], "REPOSITORY_NOT_FOUND");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("not found"));
+}
+
+/// Without `--json` a missing repository leaves stdout empty and names `.jit` on
+/// stderr.
+#[test]
+fn test_startup_repository_not_found_without_json_leaves_stdout_empty() {
+    let cli = JitCli::uninitialised().unwrap();
+
+    let output = cli.command(["query", "all"]).output().unwrap();
+
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty(), "non-json stdout must stay empty");
+    assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
+}
+
+/// A repository whose on-disk format is newer than this binary supports fails
+/// as `REPOSITORY_FORMAT_TOO_NEW` under `--json`.
+#[test]
+fn test_startup_repository_format_too_new_json_emits_envelope() {
+    let cli = JitCli::initialised().unwrap();
+    let index_path = cli.root().join(".jit").join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    index["schema_version"] = serde_json::json!(9999);
+    fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+
+    let output = cli.command(["query", "all", "--json"]).output().unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("format-too-new failure should emit JSON on stdout under --json");
+    assert_eq!(json["error"]["code"], "REPOSITORY_FORMAT_TOO_NEW");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("newer than this jit"));
+}
