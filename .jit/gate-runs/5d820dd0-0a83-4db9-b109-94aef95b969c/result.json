@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-c797b59b",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "205f72f95a7e47a0f7e1d288a05d656e34e8b1b7",
+  "completed_at": "2026-10-29T08:19:41.892964590Z",
+  "duration_ms": 100874,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The typed shared-harness API and its direct callers satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5d820dd0-0a83-4db9-b109-94aef95b969c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T08:18:01.018393031Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5dc073061, fa2db0da4, 205f72f95 (jit:c797b59b)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-01 (.jit issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/shared-test-contracts, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T08:17:16Z); code-review pending (no prior run)\nTruncation recovery: narrowed per-commit patches, configuration/item reads, harness API, and direct-consumer searches after truncated broad reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The typed shared-harness API and its direct callers satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
