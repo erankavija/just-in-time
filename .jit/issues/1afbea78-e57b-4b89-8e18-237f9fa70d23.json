@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:44:16.142541445Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Error-output tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:09:43.472246145Z"
+  "updated_at": "2026-10-29T07:44:16.318326252Z"
 }

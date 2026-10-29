@@ -779,7 +779,8 @@
     "2c9badcd": 1,
     "5fac48b8": 0,
     "13190465": 1,
-    "b73b3e5a": 1
+    "b73b3e5a": 1,
+    "641bd14e": 1
   },
   "external_blockers": "19d9bd7d waits on c780514e 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627), led by just-in-time-4f. c797b59b waits on 19d9bd7d.",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1476,6 +1477,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "repository_state retyping; multi-file core family, literal REQ-03"
+    },
+    {
+      "issue": "641bd14e",
+      "vendor": "lead",
+      "model": "opus",
+      "effort": "default",
+      "reason": "rework 1 (lead-executed, small): code-review F1, issue_id_at returned the raw uuid String; added IssueIdStaging::from_uuid and ValidatedIssueId::from_uuid"
+    },
+    {
+      "issue": "19d9bd7d",
+      "vendor": "claude",
+      "model": "sonnet",
+      "effort": "default",
+      "reason": "CLI suite retyping, 12 test files; upstream c780514e tasks terminal per 4f"
     }
   ],
   "surfaced_pitfalls": [
@@ -1541,7 +1556,8 @@
     "Run cargo-ci on the branch before code-review; review fails unverified backend/test criteria otherwise.",
     "State dev/active/ out of footprint in Codex briefs; workers rewrite other epics planning docs in prose sweeps.",
     "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch.",
-    "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure."
+    "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure.",
+    "Under the alias, construction sites (raw value -> IssueId) fail REQ-03-style criteria just like uses; a generated UUID needs an infallible constructor on both sides of the bridge (IssueId::from_uuid), not a serde round-trip, which Codex tried and the lead removed."
   ],
   "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [

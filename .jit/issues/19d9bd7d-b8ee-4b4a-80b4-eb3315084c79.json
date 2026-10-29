@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:39.426937531Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
@@ -13,6 +13,7 @@
   ],
   "description": "Retype issue ids in the CLI integration tests that drive the library directly.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. Most `cli_*` tests drive the binary and exchange ids as process strings, which is the CLI boundary. The files in the footprint also call executor or storage APIs directly.\n\n## Success Criteria\n\n- [hard] REQ-01: Library-facing code in the listed `cli_*` files takes and returns issue ids as `IssueId` and uses no non-UUID issue id.\n- [hard] REQ-02: Ids exchanged with the binary stay strings at the process boundary, parsed once where a test hands them to the library.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "first_ready_at": "2026-10-29T07:43:12.909532399Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -31,7 +32,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "CLI suites that use the library carry typed issue ids",
-  "updated_at": "2026-10-22T14:28:41.389304617Z"
+  "updated_at": "2026-10-29T07:44:04.172728859Z"
 }
