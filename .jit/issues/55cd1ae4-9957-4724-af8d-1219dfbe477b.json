@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "7053d3df-3581-4e52-aaf7-4437fa5db475",
+      "run_id": "babb7797-4c13-46a4-9b0f-196a9935a925",
       "status": "passed",
-      "updated_at": "2026-10-29T07:03:59.531712149Z",
+      "updated_at": "2026-10-29T07:05:47.604178141Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Blocked-transition and startup envelope cases move beside their owners",
-  "updated_at": "2026-10-29T07:03:59.531712149Z"
+  "updated_at": "2026-10-29T07:05:47.604178141Z"
 }

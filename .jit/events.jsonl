@@ -21325,3 +21325,4 @@
 {"assignee":"agent:jit-execution-lead","id":"32620bd0-0eb0-4522-bfdf-d66082f2f93b","issue_id":"3f01cb72-5726-43bd-bb1f-136a640bc0aa","timestamp":"2026-10-29T07:06:13.581648329Z","type":"issue_claimed"}
 {"assignee":"agent:jit-execution-lead","id":"cf3a3283-c9bd-4826-a868-1f51b4182470","issue_id":"6a13eeac-f6e6-4da3-93b5-6432f06b3f6f","timestamp":"2026-10-29T07:06:13.951411662Z","type":"issue_claimed"}
 {"id":"9ce7990a-ea79-4899-bac4-ba0bca231160","issue_id":"955aaa9a-34f7-4304-bed1-ad8102185253","priority":"high","timestamp":"2026-10-29T07:06:39.353215586Z","title":"Cold profiled-fixture builds no longer time out their waiters","type":"issue_created"}
+{"fields":["dependencies"],"id":"c90cf9c3-9c94-4d46-9bba-679951a49f82","issue_id":"c5aafdc0-998c-46a0-a286-7f853f0b814a","timestamp":"2026-10-29T07:07:08.885821833Z","type":"issue_updated","updated_by":"dependency-add"}

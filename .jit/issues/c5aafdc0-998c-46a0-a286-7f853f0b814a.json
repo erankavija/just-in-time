@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:29:44.806618440Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -24,6 +24,7 @@
     "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
     "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
     "8da3f7f5-3551-4111-a68a-4d4d4b093617",
+    "955aaa9a-34f7-4304-bed1-ad8102185253",
     "955ee89e-1b00-4158-af63-1847f168f708",
     "9c3b9da2-bb21-4d02-aead-6d970c71d821",
     "a057a4f5-b33f-4777-8df1-f458826afea5",
@@ -72,5 +73,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Tests run on shared fixtures and guards",
-  "updated_at": "2026-10-22T14:44:31.376089482Z"
+  "updated_at": "2026-10-29T07:07:08.885821833Z"
 }
