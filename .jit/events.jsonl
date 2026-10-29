@@ -21335,3 +21335,5 @@
 {"from":"backlog","id":"1211c567-0c5c-4743-8319-eb4e1fafad29","issue_id":"1afbea78-e57b-4b89-8e18-237f9fa70d23","timestamp":"2026-10-29T07:09:43.472246145Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"ffe60052-f045-42ab-905d-c6a97bfa2c13","issue_id":"69341a9d-a518-4ed6-972e-070760d085ab","timestamp":"2026-10-29T07:09:43.565037073Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"d0121a32-9fef-4526-b187-74b9014b1273","issue_id":"b51a5c2d-2aaa-4c82-9a70-12720d03a978","timestamp":"2026-10-29T07:09:43.654840353Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"fc1f335d-410e-4335-9f60-07ef0352c7a2","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","timestamp":"2026-10-29T07:14:30.620531004Z","type":"gate_added"}
+{"gate_key":"code-review","id":"d2dbecb5-969b-4d2a-a300-b9c9548205db","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","timestamp":"2026-10-29T07:14:30.620531004Z","type":"gate_added"}
