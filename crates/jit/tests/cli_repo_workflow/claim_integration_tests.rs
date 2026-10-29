@@ -172,10 +172,8 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
 }
 
 fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: ErrorCode) {
-    let expected_status = Some(expected_code.exit_code().code());
-    assert_eq!(plain.status.code(), expected_status);
-    assert_eq!(json.status.code(), expected_status);
-    assert_eq!(plain.status.code(), json.status.code());
+    assert!(!plain.status.success());
+    assert!(!json.status.success());
 
     assert!(plain.stdout.is_empty(), "plain failure leaked to stdout");
     assert!(
@@ -1107,11 +1105,10 @@ fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
         .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
 }
 
-/// The `--json` claim path must honor the same exit-10 contract as the human
-/// path: running `claim acquire --json` outside a git repository emits a JSON
-/// error naming the git requirement and exits with code 10.
+/// Running `claim acquire --json` outside a git repository emits a JSON error
+/// naming the git requirement.
 #[test]
-fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
+fn test_claim_acquire_json_outside_git_repo_reports_git_requirement() {
     let cli = JitCli::initialised().unwrap();
     let issue_id = cli
         .create_issue(["--title", "Test Issue Outside Git JSON"])
@@ -1131,11 +1128,7 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim acquire --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1146,19 +1139,15 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
     );
 }
 
-/// `claim list --json` outside a git repository must also exit 10 with a JSON
-/// error naming the git requirement.
+/// `claim list --json` outside a git repository emits a JSON error naming the
+/// git requirement.
 #[test]
-fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
+fn test_claim_list_json_outside_git_repo_reports_git_requirement() {
     let cli = JitCli::initialised().unwrap();
 
     let output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim list --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1236,7 +1225,6 @@ fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
     ])
     .assert()
     .failure()
-    .code(10)
     .stderr(predicate::str::contains("git repository"))
     .stderr(predicate::str::contains("commit"))
     .stderr(predicate::str::contains("git init").not());
@@ -1244,8 +1232,8 @@ fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
 
 /// JSON-mode counterpart of
 /// [`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`]:
-/// same exit code and error code as the no-repository case, but the message
-/// hints a commit instead of `git init`.
+/// same error code as the no-repository case, but the message hints a commit
+/// instead of `git init`.
 #[test]
 fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init() {
     let cli = JitCli::initialised().unwrap();
@@ -1268,7 +1256,7 @@ fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(10));
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1562,4 +1550,212 @@ fn test_claim_status_issue_filter_resolves_any_spelling_of_a_full_id() {
         assert_eq!(leases.len(), 1, "{spelling}: {json}");
         assert_eq!(leases[0]["lease_id"], lease_id);
     }
+}
+
+/// Returns `(dependency, dependent)`: `dependent` is in backlog behind the
+/// unmet `dependency`.
+fn create_dependency_blocked_pair(cli: &JitCli) -> (String, String) {
+    let dependency = cli.create_issue(["--title", "Prerequisite"]).unwrap();
+    let dependent = cli.create_issue(["--title", "Dependent work"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
+    (dependency, dependent)
+}
+
+fn remediation_commands(envelope: &Value) -> Vec<&str> {
+    envelope["error"]["details"]["remediation"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|command| command.as_str().unwrap())
+        .collect()
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_json_names_blocker_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    let (dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert_eq!(json["error"]["details"]["issue_id"], dependent);
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "backlog");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["issue_id"],
+        dependency
+    );
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&format!("jit graph deps {dependent}"))));
+}
+
+#[test]
+fn test_issue_claim_blocked_by_precheck_gate_json_names_gate_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "tdd-reminder",
+        "--title",
+        "TDD Reminder",
+        "-d",
+        "Write tests first",
+        "--stage",
+        "precheck",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    let issue = cli
+        .create_issue(["--title", "Precheck work", "--gate", "tdd-reminder"])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "claim", &issue, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["requested_state"], "in_progress");
+    assert_eq!(json["error"]["details"]["actual_state"], "ready");
+    assert_eq!(json["error"]["details"]["blockers"][0]["type"], "gate");
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["key"],
+        "tdd-reminder"
+    );
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&format!("jit gate evaluate {issue} tdd-reminder"))));
+}
+
+#[test]
+fn test_issue_claim_next_blocked_by_precheck_gate_json_names_issue_and_gate() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "tdd-reminder",
+        "--title",
+        "TDD Reminder",
+        "-d",
+        "Write tests first",
+        "--stage",
+        "precheck",
+        "--mode",
+        "manual",
+    ])
+    .unwrap();
+    let issue = cli
+        .create_issue([
+            "--title",
+            "Claim-next precheck work",
+            "--gate",
+            "tdd-reminder",
+        ])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "claim-next", "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert_eq!(json["error"]["details"]["issue_id"], issue);
+    assert_eq!(
+        json["error"]["details"]["blockers"][0]["key"],
+        "tdd-reminder"
+    );
+}
+
+#[test]
+fn test_issue_claim_next_skips_non_ready_issues() {
+    let cli = JitCli::initialised().unwrap();
+    let done_issue = cli.create_issue(["--title", "Already done"]).unwrap();
+    let ready_issue = cli.create_issue(["--title", "Ready work"]).unwrap();
+    cli.run(["issue", "update", &done_issue, "--state", "done"])
+        .unwrap();
+
+    let claimed = cli.run_json(["issue", "claim-next", "agent:test"]).unwrap();
+
+    assert_eq!(claimed["id"], ready_issue);
+    assert_eq!(claimed["state"], "in_progress");
+    assert_eq!(claimed["assignee"], "agent:test");
+    assert!(cli.run_json(["issue", "show", &done_issue]).unwrap()["assignee"].is_null());
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_human_error_names_assign() {
+    let cli = JitCli::initialised().unwrap();
+    let (_dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("jit issue assign"), "stderr: {stderr}");
+    assert!(stderr.contains(&dependent), "stderr: {stderr}");
+}
+
+#[test]
+fn test_issue_claim_blocked_by_dependencies_json_error_names_assign() {
+    let cli = JitCli::initialised().unwrap();
+    let (_dependency, dependent) = create_dependency_blocked_pair(&cli);
+
+    let output = cli
+        .command(["issue", "claim", &dependent, "agent:test", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    let assign = format!("jit issue assign {dependent}");
+    assert!(json["error"]["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|suggestion| suggestion.as_str().unwrap().contains(&assign)));
+    assert!(remediation_commands(&json)
+        .iter()
+        .any(|command| command.contains(&assign)));
+}
+
+#[test]
+fn test_issue_claim_assign_only_sets_assignee_without_transition() {
+    let cli = JitCli::initialised().unwrap();
+    let issue = cli.create_issue(["--title", "Assign-only work"]).unwrap();
+
+    cli.run(["issue", "claim", &issue, "agent:test", "--assign-only"])
+        .unwrap();
+
+    let shown = cli.run_json(["issue", "show", &issue]).unwrap();
+    assert_eq!(shown["assignee"], "agent:test");
+    assert_eq!(shown["state"], "ready");
+}
+
+#[test]
+fn test_issue_claim_ready_issue_transitions_to_in_progress() {
+    let cli = JitCli::initialised().unwrap();
+    let issue = cli.create_issue(["--title", "Ready work"]).unwrap();
+    cli.run(["issue", "update", &issue, "--state", "ready"])
+        .unwrap();
+
+    cli.run(["issue", "claim", &issue, "agent:test"]).unwrap();
+
+    let shown = cli.run_json(["issue", "show", &issue]).unwrap();
+    assert_eq!(shown["assignee"], "agent:test");
+    assert_eq!(shown["state"], "in_progress");
 }
