@@ -19,11 +19,18 @@ pub type IssueId = String;
 pub trait IssueIdStaging {
     /// The first [`SHORT_ID_LENGTH`] characters of the id.
     fn short_id(&self) -> &str;
+
+    /// The id of a generated UUID.
+    fn from_uuid(uuid: Uuid) -> Self;
 }
 
 impl IssueIdStaging for String {
     fn short_id(&self) -> &str {
         short_id_of(self)
+    }
+
+    fn from_uuid(uuid: Uuid) -> Self {
+        uuid.hyphenated().to_string()
     }
 }
 
@@ -56,6 +63,12 @@ impl ValidatedIssueId {
     /// The first [`SHORT_ID_LENGTH`] characters of the id.
     pub fn short_id(&self) -> &str {
         short_id_of(&self.0)
+    }
+
+    /// The id of a generated UUID; its hyphenated form is canonical, so this
+    /// cannot fail.
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid.hyphenated().to_string())
     }
 }
 
@@ -616,6 +629,18 @@ mod tests {
                     serde_json::from_value::<ValidatedIssueId>(json!(spelling)).is_err()
                 );
             }
+        }
+
+        /// A generated UUID becomes the id its canonical text parses to, on
+        /// both sides of the bridge.
+        #[test]
+        fn test_from_uuid_yields_the_canonical_id_on_both_sides_of_the_bridge(
+            bits in any::<u128>(),
+        ) {
+            let uuid = Uuid::from_u128(bits);
+            let parsed = ValidatedIssueId::try_from(uuid.to_string()).unwrap();
+            prop_assert_eq!(&ValidatedIssueId::from_uuid(uuid), &parsed);
+            prop_assert_eq!(<String as IssueIdStaging>::from_uuid(uuid), parsed.as_str());
         }
 
         /// The short id is the id's leading `SHORT_ID_LENGTH` characters,

@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-641bd14e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "43478baf49fd12a021d6038cc8d07dc0fa2995c7",
+  "completed_at": "2026-10-29T07:40:52.832373577Z",
+  "duration_ms": 326605,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/mutation.rs",
+        "id": "F1",
+        "line": 296,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/641bd14e/requirement/REQ-03",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "MutationContext::issue_id_at directly returns a String-producing UUID factory, which fails once IssueId is the validated newtype."
+      }
+    ],
+    "summary": "The issue-ID factory still directly returns a raw String, so repository-state will not compile unchanged after IssueId becomes the validated newtype.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "38d68099-6065-47fd-b380-d9190c698a84",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:35:26.226683234Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6393 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-641bd14e\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a18695-cbbf-7e80-a418-10b994264cf0\n--------\nuser\n--- 6380 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `aec0cb276`, `5703fc79a`, `43478baf` (`jit:641bd14e`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/641bd14e/requirement/REQ-01`–`REQ-03`, `@/issue/2195c98f/requirement/REQ-01`, `REQ-17` (issue Markdown); `@/invariant/semantic-types` (`.jit/invariants.toml`); `@/charter/D-18` (`dev/vision/9db27a3a-charter.md`); `@/gate/cargo-ci` (`.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T07:34:02Z); code-review has no prior recorded run\nTruncation recovery: narrowed per-commit patches and mutation allocation, serializer, finalizer, and caller reads after broad searches truncated\n\n1. [blocking][issue-impact][high] `MutationContext::issue_id_at` directly returns `IdAuthority::uuid_at`, which produces `String` ([crates/jit/src/repository_state/mutation.rs:296](crates/jit/src/repository_state/mutation.rs:296)). `IssueId` is explicitly scheduled to change from its current `String` alias to `ValidatedIssueId`, which only accepts a `String` through fallible `TryFrom`; this return expression will therefore not compile unchanged after the flip. That violates REQ-03’s required newtype-ready usage. References: `@/issue/641bd14e/requirement/REQ-03`, `@/invariant/semantic-types`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue-ID factory still directly returns a raw String, so repository-state will not compile unchanged after IssueId becomes the validated newtype.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"MutationContext::issue_id_at directly returns a String-producing UUID factory, which fails once IssueId is the validated newtype.\",\"file\":\"crates/jit/src/repository_state/mutation.rs\",\"line\":296,\"references\":[\"@/issue/641bd14e/requirement/REQ-03\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
