@@ -217,7 +217,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &self.storage,
                         &preferred_root,
                         &legacy_root,
-                        container_id.as_str(),
+                        container_id,
                     )?;
                     (resolved.destination_root, resolved.conflicting_roots)
                 }

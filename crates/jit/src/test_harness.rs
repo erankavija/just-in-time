@@ -193,7 +193,7 @@ impl TestHarness {
     }
 
     /// Get issue by ID
-    pub fn get_issue(&self, id: &str) -> Issue {
+    pub fn get_issue(&self, id: &crate::domain::identity::IssueId) -> Issue {
         self.storage.load_issue(id).unwrap()
     }
 }

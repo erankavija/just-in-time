@@ -603,7 +603,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
-                crate::storage::IssueNotFoundError::new("abc123").into(),
+                crate::storage::IssueNotFoundError::new(crate::test_utils::issue_id(86)).into(),
                 3,
                 "*",
             ),

@@ -96,7 +96,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
 /// the template path. The container itself is not modified.
 fn wire_plan_bracket<S: ScopeFixtureStore>(
     executor: &CommandExecutor<S>,
-    container_id: &str,
+    container_id: &jit::domain::identity::IssueId,
     plan_path: &str,
     planning_state: State,
 ) -> String {

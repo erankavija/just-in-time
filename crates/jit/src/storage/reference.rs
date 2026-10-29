@@ -32,6 +32,7 @@ use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
 use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::IssueIdStaging;
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
 use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
 use anyhow::Result;
@@ -325,7 +326,9 @@ fn sample_gate_run() -> GateRunResult {
         run_id: SAMPLE_RUN_ID.to_string(),
         gate_key: "tests".to_string(),
         stage: GateStage::Postcheck,
-        issue_id: "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64".to_string(),
+        issue_id: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
+            0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,
+        )),
         commit: Some("9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910".to_string()),
         branch: Some("main".to_string()),
         status: GateRunStatus::Passed,
@@ -691,7 +694,7 @@ mod tests {
         let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
         assert_eq!(issue.short_id().len(), SHORT_ID_LENGTH);
-        assert!(issue.id.starts_with(&issue.short_id()));
+        assert!(issue.id.as_str().starts_with(&issue.short_id()));
 
         // The record stores no short id: the encoded issue carries the full `id`
         // and no key holding its truncation.
