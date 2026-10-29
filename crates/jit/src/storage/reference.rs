@@ -684,9 +684,9 @@ mod tests {
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
         let id = crate::repository_state::MutationContext::preview().issue_id_at(0);
-        let parsed = Uuid::parse_str(&id).expect("an issue id is a UUID");
+        let parsed = Uuid::parse_str(id.as_str()).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));
-        assert_eq!(parsed.hyphenated().to_string(), id);
+        assert_eq!(parsed.hyphenated().to_string(), id.as_str());
 
         let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
