@@ -10,7 +10,7 @@
 //! - projection flags (`--field`/`--fields`) are not accepted on `issue status`
 
 use assert_cmd::prelude::*;
-use jit::test_cli::JitCli;
+use jit::test_cli::{seed_ambiguous_prefix, JitCli};
 
 fn short(id: &str) -> &str {
     &id[0..8]
@@ -404,6 +404,31 @@ fn test_show_short_prefix_is_invalid_prefix_human_and_json() {
         .as_str()
         .unwrap()
         .contains("at least 4 characters"));
+}
+
+/// `issue show` refuses an ambiguous prefix: the human message says "Ambiguous
+/// ID" and `--json` carries `AMBIGUOUS_ID`.
+#[test]
+fn test_show_ambiguous_prefix_is_ambiguous_id_human_and_json() {
+    let temp = JitCli::initialised().unwrap();
+    let (prefix, _) = seed_ambiguous_prefix(&temp).unwrap();
+
+    let human = temp.command(["issue", "show", &prefix]).output().unwrap();
+    assert!(!human.status.success());
+    let stderr = String::from_utf8_lossy(&human.stderr);
+    assert!(stderr.contains("Ambiguous ID"), "stderr was: {stderr}");
+
+    let machine = temp
+        .command(["issue", "show", &prefix, "--json"])
+        .output()
+        .unwrap();
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Ambiguous ID"));
 }
 
 /// Multi-id `--json` where one id is bad fails fast on the whole command with a
