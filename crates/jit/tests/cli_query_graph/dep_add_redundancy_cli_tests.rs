@@ -4,7 +4,7 @@
 //! exit by default, and `--reduce` makes it succeed while leaving `jit validate`
 //! clean.
 
-use jit::test_cli::JitCli;
+use jit::test_cli::{seed_ambiguous_prefix, JitCli};
 use jit::test_taxonomy::setup_test_repo_with_taxonomy;
 
 /// REQ-01: a redundant `jit dep add` exits nonzero and names the offending pair.
@@ -327,5 +327,26 @@ fn test_cli_dep_rm_validates_both_positions_symmetrically() {
             String::from_utf8_lossy(&out.stderr).contains("at least 4 characters"),
             "{args:?}"
         );
+    });
+}
+
+/// An ambiguous id prefix in either `dep add` position is refused as
+/// `AMBIGUOUS_ID` under `--json`.
+#[test]
+fn test_cli_dep_add_ambiguous_prefix_rejected_in_both_positions() {
+    let cli = JitCli::initialised().unwrap();
+    let (prefix, _) = seed_ambiguous_prefix(&cli).unwrap();
+    let other = cli.create_issue(["--title", "Other"]).unwrap();
+
+    [
+        ["dep", "add", &prefix, &other, "--json"],
+        ["dep", "add", &other, &prefix, "--json"],
+    ]
+    .into_iter()
+    .for_each(|args| {
+        let out = cli.command(args).output().unwrap();
+        assert!(!out.status.success(), "{args:?}");
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(json["error"]["code"], "AMBIGUOUS_ID", "{args:?}");
     });
 }

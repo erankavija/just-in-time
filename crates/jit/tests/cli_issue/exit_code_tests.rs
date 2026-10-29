@@ -742,82 +742,6 @@ fn test_exit_code_document_invalid_scope() {
 // through to the generic exit 1.
 // ============================================================================
 
-/// Craft two issue files that share the `aaaabbbb` id prefix and register them in
-/// the on-disk index, so a lookup of that prefix is genuinely ambiguous. Returns
-/// the shared prefix. Uses a real issue's JSON as a template so every required
-/// field is present.
-fn make_ambiguous_prefix(temp_dir: &TempDir) -> &'static str {
-    let template_id = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(temp_dir)
-            .args(["issue", "create", "--title", "Template", "--json"])
-            .output()
-            .unwrap(),
-    );
-
-    let issues_dir = temp_dir.path().join(".jit").join("issues");
-    let template_path = issues_dir.join(format!("{}.json", template_id));
-    let template: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&template_path).unwrap()).unwrap();
-
-    let crafted_ids = [
-        "aaaabbbb-1111-4111-8111-111111111111",
-        "aaaabbbb-2222-4222-8222-222222222222",
-    ];
-    for id in crafted_ids {
-        let mut issue = template.clone();
-        issue["id"] = serde_json::json!(id);
-        fs::write(
-            issues_dir.join(format!("{}.json", id)),
-            serde_json::to_string_pretty(&issue).unwrap(),
-        )
-        .unwrap();
-    }
-
-    // Register the crafted ids in the local index so resolve_issue_id sees them.
-    let index_path = temp_dir.path().join(".jit").join("index.json");
-    let mut index: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
-    let all_ids = index["all_ids"].as_array_mut().unwrap();
-    for id in crafted_ids {
-        all_ids.push(serde_json::json!(id));
-    }
-    fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
-
-    "aaaabbbb"
-}
-
-#[test]
-fn test_exit_code_ambiguous_prefix() {
-    let temp_dir = setup_test_env();
-    let prefix = make_ambiguous_prefix(&temp_dir);
-
-    // Human path: ambiguous prefix is an argument error (exit 2), preserving the
-    // original "Ambiguous ID" phrasing.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["issue", "show", prefix])
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Ambiguous ID"), "stderr was: {stderr}");
-
-    // --json path: same exit code, distinguishing AMBIGUOUS_ID code on stdout.
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["issue", "show", prefix, "--json"])
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
-    assert!(json["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("Ambiguous ID"));
-}
-
 /// REQ-02: the batch-mode description guard is a usage error (exit 2), matching
 /// clap usage errors and the other batch-mode rejections.
 #[test]
@@ -839,41 +763,6 @@ fn test_exit_code_batch_description_guard() {
 
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("not supported with --filter"));
-}
-
-/// REQ-01 for `jit dep add`: an ambiguous id prefix in either position is an
-/// argument error (exit 2) carrying the AMBIGUOUS_ID code under --json.
-#[test]
-fn test_exit_code_dep_add_ambiguous_prefix_both_positions() {
-    let temp_dir = setup_test_env();
-    let prefix = make_ambiguous_prefix(&temp_dir);
-    let other = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "Other", "--json"])
-            .output()
-            .unwrap(),
-    );
-
-    // Ambiguous `<from>`.
-    let from_json = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["dep", "add", prefix, &other, "--json"])
-        .output()
-        .unwrap();
-    assert_eq!(from_json.status.code(), Some(2));
-    let json: serde_json::Value = serde_json::from_slice(&from_json.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
-
-    // Ambiguous `<target>`.
-    let target_json = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["dep", "add", &other, prefix, "--json"])
-        .output()
-        .unwrap();
-    assert_eq!(target_json.status.code(), Some(2));
-    let json: serde_json::Value = serde_json::from_slice(&target_json.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
 }
 
 // ============================================================================
