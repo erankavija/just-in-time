@@ -21281,3 +21281,7 @@
 {"gate_key":"cargo-ci","id":"ccadc702-d7d0-4fb9-abb6-9f1420f0b8e4","issue_id":"b73b3e5a-87d4-455a-961d-20c88a3a7039","timestamp":"2026-10-29T00:07:29.547627644Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"9ac2d51c-dd35-41ce-9284-ec01eb44b677","issue_id":"b73b3e5a-87d4-455a-961d-20c88a3a7039","timestamp":"2026-10-29T00:07:36.426112401Z","to":"done","type":"issue_state_changed"}
 {"id":"fc15a998-6b3d-4241-90ef-c0083f5a17b5","issue_id":"b73b3e5a-87d4-455a-961d-20c88a3a7039","timestamp":"2026-10-29T00:07:36.426112401Z","type":"issue_completed"}
+{"id":"e47aad68-bd8c-4c66-a324-9dc76b54bfc2","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","priority":"normal","timestamp":"2026-10-29T02:22:10.612875921Z","title":"Link checks read only the documents they scan for links","type":"issue_created"}
+{"assignee":"agent:jit-execution-lead","id":"86bece16-ec1a-4c3c-a733-dc98949a88fc","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","timestamp":"2026-10-29T02:22:35.490203496Z","type":"issue_claimed"}
+{"fields":["description"],"id":"d3b01fd9-274a-48f4-9e44-d095506f3267","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","timestamp":"2026-10-29T02:22:35.596339423Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["assignee"],"id":"3a8424e3-65d6-41b6-b47b-f3a511927870","issue_id":"f71504cd-e282-477c-a609-5f7e1c08a36e","timestamp":"2026-10-29T02:22:41.412642269Z","type":"issue_updated","updated_by":"issue-unassign"}
