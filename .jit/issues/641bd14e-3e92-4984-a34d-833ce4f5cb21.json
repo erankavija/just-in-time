@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1701ffb8-ecff-4fc3-905d-2264095cd7a6",
+      "run_id": "e1a2902c-6dad-4c86-96b0-8d233766b125",
       "status": "passed",
-      "updated_at": "2026-10-29T07:35:25.768643691Z",
+      "updated_at": "2026-10-29T07:45:25.564704539Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Repository-state mutations carry typed issue ids",
-  "updated_at": "2026-10-29T07:40:53.068316022Z"
+  "updated_at": "2026-10-29T07:45:25.564704539Z"
 }
