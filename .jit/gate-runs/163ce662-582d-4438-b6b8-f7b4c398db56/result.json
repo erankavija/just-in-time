@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-b45a2865",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "211a3ce9e15512f4b5916d9a316e8c987f086829",
+  "completed_at": "2026-10-29T00:03:00.268918426Z",
+  "duration_ms": 215532,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable fast_rules typing changes meet the issue criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "163ce662-582d-4438-b6b8-f7b4c398db56",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:59:24.736232187Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f57d1079, 61577b0d, 211a3ce9 (all `jit:b45a2865`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-01 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:58:34Z); code-review pending\nTruncation recovery: recovered individual patches for all tagged commits and bounded reads of changed tests, suite-wide ID uses, fixture source, policies, and gate registry\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable fast_rules typing changes meet the issue criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -16,6 +16,7 @@
 use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::domain::{ContentFormat, Issue, State};
 use jit::test_utils::document_reference_typed;
 use jit::validation::graph::{evaluate_graph, GraphFinding};
@@ -1163,8 +1164,8 @@ mod cross_epic {
         let rules = graph_rules(&set);
 
         let (epic_a, epic_b) = two_epics_colliding_on("REQ-01");
-        let id_a = epic_a.short_id().to_string();
-        let id_b = epic_b.short_id().to_string();
+        let id_a = epic_a.short_id();
+        let id_b = epic_b.short_id();
 
         let findings = issue_graph_findings(&rules, &[epic_a, epic_b]);
         assert_eq!(findings.len(), 1);
@@ -1280,7 +1281,7 @@ mod research {
 
     /// A `type:experiment` that tests the goal's hypothesis H-1 and has the
     /// required `## Method` and `## Evidence` sections.
-    fn compliant_experiment(goal_id: &str) -> Issue {
+    fn compliant_experiment(goal_id: &IssueId) -> Issue {
         let body = "## Method\n\n\
             - train with 10x the original dataset size\n\
             - evaluate on the held-out test set\n\n\
@@ -1290,7 +1291,7 @@ mod research {
         // Containment is wired by the caller: goal depends on exp.
         exp.labels = vec![
             "type:experiment".to_string(),
-            format!("tests:{}/H-1", &goal_id[..8]),
+            format!("tests:{}/H-1", goal_id.short_id()),
         ];
         exp.state = State::Done;
         exp
@@ -1414,7 +1415,7 @@ mod research {
     #[test]
     fn test_research_compliant_experiment_passes_local() {
         let set = load_example("research");
-        let exp = compliant_experiment("dummy-goal-id");
+        let exp = compliant_experiment(&jit::test_utils::issue_id(4));
         assert!(
             !has_local_finding(&exp, &set),
             "a well-formed experiment body must produce no local findings"
@@ -1424,7 +1425,7 @@ mod research {
     #[test]
     fn test_research_experiment_missing_method_section_is_blocked() {
         let set = load_example("research");
-        let mut exp = compliant_experiment("dummy-goal-id");
+        let mut exp = compliant_experiment(&jit::test_utils::issue_id(4));
         exp.description = "## Evidence\n\n- observations\n".to_string();
         let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
         assert!(
@@ -1436,7 +1437,7 @@ mod research {
     #[test]
     fn test_research_experiment_missing_evidence_section_is_blocked() {
         let set = load_example("research");
-        let mut exp = compliant_experiment("dummy-goal-id");
+        let mut exp = compliant_experiment(&jit::test_utils::issue_id(4));
         exp.description = "## Method\n\n- the protocol\n".to_string();
         let eval = evaluate_local(&exp, &set, ContentFormat::Markdown).unwrap();
         assert!(
@@ -1518,7 +1519,7 @@ mod research {
         labels: &[&str],
         body: &str,
         state: State,
-    ) -> String {
+    ) -> IssueId {
         let mut issue = crate::fixture_issue(title.to_string(), body.to_string());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;

@@ -5,6 +5,7 @@
 use jit::commands::test_helpers::memory_executor;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_utils::issue_id;
 
 #[test]
 fn test_validation_detects_broken_dependency() {
@@ -47,10 +48,9 @@ fn test_validation_detects_broken_dependency() {
     // Validation should pass
     assert!(executor.validate_silent().is_ok());
 
-    // Corrupt the stored edge directly; production dependency commands reject
-    // this shape before publication.
+    // Add a well-formed dependency id whose target is absent.
     let mut issue2 = storage.load_issue(&issue2_id).unwrap();
-    issue2.dependencies = vec!["00000000-0000-0000-0000-000000000000".to_string()];
+    issue2.dependencies = vec![issue_id(1)];
     jit::test_harness::seed_memory_issue(&storage, &issue2);
 
     // Validation should fail
@@ -182,10 +182,9 @@ fn test_validation_detects_multiple_broken_dependencies() {
         )
         .unwrap();
 
-    // Manually add broken dependencies
+    // Manually add missing targets using canonical issue ids.
     let mut issue = storage.load_issue(&issue1_id).unwrap();
-    issue.dependencies.push("nonexistent1".to_string());
-    issue.dependencies.push("nonexistent2".to_string());
+    issue.dependencies.extend([issue_id(2), issue_id(3)]);
     jit::test_harness::seed_memory_issue(&storage, &issue);
 
     // Validation should fail
