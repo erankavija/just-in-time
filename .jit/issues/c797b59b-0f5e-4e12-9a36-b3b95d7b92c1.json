@@ -18,9 +18,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "02ca629d-57ab-4b21-8df8-cf649f9450c1",
+      "run_id": "efbb37f5-aba2-4cca-9138-5d243a7a357b",
       "status": "passed",
-      "updated_at": "2026-10-29T08:18:00.515615198Z",
+      "updated_at": "2026-10-29T08:20:52.559959469Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The shared integration harness carries typed issue ids",
-  "updated_at": "2026-10-29T08:19:42.136956143Z"
+  "updated_at": "2026-10-29T08:20:52.559959469Z"
 }
