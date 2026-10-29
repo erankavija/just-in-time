@@ -430,6 +430,40 @@ fn test_issue_update_and_delete() {
 }
 
 #[test]
+fn test_issue_delete_confirmed_reports_the_deleted_id_in_text_mode() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doomed"]).unwrap();
+
+    let output = cli
+        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(&format!("Deleted issue: {id}")), "{stdout}");
+}
+
+#[test]
+fn test_issue_delete_confirmed_reports_the_deleted_id_in_json_mode() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doomed"]).unwrap();
+
+    let output = cli
+        .command_with_env(
+            ["issue", "delete", &id, "--json"],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["id"], id);
+    assert_eq!(json["deleted"], true);
+}
+
+#[test]
 fn test_dependencies() {
     let cli = JitCli::initialised().unwrap();
 

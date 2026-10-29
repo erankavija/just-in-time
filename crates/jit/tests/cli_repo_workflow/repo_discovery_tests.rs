@@ -348,10 +348,11 @@ fn test_bare_ancestor_jit_is_skipped_not_bound() {
 
     let out = jit_status(&root, &sub);
     assert!(!out.status.success());
+    let envelope: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
-        out.status.code(),
-        Some(3),
-        "bare ancestor .jit must yield NotFound (3), not GenericError (1); stderr={}",
+        envelope["error"]["code"],
+        jit::output::ErrorCode::RepositoryNotFound.as_str(),
+        "bare ancestor .jit must be reported as not found; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let message = status_error_message(&out);
