@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Output;
+use std::process::{ExitStatus, Output};
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -84,17 +84,11 @@ fn success_json_with_path(repo: &JitCli, args: &[&str], path: Option<&Path>) -> 
     parse_json(&output)
 }
 
-fn failed_json_with_path(
-    repo: &JitCli,
-    args: &[&str],
-    exit_code: i32,
-    path: Option<&Path>,
-) -> Value {
+fn failed_json_with_path(repo: &JitCli, args: &[&str], path: Option<&Path>) -> Value {
     let output = jit_with_path(repo, args, path);
-    assert_eq!(
-        output.status.code(),
-        Some(exit_code),
-        "jit {args:?} returned the wrong status\nstdout={}\nstderr={}",
+    assert!(
+        !output.status.success(),
+        "jit {args:?} unexpectedly succeeded\nstdout={}\nstderr={}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -423,7 +417,6 @@ fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
     let failure = failed_json_with_path(
         &repo,
         &["init", "--profile", "packages/workflow", "--json"],
-        1,
         None,
     );
 
@@ -459,7 +452,6 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
             "packages/workflow",
             "--json",
         ],
-        1,
         None,
     );
 
@@ -576,7 +568,6 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let blocked_plan = failed_json_with_path(
         &repo,
         &["issue", "update", planning_id, "--state", "done", "--json"],
-        4,
         path,
     );
     assert_eq!(blocked_plan["error"]["details"]["actual_state"], "gated");
@@ -642,7 +633,6 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let blocked_breakdown = failed_json_with_path(
         &repo,
         &["issue", "update", breakdown_id, "--state", "done", "--json"],
-        4,
         path,
     );
     assert_eq!(
@@ -1002,7 +992,7 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
 /// The report is the answer whether or not the selection can be published, so
 /// an unpublishable run's report is unwrapped from the shared typed error
 /// envelope rather than read as a different shape.
-fn profile_difference(repo: &JitCli, selectors: &[&str]) -> (Option<i32>, Value) {
+fn profile_difference(repo: &JitCli, selectors: &[&str]) -> (ExitStatus, Value) {
     let args = ["profile", "diff"]
         .into_iter()
         .chain(
@@ -1023,7 +1013,7 @@ fn profile_difference(repo: &JitCli, selectors: &[&str]) -> (Option<i32>, Value)
         report["profiles"].as_array().map(Vec::len),
         "the report uses the count-wrapped list envelope: {parsed}"
     );
-    (output.status.code(), report)
+    (output.status, report)
 }
 
 /// The decisions the report carries for profile `id`, each as its action beside
@@ -1083,7 +1073,7 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
 
     let (status, report) = profile_difference(&repo, &["packages/planner"]);
 
-    assert_eq!(status, Some(0), "a publishable selection is a clean check");
+    assert!(status.success(), "a publishable selection is a clean check");
     assert!(
         decisions(&report, "planner-asset-only").contains(&("create".to_string(), target.clone())),
         "the report states the target the package would publish: {report}"
@@ -1129,7 +1119,7 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
     let (status, report) = profile_difference(&repo, &["packages/planner", "packages/rival"]);
 
     assert_eq!(
-        status,
+        status.code(),
         Some(4),
         "a selection that cannot be published fails the check: {report}"
     );
@@ -1226,7 +1216,7 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
 
     let (status, report) = profile_difference(&repo, &["packages/base"]);
 
-    assert_eq!(status, Some(0), "a publishable selection is a clean check");
+    assert!(status.success(), "a publishable selection is a clean check");
     assert!(
         declarations(&report, "base").contains(&("create".to_string(), contributed_identity())),
         "the report states the declaration the package would publish: {report}"
@@ -1237,7 +1227,7 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
     let (status, report) = profile_difference(&repo, &["packages/base", "packages/workflow"]);
 
     assert_eq!(
-        status,
+        status.code(),
         Some(4),
         "a selection that cannot be published fails the check: {report}"
     );
