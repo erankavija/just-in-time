@@ -31,9 +31,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "496c9dd1-eb02-4494-af92-98975a9747cd",
-      "status": "failed",
-      "updated_at": "2026-10-28T23:27:49.816420991Z",
+      "run_id": "1f1653b7-bf90-41c9-98a5-6e9534cf1450",
+      "status": "passed",
+      "updated_at": "2026-10-29T06:57:25.131510710Z",
       "updated_by": "auto:executor"
     }
   },
@@ -51,5 +51,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Issue drafts carry their pre-derived identifier",
-  "updated_at": "2026-10-29T06:53:10.910557806Z"
+  "updated_at": "2026-10-29T06:57:25.131510710Z"
 }
