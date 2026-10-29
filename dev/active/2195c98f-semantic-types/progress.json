@@ -1501,6 +1501,11 @@
       "source": "lead",
       "finding": "The shared sccache server inherited an ephemeral TMPDIR (/tmp/tmp.*/scratch) from the process that started it; once that directory was removed every compile failed in cargo-ci setup. Fix: sccache --stop-server; the next build restarts it with the default TMPDIR.",
       "status": "environmental"
+    },
+    {
+      "issue": "f71504cd",
+      "finding": "code-review F1 advisory (pre-existing): link checking reaches git through git2 in commands/document.rs:1129, outside the storage-owned git CLI module (@/charter/D-21).",
+      "disposition": "covered by the libgit2 removal work (34bb375a, 6fdb2d53); not this epic"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1581,6 +1586,7 @@
     "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)",
     "13190465 (1afa3fa0b, rework 1)",
     "b45a2865 (520da32bc)",
-    "b73b3e5a (42ee68606, rework 1)"
+    "b73b3e5a (42ee68606, rework 1)",
+    "f71504cd (5aa792397, out-of-epic bug, invoker approved; gates cargo-ci + code-review attached by lead to match 55e3d3fd)"
   ]
 }
