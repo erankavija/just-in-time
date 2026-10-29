@@ -794,6 +794,7 @@ impl InMemoryStorage {
                 RepositoryEntry::Absent
                 | RepositoryEntry::File { .. }
                 | RepositoryEntry::FileTail { .. }
+                | RepositoryEntry::FileKind { .. }
                 | RepositoryEntry::Symlink { .. }
                 | RepositoryEntry::Unsupported { .. } => None,
             })
