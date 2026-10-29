@@ -35,6 +35,7 @@
 //!   parallel structured store is written under `.jit/`.
 //! - REQ-04: every test below runs under `cargo test`.
 
+use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -90,11 +91,12 @@ fn test_default_repo_mitigates_label_resolves_risk() {
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `mitigates` namespace.
     let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
-    let short = &crate::create_issue(
+    let issue = crate::create_issue(
         &exec,
         "Migration plan",
         "## Risks\n\n- RISK-01: data loss during migration\n",
     );
+    let short = issue.short_id();
 
     let label = format!("mitigates:{short}/RISK-01");
     let resolved = exec
@@ -121,11 +123,12 @@ fn test_default_repo_resolves_label_resolves_risk() {
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `resolves` namespace.
     let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
-    let short = &crate::create_issue(
+    let issue = crate::create_issue(
         &exec,
         "Migration plan",
         "## Risks\n\n- RISK-01: data loss during migration\n",
     );
+    let short = issue.short_id();
 
     let label = format!("resolves:{short}/RISK-01");
     let resolved = exec
