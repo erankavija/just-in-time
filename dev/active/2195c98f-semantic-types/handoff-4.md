@@ -11,7 +11,7 @@
 - Story e2651d77 tasks: 12 done, 6 rejected, 1 ready (5fac48b8, blocked on an escalation), 13 backlog.
 - Active worker worktree: `agent-5fac48b8` (branch `worktree-agent-5fac48b8`, head 4608d2843 plus lead gate commits; cargo-ci passed; code-review failed). Its build target was cleaned to free disk; the next build there is cold.
 - Open escalations: one (see Open questions).
-- External blocker: 19d9bd7d waits on c780514e tasks 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627). The c780514e lead, session `just-in-time-4f`, was "waiting" (likely on the invoker) when this handoff was written.
+- External blocker: 19d9bd7d waits on c780514e tasks 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627). Both chains are active and not blocked on the invoker (4f, 2026-10-29): 2916a306 is finishing a user-approved shared `test_cli.rs` helper; c5c933f2 is in rework after one code-review failure. 4f messages this session or its successor when 3f01cb72 and 6a13eeac are terminal.
 - Progress file: `progress.json` in this directory.
 - Session rule from the invoker (recorded in `progress.json` `session_rules`): do not stop to ask; record escalations; write the handoff when only invoker input remains; check workers every 30 min.
 
