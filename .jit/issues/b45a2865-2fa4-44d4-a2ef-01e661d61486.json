@@ -12,6 +12,7 @@
   ],
   "description": "Move the `fast_rules` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_rules` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example the `\"nonexistent1\"` and `\"nonexistent2\"` dependencies at `fast_rules/validation_tests.rs:178-179` and the id sites of `fast_rules/local_rule_enforcement_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_rules` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_rules` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "done_at": "2026-10-29T00:04:34.882876428Z",
   "first_ready_at": "2026-10-28T23:34:11.002772010Z",
   "gates_required": [
     "cargo-ci",
@@ -44,7 +45,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "The fast_rules suite carries typed canonical issue ids",
-  "updated_at": "2026-10-29T00:04:27.931083797Z"
+  "updated_at": "2026-10-29T00:04:34.882876428Z"
 }
