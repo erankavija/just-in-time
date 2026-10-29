@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-10-29T08:32:13.240199081Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "706410a8-e6fb-433f-a1e6-bd1462a2dd60",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:38:13.605262965Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
@@ -38,5 +44,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Domain types carry issue ids as IssueId",
-  "updated_at": "2026-10-29T08:32:13.240199081Z"
+  "updated_at": "2026-10-29T08:38:13.605262965Z"
 }
