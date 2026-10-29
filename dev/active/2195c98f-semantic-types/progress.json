@@ -1512,6 +1512,13 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "domain family retype; brief carries construction-site lessons"
+    },
+    {
+      "issue": "7abcc22d",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "default",
+      "reason": "contract-setting newtype cutover; strongest allowed Claude tier (no Fable)"
     }
   ],
   "surfaced_pitfalls": [
