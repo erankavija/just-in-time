@@ -1,4 +1,5 @@
 use jit::test_cli::JitCli;
+use std::fs;
 
 #[test]
 fn test_issue_not_found_error_json() {
@@ -136,4 +137,207 @@ fn test_gate_operation_error_json() {
             .is_some_and(|message| !message.trim().is_empty()),
         "the JSON error envelope must carry a non-empty message: {json}"
     );
+}
+
+/// A transition blocked by an unpassed gate diverts to `gated`, names the gate and
+/// its remediation, and completes once the gate passes.
+#[test]
+fn test_blocked_by_gates_human_diverts_to_gated_then_completes_on_pass() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "--title",
+        "Tests",
+        "--description",
+        "Tests",
+        "tests",
+    ])
+    .unwrap();
+    let id = cli
+        .create_issue(["--title", "Test issue", "--gate", "tests"])
+        .unwrap();
+    cli.run(["issue", "update", &id, "--state", "ready"])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "update", &id, "--state", "done"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("gate") || stderr.contains("tests"));
+    assert!(stderr.contains("gated") || stderr.contains("not passed"));
+    assert!(stderr.contains("jit gate evaluate"));
+    assert!(stderr.contains(&id));
+    assert_eq!(
+        cli.run_json(["issue", "show", &id]).unwrap()["state"],
+        "gated"
+    );
+
+    cli.run(["gate", "evaluate", &id, "tests", "--by", "human:reviewer"])
+        .unwrap();
+    assert_eq!(
+        cli.run_json(["issue", "show", &id]).unwrap()["state"],
+        "done"
+    );
+}
+
+/// Under `--json` a gate-blocked transition carries the blocker details and the
+/// remediation commands that inspect and satisfy the gate.
+#[test]
+fn test_blocked_by_gates_json_details_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    cli.run([
+        "gate",
+        "define",
+        "--title",
+        "Tests",
+        "--description",
+        "Tests",
+        "tests",
+    ])
+    .unwrap();
+    let id = cli
+        .create_issue(["--title", "Test issue", "--gate", "tests"])
+        .unwrap();
+
+    let output = cli
+        .command(["issue", "update", &id, "--state", "done", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let code = json["error"]["code"].as_str().unwrap();
+    assert!(code.contains("GATE") || code.contains("VALIDATION"));
+    let error_msg = json["error"]["message"].as_str().unwrap();
+    assert!(error_msg.contains("gate") || error_msg.contains("tests"));
+
+    let details = &json["error"]["details"];
+    assert_eq!(details["issue_id"], id.as_str());
+    assert_eq!(details["requested_state"], "done");
+    assert_eq!(details["actual_state"], "gated");
+    assert_eq!(details["blockers"][0]["type"], "gate");
+    assert_eq!(details["blockers"][0]["key"], "tests");
+    assert_eq!(details["blockers"][0]["status"], "pending");
+
+    let remediation = details["remediation"].as_array().unwrap();
+    let suggests = |expected: String| {
+        remediation
+            .iter()
+            .any(|cmd| cmd.as_str().unwrap().contains(&expected))
+    };
+    assert!(suggests(format!("jit gate evaluate {id} tests")));
+    assert!(suggests(format!("jit gate status-all {id}")));
+    // jit:62f3bebd REQ-01 — also points at the per-gate run-history view.
+    assert!(remediation.iter().any(|cmd| {
+        let cmd = cmd.as_str().unwrap();
+        cmd.contains(&format!("jit gate status {id} tests")) && cmd.contains("--all")
+    }));
+}
+
+/// A transition blocked by an unmet dependency reports `BLOCKED` with the
+/// blocker's identity and state, and remediation commands that inspect it.
+#[test]
+fn test_blocked_by_dependencies_json_details_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    let dependency = cli
+        .create_issue(["--title", "Blocked prerequisite"])
+        .unwrap();
+    let dependent = cli.create_issue(["--title", "Blocked work"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
+
+    let output = cli
+        .command(["issue", "update", &dependent, "--state", "ready", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("dependencies"));
+
+    let details = &json["error"]["details"];
+    assert_eq!(details["issue_id"], dependent.as_str());
+    assert_eq!(details["requested_state"], "ready");
+    assert_eq!(details["actual_state"], "backlog");
+    assert_eq!(details["blockers"][0]["type"], "dependency");
+    assert_eq!(details["blockers"][0]["issue_id"], dependency.as_str());
+    assert_eq!(details["blockers"][0]["title"], "Blocked prerequisite");
+    assert_eq!(details["blockers"][0]["state"], "ready");
+
+    let remediation = details["remediation"].as_array().unwrap();
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit graph deps {dependent}"))));
+    assert!(remediation.iter().any(|cmd| cmd
+        .as_str()
+        .unwrap()
+        .contains(&format!("jit issue show {dependency}"))));
+}
+
+/// The human rendering of a dependency-blocked transition names the blocker and
+/// the remediation commands.
+#[test]
+fn test_blocked_by_dependencies_human_names_blocker_and_remediation() {
+    let cli = JitCli::initialised().unwrap();
+    let dependency = cli
+        .create_issue(["--title", "Blocked prerequisite"])
+        .unwrap();
+    let dependent = cli.create_issue(["--title", "Blocked work"]).unwrap();
+    cli.run(["dep", "add", &dependent, &dependency]).unwrap();
+
+    let output = cli
+        .command(["issue", "update", &dependent, "--state", "ready"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Blocked prerequisite"));
+    assert!(stderr.contains(&dependency[..8]));
+    assert!(stderr.contains("jit graph deps"));
+    assert!(stderr.contains("jit issue show"));
+}
+
+/// A dependency naming no stored issue blocks the transition with state `missing`.
+#[test]
+fn test_blocked_by_missing_dependency_json_reports_missing_state() {
+    let cli = JitCli::initialised().unwrap();
+    let dependent = cli.create_issue(["--title", "Dangling work"]).unwrap();
+
+    let missing_id = "missing-dependency";
+    let issue_path = cli
+        .root()
+        .join(".jit")
+        .join("issues")
+        .join(format!("{dependent}.json"));
+    let mut issue_data: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
+    issue_data["state"] = serde_json::json!("backlog");
+    issue_data["dependencies"] = serde_json::json!([missing_id]);
+    fs::write(
+        &issue_path,
+        serde_json::to_string_pretty(&issue_data).unwrap(),
+    )
+    .unwrap();
+
+    let output = cli
+        .command(["issue", "update", &dependent, "--state", "ready", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "BLOCKED");
+    let blocker = &json["error"]["details"]["blockers"][0];
+    assert_eq!(blocker["type"], "dependency");
+    assert_eq!(blocker["issue_id"], missing_id);
+    assert_eq!(blocker["state"], "missing");
 }

@@ -206,6 +206,37 @@ pub fn created_issue_id(output: &serde_json::Value) -> Result<String> {
         .ok_or_else(|| anyhow!("no string `id` in {output}"))
 }
 
+/// Seeds two issues sharing an id prefix, returning that prefix and the ids.
+pub fn seed_ambiguous_prefix(cli: &JitCli) -> Result<(String, Vec<String>)> {
+    const PREFIX: &str = "aaaabbbb";
+    const IDS: [&str; 2] = [
+        "aaaabbbb-1111-4111-8111-111111111111",
+        "aaaabbbb-2222-4222-8222-222222222222",
+    ];
+    let template_id = cli.create_issue(["--title", "Template"])?;
+    let issues_dir = cli.root().join(".jit").join("issues");
+    let template: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
+        issues_dir.join(format!("{template_id}.json")),
+    )?)?;
+    for id in IDS {
+        let mut issue = template.clone();
+        issue["id"] = serde_json::json!(id);
+        std::fs::write(
+            issues_dir.join(format!("{id}.json")),
+            serde_json::to_string_pretty(&issue)?,
+        )?;
+    }
+    let index_path = cli.root().join(".jit").join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&index_path)?)?;
+    index["all_ids"]
+        .as_array_mut()
+        .context("index has no `all_ids` array")?
+        .extend(IDS.iter().map(|id| serde_json::json!(id)));
+    std::fs::write(&index_path, serde_json::to_string_pretty(&index)?)?;
+    Ok((PREFIX.to_string(), IDS.map(str::to_string).to_vec()))
+}
+
 /// Initialise git in `path` with a fixed author identity and unsigned commits,
 /// ignoring the developer's global and system git configuration.
 pub fn init_git_repository(path: &Path) -> Result<()> {

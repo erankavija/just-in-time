@@ -73,3 +73,30 @@ fn test_query_priority_json_output() {
     assert!(json["issues"].is_array());
     assert_eq!(json["count"], 1);
 }
+
+/// A query filter placed before a subcommand, where it would be silently
+/// dropped, is refused; under `--json` as an `INVALID_ARGUMENT` envelope.
+#[test]
+fn test_query_parent_filter_before_subcommand_rejected() {
+    let cli = JitCli::initialised().unwrap();
+
+    let human = cli
+        .command(["query", "--state", "ready", "available"])
+        .output()
+        .unwrap();
+    assert!(!human.status.success());
+    assert!(String::from_utf8_lossy(&human.stderr)
+        .contains("were given before the `available` subcommand"));
+
+    let machine = cli
+        .command(["query", "--state", "ready", "--json", "available"])
+        .output()
+        .unwrap();
+    assert!(!machine.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&machine.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("were given before"));
+}
