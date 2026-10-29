@@ -118,7 +118,8 @@ fn test_graph_export_json_conflicts_with_explicit_dot_format() {
         .output()
         .unwrap();
     assert!(!output.status.success());
-    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
@@ -130,5 +131,6 @@ fn test_graph_export_json_conflicts_with_explicit_mermaid_format() {
         .output()
         .unwrap();
     assert!(!output.status.success());
-    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
