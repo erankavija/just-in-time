@@ -22,6 +22,12 @@
       "status": "passed",
       "updated_at": "2026-10-29T08:18:00.515615198Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5d820dd0-0a83-4db9-b109-94aef95b969c",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:19:42.136956143Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1",
@@ -39,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The shared integration harness carries typed issue ids",
-  "updated_at": "2026-10-29T08:18:00.515615198Z"
+  "updated_at": "2026-10-29T08:19:42.136956143Z"
 }
