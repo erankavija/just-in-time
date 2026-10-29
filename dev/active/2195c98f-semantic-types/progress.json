@@ -750,6 +750,18 @@
       "status": "resolved",
       "reason": "Out-of-epic bug reported by gf2: jit doc check-links captures every referenced document in full (7.4 GB vs 512 MiB).",
       "resolution": "Invoker: fix it in this session, outside the epic (not a child of 2195c98f)."
+    },
+    {
+      "issue": "(none; out-of-epic product question from gf2)",
+      "status": "open",
+      "reason": "After f71504cd, full check-links on gf2 completes (69653 docs, 2353 errors, 3211 warnings); errors are link-like text inside non-markdown sources and immutable benchmark-receipt snapshots (dev/bench_results/**/inputs/**): Rust intra-doc links, Cargo.toml emails, Python expressions, relative links valid only at the snapshot origin.",
+      "options": [
+        "A: file an issue so link scanning applies only to formats that carry links (markdown/HTML), others checked for presence only",
+        "B: file an issue for a repository-declared exclusion of trees from link scanning (config, per @/inv/domain-agnostic)",
+        "C: both A and B",
+        "D: no change; adopters scope checks"
+      ],
+      "recommendation": "C"
     }
   ],
   "rework_counts": {
@@ -1501,6 +1513,11 @@
       "source": "lead",
       "finding": "The shared sccache server inherited an ephemeral TMPDIR (/tmp/tmp.*/scratch) from the process that started it; once that directory was removed every compile failed in cargo-ci setup. Fix: sccache --stop-server; the next build restarts it with the default TMPDIR.",
       "status": "environmental"
+    },
+    {
+      "issue": "f71504cd",
+      "finding": "code-review F1 advisory (pre-existing): link checking reaches git through git2 in commands/document.rs:1129, outside the storage-owned git CLI module (@/charter/D-21).",
+      "disposition": "covered by the libgit2 removal work (34bb375a, 6fdb2d53); not this epic"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1581,6 +1598,7 @@
     "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)",
     "13190465 (1afa3fa0b, rework 1)",
     "b45a2865 (520da32bc)",
-    "b73b3e5a (42ee68606, rework 1)"
+    "b73b3e5a (42ee68606, rework 1)",
+    "f71504cd (5aa792397, out-of-epic bug, invoker approved; gates cargo-ci + code-review attached by lead to match 55e3d3fd)"
   ]
 }

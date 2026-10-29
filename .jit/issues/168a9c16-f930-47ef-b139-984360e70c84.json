@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ca759d23-95cc-4155-91ec-fbab395a01f1",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:24:14.685858778Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2778ed99-3e65-4b7f-b22f-5734af856ba5",
+      "status": "failed",
+      "updated_at": "2026-10-29T07:26:20.020172670Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "168a9c16-f930-47ef-b139-984360e70c84",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
-  "updated_at": "2026-10-29T07:06:12.793457523Z"
+  "updated_at": "2026-10-29T07:26:20.020172670Z"
 }

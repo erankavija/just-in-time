@@ -63,8 +63,6 @@ fn test_check_all_valid_links_succeeds() {
     // Add document with scanned assets
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
-
-    // Check links should pass
     let stdout = cli.run(["doc", "check-links", "--scope", "all"]).unwrap();
     assert!(stdout.contains("All documents valid"));
 }
@@ -89,8 +87,6 @@ fn test_missing_assets_fails() {
 
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
-
-    // Check links should fail
     let output = cli
         .command(["doc", "check-links", "--scope", "all"])
         .output()
@@ -121,8 +117,6 @@ fn test_broken_internal_doc_links_fails() {
 
     cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .unwrap();
-
-    // Check links should fail
     let output = cli
         .command(["doc", "check-links", "--scope", "all"])
         .output()
