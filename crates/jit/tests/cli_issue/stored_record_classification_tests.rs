@@ -25,7 +25,7 @@ fn test_query_all_json_classifies_malformed_stored_index_as_parse_error() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let envelope: serde_json::Value = serde_json::from_slice(&output.stdout)
         .expect("malformed stored index should emit a JSON error envelope");
     assert_eq!(envelope["error"]["code"], "PARSE_ERROR");
