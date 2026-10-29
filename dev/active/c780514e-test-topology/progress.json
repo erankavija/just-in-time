@@ -1273,6 +1273,14 @@
       "title": "Domain owners for query-all filter composition and gated readiness",
       "reason": "3f15b95c REQ-01/REQ-02 gap: query_all composition lives in commands/query.rs and gated-ready had no domain owner; upstream owner task 1d52a376 left them uncovered",
       "wired": "3f15b95c depends on it"
+    },
+    {
+      "session": 4,
+      "id": "955aaa9a",
+      "title": "Cold profiled-fixture builds no longer time out their waiters",
+      "reason": "2a6bc44c moved fixture build into the suite; cold key build exceeds 12 s lock bound under load",
+      "wired": "story c5aafdc0",
+      "note": "design choice (a fast build / b liveness-based waits / c per-binary prebuild) goes to the user at dispatch"
     }
   ],
   "escalations": [
@@ -1393,7 +1401,11 @@
     "f1c1acc8": 2,
     "8f87e366": 2,
     "e5166159": 1,
-    "c5c933f2": 1
+    "c5c933f2": 1,
+    "168a9c16": 1,
+    "3f01cb72": 1,
+    "55cd1ae4": 1,
+    "966d0627": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2063,7 +2075,11 @@
     "trio-s4": "d7c26016 closed; 53d582ab 587b6e1c F1 -> lead deleted re-proof test 4de6a05be; f1c1acc8 a8a43598 F1 -> lead removed duplicate parity cases f5f49e6c3",
     "f1c1acc8-r2-s4": "c93f8ccd F1 (cfg unix completeness) + F2 advisory: completeness test cfg(unix); parity file deleted (all cases owned by projection suite); 823834d34",
     "exitcodes-s4": "e5166159 bea46484 F1 stale comment -> 779c18e3a; 8f87e366 6f18faf7/d3bd09d8 GATE_FAILED class -> 31261a8bb, f17c1c197; both closed",
-    "c5c933f2-s4": "42bdf5aea + lead 1d583ebf9 (one ALLOW_LINKED_WRITES); 19646106 F1 in-process test -> rework 1 (move to commands/mod.rs unit tests, Claude Sonnet slot B)"
+    "c5c933f2-s4": "42bdf5aea + lead 1d583ebf9 (one ALLOW_LINKED_WRITES); 19646106 F1 in-process test -> rework 1 (move to commands/mod.rs unit tests, Claude Sonnet slot B)",
+    "owners-s4": "2916a306, 9a313a88 closed (seed_ambiguous_prefix shared helper, user-approved); 55cd1ae4 57cd99ac F1 restating rustdoc -> fd7389ae0, closed. First cargo-ci failed on cold profiled-fixture lock -> forced warm re-run passed; defect tracked as new task 955aaa9a",
+    "c5c933f2-r1-s4": "in-process audit test moved to commands/mod.rs unit tests 1772e003b; closed",
+    "crw-exit-s4": "966d0627 (+lead 2af6708a7 JSON confirmed-delete owner), 6a13eeac closed",
+    "qg-exit-s4": "168a9c16 2778ed99 F1 -> dbc3a716b; 3f01cb72 5816b6ef F1 -> b97bdc2f8; re-gating"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
