@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "38d68099-6065-47fd-b380-d9190c698a84",
-      "status": "failed",
-      "updated_at": "2026-10-29T07:40:53.068316022Z",
+      "run_id": "d6259b18-7d6b-4fdd-8d21-a434bc2db6f9",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:46:43.566301766Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Repository-state mutations carry typed issue ids",
-  "updated_at": "2026-10-29T07:45:25.564704539Z"
+  "updated_at": "2026-10-29T07:46:43.566301766Z"
 }
