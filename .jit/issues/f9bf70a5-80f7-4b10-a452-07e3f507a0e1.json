@@ -26,7 +26,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive executions are one domain record type",
-  "updated_at": "2026-10-21T10:40:08.927587930Z"
+  "updated_at": "2026-10-29T08:38:50.301929238Z"
 }
