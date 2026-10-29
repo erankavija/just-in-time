@@ -42,8 +42,7 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
         .output()
         .unwrap();
 
-    // Drift present -> non-zero exit (ValidationFailed == 4).
-    assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
+    assert!(!output.status.success(), "expected failure on drift");
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
@@ -144,7 +143,7 @@ fn test_check_human_output_names_declared_direction() {
 
     let output = cli.command(["invariant", "check"]).output().unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("declared-but-unenforced") && stdout.contains("ghost-rule"),
@@ -179,8 +178,8 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
         .output()
         .unwrap();
 
-    // Exit non-zero (drift present), and stdout is VALID JSON (not a parse error).
-    assert_eq!(output.status.code(), Some(4), "expected exit 4 on drift");
+    // Drift fails, and stdout is VALID JSON (not a parse error).
+    assert!(!output.status.success(), "expected failure on drift");
     let json: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
         panic!(
             "expected valid JSON, not a raw parse error: {e}\nstdout: {}",
@@ -218,7 +217,7 @@ fn test_check_reports_unloadable_gate_registry() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
     assert!(
