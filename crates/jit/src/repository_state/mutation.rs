@@ -372,7 +372,7 @@ pub enum MutationIntent {
     /// event emits exactly the missing event; a duplicate event is never emitted.
     ClaimIssue {
         /// Canonical full issue id (the caller resolves short ids first).
-        issue_id: String,
+        issue_id: IssueId,
         /// Claiming agent identity.
         agent: Assignee,
     },
@@ -410,7 +410,7 @@ pub enum MutationIntent {
     /// caller can compose deletion with dependent-edge repairs atomically.
     DeleteIssue {
         /// Canonical full issue id whose captured record must exist.
-        issue_id: String,
+        issue_id: IssueId,
     },
     /// Record one gate-run artifact. The finalizer assigns `run_id`, before the
     /// issue updates that name it, and preserves
@@ -480,7 +480,7 @@ pub enum MutationError {
     },
     /// A referenced issue was absent from the captured image.
     #[error("issue {0} is absent from the captured image")]
-    MissingIssue(String),
+    MissingIssue(IssueId),
     /// The captured `events.jsonl` ends in an uncertified torn tail and this
     /// mutation carries no profile lifecycle marker to certify it, so appending
     /// would produce a log the reader rejects.
@@ -502,7 +502,7 @@ pub enum MutationError {
 }
 
 /// The canonical path for one issue record.
-fn issue_path(id: &str) -> Result<VirtualPath, RepositoryLayoutError> {
+fn issue_path(id: &IssueId) -> Result<VirtualPath, RepositoryLayoutError> {
     VirtualPath::data(format!("issues/{id}.json"))
 }
 
@@ -659,7 +659,7 @@ fn captured_file_bytes<'a>(
 }
 
 /// Parse the captured issue at `id`, or `None` when the issue file is absent.
-fn captured_issue(image: &RepositoryImage, id: &str) -> Result<Option<Issue>, MutationError> {
+fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>, MutationError> {
     let path = issue_path(id)?;
     match captured_file_bytes(image, &path)? {
         None => Ok(None),
@@ -694,7 +694,7 @@ fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError>
 /// Whether the captured event tail already reflects `agent`'s claim of `issue_id`
 /// as the current assignment: the most recent assignment-affecting event for the
 /// issue is an `IssueClaimed` by `agent` with no later release.
-fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee) -> bool {
+fn event_tail_reflects_claim(events: &[Event], issue_id: &IssueId, agent: &Assignee) -> bool {
     events
         .iter()
         .rev()
@@ -738,8 +738,8 @@ pub(super) fn finalize_delta(
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
     let mut pending_events: Vec<PendingEvent> = Vec::new();
-    let mut index_creations: Vec<String> = Vec::new();
-    let mut index_deletions: Vec<String> = Vec::new();
+    let mut index_creations: Vec<IssueId> = Vec::new();
+    let mut index_deletions: Vec<IssueId> = Vec::new();
 
     if intents.iter().any(|intent| {
         matches!(
@@ -1311,8 +1311,8 @@ fn expected_of(
 /// Derive the deterministic membership index write from the captured preimage.
 fn index_membership_action(
     image: &RepositoryImage,
-    created_ids: &[String],
-    deleted_ids: &[String],
+    created_ids: &[IssueId],
+    deleted_ids: &[IssueId],
 ) -> Result<RepositoryAction, MutationError> {
     let path = VirtualPath::INDEX;
     let expected = expected_of(image, &path)?;
@@ -2472,10 +2472,9 @@ mod tests {
         let derived = (0..3).map(|index| context.issue_id_at(index));
         let repeated = (0..3).map(|index| context.issue_id_at(index));
 
-        assert!(derived
-            .zip(repeated)
-            .zip(0..3)
-            .all(|((first, second), index)| first == second && first == ids.uuid_at(index)));
+        assert!(derived.zip(repeated).zip(0..3).all(
+            |((first, second), index)| first == second && first.as_str() == ids.uuid_at(index)
+        ));
     }
 
     #[test]

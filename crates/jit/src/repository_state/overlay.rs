@@ -251,18 +251,22 @@ mod tests {
 
     #[test]
     fn test_apply_overlay_updates_captured_issue_listing() {
-        let base = base_image(&[(".jit/issues/a.json", "{}")], Some(&["a.json"]));
+        let first = format!("{}.json", crate::test_utils::issue_id(1));
+        let second = format!("{}.json", crate::test_utils::issue_id(2));
+        let first_path = format!(".jit/issues/{first}");
+        let second_path = format!(".jit/issues/{second}");
+        let base = base_image(&[(&first_path, "{}")], Some(&[&first]));
         let overlaid = apply_overlay(
             &base,
             [
-                (vpath(".jit/issues/b.json"), Some(b"{}".to_vec())),
-                (vpath(".jit/issues/a.json"), None),
+                (vpath(&second_path), Some(b"{}".to_vec())),
+                (vpath(&first_path), None),
             ],
         )
         .unwrap();
         let dir = VirtualPath::data("issues").unwrap();
         let names = overlaid.directory_listings()[&dir].names();
-        assert!(names.contains("b.json"));
-        assert!(!names.contains("a.json"));
+        assert!(names.contains(&second));
+        assert!(!names.contains(&first));
     }
 }

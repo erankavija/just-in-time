@@ -1746,12 +1746,13 @@ mod tests {
 
     #[test]
     fn test_close_enforces_depth_for_listed_children() {
-        let result = close_listing("issues", &["one.json"], &[], listing_budget(64, 1));
+        let name = format!("{}.json", crate::test_utils::issue_id(1));
+        let result = close_listing("issues", &[&name], &[], listing_budget(64, 1));
 
         assert!(matches!(
             result,
             Err(CaptureError::DepthBudgetExceeded(path))
-                if path == VirtualPath::data("issues/one.json").unwrap()
+                if path == VirtualPath::data(format!("issues/{name}")).unwrap()
         ));
     }
 
