@@ -29,6 +29,86 @@ pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &st
     }
 }
 
+/// A session whose every capture is held to `max_bytes`, keeping each request's
+/// read mode, so a test proves a capture fits a small budget without a large
+/// fixture.
+pub(crate) struct LimitedCaptureSession {
+    pub(crate) inner: Box<dyn crate::storage::RepositoryMutationSession>,
+    pub(crate) max_bytes: u64,
+}
+
+impl LimitedCaptureSession {
+    fn limit(
+        &self,
+        spec: crate::repository_state::CaptureSpec,
+    ) -> crate::repository_state::CaptureSpec {
+        use crate::repository_state::{CaptureBudget, CaptureSpec, ReadMode};
+        let mut limited = CaptureSpec::new(
+            [],
+            CaptureBudget {
+                max_bytes: self.max_bytes,
+                ..spec.budget()
+            },
+        )
+        .unwrap();
+        for path in spec.paths() {
+            match spec.read_mode(path) {
+                Some(ReadMode::Tail) => limited.discover_tail(path.clone()).unwrap(),
+                Some(ReadMode::Kind) => limited.discover_kinds([path.clone()]).unwrap(),
+                _ => limited.discover_paths([path.clone()]).unwrap(),
+            }
+        }
+        limited
+            .discover_listings(spec.listings().iter().cloned())
+            .unwrap();
+        for request in spec.pinned() {
+            let (revision, path) = request;
+            match spec.pinned_read_mode(request) {
+                Some(ReadMode::Kind) => limited.discover_pinned_kind(revision, path).unwrap(),
+                _ => limited.discover_pinned(revision, path).unwrap(),
+            }
+        }
+        limited
+    }
+}
+
+impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
+    fn layout(&self) -> &crate::repository_state::RepositoryLayout {
+        self.inner.layout()
+    }
+    fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
+    }
+    fn capture(
+        &mut self,
+        spec: crate::repository_state::CaptureSpec,
+    ) -> std::result::Result<
+        crate::repository_state::RepositoryImage,
+        crate::storage::RepositoryStateStoreError,
+    > {
+        self.inner.capture(self.limit(spec))
+    }
+    fn extend(
+        &mut self,
+        image: crate::repository_state::RepositoryImage,
+        spec: crate::repository_state::CaptureSpec,
+    ) -> std::result::Result<
+        crate::repository_state::RepositoryImage,
+        crate::storage::RepositoryStateStoreError,
+    > {
+        self.inner.extend(image, self.limit(spec))
+    }
+    fn apply(
+        &mut self,
+        plan: &crate::repository_state::MaterializationPlan,
+    ) -> std::result::Result<
+        crate::storage::RepositoryApplyOutcome,
+        crate::storage::RepositoryStateStoreError,
+    > {
+        self.inner.apply(plan)
+    }
+}
+
 /// Seed one issue record and its active index membership without invoking a
 /// product mutation path. Lifecycle timestamps are preserved verbatim.
 pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {

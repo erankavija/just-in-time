@@ -34,8 +34,9 @@ enum DocumentScanSource {
     Pinned { revision: String, path: String },
 }
 
-/// Capture bounds for one link check: every reference, plus the assets and link
-/// targets a pinned reference names at its commit.
+/// Capture bounds for one link check: each pinned reference's content, plus the
+/// kinds of every reference and of the assets and link targets a pinned
+/// reference names at its commit.
 const LINK_CHECK_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 0,
@@ -1346,25 +1347,34 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use std::collections::BTreeSet;
-
         with_mutation_session(&self.storage, layout, "document link check", |session| {
-            let spec = link_check_capture_spec(documents, &BTreeSet::new())?;
-            let Some(image) = capture_discovering(session, spec, |image, spec| {
-                pinned_link_targets(image, documents, link_validator)
-                    .iter()
-                    .try_for_each(|(revision, path)| discover_derived_pinned(spec, revision, path))
-            })?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            Ok(SessionStep::Done(read_documents(
-                &image,
-                documents,
-                link_validator,
-            )?))
+            Ok(
+                match capture_link_check_readings(session, documents, link_validator)? {
+                    Some(readings) => SessionStep::Done(readings),
+                    None => SessionStep::Retry,
+                },
+            )
         })
     }
+}
+
+/// Capture and read every document reference at the version it names, in one
+/// discovering round of `session`. `None` is a retryable conflict.
+fn capture_link_check_readings(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    documents: &[(IssueId, &crate::domain::DocumentReference)],
+    link_validator: &crate::document::LinkValidator,
+) -> Result<Option<Vec<CheckedDocument>>> {
+    let spec = link_check_capture_spec(documents, &std::collections::BTreeSet::new())?;
+    let Some(image) = capture_discovering(session, spec, |image, spec| {
+        pinned_link_targets(image, documents, link_validator)
+            .iter()
+            .try_for_each(|(revision, path)| discover_derived_pinned(spec, revision, path))
+    })?
+    else {
+        return Ok(None);
+    };
+    read_documents(&image, documents, link_validator).map(Some)
 }
 
 impl CapturedDocumentScan {
@@ -1389,9 +1399,13 @@ fn local_asset_paths(
         .filter_map(|asset| asset.resolved_path.as_deref())
 }
 
-/// Declare the evidence a link check reads: each reference at the version it
-/// names, a pinned reference's local assets at its commit, and `link_targets`
-/// discovered by scanning pinned content.
+/// Declare the evidence a link check reads: the kind of each reference at the
+/// version it names, the content of a pinned reference, whose links are scanned
+/// from it, and the kinds of a pinned reference's local assets at its commit and
+/// of `link_targets` discovered by scanning pinned content.
+///
+/// An unpinned reference's links and assets are checked against the working
+/// tree itself, so its content is never captured.
 fn link_check_capture_spec(
     documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_targets: &std::collections::BTreeSet<(String, String)>,
@@ -1406,21 +1420,23 @@ fn link_check_capture_spec(
         let requests = DocumentReferenceRequests::for_reference(document)?;
         worktree.extend(requests.worktree().cloned());
         let (revision, path) = requests.pinned();
-        spec.discover_pinned(revision, path)?;
         if document.commit.is_some() {
+            spec.discover_pinned(revision, path)?;
             for asset in local_asset_paths(document) {
                 discover_derived_pinned(&mut spec, revision, &asset.to_string_lossy())?;
             }
+        } else {
+            spec.discover_pinned_kind(revision, path)?;
         }
     }
-    spec.discover_paths(worktree)?;
+    spec.discover_kinds(worktree)?;
     for (revision, path) in link_targets {
         discover_derived_pinned(&mut spec, revision, path)?;
     }
     Ok(spec)
 }
 
-/// Request pinned evidence for a path derived from a document's content.
+/// Request the pinned kind of a path derived from a document's content.
 ///
 /// A derived path the pinned-request contract rejects — a link target that
 /// climbs past the repository root, say — names no repository file, so it is
@@ -1433,7 +1449,7 @@ fn discover_derived_pinned(
 ) -> Result<()> {
     use crate::repository_state::CaptureError;
 
-    match spec.discover_pinned(revision, path) {
+    match spec.discover_pinned_kind(revision, path) {
         Ok(()) | Err(CaptureError::InvalidPinnedRequest(..)) | Err(CaptureError::Layout(_)) => {
             Ok(())
         }
@@ -1948,6 +1964,41 @@ mod tests {
         assert_eq!(second.items, first.items);
         assert_eq!(storage.read_events().unwrap().len(), event_count);
         assert_eq!(storage.load_issue(&id).unwrap().updated_at, updated_at);
+    }
+
+    #[test]
+    fn test_capture_link_check_readings_resolves_unscanned_document_larger_than_capture_budget() {
+        let storage = InMemoryStorage::new();
+        let max_bytes = 64 * 1024;
+        storage.add_worktree_file("receipts/large.log", &"x".repeat(max_bytes * 2));
+        let mut issue = crate::test_utils::fixture_issue("Receipts".into(), String::new());
+        issue
+            .documents
+            .push(document_reference("receipts/large.log"));
+        crate::commands::test_helpers::seed_issue(&storage, issue.clone());
+        let layout = storage.repository_layout();
+        let documents = issue
+            .documents
+            .iter()
+            .map(|document| (issue.id.clone(), document))
+            .collect::<Vec<_>>();
+        let link_validator = crate::document::LinkValidator::new(
+            layout.worktree_root().to_path_buf(),
+            vec!["receipts/large.log".into()],
+        );
+        let mut session = crate::commands::test_helpers::LimitedCaptureSession {
+            inner: storage.open_mutation_session(layout).unwrap(),
+            max_bytes: max_bytes as u64,
+        };
+
+        let readings = capture_link_check_readings(&mut session, &documents, &link_validator)
+            .unwrap()
+            .expect("a settled capture");
+
+        assert!(matches!(
+            readings.as_slice(),
+            [CheckedDocument::WorkingTree]
+        ));
     }
 
     #[test]

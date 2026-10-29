@@ -471,6 +471,7 @@ impl JsonFileStorage {
         &self,
         repo_root: &Path,
         requests: &BTreeSet<(String, String)>,
+        kind_only: &BTreeSet<(String, String)>,
     ) -> BTreeMap<
         (String, String),
         Result<crate::storage::PinnedTargetRead, crate::storage::GitRevisionError>,
@@ -480,7 +481,7 @@ impl JsonFileStorage {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
-            .inspect_pinned_targets(requests, &mut cache)
+            .inspect_pinned_targets(requests, kind_only, &mut cache)
     }
 
     /// Exclusive access to the pinned-evidence cache for one capture.

@@ -74,6 +74,14 @@ struct TreeEntry {
 }
 
 impl PinnedTargetRead {
+    /// This classification without its bytes.
+    fn without_bytes(&self) -> Self {
+        Self {
+            bytes: None,
+            ..self.clone()
+        }
+    }
+
     /// Canonical historical commit used for this classification.
     pub fn version(&self) -> &ArtifactVersion {
         &self.version
@@ -203,6 +211,9 @@ impl GitRevisionResolver {
 
     /// Resolve and inspect a set of pinned targets with shared Git processes.
     ///
+    /// A request in `kind_only` is classified from the commit tree alone: its
+    /// read carries no bytes, and no blob is read for it.
+    ///
     /// The supplied cache is owned by the caller and is replaced with only the
     /// successfully classified commit-and-path pairs used by this call. An empty
     /// request set spawns nothing and leaves the cache untouched, so captures
@@ -213,6 +224,7 @@ impl GitRevisionResolver {
     pub fn inspect_pinned_targets(
         &self,
         requests: &BTreeSet<(String, String)>,
+        kind_only: &BTreeSet<(String, String)>,
         cache: &mut BTreeMap<(String, String), PinnedTargetRead>,
     ) -> BTreeMap<(String, String), Result<PinnedTargetRead, GitRevisionError>> {
         if requests.is_empty() {
@@ -244,11 +256,20 @@ impl GitRevisionResolver {
             BTreeMap::<String, BTreeMap<String, Vec<(String, String, ArtifactVersion)>>>::new();
         valid_requests.into_iter().for_each(|request| {
             let (revision, path) = request;
+            let wants_kind = kind_only.contains(request);
             match resolutions.get(revision) {
                 Some(Ok(version)) => {
                     let cache_key = (version.as_str().to_string(), path.clone());
-                    if let Some(read) = previous_cache.get(&cache_key) {
-                        results.insert(request.clone(), Ok(read.clone()));
+                    let cached = previous_cache.get(&cache_key).filter(|read| {
+                        wants_kind || read.bytes.is_some() || !read.target_kind.is_file()
+                    });
+                    if let Some(read) = cached {
+                        let answer = if wants_kind {
+                            read.without_bytes()
+                        } else {
+                            read.clone()
+                        };
+                        results.insert(request.clone(), Ok(answer));
                         next_cache.insert(cache_key, read.clone());
                     } else {
                         uncached
@@ -325,9 +346,19 @@ impl GitRevisionResolver {
                     unavailable_reason: Some("not found in commit tree".into()),
                 });
                 if target.target_kind.is_file() {
-                    if let Some(object_oid) = target.object_oid.clone() {
+                    let (kinds, wholes): (Vec<_>, Vec<_>) =
+                        requests.into_iter().partition(|(revision, path, _)| {
+                            kind_only.contains(&(revision.clone(), path.clone()))
+                        });
+                    kinds.into_iter().for_each(|(revision, path, _)| {
+                        results.insert((revision, path.clone()), Ok(target.clone()));
+                        next_cache.insert((commit.clone(), path), target.clone());
+                    });
+                    if let Some(object_oid) =
+                        target.object_oid.clone().filter(|_| !wholes.is_empty())
+                    {
                         pending_files.entry(object_oid).or_default().extend(
-                            requests.into_iter().map(|(revision, path, _)| {
+                            wholes.into_iter().map(|(revision, path, _)| {
                                 (revision, path, commit.clone(), target.clone())
                             }),
                         );

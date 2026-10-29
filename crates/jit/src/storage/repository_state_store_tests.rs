@@ -516,6 +516,7 @@ enum SemanticEntry {
     Directory(FileMode),
     File(Vec<u8>, FileMode),
     FileTail(u64, Vec<u8>, FileMode),
+    FileKind(FileMode),
     Symlink(Vec<u8>),
     Unsupported,
 }
@@ -530,6 +531,7 @@ fn semantic_entry(entry: &RepositoryEntry) -> SemanticEntry {
         RepositoryEntry::FileTail { tail, mode } => {
             SemanticEntry::FileTail(tail.length(), tail.tail().to_vec(), *mode)
         }
+        RepositoryEntry::FileKind { mode } => SemanticEntry::FileKind(*mode),
         RepositoryEntry::Symlink { target, .. } => SemanticEntry::Symlink(target.bytes().to_vec()),
         RepositoryEntry::Unsupported { .. } => SemanticEntry::Unsupported,
     }
@@ -1717,6 +1719,56 @@ fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> Capture
         .try_for_each(|path| spec.discover_pinned("HEAD", path))
         .unwrap();
     spec
+}
+
+/// A kind-only pinned request classifies its file from the commit tree without
+/// reading the blob, and its bytes-free answer never serves a later whole read.
+#[cfg(unix)]
+#[test]
+fn test_json_capture_reads_no_blob_for_a_kind_only_pinned_request() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"pinned a").unwrap();
+    for args in [&["add", "-A"][..], &["commit", "-m", "first"]] {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?} failed");
+    }
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let request = ("HEAD".to_string(), "docs/a.md".to_string());
+    let blob_reads = || {
+        stand_in
+            .invocations()
+            .iter()
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
+            .count()
+    };
+    let mut kind = CaptureSpec::new([], budget()).unwrap();
+    kind.discover_pinned_kind(&request.0, &request.1).unwrap();
+
+    let image = session.capture(kind).unwrap();
+
+    let evidence = &image.pinned_evidence()[&request];
+    assert!(evidence.exists());
+    assert_eq!(evidence.bytes(), None);
+    assert_eq!(blob_reads(), 0);
+
+    let whole = session.capture(pinned_capture_spec(["docs/a.md"])).unwrap();
+
+    assert_eq!(
+        whole.pinned_evidence()[&request].bytes(),
+        Some(&b"pinned a"[..])
+    );
+    assert_eq!(blob_reads(), 1);
 }
 
 #[cfg(unix)]

@@ -54,7 +54,9 @@ pub enum DocumentReferenceError {
 ///
 /// A capturing caller enqueues every request; [`resolve_document_reference`]
 /// then reads exactly those. Requesting less is a capture error at resolution
-/// time rather than a silently different answer.
+/// time rather than a silently different answer. Resolution reads only each
+/// request's kind, so a caller that does not consume the content may request
+/// it as [`ReadMode::Kind`](crate::repository_state::ReadMode::Kind).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentReferenceRequests {
     worktree: Option<VirtualPath>,
