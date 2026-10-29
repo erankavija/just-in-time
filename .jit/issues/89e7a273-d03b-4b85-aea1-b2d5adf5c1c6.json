@@ -17,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ec9cadf2-6356-47ea-a74a-9d7a65fc1afc",
+      "run_id": "3e02c659-29d6-49b5-a5ef-ab818634c926",
       "status": "passed",
-      "updated_at": "2026-10-29T08:05:33.792516313Z",
+      "updated_at": "2026-10-29T08:12:07.690389696Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Storage trait and backends take issue ids as IssueId",
-  "updated_at": "2026-10-29T08:10:32.514340767Z"
+  "updated_at": "2026-10-29T08:12:07.690389696Z"
 }
