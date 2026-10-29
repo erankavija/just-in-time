@@ -13,9 +13,10 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-10-29T07:14:30.620531004Z",
-      "updated_by": null
+      "run_id": "bdf920cb-51c5-44ac-a25f-bb79bd0bcb11",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:23:53.311035043Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -34,5 +35,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Link checks read only the documents they scan for links",
-  "updated_at": "2026-10-29T07:14:30.620531004Z"
+  "updated_at": "2026-10-29T07:23:53.311035043Z"
 }
