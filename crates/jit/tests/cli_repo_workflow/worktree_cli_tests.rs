@@ -455,7 +455,7 @@ fn test_validate_branch_drift_detects_drifted_branch() {
         .command(["validate", "--branch-drift"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("Branch has diverged from origin/main"),

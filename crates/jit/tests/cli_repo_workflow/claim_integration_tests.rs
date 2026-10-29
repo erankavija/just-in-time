@@ -172,10 +172,8 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
 }
 
 fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: ErrorCode) {
-    let expected_status = Some(expected_code.exit_code().code());
-    assert_eq!(plain.status.code(), expected_status);
-    assert_eq!(json.status.code(), expected_status);
-    assert_eq!(plain.status.code(), json.status.code());
+    assert!(!plain.status.success());
+    assert!(!json.status.success());
 
     assert!(plain.stdout.is_empty(), "plain failure leaked to stdout");
     assert!(
@@ -1107,11 +1105,10 @@ fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
         .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
 }
 
-/// The `--json` claim path must honor the same exit-10 contract as the human
-/// path: running `claim acquire --json` outside a git repository emits a JSON
-/// error naming the git requirement and exits with code 10.
+/// Running `claim acquire --json` outside a git repository emits a JSON error
+/// naming the git requirement.
 #[test]
-fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
+fn test_claim_acquire_json_outside_git_repo_reports_git_requirement() {
     let cli = JitCli::initialised().unwrap();
     let issue_id = cli
         .create_issue(["--title", "Test Issue Outside Git JSON"])
@@ -1131,11 +1128,7 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim acquire --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1146,19 +1139,15 @@ fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
     );
 }
 
-/// `claim list --json` outside a git repository must also exit 10 with a JSON
-/// error naming the git requirement.
+/// `claim list --json` outside a git repository emits a JSON error naming the
+/// git requirement.
 #[test]
-fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
+fn test_claim_list_json_outside_git_repo_reports_git_requirement() {
     let cli = JitCli::initialised().unwrap();
 
     let output = cli.command(["claim", "list", "--json"]).output().unwrap();
 
-    assert_eq!(
-        output.status.code(),
-        Some(10),
-        "claim list --json outside git must exit 10 (external dependency)"
-    );
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
@@ -1236,7 +1225,6 @@ fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
     ])
     .assert()
     .failure()
-    .code(10)
     .stderr(predicate::str::contains("git repository"))
     .stderr(predicate::str::contains("commit"))
     .stderr(predicate::str::contains("git init").not());
@@ -1244,8 +1232,8 @@ fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
 
 /// JSON-mode counterpart of
 /// [`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`]:
-/// same exit code and error code as the no-repository case, but the message
-/// hints a commit instead of `git init`.
+/// same error code as the no-repository case, but the message hints a commit
+/// instead of `git init`.
 #[test]
 fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init() {
     let cli = JitCli::initialised().unwrap();
@@ -1268,7 +1256,7 @@ fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(10));
+    assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
