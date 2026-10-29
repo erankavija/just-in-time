@@ -21315,3 +21315,12 @@
 {"from":"backlog","id":"1a9856a1-57fd-496c-a3ec-67b8c9921cfd","issue_id":"168a9c16-f930-47ef-b139-984360e70c84","timestamp":"2026-10-29T07:05:00.680468856Z","to":"ready","type":"issue_state_changed"}
 {"from":"in_progress","id":"5935aef0-574e-4849-9a04-e8557d1da239","issue_id":"9a313a88-c229-4b59-8682-8e665aa957a6","timestamp":"2026-10-29T07:05:23.628050672Z","to":"done","type":"issue_state_changed"}
 {"id":"9876bd0c-b7ec-4757-bfb7-f9a6a0b15e8e","issue_id":"9a313a88-c229-4b59-8682-8e665aa957a6","timestamp":"2026-10-29T07:05:23.628050672Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"80d7ded1-9681-46f9-a6ec-c5f6dae1448c","issue_id":"55cd1ae4-9957-4724-af8d-1219dfbe477b","timestamp":"2026-10-29T07:05:47.604178141Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:jit-execution-lead","id":"ef32af5d-e724-43fe-9af6-6dfa2a0eb0a1","issue_id":"168a9c16-f930-47ef-b139-984360e70c84","timestamp":"2026-10-29T07:06:12.526843388Z","type":"issue_claimed"}
+{"from":"ready","id":"2f2de123-e602-40a6-8943-7a83919f5c09","issue_id":"168a9c16-f930-47ef-b139-984360e70c84","timestamp":"2026-10-29T07:06:12.793457523Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"92c1e178-694d-4c71-9231-13a211c72e62","issue_id":"168a9c16-f930-47ef-b139-984360e70c84","timestamp":"2026-10-29T07:06:12.793457523Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"49f18353-1287-4aee-8fec-a0d31198b46b","issue_id":"966d0627-e3d4-40e6-b887-14cd1b6e8cd5","timestamp":"2026-10-29T07:06:13.092722157Z","type":"issue_claimed"}
+{"from":"ready","id":"2c689a01-c002-4212-b7c5-795b0e4bc8d8","issue_id":"966d0627-e3d4-40e6-b887-14cd1b6e8cd5","timestamp":"2026-10-29T07:06:13.301676577Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"3c00fdff-e9f0-4e65-ad7d-4c2749a04ddb","issue_id":"966d0627-e3d4-40e6-b887-14cd1b6e8cd5","timestamp":"2026-10-29T07:06:13.301676577Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"32620bd0-0eb0-4522-bfdf-d66082f2f93b","issue_id":"3f01cb72-5726-43bd-bb1f-136a640bc0aa","timestamp":"2026-10-29T07:06:13.581648329Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"cf3a3283-c9bd-4826-a868-1f51b4182470","issue_id":"6a13eeac-f6e6-4da3-93b5-6432f06b3f6f","timestamp":"2026-10-29T07:06:13.951411662Z","type":"issue_claimed"}
