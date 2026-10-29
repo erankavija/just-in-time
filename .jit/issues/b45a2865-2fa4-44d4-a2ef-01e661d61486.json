@@ -23,6 +23,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T23:59:24.283225917Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "163ce662-582d-4438-b6b8-f7b4c398db56",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:03:00.510411519Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
@@ -40,5 +46,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_rules suite carries typed canonical issue ids",
-  "updated_at": "2026-10-28T23:59:24.283225917Z"
+  "updated_at": "2026-10-29T00:03:00.510411519Z"
 }
