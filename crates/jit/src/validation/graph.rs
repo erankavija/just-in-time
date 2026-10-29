@@ -279,8 +279,7 @@ impl GraphFinding {
 /// let set = RuleSet::parse(toml, None, []).unwrap();
 /// let rules: Vec<&_> = set.rules.iter().collect();
 ///
-/// let mut task = Issue::draft("a task".into(), String::new());
-/// task.id = jit::test_utils::issue_id(1);
+/// let mut task = Issue::draft(jit::test_utils::issue_id(1), "a task".into(), String::new());
 /// task.labels = vec!["type:task".into()];
 /// // No design dependency -> one finding, attributed to the task.
 /// let findings = evaluate_graph(

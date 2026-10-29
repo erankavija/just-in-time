@@ -654,9 +654,12 @@ impl FailureFixture {
             SetupStep::UnsetEnvironment(name) => {
                 self.environment.insert(name, None);
             }
-            SetupStep::SeedIssue(id) => {
-                let mut issue = jit::domain::Issue::draft("Failure fixture".into(), String::new());
-                issue.id = id;
+            SetupStep::SeedIssue(seed) => {
+                let issue = jit::domain::Issue::draft(
+                    jit::test_utils::issue_id(seed),
+                    "Failure fixture".into(),
+                    String::new(),
+                );
                 std::fs::write(
                     self.root().join(format!(".jit/issues/{}.json", issue.id)),
                     serde_json::to_vec(&issue).unwrap(),
@@ -779,7 +782,9 @@ enum SetupStep {
     SetEnvironment(String, String),
     UnsetEnvironment(String),
     ActiveClaimIndex,
-    SeedIssue(String),
+    /// Seed the issue whose id the canonical-id fixture derives from this
+    /// hexadecimal seed.
+    SeedIssue(u128),
     DuplicateGate(String),
     DanglingInvariant(String),
     MissingFile(String),
@@ -830,7 +835,11 @@ impl SetupStep {
                     prefixed("dangling-invariant-enforcement:").map(Self::DanglingInvariant)
                 })
                 .or_else(|| prefixed("file-absent:").map(Self::MissingFile))
-                .or_else(|| prefixed("seed-issue:").map(Self::SeedIssue))
+                .or_else(|| {
+                    prefixed("seed-issue:")
+                        .and_then(|seed| u128::from_str_radix(&seed, 16).ok())
+                        .map(Self::SeedIssue)
+                })
                 .or_else(|| prefixed("no-issue:").map(Self::MissingIssue))
                 .or_else(|| prefixed("unknown-gate:").map(Self::UnknownGate))
                 .or_else(|| prefixed("unknown-preset:").map(Self::UnknownPreset))

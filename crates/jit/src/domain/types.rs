@@ -521,16 +521,16 @@ pub enum ReadinessCorrection {
 }
 
 impl Issue {
-    /// Draft an issue carrying no authoritative id or lifecycle timestamps.
+    /// Draft issue `id` carrying no authoritative lifecycle timestamps.
     ///
-    /// The id is empty and the lifecycle timestamps hold a sentinel epoch; the
-    /// `repository_state` finalizer assigns the real id and stamps `created_at`,
-    /// `updated_at`, and `first_ready_at`. Command producers build drafts so time
-    /// and identity authority stay solely in the finalizer, never in a command.
-    pub fn draft(title: String, description: String) -> Self {
+    /// The lifecycle timestamps hold a sentinel epoch; the `repository_state`
+    /// finalizer stamps `created_at`, `updated_at`, and `first_ready_at`, so time
+    /// authority stays solely in the finalizer. A created issue's `id` is the one
+    /// its mutation context derived for it.
+    pub fn draft(id: IssueId, title: String, description: String) -> Self {
         let sentinel = DateTime::from_timestamp(0, 0).expect("epoch is representable");
         Self {
-            id: String::new(),
+            id,
             title,
             description,
             state: State::Backlog,

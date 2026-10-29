@@ -109,9 +109,7 @@ pub fn issue_id(seed: u128) -> IssueId {
 
 /// A drafted issue carrying a fresh random id.
 pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
-    let mut issue = crate::domain::Issue::draft(title, description);
-    issue.id = uuid::Uuid::new_v4().to_string();
-    issue
+    crate::domain::Issue::draft(issue_id(uuid::Uuid::new_v4().as_u128()), title, description)
 }
 
 /// The event recording `body`, stamped with `id` and `timestamp` as the
@@ -810,9 +808,11 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     let mut written = fs::metadata(&path)?.len();
     let mut ordinal = 0_u64;
     while written <= bytes {
-        let mut issue =
-            crate::domain::Issue::draft(format!("Accumulated history {ordinal}"), String::new());
-        issue.id = issue_id(u128::from(ordinal));
+        let issue = crate::domain::Issue::draft(
+            issue_id(u128::from(ordinal)),
+            format!("Accumulated history {ordinal}"),
+            String::new(),
+        );
         let line = serde_json::to_string(&stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             format!("01J0000000000000000000{ordinal:04}"),

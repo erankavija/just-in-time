@@ -1,6 +1,8 @@
 //! Typed mutation identity, time authority, and the sole typed-to-byte finalizer.
 //!
-//! Commands submit timestamp-free, identifier-free semantic [`MutationIntent`]s.
+//! Commands submit timestamp-free semantic [`MutationIntent`]s; a created issue
+//! carries the id its caller derived from the context, and every other
+//! identifier is the finalizer's.
 //! A [`MutationContext`] — created exactly once per command operation, before
 //! its conflict-retry loop — supplies deterministic identifiers (from a single seed drawn
 //! once on the first allocation) and one mutation timestamp (sampled once, on the
@@ -287,10 +289,17 @@ impl MutationContext {
         self.dispatch_annotation.as_ref()
     }
 
+    /// Derive the id of the issue created at position `index` of a mutation's
+    /// creation order. The finalizer reserves those leading indices, so a draft
+    /// built with this id keeps every later identifier in the frozen order.
+    pub(crate) fn issue_id_at(&self, index: u64) -> IssueId {
+        self.ids.uuid_at(index)
+    }
+
     /// Derive an identifier at the finalizer's frozen allocation index without
     /// advancing that order. Command orchestration uses this only to capture the
-    /// expected-absent paths of records whose finalizer-assigned ids are part of
-    /// their path, and to return those ids after publication.
+    /// expected-absent paths of gate-run records, whose finalizer-assigned ids
+    /// are part of their path, and to return those ids after publication.
     pub(crate) fn identifier_at(&self, index: u64) -> String {
         self.ids.uuid_at(index)
     }
@@ -316,6 +325,12 @@ impl MutationContext {
         }
     }
 
+    /// Skip the `count` indices the mutation's issue creations derived their
+    /// ids at.
+    fn reserve(&self, count: usize) {
+        self.next_index.set(self.next_index.get() + count as u64);
+    }
+
     /// Allocate the next identifier in the frozen order.
     fn allocate(&self) -> String {
         let index = self.next_index.get();
@@ -324,25 +339,27 @@ impl MutationContext {
     }
 }
 
-/// One repository-owned semantic mutation, free of identifiers and timestamps.
+/// One repository-owned semantic mutation, free of timestamps.
 ///
-/// The finalizer assigns identity and applies the mutation timestamp; callers
-/// never stamp either. The set is closed: a new record class extends this enum.
+/// The finalizer applies the mutation timestamp and assigns every identifier
+/// except a created issue's, which the caller derives through
+/// [`MutationContext::issue_id_at`]; callers never stamp time. The set is
+/// closed: a new record class extends this enum.
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MutationIntent {
-    /// Create a new issue. The finalizer assigns the id and stamps `created_at`,
-    /// `updated_at`, and `first_ready_at` (when initially `Ready`); every other
-    /// field is taken verbatim from `draft`.
+    /// Create a new issue. The finalizer stamps `created_at`, `updated_at`, and
+    /// `first_ready_at` (when initially `Ready`); every other field, the id
+    /// included, is taken verbatim from `draft`.
     CreateIssue {
-        /// Semantic issue whose id/lifecycle timestamps are assigned by the
+        /// Semantic issue whose lifecycle timestamps are stamped by the
         /// finalizer; all other fields are authoritative.
         draft: Box<Issue>,
     },
     /// Create a prevalidated issue batch and wire all intra-batch dependency
     /// relationships in the same delta. Dependency pairs are
     /// `(dependent_index, dependency_index)` into `drafts`; the finalizer
-    /// resolves them after allocating every issue id.
+    /// resolves them to the drafts' ids.
     CreateIssueBatch {
         /// Semantic issue drafts in caller request order.
         drafts: Vec<Issue>,
@@ -698,10 +715,10 @@ fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee)
 /// Given the captured `image`, the reused `context`, and closed semantic
 /// `intents`, it produces one exact [`MaterializationPlan`]. When no transition occurs the plan carries an empty delta having
 /// sampled neither an identifier nor the mutation timestamp, so a no-op emits no
-/// bytes. Identifiers are allocated in the frozen order — new issue ids first
-/// (creation order), gate-run/record ids next, event ids last after canonical
-/// event ordering — and one mutation timestamp is applied to every transition
-/// that occurs.
+/// bytes. Identifiers follow the frozen order — the indices of new issue ids
+/// first (creation order, derived by the caller and reserved here), gate-run/record
+/// ids next, event ids last after canonical event ordering — and one mutation
+/// timestamp is applied to every transition that occurs.
 pub fn finalize(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
@@ -743,13 +760,23 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Pass 1: issue creations, in canonical request order, get identifiers first.
+    // Pass 1: issue creations, in canonical request order, hold the leading
+    // indices their callers derived ids at.
+    context.reserve(
+        intents
+            .iter()
+            .map(|intent| match intent {
+                MutationIntent::CreateIssue { .. } => 1,
+                MutationIntent::CreateIssueBatch { drafts, .. } => drafts.len(),
+                _ => 0,
+            })
+            .sum(),
+    );
     for intent in intents {
         if let MutationIntent::CreateIssue { draft } = intent {
-            let id = context.allocate();
             let now = context.timestamp();
             let mut issue = (**draft).clone();
-            issue.id = id.clone();
+            let id = issue.id.clone();
             issue.created_at = now;
             issue.updated_at = now;
             if issue.state == State::Ready {
@@ -779,17 +806,13 @@ pub(super) fn finalize_delta(
             dependencies,
         } = intent
         {
-            let ids = (0..drafts.len())
-                .map(|_| context.allocate())
-                .collect::<Vec<_>>();
             for (index, draft) in drafts.iter().enumerate() {
                 let now = context.timestamp();
                 let mut issue = draft.clone();
-                issue.id = ids[index].clone();
                 issue.dependencies = dependencies
                     .iter()
                     .filter(|(dependent, _)| *dependent == index)
-                    .map(|(_, dependency)| ids[*dependency].clone())
+                    .map(|(_, dependency)| drafts[*dependency].id.clone())
                     .collect();
                 issue.dependencies.sort();
                 issue.dependencies.dedup();
@@ -1419,8 +1442,7 @@ mod tests {
     }
 
     fn seeded_issue(id: &IssueId, assignee: Option<Assignee>) -> Issue {
-        let mut issue = crate::test_utils::fixture_issue("Title".into(), "Body".into());
-        issue.id = id.clone();
+        let mut issue = Issue::draft(id.clone(), "Title".into(), "Body".into());
         issue.assignee = assignee;
         issue.created_at = DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
             .unwrap()
@@ -1429,9 +1451,13 @@ mod tests {
         issue
     }
 
+    /// The id the creation tests' drafts carry.
+    fn created_id() -> IssueId {
+        crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111)
+    }
+
     fn map_order_draft(reverse: bool) -> Issue {
-        let mut issue = crate::test_utils::fixture_issue("Canonical".into(), "Body".into());
-        issue.id = crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111);
+        let mut issue = Issue::draft(created_id(), "Canonical".into(), "Body".into());
         let context_entries = [("alpha", "one"), ("zeta", "two")];
         let gate_entries = [
             (
@@ -1486,7 +1512,7 @@ mod tests {
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let created_id = created_id();
         let image = image_with(vec![
             (
                 VirtualPath::data("issues").unwrap(),
@@ -1550,7 +1576,7 @@ mod tests {
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let created_id = created_id();
         image_with(vec![
             (
                 VirtualPath::data("issues").unwrap(),
@@ -1598,7 +1624,7 @@ mod tests {
         }];
         let plan = finalize(&layout(), &image, &annotated_ctx(), &intents).unwrap();
 
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let created_id = created_id();
         assert!(
             plan.delta()
                 .actions()
@@ -1859,7 +1885,7 @@ mod tests {
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let created_id = created_id();
         let image = image_with(vec![
             (
                 VirtualPath::data("issues").unwrap(),
@@ -2396,7 +2422,7 @@ mod tests {
     #[test]
     fn test_finalize_creation_orders_events_and_assigns_frozen_identity_sequence() {
         let ids = IdAuthority::from_seed([7u8; 32]);
-        let mut draft = crate::test_utils::fixture_issue("New".into(), "Body".into());
+        let mut draft = Issue::draft(created_id(), "New".into(), "Body".into());
         draft.state = State::Ready;
         let intents = [
             MutationIntent::CreateIssue {
@@ -2440,6 +2466,102 @@ mod tests {
     }
 
     #[test]
+    fn test_issue_id_at_derives_the_frozen_creation_sequence_for_the_seed() {
+        let ids = IdAuthority::from_seed([7u8; 32]);
+        let context = ctx();
+        let derived = (0..3).map(|index| context.issue_id_at(index));
+        let repeated = (0..3).map(|index| context.issue_id_at(index));
+
+        assert!(derived
+            .zip(repeated)
+            .zip(0..3)
+            .all(|((first, second), index)| first == second && first == ids.uuid_at(index)));
+    }
+
+    #[test]
+    fn test_finalize_batch_creation_keeps_draft_ids_and_reserves_their_indices() {
+        let drafts = [
+            crate::test_utils::issue_id(61),
+            crate::test_utils::issue_id(62),
+        ]
+        .map(|id| Issue::draft(id, "Batch".into(), "Body".into()))
+        .to_vec();
+        let draft_ids = drafts
+            .iter()
+            .map(|draft| draft.id.clone())
+            .collect::<Vec<_>>();
+        let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+            all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
+        })
+        .unwrap();
+        let image = image_with(
+            [
+                (
+                    VirtualPath::data("issues").unwrap(),
+                    RepositoryEntry::Absent,
+                ),
+                (VirtualPath::INDEX, file_entry(&index_bytes)),
+                (VirtualPath::EVENTS, RepositoryEntry::Absent),
+            ]
+            .into_iter()
+            .chain(
+                draft_ids
+                    .iter()
+                    .map(|id| (issue_path(id).unwrap(), RepositoryEntry::Absent)),
+            )
+            .collect(),
+        );
+        let plan = finalize(
+            &layout(),
+            &image,
+            &ctx(),
+            &[MutationIntent::CreateIssueBatch {
+                drafts,
+                dependencies: vec![(1, 0)],
+            }],
+        )
+        .unwrap();
+
+        let written = draft_ids
+            .iter()
+            .map(|id| {
+                plan.delta()
+                    .actions()
+                    .iter()
+                    .find_map(|action| match action {
+                        RepositoryAction::WriteFile { path, bytes, .. }
+                            if path == &issue_path(id).unwrap() =>
+                        {
+                            serde_json::from_slice::<Issue>(bytes).ok()
+                        }
+                        _ => None,
+                    })
+                    .expect("each draft is written at its own id")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(written[1].dependencies, [draft_ids[0].clone()]);
+        let events = appended_events(plan.delta());
+        let created = events
+            .iter()
+            .filter_map(|event| match event.body() {
+                EventBody::IssueCreated { issue_id, .. } => Some(issue_id.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(created, draft_ids, "creation events record the drafts' ids");
+        let ids = IdAuthority::from_seed([7u8; 32]);
+        assert!(
+            events
+                .iter()
+                .zip(2..)
+                .all(|(event, index)| event.id() == ids.uuid_at(index)),
+            "event ids follow the two reserved creation indices: {events:?}"
+        );
+    }
+
+    #[test]
     fn test_create_issue_stamps_lifecycle_and_membership() {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: 2,
@@ -2448,7 +2570,7 @@ mod tests {
         })
         .unwrap();
         let draft = {
-            let mut issue = crate::test_utils::fixture_issue("New".into(), "Body".into());
+            let mut issue = Issue::draft(created_id(), "New".into(), "Body".into());
             issue.state = State::Ready;
             issue
         };
@@ -2459,11 +2581,8 @@ mod tests {
             ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            // The new id is deterministic; precompute it to seed its absent slot.
-            (
-                issue_path(&IdAuthority::from_seed([7u8; 32]).uuid_at(0)).unwrap(),
-                RepositoryEntry::Absent,
-            ),
+            // The draft carries its id; seed that id's absent slot.
+            (issue_path(&created_id()).unwrap(), RepositoryEntry::Absent),
         ]);
         let delta = finalize(
             &layout(),
@@ -2474,7 +2593,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let expected_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let expected_id = created_id();
         let issue_action = delta
             .delta()
             .actions()
@@ -2553,8 +2672,8 @@ mod tests {
 
     #[test]
     fn test_create_issue_rejects_future_index_without_a_plan() {
-        let draft = crate::test_utils::fixture_issue("New".into(), "Body".into());
-        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let draft = Issue::draft(created_id(), "New".into(), "Body".into());
+        let created_id = created_id();
         let index_bytes = serde_json::to_vec(&serde_json::json!({
             "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION + 1,
             "all_ids": [],
