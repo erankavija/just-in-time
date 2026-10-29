@@ -1,5 +1,6 @@
 {
   "assignee": null,
+  "claimed_at": "2026-10-29T07:07:40.446356307Z",
   "context": {},
   "created_at": "2025-12-18T20:35:58.694584821Z",
   "dependencies": [
@@ -38,7 +39,8 @@
     "f16cfe8c-970e-450b-9ac5-050243c6741d",
     "f2532a2d-138d-46bf-9547-e1ea517f0170",
     "f3f7de97-7315-4780-8389-9c857da29239",
-    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb"
+    "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+    "f71504cd-e282-477c-a609-5f7e1c08a36e"
   ],
   "description": "First stable production release of just-in-time with complete gate system and documentation",
   "documents": [
@@ -68,5 +70,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 Production Release",
-  "updated_at": "2026-10-27T21:00:39.412794110Z"
+  "updated_at": "2026-10-29T07:07:55.665979642Z"
 }

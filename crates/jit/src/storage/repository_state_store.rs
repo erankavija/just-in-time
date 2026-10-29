@@ -23,7 +23,7 @@ use crate::storage::{
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -1145,8 +1145,14 @@ fn capture_capability_image(
         .iter()
         .filter(|request| !prior.pinned.contains_key(*request))
         .cloned()
+        .collect::<BTreeSet<_>>();
+    let kind_only = unanswered
+        .iter()
+        .filter(|request| spec.pinned_read_mode(request) == Some(ReadMode::Kind))
+        .cloned()
         .collect();
-    let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), &unanswered);
+    let pinned_reads =
+        storage.inspect_pinned_targets(layout.worktree_root(), &unanswered, &kind_only);
     let mut evidence_cache = storage.pinned_evidence_cache();
     let pinned = spec
         .pinned()
@@ -1170,6 +1176,7 @@ fn capture_capability_image(
                         .filter(|evidence| {
                             evidence.commit_oid() == Some(read.version().as_str())
                                 && evidence.object_oid() == read.object_oid()
+                                && evidence.bytes().is_some() == read.bytes().is_some()
                         });
                     if let Some(evidence) = cached {
                         return Ok(((revision.clone(), path.clone()), evidence.clone()));
@@ -1236,6 +1243,9 @@ fn capture_memory_image(
                 tail: EventLogTail::of_bytes(content.bytes()),
                 mode: *mode,
             }
+        }
+        (Some(RepositoryEntry::File { mode, .. }), Some(ReadMode::Kind)) => {
+            RepositoryEntry::FileKind { mode: *mode }
         }
         (entry, _) => entry.cloned().unwrap_or(RepositoryEntry::Absent),
     };
@@ -1473,6 +1483,11 @@ fn inspect_capability_leaf(
     }
     if metadata.is_dir() {
         return directory_entry(metadata);
+    }
+    if metadata.is_file() && read == ReadMode::Kind {
+        return Ok(RepositoryEntry::FileKind {
+            mode: normalized_mode(&metadata),
+        });
     }
     if metadata.is_file() {
         let mut options = OpenOptions::new();

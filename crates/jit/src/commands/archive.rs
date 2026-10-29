@@ -355,6 +355,9 @@ fn image_evidence(
         RepositoryEntry::FileTail { .. } => {
             return Err(crate::repository_state::CaptureError::TailOnlyCapture(vpath).into())
         }
+        RepositoryEntry::FileKind { .. } => {
+            return Err(crate::repository_state::CaptureError::KindOnlyCapture(vpath).into())
+        }
         RepositoryEntry::Symlink { .. } => ArtifactEvidence::Symlink,
         RepositoryEntry::Unsupported { .. } => ArtifactEvidence::Unsupported,
         RepositoryEntry::Directory { .. } => {

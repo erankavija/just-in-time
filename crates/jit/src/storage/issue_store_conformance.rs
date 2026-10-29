@@ -788,6 +788,40 @@ fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
     ));
 }
 
+/// A kind read classifies each target as a whole read would, without reading a
+/// file's bytes: a file larger than the whole byte budget still captures, and a
+/// producer asking for its bytes fails typed.
+fn test_capture_kind_classifies_targets_without_reading_file_bytes<B: Backend>() {
+    use crate::repository_state::{CaptureError, ReadMode, RepositoryTargetKind};
+
+    let file = VirtualPath::worktree("receipts/large.log").unwrap();
+    let directory = VirtualPath::worktree("receipts").unwrap();
+    let absent = VirtualPath::worktree("receipts/absent.log").unwrap();
+    let repository = Repository::<B>::seeded(&[(file.clone(), "x".repeat(4096))]);
+    let layout = repository.layout();
+    let budget = CaptureBudget {
+        max_listings: 0,
+        max_bytes: 1024,
+        max_depth: 8,
+    };
+    let mut spec = CaptureSpec::new([], budget).unwrap();
+    spec.discover_kinds([file.clone(), directory.clone(), absent.clone()])
+        .unwrap();
+    assert_eq!(spec.read_mode(&file), Some(ReadMode::Kind));
+    let mut session = repository.store.open_mutation_session(layout).unwrap();
+
+    let image = session.capture(spec).unwrap();
+
+    let kind = |path: &VirtualPath| RepositoryTargetKind::from_entry(image.entry(path).unwrap());
+    assert_eq!(kind(&file), RepositoryTargetKind::File);
+    assert_eq!(kind(&directory), RepositoryTargetKind::Directory);
+    assert_eq!(kind(&absent), RepositoryTargetKind::Missing);
+    assert!(matches!(
+        image.file_bytes(&file),
+        Err(CaptureError::KindOnlyCapture(_))
+    ));
+}
+
 /// Runs every case against every backend, one `#[test]` per pair, in a module
 /// named for the backend.
 macro_rules! conformance_suite {
@@ -829,5 +863,6 @@ conformance_suite!(
         test_gate_presets_list_and_get_the_declared_presets,
         test_read_path_reports_a_missing_file_and_refuses_unsafe_paths,
         test_read_path_reads_a_seeded_file_and_refuses_a_directory,
+        test_capture_kind_classifies_targets_without_reading_file_bytes,
     ]
 );
