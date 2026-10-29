@@ -24,9 +24,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "9ac299a4-bf9b-4644-82d6-520a1b91e2a8",
-      "status": "failed",
-      "updated_at": "2026-10-28T23:46:07.900594933Z",
+      "run_id": "9b198b85-7019-4307-b345-5eb1f62c7dcb",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:06:35.251044234Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_docs_templates suite carries typed canonical issue ids",
-  "updated_at": "2026-10-29T00:01:44.693803965Z"
+  "updated_at": "2026-10-29T00:06:35.251044234Z"
 }
