@@ -244,8 +244,6 @@ fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
     assert!(output.stderr.is_empty());
 }
 
-/// Under `--json` a missing repository is a `REPOSITORY_NOT_FOUND` envelope on
-/// stdout.
 #[test]
 fn test_startup_repository_not_found_json_emits_envelope() {
     let cli = JitCli::uninitialised().unwrap();
@@ -262,8 +260,6 @@ fn test_startup_repository_not_found_json_emits_envelope() {
         .contains("not found"));
 }
 
-/// Without `--json` a missing repository leaves stdout empty and names `.jit` on
-/// stderr.
 #[test]
 fn test_startup_repository_not_found_without_json_leaves_stdout_empty() {
     let cli = JitCli::uninitialised().unwrap();
@@ -275,8 +271,6 @@ fn test_startup_repository_not_found_without_json_leaves_stdout_empty() {
     assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
 }
 
-/// A repository whose on-disk format is newer than this binary supports fails
-/// as `REPOSITORY_FORMAT_TOO_NEW` under `--json`.
 #[test]
 fn test_startup_repository_format_too_new_json_emits_envelope() {
     let cli = JitCli::initialised().unwrap();

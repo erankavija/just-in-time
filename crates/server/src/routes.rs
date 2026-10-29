@@ -1423,8 +1423,11 @@ mod tests {
         let storage = InMemoryStorage::new();
         // The repository declares a default type, so an issue reaches the store
         // without a `type:` label only when it is seeded rather than created.
-        let mut untyped = jit::domain::Issue::draft("Untyped".to_string(), String::new());
-        untyped.id = "untyped-node".to_string();
+        let untyped = jit::domain::Issue::draft(
+            jit::test_utils::issue_id(1),
+            "Untyped".to_string(),
+            String::new(),
+        );
         storage.seed_issue_fixture(&untyped);
 
         let executor = Arc::new(memory_executor_declaring(

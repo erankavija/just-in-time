@@ -343,22 +343,18 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 ///
 /// // A spine `C -> I -> B -> P`: container, an impl task, a breakdown node,
 /// // and the plan upstream of the breakdown. Edges point dependent -> dependency.
-/// let mut c = Issue::draft("container".to_string(), String::new());
-/// c.id = issue_id(1);
+/// let mut c = Issue::draft(issue_id(1), "container".to_string(), String::new());
 /// c.labels = vec!["type:epic".to_string()];
 /// c.dependencies = vec![issue_id(2)];
 ///
-/// let mut i = Issue::draft("impl".to_string(), String::new());
-/// i.id = issue_id(2);
+/// let mut i = Issue::draft(issue_id(2), "impl".to_string(), String::new());
 /// i.dependencies = vec![issue_id(3)];
 ///
-/// let mut b = Issue::draft("breakdown".to_string(), String::new());
-/// b.id = issue_id(3);
+/// let mut b = Issue::draft(issue_id(3), "breakdown".to_string(), String::new());
 /// b.labels = vec!["type:breakdown".to_string()];
 /// b.dependencies = vec![issue_id(4)];
 ///
-/// let mut p = Issue::draft("plan".to_string(), String::new());
-/// p.id = issue_id(4);
+/// let p = Issue::draft(issue_id(4), "plan".to_string(), String::new());
 ///
 /// let issues = vec![c, i, b, p];
 ///

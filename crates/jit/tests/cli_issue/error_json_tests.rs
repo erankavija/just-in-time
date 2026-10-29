@@ -139,8 +139,6 @@ fn test_gate_operation_error_json() {
     );
 }
 
-/// A transition blocked by an unpassed gate diverts to `gated`, names the gate and
-/// its remediation, and completes once the gate passes.
 #[test]
 fn test_blocked_by_gates_human_diverts_to_gated_then_completes_on_pass() {
     let cli = JitCli::initialised().unwrap();
@@ -184,8 +182,6 @@ fn test_blocked_by_gates_human_diverts_to_gated_then_completes_on_pass() {
     );
 }
 
-/// Under `--json` a gate-blocked transition carries the blocker details and the
-/// remediation commands that inspect and satisfy the gate.
 #[test]
 fn test_blocked_by_gates_json_details_and_remediation() {
     let cli = JitCli::initialised().unwrap();
@@ -231,15 +227,12 @@ fn test_blocked_by_gates_json_details_and_remediation() {
     };
     assert!(suggests(format!("jit gate evaluate {id} tests")));
     assert!(suggests(format!("jit gate status-all {id}")));
-    // jit:62f3bebd REQ-01 — also points at the per-gate run-history view.
     assert!(remediation.iter().any(|cmd| {
         let cmd = cmd.as_str().unwrap();
         cmd.contains(&format!("jit gate status {id} tests")) && cmd.contains("--all")
     }));
 }
 
-/// A transition blocked by an unmet dependency reports `BLOCKED` with the
-/// blocker's identity and state, and remediation commands that inspect it.
 #[test]
 fn test_blocked_by_dependencies_json_details_and_remediation() {
     let cli = JitCli::initialised().unwrap();
@@ -282,8 +275,6 @@ fn test_blocked_by_dependencies_json_details_and_remediation() {
         .contains(&format!("jit issue show {dependency}"))));
 }
 
-/// The human rendering of a dependency-blocked transition names the blocker and
-/// the remediation commands.
 #[test]
 fn test_blocked_by_dependencies_human_names_blocker_and_remediation() {
     let cli = JitCli::initialised().unwrap();
@@ -306,7 +297,6 @@ fn test_blocked_by_dependencies_human_names_blocker_and_remediation() {
     assert!(stderr.contains("jit issue show"));
 }
 
-/// A dependency naming no stored issue blocks the transition with state `missing`.
 #[test]
 fn test_blocked_by_missing_dependency_json_reports_missing_state() {
     let cli = JitCli::initialised().unwrap();

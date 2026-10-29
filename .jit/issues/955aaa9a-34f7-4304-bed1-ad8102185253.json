@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-29T07:06:39.353215586Z",
+  "dependencies": [],
+  "description": "Make the first suite run after a crate-source change pass without profiled-fixture lock timeouts.\n\n## Background\n\nThe profiled-repository fixture (`crates/jit/src/test_utils.rs`) is keyed on the package closure and the `jit` crate source digest, and is built in the suite on first use. When a source change produces a new key, the first consumer builds the fixture while the others wait up to `PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND` (12 s) and then fail with \"profiled-repository fixture … is busy\". On a loaded host a cold build exceeds that bound, so the first `cargo-ci` after a source change fails several unit tests that pass on the warm cache. nextest's per-test timeout (`.config/nextest.toml`) caps any waiter at roughly 20 s, so raising the lock bound alone does not help. Runner setup hooks and per-test filters are out (they were removed deliberately).\n\n## Success Criteria\n\n- [hard] REQ-01: A full suite run immediately after a crate-source change (cold fixture keys), on a host under load, passes with no fixture-lock \"busy\" failure; the evidence is recorded with the change.\n- [hard] REQ-02: Consumers waiting on a fixture build fail only when the build itself fails or its holder dies, and a failing build reports its own cause to every waiter.\n- [hard] REQ-03: No runner setup hook, no per-test filter and no test-specific timeout is introduced.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-29T07:06:39.353215586Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "955aaa9a-34f7-4304-bed1-ad8102185253",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Cold profiled-fixture builds no longer time out their waiters",
+  "updated_at": "2026-10-29T07:06:39.353215586Z"
+}

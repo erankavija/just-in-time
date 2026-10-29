@@ -728,7 +728,7 @@
     },
     {
       "issue": "5fac48b8",
-      "status": "open",
+      "status": "resolved",
       "reason": "code-review F1 [high, blocking] on REQ-01 (\"no code path creates an issue whose id is empty\"): IssueId is still the String alias (identity.rs:15), so Issue::draft accepts an empty id and the type cannot guarantee REQ-01. The plan stages issue ids behind that alias until the flip 7abcc22d, which is downstream of 5fac48b8 (5fac48b8 → 641bd14e → 89e7a273 → 3ee3a4d1 → 7abcc22d). No production or test path builds an empty id after the change (branch worktree-agent-5fac48b8, 4608d2843; cargo-ci passed).",
       "options": [
         "A (recommended): amend 5fac48b8 REQ-01 to state that no code path creates an empty issue id, with the type-level guarantee delivered by the flip 7abcc22d; re-run code-review",
@@ -742,7 +742,14 @@
         "7abcc22d",
         "c797b59b (via 13190465 path unaffected)",
         "all post-flip tasks"
-      ]
+      ],
+      "resolution": "Invoker chose A (2026-10-29): REQ-01 amended; code-review passed with 0 findings; landed 7af3dc393, closed eb3a28427."
+    },
+    {
+      "issue": "f71504cd",
+      "status": "resolved",
+      "reason": "Out-of-epic bug reported by gf2: jit doc check-links captures every referenced document in full (7.4 GB vs 512 MiB).",
+      "resolution": "Invoker: fix it in this session, outside the epic (not a child of 2195c98f)."
     }
   ],
   "rework_counts": {
@@ -1443,6 +1450,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "rework 1: code-review F1, String-valued binding maps"
+    },
+    {
+      "issue": "f71504cd",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "default",
+      "reason": "out-of-epic bug fix (invoker approved); storage capture mechanism, kind-only requests"
+    },
+    {
+      "issue": "641bd14e",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "repository_state retyping; multi-file core family, literal REQ-03"
     }
   ],
   "surfaced_pitfalls": [
@@ -1502,7 +1523,8 @@
     "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression.",
     "Run cargo-ci on the branch before code-review; review fails unverified backend/test criteria otherwise.",
     "State dev/active/ out of footprint in Codex briefs; workers rewrite other epics planning docs in prose sweeps.",
-    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch."
+    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch.",
+    "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure."
   ],
   "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [

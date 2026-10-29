@@ -176,10 +176,11 @@ impl EventTag {
             .expect("`agent:worker-1` is a well-formed assignee");
 
         let body = match self {
-            EventTag::IssueCreated => EventBody::draft_issue_created(&Issue {
-                id: issue_id,
-                ..Issue::draft("Sample issue".to_string(), String::new())
-            }),
+            EventTag::IssueCreated => EventBody::draft_issue_created(&Issue::draft(
+                issue_id,
+                "Sample issue".to_string(),
+                String::new(),
+            )),
             EventTag::IssueClaimed => EventBody::draft_issue_claimed(issue_id, assignee),
             EventTag::IssueStateChanged => {
                 EventBody::draft_issue_state_changed(issue_id, State::Ready, State::InProgress)

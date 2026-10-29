@@ -191,8 +191,11 @@ fn event_line(event: &Event) -> String {
 }
 
 fn issue_created(id: &str) -> Event {
-    let mut issue = Issue::draft("Known".to_string(), String::new());
-    issue.id = crate::test_utils::issue_id(50);
+    let issue = Issue::draft(
+        crate::test_utils::issue_id(50),
+        "Known".to_string(),
+        String::new(),
+    );
     crate::test_utils::stamped_event(
         EventBody::draft_issue_created(&issue),
         id,

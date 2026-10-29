@@ -2243,9 +2243,11 @@ mod tests {
                 format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
             )
             .unwrap();
-            let mut linked_issue =
-                crate::domain::Issue::draft("Only in linked event log".to_string(), String::new());
-            linked_issue.id = crate::test_utils::issue_id(55);
+            let linked_issue = crate::domain::Issue::draft(
+                crate::test_utils::issue_id(55),
+                "Only in linked event log".to_string(),
+                String::new(),
+            );
             let linked_event = crate::test_utils::stamped_event(
                 crate::domain::EventBody::draft_issue_created(&linked_issue),
                 "linked-event",

@@ -202,7 +202,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
             labels.push(label_utils::type_label(&kind));
         }
 
-        let mut issue = Issue::draft(title, description);
+        let context = super::production_mutation_context();
+        let mut issue = Issue::draft(context.issue_id_at(0), title, description);
         issue.priority = priority;
         issue.gates_required = gates;
         issue.labels = labels;
@@ -234,7 +235,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // behavior; runs before the write so a bad type changes nothing.
         let (issue_id, validation) =
             self.exec
-                .publish_issue_creation(issue, explicit_type, force)?;
+                .publish_issue_creation(&context, issue, explicit_type, force)?;
 
         Ok((issue_id, validation.warnings))
     }

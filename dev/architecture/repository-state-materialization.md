@@ -252,9 +252,10 @@ reflect the proposed state before anything is published:
 
 Record-level mutations (issue create/update/claim/delete, gate runs, events, index
 membership) are driven by the typed-to-byte finalizer in
-`repository_state/mutation.rs`. Commands submit timestamp-free, identifier-free
-semantic `MutationIntent`s; the finalizer assigns identity and time and emits one
-exact plan.
+`repository_state/mutation.rs`. Commands submit timestamp-free semantic
+`MutationIntent`s; a created issue carries the id its command derived through
+`MutationContext::issue_id_at`, and the finalizer assigns every other identity and
+the time and emits one exact plan.
 
 - `MutationIntent` is a closed enum of repository-owned mutations. A new record
   class extends this enum.
@@ -264,9 +265,9 @@ exact plan.
   the first identifier allocation, the timestamp on the first transition — so a
   no-op mutation samples neither, and a retry reuses identical record identities
   and times.
-- `finalize` (built on `finalize_delta`) allocates identifiers in a frozen order —
-  new issue ids first, gate-run/record ids next, event ids last after canonical
-  event ordering — stamps the one timestamp on every transition, emits the new
+- `finalize` (built on `finalize_delta`) follows a frozen identifier order — the
+  indices of new issue ids first, reserved for the ids their commands derived,
+  gate-run/record ids next, event ids last after canonical event ordering — stamps the one timestamp on every transition, emits the new
   event lines as one `AppendEvents` action at the captured log length
   (`@/inv/event-log`), and derives `index.json` membership from the captured
   preimage. The captured tail is the finalizer's torn-tail evidence: it refuses to

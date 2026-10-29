@@ -151,8 +151,7 @@ mod tests {
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &crate::domain::identity::IssueId, title: &str) -> Event {
-        let mut issue = crate::domain::Issue::draft(title.to_string(), String::new());
-        issue.id = issue_id.clone();
+        let issue = crate::domain::Issue::draft(issue_id.clone(), title.to_string(), String::new());
         crate::test_utils::stamped_event(
             crate::domain::EventBody::draft_issue_created(&issue),
             id,
