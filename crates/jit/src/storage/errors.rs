@@ -13,6 +13,7 @@
 //! [`InMemoryStorage`]: crate::storage::InMemoryStorage
 //! [`JsonFileStorage`]: crate::storage::JsonFileStorage
 
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use thiserror::Error;
 
 /// Error raised when an issue cannot be found by id or id prefix.
@@ -23,11 +24,17 @@ use thiserror::Error;
 /// rather than scanning the message text.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum IssueNotFoundError {
-    /// No issue matched the given id or id prefix.
+    /// No issue matched the given id.
     #[error("Issue not found: {id}")]
     ById {
-        /// The id or id-prefix that did not resolve.
-        id: String,
+        /// The id that did not resolve.
+        id: IssueId,
+    },
+    /// No issue matched the requested prefix.
+    #[error("Issue not found: {prefix}")]
+    ByPrefix {
+        /// The unresolved input.
+        prefix: IssueIdPrefix,
     },
     /// The issue was absent from every read source: local `.jit/`, git `HEAD`,
     /// and the main worktree (the [`JsonFileStorage`](crate::storage::JsonFileStorage)
@@ -35,26 +42,32 @@ pub enum IssueNotFoundError {
     #[error("Issue {id} not found in local storage, git, or main worktree")]
     AcrossSources {
         /// The fully-qualified id that was searched for.
-        id: String,
+        id: IssueId,
     },
 }
 
 impl IssueNotFoundError {
-    /// Build an [`IssueNotFoundError::ById`] for the given id or id prefix.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self::ById { id: id.into() }
+    /// Build an [`IssueNotFoundError::ById`] for a stored id.
+    pub fn new(id: IssueId) -> Self {
+        Self::ById { id }
+    }
+
+    /// Build an error for unresolved input.
+    pub fn by_prefix(prefix: IssueIdPrefix) -> Self {
+        Self::ByPrefix { prefix }
     }
 
     /// Build an [`IssueNotFoundError::AcrossSources`] for an id missing from
     /// every read source.
-    pub fn across_sources(id: impl Into<String>) -> Self {
-        Self::AcrossSources { id: id.into() }
+    pub fn across_sources(id: &IssueId) -> Self {
+        Self::AcrossSources { id: id.clone() }
     }
 
     /// The id (or id prefix) that did not resolve.
     pub fn id(&self) -> &str {
         match self {
-            Self::ById { id } | Self::AcrossSources { id } => id,
+            Self::ById { id } | Self::AcrossSources { id } => id.as_str(),
+            Self::ByPrefix { prefix } => prefix.as_str(),
         }
     }
 }
@@ -263,13 +276,13 @@ pub enum AmbiguousIdError {
         "Ambiguous dependency id '{prefix}': matches {} stored dependencies ({}). \
          Use a longer id.",
         .matches.len(),
-        .matches.join(", ")
+        .matches.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
     )]
     Dependency {
         /// The prefix that resolved ambiguously.
         prefix: String,
         /// The matched stored dependency ids.
-        matches: Vec<String>,
+        matches: Vec<IssueId>,
     },
 }
 
@@ -285,7 +298,7 @@ impl AmbiguousIdError {
     /// Build an [`AmbiguousIdError::Dependency`] for an ambiguous dependency prefix.
     pub fn dependency(
         prefix: impl Into<String>,
-        matches: impl IntoIterator<Item = String>,
+        matches: impl IntoIterator<Item = IssueId>,
     ) -> Self {
         Self::Dependency {
             prefix: prefix.into(),
@@ -301,9 +314,10 @@ impl AmbiguousIdError {
     }
 
     /// The matched candidate descriptions.
-    pub fn matches(&self) -> &[String] {
+    pub fn matches(&self) -> Vec<&str> {
         match self {
-            Self::Issue { matches, .. } | Self::Dependency { matches, .. } => matches,
+            Self::Issue { matches, .. } => matches.iter().map(String::as_str).collect(),
+            Self::Dependency { matches, .. } => matches.iter().map(|id| id.as_str()).collect(),
         }
     }
 }
@@ -314,27 +328,38 @@ mod tests {
 
     #[test]
     fn test_issue_not_found_by_id_message_and_accessor() {
-        let err = IssueNotFoundError::new("abcd1234");
-        assert_eq!(err.to_string(), "Issue not found: abcd1234");
-        assert_eq!(err.id(), "abcd1234");
+        let id = crate::test_utils::issue_id(1);
+        let err = IssueNotFoundError::new(id.clone());
+        assert_eq!(err.to_string(), format!("Issue not found: {id}"));
+        assert_eq!(err.id(), id.as_str());
+    }
+
+    #[test]
+    fn test_issue_not_found_by_prefix_preserves_unresolved_input() {
+        let prefix = "ABCD1234".parse::<IssueIdPrefix>().unwrap();
+        let err = IssueNotFoundError::by_prefix(prefix.clone());
+        assert_eq!(err.to_string(), format!("Issue not found: {prefix}"));
+        assert_eq!(err.id(), prefix.as_str());
     }
 
     #[test]
     fn test_issue_not_found_across_sources_message_and_accessor() {
-        let err = IssueNotFoundError::across_sources("abcd1234");
+        let id = crate::test_utils::issue_id(1);
+        let err = IssueNotFoundError::across_sources(&id);
         assert_eq!(
             err.to_string(),
-            "Issue abcd1234 not found in local storage, git, or main worktree"
+            format!("Issue {id} not found in local storage, git, or main worktree")
         );
-        assert_eq!(err.id(), "abcd1234");
+        assert_eq!(err.id(), id.as_str());
     }
 
     #[test]
     fn test_issue_not_found_downcasts_from_anyhow() {
-        let err: anyhow::Error = IssueNotFoundError::new("abcd1234").into();
+        let id = crate::test_utils::issue_id(1);
+        let err: anyhow::Error = IssueNotFoundError::new(id.clone()).into();
         let typed = err.downcast_ref::<IssueNotFoundError>();
         assert!(typed.is_some());
-        assert_eq!(typed.unwrap().id(), "abcd1234");
+        assert_eq!(typed.unwrap().id(), id.as_str());
     }
 
     #[test]
@@ -449,11 +474,12 @@ mod tests {
 
     #[test]
     fn test_ambiguous_id_dependency_variant_message() {
-        let err = AmbiguousIdError::dependency("bbbb", ["bbbb1", "bbbb2"].map(String::from));
+        let [first, second] = [1, 2].map(crate::test_utils::issue_id);
+        let err = AmbiguousIdError::dependency("bbbb", [first.clone(), second.clone()]);
         assert_eq!(
             err.to_string(),
-            "Ambiguous dependency id 'bbbb': matches 2 stored dependencies (bbbb1, bbbb2). \
-             Use a longer id."
+            format!("Ambiguous dependency id 'bbbb': matches 2 stored dependencies ({first}, {second}). \
+             Use a longer id.")
         );
     }
 }
