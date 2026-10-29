@@ -12,6 +12,7 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::State;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -38,7 +39,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
 /// Seed an in-progress epic with NO design dependency (so the rule under test is
 /// violated at a `done` transition) and return its id.
-fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
+fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
@@ -48,7 +49,7 @@ fn seed_epic(executor: &CommandExecutor<InMemoryStorage>) -> String {
 }
 
 /// The persisted state of `id`.
-fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> State {
+fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> State {
     executor.storage().load_issue(id).unwrap().state
 }
 

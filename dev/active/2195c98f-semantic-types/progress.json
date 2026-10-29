@@ -725,6 +725,24 @@
       "reason": "Take over the last two c780514e blockers of 0af95f14 while the c780514e lead waits on the invoker? Prior approval covered only 2a6bc44c and 55043636.",
       "recommendation": "Take them (A).",
       "resolution": "Invoker (session 5): take them. just-in-time-4f agreed."
+    },
+    {
+      "issue": "5fac48b8",
+      "status": "open",
+      "reason": "code-review F1 [high, blocking] on REQ-01 (\"no code path creates an issue whose id is empty\"): IssueId is still the String alias (identity.rs:15), so Issue::draft accepts an empty id and the type cannot guarantee REQ-01. The plan stages issue ids behind that alias until the flip 7abcc22d, which is downstream of 5fac48b8 (5fac48b8 → 641bd14e → 89e7a273 → 3ee3a4d1 → 7abcc22d). No production or test path builds an empty id after the change (branch worktree-agent-5fac48b8, 4608d2843; cargo-ci passed).",
+      "options": [
+        "A (recommended): amend 5fac48b8 REQ-01 to state that no code path creates an empty issue id, with the type-level guarantee delivered by the flip 7abcc22d; re-run code-review",
+        "B: rework Issue::draft to take ValidatedIssueId now (callers convert at the draft), departing from the alias-staging contract that staging entries compile unchanged at the flip",
+        "C: other guidance"
+      ],
+      "blocks": [
+        "641bd14e",
+        "89e7a273",
+        "3ee3a4d1",
+        "7abcc22d",
+        "c797b59b (via 13190465 path unaffected)",
+        "all post-flip tasks"
+      ]
     }
   ],
   "rework_counts": {
@@ -739,9 +757,12 @@
     "8acca4f4": 2,
     "10ae7776": 1,
     "55043636": 1,
-    "2c9badcd": 1
+    "2c9badcd": 1,
+    "5fac48b8": 0,
+    "13190465": 1,
+    "b73b3e5a": 1
   },
-  "external_blockers": "19d9bd7d waits on c780514e 3f01cb72, 6a13eeac, 8f87e366; 13190465 on 3ca153c7, 53d582ab; b45a2865 on b58ea1e2, ce097844; b73b3e5a on f0bee761 (just-in-time-4f).",
+  "external_blockers": "19d9bd7d waits on c780514e 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627), led by just-in-time-4f. c797b59b waits on 19d9bd7d.",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
   "dispatch_log": [
     {
@@ -1396,6 +1417,32 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "mechanical suite id retyping with literal criteria"
+    },
+    {
+      "issue": "13190465",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "mechanical fast_issue suite id retyping"
+    },
+    {
+      "issue": "b45a2865",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "mechanical fast_rules suite id retyping"
+    },
+    {
+      "issue": "13190465",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "rework 1: code-review F1, direct IssueId slices in fast_issue"
+    },
+    {
+      "issue": "b73b3e5a",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "rework 1: code-review F1, String-valued binding maps"
     }
   ],
   "surfaced_pitfalls": [
@@ -1452,9 +1499,12 @@
     "Unresolved request text is not an IssueId; error/DTO carriers of it stay strings (8acca4f4).",
     "Codex re-adds #[allow(...)] even when a rework item forbids it; grep the diff for #[allow before review.",
     "Write story-review gap tasks as class sweeps over the whole crate, not single sites (83d04069 needed 3 rounds).",
-    "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression."
+    "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression.",
+    "Run cargo-ci on the branch before code-review; review fails unverified backend/test criteria otherwise.",
+    "State dev/active/ out of footprint in Codex briefs; workers rewrite other epics planning docs in prose sweeps.",
+    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch."
   ],
-  "session_note": "Session 4 handoff written as handoff-3.md; see it for next actions.",
+  "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [
     {
       "issue": "8acca4f4",
@@ -1506,6 +1556,9 @@
     },
     "e2eb8862 (landed d273d0962, closed 8b9fccb1d)",
     "2c9badcd (landed 8b1d10d66 after rework 1)",
-    "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)"
+    "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)",
+    "13190465 (1afa3fa0b, rework 1)",
+    "b45a2865 (520da32bc)",
+    "b73b3e5a (42ee68606, rework 1)"
   ]
 }

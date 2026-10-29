@@ -2,9 +2,9 @@
 //! (issue 949cd9d0) and for the removal of the legacy verb aliases
 //! `pass`/`pass-all`/`check`/`check-all` (issue c505031a).
 //!
-//! `status-all` exits 0 only when every required gate — automated AND manual —
+//! `status-all` succeeds only when every required gate — automated AND manual —
 //! has passed; a pending (auto never run, manual never attested) or failed gate
-//! yields exit 4. The retired verbs no longer parse at all: clap rejects them
+//! fails. The retired verbs no longer parse at all: clap rejects them
 //! as unrecognized subcommands rather than resolving them as aliases.
 
 use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
@@ -15,17 +15,16 @@ use predicates::prelude::*;
 // ===== REQ-02: status-all strict exit =====
 
 #[test]
-fn test_status_all_pending_auto_gate_exits_4() {
+fn test_status_all_pending_auto_gate_fails() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "auto-gate", "exit 0");
     let id = create_issue_requiring(&temp, &["auto-gate"]);
 
-    // Auto gate never evaluated -> pending -> exit 4, no mutation.
+    // Auto gate never evaluated -> pending -> failure, no mutation.
     let out = temp
         .command(["gate", "status-all", &id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
@@ -39,7 +38,7 @@ fn test_status_all_pending_auto_gate_exits_4() {
 }
 
 #[test]
-fn test_status_all_pending_manual_gate_exits_4() {
+fn test_status_all_pending_manual_gate_fails() {
     let temp = JitCli::initialised().unwrap();
     define_manual_gate(&temp, "manual-gate");
     let id = create_issue_requiring(&temp, &["manual-gate"]);
@@ -49,7 +48,6 @@ fn test_status_all_pending_manual_gate_exits_4() {
         .command(["gate", "status-all", &id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
@@ -64,12 +62,11 @@ fn test_status_all_pending_manual_gate_exits_4() {
     temp.command(["gate", "status-all", &id])
         .assert()
         .failure()
-        .code(4)
         .stdout(predicate::str::contains("manual-gate"));
 }
 
 #[test]
-fn test_status_all_failed_gate_exits_4() {
+fn test_status_all_failed_gate_fails() {
     let temp = JitCli::initialised().unwrap();
     define_auto_gate(&temp, "fail-gate", "exit 1");
     let id = create_issue_requiring(&temp, &["fail-gate"]);
@@ -83,7 +80,6 @@ fn test_status_all_failed_gate_exits_4() {
         .command(["gate", "status-all", &id, "--json"])
         .assert()
         .failure()
-        .code(4)
         .get_output()
         .stdout
         .clone();
@@ -174,11 +170,8 @@ fn test_canonical_verbs_still_work_after_alias_removal() {
         .success();
 
     // `status-all` (formerly aliased as `check-all`) still enforces the
-    // strict readiness exit: gate-d is still pending, so this exits 4.
-    temp.command(["gate", "status-all", &id])
-        .assert()
-        .failure()
-        .code(4);
+    // strict readiness exit: gate-d is still pending, so this fails.
+    temp.command(["gate", "status-all", &id]).assert().failure();
 
     // `evaluate-all` (formerly aliased as `pass-all`) still evaluates every
     // required gate; once gate-d is attested, status-all exits 0.

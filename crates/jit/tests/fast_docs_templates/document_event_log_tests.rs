@@ -3,11 +3,12 @@
 //! `jit doc add` and `jit doc remove` mutate an issue's `documents` field, so
 //! each must append an `issue_updated` event with `fields: ["documents"]`,
 //! mirroring `issue update` / `bulk_update` / dependency commands.
+use jit::domain::identity::IssueId;
 use jit::domain::EventBody;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
-fn create_issue<S>(executor: &jit::commands::CommandExecutor<S>, title: &str) -> String
+fn create_issue<S>(executor: &jit::commands::CommandExecutor<S>, title: &str) -> IssueId
 where
     S: IssueStore + jit::storage::RepositoryStateStore,
 {
@@ -29,12 +30,19 @@ where
 
 /// Assert the last event is `issue_updated` for `issue_id` with the expected
 /// actor and `fields` containing `documents`.
-fn assert_last_event_is_documents_update(h: &TestHarness, issue_id: &str, expected_actor: &str) {
+fn assert_last_event_is_documents_update(
+    h: &TestHarness,
+    issue_id: &IssueId,
+    expected_actor: &str,
+) {
     let events = h.storage.read_events().unwrap();
     let event = events.last().expect("event log should not be empty");
 
     assert_eq!(event.get_type(), "issue_updated");
-    assert_eq!(event.issue_id().map(|id| id.as_str()), Some(issue_id));
+    assert_eq!(
+        event.issue_id().map(|id| id.as_str()),
+        Some(issue_id.as_str())
+    );
 
     match event.body() {
         EventBody::IssueUpdated {

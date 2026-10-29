@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-b73b3e5a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1c864fa60e54615be87523fa79f48d48fd7d3946",
+  "completed_at": "2026-10-28T23:46:07.661892474Z",
+  "duration_ms": 223022,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
+        "id": "F1",
+        "line": 152,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b73b3e5a/requirement/REQ-02",
+          "@/issue/b73b3e5a/requirement/REQ-05",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Template-binding helpers return String-valued maps instead of IssueId-valued maps, so they will not compile after the validated IssueId cutover."
+      }
+    ],
+    "summary": "Two template-binding helpers retain String-valued issue-id maps that will fail the IssueId newtype cutover.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b73b3e5a-87d4-455a-961d-20c88a3a7039",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9ac299a4-bf9b-4644-82d6-520a1b91e2a8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:42:24.638924190Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3726 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b73b3e5a\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184e4-ba27-74d3-bb5a-7dd3e3802fb2\n--------\nuser\n--- 3713 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3f2c77e6, 6b8316d1, 1c864fa6 (`jit:b73b3e5a`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-01 and @/issue/b73b3e5a/requirement/REQ-02,REQ-05 (issue markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types,semantic-test-assertions,shared-test-contracts,orthogonal-tests,essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: reread each implementation patch separately by path after combined output truncated\n\n1. **[blocking][issue-impact][high]** `container_binding` and `bindings` still return `BTreeMap<String, String>` and stringify their `IssueId` values at [template_apply_tests.rs:152](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b73b3e5a/crates/jit/tests/fast_docs_templates/template_apply_tests.rs:152) and [template_apply_atomicity_tests.rs:381](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b73b3e5a/crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs:381). The callee requires `BTreeMap<String, IssueId>`, so these helpers only compile while `IssueId` is a `String` alias and will fail at the validated-newtype cutover. This violates hard REQ-02 and REQ-05.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two template-binding helpers retain String-valued issue-id maps that will fail the IssueId newtype cutover.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Template-binding helpers return String-valued maps instead of IssueId-valued maps, so they will not compile after the validated IssueId cutover.\",\"file\":\"crates/jit/tests/fast_docs_templates/template_apply_tests.rs\",\"line\":152,\"references\":[\"@/issue/b73b3e5a/requirement/REQ-02\",\"@/issue/b73b3e5a/requirement/REQ-05\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

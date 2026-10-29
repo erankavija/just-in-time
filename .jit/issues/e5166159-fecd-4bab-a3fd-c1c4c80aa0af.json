@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T23:31:47.646045147Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Move the gate preset case that only the exit-code suite tests beside the gate preset tests.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1079`: `gate preset create` naming a gate that was removed from the registry (\"Gate not found in registry: mygate\").\n\n## Success Criteria\n\n- [hard] REQ-01: The case has an owning test in `cli_repo_workflow/gate_preset_tests.rs` with the same non-exit assertion.\n- [hard] REQ-02: The moved case names a numeric exit code only where the projection has no row for its command and code.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:50:21.278638078Z",
+  "first_ready_at": "2026-10-28T23:30:31.456522679Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "31f1dd45-5b45-4f36-a96a-e8812fb8eff7",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:45:52.787750589Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "19378a8c-1663-4459-a22c-1960af9554a5",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:48:35.665206700Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e5166159-fecd-4bab-a3fd-c1c4c80aa0af",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate preset registry case moves beside its owner",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:50:21.278638078Z"
 }

@@ -6,13 +6,14 @@
 //! the recorded pre-archive state exactly, closing the `done → archived → ready`
 //! resurrection loophole. These tests exercise the dependency, readiness,
 //! transition, rollup, revive, and event-log surfaces.
+use jit::domain::identity::IssueId;
 use jit::domain::{Issue, State};
 use jit::output::StateRollup;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
 /// Drive a dependency-free issue to `Done` (no gates required).
-fn drive_to_done(h: &TestHarness, id: &jit::domain::identity::IssueId) {
+fn drive_to_done(h: &TestHarness, id: &IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::InProgress)
@@ -25,14 +26,14 @@ fn drive_to_done(h: &TestHarness, id: &jit::domain::identity::IssueId) {
 }
 
 /// Park an issue into `Archived` the way `jit issue update --state archived` does.
-fn archive(h: &TestHarness, id: &jit::domain::identity::IssueId) {
+fn archive(h: &TestHarness, id: &IssueId) {
     h.executor
         .issues()
         .update_issue_state(id, State::Archived)
         .unwrap();
 }
 
-fn count_state_changes(h: &TestHarness, id: &jit::domain::identity::IssueId) -> usize {
+fn count_state_changes(h: &TestHarness, id: &IssueId) -> usize {
     h.storage
         .read_events()
         .unwrap()
@@ -250,7 +251,7 @@ fn test_query_closed_uses_effective_terminality() {
         .unwrap();
     archive(&h, &parked);
 
-    let closed: Vec<String> = jit::domain::queries::query_closed(&h.all_issues())
+    let closed: Vec<IssueId> = jit::domain::queries::query_closed(&h.all_issues())
         .into_iter()
         .map(|issue| issue.id)
         .collect();

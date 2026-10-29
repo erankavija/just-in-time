@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use jit::commands::test_helpers::{memory_executor_wrapping, MemoryDeclarations};
 use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
+use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
@@ -377,14 +378,14 @@ applies_to = ["{container_type}"]
         .clone()
 }
 
-fn bindings(container: &str) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), container.to_string())])
+fn bindings(container: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), container.clone())])
 }
 
 fn fixture<S: IssueStore + RepositoryStateStore>(
     executor: CommandExecutor<PublicationProbeStore<S>>,
     taxonomy: &TestTaxonomy,
-) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
+) -> (CommandExecutor<PublicationProbeStore<S>>, IssueId, IssueId) {
     jit::test_mode::enable();
     assert!(executor
         .storage()

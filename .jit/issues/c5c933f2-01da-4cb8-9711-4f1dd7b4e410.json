@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "af3dc0fa-ddb4-470c-be14-7083fdcf5a5c",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:38:55.869638101Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "19646106-8e61-465e-83a7-9d7bdaf9eca0",
+      "status": "failed",
+      "updated_at": "2026-10-28T23:42:37.158932119Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c5c933f2-01da-4cb8-9711-4f1dd7b4e410",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "claim and worktree tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-28T23:16:06.653950127Z"
+  "updated_at": "2026-10-28T23:42:37.158932119Z"
 }

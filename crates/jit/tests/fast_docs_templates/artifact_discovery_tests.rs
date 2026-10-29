@@ -9,7 +9,7 @@ use jit::domain::artifact_inventory::{
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
 use jit::domain::{Issue, State};
 use jit::storage::{discover_archive_artifacts, JsonFileStorage};
-use jit::test_utils::{document_reference_at, setup_test_repo_with_config};
+use jit::test_utils::{document_reference_at, issue_id, setup_test_repo_with_config};
 use jit::CommandExecutor;
 use std::fs;
 use tempfile::TempDir;
@@ -663,7 +663,7 @@ fn pin_evidence(readable: bool) -> PinnedRootEvidenceMap {
 
 fn pinned_issue() -> Issue {
     let mut issue = crate::fixture_issue("history".to_string(), String::new());
-    issue.id = "history".to_string();
+    issue.id = issue_id(1);
     issue.state = State::Done;
     issue.labels = vec!["type:initiative".to_string()];
     issue.documents = vec![document_reference_at("docs/history.html", "release-v1")];
@@ -679,7 +679,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let inventory = inventory_explicit_roots(
         &issues,
         &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
-        ExplicitRootTarget::Container("history"),
+        ExplicitRootTarget::Container(issues[0].id.as_str()),
         &pin_evidence(true),
     )
     .unwrap();
@@ -709,7 +709,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     let inventory = inventory_explicit_roots(
         &issues,
         &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
-        ExplicitRootTarget::Container("history"),
+        ExplicitRootTarget::Container(issues[0].id.as_str()),
         &pin_evidence(false),
     )
     .unwrap();

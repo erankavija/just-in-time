@@ -1356,6 +1356,12 @@
       "issue": "2d342676, f0bee761",
       "category": "shared test infrastructure (policy 7): absent declarations and wrapper-store executors",
       "status": "resolved: extend shared fixture (user, 2026-10-29)"
+    },
+    {
+      "session": 4,
+      "issue": "7208e568",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS (3 code-review failures on one dry-run test)",
+      "status": "resolved: rework 3 exact ordered heading match vs JSON (user, 2026-10-29)"
     }
   ],
   "rework_counts": {
@@ -1379,12 +1385,15 @@
     "b7078f0d": 2,
     "4b5b8f4a": 1,
     "5001b556": 1,
-    "7208e568": 2,
+    "7208e568": 3,
     "2d342676": 1,
     "f0bee761": 1,
     "26cbc32e": 1,
     "53d582ab": 1,
-    "f1c1acc8": 1
+    "f1c1acc8": 2,
+    "8f87e366": 2,
+    "e5166159": 1,
+    "c5c933f2": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1434,7 +1443,8 @@
     "s4: InMemoryStorage::new() roots under /tmp/jit-test-<uuid>; leaks exhausted /tmp inodes (fixed 022a46af6).",
     "s4: briefs must not tell a worker to follow a target file's existing conventions when that file is not yet migrated; it copies the old locator/setup (3f15b95c F1).",
     "s4: jit issue create rewrites .jit/index.json, which land.sh treats as dirt; commit it before landing.",
-    "s4: a hook blocks wait loops on pgrep -f; land.sh already waits on the exclusive lock."
+    "s4: a hook blocks wait loops on pgrep -f; land.sh already waits on the exclusive lock.",
+    "s4: close.sh commits the whole index; a file staged elsewhere (git rm) is swept into the close commit. b53fdc563 swept a deleted test file without its mod line and broke main until 823834d34. Commit code before closing; never leave staged changes."
   ],
   "rules": "Worktree source edits only; at most two active worktrees for this lead; >=60GB free before dispatch. CARGO_INCREMENTAL=0. Builds: flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock <command>. Full validation and main merges use -x instead of -s. Do not pre-acquire cargo-ci.lock. Current main must be incorporated into the task branch and full workspace nextest plus workspace doctests pass before merge. No broad lock cleanup or fixture-timeout force exemption. Exact-path tracker commits. Fixed breakdown; scope changes escalate to coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b.",
   "priority": "profiled-fixture-build-lock first, then waves 1-2 (on 2195c98f's critical path)",
@@ -2050,7 +2060,10 @@
     "fastseed-s4": "Codex partial: 3ca153c7 complete; 2d342676/f0bee761 gaps -> fixture extension (brief-G, Claude Opus)",
     "fastseed-2-s4": "lead PASS cf8edf39c/60ef8b2ff/c1f2e248c/2745ee30e/5630d0e78 (Claude Opus): MemoryDeclarations.absent + memory_executor_wrapping; 2d342676,3ca153c7,f0bee761,5001b556 closed; 7208e568 code-review aef6aa40 F1/F2 -> lead fix 092b81b0b (rework 2 of 2)",
     "crw-docs-s4": "aadae7cd closed; 26cbc32e 198b66e7 F1 (in-process setup) -> lead fix 2e12ac4c3; closed",
-    "trio-s4": "d7c26016 closed; 53d582ab 587b6e1c F1 -> lead deleted re-proof test 4de6a05be; f1c1acc8 a8a43598 F1 -> lead removed duplicate parity cases f5f49e6c3"
+    "trio-s4": "d7c26016 closed; 53d582ab 587b6e1c F1 -> lead deleted re-proof test 4de6a05be; f1c1acc8 a8a43598 F1 -> lead removed duplicate parity cases f5f49e6c3",
+    "f1c1acc8-r2-s4": "c93f8ccd F1 (cfg unix completeness) + F2 advisory: completeness test cfg(unix); parity file deleted (all cases owned by projection suite); 823834d34",
+    "exitcodes-s4": "e5166159 bea46484 F1 stale comment -> 779c18e3a; 8f87e366 6f18faf7/d3bd09d8 GATE_FAILED class -> 31261a8bb, f17c1c197; both closed",
+    "c5c933f2-s4": "42bdf5aea + lead 1d583ebf9 (one ALLOW_LINKED_WRITES); 19646106 F1 in-process test -> rework 1 (move to commands/mod.rs unit tests, Claude Sonnet slot B)"
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [
@@ -2401,6 +2414,24 @@
       "issues": [
         "b58ea1e2",
         "ce097844"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "A branch worktree-agent-w4-owners",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "2916a306",
+        "9a313a88",
+        "55cd1ae4"
+      ]
+    },
+    {
+      "session": 4,
+      "slot": "B branch worktree-agent-w4-c5c-rework",
+      "worker": "Claude Sonnet",
+      "issues": [
+        "c5c933f2"
       ]
     }
   ],
