@@ -738,13 +738,9 @@ fn collect_item_link_findings(
             let Some((namespace, value)) = label.split_once(':') else {
                 continue;
             };
-            if let Some(message) = unqualified_link_message(
-                &issue.short_id(),
-                namespace,
-                value,
-                &kinds,
-                credit_namespaces,
-            ) {
+            if let Some(message) =
+                unqualified_link_message(&issue.id, namespace, value, &kinds, credit_namespaces)
+            {
                 findings.push(ReportedFinding::new(
                     Some(issue.id.clone()),
                     &Finding {

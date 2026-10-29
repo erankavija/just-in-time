@@ -5,7 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
-use crate::domain::identity::{IssueId, ProfileId};
+use crate::domain::identity::{IssueId, IssueIdStaging, ProfileId};
 use crate::domain::vocabulary::wire_vocabulary;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -365,7 +365,7 @@ impl GateState {
 #[serde(try_from = "IssueWire")]
 pub struct Issue {
     /// Unique identifier (UUID)
-    pub id: String,
+    pub id: IssueId,
     /// Short summary of the issue
     pub title: String,
     /// Detailed description and acceptance criteria
@@ -378,7 +378,7 @@ pub struct Issue {
     #[schemars(with = "Option<String>")]
     pub assignee: Option<Assignee>,
     /// IDs of issues that must be done first
-    pub dependencies: Vec<String>,
+    pub dependencies: Vec<IssueId>,
     /// Gate keys that must pass before ready/done
     pub gates_required: Vec<String>,
     /// Current status of each required gate
@@ -444,13 +444,13 @@ pub struct Issue {
 /// record carries `archived_from`.
 #[derive(Deserialize)]
 struct IssueWire {
-    id: String,
+    id: IssueId,
     title: String,
     description: String,
     state: State,
     priority: Priority,
     assignee: Option<Assignee>,
-    dependencies: Vec<String>,
+    dependencies: Vec<IssueId>,
     gates_required: Vec<String>,
     gates_status: HashMap<String, GateState>,
     context: HashMap<String, String>,
@@ -557,7 +557,7 @@ impl Issue {
     /// Returns a git-style short hash for human-readable output.
     /// Minimum length is 8 characters for reasonable collision resistance.
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 
     /// The terminal state this issue counts as for dependency, readiness, and
@@ -580,7 +580,7 @@ impl Issue {
     /// Returns true if any dependency is unmet by [`is_dependency_met`], including
     /// a dependency whose id resolves to no issue.
     /// Note: Gates do not block work from starting, only from completing.
-    pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
+    pub fn is_blocked(&self, resolved_issues: &HashMap<IssueId, &Issue>) -> bool {
         self.dependencies.iter().any(|dep_id| {
             !matches!(resolved_issues.get(dep_id), Some(issue) if is_dependency_met(issue.state, issue.archived_from))
         })
@@ -623,7 +623,7 @@ impl Issue {
     /// `None`.
     pub fn derive_readiness_correction(
         &self,
-        resolved_issues: &HashMap<String, &Issue>,
+        resolved_issues: &HashMap<IssueId, &Issue>,
     ) -> Option<ReadinessCorrection> {
         match (self.state, self.is_blocked(resolved_issues)) {
             (State::Backlog, false) => Some(ReadinessCorrection::Promote),
@@ -636,7 +636,7 @@ impl Issue {
     /// A Backlog issue transitions to Ready when it becomes unblocked
     pub fn should_auto_transition_to_ready(
         &self,
-        resolved_issues: &HashMap<String, &Issue>,
+        resolved_issues: &HashMap<IssueId, &Issue>,
     ) -> bool {
         self.derive_readiness_correction(resolved_issues) == Some(ReadinessCorrection::Promote)
     }
@@ -676,7 +676,7 @@ impl Issue {
 /// for full details.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalIssue {
-    pub id: String,
+    pub id: IssueId,
     pub title: String,
     pub state: State,
     pub priority: Priority,
@@ -738,7 +738,7 @@ impl From<&Issue> for MinimalIssue {
 impl MinimalIssue {
     /// Get short ID (first 8 characters of UUID)
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 
     /// Whether this issue is terminal for dependency and readiness purposes,
@@ -752,7 +752,7 @@ impl MinimalIssue {
 /// Minimal blocked issue for queries - includes blocking reasons
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct MinimalBlockedIssue {
-    pub id: String,
+    pub id: IssueId,
     pub title: String,
     pub state: State,
     pub priority: Priority,
@@ -789,7 +789,7 @@ impl Serialize for MinimalBlockedIssue {
 
 impl MinimalBlockedIssue {
     pub fn short_id(&self) -> String {
-        self.id.chars().take(SHORT_ID_LENGTH).collect()
+        self.id.short_id().to_string()
     }
 }
 
@@ -810,11 +810,11 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
 /// Implement GraphNode for Issue to enable dependency graph operations
 impl crate::graph::GraphNode for Issue {
     fn id(&self) -> &str {
-        &self.id
+        self.id.as_str()
     }
 
     fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-        self.dependencies.iter().map(String::as_str)
+        self.dependencies.iter().map(IssueId::as_str)
     }
 }
 
@@ -885,7 +885,7 @@ pub struct GateRunResult {
     /// Stage at which gate was executed
     pub stage: GateStage,
     /// Issue ID
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Git commit the checker was launched at, when one was available. `None`
     /// for a run that launched no checker — a verdict taken from an earlier run
     /// ([`origin`](Self::origin)) ran at no commit of its own, and the run it
@@ -968,7 +968,7 @@ impl GateRunResult {
     /// text, or inputs digest, and its [`GateVerdictOrigin::Attested`] origin
     /// keeps it out of verdict reuse.
     pub fn attestation(
-        issue_id: &str,
+        issue_id: &IssueId,
         gate_key: &str,
         stage: GateStage,
         status: GateStatus,
@@ -981,7 +981,7 @@ impl GateRunResult {
             run_id: String::new(),
             gate_key: gate_key.to_string(),
             stage,
-            issue_id: issue_id.to_string(),
+            issue_id: issue_id.clone(),
             commit: None,
             branch: None,
             status: match status {
@@ -1508,7 +1508,7 @@ impl Event {
 
     /// This event's id.
     pub fn id(&self) -> &str {
-        &self.id
+        self.id.as_str()
     }
 
     /// When this event occurred.
@@ -2037,7 +2037,6 @@ mod tests {
         assert!(issue.gates_required.is_empty());
         assert!(issue.gates_status.is_empty());
         assert!(issue.context.is_empty());
-        assert!(!issue.id.is_empty());
         assert_eq!(issue.first_ready_at, None);
         assert_eq!(issue.claimed_at, None);
         assert_eq!(issue.done_at, None);

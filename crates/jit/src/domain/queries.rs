@@ -4,6 +4,7 @@
 //! without requiring storage access. These are pure functions that can be used
 //! independently of the CLI orchestration layer.
 
+use crate::domain::identity::IssueId;
 use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -63,7 +64,7 @@ pub fn query_available(issues: &[Issue], filter: AvailableFilter<'_>) -> Vec<Iss
 ///
 /// This is a common pattern used throughout query and validation code to enable
 /// efficient lookups when checking if issues are blocked by dependencies.
-pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
+pub fn build_issue_map(issues: &[Issue]) -> HashMap<IssueId, &Issue> {
     issues.iter().map(|i| (i.id.clone(), i)).collect()
 }
 
@@ -77,7 +78,7 @@ pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
 /// dangling id as its own defect.
 pub fn unmet_dependencies<'a>(
     issue: &Issue,
-    resolved_issues: &HashMap<String, &'a Issue>,
+    resolved_issues: &HashMap<IssueId, &'a Issue>,
 ) -> Vec<&'a Issue> {
     issue
         .dependencies
@@ -129,7 +130,7 @@ pub enum BlockingReason {
     /// one of those).
     Dependency {
         /// Id of the depended-on issue.
-        id: String,
+        id: IssueId,
         /// Title of the depended-on issue.
         title: String,
         /// Current state of the depended-on issue.
@@ -368,10 +369,10 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 /// assert!(full.contains(&issue_id(4)));
 /// ```
 pub fn bracket_scope_ids(
-    container_id: &str,
+    container_id: &IssueId,
     issues: &[Issue],
     breakdown_type: Option<&str>,
-) -> std::collections::HashSet<String> {
+) -> std::collections::HashSet<IssueId> {
     use std::collections::{HashSet, VecDeque};
 
     // The boundary label, built from the caller-supplied breakdown-node type
@@ -380,24 +381,24 @@ pub fn bracket_scope_ids(
     // result is the full dependency closure.
     let breakdown_label = breakdown_type.map(crate::labels::type_label);
 
-    let is_breakdown = |id: &str| match &breakdown_label {
+    let is_breakdown = |id: &IssueId| match &breakdown_label {
         Some(label) => issues
             .iter()
-            .find(|i| i.id == id)
+            .find(|i| &i.id == id)
             .is_some_and(|i| i.labels.iter().any(|l| l == label)),
         None => false,
     };
 
-    let mut included: HashSet<String> = HashSet::new();
-    included.insert(container_id.to_string());
+    let mut included: HashSet<IssueId> = HashSet::new();
+    included.insert(container_id.clone());
 
-    let mut queue: VecDeque<String> = VecDeque::new();
-    queue.push_back(container_id.to_string());
+    let mut queue: VecDeque<IssueId> = VecDeque::new();
+    queue.push_back(container_id.clone());
 
     while let Some(current) = queue.pop_front() {
         // Halt the walk AT a breakdown node: it is in scope, but its own
         // dependencies (the plan `P` / upstream) are out of scope.
-        if current != container_id && is_breakdown(&current) {
+        if &current != container_id && is_breakdown(&current) {
             continue;
         }
         let Some(node) = issues.iter().find(|i| i.id == current) else {
@@ -587,7 +588,7 @@ mod tests {
             let expected: Vec<_> = issues.iter()
                 .filter(|issue| admitted.iter().flatten()
                     .all(|matches| matches.iter().any(|candidate| candidate.id == issue.id)))
-                .map(|issue| issue.id.as_str()).collect();
+                .map(|issue| &issue.id).collect();
             let actual = query_all(&issues, AllFilter { state, assignee, priority, labels: &labels });
             prop_assert_eq!(ids_of(&actual), expected);
         }
@@ -659,7 +660,7 @@ mod tests {
         ];
         let actual = query_available(&issues, AvailableFilter::default());
         assert_eq!(
-            actual.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(),
+            actual.iter().map(|i| &i.id).collect::<Vec<_>>(),
             [&issues[2].id, &issues[0].id, &issues[3].id, &issues[1].id]
         );
     }
@@ -1023,8 +1024,8 @@ mod tests {
         assert_eq!(ids, std::collections::HashSet::from([issue_id(200)]));
     }
 
-    fn ids_of(issues: &[Issue]) -> Vec<&str> {
-        issues.iter().map(|i| i.id.as_str()).collect()
+    fn ids_of(issues: &[Issue]) -> Vec<&IssueId> {
+        issues.iter().map(|i| &i.id).collect()
     }
 
     fn state_issue(index: usize, state: State) -> Issue {
@@ -1055,7 +1056,7 @@ mod tests {
         issue.gates_required = vec!["tests".into()];
         assert_eq!(
             ids_of(&query_ready(std::slice::from_ref(&issue))),
-            [issue.id.as_str()]
+            [&issue.id]
         );
     }
 
@@ -1080,7 +1081,7 @@ mod tests {
 
         let ready_ids = ids_of(&query_ready(&issues))
             .into_iter()
-            .map(String::from)
+            .cloned()
             .collect::<Vec<_>>();
 
         let ready_state_index = State::ALL

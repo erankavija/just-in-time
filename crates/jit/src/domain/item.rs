@@ -42,7 +42,7 @@
 use crate::config::{ItemKindConfig, ItemKindSource, SourceOfTruth, TomlSourceDescriptor};
 use crate::document::ContentParser;
 use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
-use crate::domain::identity::{InvalidIdPrefixError, IssueIdPrefix};
+use crate::domain::identity::{InvalidIdPrefixError, IssueId, IssueIdPrefix, IssueIdStaging};
 use crate::domain::projection::project;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
@@ -440,8 +440,8 @@ pub enum ItemError {
     /// The body could not be parsed for the issue's content format.
     #[error("failed to parse description of issue {issue}: {source}")]
     Parse {
-        /// Short id of the issue whose body failed to parse.
-        issue: String,
+        /// Issue whose body failed to parse.
+        issue: IssueId,
         /// The underlying parser error.
         source: crate::document::ContentParserError,
     },
@@ -874,12 +874,13 @@ pub fn is_qualified_reference(value: &str) -> bool {
 /// `<namespace>:@/<kind>/<value>` for a project-scope kind, and
 /// `<namespace>:<short-id>/<value>` for an issue-scope kind or a credit namespace.
 pub fn unqualified_link_message(
-    issue_short_id: &str,
+    issue_id: &IssueId,
     namespace: &str,
     value: &str,
     kinds: &[ItemKind],
     credit_namespaces: &HashSet<String>,
 ) -> Option<String> {
+    let issue_short_id = issue_id.short_id();
     if is_qualified_reference(value) {
         return None;
     }
@@ -1525,9 +1526,14 @@ mod tests {
     fn test_unqualified_link_message_names_replacement_per_kind_scope() {
         let kinds = [req_kind(), invariant_kind()];
         let none = HashSet::new();
-        let issue_scoped =
-            unqualified_link_message("abc12345", "satisfies", "REQ-01", &kinds, &none)
-                .expect("bare satisfies value is reported");
+        let issue_scoped = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "satisfies",
+            "REQ-01",
+            &kinds,
+            &none,
+        )
+        .expect("bare satisfies value is reported");
         assert!(
             issue_scoped.contains("'satisfies:REQ-01'"),
             "{issue_scoped}"
@@ -1536,8 +1542,14 @@ mod tests {
             issue_scoped.contains("'satisfies:<short-id>/REQ-01'"),
             "{issue_scoped}"
         );
-        let project_scoped = unqualified_link_message("abc12345", "enforces", "dag", &kinds, &none)
-            .expect("bare enforces value is reported");
+        let project_scoped = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "enforces",
+            "dag",
+            &kinds,
+            &none,
+        )
+        .expect("bare enforces value is reported");
         assert!(
             project_scoped.contains("'enforces:@/invariant/dag'"),
             "{project_scoped}"
@@ -1547,8 +1559,14 @@ mod tests {
     #[test]
     fn test_unqualified_link_message_reports_credit_namespace_without_kind() {
         let credit = HashSet::from(["tests".to_string()]);
-        let message = unqualified_link_message("abc12345", "tests", "H-1", &[], &credit)
-            .expect("bare credit-namespace value is reported");
+        let message = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "tests",
+            "H-1",
+            &[],
+            &credit,
+        )
+        .expect("bare credit-namespace value is reported");
         assert!(message.contains("'tests:<short-id>/H-1'"), "{message}");
     }
 
@@ -1562,7 +1580,14 @@ mod tests {
             ("type", "task"),
         ] {
             assert!(
-                unqualified_link_message("a", namespace, value, &kinds, &credit).is_none(),
+                unqualified_link_message(
+                    &crate::test_utils::issue_id(1),
+                    namespace,
+                    value,
+                    &kinds,
+                    &credit
+                )
+                .is_none(),
                 "{namespace}:{value}"
             );
         }

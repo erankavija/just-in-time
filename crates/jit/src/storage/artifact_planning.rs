@@ -74,7 +74,7 @@ pub fn resolve_container_destination<S: IssueStore>(
     Ok(derive_container_destination(
         preferred_root,
         legacy_root,
-        container_id.as_str(),
+        container_id,
         &evidence,
     )?)
 }

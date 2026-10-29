@@ -679,7 +679,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let inventory = inventory_explicit_roots(
         &issues,
         &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
-        ExplicitRootTarget::Container(issues[0].id.as_str()),
+        ExplicitRootTarget::Container(&issues[0].id),
         &pin_evidence(true),
     )
     .unwrap();
@@ -709,7 +709,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     let inventory = inventory_explicit_roots(
         &issues,
         &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
-        ExplicitRootTarget::Container(issues[0].id.as_str()),
+        ExplicitRootTarget::Container(&issues[0].id),
         &pin_evidence(false),
     )
     .unwrap();

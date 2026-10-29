@@ -14,10 +14,10 @@ use crate::domain::artifact_plan::{
     EdgeResolutionMode, EvidenceCode, PendingDeletion, PlanBlocker, PlanError, PlanTarget,
     PlanWarning, PolicyStatus, ReferenceChange, WarningCode,
 };
+use crate::domain::identity::{IssueId, IssueIdStaging};
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
 use crate::domain::State;
-use crate::domain::SHORT_ID_LENGTH;
 use crate::labels::type_value_of;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -216,7 +216,7 @@ pub struct EmbeddedArtifactOwner {
     /// Direct issue-linked working-tree document from which the closure starts.
     pub root: String,
     /// Full durable owner issue id.
-    pub issue: String,
+    pub issue: IssueId,
     /// Current lifecycle state of the owner.
     pub state: State,
     /// Pre-archive origin, so an `Archived` owner classifies by its effective
@@ -415,7 +415,7 @@ pub enum ArtifactEvidenceError {
 pub fn resolve_container_destination(
     preferred_root: &str,
     legacy_root: &str,
-    container_id: &str,
+    container_id: &IssueId,
     evidence: &ArtifactEvidenceMap,
 ) -> Result<ResolvedContainerDestination, ArtifactEvidenceError> {
     let archive_root = Path::new(legacy_root)
@@ -451,7 +451,7 @@ pub fn resolve_container_destination(
             let marker = format!("{child}/.jit-container");
             if matches!(
                 required_resolution_evidence(evidence, &marker)?,
-                ArtifactEvidence::File(owner) if owner.trim_ascii() == container_id.as_bytes()
+                ArtifactEvidence::File(owner) if owner.trim_ascii() == container_id.as_str().as_bytes()
             ) {
                 matching_roots.push(child.clone());
             }
@@ -567,12 +567,12 @@ fn location_from_evidence(
 fn container_destination_from_evidence(
     destination_root: &str,
     policy: &ArtifactClassificationPolicy,
-    container_id: &str,
+    container_id: &IssueId,
     artifacts: &[ArtifactPlanEntry],
     evidence: &ArtifactEvidenceMap,
 ) -> Result<ContainerDestinationState, ArtifactEvidenceError> {
     let target = PlanTarget::Container {
-        id: container_id.to_string(),
+        id: container_id.clone(),
     };
     let entries = match required_resolution_evidence(evidence, destination_root)? {
         ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Available),
@@ -598,7 +598,7 @@ fn container_destination_from_evidence(
                     path: marker_path.clone(),
                 }
             })?;
-            return Ok(if owner == container_id {
+            return Ok(if owner == container_id.as_str() {
                 ContainerDestinationState::Available
             } else {
                 ContainerDestinationState::Conflict
@@ -1688,8 +1688,8 @@ fn target_document_path(target: &PlanTarget) -> Option<String> {
     }
 }
 
-fn container_short_id(id: &str) -> String {
-    id.chars().take(SHORT_ID_LENGTH).collect()
+fn container_short_id(id: &IssueId) -> String {
+    id.short_id().to_string()
 }
 
 /// Where one plan publishes each repository-relative source beneath its
@@ -1879,7 +1879,9 @@ mod tests {
     use proptest::prelude::*;
     use std::collections::HashMap;
 
-    const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
+    fn container_id() -> IssueId {
+        crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12)
+    }
 
     fn identity(bytes: &[u8]) -> ContentIdentity {
         ContentIdentity::from_bytes(bytes)
@@ -2420,7 +2422,7 @@ mod tests {
         let cases = [
             (
                 vec!["archive/abcdef12-old"],
-                vec![("archive/abcdef12-old", format!(" \n{CONTAINER}\t"))],
+                vec![("archive/abcdef12-old", format!(" \n{}\t", container_id()))],
                 false,
                 "archive/abcdef12-old",
                 Vec::new(),
@@ -2429,8 +2431,8 @@ mod tests {
             (
                 vec!["archive/abcdef12-a", "archive/abcdef12-b"],
                 vec![
-                    ("archive/abcdef12-a", CONTAINER.to_string()),
-                    ("archive/abcdef12-b", CONTAINER.to_string()),
+                    ("archive/abcdef12-a", container_id().to_string()),
+                    ("archive/abcdef12-b", container_id().to_string()),
                 ],
                 false,
                 "archive/abcdef12-a",
@@ -2466,7 +2468,7 @@ mod tests {
             let resolved = resolve_container_destination(
                 "archive/abcdef12-new",
                 "archive/abcdef12",
-                CONTAINER,
+                &container_id(),
                 &evidence,
             )
             .unwrap();
@@ -2547,7 +2549,12 @@ mod tests {
             ("archive/abcdef12".into(), ArtifactEvidence::Missing),
         ]);
         assert_eq!(
-            resolve_container_destination("archive/new", "archive/abcdef12", CONTAINER, &evidence,),
+            resolve_container_destination(
+                "archive/new",
+                "archive/abcdef12",
+                &container_id(),
+                &evidence,
+            ),
             Err(ArtifactEvidenceError::IncompleteEvidence {
                 path: "archive/unread".into(),
             })
@@ -2571,7 +2578,12 @@ mod tests {
             ("archive/abcdef12".into(), ArtifactEvidence::Missing),
         ]);
         assert_eq!(
-            resolve_container_destination("archive/new", "archive/abcdef12", CONTAINER, &evidence,),
+            resolve_container_destination(
+                "archive/new",
+                "archive/abcdef12",
+                &container_id(),
+                &evidence,
+            ),
             Err(ArtifactEvidenceError::IncompleteEvidence {
                 path: "archive/unmarked/.jit-container".into(),
             })
@@ -2590,7 +2602,7 @@ mod tests {
         assert!(resolve_container_destination(
             "archive/new",
             "archive/abcdef12",
-            CONTAINER,
+            &container_id(),
             &resolution
         )
         .is_err());
@@ -2670,7 +2682,8 @@ mod tests {
     #[test]
     fn test_classification_evidence_maps_each_destination_to_its_outcome() {
         let artifact = embedded("docs/a.md");
-        let owner_marker = |owner: &str| ArtifactEvidence::File(owner.as_bytes().to_vec());
+        let owner_marker =
+            |owner: &IssueId| ArtifactEvidence::File(owner.as_str().as_bytes().to_vec());
         let cases = [
             (
                 "absent",
@@ -2681,13 +2694,13 @@ mod tests {
             (
                 "owned by target",
                 directory(ArtifactListingScope::RecursiveFiles, &["archive/foreign"]),
-                Some(owner_marker(CONTAINER)),
+                Some(owner_marker(&container_id())),
                 ContainerDestinationState::Available,
             ),
             (
                 "owned by other",
                 directory(ArtifactListingScope::RecursiveFiles, &[]),
-                Some(owner_marker("another-container")),
+                Some(owner_marker(&crate::test_utils::issue_id(1))),
                 ContainerDestinationState::Conflict,
             ),
             (
@@ -3202,7 +3215,7 @@ mod tests {
     }
 
     fn bare_short_id_root() -> String {
-        format!("archive/{}", &CONTAINER[..SHORT_ID_LENGTH])
+        format!("archive/{}", container_id().short_id())
     }
 
     #[test]
