@@ -24,6 +24,12 @@
       "status": "passed",
       "updated_at": "2026-10-29T07:56:15.899628653Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6d6370a0-cd10-4d54-9a8b-7005ad0c26d7",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:00:17.014065069Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
@@ -41,5 +47,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "CLI suites that use the library carry typed issue ids",
-  "updated_at": "2026-10-29T07:56:15.899628653Z"
+  "updated_at": "2026-10-29T08:00:17.014065069Z"
 }
