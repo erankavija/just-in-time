@@ -3623,6 +3623,117 @@ mod tests {
     }
 
     #[test]
+    fn test_create_issue_under_dispatch_override_persists_the_audit_record_with_the_issue_events() {
+        use crate::domain::{LinkedCheckoutWriteStance, Priority};
+        use crate::storage::IssueStore;
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage.clone(),
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&taxonomy.config_fragment()),
+                ..Default::default()
+            },
+        );
+        let events_before = storage
+            .read_events()
+            .expect("read the event log before the permitted mutation");
+        let annotation = override_annotation();
+        let expected_checkout = std::path::PathBuf::from("/repo/.worktrees/feature");
+        let expected_declared_stance = LinkedCheckoutWriteStance::Refuse;
+        let expected_invocation_override = LinkedCheckoutWriteStance::Allow;
+
+        let (issue_id, _) = with_dispatch_mutation_annotation(annotation, || {
+            executor.issues().create_issue(
+                "Permitted mutation".to_string(),
+                "Issue created while an override permitted the invocation".to_string(),
+                Priority::Normal,
+                Vec::new(),
+                vec![crate::test_taxonomy::type_label(&taxonomy, 4)],
+                None,
+                None,
+                false,
+            )
+        })
+        .expect("the permitted mutation succeeds");
+
+        let events_after = storage
+            .read_events()
+            .expect("read the event log after the permitted mutation");
+        assert!(
+            events_after.starts_with(&events_before),
+            "the permitted mutation must preserve the prior event-log prefix"
+        );
+        let appended = &events_after[events_before.len()..];
+        let override_records = appended
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.body(),
+                    EventBody::LinkedCheckoutWriteOverridden { .. }
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            override_records.len(),
+            1,
+            "the permitted mutation must append exactly one linked-checkout override audit record"
+        );
+        let override_event = override_records[0];
+        let EventBody::LinkedCheckoutWriteOverridden {
+            checkout,
+            declared_stance,
+            invocation_override,
+            ..
+        } = override_event.body()
+        else {
+            unreachable!("the selected event is the linked-checkout override audit record");
+        };
+        assert_eq!(
+            checkout, &expected_checkout,
+            "the audit record must name the checkout selected by the dispatch site"
+        );
+        assert_eq!(
+            declared_stance, &expected_declared_stance,
+            "the audit record must preserve the declared linked-checkout write stance"
+        );
+        assert_eq!(
+            invocation_override, &expected_invocation_override,
+            "the audit record must preserve the invocation stance that permitted the mutation"
+        );
+        assert!(
+            !override_event.id().is_empty(),
+            "the finalizer must assign a non-empty identifier to the audit record"
+        );
+
+        let issue_created_timestamp = appended
+            .iter()
+            .find_map(|event| match event.body() {
+                EventBody::IssueCreated {
+                    issue_id: event_issue_id,
+                    ..
+                } if event_issue_id == &issue_id => Some(event.timestamp()),
+                _ => None,
+            })
+            .expect("the issue-created event must be in the same append as the audit record");
+        assert_eq!(
+            override_event.timestamp(),
+            issue_created_timestamp,
+            "the audit record and issue-created event must share one mutation timestamp"
+        );
+        assert!(
+            matches!(
+                appended.last(),
+                Some(event) if matches!(event.body(), EventBody::LinkedCheckoutWriteOverridden { .. })
+            ),
+            "canonical event ordering must place the override audit record last in the append"
+        );
+        storage
+            .load_issue(&issue_id)
+            .expect("the mutation explained by the audit record must be durable");
+    }
+
+    #[test]
     fn test_repository_layout_normalizes_only_leading_current_directory_components() {
         use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence, VirtualPath};
         let layout = RepositoryLayout::new(
