@@ -1314,7 +1314,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     continue;
                 };
                 if let Some(message) = crate::domain::item::unqualified_link_message(
-                    &issue.short_id(),
+                    &issue.id,
                     namespace,
                     value,
                     &kinds,

@@ -19,7 +19,6 @@
 //!   one recoverable repository delta.
 
 use super::*;
-use crate::domain::identity::IssueIdStaging;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -329,17 +328,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                         Ok::<_, anyhow::Error>(edges)
                     })?;
             let credit = Self::batch_credit_namespaces(&declarations)?;
-            let short_id_of = |key: &str| {
+            let issue_id_of = |key: &str| {
                 positions
                     .get(key)
-                    .map(|&index| created_issue_ids[index].short_id().to_string())
+                    .map(|&index| created_issue_ids[index].clone())
             };
             let drafts = defs
                 .iter()
                 .zip(&created_issue_ids)
                 .map(|(def, id)| {
                     let def = &BatchIssueDef {
-                        labels: resolve_labels(def, &credit, short_id_of).map_err(|_| {
+                        labels: resolve_labels(def, &credit, issue_id_of).map_err(|_| {
                             anyhow!("validated batch contains an unresolved label key")
                         })?,
                         ..def.clone()
@@ -401,27 +400,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         //     resolves to its entry's short id, so write validation below sees the
         //     final label shape.
         let credit = Self::batch_credit_namespaces(declarations)?;
-        let short_ids = defs
+        let issue_ids = defs
             .iter()
             .zip(ids)
-            .map(|(def, id)| (def.key.as_str(), id.short_id()))
+            .map(|(def, id)| (def.key.as_str(), id))
             .collect::<HashMap<_, _>>();
         let resolved_labels: Vec<Option<Vec<String>>> = defs
             .iter()
             .map(|def| {
-                resolve_labels(def, &credit, |key| {
-                    short_ids.get(key).map(|short_id| short_id.to_string())
-                })
-                .map_err(|unknown| {
-                    problems.extend(unknown.into_iter().map(|(label, missing)| {
-                        BatchValidationProblem::UnknownLabelKey {
-                            key: def.key.clone(),
-                            label,
-                            missing,
-                        }
-                    }))
-                })
-                .ok()
+                resolve_labels(def, &credit, |key| issue_ids.get(key).copied().cloned())
+                    .map_err(|unknown| {
+                        problems.extend(unknown.into_iter().map(|(label, missing)| {
+                            BatchValidationProblem::UnknownLabelKey {
+                                key: def.key.clone(),
+                                label,
+                                missing,
+                            }
+                        }))
+                    })
+                    .ok()
             })
             .collect();
 
@@ -607,18 +604,18 @@ fn batch_issue_ids(
 }
 
 /// `def`'s labels with every manifest-key reference in a `credit` namespace
-/// resolved through `short_id_of`, or every `(label, missing key)` that does not
+/// resolved through `issue_id_of`, or every `(label, missing key)` that does not
 /// resolve.
 fn resolve_labels(
     def: &BatchIssueDef,
     credit: &HashSet<String>,
-    short_id_of: impl Fn(&str) -> Option<String>,
+    issue_id_of: impl Fn(&str) -> Option<IssueId>,
 ) -> std::result::Result<Vec<String>, Vec<(String, String)>> {
     let (resolved, unknown): (Vec<_>, Vec<_>) = def
         .labels
         .iter()
         .map(|label| {
-            crate::domain::key_reference::resolve_key_reference(label, credit, &short_id_of)
+            crate::domain::key_reference::resolve_key_reference(label, credit, &issue_id_of)
                 .map_err(|missing| (label.clone(), missing))
         })
         .partition(std::result::Result::is_ok);
@@ -658,6 +655,7 @@ fn detect_cycle(defs: &[BatchIssueDef]) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueIdStaging;
     use crate::storage::InMemoryStorage;
 
     fn def(key: &str, deps: &[&str]) -> BatchIssueDef {
