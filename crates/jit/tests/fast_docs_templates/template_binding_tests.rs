@@ -21,6 +21,7 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::{Issue, Priority};
 use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::BTreeMap;
@@ -101,7 +102,7 @@ applies_to  = ["epic"]
 "#;
 
 /// Create a breakable container, returning its id.
-fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) -> String {
+fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) -> IssueId {
     executor
         .issues()
         .create_issue(

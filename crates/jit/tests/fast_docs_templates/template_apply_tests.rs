@@ -15,11 +15,13 @@
 //! reduced spine C→B→P→upstream.
 
 use jit::declarations::{GateChecker, GateMode};
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
+use jit::test_utils::issue_id;
 use jit::CommandExecutor;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -113,7 +115,7 @@ fn type_of(issue: &jit::domain::Issue) -> Option<String> {
     })
 }
 
-fn create_epic(h: &TestHarness, title: &str) -> String {
+fn create_epic(h: &TestHarness, title: &str) -> IssueId {
     // The area a document declaration names is one the repository declares, so
     // the fixture declares it before a template that names it is applied.
     declare_document_area(h);
@@ -147,8 +149,8 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
     id
 }
 
-fn container_binding(id: &str) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), id.to_string())])
+fn container_binding(id: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), id.clone())])
 }
 
 #[test]
@@ -449,7 +451,8 @@ fn test_apply_rejects_anchor_bound_to_missing_issue() {
     let epic = create_epic(&h, "Missing-anchor epic");
 
     let before = h.all_issues().len();
-    let bindings = BTreeMap::from([("container".to_string(), "deadbeefdeadbeef".to_string())]);
+    let missing_id = issue_id(1);
+    let bindings = BTreeMap::from([("container".to_string(), missing_id.clone())]);
     let err = h
         .executor
         .apply_template_with(&template, &epic, &bindings, false)
@@ -628,7 +631,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     assert_eq!(refreshed.created_node_ids_by_role["planning"], planning_id);
 
     // Exactly one breakdown node (with brackets:<C-short-id>) and one planning node remain.
-    let short_id: String = epic.chars().take(8).collect();
+    let short_id = epic.short_id();
     let bracket_label = format!("brackets:{short_id}");
     let breakdown_count = h
         .all_issues()
@@ -1693,16 +1696,15 @@ fn engine_config() -> ProptestConfig {
 }
 
 /// Build an isolated harness with an `epic` container that has `upstream_count`
-/// pre-existing upstream dependencies. Returns the harness, the container's short
-/// id, and the full ids of its upstream deps (the move-upstream transform's
-/// snapshot input).
+/// pre-existing upstream dependencies. Returns the harness, the container id,
+/// and its upstream dependency ids (the move-upstream transform's snapshot input).
 fn harness_with_upstreams(
     title: &str,
     upstream_count: usize,
-) -> (TestHarness, String, Vec<String>) {
+) -> (TestHarness, IssueId, Vec<IssueId>) {
     let h = TestHarness::new();
     let epic = create_epic(&h, title);
-    let upstreams: Vec<String> = (0..upstream_count)
+    let upstreams: Vec<IssueId> = (0..upstream_count)
         .map(|i| {
             let up = h.create_issue(&format!("Upstream {i}"));
             h.executor.add_dependency(&epic, &up).unwrap();
@@ -1728,7 +1730,7 @@ fn store_is_acyclic(h: &TestHarness) -> bool {
 /// reduction must leave the result in this reduced form.
 fn store_is_transitively_reduced(h: &TestHarness) -> bool {
     let issues = h.all_issues();
-    let deps_by_id: BTreeMap<String, Vec<String>> = issues
+    let deps_by_id: BTreeMap<IssueId, Vec<IssueId>> = issues
         .iter()
         .map(|i| (i.id.clone(), i.dependencies.clone()))
         .collect();
@@ -1737,12 +1739,12 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
     // ignoring a single direct edge `(start -> skip)` so we can ask "is `target`
     // reachable WITHOUT the direct edge under test".
     fn reachable(
-        deps_by_id: &BTreeMap<String, Vec<String>>,
-        start: &str,
-        target: &str,
-        skip: (&str, &str),
+        deps_by_id: &BTreeMap<IssueId, Vec<IssueId>>,
+        start: &IssueId,
+        target: &IssueId,
+        skip: (&IssueId, &IssueId),
     ) -> bool {
-        let mut stack = vec![start.to_string()];
+        let mut stack = vec![start.clone()];
         let mut seen = std::collections::HashSet::new();
         while let Some(node) = stack.pop() {
             if !seen.insert(node.clone()) {
@@ -1750,7 +1752,7 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
             }
             if let Some(deps) = deps_by_id.get(&node) {
                 for dep in deps {
-                    if node == skip.0 && dep == skip.1 {
+                    if &node == skip.0 && dep == skip.1 {
                         continue; // ignore the direct edge under test
                     }
                     if dep == target {
@@ -1767,14 +1769,14 @@ fn store_is_transitively_reduced(h: &TestHarness) -> bool {
         deps.iter().all(|to| {
             // The direct edge `from -> to` is redundant iff `to` is still reachable
             // from `from` after removing that edge. A reduced graph has none.
-            !reachable(&deps_by_id, from, to, (from.as_str(), to.as_str()))
+            !reachable(&deps_by_id, from, to, (from, to))
         })
     })
 }
 
 /// The set of `(issue_id, sorted dependency_ids)` pairs across the whole store —
 /// the canonical "node + edge set" fingerprint used to compare two graph states.
-fn edge_fingerprint(h: &TestHarness) -> BTreeMap<String, Vec<String>> {
+fn edge_fingerprint(h: &TestHarness) -> BTreeMap<IssueId, Vec<IssueId>> {
     h.all_issues()
         .into_iter()
         .map(|i| {

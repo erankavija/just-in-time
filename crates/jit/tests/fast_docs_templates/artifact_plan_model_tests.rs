@@ -4,6 +4,8 @@ use jit::domain::artifact_plan::{
     PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
     ARCHIVE_PLAN_SCHEMA_VERSION,
 };
+use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::test_utils::issue_id;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
@@ -15,15 +17,14 @@ fn artifact(source: &str, version: ArtifactVersion) -> ArtifactPlanEntry {
 }
 
 fn configured_plan(
+    id: &IssueId,
     artifacts: Vec<ArtifactPlanEntry>,
     blockers: Vec<PlanBlocker>,
     warnings: Vec<PlanWarning>,
 ) -> ArtifactPlan {
     ArtifactPlan::new(
-        PlanTarget::Container {
-            id: "7d3a3a47-1e1c-466b-992c-b2df7ccae978".to_string(),
-        },
-        "dev/archive/7d3a3a47",
+        PlanTarget::Container { id: id.clone() },
+        format!("dev/archive/{}", id.short_id()),
         PolicyStatus::Configured,
         artifacts,
         blockers,
@@ -43,8 +44,10 @@ fn object_keys(value: &Value) -> BTreeSet<&str> {
 
 #[test]
 fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
+    let container_id = issue_id(1);
     let pinned = ArtifactVersion::pinned(FULL_SHA1_OID).unwrap();
     let first = configured_plan(
+        &container_id,
         vec![
             artifact("./dev//z.md", ArtifactVersion::WorkingTree),
             artifact("dev/a.md", ArtifactVersion::WorkingTree),
@@ -61,6 +64,7 @@ fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
         ],
     );
     let second = configured_plan(
+        &container_id,
         vec![
             artifact("dev/a.md", pinned),
             artifact("dev/a.md", ArtifactVersion::WorkingTree),
@@ -239,6 +243,7 @@ fn test_content_identity_is_derived_from_one_byte_slice() {
 #[test]
 fn test_pinned_artifact_is_non_relocating_historical_entry() {
     let value = serde_json::to_value(configured_plan(
+        &issue_id(1),
         vec![artifact(
             "dev/active/history.md",
             ArtifactVersion::pinned(FULL_SHA1_OID).unwrap(),
@@ -269,6 +274,7 @@ fn test_preview_and_execution_share_the_artifact_plan_type() {
     }
 
     let plan = configured_plan(
+        &issue_id(1),
         vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
         Vec::new(),
         Vec::new(),
@@ -285,6 +291,7 @@ fn test_preview_and_execution_share_the_artifact_plan_type() {
 #[test]
 fn test_artifact_plan_decode_rejects_a_non_canonical_plan() {
     let wire = serde_json::to_value(configured_plan(
+        &issue_id(1),
         vec![
             artifact("dev/a.md", ArtifactVersion::WorkingTree),
             artifact("dev/b.md", ArtifactVersion::WorkingTree),
@@ -315,6 +322,7 @@ fn test_artifact_plan_decode_rejects_a_non_canonical_plan() {
 #[test]
 fn test_archive_plan_schema_v1_golden_fields() {
     let value = serde_json::to_value(configured_plan(
+        &issue_id(1),
         vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
         Vec::new(),
         Vec::new(),
