@@ -762,7 +762,7 @@
     "13190465": 1,
     "b73b3e5a": 1
   },
-  "external_blockers": "19d9bd7d waits on c780514e 3f01cb72, 6a13eeac, 8f87e366; 13190465 on 3ca153c7, 53d582ab; b45a2865 on b58ea1e2, ce097844; b73b3e5a on f0bee761 (just-in-time-4f).",
+  "external_blockers": "19d9bd7d waits on c780514e 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627), led by just-in-time-4f. c797b59b waits on 19d9bd7d.",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
   "dispatch_log": [
     {
@@ -1553,6 +1553,9 @@
     },
     "e2eb8862 (landed d273d0962, closed 8b9fccb1d)",
     "2c9badcd (landed 8b1d10d66 after rework 1)",
-    "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)"
+    "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)",
+    "13190465 (1afa3fa0b, rework 1)",
+    "b45a2865 (520da32bc)",
+    "b73b3e5a (42ee68606, rework 1)"
   ]
 }
