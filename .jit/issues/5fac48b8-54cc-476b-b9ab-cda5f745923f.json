@@ -29,6 +29,12 @@
       "status": "passed",
       "updated_at": "2026-10-28T23:23:00.822066236Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "496c9dd1-eb02-4494-af92-98975a9747cd",
+      "status": "failed",
+      "updated_at": "2026-10-28T23:27:49.816420991Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
@@ -45,5 +51,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Issue drafts carry their pre-derived identifier",
-  "updated_at": "2026-10-28T23:23:00.822066236Z"
+  "updated_at": "2026-10-28T23:27:49.816420991Z"
 }
