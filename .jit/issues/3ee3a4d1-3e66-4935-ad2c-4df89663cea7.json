@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "c4d19420-d9aa-4a72-bbbd-2098bf90ffa2",
+      "run_id": "2f6c020c-9b0f-4030-beda-7d1449d08f34",
       "status": "passed",
-      "updated_at": "2026-10-29T08:32:13.240199081Z",
+      "updated_at": "2026-10-29T08:38:40.445637294Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Domain types carry issue ids as IssueId",
-  "updated_at": "2026-10-29T08:38:13.605262965Z"
+  "updated_at": "2026-10-29T08:38:40.445637294Z"
 }
