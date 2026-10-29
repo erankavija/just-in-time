@@ -1,6 +1,7 @@
 //! Tests for label-based query functionality (Phase 1.4)
 
 use jit::commands::test_helpers::memory_executor;
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 
@@ -56,7 +57,7 @@ fn test_query_by_label_exact_match() {
     let results = executor.query_by_label("milestone:v1.0").unwrap();
 
     assert_eq!(results.len(), 2);
-    let result_ids: Vec<String> = results.iter().map(|i| i.id.clone()).collect();
+    let result_ids: Vec<IssueId> = results.iter().map(|i| i.id.clone()).collect();
     assert!(result_ids.contains(&milestone_id));
     assert!(result_ids.contains(&epic_id));
 }
@@ -79,7 +80,7 @@ fn create_labeled(
     executor: &jit::commands::CommandExecutor<InMemoryStorage>,
     title: &str,
     labels: &[&str],
-) -> String {
+) -> IssueId {
     executor
         .issues()
         .create_issue(
@@ -110,7 +111,7 @@ fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set
     let queried = executor.query_by_labels(&[pattern]).unwrap();
 
     let ids = |issues: &[jit::domain::Issue]| {
-        let mut ids: Vec<_> = issues.iter().map(|i| i.id.clone()).collect();
+        let mut ids: Vec<IssueId> = issues.iter().map(|i| i.id.clone()).collect();
         ids.sort();
         ids
     };

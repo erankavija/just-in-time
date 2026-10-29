@@ -1,6 +1,7 @@
 //! Tests for strategic queries (Phase 3)
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -33,7 +34,7 @@ fn test_query_strategic_returns_every_declared_strategic_type() {
         },
     );
 
-    let strategic_ids: Vec<String> = taxonomy
+    let strategic_ids: Vec<IssueId> = taxonomy
         .strategic_types
         .iter()
         .map(|type_name| {
@@ -74,6 +75,6 @@ fn test_query_strategic_returns_every_declared_strategic_type() {
     let strategic = executor.query_strategic().unwrap();
 
     assert_eq!(strategic.len(), taxonomy.strategic_types.len());
-    let ids: Vec<String> = strategic.iter().map(|i| i.id.clone()).collect();
+    let ids: Vec<IssueId> = strategic.iter().map(|i| i.id.clone()).collect();
     assert!(strategic_ids.iter().all(|id| ids.contains(id)));
 }

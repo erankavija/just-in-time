@@ -17,7 +17,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8489688e-e9be-40d8-bd54-b05fb1d1fce1",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:04:27.931083797Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "163ce662-582d-4438-b6b8-f7b4c398db56",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:03:00.510411519Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b45a2865-2fa4-44d4-a2ef-01e661d61486",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "The fast_rules suite carries typed canonical issue ids",
-  "updated_at": "2026-10-28T23:34:48.801656263Z"
+  "updated_at": "2026-10-29T00:04:27.931083797Z"
 }
