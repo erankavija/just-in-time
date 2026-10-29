@@ -1523,7 +1523,8 @@
     "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression.",
     "Run cargo-ci on the branch before code-review; review fails unverified backend/test criteria otherwise.",
     "State dev/active/ out of footprint in Codex briefs; workers rewrite other epics planning docs in prose sweeps.",
-    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch."
+    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch.",
+    "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure."
   ],
   "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [
