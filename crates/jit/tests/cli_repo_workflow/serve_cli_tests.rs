@@ -481,9 +481,8 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
         phase(DAEMON_STOP_BUDGET),
     );
 
-    assert_eq!(
-        status.and_then(|status| status.code()),
-        Some(0),
+    assert!(
+        status.is_some_and(|status| status.success()),
         "`jit serve` must report a start it can stand behind, got: {output}"
     );
     assert_eq!(
@@ -496,9 +495,8 @@ fn test_serve_reports_a_started_server_only_once_it_answers() {
         "the server `jit serve` reported started must be answering on the port \
          it reported: {output}"
     );
-    assert_eq!(
-        stop_status.and_then(|status| status.code()),
-        Some(0),
+    assert!(
+        stop_status.is_some_and(|status| status.success()),
         "the reported server must be stoppable through its record, got: \
          {stop_output}"
     );
