@@ -1499,9 +1499,12 @@
     "Unresolved request text is not an IssueId; error/DTO carriers of it stay strings (8acca4f4).",
     "Codex re-adds #[allow(...)] even when a rework item forbids it; grep the diff for #[allow before review.",
     "Write story-review gap tasks as class sweeps over the whole crate, not single sites (83d04069 needed 3 rounds).",
-    "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression."
+    "The cargo-ci suite budget can fail on a quiet start when load rises mid-run (63 s vs 11.5 s alone); confirm with a nextest timing run before treating it as a regression.",
+    "Run cargo-ci on the branch before code-review; review fails unverified backend/test criteria otherwise.",
+    "State dev/active/ out of footprint in Codex briefs; workers rewrite other epics planning docs in prose sweeps.",
+    "Code-review treats \"no code path creates X\" as a type-level guarantee; check staged criteria before dispatch."
   ],
-  "session_note": "Session 4 handoff written as handoff-3.md; see it for next actions.",
+  "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
   "decisions": [
     {
       "issue": "8acca4f4",
