@@ -21,6 +21,12 @@
       "status": "passed",
       "updated_at": "2026-10-29T08:05:33.792516313Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "57c91662-2ee1-4c46-b840-f340214ef97b",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:10:32.514340767Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
@@ -38,5 +44,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Storage trait and backends take issue ids as IssueId",
-  "updated_at": "2026-10-29T08:05:33.792516313Z"
+  "updated_at": "2026-10-29T08:10:32.514340767Z"
 }
