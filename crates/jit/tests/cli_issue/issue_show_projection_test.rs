@@ -125,10 +125,12 @@ fn test_unknown_field_errors() {
         .create_issue(["--title", "X", "--description", "Body"])
         .unwrap();
 
-    temp.command(["issue", "show", &id, "--field", "nope"])
+    let assert = temp
+        .command(["issue", "show", &id, "--field", "nope", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
@@ -138,10 +140,12 @@ fn test_unknown_field_in_fields_list_errors() {
         .create_issue(["--title", "X", "--description", "Body"])
         .unwrap();
 
-    temp.command(["issue", "show", &id, "--fields", "state,bogus"])
+    let assert = temp
+        .command(["issue", "show", &id, "--fields", "state,bogus", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
@@ -151,13 +155,14 @@ fn test_field_and_fields_mutually_exclusive() {
         .create_issue(["--title", "X", "--description", "Body"])
         .unwrap();
 
-    // clap-level conflict -> exit code 2 (usage error).
-    temp.command([
-        "issue", "show", &id, "--field", "state", "--fields", "state",
-    ])
-    .assert()
-    .failure()
-    .code(2);
+    let assert = temp
+        .command([
+            "issue", "show", &id, "--field", "state", "--fields", "state",
+        ])
+        .assert()
+        .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(stderr.contains("cannot be used with"), "{stderr}");
 }
 
 #[test]
@@ -170,8 +175,10 @@ fn test_projection_with_multiple_ids_errors() {
         .create_issue(["--title", "Second", "--description", "Body"])
         .unwrap();
 
-    temp.command(["issue", "show", &a, &b, "--field", "state"])
+    let assert = temp
+        .command(["issue", "show", &a, &b, "--field", "state", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
+    let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }

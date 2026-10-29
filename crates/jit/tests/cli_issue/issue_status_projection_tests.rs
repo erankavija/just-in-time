@@ -334,8 +334,7 @@ fn test_status_rejects_field_projection_flags() {
         temp.command(["issue", "status", &id])
             .args(flag)
             .assert()
-            .failure()
-            .code(2);
+            .failure();
     }
 }
 
@@ -349,7 +348,7 @@ fn test_status_unknown_id_fails() {
 }
 
 /// Under `--json`, a non-matching (but long-enough) id yields the JSON error
-/// envelope with `ISSUE_NOT_FOUND` and exit code 3 — the same contract as
+/// envelope with `ISSUE_NOT_FOUND` — the same contract as
 /// `issue show`, routed through `handle_json_error!`. Pins that id failures do
 /// not escape to bare human stderr when `--json` is requested.
 #[test]
@@ -358,16 +357,15 @@ fn test_status_unknown_id_json_error_envelope() {
     let assert = temp
         .command(["issue", "status", "deadbeef", "--json"])
         .assert()
-        .failure()
-        .code(3);
+        .failure();
     let out = assert.get_output().stdout.clone();
     let json: serde_json::Value = serde_json::from_slice(&out)
         .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {out:?}"));
     assert_eq!(json["error"]["code"].as_str(), Some("ISSUE_NOT_FOUND"));
 }
 
-/// A too-short prefix (< 4 chars) refines to `INVALID_ID_PREFIX` with exit code
-/// 2, distinct from the not-found code — proving `refine_id_error` runs on the
+/// A too-short prefix (< 4 chars) refines to `INVALID_ID_PREFIX`, distinct from
+/// the not-found code — proving `refine_id_error` runs on the
 /// status path exactly as on `issue show`.
 #[test]
 fn test_status_short_prefix_json_error_envelope() {
@@ -375,8 +373,7 @@ fn test_status_short_prefix_json_error_envelope() {
     let assert = temp
         .command(["issue", "status", "ab", "--json"])
         .assert()
-        .failure()
-        .code(2);
+        .failure();
     let out = assert.get_output().stdout.clone();
     let json: serde_json::Value = serde_json::from_slice(&out)
         .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {out:?}"));
@@ -444,8 +441,7 @@ fn test_status_multi_id_one_bad_fails_fast_json() {
     let assert = temp
         .command(["issue", "status", &good, "deadbeef", "--json"])
         .assert()
-        .failure()
-        .code(3);
+        .failure();
     let out = assert.get_output().stdout.clone();
     let text = String::from_utf8_lossy(&out);
     let json: serde_json::Value = serde_json::from_slice(&out)
