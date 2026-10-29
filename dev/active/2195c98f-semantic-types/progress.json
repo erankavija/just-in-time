@@ -728,7 +728,7 @@
     },
     {
       "issue": "5fac48b8",
-      "status": "open",
+      "status": "resolved",
       "reason": "code-review F1 [high, blocking] on REQ-01 (\"no code path creates an issue whose id is empty\"): IssueId is still the String alias (identity.rs:15), so Issue::draft accepts an empty id and the type cannot guarantee REQ-01. The plan stages issue ids behind that alias until the flip 7abcc22d, which is downstream of 5fac48b8 (5fac48b8 → 641bd14e → 89e7a273 → 3ee3a4d1 → 7abcc22d). No production or test path builds an empty id after the change (branch worktree-agent-5fac48b8, 4608d2843; cargo-ci passed).",
       "options": [
         "A (recommended): amend 5fac48b8 REQ-01 to state that no code path creates an empty issue id, with the type-level guarantee delivered by the flip 7abcc22d; re-run code-review",
@@ -742,7 +742,14 @@
         "7abcc22d",
         "c797b59b (via 13190465 path unaffected)",
         "all post-flip tasks"
-      ]
+      ],
+      "resolution": "Invoker chose A (2026-10-29): REQ-01 amended; code-review passed with 0 findings; landed 7af3dc393, closed eb3a28427."
+    },
+    {
+      "issue": "f71504cd",
+      "status": "resolved",
+      "reason": "Out-of-epic bug reported by gf2: jit doc check-links captures every referenced document in full (7.4 GB vs 512 MiB).",
+      "resolution": "Invoker: fix it in this session, outside the epic (not a child of 2195c98f)."
     }
   ],
   "rework_counts": {
@@ -1443,6 +1450,20 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "rework 1: code-review F1, String-valued binding maps"
+    },
+    {
+      "issue": "f71504cd",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "default",
+      "reason": "out-of-epic bug fix (invoker approved); storage capture mechanism, kind-only requests"
+    },
+    {
+      "issue": "641bd14e",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "repository_state retyping; multi-file core family, literal REQ-03"
     }
   ],
   "surfaced_pitfalls": [
@@ -1559,6 +1580,7 @@
     "0af95f14 (landed c66663dc8; in-epic, reclaimed from planning-lead-c780514e)",
     "13190465 (1afa3fa0b, rework 1)",
     "b45a2865 (520da32bc)",
-    "b73b3e5a (42ee68606, rework 1)"
+    "b73b3e5a (42ee68606, rework 1)",
+    "5fac48b8 (7af3dc393, after REQ-01 amendment)"
   ]
 }
