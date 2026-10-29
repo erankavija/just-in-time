@@ -21405,3 +21405,11 @@
 {"assignee":"agent:jit-execution-lead","id":"aaba6b8f-9c5f-4cc9-96b8-229bc6835cd4","issue_id":"89e7a273-d03b-4b85-aea1-b2d5adf5c1c6","timestamp":"2026-10-29T07:48:23.783144569Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"b5b2ba27-092c-4bbe-a847-e707eeabbd06","issue_id":"89e7a273-d03b-4b85-aea1-b2d5adf5c1c6","timestamp":"2026-10-29T08:05:33.792516313Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"59f09834-2700-4f29-b557-dc1b2cdba124","issue_id":"89e7a273-d03b-4b85-aea1-b2d5adf5c1c6","timestamp":"2026-10-29T08:10:32.514340767Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"f3d3a9d3-7b1a-4c34-935c-5782063830ee","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T07:56:15.899628653Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"94e11669-4448-4abd-ab6a-f37c56c5712d","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:00:17.014065069Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"df4b1217-31ae-44fc-afba-432a6e2f06ee","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:03:48.117949867Z","type":"gate_failed","updated_by":"auto:executor"}
+{"from":"ready","id":"4357e1a4-126e-4109-9d7c-0a6e899214e3","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:03:54.144758934Z","to":"gated","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"0ab4f292-f35a-4982-a1f2-294ba806f5d8","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:08:13.040217480Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"gated","id":"e8e27928-2323-4704-9c30-556cc2291c67","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:08:23.149279082Z","to":"done","type":"issue_state_changed"}
+{"id":"30230a78-fcda-4781-94b0-63857902db68","issue_id":"19d9bd7d-b8ee-4b4a-80b4-eb3315084c79","timestamp":"2026-10-29T08:08:23.149279082Z","type":"issue_completed"}
+{"from":"backlog","id":"02dde36c-6c12-488a-bb88-523b0f67f115","issue_id":"c797b59b-0f5e-4e12-9a36-b3b95d7b92c1","timestamp":"2026-10-29T08:08:23.275845617Z","to":"ready","type":"issue_state_changed"}

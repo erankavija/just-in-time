@@ -106,7 +106,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     // `gate status-all` is the CLI's gate-readiness report; what its exit status
     // says about readiness is its own suite's property.
     let output = repo
-        .command(["gate", "status-all", &issue_id, "--json"])
+        .command(["gate", "status-all", issue_id.as_str(), "--json"])
         .output()
         .expect("spawn the jit gate readiness subprocess");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {

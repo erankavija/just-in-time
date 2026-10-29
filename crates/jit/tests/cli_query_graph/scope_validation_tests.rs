@@ -14,16 +14,17 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
+use jit::domain::identity::{IssueId, IssueIdStaging};
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
-use jit::test_utils::document_reference;
+use jit::test_utils::{document_reference, issue_id};
 
 trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String;
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId;
 }
 
 impl ScopeFixtureStore for InMemoryStorage {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId {
         let id = issue.id.clone();
         jit::test_harness::seed_memory_issue(executor.storage(), &issue);
         id
@@ -31,7 +32,7 @@ impl ScopeFixtureStore for InMemoryStorage {
 }
 
 impl ScopeFixtureStore for jit::storage::JsonFileStorage {
-    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
+    fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId {
         let dependencies = issue.dependencies.clone();
         let documents = issue.documents.clone();
         let target_state = issue.state;
@@ -96,10 +97,10 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
 /// the template path. The container itself is not modified.
 fn wire_plan_bracket<S: ScopeFixtureStore>(
     executor: &CommandExecutor<S>,
-    container_id: &jit::domain::identity::IssueId,
+    container_id: &IssueId,
     plan_path: &str,
     planning_state: State,
-) -> String {
+) -> IssueId {
     let c_short = executor
         .storage()
         .load_issue(container_id)
@@ -107,7 +108,7 @@ fn wire_plan_bracket<S: ScopeFixtureStore>(
         .short_id();
 
     let mut p = crate::fixture_issue("planning".to_string(), String::new());
-    p.id = format!("plan-{container_id}");
+    p.id = derived_id(&["plan", container_id.as_str()]);
     p.labels = vec!["type:planning".to_string()];
     p.state = planning_state;
     p.documents.push(DocumentReference {
@@ -117,7 +118,7 @@ fn wire_plan_bracket<S: ScopeFixtureStore>(
     let p_id = S::publish_scope_issue(executor, p);
 
     let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
-    b.id = format!("break-{container_id}");
+    b.id = derived_id(&["break", container_id.as_str()]);
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{c_short}")];
     b.dependencies = vec![p_id.clone()];
     b.state = State::Backlog;
@@ -152,20 +153,25 @@ depends_on = ["planning"]
 /// Seed an exact issue preimage into the in-memory aggregate, returning its id.
 /// The deterministic id [`seed`] assigns, so a child can name its container's
 /// short id before the container exists.
-fn seed_id(title: &str, description: &str) -> String {
-    let hash = title
-        .bytes()
-        .chain(description.bytes())
+fn seed_id(title: &str, description: &str) -> IssueId {
+    derived_id(&[title, description])
+}
+
+/// A canonical issue id determined by `parts`, so equal inputs name one issue.
+fn derived_id(parts: &[&str]) -> IssueId {
+    let hash = parts
+        .iter()
+        .flat_map(|part| part.bytes())
         .fold(0xcbf29ce484222325_u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         });
-    format!("{hash:016x}-fixture")
+    issue_id(u128::from(hash))
 }
 
 /// The `satisfies` label crediting criterion `req` of the issue `seed` creates
 /// from `title` and `description`.
 fn credit(title: &str, description: &str, req: &str) -> String {
-    format!("satisfies:{}/{req}", &seed_id(title, description)[..8])
+    format!("satisfies:{}/{req}", seed_id(title, description).short_id())
 }
 
 fn seed(
@@ -173,8 +179,8 @@ fn seed(
     title: &str,
     labels: &[&str],
     description: &str,
-    deps: &[String],
-) -> String {
+    deps: &[IssueId],
+) -> IssueId {
     let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
     issue.id = seed_id(title, description);
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
@@ -202,7 +208,7 @@ assert = { label-coverage = { } }
 fn spine_with_breakdown_criteria(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
-) -> (String, String) {
+) -> (IssueId, IssueId) {
     // B declares the criterion; impl depends on B; C depends on impl.
     let b = seed(
         executor,
@@ -211,7 +217,7 @@ fn spine_with_breakdown_criteria(
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
         &[],
     );
-    let credit = format!("satisfies:{}/REQ-01", &b[..8]);
+    let credit = format!("satisfies:{}/REQ-01", b.short_id());
     let impl_labels: Vec<&str> = if impl_satisfies {
         vec!["type:task", &credit]
     } else {
@@ -230,7 +236,7 @@ fn spine_with_breakdown_criteria(
 
 /// A selected breakdown whose configured rule reads criteria from its bracketed
 /// container, plus a satisfying child in that container's dependency context.
-fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (String, String) {
+fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (IssueId, IssueId) {
     let criteria = "## Success Criteria\n\n- [hard] REQ-01: selected work\n";
     let child = seed(
         executor,
@@ -394,13 +400,19 @@ fn test_rule_validation_reports_selected_container_errors_precisely() {
         .any(|finding| finding.message.contains("names no known issue")));
 
     [
-        ("deadbeef-a", "ambiguous target one"),
-        ("deadbeef-b", "ambiguous target two"),
+        (
+            "deadbeef-0000-4000-8000-00000000000a",
+            "ambiguous target one",
+        ),
+        (
+            "deadbeef-0000-4000-8000-00000000000b",
+            "ambiguous target two",
+        ),
     ]
     .into_iter()
     .for_each(|(id, title)| {
         let mut target = crate::fixture_issue(title.to_string(), String::new());
-        target.id = id.to_string();
+        target.id = id.parse().expect("the fixture id is a canonical issue id");
         target.labels = vec!["type:epic".to_string()];
         jit::test_harness::seed_memory_issue(executor.storage(), &target);
     });
@@ -751,10 +763,10 @@ fn seed_breakdown_bracketing(
     executor: &CommandExecutor<InMemoryStorage>,
     pointer: &str,
     state: State,
-    deps: &[String],
-) -> String {
+    deps: &[IssueId],
+) -> IssueId {
     let mut b = crate::fixture_issue("breakdown".to_string(), String::new());
-    b.id = format!("break-{pointer}");
+    b.id = derived_id(&["break", pointer]);
     b.labels = vec!["type:breakdown".to_string(), format!("brackets:{pointer}")];
     b.dependencies = deps.to_vec();
     b.state = state;
@@ -789,7 +801,7 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
     );
     // B2 is completed and brackets C2; it is reachable from C1 via task1, so it
     // enters C1's slice as a breakdown boundary node while C2 does not.
-    let b2 = seed_breakdown_bracketing(&executor, &c2[..8], State::Done, &[]);
+    let b2 = seed_breakdown_bracketing(&executor, c2.short_id(), State::Done, &[]);
     let task1 = seed(
         &executor,
         "task1",
@@ -907,7 +919,7 @@ assert = { label-coverage = { satisfies-namespace = "satisfies", child-link = "d
 fn container_with_external_plan(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
-) -> String {
+) -> IssueId {
     let body = "no criteria in the body — the plan lives in the external file";
     let credit = credit("container", body, "REQ-77");
     let impl_labels: Vec<&str> = if impl_satisfies {
@@ -1064,7 +1076,7 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
     let err = executor.validate_scope(&c).unwrap_err();
     let message = err.to_string();
     assert!(
-        message.contains("plan document") && message.contains(&c[..8]),
+        message.contains("plan document") && message.contains(c.short_id()),
         "a plan missing after planning completed must surface as a contextual error: {message}"
     );
 }
@@ -1193,6 +1205,7 @@ fn test_inline_template_still_validates_from_body() {
 mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
+    use jit::domain::identity::{IssueId, IssueIdStaging};
     use jit::domain::State;
     use jit::storage::JsonFileStorage;
     use jit::test_utils::setup_test_repo_with_config;
@@ -1214,8 +1227,8 @@ mod file_backed_external_plan {
         title: &str,
         labels: &[&str],
         description: &str,
-        deps: &[String],
-    ) -> String {
+        deps: &[IssueId],
+    ) -> IssueId {
         let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
         issue.id = super::seed_id(title, description);
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
@@ -1233,7 +1246,7 @@ mod file_backed_external_plan {
         repo_root: &TempDir,
         executor: &CommandExecutor<JsonFileStorage>,
         impl_satisfies: bool,
-    ) -> String {
+    ) -> IssueId {
         let c = seed(
             executor,
             "container",
@@ -1241,7 +1254,7 @@ mod file_backed_external_plan {
             "no criteria in the body — the plan lives in the external file",
             &[],
         );
-        let credit = format!("satisfies:{}/REQ-77", &c[..8]);
+        let credit = format!("satisfies:{}/REQ-77", c.short_id());
         let impl_labels: Vec<&str> = if impl_satisfies {
             vec!["type:task", &credit]
         } else {
@@ -1316,6 +1329,7 @@ mod file_backed_external_plan {
 // ---------------------------------------------------------------------------
 
 mod cli {
+    use jit::domain::identity::{IssueId, IssueIdStaging};
     use jit::test_cli::JitCli;
     use jit::test_taxonomy::{
         setup_test_repo_with_taxonomy, type_label, TaxonomyRepo, TestTaxonomy,
@@ -1356,7 +1370,8 @@ assert = {{ label-coverage = {{ }} }}
                 &type_label(taxonomy, 3),
             ])
             .unwrap();
-        let credit = format!("satisfies:{}/REQ-01", &b[..8]);
+        let b_id: IssueId = b.parse().expect("the binary prints a canonical issue id");
+        let credit = format!("satisfies:{}/REQ-01", b_id.short_id());
         let implementation_label = type_label(taxonomy, 4);
         let impl_labels: &[&str] = if covered {
             &[&implementation_label, &credit]
