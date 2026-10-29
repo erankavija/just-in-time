@@ -11,6 +11,7 @@
   ],
   "description": "Retype the issue ids that the shared integration-test harness returns and accepts.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The shared harness (`crates/jit/src/test_harness.rs:108-224`, reached as `jit::test_harness`) returns created ids as `String` and takes `get_issue(&self, id: &str)`.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness's issue-creating helpers return `IssueId`, and its id-taking helpers take `&IssueId`.\n- [hard] REQ-02: Suite callers of the harness, which already pass `&IssueId`, compile unchanged.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "first_ready_at": "2026-10-29T08:08:23.275845617Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -29,7 +30,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "The shared integration harness carries typed issue ids",
-  "updated_at": "2026-10-21T10:50:27.147623693Z"
+  "updated_at": "2026-10-29T08:08:23.275845617Z"
 }
