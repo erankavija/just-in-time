@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ae698bd9-63bd-49bd-bd3f-d96193feae64",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:24:14.938052751Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5816b6ef-fd12-4406-a303-b1e505a033cd",
+      "status": "failed",
+      "updated_at": "2026-10-29T07:29:51.934616258Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f01cb72-5726-43bd-bb1f-136a640bc0aa",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "cli_query_graph tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:06:13.581648329Z"
+  "updated_at": "2026-10-29T07:29:51.934616258Z"
 }
