@@ -750,6 +750,18 @@
       "status": "resolved",
       "reason": "Out-of-epic bug reported by gf2: jit doc check-links captures every referenced document in full (7.4 GB vs 512 MiB).",
       "resolution": "Invoker: fix it in this session, outside the epic (not a child of 2195c98f)."
+    },
+    {
+      "issue": "(none; out-of-epic product question from gf2)",
+      "status": "open",
+      "reason": "After f71504cd, full check-links on gf2 completes (69653 docs, 2353 errors, 3211 warnings); errors are link-like text inside non-markdown sources and immutable benchmark-receipt snapshots (dev/bench_results/**/inputs/**): Rust intra-doc links, Cargo.toml emails, Python expressions, relative links valid only at the snapshot origin.",
+      "options": [
+        "A: file an issue so link scanning applies only to formats that carry links (markdown/HTML), others checked for presence only",
+        "B: file an issue for a repository-declared exclusion of trees from link scanning (config, per @/inv/domain-agnostic)",
+        "C: both A and B",
+        "D: no change; adopters scope checks"
+      ],
+      "recommendation": "C"
     }
   ],
   "rework_counts": {
