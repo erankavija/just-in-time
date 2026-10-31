@@ -331,10 +331,13 @@ fn test_status_rejects_field_projection_flags() {
         .unwrap();
 
     for flag in [["--field", "state"], ["--fields", "state,title"]] {
-        temp.command(["issue", "status", &id])
+        let assert = temp
+            .command(["issue", "status", &id])
             .args(flag)
             .assert()
             .failure();
+        let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+        assert!(stderr.contains("unexpected argument"), "{stderr}");
     }
 }
 
