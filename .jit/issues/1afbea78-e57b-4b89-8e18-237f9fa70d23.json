@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8f3d4b32-34e9-4274-968f-45c706ffe230",
+      "status": "failed",
+      "updated_at": "2026-10-31T23:14:03.901258952Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1afbea78-e57b-4b89-8e18-237f9fa70d23",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Error-output tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:16.318326252Z"
+  "updated_at": "2026-10-31T23:14:03.901258952Z"
 }

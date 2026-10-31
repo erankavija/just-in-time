@@ -16,7 +16,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9bc791cf-d97b-4c26-bf6a-4b56a2dcb52d",
+      "status": "failed",
+      "updated_at": "2026-10-31T23:14:09.194922363Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b51a5c2d-2aaa-4c82-9a70-12720d03a978",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue-creation tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:17.296906315Z"
+  "updated_at": "2026-10-31T23:14:09.194922363Z"
 }

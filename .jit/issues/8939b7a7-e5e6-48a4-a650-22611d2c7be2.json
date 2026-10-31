@@ -16,7 +16,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5408b7b2-5f20-4014-a2cb-44093f91464e",
+      "status": "failed",
+      "updated_at": "2026-10-31T23:14:41.970358288Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8939b7a7-e5e6-48a4-a650-22611d2c7be2",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Profile tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:17.689174945Z"
+  "updated_at": "2026-10-31T23:14:41.970358288Z"
 }
