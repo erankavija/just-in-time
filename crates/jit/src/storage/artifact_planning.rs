@@ -12,6 +12,7 @@ use crate::domain::artifact_discovery::{
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
 };
+use crate::domain::identity::IssueId;
 use crate::repository_state::RootRelativePath;
 use crate::storage::repository_state_store::{
     is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
@@ -29,7 +30,7 @@ pub fn resolve_container_destination<S: IssueStore>(
     storage: &S,
     preferred_root: &str,
     legacy_root: &str,
-    container_id: &str,
+    container_id: &IssueId,
 ) -> Result<ResolvedContainerDestination> {
     validate_repo_relative_path(preferred_root)?;
     validate_repo_relative_path(legacy_root)?;

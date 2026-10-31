@@ -1069,7 +1069,7 @@ mod tests {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
         let encoded = serde_json::json!({
             "root": "worktree",
-            "relative": ".jit/issues/one.json",
+            "relative": format!(".jit/issues/{}.json", crate::test_utils::issue_id(1)),
         });
         let error = deserialize_path(&layout, encoded).unwrap_err();
         assert!(error.to_string().contains("aliases the selected data root"));
@@ -1081,13 +1081,12 @@ mod tests {
         // empty descendant string; a non-empty path is a `Descendant`.
         assert_eq!(RootRelativePath::parse("").unwrap(), RootRelativePath::Root);
         assert!(RootRelativePath::parse("").unwrap().is_root());
-        match RootRelativePath::parse("issues/one.json").unwrap() {
-            RootRelativePath::Descendant(text) => assert_eq!(&*text, "issues/one.json"),
+        let issue_path = format!("issues/{}.json", crate::test_utils::issue_id(1));
+        match RootRelativePath::parse(&issue_path).unwrap() {
+            RootRelativePath::Descendant(text) => assert_eq!(&*text, issue_path),
             RootRelativePath::Root => panic!("a non-empty path must be a descendant"),
         }
-        assert!(!RootRelativePath::parse("issues/one.json")
-            .unwrap()
-            .is_root());
+        assert!(!RootRelativePath::parse(&issue_path).unwrap().is_root());
         // Depth is 0 for the root and the component count for a descendant.
         assert_eq!(RootRelativePath::Root.depth(), 0);
         assert_eq!(RootRelativePath::parse("a/b").unwrap().depth(), 2);

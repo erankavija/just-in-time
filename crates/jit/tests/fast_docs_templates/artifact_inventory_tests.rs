@@ -73,7 +73,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     let inventory = inventory_explicit_roots(
         &issues,
         &taxonomy.hierarchy_config(),
-        ExplicitRootTarget::Container(selected_id.as_str()),
+        ExplicitRootTarget::Container(&selected_id),
         &FakePinnedResolver::default(),
     )
     .unwrap();
@@ -82,7 +82,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     let reordered = inventory_explicit_roots(
         &reversed,
         &taxonomy.hierarchy_config(),
-        ExplicitRootTarget::Container(selected_id.as_str()),
+        ExplicitRootTarget::Container(&selected_id),
         &FakePinnedResolver::default(),
     )
     .unwrap();
@@ -122,7 +122,7 @@ fn test_container_inventory_includes_opaque_roots_without_adapters() {
     let inventory = inventory_explicit_roots(
         &[container, child],
         &taxonomy.hierarchy_config(),
-        ExplicitRootTarget::Container(container_id.as_str()),
+        ExplicitRootTarget::Container(&container_id),
         &FakePinnedResolver::default(),
     )
     .unwrap();
@@ -269,7 +269,7 @@ fn test_pinned_root_requests_are_target_relevant_and_deduplicated() {
             .collect::<Vec<_>>()
     };
     assert_eq!(
-        requests(ExplicitRootTarget::Container(container_id.as_str())),
+        requests(ExplicitRootTarget::Container(&container_id)),
         [("release".into(), "docs/shared.md".into())]
     );
     assert_eq!(

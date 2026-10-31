@@ -217,7 +217,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &self.storage,
                         &preferred_root,
                         &legacy_root,
-                        container_id.as_str(),
+                        container_id,
                     )?;
                     (resolved.destination_root, resolved.conflicting_roots)
                 }
@@ -237,8 +237,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
                 root_container_id
                     .as_ref()
-                    .context("container id was not resolved")?
-                    .as_str(),
+                    .context("container id was not resolved")?,
             ),
         };
         let pinned = inventory_issues_pinned_evidence(
@@ -646,8 +645,7 @@ impl CommandExecutor<JsonFileStorage> {
                     }
                     evidence.insert(child, fact);
                 }
-                let resolved =
-                    derive_container_destination(&preferred, &legacy, id.as_str(), &evidence)?;
+                let resolved = derive_container_destination(&preferred, &legacy, id, &evidence)?;
                 conflicts = resolved.conflicting_roots;
                 resolved.destination_root
             }
@@ -663,10 +661,7 @@ impl CommandExecutor<JsonFileStorage> {
         let explicit = match target {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
-                root_id
-                    .as_ref()
-                    .context("container id was not resolved")?
-                    .as_str(),
+                root_id.as_ref().context("container id was not resolved")?,
             ),
         };
         let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;

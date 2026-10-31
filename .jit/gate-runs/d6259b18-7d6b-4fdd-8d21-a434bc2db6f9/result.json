@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-641bd14e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ce43274e26430be084fa7eb16d4d2de9a6078518",
+  "completed_at": "2026-10-29T07:46:43.323675442Z",
+  "duration_ms": 77179,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Repository-state issue identities are consistently typed and the prior UUID factory blocker is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "641bd14e-3e92-4984-a34d-833ce4f5cb21",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6259b18-7d6b-4fdd-8d21-a434bc2db6f9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:45:26.144437603Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:641bd14e` commits aec0cb276, 5703fc79a, 43478baf, 7bd1d783, 62b16a975, ce43274e2\nPolicy sources: AGENTS.md\nResolved items: @/issue/641bd14e/requirement/REQ-01, REQ-02, REQ-03 and @/issue/2195c98f/requirement/REQ-01, REQ-17 (issue descriptions); @/invariant/semantic-types and @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-29T07:44:01Z; prior code-review F1 is addressed by 7bd1d783\nTruncation recovery: reread per-commit patches, per-file type candidates, identity conversion, index codec, and bounded serializer-test ranges\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Repository-state issue identities are consistently typed and the prior UUID factory blocker is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

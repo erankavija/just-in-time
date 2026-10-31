@@ -19,6 +19,7 @@ use super::{
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
+use crate::domain::identity::IssueId;
 use crate::repository_state::default_rule_membership_diff_from_identities;
 use std::collections::BTreeMap;
 
@@ -218,7 +219,7 @@ pub struct ValidationCaptureClosure {
 pub fn validate_capture_closure(
     layout: &super::RepositoryLayout,
     config: &JitConfig,
-    all_ids: &[String],
+    all_ids: &[IssueId],
     rules_content: Option<&str>,
 ) -> Result<ValidationCaptureClosure, ProducerError> {
     use crate::config::SourceOfTruth;
@@ -804,8 +805,9 @@ kind = "advisory"
     fn test_validate_capture_closure_covers_registries_records_and_projections() {
         use std::collections::BTreeSet;
         let config: JitConfig = toml::from_str(&CONFIG).unwrap();
+        let id = crate::test_utils::issue_id(1);
         let closure =
-            validate_capture_closure(&layout(), &config, &["abc".to_string()], None).unwrap();
+            validate_capture_closure(&layout(), &config, std::slice::from_ref(&id), None).unwrap();
         let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
         for expected in [
             VirtualPath::data("config.toml").unwrap(),
@@ -815,7 +817,7 @@ kind = "advisory"
             VirtualPath::data("templates.toml").unwrap(),
             VirtualPath::data("index.json").unwrap(),
             VirtualPath::data("events.jsonl").unwrap(),
-            VirtualPath::data("issues/abc.json").unwrap(),
+            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
             VirtualPath::worktree("AGENTS.md").unwrap(),
         ] {
             assert!(paths.contains(&expected), "closure missing {expected:?}");

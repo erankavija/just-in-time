@@ -12,6 +12,7 @@ use crate::domain::artifact_plan::{
     ReferenceChange, WarningCode,
 };
 use crate::domain::event_log::EventLogError;
+use crate::domain::identity::IssueId;
 use crate::domain::{Event, EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -164,7 +165,7 @@ pub fn finalize_archive_execution(
         }
     }
 
-    let mut issues = BTreeMap::<String, Issue>::new();
+    let mut issues = BTreeMap::<IssueId, Issue>::new();
     let mut event_changes = Vec::new();
     let mut observed_uncovered = false;
     for change in artifacts
@@ -221,7 +222,7 @@ pub fn finalize_archive_execution(
         let RepositoryEntry::File { content, .. } = captured_entry(image, &path)? else {
             return Err(ArchiveExecutionError::NonFileSource {
                 role: "captured issue",
-                path: id.clone(),
+                path: path.relative().as_str().to_string(),
             }
             .into());
         };
@@ -422,34 +423,34 @@ fn captured_entry<'a>(
 }
 
 /// Canonical data-root-relative path for one captured issue record.
-fn issue_path(id: &str) -> Result<VirtualPath, ArchiveExecutionError> {
+fn issue_path(id: &IssueId) -> Result<VirtualPath, ArchiveExecutionError> {
     Ok(VirtualPath::data(format!("issues/{id}.json")).map_err(ProducerError::from)?)
 }
 
 fn captured_issue<'a>(
     image: &RepositoryImage,
-    id: &str,
-    issues: &'a mut BTreeMap<String, Issue>,
+    id: &IssueId,
+    issues: &'a mut BTreeMap<IssueId, Issue>,
 ) -> Result<&'a mut Issue, ArchiveExecutionError> {
     if !issues.contains_key(id) {
         let path = issue_path(id)?;
         let bytes = image
             .file_bytes(&path)
             .map_err(ProducerError::from)?
-            .ok_or_else(|| ArchiveExecutionError::MissingCapturedIssue(id.to_string()))?;
+            .ok_or_else(|| ArchiveExecutionError::MissingCapturedIssue(id.clone()))?;
         let issue: Issue =
             serde_json::from_slice(bytes).map_err(ArchiveExecutionError::MalformedIssueJson)?;
-        if issue.id != id {
+        if &issue.id != id {
             return Err(ArchiveExecutionError::IssueIdMismatch {
-                expected: id.to_string(),
+                expected: id.clone(),
                 found: issue.id,
             });
         }
-        issues.insert(id.into(), issue);
+        issues.insert(id.clone(), issue);
     }
     issues
         .get_mut(id)
-        .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.to_string()))
+        .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.clone()))
 }
 
 pub(crate) fn captured_archive_events(
@@ -466,8 +467,8 @@ pub(crate) fn captured_archive_events(
 
 /// A typed failure raised while finalizing one archive execution.
 ///
-/// Composed into [`RepositoryStateError::ArchiveExecution`]. `String`-typed
-/// fields hold raw path or issue identifiers, never a pre-rendered message;
+/// Composed into [`RepositoryStateError::ArchiveExecution`]. Fields hold paths
+/// or typed issue identifiers, never a pre-rendered message;
 /// rendering lives in this type's `Display` impl. `role` distinguishes the
 /// several captured-entry roles [`Self::NonFileSource`] and
 /// [`Self::UnsafeOccupant`] classify across the finalizer (source, an
@@ -489,7 +490,7 @@ pub enum ArchiveExecutionError {
     NonFileSource {
         /// Which captured-entry role failed the ordinary-file check.
         role: &'static str,
-        /// Raw path or issue identifier.
+        /// Raw path identifier.
         path: String,
     },
     /// A captured entry occupying a publication or ancestor target was not
@@ -505,24 +506,24 @@ pub enum ArchiveExecutionError {
     #[error("planned document index {document_index} is absent on issue {issue}")]
     MissingPlannedDocument {
         /// Full durable issue id.
-        issue: String,
+        issue: IssueId,
         /// Planned document index.
         document_index: usize,
     },
     /// A planned relink targeted a commit-pinned issue document.
     #[error("planned relink points at pinned issue document: {0}")]
-    RelinkTargetsPinned(String),
+    RelinkTargetsPinned(IssueId),
     /// A planned relink no longer matches its issue document's captured path.
     #[error("planned relink no longer matches issue {issue} document {document_index}")]
     RelinkStale {
         /// Full durable issue id.
-        issue: String,
+        issue: IssueId,
         /// Planned document index.
         document_index: usize,
     },
     /// A referenced issue record was absent from the captured image.
     #[error("captured issue is absent: {0}")]
-    MissingCapturedIssue(String),
+    MissingCapturedIssue(IssueId),
     /// A captured issue record was not valid JSON.
     #[error("invalid captured issue json: {0}")]
     MalformedIssueJson(#[source] serde_json::Error),
@@ -530,17 +531,17 @@ pub enum ArchiveExecutionError {
     #[error("captured issue {expected} contains mismatched embedded id {found}")]
     IssueIdMismatch {
         /// Id the issue was looked up by.
-        expected: String,
+        expected: IssueId,
         /// Id embedded in the captured issue record.
-        found: String,
+        found: IssueId,
     },
     /// A captured issue vanished from the in-memory cache immediately after
     /// insertion.
     #[error("captured issue cache lost {0}")]
-    CapturedIssueCacheLost(String),
+    CapturedIssueCacheLost(IssueId),
     /// An issue serialized as changed was absent from the captured intent set.
     #[error("changed archive issue {0} was not captured")]
-    MissingChangedIssue(String),
+    MissingChangedIssue(IssueId),
     /// The archive plan's artifacts were not eligible for execution.
     #[error(transparent)]
     Plan(#[from] PlanError),
@@ -700,7 +701,7 @@ mod tests {
         .unwrap()
     }
 
-    fn captured_issue_entry(id: &str, issue: &Issue) -> (VirtualPath, RepositoryEntry) {
+    fn captured_issue_entry(id: &IssueId, issue: &Issue) -> (VirtualPath, RepositoryEntry) {
         (
             VirtualPath::data(format!("issues/{id}.json")).unwrap(),
             file_entry(&crate::repository_state::serialize_issue(issue).unwrap()),

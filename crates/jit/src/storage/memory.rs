@@ -5,6 +5,7 @@
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::event_log::parse_known_events;
+use crate::domain::identity::IssueId;
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
@@ -347,7 +348,7 @@ impl InMemoryStorage {
     }
 
     /// Canonical `Data(...)` identity for one issue record.
-    fn issue_vpath(id: &str) -> Result<VirtualPath> {
+    fn issue_vpath(id: &IssueId) -> Result<VirtualPath> {
         VirtualPath::data(
             VirtualPath::ISSUES
                 .relative()
@@ -488,7 +489,7 @@ impl InMemoryStorage {
     }
 
     /// Deserialize one captured issue record, if present.
-    fn load_issue_entry(state: &MemoryRepositoryState, id: &str) -> Result<Option<Issue>> {
+    fn load_issue_entry(state: &MemoryRepositoryState, id: &IssueId) -> Result<Option<Issue>> {
         Self::data_entry_bytes(state, &Self::issue_vpath(id)?)
             .map(|bytes| {
                 serde_json::from_slice::<Issue>(&bytes)
@@ -842,12 +843,15 @@ impl IssueStore for InMemoryStorage {
         self.repo_lock.acquire()
     }
 
-    fn load_issue(&self, id: &str) -> Result<Issue> {
+    fn load_issue(&self, id: &IssueId) -> Result<Issue> {
         Self::load_issue_entry(&self.repository_state(), id)?
-            .ok_or_else(|| IssueNotFoundError::new(id).into())
+            .ok_or_else(|| IssueNotFoundError::new(id.clone()).into())
     }
 
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
+    fn load_issue_or_not_found(
+        &self,
+        id: &IssueId,
+    ) -> Result<Issue, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
         // In-memory: a missing issue is always NotFound (no I/O involved); a
         // present-but-corrupt record surfaces as a genuine parse failure.
@@ -911,8 +915,8 @@ impl IssueStore for InMemoryStorage {
         }
     }
 
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
-        self.read_gate_runs(|result| result.issue_id == issue_id)
+    fn list_gate_runs_for_issue(&self, issue_id: &IssueId) -> Result<Vec<GateRunResult>> {
+        self.read_gate_runs(|result| &result.issue_id == issue_id)
     }
 
     fn find_reusable_gate_run(
@@ -1038,7 +1042,7 @@ mod tests {
         InMemoryStorage::put_data_entry(&mut state, nested, b"{ nested".to_vec());
         drop(state);
         assert!(storage
-            .list_gate_runs_for_issue("any-issue")
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
             .unwrap()
             .is_empty());
 
@@ -1052,7 +1056,9 @@ mod tests {
             VirtualPath::GATE_RUNS.relative().as_str()
         );
         assert!(format!("{load_error:#}").contains(&record_path));
-        let list_error = storage.list_gate_runs_for_issue("any-issue").unwrap_err();
+        let list_error = storage
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .unwrap_err();
         assert!(format!("{list_error:#}").contains(&record_path));
     }
 
@@ -1073,7 +1079,9 @@ mod tests {
 
         for error in [
             storage.load_gate_run_result("directory-run").unwrap_err(),
-            storage.list_gate_runs_for_issue("any-issue").unwrap_err(),
+            storage
+                .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+                .unwrap_err(),
         ] {
             let message = format!("{error:#}");
             assert!(message.contains("directory-run/result.json"));
@@ -1091,7 +1099,7 @@ mod tests {
                 .insert(VirtualPath::GATE_RUNS, gate_run_parent_entry(kind));
 
             let loaded = storage.load_gate_run_result("run-one");
-            let listed = storage.list_gate_runs_for_issue("issue-one");
+            let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if matches!(kind, "absent" | "directory") {
                 assert!(loaded
                     .unwrap_err()
@@ -1119,7 +1127,7 @@ mod tests {
             drop(state);
 
             let loaded = storage.load_gate_run_result("run-one");
-            let listed = storage.list_gate_runs_for_issue("issue-one");
+            let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if matches!(kind, "absent" | "directory") {
                 assert!(loaded
                     .unwrap_err()

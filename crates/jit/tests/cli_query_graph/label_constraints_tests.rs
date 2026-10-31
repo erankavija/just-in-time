@@ -12,6 +12,7 @@
 //! and a real `config.toml`, so the full load-validate path runs.
 
 use jit::commands::CommandExecutor;
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::storage::JsonFileStorage;
 use jit::test_cli::JitCli;
@@ -20,7 +21,11 @@ use jit::test_taxonomy::{
 };
 use jit::test_utils::setup_test_repo_with_config;
 
-fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: &[&str]) -> String {
+fn create_labeled(
+    exec: &CommandExecutor<JsonFileStorage>,
+    title: &str,
+    labels: &[&str],
+) -> IssueId {
     let (id, _) = exec
         .issues()
         .create_issue(
