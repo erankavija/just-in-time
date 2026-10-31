@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c219548b-3e52-47de-a52b-571fa05f6abc",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:16.734194836Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6afabfca-d6ef-4efa-ab19-8a0665b9aca9",
+      "status": "failed",
+      "updated_at": "2026-10-31T23:18:36.281159102Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "69341a9d-a518-4ed6-972e-070760d085ab",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue show and failure-envelope tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:16.902050790Z"
+  "updated_at": "2026-10-31T23:18:36.281159102Z"
 }

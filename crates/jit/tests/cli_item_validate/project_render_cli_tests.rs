@@ -116,11 +116,10 @@ fn test_project_render_named_selects_single_projection() {
 }
 
 #[test]
-fn test_project_render_json_projection_error_exits_validation_failed() {
-    // A typed projection failure under --json carries VALIDATION_FAILED and
-    // exit 4, matching the non-JSON classification (jit:450db193 review F1,
-    // round 5). A region-mode target missing its begin marker fails the splice
-    // with a typed ProjectionError.
+fn test_project_render_json_projection_error_reports_validation_failed() {
+    // A typed projection failure under --json carries VALIDATION_FAILED. A
+    // region-mode target missing its begin marker fails the splice with a typed
+    // ProjectionError.
     let cli = JitCli::with_repository(
         jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
@@ -140,10 +139,9 @@ fn test_project_render_json_projection_error_exits_validation_failed() {
         .command(["project", "render", "--json"])
         .output()
         .unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(4),
-        "typed projection failure exits 4 under --json; stdout: {} stderr: {}",
+    assert!(
+        !output.status.success(),
+        "typed projection failure fails under --json; stdout: {} stderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );

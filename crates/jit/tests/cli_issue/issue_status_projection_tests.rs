@@ -321,7 +321,7 @@ fn test_show_json_unmet_dependencies_empty_array_when_none() {
 }
 
 /// `issue status` does not accept the single-issue projection flags; passing one
-/// is a clap usage error (exit 2). Pins the "separate subcommand, no
+/// is a clap usage error. Pins the "separate subcommand, no
 /// interaction with --field/--fields" decision.
 #[test]
 fn test_status_rejects_field_projection_flags() {

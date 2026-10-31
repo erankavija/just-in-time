@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:20:41.071266056Z",
+  "duration_ms": 201779,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
+        "id": "F1",
+        "line": 446,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8939b7a7/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The profile-apply dependency test now checks only failure and message text, not the PROFILE_ERROR JSON error class."
+      }
+    ],
+    "summary": "The profile-apply dependency test lost its typed error-class assertion.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8939b7a7-e5e6-48a4-a650-22611d2c7be2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d7dfdbd0-1242-4dd3-8094-e7354212fc14",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:19.291393273Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8141 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19440-d5f6-7273-8325-7ccc34a7275a\n--------\nuser\n--- 8128 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: bebf23ee486ffaf8aa6f42b08e271ba16a142294, c25ce771d6af8c19d06b2345a63f01bf162c1a4b (`jit:8939b7a7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8939b7a7/requirement/REQ-01..REQ-03 (issue description); @/issue/c780514e/requirement/REQ-01 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed, exit code unavailable, 2026-10-31T23:17:17Z; code-review: pending\nTruncation recovery: re-read tagged three-file patch and merge-parent stats; narrowed policy, source, and exit-code mapping reads after broad searches truncated\n\n1. **F1 — blocking, issue-impact:** `test_profile_apply_reports_a_dependency_that_cannot_be_resolved` now checks only failure and message text after removing its `Some(1)` expectation. The shared helper at `profile_acceptance_tests.rs:87` no longer establishes an error class, and this test never asserts `failure[\"error\"][\"code\"]`. Exit 1 is a broad generic bucket, while profile dependency failures are specifically rendered as `PROFILE_ERROR`; consequently the test no longer preserves the required error-class evidence. Assert `PROFILE_ERROR` from the JSON envelope. Reference: `@/issue/8939b7a7/requirement/REQ-02`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The profile-apply dependency test lost its typed error-class assertion.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The profile-apply dependency test now checks only failure and message text, not the PROFILE_ERROR JSON error class.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs\",\"line\":446,\"references\":[\"@/issue/8939b7a7/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

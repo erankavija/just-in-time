@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ed8cbbc7-6a32-4cf5-a255-a3e8789e5a48",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:17.427526671Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "54c199b4-b9ee-47b3-9529-0c3a4d3a57d8",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:20:07.387680906Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d3549d1d-1ebc-432d-9a2f-66223e1aaee0",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Configuration and workflow tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:18.081597976Z"
+  "updated_at": "2026-10-31T23:20:07.387680906Z"
 }

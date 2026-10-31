@@ -101,10 +101,9 @@ fn test_gate_status_transposed_args_did_you_mean() {
 fn test_invariant_list_rejection_mentions_item_list_route() {
     let cli = JitCli::uninitialised().unwrap();
     let output = cli.command(["invariant", "list"]).output().unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "an unsupported invariant subcommand remains a usage error"
+    assert!(
+        !output.status.success(),
+        "an unsupported invariant subcommand is rejected"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

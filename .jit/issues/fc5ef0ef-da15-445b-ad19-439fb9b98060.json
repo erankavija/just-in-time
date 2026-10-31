@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e9c0a762-7bd4-4794-b62b-6a54d67a553b",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:17.671756109Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ac60f64b-2e5b-49be-9173-791437e8262d",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:19:54.627415891Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fc5ef0ef-da15-445b-ad19-439fb9b98060",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate evaluation tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-29T07:44:18.482397185Z"
+  "updated_at": "2026-10-31T23:19:54.627415891Z"
 }
