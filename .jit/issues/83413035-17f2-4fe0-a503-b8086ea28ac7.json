@@ -25,7 +25,7 @@
     "satisfies:2195c98f/REQ-17"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Resolved hierarchy facts carry typed issue ids",
-  "updated_at": "2026-10-31T23:12:01.844761700Z"
+  "updated_at": "2026-10-31T23:13:25.426342689Z"
 }

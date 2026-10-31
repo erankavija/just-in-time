@@ -27,7 +27,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate keys are a validated GateKey in the registry and gate runs",
-  "updated_at": "2026-10-31T23:10:47.595090080Z"
+  "updated_at": "2026-10-31T23:13:25.016379583Z"
 }
