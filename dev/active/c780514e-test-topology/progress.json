@@ -899,7 +899,7 @@
           "key": "exit-code-reassertion-cli-item-validate",
           "title": "cli_item_validate tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fc5ef0ef-da15-445b-ad19-439fb9b98060",
@@ -907,7 +907,7 @@
           "key": "exit-code-reassertion-gate-evaluate",
           "title": "Gate evaluation tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "8f87e366-0470-42de-a24a-9262b637bd13",
@@ -1072,7 +1072,7 @@
           "key": "exit-code-reassertion-issue-create",
           "title": "Issue-creation tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "1afbea78-e57b-4b89-8e18-237f9fa70d23",
@@ -1080,7 +1080,7 @@
           "key": "exit-code-reassertion-issue-errors",
           "title": "Error-output tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "69341a9d-a518-4ed6-972e-070760d085ab",
@@ -1088,7 +1088,7 @@
           "key": "exit-code-reassertion-issue-show",
           "title": "Issue show and failure-envelope tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ce097844-5f62-4dce-bd75-2af8159f7920",
@@ -1165,7 +1165,7 @@
           "key": "exit-code-reassertion-profile",
           "title": "Profile tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "d3549d1d-1ebc-432d-9a2f-66223e1aaee0",
@@ -1173,7 +1173,7 @@
           "key": "exit-code-reassertion-workflow",
           "title": "Configuration and workflow tests stop re-asserting projected exit codes",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "89f517a5-73b0-4fb2-b212-262055f27970",
@@ -2084,7 +2084,12 @@
     "owners-s4": "2916a306, 9a313a88 closed (seed_ambiguous_prefix shared helper, user-approved); 55cd1ae4 57cd99ac F1 restating rustdoc -> fd7389ae0, closed. First cargo-ci failed on cold profiled-fixture lock -> forced warm re-run passed; defect tracked as new task 955aaa9a",
     "c5c933f2-r1-s4": "in-process audit test moved to commands/mod.rs unit tests 1772e003b; closed",
     "crw-exit-s4": "966d0627 (+lead 2af6708a7 JSON confirmed-delete owner), 6a13eeac closed",
-    "qg-exit-s4": "168a9c16 2778ed99 F1 -> dbc3a716b; 3f01cb72 5816b6ef F1 -> b97bdc2f8; re-gating"
+    "qg-exit-s4": "168a9c16 2778ed99 F1 -> dbc3a716b; 3f01cb72 5816b6ef F1 -> b97bdc2f8; re-gating",
+    "exit-code-7": {
+      "verdict": "PASS",
+      "lead_fixes": "snapshot/status class evidence, stale names; code-review F1s on 69341a9d, 8939b7a7, 134ee921 fixed in 86e1870fc, 4f7f939f3, 898293a51",
+      "note": "first cargo-ci failed on cold fixture lock (8f3d4b32), forced warm rerun passed; 955aaa9a owns the defect"
+    }
   },
   "worker_tiering": "User instruction relayed2026-10-22: future bounded implementation/test/fixture/doc work defaults gpt-6-luna xhigh, fork_turns none; stronger tier only with difficulty rationale. Existing productive workers finish uninterrupted; same physical worktrees and quality gates.",
   "resource_actions": [

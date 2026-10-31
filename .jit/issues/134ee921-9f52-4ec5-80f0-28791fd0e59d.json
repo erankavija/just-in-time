@@ -10,6 +10,7 @@
   ],
   "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_item_validate` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_item_validate`: `validate_cli_rule_tests.rs` (6), `invariant_check_cli_tests.rs` (4), `derived_state_repair_tests.rs` (3), `project_render_cli_tests.rs` (1), `validation_lease_tests.rs` (1).\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
   "documents": [],
+  "done_at": "2026-10-31T23:31:38.785464921Z",
   "first_ready_at": "2026-10-28T23:30:30.995917169Z",
   "gates_required": [
     "cargo-ci",
@@ -17,15 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ab8dfab5-f186-4ca9-a6d7-dc3a942469b8",
+      "run_id": "27fb17ee-8469-4c56-ab38-90449f8373b6",
       "status": "passed",
-      "updated_at": "2026-10-31T23:17:17.925352580Z",
+      "updated_at": "2026-10-31T23:28:44.727775001Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "34187540-6f13-494f-85ed-1a15c395667a",
-      "status": "failed",
-      "updated_at": "2026-10-31T23:20:23.167410651Z",
+      "run_id": "9179d3f6-f0ef-4d46-b486-e45f575c582f",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:30:06.171984653Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "cli_item_validate tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-31T23:20:23.167410651Z"
+  "updated_at": "2026-10-31T23:31:38.785464921Z"
 }
