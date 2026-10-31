@@ -172,11 +172,11 @@ fn test_get_whole_section_returns_subtree() {
 }
 
 // ---------------------------------------------------------------------------
-// REQ-02: an unknown TOP-LEVEL key fails exit 2, listing valid sections.
+// REQ-02: an unknown TOP-LEVEL key fails, listing valid sections.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_get_unknown_top_level_key_fails_exit_2_with_sections() {
+fn test_get_unknown_top_level_key_fails_with_sections() {
     let cli = JitCli::initialised().unwrap();
 
     let out = config_get(&cli, &["bogus_section"]);
@@ -208,11 +208,11 @@ fn test_get_unknown_top_level_key_json_reports_invalid_argument() {
 }
 
 // ---------------------------------------------------------------------------
-// Unknown NESTED key also fails exit 2, naming the missing segment.
+// Unknown NESTED key also fails, naming the missing segment.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_get_unknown_nested_key_fails_exit_2() {
+fn test_get_unknown_nested_key_fails() {
     let cli = JitCli::initialised().unwrap();
     fs::write(cli.root().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
 
@@ -227,7 +227,7 @@ fn test_get_unknown_nested_key_fails_exit_2() {
 
 // ---------------------------------------------------------------------------
 // A malformed `config.toml` is a LOAD failure, not an unknown-key argument
-// error: it must NOT be reported as `INVALID_ARGUMENT` / exit 2, in either
+// error: it must NOT be reported as `INVALID_ARGUMENT`, in either
 // mode, and `--json` must not force it into a JSON envelope it never had
 // before (matching `jit config show` / `jit config validate`'s existing
 // behavior for the same underlying failure).
