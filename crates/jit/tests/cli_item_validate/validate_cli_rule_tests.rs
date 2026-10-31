@@ -450,7 +450,7 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 }
 
 #[test]
-fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
+fn test_validate_retains_rule_findings_with_integrity_failure() {
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
