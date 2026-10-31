@@ -66,7 +66,7 @@ fn test_per_issue_local_rule_fails() {
     assert!(report
         .findings
         .iter()
-        .all(|f| f.issue_id.as_deref() == Some(id.as_str())));
+        .all(|f| f.issue_id.as_ref() == Some(&id)));
 }
 
 #[test]

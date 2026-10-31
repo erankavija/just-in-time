@@ -128,8 +128,7 @@ fn captured_issue_record(
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
     match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
-            let issue: Issue = serde_json::from_slice(content.bytes())
-                .with_context(|| format!("failed to parse captured issue at {path:?}"))?;
+            let issue = crate::repository_state::decode_issue_record(&path, content.bytes())?;
             if &issue.id != issue_id {
                 anyhow::bail!(
                     "captured issue {issue_id} contains mismatched embedded id {}",
@@ -641,7 +640,7 @@ fn gate_findings_from_report(
 
 /// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
 ///
-/// A missing, repeated, or empty target is a configuration fault.
+/// A missing, repeated, empty, or unknown target is a configuration fault.
 fn label_target_report(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &IssueId,
@@ -676,7 +675,11 @@ fn label_target_report(
         .iter()
         .find(|issue| issue.id.as_str() == target)
         .map(|issue| issue.id.clone())
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.to_string()))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "label '{label_namespace}:{target}' on issue {issue_id} names no active issue"
+            )
+        })?;
     captured_scope_rule_report(image, &target)
 }
 
@@ -2755,7 +2758,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         index["all_ids"]
             .as_array_mut()
             .unwrap()
-            .push(unrelated.into());
+            .push(unrelated.as_str().into());
         std::fs::write(index_path, serde_json::to_vec_pretty(&index).unwrap()).unwrap();
 
         let result = executor.check_gate(&issue_id, "selected-safe").unwrap();

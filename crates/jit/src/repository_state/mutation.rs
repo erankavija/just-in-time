@@ -23,7 +23,7 @@ use super::{
 };
 use crate::declarations::GateRegistry;
 use crate::domain::event_catalog::EventTag;
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::domain::{
     Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
 };
@@ -2007,6 +2007,76 @@ mod tests {
             })
             .sum::<usize>();
         assert!(reproduced > 0, "the repository log holds current events");
+    }
+
+    /// Every repository issue record, current-format gate-run result and the
+    /// membership index re-serialize to their stored bytes; every other gate-run
+    /// result decodes and reproduces its ids.
+    #[test]
+    fn test_repository_records_decode_and_reproduce_their_stored_issue_ids() {
+        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit");
+        let stored = |path: &std::path::Path| -> Value {
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+        };
+        let records = |directory: &str| {
+            std::fs::read_dir(data.join(directory))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect::<Vec<_>>()
+        };
+        let issues = records("issues")
+            .into_iter()
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "json")
+            })
+            .map(|path| {
+                let raw = stored(&path);
+                let issue: Issue = serde_json::from_value(raw.clone()).unwrap();
+                assert_eq!(
+                    serialize_issue(&issue).unwrap(),
+                    canonical_json(&raw, true).unwrap(),
+                    "{}",
+                    path.display()
+                );
+            })
+            .count();
+        let current_format_runs = records("gate-runs")
+            .into_iter()
+            .filter(|directory| {
+                let path = directory.join("result.json");
+                let bytes = std::fs::read(&path).unwrap();
+                let run: GateRunResult = serde_json::from_slice(&bytes).unwrap();
+                let written = serialize_gate_run(&run).unwrap();
+                let raw = stored(&path);
+                let decoded: Value = serde_json::from_slice(&written).unwrap();
+                ["issue_id", "run_id"].iter().for_each(|field| {
+                    assert_eq!(decoded[field], raw[field], "{} {field}", path.display());
+                });
+                let keys = |value: &Value| {
+                    value.as_object().map(|object| {
+                        object
+                            .keys()
+                            .cloned()
+                            .collect::<std::collections::BTreeSet<_>>()
+                    })
+                };
+                let is_current_format = keys(&decoded) == keys(&raw);
+                if is_current_format {
+                    assert_eq!(written, bytes, "{}", path.display());
+                }
+                is_current_format
+            })
+            .count();
+        let index_path = data.join("index.json");
+        let index_bytes = std::fs::read(&index_path).unwrap();
+        let index: RepositoryIndex = serde_json::from_slice(&index_bytes).unwrap();
+
+        assert_eq!(index.to_pretty_bytes().unwrap(), index_bytes);
+        assert!(
+            issues > 0 && current_format_runs > 0,
+            "the repository holds issue records and current-format gate runs"
+        );
     }
 
     #[test]

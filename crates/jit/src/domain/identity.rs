@@ -10,34 +10,6 @@ use std::str::FromStr;
 use thiserror::Error;
 use uuid::Uuid;
 
-/// Temporary bridge: issue ids stay `String` until the flip gives
-/// [`ValidatedIssueId`] this name (`@/inv/canonical-cutover`).
-pub type IssueId = String;
-
-/// Temporary bridge giving the [`IssueId`] alias the newtype's `short_id()`
-/// (`@/inv/canonical-cutover`).
-pub trait IssueIdStaging {
-    /// The first [`SHORT_ID_LENGTH`] characters of the id.
-    fn short_id(&self) -> &str;
-
-    /// The id of a generated UUID.
-    fn from_uuid(uuid: Uuid) -> Self;
-}
-
-impl IssueIdStaging for String {
-    fn short_id(&self) -> &str {
-        short_id_of(self)
-    }
-
-    fn from_uuid(uuid: Uuid) -> Self {
-        uuid.hyphenated().to_string()
-    }
-}
-
-fn short_id_of(id: &str) -> &str {
-    id.get(..SHORT_ID_LENGTH).unwrap_or(id)
-}
-
 /// Error raised when an issue id is not a canonical lowercase hyphenated UUID.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("invalid issue id '{input}'; expected a lowercase hyphenated UUID")]
@@ -52,9 +24,9 @@ pub struct InvalidIssueIdError {
 #[serde(try_from = "String", into = "String")]
 // The empty description keeps this rustdoc out of the published schema.
 #[schemars(with = "String", description = "")]
-pub struct ValidatedIssueId(String);
+pub struct IssueId(String);
 
-impl ValidatedIssueId {
+impl IssueId {
     /// Borrow the id.
     pub fn as_str(&self) -> &str {
         &self.0
@@ -62,7 +34,7 @@ impl ValidatedIssueId {
 
     /// The first [`SHORT_ID_LENGTH`] characters of the id.
     pub fn short_id(&self) -> &str {
-        short_id_of(&self.0)
+        self.0.get(..SHORT_ID_LENGTH).unwrap_or(&self.0)
     }
 
     /// The id of a generated UUID; its hyphenated form is canonical, so this
@@ -72,7 +44,7 @@ impl ValidatedIssueId {
     }
 }
 
-impl TryFrom<&str> for ValidatedIssueId {
+impl TryFrom<&str> for IssueId {
     type Error = InvalidIssueIdError;
 
     fn try_from(input: &str) -> Result<Self, Self::Error> {
@@ -86,7 +58,7 @@ impl TryFrom<&str> for ValidatedIssueId {
     }
 }
 
-impl TryFrom<String> for ValidatedIssueId {
+impl TryFrom<String> for IssueId {
     type Error = InvalidIssueIdError;
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
@@ -94,7 +66,7 @@ impl TryFrom<String> for ValidatedIssueId {
     }
 }
 
-impl FromStr for ValidatedIssueId {
+impl FromStr for IssueId {
     type Err = InvalidIssueIdError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
@@ -102,13 +74,13 @@ impl FromStr for ValidatedIssueId {
     }
 }
 
-impl From<ValidatedIssueId> for String {
-    fn from(id: ValidatedIssueId) -> Self {
+impl From<IssueId> for String {
+    fn from(id: IssueId) -> Self {
         id.0
     }
 }
 
-impl fmt::Display for ValidatedIssueId {
+impl fmt::Display for IssueId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }
@@ -304,7 +276,7 @@ impl From<&IssueId> for IssueIdPrefix {
     fn from(id: &IssueId) -> Self {
         Self {
             requested: id.to_string(),
-            normalised: normalise(id),
+            normalised: normalise(id.as_str()),
         }
     }
 }
@@ -585,12 +557,12 @@ mod tests {
 
     #[test]
     fn test_try_from_rejects_empty_input() {
-        assert!(ValidatedIssueId::try_from("").is_err());
+        assert!(IssueId::try_from("").is_err());
     }
 
     #[test]
     fn test_json_schema_is_a_plain_string() {
-        let schema = ValidatedIssueId::json_schema(&mut schemars::gen::SchemaGenerator::default());
+        let schema = IssueId::json_schema(&mut schemars::gen::SchemaGenerator::default());
         assert_eq!(
             serde_json::to_value(schema).unwrap(),
             json!({"type": "string"})
@@ -602,12 +574,12 @@ mod tests {
         /// both string views print it.
         #[test]
         fn test_try_from_round_trips_a_canonical_id(id in canonical_id()) {
-            let parsed = ValidatedIssueId::try_from(id.as_str()).unwrap();
+            let parsed = IssueId::try_from(id.as_str()).unwrap();
             prop_assert_eq!(parsed.as_str(), id.as_str());
             prop_assert_eq!(parsed.to_string(), id.clone());
             let encoded = serde_json::to_value(&parsed).unwrap();
             prop_assert_eq!(&encoded, &Value::String(id.clone()));
-            prop_assert_eq!(serde_json::from_value::<ValidatedIssueId>(encoded).unwrap(), parsed);
+            prop_assert_eq!(serde_json::from_value::<IssueId>(encoded).unwrap(), parsed);
         }
 
         /// Every other spelling of the same UUID is refused by parsing and
@@ -623,10 +595,10 @@ mod tests {
                 canonical.to_uppercase(),
             ];
             for spelling in spellings.iter().filter(|spelling| **spelling != canonical) {
-                let error = ValidatedIssueId::try_from(spelling.as_str()).unwrap_err();
+                let error = IssueId::try_from(spelling.as_str()).unwrap_err();
                 prop_assert!(error.to_string().contains(spelling.as_str()));
                 prop_assert!(
-                    serde_json::from_value::<ValidatedIssueId>(json!(spelling)).is_err()
+                    serde_json::from_value::<IssueId>(json!(spelling)).is_err()
                 );
             }
         }
@@ -638,27 +610,22 @@ mod tests {
             bits in any::<u128>(),
         ) {
             let uuid = Uuid::from_u128(bits);
-            let parsed = ValidatedIssueId::try_from(uuid.to_string()).unwrap();
-            prop_assert_eq!(&ValidatedIssueId::from_uuid(uuid), &parsed);
-            prop_assert_eq!(<String as IssueIdStaging>::from_uuid(uuid), parsed.as_str());
+            let parsed = IssueId::try_from(uuid.to_string()).unwrap();
+            prop_assert_eq!(&IssueId::from_uuid(uuid), &parsed);
         }
 
-        /// The short id is the id's leading `SHORT_ID_LENGTH` characters,
-        /// and the staging bridge yields the same text.
+        /// The short id is the id's leading `SHORT_ID_LENGTH` characters.
         #[test]
-        fn test_short_id_is_the_leading_characters_on_both_sides_of_the_bridge(
-            id in canonical_id(),
-        ) {
-            let parsed = ValidatedIssueId::try_from(id.as_str()).unwrap();
+        fn test_short_id_is_the_leading_characters(id in canonical_id()) {
+            let parsed = IssueId::try_from(id.as_str()).unwrap();
             prop_assert_eq!(parsed.short_id(), &id[..SHORT_ID_LENGTH]);
-            prop_assert_eq!(IssueIdStaging::short_id(&id), parsed.short_id());
         }
 
         /// A stored id converts to a prefix that names it and equals its
         /// parsed form.
         #[test]
         fn test_from_issue_id_names_the_id_as_its_parse_does(id in canonical_id()) {
-            let prefix = IssueIdPrefix::from(&id);
+            let prefix = IssueIdPrefix::from(&IssueId::try_from(id.as_str()).unwrap());
             prop_assert!(prefix.matches(&id));
             prop_assert_eq!(Ok(prefix), IssueIdPrefix::try_from(id.as_str()));
         }

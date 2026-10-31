@@ -639,8 +639,14 @@ mod exit_code_projection_tests {
             (crate::graph::GraphError::CycleDetected.into(), 4, "dep add"),
             (
                 crate::errors::RedundantDependencyError::new(
-                    ("aaaa1111".to_string(), "bbbb2222".to_string()),
-                    vec![("aaaa1111".to_string(), "cccc3333".to_string())],
+                    (
+                        crate::test_utils::issue_id(1),
+                        crate::test_utils::issue_id(2),
+                    ),
+                    vec![(
+                        crate::test_utils::issue_id(1),
+                        crate::test_utils::issue_id(3),
+                    )],
                 )
                 .into(),
                 4,

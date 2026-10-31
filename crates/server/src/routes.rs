@@ -154,7 +154,7 @@ pub struct GraphData {
 /// containment.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphNode {
-    pub id: String,
+    pub id: IssueId,
     pub label: String,
     pub state: IssueState,
     pub priority: Priority,
@@ -171,8 +171,8 @@ pub struct GraphNode {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphEdge {
-    pub from: String,
-    pub to: String,
+    pub from: IssueId,
+    pub to: IssueId,
 }
 
 /// Get dependency graph
@@ -197,7 +197,7 @@ async fn get_graph<S: IssueStore>(
         })?;
 
     // Build node lookup for blocked state calculation
-    let issue_map: std::collections::HashMap<String, &Issue> =
+    let issue_map: std::collections::HashMap<IssueId, &Issue> =
         issues.iter().map(|i| (i.id.clone(), i)).collect();
 
     // Resolve the hierarchy with the core resolver, over the repo's type levels.
@@ -221,7 +221,10 @@ async fn get_graph<S: IssueStore>(
             labels: issue.labels.clone(),
             blocked: issue.is_blocked(&issue_map),
             type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
-            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
+            hierarchy: resolution
+                .get(issue.id.as_str())
+                .cloned()
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -1402,17 +1405,17 @@ mod tests {
                 .clone()
         };
 
-        let leaf_node = node(&leaf);
+        let leaf_node = node(leaf.as_str());
         assert_eq!(leaf_node["type"], leaf_type);
-        assert_eq!(leaf_node["parent"], container);
-        assert_eq!(leaf_node["cluster"], container);
+        assert_eq!(leaf_node["parent"], container.as_str());
+        assert_eq!(leaf_node["cluster"], container.as_str());
         assert_eq!(leaf_node["children"], serde_json::json!([]));
         assert_eq!(leaf_node["rank"], 0);
 
-        let container_node = node(&container);
+        let container_node = node(container.as_str());
         assert_eq!(container_node["type"], container_type);
         assert_eq!(container_node["parent"], serde_json::Value::Null);
-        assert_eq!(container_node["cluster"], container);
+        assert_eq!(container_node["cluster"], container.as_str());
         assert_eq!(container_node["children"], serde_json::json!([leaf]));
         assert_eq!(container_node["rank"], 1);
     }
@@ -1798,7 +1801,7 @@ unique = false
     fn link_html_document(
         worktree: &std::path::Path,
         executor: &CommandExecutor<JsonFileStorage>,
-    ) -> String {
+    ) -> IssueId {
         use jit::domain::Priority;
 
         let (id, _) = executor
@@ -1841,7 +1844,7 @@ unique = false
         let server = test_app(executor);
         let hits = search_hits(&server, "Test issue").await;
         assert!(
-            hits.iter().any(|hit| hit.issue_id.as_deref() == Some(&id)),
+            hits.iter().any(|hit| hit.issue_id.as_ref() == Some(&id)),
             "{hits:?}"
         );
     }

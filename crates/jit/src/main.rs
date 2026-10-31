@@ -22,7 +22,7 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
@@ -2120,7 +2120,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let issues = storage.list_issues()?;
                             let graph_findings = executor.evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_deref() == Some(id.as_str())
+                                gf.issue_id.as_ref() == Some(&id)
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
                             }) {
                                 let _ =
@@ -2489,7 +2489,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     println!("{}", child.to_line());
                                 }
                                 if !response.extras.dangling.is_empty() {
-                                    println!("dangling: {}", response.extras.dangling.join(","));
+                                    println!(
+                                        "dangling: {}",
+                                        response
+                                            .extras
+                                            .dangling
+                                            .iter()
+                                            .map(IssueId::as_str)
+                                            .collect::<Vec<_>>()
+                                            .join(",")
+                                    );
                                 }
                             }
                         }
@@ -2524,7 +2533,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     println!("{}", line);
                                 }
                                 if !response.dangling.is_empty() {
-                                    println!("dangling: {}", response.dangling.join(","));
+                                    println!(
+                                        "dangling: {}",
+                                        response
+                                            .dangling
+                                            .iter()
+                                            .map(IssueId::as_str)
+                                            .collect::<Vec<_>>()
+                                            .join(",")
+                                    );
                                 }
                             }
                         }
@@ -3162,40 +3179,41 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 };
                 match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
                     |(to_ids, unmatched)| {
-                        let mut result = executor.remove_dependencies(&from_id, &to_ids)?;
-                        result.not_found.extend(unmatched);
-                        Ok(result)
+                        let result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        let not_found = result
+                            .not_found
+                            .iter()
+                            .map(ToString::to_string)
+                            .chain(unmatched)
+                            .collect::<Vec<_>>();
+                        Ok((result.removed, not_found))
                     },
                 ) {
-                    Ok(result) => {
+                    Ok((removed, not_found)) => {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
                                 "from_id": from_id,
-                                "removed": result.removed,
-                                "not_found": result.not_found,
-                                "message": format!("Removed {} dependencies from issue {}", result.removed.len(), from_id)
+                                "removed": removed,
+                                "not_found": not_found,
+                                "message": format!("Removed {} dependencies from issue {}", removed.len(), from_id)
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            if !result.removed.is_empty() {
+                            if !removed.is_empty() {
                                 let _ = output_ctx.print_success(format!(
                                     "Removed {} dependenc{}:",
-                                    result.removed.len(),
-                                    if result.removed.len() == 1 {
-                                        "y"
-                                    } else {
-                                        "ies"
-                                    }
+                                    removed.len(),
+                                    if removed.len() == 1 { "y" } else { "ies" }
                                 ));
-                                for dep in &result.removed {
+                                for dep in &removed {
                                     println!("  • {}", dep);
                                 }
                             }
-                            if !result.not_found.is_empty() {
-                                println!("Not found ({}):", result.not_found.len());
-                                for dep in &result.not_found {
+                            if !not_found.is_empty() {
+                                println!("Not found ({}):", not_found.len());
+                                for dep in &not_found {
                                     println!("  • {}", dep);
                                 }
                             }
@@ -4689,8 +4707,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let parent = node
                                 .hierarchy
                                 .parent
-                                .as_ref()
-                                .map(|p| p.short_id())
+                                .as_deref()
+                                .map(|p| p.get(..jit::domain::SHORT_ID_LENGTH).unwrap_or(p))
                                 .unwrap_or("-");
                             println!(
                                 "  {} | parent={} children={} rank={} | {}",

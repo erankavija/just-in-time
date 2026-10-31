@@ -32,7 +32,6 @@ use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
 use crate::domain::identity::IssueIdPrefix;
-use crate::domain::identity::IssueIdStaging;
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
 use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
 use anyhow::Result;

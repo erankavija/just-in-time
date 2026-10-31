@@ -132,12 +132,12 @@
 //! let resolution = resolve_hierarchy(&nodes, &config);
 //!
 //! // The task's nearest container is the epic, not the milestone.
-//! assert_eq!(resolution.parent(&task.id), Some(epic.id.as_str()));
-//! assert_eq!(resolution.parent(&epic.id), Some(milestone.id.as_str()));
-//! assert_eq!(resolution.parent(&milestone.id), None);
+//! assert_eq!(resolution.parent(task.id.as_str()), Some(epic.id.as_str()));
+//! assert_eq!(resolution.parent(epic.id.as_str()), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.parent(milestone.id.as_str()), None);
 //!
 //! // The whole chain clusters to the strategic root (the milestone).
-//! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.cluster(task.id.as_str()), Some(milestone.id.as_str()));
 //! ```
 
 use crate::domain::identity::IssueId;
@@ -168,11 +168,11 @@ pub trait HierarchyNode {
 
 impl HierarchyNode for crate::domain::Issue {
     fn id(&self) -> &str {
-        &self.id
+        self.id.as_str()
     }
 
     fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-        self.dependencies.iter().map(String::as_str)
+        self.dependencies.iter().map(IssueId::as_str)
     }
 
     fn type_name(&self) -> Option<&str> {
@@ -600,7 +600,7 @@ pub fn detect_membership_divergences(
                 closure_cache
                     .entry(anchor)
                     .or_insert_with(|| dependency_closure(anchor, &by_id))
-                    .contains(&issue.id)
+                    .contains(issue.id.as_str())
             });
             if !contained {
                 divergences.push(MembershipDivergence {
@@ -967,7 +967,7 @@ mod tests {
         initiative.dependencies = vec![action.id.clone()];
 
         let r = resolve_hierarchy(&[&initiative, &action], &default_config());
-        assert_eq!(r.parent(&action.id), Some(initiative.id.as_str()));
+        assert_eq!(r.parent(action.id.as_str()), Some(initiative.id.as_str()));
     }
 
     #[test]

@@ -10,7 +10,7 @@
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
 use crate::domain::artifact_plan::PlanTarget;
-use crate::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder};
 use crate::domain::{
     Event, EventBody, GateRunResult, GateRunStatus, GateStatus, GateVerdictOrigin, Issue,
@@ -411,6 +411,46 @@ fn test_resolve_issue_id_resolves_prefixes_alike<B: Backend>() {
         shared.downcast_ref::<AmbiguousIdError>().is_some(),
         "{shared}"
     );
+}
+
+/// A spelling that names no stored id, a non-canonical one included, is not
+/// found.
+fn test_resolve_issue_id_reports_a_non_canonical_id_as_not_found<B: Backend>() {
+    let repository = Repository::<B>::empty();
+    repository.publish_issues(&[issue_with_id(crate::test_utils::issue_id(54))]);
+
+    let error = repository
+        .store
+        .resolve_issue_id(&IssueIdPrefix::from_str("not-a-canonical-id").unwrap())
+        .unwrap_err();
+
+    assert!(
+        error.downcast_ref::<IssueNotFoundError>().is_some(),
+        "{error:#}"
+    );
+}
+
+/// An issue record whose id or dependency is not canonical fails to decode,
+/// and the error names the record.
+fn test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record<B: Backend>() {
+    let id = crate::test_utils::issue_id(0xabcd);
+    let non_canonical = |seed| crate::test_utils::issue_id(seed).as_str().to_uppercase();
+    let path = issue_path(&id);
+    for (field, value) in [
+        ("id", serde_json::json!(non_canonical(0xabcd))),
+        ("dependencies", serde_json::json!([non_canonical(0xbcde)])),
+    ] {
+        let mut record = serde_json::to_value(issue_with_id(id.clone())).unwrap();
+        record[field] = value;
+        let repository = Repository::<B>::seeded(&[(path.clone(), record.to_string())]);
+
+        let error = format!("{:#}", repository.store.load_issue(&id).unwrap_err());
+
+        assert!(
+            error.contains(path.relative().as_str()) && error.contains("invalid issue id"),
+            "{field}: {error}"
+        );
+    }
 }
 
 fn test_list_issues_is_empty_before_any_issue_is_published<B: Backend>() {
@@ -850,6 +890,8 @@ conformance_suite!(
         test_load_issue_reports_an_unpublished_id_as_not_found,
         test_load_issue_or_not_found_separates_an_absent_issue_from_an_unreadable_one,
         test_resolve_issue_id_resolves_prefixes_alike,
+        test_resolve_issue_id_reports_a_non_canonical_id_as_not_found,
+        test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record,
         test_list_issues_is_empty_before_any_issue_is_published,
         test_load_gate_registry_reads_the_declared_gates_and_none_when_absent,
         test_read_events_skips_retired_tags_and_rejects_malformed_known_records,

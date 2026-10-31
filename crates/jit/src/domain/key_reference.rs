@@ -7,7 +7,7 @@
 //! resolves the key through the same key → created-id map that wires
 //! `depends_on`.
 
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use std::collections::HashSet;
 
 /// The manifest key referenced by a label value of the form

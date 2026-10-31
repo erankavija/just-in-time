@@ -480,20 +480,28 @@ impl InMemoryStorage {
 
     /// Deserialize every captured issue record in the aggregate image.
     fn load_issues(state: &MemoryRepositoryState) -> Result<Vec<Issue>> {
-        Self::data_files_in(state, VirtualPath::ISSUES.relative().as_str(), ".json")
-            .map(|(_, bytes)| {
-                serde_json::from_slice::<Issue>(&bytes)
-                    .context("Failed to deserialize issue from repository image")
+        let directory = VirtualPath::ISSUES;
+        let directory = directory.relative().as_str();
+        Self::data_files_in(state, directory, ".json")
+            .map(|(leaf, bytes)| {
+                serde_json::from_slice::<Issue>(&bytes).with_context(|| {
+                    format!("Failed to deserialize issue record at {directory}/{leaf}")
+                })
             })
             .collect()
     }
 
     /// Deserialize one captured issue record, if present.
     fn load_issue_entry(state: &MemoryRepositoryState, id: &IssueId) -> Result<Option<Issue>> {
-        Self::data_entry_bytes(state, &Self::issue_vpath(id)?)
+        let path = Self::issue_vpath(id)?;
+        Self::data_entry_bytes(state, &path)
             .map(|bytes| {
-                serde_json::from_slice::<Issue>(&bytes)
-                    .context("Failed to deserialize issue from repository image")
+                serde_json::from_slice::<Issue>(&bytes).with_context(|| {
+                    format!(
+                        "Failed to deserialize issue record at {}",
+                        path.relative().as_str()
+                    )
+                })
             })
             .transpose()
     }

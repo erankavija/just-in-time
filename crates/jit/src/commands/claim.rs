@@ -1216,7 +1216,7 @@ mod tests {
 
         let content = fs::read_to_string(&claims_log)?;
         assert!(!content.is_empty());
-        assert!(content.contains(&issue_id));
+        assert!(content.contains(issue_id.as_str()));
         Ok(())
     }
 

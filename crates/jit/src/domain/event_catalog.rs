@@ -6,7 +6,7 @@
 //! `issue_id` claims with serialized events and `Event`, then compare the
 //! committed reference with the projection (`@/inv/single-source-prose`).
 
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

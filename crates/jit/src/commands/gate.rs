@@ -384,8 +384,7 @@ fn captured_gate_preset_issue(
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
     let issue = match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
-            serde_json::from_slice::<Issue>(content.bytes())
-                .with_context(|| format!("failed to parse captured issue {issue_id}"))?
+            crate::repository_state::decode_issue_record(&path, content.bytes())?
         }
         RepositoryEntry::Absent => {
             return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())

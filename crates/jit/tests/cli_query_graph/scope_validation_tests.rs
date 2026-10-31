@@ -14,7 +14,7 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
 use jit::test_utils::{document_reference, issue_id};
@@ -1205,7 +1205,7 @@ fn test_inline_template_still_validates_from_body() {
 mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
-    use jit::domain::identity::{IssueId, IssueIdStaging};
+    use jit::domain::identity::IssueId;
     use jit::domain::State;
     use jit::storage::JsonFileStorage;
     use jit::test_utils::setup_test_repo_with_config;
@@ -1329,7 +1329,7 @@ mod file_backed_external_plan {
 // ---------------------------------------------------------------------------
 
 mod cli {
-    use jit::domain::identity::{IssueId, IssueIdStaging};
+    use jit::domain::identity::IssueId;
     use jit::test_cli::JitCli;
     use jit::test_taxonomy::{
         setup_test_repo_with_taxonomy, type_label, TaxonomyRepo, TestTaxonomy,

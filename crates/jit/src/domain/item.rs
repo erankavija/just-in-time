@@ -42,7 +42,7 @@
 use crate::config::{ItemKindConfig, ItemKindSource, SourceOfTruth, TomlSourceDescriptor};
 use crate::document::ContentParser;
 use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
-use crate::domain::identity::{InvalidIdPrefixError, IssueId, IssueIdPrefix, IssueIdStaging};
+use crate::domain::identity::{InvalidIdPrefixError, IssueId, IssueIdPrefix};
 use crate::domain::projection::project;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;

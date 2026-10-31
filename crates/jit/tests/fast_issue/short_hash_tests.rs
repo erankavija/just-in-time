@@ -2,7 +2,6 @@
 //!
 //! Validates that partial UUID prefixes work like git short hashes. Short
 //! prefixes enter through the CLI, which resolves each issue-id argument once.
-use jit::domain::identity::IssueId;
 use jit::domain::SHORT_ID_LENGTH;
 use jit::test_cli::JitCli;
 use jit::test_utils::issue_id;
@@ -157,8 +156,8 @@ fn test_cli_issue_show_resolves_noncanonical_full_ids() {
     }
 }
 
-fn short(id: &IssueId) -> String {
-    id.as_str()[..SHORT_ID_LENGTH].to_string()
+fn short(id: &str) -> String {
+    id[..SHORT_ID_LENGTH].to_string()
 }
 
 /// `jit args --json` with `{short}` naming a too-short prefix refuses it as an
@@ -225,7 +224,7 @@ fn test_cli_dep_rm_removes_a_dangling_dependency_by_short_prefix() {
     std::fs::write(&record, serde_json::to_vec(&issue).unwrap()).unwrap();
 
     let removed = cli
-        .run_json(["dep", "rm", from.as_str(), &short(&to)])
+        .run_json(["dep", "rm", from.as_str(), &short(to.as_str())])
         .unwrap();
     assert_eq!(removed["removed"], serde_json::json!([to]));
     let shown = cli.run_json(["issue", "show", from.as_str()]).unwrap();

@@ -6,7 +6,7 @@
 
 use crate::doc_show_tests::{declared_area, declared_config};
 use crate::linked_checkout_write_policy_tests::store_bytes;
-use jit::domain::identity::IssueIdStaging;
+use jit::domain::identity::IssueId;
 use jit::test_cli::JitCli;
 use jit::test_utils::declaration_dir;
 use serde_json::Value;
@@ -52,6 +52,8 @@ fn test_doc_list_includes_every_file_under_the_issue_artifact_directory_without_
     cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
     let directory = cli
         .run(["doc", "dir", issue.short_id(), declared_area()])
@@ -87,6 +89,8 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
     cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
     let directory = cli
         .run(["doc", "dir", issue.short_id(), declared_area()])
@@ -133,6 +137,8 @@ fn test_doc_show_displays_a_derived_document() {
     cli.run(["init", "--json"]).unwrap();
     let issue = cli
         .create_issue(["--title", "Owner of derived documents"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
     let directory = cli
         .run(["doc", "dir", issue.short_id(), declared_area()])
@@ -165,6 +171,8 @@ fn test_doc_list_includes_artifacts_merged_from_a_linked_worktree_without_a_trac
     fs::write(&config, declared).unwrap();
     let issue = primary
         .create_issue(["--title", "Owner of merged artifacts"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
     let artifact = format!(
         "{}/report.md",

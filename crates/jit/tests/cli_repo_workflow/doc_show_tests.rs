@@ -10,8 +10,7 @@
 //! sibling `artifact_conformance_cli_tests` module drives the same repository
 //! shape and resolves directories through the same `doc dir` run
 //! (`@/invariant/shared-test-contracts`).
-
-use jit::domain::identity::IssueIdStaging;
+use jit::domain::identity::IssueId;
 use jit::test_cli::JitCli;
 use jit::test_utils::declaration_dir;
 use std::collections::HashSet;
@@ -21,7 +20,11 @@ use std::process::Output;
 #[test]
 fn test_doc_show_without_git() {
     let cli = JitCli::initialised().unwrap();
-    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
     let short_id = issue_id.short_id();
     fs::write(
         cli.root().join("design.md"),
@@ -59,7 +62,11 @@ fn test_doc_show_without_git() {
 fn test_doc_show_with_git() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap();
-    let issue_id = cli.create_issue(["--title", "Test Issue"]).unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test Issue"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
     let short_id = issue_id.short_id();
     fs::write(
         cli.root().join("design.md"),
@@ -195,9 +202,13 @@ fn test_doc_dir_names_the_directory_the_membership_precedence_resolves_inside_a_
             "--label",
             &format!("{namespace}:{membership}"),
         ])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
     let bare = cli
         .create_issue(["--title", "Issue naming no membership value"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
 
     let member_directory = cli
@@ -248,7 +259,11 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
     );
     cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
-    let issue = cli.create_issue(["--title", "Undeclared area"]).unwrap();
+    let issue = cli
+        .create_issue(["--title", "Undeclared area"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
 
     // The same repository resolves a declared area, so a rejection below is the
     // registry talking rather than the command being absent.
@@ -308,6 +323,8 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
     let authored = undeclared_area();
     let issue = cli
         .create_issue(["--title", "Configured registry"])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
 
     let accepts = |area: &str| {
@@ -377,6 +394,8 @@ fn test_doc_dir_json_output_is_a_flat_object_naming_the_issue_the_area_and_the_d
             "--label",
             &format!("{namespace}:artifact-layout"),
         ])
+        .unwrap()
+        .parse::<IssueId>()
         .unwrap();
 
     let printed = cli
@@ -431,7 +450,11 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
     );
     cli.run(["init", "--json"]).unwrap();
     let area = declared_area();
-    let known = cli.create_issue(["--title", "Known issue"]).unwrap();
+    let known = cli
+        .create_issue(["--title", "Known issue"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
     let unknown = "deadbeef";
     assert_ne!(
         known.short_id(),

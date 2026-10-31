@@ -15,7 +15,7 @@
 //! reduced spine C→B→P→upstream.
 
 use jit::declarations::{GateChecker, GateMode};
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
@@ -1641,13 +1641,19 @@ fn test_apply_result_serializes_to_expected_json_shape() {
 
     // Top-level fields are present under their documented names.
     assert_eq!(json["template"], "plan");
-    assert_eq!(json["anchor_bindings"]["container"], epic_full);
+    assert_eq!(json["anchor_bindings"]["container"], epic_full.as_str());
 
     // The role→id map names both roles with the ids the result reports.
     let planning_id = &result.created_node_ids_by_role["planning"];
     let breakdown_id = &result.created_node_ids_by_role["breakdown"];
-    assert_eq!(json["created_node_ids_by_role"]["planning"], *planning_id);
-    assert_eq!(json["created_node_ids_by_role"]["breakdown"], *breakdown_id);
+    assert_eq!(
+        json["created_node_ids_by_role"]["planning"],
+        planning_id.as_str()
+    );
+    assert_eq!(
+        json["created_node_ids_by_role"]["breakdown"],
+        breakdown_id.as_str()
+    );
 
     // The pre-apply snapshot is serialized as the container's ORIGINAL upstream
     // deps (the input the move-upstream transform consumed), not its post-apply

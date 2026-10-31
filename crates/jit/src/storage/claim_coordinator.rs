@@ -207,7 +207,8 @@ impl ClaimsIndex {
         }
 
         let content = fs::read_to_string(&index_path).context("Failed to read claims index")?;
-        serde_json::from_str(&content).context("Failed to parse claims index")
+        serde_json::from_str(&content)
+            .with_context(|| format!("Failed to parse claims index at {}", index_path.display()))
     }
 
     /// Non-fatal warnings derived from the index's diagnostic state.
@@ -1197,14 +1198,19 @@ impl ClaimCoordinator {
             let file = fs::File::open(&log_path).context("Failed to open claims log")?;
             let reader = BufReader::new(file);
 
-            for line in reader.lines() {
+            for (index, line) in reader.lines().enumerate() {
                 let line = line.context("Failed to read line from claims log")?;
                 if line.trim().is_empty() {
                     continue;
                 }
 
-                let entry: ClaimLogEntry =
-                    serde_json::from_str(&line).context("Failed to parse claim log entry")?;
+                let entry: ClaimLogEntry = serde_json::from_str(&line).with_context(|| {
+                    format!(
+                        "Failed to parse claim log entry at {}:{}",
+                        log_path.display(),
+                        index + 1
+                    )
+                })?;
 
                 // Check for sequence gaps
                 if entry.seq != expected_seq {
@@ -1931,10 +1937,10 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_claim_log_decode_rejects_invalid_agent_id_and_names_field() {
+    /// One acquire entry of the claims log, encoded as a JSON object.
+    fn acquire_entry_value() -> serde_json::Value {
         let now = Utc::now();
-        let entry = ClaimLogEntry {
+        serde_json::to_value(ClaimLogEntry {
             schema_version: 1,
             seq: 1,
             timestamp: now,
@@ -1952,8 +1958,13 @@ mod tests {
                     stale: false,
                 },
             },
-        };
-        let mut line = serde_json::to_value(entry).unwrap();
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn test_claim_log_decode_rejects_invalid_agent_id_and_names_field() {
+        let mut line = acquire_entry_value();
         line["agent_id"] = serde_json::Value::String("invalid".to_string());
         let line = serde_json::to_string(&line).unwrap();
 
@@ -1962,6 +1973,25 @@ mod tests {
         assert!(
             error.to_string().contains("agent_id"),
             "the claims-log decode error should name the invalid field, got: {error}"
+        );
+    }
+
+    #[test]
+    fn test_rebuild_index_from_log_rejects_a_non_canonical_issue_id_naming_the_record() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let mut entry = acquire_entry_value();
+        let non_canonical = crate::test_utils::issue_id(0xabcd).as_str().to_uppercase();
+        entry["issue_id"] = serde_json::Value::String(non_canonical.clone());
+        let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
+        fs::create_dir_all(log_path.parent().unwrap()).unwrap();
+        fs::write(&log_path, format!("{entry}\n")).unwrap();
+
+        let error = format!("{:#}", coordinator.rebuild_index_from_log().unwrap_err());
+
+        assert!(
+            error.contains(&format!("{}:1", log_path.display())) && error.contains(&non_canonical),
+            "{error}"
         );
     }
 

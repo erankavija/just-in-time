@@ -17,7 +17,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Search in title, description, and ID
                 issue.title.to_lowercase().contains(&query_lower)
                     || issue.description.to_lowercase().contains(&query_lower)
-                    || issue.id.to_lowercase().starts_with(&query_lower)
+                    || issue.id.as_str().starts_with(&query_lower)
             })
             .collect();
 

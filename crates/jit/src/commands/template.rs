@@ -656,8 +656,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
             let bytes = image
                 .file_bytes(&path)?
                 .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
-            let issue: Issue = serde_json::from_slice(bytes)
-                .with_context(|| format!("failed to parse captured issue {id}"))?;
+            let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
             if issue.id != *id {
                 return Err(anyhow!(
                     "indexed issue {id} contains mismatched embedded id {}",
