@@ -271,10 +271,7 @@ pub fn export_json_full(
         .iter()
         .map(|issue| GraphExportFullNode {
             issue: (*issue).clone(),
-            hierarchy: resolution
-                .get(issue.id.as_str())
-                .cloned()
-                .unwrap_or_default(),
+            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
         })
         .collect();
 
@@ -560,11 +557,33 @@ mod tests {
         }
     }
 
-    /// The `--full` export and the `graph tree` view publish the *same* four
-    /// resolution keys, because both flatten one `NodeHierarchy` serialization.
+    /// Typed hierarchy facts retain the string wire format on both surfaces.
     #[test]
-    fn test_export_json_full_hierarchy_keys_match_tree_view() {
+    fn test_export_json_full_hierarchy_serialization_matches_tree_view() {
         use crate::output::HierarchyNodeView;
+
+        #[derive(Serialize)]
+        struct WireNode<T> {
+            #[serde(flatten)]
+            identity: T,
+            #[serde(flatten)]
+            hierarchy: NodeHierarchy<String>,
+        }
+
+        #[derive(Serialize)]
+        struct TreeIdentity<'a> {
+            id: &'a str,
+            short_id: &'a str,
+            title: &'a str,
+            #[serde(rename = "type")]
+            type_name: Option<&'a str>,
+        }
+
+        #[derive(Serialize)]
+        struct WireExport<'a> {
+            nodes: Vec<WireNode<&'a Issue>>,
+            edges: Vec<GraphExportEdge>,
+        }
 
         let mut initiative = typed_issue("Initiative", 2);
         let action = typed_issue("Action", 4);
@@ -576,65 +595,55 @@ mod tests {
             &issues,
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
-        let facts = resolution
-            .get(action.id.as_str())
-            .cloned()
-            .unwrap_or_default();
+        let string_facts = |issue: &Issue| {
+            let facts = resolution.get(&issue.id).unwrap();
+            NodeHierarchy {
+                parent: facts.parent.as_ref().map(ToString::to_string),
+                children: facts.children.iter().map(ToString::to_string).collect(),
+                cluster: facts.cluster.as_ref().map(ToString::to_string),
+                rank: facts.rank,
+            }
+        };
 
-        // The keys a `graph tree` node contributes beyond its identity fields.
-        let tree_node = serde_json::to_value(HierarchyNodeView {
-            id: action.id.clone(),
-            short_id: action.short_id(),
-            title: action.title.clone(),
-            type_name: Some(
-                crate::test_taxonomy::test_taxonomy()
-                    .type_at_level(4)
-                    .to_string(),
-            ),
-            hierarchy: facts,
-        })
-        .unwrap();
-        let identity: std::collections::BTreeSet<&str> =
-            ["id", "short_id", "title", "type"].into_iter().collect();
-        let tree_resolution_keys: std::collections::BTreeSet<String> = tree_node
-            .as_object()
-            .unwrap()
-            .keys()
-            .filter(|k| !identity.contains(k.as_str()))
-            .cloned()
-            .collect();
+        for issue in &issues {
+            let type_name = crate::labels::type_label_value(&issue.labels);
+            let tree_node = HierarchyNodeView {
+                id: issue.id.clone(),
+                short_id: issue.short_id(),
+                title: issue.title.clone(),
+                type_name: type_name.map(str::to_string),
+                hierarchy: resolution.get(&issue.id).unwrap().clone(),
+            };
+            let expected = WireNode {
+                identity: TreeIdentity {
+                    id: issue.id.as_str(),
+                    short_id: issue.id.short_id(),
+                    title: &issue.title,
+                    type_name,
+                },
+                hierarchy: string_facts(issue),
+            };
+            assert_eq!(
+                serde_json::to_string(&tree_node).unwrap(),
+                serde_json::to_string(&expected).unwrap(),
+            );
+        }
 
-        // The keys the `--full` export node adds beyond the on-disk issue record.
-        let full: serde_json::Value =
-            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
-        let full_node = full["nodes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|n| n["id"] == action.id.as_str())
-            .unwrap();
-        let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&action)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect();
-        let export_resolution_keys: std::collections::BTreeSet<String> = full_node
-            .as_object()
-            .unwrap()
-            .keys()
-            .filter(|k| !record_keys.contains(*k))
-            .cloned()
-            .collect();
-
-        assert_eq!(export_resolution_keys, tree_resolution_keys);
-        let expected: std::collections::BTreeSet<String> =
-            ["parent", "children", "cluster", "rank"]
-                .into_iter()
-                .map(String::from)
-                .collect();
-        assert_eq!(export_resolution_keys, expected);
+        let all_nodes = graph.nodes_by_id();
+        let expected = WireExport {
+            nodes: all_nodes
+                .iter()
+                .map(|issue| WireNode {
+                    identity: *issue,
+                    hierarchy: string_facts(issue),
+                })
+                .collect(),
+            edges: build_export_edges(&all_nodes),
+        };
+        assert_eq!(
+            export_json_full(&graph, &resolution),
+            serde_json::to_string_pretty(&expected).unwrap(),
+        );
     }
 
     fn exported_ids(json: &str) -> std::collections::BTreeSet<IssueId> {
