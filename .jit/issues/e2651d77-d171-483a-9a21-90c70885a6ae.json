@@ -8,6 +8,7 @@
     "75951558-accb-4ee9-be38-e97fee0326ee",
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
     "804a8605-267b-4934-a9ef-08422fc3686d",
+    "83413035-17f2-4fe0-a503-b8086ea28ac7",
     "855d027d-2575-4c9d-8c6a-049f406fe397",
     "8e82fa49-1859-4e29-8972-f2da05e90b0a",
     "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
@@ -40,5 +41,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Issue identity is one validated type end to end",
-  "updated_at": "2026-10-31T23:03:25.044777111Z"
+  "updated_at": "2026-10-31T23:12:02.320349372Z"
 }

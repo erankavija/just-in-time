@@ -1,7 +1,7 @@
 {
   "epic_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "epic_short_id": "2195c98f",
-  "current_wave": 4,
+  "current_wave": 10,
   "wave_note": "Layers are topological depth over the 80 interior tasks. Waves are partial because of long chains; dispatch whatever jit reports ready within the lowest open waves.",
   "waves": [
     {
@@ -101,7 +101,7 @@
           "short_id": "0af95f14",
           "title": "Library unit tests take canonical issue ids from one fixture",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "179dcef9-71f8-41d0-a871-696c989d0ee4",
@@ -260,7 +260,7 @@
           "short_id": "13190465",
           "title": "The fast_issue suite carries typed canonical issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "182350ce-35f1-46aa-8106-1a5a7dca3542",
@@ -274,7 +274,7 @@
           "short_id": "19d9bd7d",
           "title": "CLI suites that use the library carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "428646c5-14ce-4127-ab7e-2b0ed56b0195",
@@ -295,7 +295,7 @@
           "short_id": "5fac48b8",
           "title": "Issue drafts carry their pre-derived identifier",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "6826f966-461c-4668-ae5a-92d10f75c5cf",
@@ -337,14 +337,14 @@
           "short_id": "b45a2865",
           "title": "The fast_rules suite carries typed canonical issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "b73b3e5a-87d4-455a-961d-20c88a3a7039",
           "short_id": "b73b3e5a",
           "title": "The fast_docs_templates suite carries typed canonical issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "d72bf093-a36d-4cc7-8255-36c46bc9bb93",
@@ -405,7 +405,7 @@
           "short_id": "c797b59b",
           "title": "The shared integration harness carries typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e1a6c8c2-bace-4c0c-8d01-1842dfac7f80",
@@ -506,7 +506,7 @@
           "short_id": "641bd14e",
           "title": "Repository-state mutations carry typed issue ids",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "8acca4f4-af5d-4dd8-b135-5f4a87eb1311",
@@ -532,7 +532,7 @@
           "short_id": "89e7a273",
           "title": "Storage trait and backends take issue ids as IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -544,7 +544,7 @@
           "short_id": "3ee3a4d1",
           "title": "Domain types carry issue ids as IssueId",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -556,7 +556,7 @@
           "short_id": "7abcc22d",
           "title": "IssueId becomes the validated newtype",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -581,6 +581,13 @@
           "id": "ce2bdbb0-ef3b-4074-a0ba-71070cc555f3",
           "short_id": "ce2bdbb0",
           "title": "Server issue responses carry the domain short id",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "83413035-17f2-4fe0-a503-b8086ea28ac7",
+          "short_id": "83413035",
+          "title": "Resolved hierarchy facts carry typed issue ids",
           "classification": "implementation",
           "status": "pending"
         }
@@ -648,7 +655,8 @@
       "title": "Declared vocabularies are never restated as token lists or Debug names",
       "reason": "Story 83d04069 holistic-review round 2: State token list in rules.rs test; Debug-rendered vocabularies in output.rs. Written as a class sweep to end per-instance rounds. Depends on 8acca4f4 (output.rs overlap).",
       "status": "pending"
-    }
+    },
+    "83413035"
   ],
   "escalations": [
     {
@@ -762,6 +770,12 @@
         "D: no change; adopters scope checks"
       ],
       "recommendation": "C"
+    },
+    {
+      "issue": "7abcc22d",
+      "reason": "REQ-07 byte identity is unmet by 4793 of 5924 historic gate-run records (missing evaluation_stability/origin or retired tree_dirty; no id differs). Same wording on 488eb3c1, 79aa3aa7, e2651d77.",
+      "status": "resolved",
+      "resolution": "Invoker: current-format gate-run records are byte-identical; every other stored gate-run record decodes and reproduces its id fields. Amended on the four issues."
     }
   ],
   "rework_counts": {
@@ -1561,6 +1575,11 @@
       "issue": "f71504cd",
       "finding": "code-review F1 advisory (pre-existing): link checking reaches git through git2 in commands/document.rs:1129, outside the storage-owned git CLI module (@/charter/D-21).",
       "disposition": "covered by the libgit2 removal work (34bb375a, 6fdb2d53); not this epic"
+    },
+    {
+      "source": "7abcc22d",
+      "note": "NodeHierarchy holds ids as strings, so main.rs graph tree truncates by SHORT_ID_LENGTH, which epic REQ-03 forbids.",
+      "resolved": "gap task 83413035"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1587,9 +1606,11 @@
     "First cargo-ci after a crate-source change can fail commands::{validate,profile} tests with \"profiled-repository fixture ... is busy\": a cold fixture build exceeds PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND (12 s) under load (2a6bc44c defect, c780514e-owned, reported by 4f 2026-10-29). Re-run cargo-ci before treating it as a worker failure.",
     "Under the alias, construction sites (raw value -> IssueId) fail REQ-03-style criteria just like uses; a generated UUID needs an infallible constructor on both sides of the bridge (IssueId::from_uuid), not a serde round-trip, which Codex tried and the lead removed.",
     "Read land.sh output before closing: a landing cargo-ci can fail after a passing ci-only (19d9bd7d: crate_source_digest self-check mismatch from a stale shared target). cargo clean -p jit in the worktree and re-land; jit issue update --state done on unpassed gates diverts to gated.",
-    "Parallel retypes that touch one test file conflict at landing (89e7a273 vs 19d9bd7d in scope_validation_tests.rs, same retype on both sides); resolve to main and re-land."
+    "Parallel retypes that touch one test file conflict at landing (89e7a273 vs 19d9bd7d in scope_validation_tests.rs, same retype on both sides); resolve to main and re-land.",
+    "Stored gate-run records predate format changes; test byte identity over records whose decoded key set equals the stored one, and ids over the rest.",
+    "The lead's Bash cwd must not end inside a worker worktree: the harness pins the session there. Lead state runs via env -C <root>; do not reclaim the pinned worktree while it is the cwd."
   ],
-  "session_note": "Session 5 ended waiting on the invoker (5fac48b8 REQ-01 escalation) and on just-in-time-4f (19d9bd7d upstream). See handoff-4.md.",
+  "session_note": "Session 6 (lead just-in-time-ad): 7abcc22d landed; next wave 0102769f, 488eb3c1, ce2bdbb0, 83413035. Escalations go to just-in-time-c9 per invoker rule.",
   "decisions": [
     {
       "issue": "8acca4f4",
@@ -1620,7 +1641,8 @@
     "9537f74b"
   ],
   "session_rules": [
-    "Session 4 (invoker): do not stop to ask questions; record any escalation as blocked for the next session; write the handoff when all remaining work waits on invoker input; check workers every 30 min."
+    "Session 4 (invoker): do not stop to ask questions; record any escalation as blocked for the next session; write the handoff when all remaining work waits on invoker input; check workers every 30 min.",
+    "Session 6 (invoker via just-in-time-c9): send escalations to just-in-time-c9, not AskUserQuestion; continue work a decision does not block."
   ],
   "lead_executed_external": [
     {

@@ -26,7 +26,7 @@
     "satisfies:b697a3f7/REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "One readiness derivation carried into graph-editing commands",
-  "updated_at": "2026-10-24T21:22:51.976433145Z"
+  "updated_at": "2026-10-31T23:10:47.682722126Z"
 }
