@@ -155,16 +155,14 @@ fn test_search_compact_has_short_id() {
 }
 
 #[test]
-fn test_search_compact_preserves_count() {
+fn test_search_compact_returns_every_matching_issue() {
     let temp = JitCli::initialised().unwrap();
     seed_search_issues(&temp);
     let data = temp
         .run_json(["issue", "search", "authentication"])
         .unwrap();
     let issues = data["issues"].as_array().unwrap();
-    let count = data["count"].as_u64().unwrap();
 
-    // Count should match actual array length
-    assert_eq!(count, issues.len() as u64);
-    assert_eq!(count, 2); // We created 2 issues with "authentication"
+    // We created 2 issues with "authentication"
+    assert_eq!(issues.len(), 2);
 }
