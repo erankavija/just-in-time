@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e7571bc2d1eceedf030da6912335959b2c3e42ea",
+  "completed_at": "2026-10-31T23:44:54.324203708Z",
+  "duration_ms": 153972,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The schema-driven list-envelope test satisfies the issue’s hard criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "510daa14-ed80-4633-9332-798d19c2150d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a94b40f6-80d2-41c4-a0f8-45d1ff751a2e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:42:20.351919814Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c6a65ee63, e7571bc2d (uncommitted JIT state excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-04 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed at 2026-10-31T23:42:19Z (exit code not recorded)\nTruncation recovery: narrowed the tagged commit and merge-parent diffs to affected paths; reread current test and governing sources in bounded ranges\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The schema-driven list-envelope test satisfies the issue’s hard criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

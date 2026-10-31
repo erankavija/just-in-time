@@ -17,7 +17,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "17a5279b-dfbd-4b98-83a5-28a6a9297d12",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:42:18.662745789Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a373b89b-b2d7-4ecb-9916-6a882bc38eb9",
+      "status": "failed",
+      "updated_at": "2026-10-31T23:43:37.424209324Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "89f517a5-73b0-4fb2-b212-262055f27970",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exit-code re-proof suites are deleted",
-  "updated_at": "2026-10-31T23:15:01.547377413Z"
+  "updated_at": "2026-10-31T23:43:37.424209324Z"
 }

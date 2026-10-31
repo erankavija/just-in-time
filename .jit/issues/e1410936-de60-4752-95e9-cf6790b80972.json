@@ -9,6 +9,7 @@
   ],
   "description": "Remove the per-command checks of `count` against collection length from the `cli_issue` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_issue/container_rollup_tests.rs:211,348`, `cli_issue/issue_search_json_tests.rs:234`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
   "documents": [],
+  "first_ready_at": "2026-10-31T23:46:36.088682154Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +28,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "cli_issue tests stop re-asserting the list-envelope count",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-31T23:46:36.088682154Z"
 }
