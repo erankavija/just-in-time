@@ -17,6 +17,12 @@
       "status": "passed",
       "updated_at": "2026-10-31T23:34:05.695633147Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b6ed11d3-f366-4d33-9c54-fba0a1a1f94c",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:36:28.176195252Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "83413035-17f2-4fe0-a503-b8086ea28ac7",
@@ -34,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolved hierarchy facts carry typed issue ids",
-  "updated_at": "2026-10-31T23:34:05.695633147Z"
+  "updated_at": "2026-10-31T23:36:28.176195252Z"
 }
