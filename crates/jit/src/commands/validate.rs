@@ -777,7 +777,8 @@ fn effective_issues(
         .map(|id| {
             let bytes = effective(image, &format!(".jit/issues/{id}.json"))?
                 .ok_or_else(|| anyhow!("captured image has no issue file for '{id}'"))?;
-            Ok(serde_json::from_slice::<Issue>(&bytes)?)
+            let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json"))?;
+            Ok(crate::repository_state::decode_issue_record(&path, &bytes)?)
         })
         .collect()
 }

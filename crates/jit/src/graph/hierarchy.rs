@@ -132,12 +132,12 @@
 //! let resolution = resolve_hierarchy(&nodes, &config);
 //!
 //! // The task's nearest container is the epic, not the milestone.
-//! assert_eq!(resolution.parent(&task.id), Some(epic.id.as_str()));
-//! assert_eq!(resolution.parent(&epic.id), Some(milestone.id.as_str()));
-//! assert_eq!(resolution.parent(&milestone.id), None);
+//! assert_eq!(resolution.parent(task.id.as_str()), Some(epic.id.as_str()));
+//! assert_eq!(resolution.parent(epic.id.as_str()), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.parent(milestone.id.as_str()), None);
 //!
 //! // The whole chain clusters to the strategic root (the milestone).
-//! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
+//! assert_eq!(resolution.cluster(task.id.as_str()), Some(milestone.id.as_str()));
 //! ```
 
 use crate::domain::identity::IssueId;

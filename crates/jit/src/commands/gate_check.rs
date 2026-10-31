@@ -128,8 +128,7 @@ fn captured_issue_record(
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
     match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
-            let issue: Issue = serde_json::from_slice(content.bytes())
-                .with_context(|| format!("failed to parse captured issue at {path:?}"))?;
+            let issue = crate::repository_state::decode_issue_record(&path, content.bytes())?;
             if &issue.id != issue_id {
                 anyhow::bail!(
                     "captured issue {issue_id} contains mismatched embedded id {}",

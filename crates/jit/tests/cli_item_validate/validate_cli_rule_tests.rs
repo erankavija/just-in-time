@@ -458,7 +458,7 @@ fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
     let id = cli.create_issue(EPIC).unwrap();
     let issue_path = cli.root().join(".jit/issues").join(format!("{id}.json"));
     let mut issue: Value = serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
-    issue["dependencies"] = serde_json::json!(["nonexistent"]);
+    issue["dependencies"] = serde_json::json!(["00000000-0000-4000-8000-00000000dead"]);
     fs::write(&issue_path, serde_json::to_vec_pretty(&issue).unwrap()).unwrap();
 
     cli.command(["validate"])

@@ -438,8 +438,7 @@ fn captured_issue<'a>(
             .file_bytes(&path)
             .map_err(ProducerError::from)?
             .ok_or_else(|| ArchiveExecutionError::MissingCapturedIssue(id.clone()))?;
-        let issue: Issue =
-            serde_json::from_slice(bytes).map_err(ArchiveExecutionError::MalformedIssueJson)?;
+        let issue = super::decode_issue_record(&path, bytes)?;
         if &issue.id != id {
             return Err(ArchiveExecutionError::IssueIdMismatch {
                 expected: id.clone(),
@@ -524,9 +523,9 @@ pub enum ArchiveExecutionError {
     /// A referenced issue record was absent from the captured image.
     #[error("captured issue is absent: {0}")]
     MissingCapturedIssue(IssueId),
-    /// A captured issue record was not valid JSON.
-    #[error("invalid captured issue json: {0}")]
-    MalformedIssueJson(#[source] serde_json::Error),
+    /// A captured issue record did not decode.
+    #[error(transparent)]
+    MalformedIssueRecord(#[from] super::MalformedIssueRecordError),
     /// A captured issue's embedded id did not match its requested id.
     #[error("captured issue {expected} contains mismatched embedded id {found}")]
     IssueIdMismatch {
@@ -941,7 +940,7 @@ mod tests {
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::MalformedIssueJson(_)
+            ArchiveExecutionError::MalformedIssueRecord(_)
         ));
     }
 

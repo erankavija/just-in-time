@@ -273,7 +273,7 @@ fn test_exit_code_validation_command() {
         .join(format!("{}.json", id));
     let mut issue_data: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
-    issue_data["dependencies"] = serde_json::json!(["nonexistent"]);
+    issue_data["dependencies"] = serde_json::json!(["00000000-0000-4000-8000-00000000dead"]);
     fs::write(
         &issue_path,
         serde_json::to_string_pretty(&issue_data).unwrap(),

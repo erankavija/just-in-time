@@ -302,7 +302,7 @@ fn test_blocked_by_missing_dependency_json_reports_missing_state() {
     let cli = JitCli::initialised().unwrap();
     let dependent = cli.create_issue(["--title", "Dangling work"]).unwrap();
 
-    let missing_id = "missing-dependency";
+    let missing_id = "00000000-0000-4000-8000-00000000dead";
     let issue_path = cli
         .root()
         .join(".jit")

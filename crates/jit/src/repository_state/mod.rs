@@ -12,6 +12,7 @@ mod export;
 mod image;
 mod index;
 mod initialize;
+mod issue_record;
 mod managed_document;
 mod materialize;
 mod mutation;
@@ -49,6 +50,7 @@ pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
 };
+pub use issue_record::{decode_issue_record, MalformedIssueRecordError};
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,

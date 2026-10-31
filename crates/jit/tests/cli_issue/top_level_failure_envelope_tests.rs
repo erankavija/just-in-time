@@ -146,7 +146,7 @@ fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
     let mut issue: serde_json::Value =
         serde_json::from_slice(&fs::read(&issue_path).expect("read created issue record"))
             .expect("created issue record is JSON");
-    issue["dependencies"] = serde_json::json!(["missing-dependency"]);
+    issue["dependencies"] = serde_json::json!(["00000000-0000-4000-8000-00000000dead"]);
     fs::write(
         issue_path,
         serde_json::to_vec_pretty(&issue).expect("serialize broken issue record"),
@@ -168,7 +168,7 @@ fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert!(envelope["error"]["details"]["integrity_error"]
         .as_str()
-        .is_some_and(|message| message.contains("missing-dependency")));
+        .is_some_and(|message| message.contains("00000000-0000-4000-8000-00000000dead")));
     assert!(
         output.stderr.is_empty(),
         "machine-readable validation failure has no diagnostic pollution: {:?}",

@@ -2081,8 +2081,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
                 }
                 _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
             };
-            let issue: Issue = serde_json::from_slice(bytes)
-                .with_context(|| format!("failed to parse captured issue {id}"))?;
+            let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
             if issue.id != *id {
                 return Err(anyhow!(
                     "indexed issue {id} contains mismatched embedded id {}",
@@ -2371,9 +2370,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
                 let issue: Issue = match image.entry(&issue_path)? {
                     RepositoryEntry::File { content, .. } => {
-                        serde_json::from_slice(content.bytes()).with_context(|| {
-                            format!("failed to parse captured issue {}", request.issue_id())
-                        })?
+                        crate::repository_state::decode_issue_record(&issue_path, content.bytes())?
                     }
                     RepositoryEntry::Absent => {
                         return Err(crate::storage::IssueNotFoundError::new(

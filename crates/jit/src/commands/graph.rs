@@ -481,7 +481,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
     /// assert_eq!(response.count(), 2);
     /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
-    /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
+    /// assert_eq!(epic_view.hierarchy.children, vec![task.to_string()]);
     /// assert_eq!(epic_view.hierarchy.parent, None);
     /// ```
     pub fn resolve_hierarchy_tree(
