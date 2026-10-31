@@ -1,9 +1,9 @@
 //! Integration tests for `jit gate evaluate-all` (issue df7f934c).
 //!
-//! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
-//! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
-//! -> exit 10; and, for a mixed auto/manual gate set, fail-fast at an
-//! unattested manual gate rather than a silent pass (jit:1d59070d REQ-03).
+//! Covers: all-pass with per-gate JSON; fail-fast at the first non-passing gate
+//! (a later gate's checker never runs); runner error; and, for a mixed
+//! auto/manual gate set, fail-fast at an unattested manual gate rather than a
+//! silent pass (jit:1d59070d REQ-03).
 
 use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
 use jit::test_cli::JitCli;
