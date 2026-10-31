@@ -5,7 +5,7 @@
 //! a failed command plus a retry. Policy: hints only, no new aliases — every
 //! wrong guess still fails, but with a message naming the canonical spelling
 //! instead of clap's generic "unrecognized subcommand" error. These tests
-//! pin, for each wrong guess: exit code 2, the hint naming the canonical command
+//! pin, for each wrong guess: failure, the hint naming the canonical command
 //! and clap's diagnostic on stderr with empty stdout (parse failures stay
 //! outside the `--json` envelope), and that the canonical spelling in the same
 //! group is completely unaffected.

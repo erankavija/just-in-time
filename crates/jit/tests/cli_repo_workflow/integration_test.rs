@@ -353,8 +353,7 @@ fn test_export_full_requires_json_format() {
         .output()
         .unwrap();
 
-    // Usage error: --full with a non-JSON format exits 2.
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("--full is only valid with --format json"));
 }

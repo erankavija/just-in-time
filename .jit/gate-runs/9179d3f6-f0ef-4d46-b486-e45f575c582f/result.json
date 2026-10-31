@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3c876fd3c26a2e9e8af0874670f9a452f9271f3d",
+  "completed_at": "2026-10-31T23:30:05.896841980Z",
+  "duration_ms": 76363,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The prior project-render finding is resolved; scoped tests retain error-class evidence without re-proving projection-owned exit codes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "134ee921-9f52-4ec5-80f0-28791fd0e59d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9179d3f6-f0ef-4d46-b486-e45f575c582f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:28:49.532869013Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 898293a51, c25ce771, 0a5f81cb, c7c36008 (jit:134ee921)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed, 2026-10-31T23:28:44.721459285+00:00, exit code none\nTruncation recovery: recovered merge and implementation patches with per-file narrow diffs; inspected current scoped assertions and projection binding rows\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The prior project-render finding is resolved; scoped tests retain error-class evidence without re-proving projection-owned exit codes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

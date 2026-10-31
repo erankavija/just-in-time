@@ -20,10 +20,9 @@ fn make_repository_too_new(cli: &JitCli) {
 }
 
 fn assert_too_new_refusal(out: &std::process::Output, cmd: &str) {
-    assert_eq!(
-        out.status.code(),
-        Some(10),
-        "{cmd} on a too-new repo must exit 10 (ExternalError); stderr={}",
+    assert!(
+        !out.status.success(),
+        "{cmd} on a too-new repo must fail; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
