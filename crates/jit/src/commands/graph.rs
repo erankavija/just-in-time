@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::domain::identity::IssueId;
-use crate::domain::identity::IssueIdStaging;
 use crate::graph::Direction;
 use crate::output::DependencyTreeNode;
 use std::collections::{HashMap, HashSet};
@@ -635,7 +634,6 @@ fn collect_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::identity::IssueIdStaging;
     use crate::domain::{Priority, State};
     use crate::output::DependencyTreeNode;
 

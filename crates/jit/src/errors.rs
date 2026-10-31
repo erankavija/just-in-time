@@ -11,7 +11,6 @@ use std::fmt;
 
 use crate::declarations::GateMode;
 use crate::domain::identity::IssueId;
-use crate::domain::identity::IssueIdStaging;
 use crate::domain::{GateStatus, Issue, State};
 
 /// An error with diagnostic context and remediation steps.

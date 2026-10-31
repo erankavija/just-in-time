@@ -11,7 +11,7 @@ use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
@@ -1218,9 +1218,7 @@ mod tests {
         let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
             .unwrap()
             .all_ids
-            .remove(0)
-            .parse::<IssueId>()
-            .unwrap();
+            .remove(0);
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(&id).repository_relative()).unwrap(),
         )
@@ -1382,7 +1380,7 @@ mod tests {
             &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
-        let id = &index.all_ids[0].parse::<IssueId>().unwrap();
+        let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )
@@ -1438,7 +1436,7 @@ mod tests {
             &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
         )
         .unwrap();
-        let id = &index.all_ids[0].parse::<IssueId>().unwrap();
+        let id = &index.all_ids[0];
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )

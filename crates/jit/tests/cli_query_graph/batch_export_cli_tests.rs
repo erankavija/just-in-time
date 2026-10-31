@@ -1,7 +1,7 @@
 //! CLI integration tests for `jit graph export --scope` and `--format batch`
 //! (issue 3e12ffbd), exercised as a subprocess end to end.
 
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::test_cli::JitCli;
 use jit::test_taxonomy::{setup_test_repo_with_taxonomy, type_label, TaxonomyRepo};
 

@@ -4,7 +4,7 @@ use jit::domain::artifact_plan::{
     PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
     ARCHIVE_PLAN_SCHEMA_VERSION,
 };
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::test_utils::issue_id;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;

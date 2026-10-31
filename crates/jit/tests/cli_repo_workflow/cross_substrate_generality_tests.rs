@@ -31,7 +31,7 @@
 //!   this explicit.
 //! - REQ-03: the test passes under `cargo test`.
 
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use serde_json::Value;

@@ -53,14 +53,13 @@ use crate::domain::type_taxonomy::{
 use crate::domain::{ContentFormat, Issue};
 use crate::graph::DependencyGraph;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use crate::declarations::rules::{
     Assertion, ChildLink, DependencyShapeConfig, LabelCoverageConfig, LabelReferenceConfig,
     LabelReferenceScope, Rule, RuleScope, Severity, TypeHierarchyKind,
 };
 use crate::domain::id_pattern::IdPattern;
-use crate::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::validation::engine::Finding;
 
 /// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
@@ -140,10 +139,10 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     // `expand_sugar_address` is not used: it needs the configured kind list and
     // would add kind semantics D10 forbids at this crediting site.
     value.split_once('/').is_some_and(|(scope, self_id)| {
-        scope
-            .parse::<IssueIdPrefix>()
-            .is_ok_and(|prefix| prefix.matches(scope_short_id))
-            && self_id == id
+        matches!(
+            crate::domain::item::Scope::parse(scope),
+            Ok(crate::domain::item::Scope::Issue(prefix)) if prefix.matches(scope_short_id)
+        ) && self_id == id
     })
 }
 
@@ -1077,11 +1076,13 @@ enum ContainerMatch<'a> {
 }
 
 /// Resolve a `container-from-label` value against the in-memory `issues` slice
-/// by [`IssueIdPrefix`](crate::domain::identity::IssueIdPrefix). Two issues sharing a
+/// as an item address's issue segment
+/// ([`Scope::parse`](crate::domain::item::Scope::parse)). Two issues sharing a
 /// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
 /// a collision, never silently resolve the first match.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
-    let Ok(prefix) = IssueIdPrefix::from_str(value) else {
+    let Ok(crate::domain::item::Scope::Issue(prefix)) = crate::domain::item::Scope::parse(value)
+    else {
         return ContainerMatch::None;
     };
     let mut matches = issues.iter().filter(|i| prefix.matches(i.id.as_str()));

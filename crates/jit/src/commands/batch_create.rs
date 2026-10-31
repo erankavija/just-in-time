@@ -655,7 +655,6 @@ fn detect_cycle(defs: &[BatchIssueDef]) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::identity::IssueIdStaging;
     use crate::storage::InMemoryStorage;
 
     fn def(key: &str, deps: &[&str]) -> BatchIssueDef {

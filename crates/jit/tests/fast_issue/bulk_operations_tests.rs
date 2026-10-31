@@ -209,7 +209,7 @@ fn test_add_dependencies_atomic_failure_nonexistent() {
         .downcast_ref::<jit::errors::DependencyBatchRejectedError>()
         .expect("must be a typed DependencyBatchRejectedError");
     assert_eq!(batch.rejected().len(), 1);
-    assert_eq!(batch.rejected()[0].0, absent);
+    assert_eq!(batch.rejected()[0].0, absent.as_str());
     assert!(batch.rejected()[0].1.to_string().contains("not found"));
 
     // Nothing was persisted, including the sibling edge that would have

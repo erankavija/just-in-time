@@ -5,7 +5,6 @@
 //! Issue fields like title and state for rendering.
 
 use crate::domain::identity::IssueId;
-use crate::domain::identity::IssueIdStaging;
 use crate::domain::{Issue, Priority, State};
 use crate::graph::hierarchy::NodeHierarchy;
 use crate::graph::DependencyGraph;
@@ -272,7 +271,10 @@ pub fn export_json_full(
         .iter()
         .map(|issue| GraphExportFullNode {
             issue: (*issue).clone(),
-            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
+            hierarchy: resolution
+                .get(issue.id.as_str())
+                .cloned()
+                .unwrap_or_default(),
         })
         .collect();
 
@@ -574,7 +576,10 @@ mod tests {
             &issues,
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
-        let facts = resolution.get(&action.id).cloned().unwrap_or_default();
+        let facts = resolution
+            .get(action.id.as_str())
+            .cloned()
+            .unwrap_or_default();
 
         // The keys a `graph tree` node contributes beyond its identity fields.
         let tree_node = serde_json::to_value(HierarchyNodeView {

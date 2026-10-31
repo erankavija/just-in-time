@@ -21,7 +21,6 @@ use crate::storage::{
     RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
-use serde::Deserialize;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
@@ -740,10 +739,11 @@ impl JsonFileStorage {
             .join(format!("{}.json", id)))
     }
 
-    fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {
+    fn read_issue_record(&self, path: &Path) -> Result<Issue> {
         let contents = fs::read_to_string(path)
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
-        serde_json::from_str(&contents).context("Failed to deserialize data")
+        serde_json::from_str(&contents)
+            .with_context(|| format!("Failed to deserialize issue record at {}", path.display()))
     }
 
     fn load_index(&self) -> Result<Index> {
@@ -926,8 +926,8 @@ impl JsonFileStorage {
             return Ok(None);
         }
 
-        let issue =
-            serde_json::from_slice(&output.stdout).context("Failed to parse issue from git")?;
+        let issue = serde_json::from_slice(&output.stdout)
+            .with_context(|| format!("Failed to parse issue record at {git_path}"))?;
         Ok(Some(issue))
     }
 
@@ -954,7 +954,7 @@ impl JsonFileStorage {
         }
 
         // File exists — read it; any I/O or parse error is a real failure.
-        self.read_json(&main_issue_path).map(Some)
+        self.read_issue_record(&main_issue_path).map(Some)
     }
 }
 
@@ -1207,7 +1207,7 @@ impl IssueStore for JsonFileStorage {
             // files it writes under the repository write lock. The old `_lock` guard
             // was local and dropped before this method returned, so no caller ever
             // inherited serialization from it.
-            return self.read_json(&issue_path);
+            return self.read_issue_record(&issue_path);
         }
 
         // Fallback 1: Try reading from git HEAD.

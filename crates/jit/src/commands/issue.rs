@@ -1042,10 +1042,7 @@ mod tests {
         assert_eq!(status.title, "Gated child");
         assert_eq!(status.gates.len(), 1);
         assert_eq!(status.gates[0].key, "tests");
-        assert_eq!(
-            status.unmet_dependencies,
-            [crate::domain::identity::IssueIdStaging::short_id(&dep)]
-        );
+        assert_eq!(status.unmet_dependencies, [dep.short_id()]);
     }
 
     fn seed_ready(
@@ -1053,7 +1050,7 @@ mod tests {
         title: &str,
         priority: Priority,
         label: &str,
-    ) -> String {
+    ) -> IssueId {
         let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
         issue.state = State::Ready;
         issue.priority = priority;
@@ -3263,7 +3260,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .read_events()
             .unwrap()
             .iter()
-            .filter(|event| event.issue_id().map(|i| i.as_str()) == Some(id))
+            .filter(|event| event.issue_id() == Some(id))
             .map(|event| event.get_type().to_string())
             .collect::<Vec<_>>();
         types.sort();

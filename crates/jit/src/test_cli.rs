@@ -436,7 +436,10 @@ mod tests {
     #[test]
     fn test_created_issue_id_reads_id_field_and_rejects_other_output() {
         let id = crate::test_utils::issue_id(1);
-        assert_eq!(created_issue_id(&json!({"id": id, "x": 1})).unwrap(), id);
+        assert_eq!(
+            created_issue_id(&json!({"id": id, "x": 1})).unwrap(),
+            id.as_str()
+        );
         assert!(created_issue_id(&json!({"count": 0})).is_err());
         assert!(created_issue_id(&json!({"id": 7})).is_err());
     }

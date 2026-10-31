@@ -683,7 +683,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         assert!(graph
-            .validate_add_dependency(&issue1.id, &issue2.id)
+            .validate_add_dependency(issue1.id.as_str(), issue2.id.as_str())
             .is_ok());
     }
 
@@ -694,7 +694,7 @@ mod tests {
         let issues = vec![&issue1];
         let graph = DependencyGraph::new(&issues);
 
-        let result = graph.validate_add_dependency(&issue1.id, "nonexistent");
+        let result = graph.validate_add_dependency(issue1.id.as_str(), "nonexistent");
         assert_eq!(
             result,
             Err(GraphError::NodeNotFound {
@@ -716,7 +716,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         // Trying to make issue2 depend on issue1 would create a cycle
-        let result = graph.validate_add_dependency(&issue2.id, &issue1.id);
+        let result = graph.validate_add_dependency(issue2.id.as_str(), issue1.id.as_str());
         assert_eq!(result, Err(GraphError::CycleDetected));
     }
 
@@ -736,7 +736,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         // Trying to make issue3 depend on issue1 would create a cycle
-        let result = graph.validate_add_dependency(&issue3.id, &issue1.id);
+        let result = graph.validate_add_dependency(issue3.id.as_str(), issue1.id.as_str());
         assert_eq!(result, Err(GraphError::CycleDetected));
     }
 
@@ -772,7 +772,7 @@ mod tests {
         let issues = vec![&issue1, &issue2, &issue3];
         let graph = DependencyGraph::new(&issues);
 
-        let dependents = graph.get_dependents(&issue1.id);
+        let dependents = graph.get_dependents(issue1.id.as_str());
         assert_eq!(dependents.len(), 2);
         assert!(dependents.iter().any(|i| i.id == issue2.id));
         assert!(dependents.iter().any(|i| i.id == issue3.id));
@@ -792,7 +792,7 @@ mod tests {
         let issues = vec![&issue1, &issue2, &issue3];
         let graph = DependencyGraph::new(&issues);
 
-        let transitive = graph.get_transitive_dependents(&issue1.id);
+        let transitive = graph.get_transitive_dependents(issue1.id.as_str());
         assert_eq!(transitive.len(), 2);
         assert!(transitive.iter().any(|i| i.id == issue2.id));
         assert!(transitive.iter().any(|i| i.id == issue3.id));

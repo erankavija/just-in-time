@@ -101,10 +101,7 @@ pub fn document_reference_typed(
 
 /// A deterministic canonical issue id; distinct numeric seeds yield distinct ids.
 pub fn issue_id(seed: u128) -> IssueId {
-    uuid::Uuid::from_u128(seed.rotate_left(96))
-        .to_string()
-        .parse()
-        .expect("a UUID renders as a canonical issue id")
+    IssueId::from_uuid(uuid::Uuid::from_u128(seed.rotate_left(96)))
 }
 
 /// A drafted issue carrying a fresh random id.
@@ -132,10 +129,10 @@ mod fixture_issue_tests {
             first in proptest::prelude::any::<u128>(),
             second in proptest::prelude::any::<u128>(),
         ) {
-            use crate::domain::identity::ValidatedIssueId;
+            use crate::domain::identity::IssueId;
 
             let id = super::issue_id(first);
-            proptest::prop_assert!(ValidatedIssueId::try_from(id.as_str()).is_ok());
+            proptest::prop_assert!(IssueId::try_from(id.as_str()).is_ok());
             proptest::prop_assert_eq!(&id, &super::issue_id(first));
             proptest::prop_assert_eq!(id == super::issue_id(second), first == second);
         }

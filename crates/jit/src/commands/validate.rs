@@ -1,7 +1,6 @@
 //! Validation and status operations
 
 use super::*;
-use crate::domain::identity::IssueIdStaging;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
@@ -3593,7 +3592,7 @@ depends_on = ["planning"]
     /// id, and a counter over a fresh session.
     fn counted_session() -> (
         CommandExecutor<crate::storage::InMemoryStorage>,
-        String,
+        IssueId,
         RoundCounter,
     ) {
         use crate::commands::test_helpers::{seed_issue, setup};

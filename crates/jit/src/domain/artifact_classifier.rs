@@ -14,7 +14,7 @@ use crate::domain::artifact_plan::{
     EdgeResolutionMode, EvidenceCode, PendingDeletion, PlanBlocker, PlanError, PlanTarget,
     PlanWarning, PolicyStatus, ReferenceChange, WarningCode,
 };
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
 use crate::domain::State;

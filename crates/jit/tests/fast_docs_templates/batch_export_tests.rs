@@ -11,7 +11,7 @@
 
 use jit::commands::BatchIssueDef;
 use jit::declarations::GateMode;
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -332,11 +332,11 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
     ] {
         let output = h.executor.export_graph(format, false, Some(&s.e)).unwrap();
         assert!(
-            output.contains(&s.c1),
+            output.contains(s.c1.as_str()),
             "{format:?}: in-scope node c1 must be exported"
         );
         assert!(
-            !output.contains(&s.ext),
+            !output.contains(s.ext.as_str()),
             "{format:?}: out-of-scope node ext must not appear as node or edge:\n{output}"
         );
     }

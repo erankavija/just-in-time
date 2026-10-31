@@ -218,7 +218,7 @@ fn test_search_extracts_issue_ids() {
         assert!(result.issue_id.is_some());
         // ID should match filename pattern
         let id = result.issue_id.as_ref().unwrap();
-        assert!(result.path.contains(id));
+        assert!(result.path.contains(id.as_str()));
     }
 }
 

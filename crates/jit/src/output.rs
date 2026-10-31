@@ -17,7 +17,6 @@ pub mod failure;
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
 use crate::domain::identity::IssueId;
-use crate::domain::identity::IssueIdStaging;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::queries::BlockingReason;
 use crate::domain::store_divergence::StoreDivergence;
@@ -297,7 +296,7 @@ pub enum GateRunLine {
 pub fn render_gate_run_status(
     line: GateRunLine,
     gate_key: impl Display,
-    requested: &str,
+    requested: impl Display,
 ) -> String {
     match line {
         GateRunLine::NeverRun => format!(
@@ -1598,7 +1597,6 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// # Examples
 ///
 /// ```
-/// use jit::domain::identity::IssueIdStaging;
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::HierarchyNodeView;
 ///
@@ -1611,8 +1609,8 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 ///     type_name: Some("epic".into()),
 ///     hierarchy: NodeHierarchy {
 ///         parent: None,
-///         children: vec![task_id.clone()],
-///         cluster: Some(epic_id.clone()),
+///         children: vec![task_id.to_string()],
+///         cluster: Some(epic_id.to_string()),
 ///         rank: 1,
 ///     },
 /// };
@@ -1649,7 +1647,6 @@ pub struct HierarchyNodeView {
 /// # Examples
 ///
 /// ```
-/// use jit::domain::identity::IssueIdStaging;
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
 ///
@@ -1662,9 +1659,9 @@ pub struct HierarchyNodeView {
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
 ///         hierarchy: NodeHierarchy {
-///             parent: Some(epic_id.clone()),
+///             parent: Some(epic_id.to_string()),
 ///             children: vec![],
-///             cluster: Some(epic_id.clone()),
+///             cluster: Some(epic_id.to_string()),
 ///             rank: 0,
 ///         },
 ///     }],
@@ -3393,7 +3390,7 @@ mod tests {
         let output = JsonOutput::success(data);
 
         // success field removed
-        assert_eq!(output.data["id"], id);
+        assert_eq!(output.data["id"], id.as_str());
         // metadata removed
     }
 
@@ -3463,7 +3460,7 @@ mod tests {
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         assert_eq!(parsed["message"], message);
-        assert_eq!(parsed["id"], id);
+        assert_eq!(parsed["id"], id.as_str());
         assert_eq!(parsed["title"], "Test issue");
     }
 

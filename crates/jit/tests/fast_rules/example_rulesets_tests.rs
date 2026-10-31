@@ -16,7 +16,7 @@
 use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
-use jit::domain::identity::{IssueId, IssueIdStaging};
+use jit::domain::identity::IssueId;
 use jit::domain::{ContentFormat, Issue, State};
 use jit::test_utils::document_reference_typed;
 use jit::validation::graph::{evaluate_graph, GraphFinding};

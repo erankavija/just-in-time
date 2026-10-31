@@ -42,8 +42,6 @@
 //! - REQ-05: [`test_story_markdown_sole_source_both_kinds`] — editing the
 //!   description (the only source) changes BOTH indexes, and no top-level `.jit/`
 //!   file duplicates either `D-01` or `RISK-01`.
-
-use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 

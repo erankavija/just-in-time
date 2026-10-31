@@ -118,7 +118,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
         .evaluate_graph_rules(&issues)
         .unwrap()
         .into_iter()
-        .filter(|gf| gf.issue_id.as_deref() == Some(issue_id.as_str()))
+        .filter(|gf| gf.issue_id.as_ref() == Some(&issue_id))
         .collect();
     assert!(
         warnings.is_empty(),

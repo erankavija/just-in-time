@@ -32,8 +32,6 @@
 //!   the markdown description is the only source — editing it changes the index and
 //!   no parallel structured store is written under `.jit/`.
 //! - REQ-04: every test below runs under `cargo test`.
-
-use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 

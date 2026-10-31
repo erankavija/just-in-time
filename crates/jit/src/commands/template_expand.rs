@@ -27,7 +27,7 @@ use anyhow::{anyhow, Result};
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, Priority};
 use crate::labels as label_utils;

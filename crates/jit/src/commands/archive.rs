@@ -877,7 +877,7 @@ impl CommandExecutor<JsonFileStorage> {
 mod tests {
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
-    use crate::domain::identity::{IssueId, IssueIdStaging};
+    use crate::domain::identity::IssueId;
     use crate::domain::State;
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;

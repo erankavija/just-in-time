@@ -1,7 +1,7 @@
 //! Dependency graph operations
 
 use super::*;
-use crate::domain::identity::{IssueId, IssueIdStaging};
+use crate::domain::identity::IssueId;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::IssueNotFoundError;
@@ -785,7 +785,7 @@ fn derive_batch_dependency_add(
             full_issue_id.clone(),
             rejected
                 .into_iter()
-                .map(|(_, dependency_id, error)| (dependency_id.clone(), error))
+                .map(|(_, dependency_id, error)| (dependency_id.to_string(), error))
                 .collect(),
         )
         .into());

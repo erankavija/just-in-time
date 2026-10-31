@@ -38,7 +38,7 @@ fn test_self_redundant_sibling_blocks_valid_edge_and_logs_nothing() {
         .downcast_ref::<DependencyBatchRejectedError>()
         .expect("must be a typed DependencyBatchRejectedError");
     assert_eq!(batch.rejected().len(), 1, "only C is rejected, not D");
-    assert_eq!(batch.rejected()[0].0, c);
+    assert_eq!(batch.rejected()[0].0, c.as_str());
 
     // D — perfectly valid on its own — was NOT added.
     let loaded_a = h.storage.load_issue(&a).unwrap();
@@ -311,7 +311,7 @@ fn test_combination_redundancy_neither_edge_alone_would_trigger() {
     let batch = err
         .downcast_ref::<DependencyBatchRejectedError>()
         .expect("must be a typed DependencyBatchRejectedError");
-    assert!(batch.rejected().iter().any(|(to, _)| to == &c));
+    assert!(batch.rejected().iter().any(|(to, _)| to == c.as_str()));
 
     let loaded_a = h.storage.load_issue(&a).unwrap();
     assert!(
