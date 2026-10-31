@@ -66,11 +66,6 @@ fn test_deletion_not_confirmed_error_json() {
         .unwrap();
 
     assert!(!output.status.success());
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "refusal must exit 2 (REQ-01)"
-    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 

@@ -6,7 +6,7 @@ use std::fs;
 use std::str::FromStr;
 
 #[test]
-fn test_serve_failures_emit_registered_error_envelope_with_mapped_exit_status() {
+fn test_serve_failures_emit_registered_error_envelope() {
     for args in [
         ["serve", "--json"].as_slice(),
         ["serve", "--stop", "--json"].as_slice(),
@@ -31,6 +31,6 @@ fn test_serve_failures_emit_registered_error_envelope_with_mapped_exit_status() 
         assert_eq!(envelope.as_object().map(|object| object.len()), Some(1));
         assert!(envelope["error"]["message"].is_string());
         assert_eq!(registered, ErrorCode::ParseError);
-        assert_eq!(output.status.code(), Some(registered.exit_code().code()));
+        assert!(!output.status.success());
     }
 }

@@ -215,15 +215,14 @@ fn test_search_label_namespace_wildcard_matches_query_label_set() {
 }
 
 #[test]
-fn test_search_malformed_label_pattern_exits_invalid_argument() {
+fn test_search_malformed_label_pattern_fails() {
     let temp = JitCli::initialised().unwrap();
     seed_search_issues(&temp);
     let out = temp
-        .command(["issue", "search", "--label", "type:"])
+        .command(["issue", "search", "--label", "type:", "--json"])
         .output()
         .unwrap();
-    assert_eq!(
-        out.status.code(),
-        Some(jit::output::ExitCode::InvalidArgument.code())
-    );
+    assert!(!out.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
 }

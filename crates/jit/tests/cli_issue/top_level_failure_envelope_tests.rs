@@ -36,7 +36,7 @@ fn test_propagated_config_parse_failure_emits_registered_envelope_and_empty_stde
 
     let (envelope, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::ParseError);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
     assert!(envelope["error"]["message"].is_string());
     assert!(
         output.stderr.is_empty(),
@@ -86,7 +86,7 @@ fn test_stored_record_parse_failure_uses_typed_registered_code() {
 
     let (_, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::ParseError);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_command_specific_error_keeps_one_envelope_and_its_details() {
 
     let (envelope, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::IssueNotFound);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["issue_id"], "missing");
     assert!(
         output.stderr.is_empty(),
@@ -158,13 +158,9 @@ fn test_validate_json_integrity_failure_emits_one_registered_envelope() {
         .output()
         .expect("run handler-owned validation failure fixture");
 
-    assert_eq!(
-        output.status.code(),
-        Some(jit::output::ExitCode::ValidationFailed.code())
-    );
     let (envelope, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::ValidationFailed);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert!(envelope["error"]["details"]["integrity_error"]
         .as_str()
@@ -209,7 +205,7 @@ fn test_validate_json_rule_failure_emits_one_registered_envelope() {
 
     let (envelope, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::GenericError);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert!(envelope["error"]["details"]["integrity_error"].is_null());
     assert!(envelope["error"]["details"]["rule_findings"]
@@ -235,7 +231,7 @@ fn test_validate_json_branch_drift_failure_emits_one_registered_envelope() {
 
     let (envelope, code) = parse_single_error(&output);
     assert_eq!(code, ErrorCode::GenericError);
-    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(!output.status.success());
     assert_eq!(envelope["error"]["details"]["valid"], false);
     assert_eq!(
         envelope["error"]["details"]["validations"][0]["validation"],

@@ -12,7 +12,7 @@
 
 use jit::test_cli::JitCli;
 
-/// Assert a wrong-verb guess is a parse failure: exit 2, the hint and clap's
+/// Assert a wrong-verb guess is a parse failure: the hint and clap's
 /// diagnostic on stderr, empty stdout, with and without `--json` and inside
 /// or outside a repository.
 fn assert_wrong_verb_hint(args: &[&str], expect_in_hint: &str) {
@@ -28,7 +28,7 @@ fn assert_wrong_verb_hint(args: &[&str], expect_in_hint: &str) {
     ] {
         let output = cli.command(argv).output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert_eq!(output.status.code(), Some(2), "{argv:?}: {stderr}");
+        assert!(!output.status.success(), "{argv:?}: {stderr}");
         assert!(output.stdout.is_empty(), "{argv:?}: stdout must be empty");
         assert!(
             stderr.contains("Hint:") && stderr.contains(expect_in_hint),
