@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f7ea8d85-2cdd-439a-810c-3bbc14ff66f9",
-      "status": "failed",
-      "updated_at": "2026-10-31T23:04:56.835269142Z",
+      "run_id": "943f24b7-4aea-40ad-a6a8-7276e75629b7",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:06:12.798597913Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "IssueId becomes the validated newtype",
-  "updated_at": "2026-10-31T23:04:56.835269142Z"
+  "updated_at": "2026-10-31T23:06:12.798597913Z"
 }
