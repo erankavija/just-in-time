@@ -371,7 +371,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .map(|id| {
             let mut path = VirtualPath::ISSUES.repository_relative();
             path.push('/');
-            path.push_str(&id.to_string());
+            path.push_str(id.as_str());
             path.push_str(".json");
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
