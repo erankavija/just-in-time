@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-10-31T23:06:12.798597913Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "71ad9216-e854-4585-a432-fd15164544b1",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:09:49.817191832Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7abcc22d-c931-4da8-94b0-c9c894333540",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "ready",
   "title": "IssueId becomes the validated newtype",
-  "updated_at": "2026-10-31T23:06:12.798597913Z"
+  "updated_at": "2026-10-31T23:09:49.817191832Z"
 }
