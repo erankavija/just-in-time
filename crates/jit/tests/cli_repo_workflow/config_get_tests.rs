@@ -227,8 +227,7 @@ fn test_get_unknown_nested_key_fails() {
 
 // ---------------------------------------------------------------------------
 // A malformed `config.toml` is a LOAD failure, not an unknown-key argument
-// error: it must NOT be reported as `INVALID_ARGUMENT`, in either
-// mode, and `--json` must not force it into a JSON envelope it never had
+// error: it must NOT be reported as `INVALID_ARGUMENT`, in either mode, and `--json` must not force it into a JSON envelope it never had
 // before (matching `jit config show` / `jit config validate`'s existing
 // behavior for the same underlying failure).
 // ---------------------------------------------------------------------------

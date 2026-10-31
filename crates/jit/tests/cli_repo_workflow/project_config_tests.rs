@@ -347,10 +347,10 @@ fn test_user_home_config_toml_has_no_effect_on_any_command() {
         "3",
         "--global",
     ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        !out.status.success(),
-        "`--global` is no longer an option: {}",
-        String::from_utf8_lossy(&out.stderr)
+        !out.status.success() && stderr.contains("unexpected argument '--global'"),
+        "`--global` is no longer an option: {stderr}"
     );
     assert_eq!(
         fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap(),
