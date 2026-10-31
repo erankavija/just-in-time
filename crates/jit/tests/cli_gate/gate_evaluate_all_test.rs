@@ -47,7 +47,7 @@ fn run_count(cli: &JitCli, key: &str) -> usize {
 }
 
 #[test]
-fn test_evaluate_all_all_gates_pass_exit_0() {
+fn test_evaluate_all_all_gates_pass_reports_each_gate() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     define_gate(&cli, "g1", "true");
@@ -109,7 +109,7 @@ fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
 }
 
 #[test]
-fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
+fn test_evaluate_all_fail_fast_stops_at_first_failure() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     define_gate(&cli, "g1", "false"); // first gate fails (checker exit 1)
@@ -142,7 +142,7 @@ fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
 }
 
 #[test]
-fn test_evaluate_all_runner_error_exit_10() {
+fn test_evaluate_all_runner_error_reports_error_verdict() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     // First gate's checker kills itself -> no exit code -> runner error.
@@ -168,7 +168,7 @@ fn test_evaluate_all_runner_error_exit_10() {
 }
 
 #[test]
-fn test_evaluate_all_no_required_gates_exit_0() {
+fn test_evaluate_all_no_required_gates_succeeds() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     let id = create_issue_requiring(&cli, &[]);
