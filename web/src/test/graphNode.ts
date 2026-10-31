@@ -14,6 +14,7 @@ import type { GraphNode } from '../types/models';
 export function graphNode(id: string, overrides: Partial<GraphNode> = {}): GraphNode {
   return {
     id,
+    short_id: id,
     label: id,
     state: 'ready',
     priority: 'normal',
