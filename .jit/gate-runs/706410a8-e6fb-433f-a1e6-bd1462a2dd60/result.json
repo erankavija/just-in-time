@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-3ee3a4d1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f36100416b8dd514439daaacf4a1109b35c24c8d",
+  "completed_at": "2026-10-29T08:38:13.365504294Z",
+  "duration_ms": 359687,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable domain issue-ID retyping satisfies the scoped criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "706410a8-e6fb-433f-a1e6-bd1462a2dd60",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T08:32:13.678406601Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 88d55463a, f36100416 (`jit:3ee3a4d1`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-01, REQ-03, REQ-17 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T08:30:50Z); code-review pending\nTruncation recovery: Re-read repository-local AGENTS.md and each attributable patch by scoped path after broad AGENTS and aggregate patch output truncated.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable domain issue-ID retyping satisfies the scoped criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

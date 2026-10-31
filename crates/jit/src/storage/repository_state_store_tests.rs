@@ -2048,7 +2048,7 @@ impl WriteSetFixture {
     fn new(files: &[(&str, &[u8])]) -> Self {
         let worktree = TempDir::new().unwrap();
         let data = worktree.path().join(".jit");
-        std::fs::create_dir_all(data.join("issues")).unwrap();
+        std::fs::create_dir_all(data.join("records")).unwrap();
         for (relative, bytes) in files {
             std::fs::write(data.join(relative), bytes).unwrap();
         }
@@ -2127,17 +2127,20 @@ fn seeded_log() -> &'static [u8] {
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/one.json", b"{\"id\":\"one\"}"),
-        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
+        ("records/stale.json", b"{\"value\":\"stale\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let written = data_path("issues/one.json");
-    let removed = data_path("issues/stale.json");
+    let written = data_path("records/one.json");
+    let removed = data_path("records/stale.json");
     let image = fixture.capture([written.clone(), removed.clone(), VirtualPath::EVENTS]);
 
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        vec![put_file(
+            written,
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
+        )],
         vec![removed],
         event_append(seeded_log().len() as u64),
     )
@@ -2251,23 +2254,23 @@ fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let written = data_path("issues/one.json");
+    let written = data_path("records/one.json");
     let image = fixture.capture([written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
         vec![put_file(
             written.clone(),
-            b"{\"id\":\"one\",\"state\":\"ready\"}",
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
         )],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("issues/one.json", b"{\"id\":\"one\",\"raced\":true}");
+    fixture.write("records/one.json", b"{\"value\":\"one\",\"raced\":true}");
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -2279,10 +2282,10 @@ fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("records/stale.json", b"{\"value\":\"stale\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let removed = data_path("issues/stale.json");
+    let removed = data_path("records/stale.json");
     let image = fixture.capture([removed.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
@@ -2292,7 +2295,10 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
     )
     .unwrap();
 
-    fixture.write("issues/stale.json", b"{\"id\":\"stale\",\"raced\":true}");
+    fixture.write(
+        "records/stale.json",
+        b"{\"value\":\"stale\",\"raced\":true}",
+    );
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -2304,22 +2310,25 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("index.json", b"{\"issues\":[]}"),
-        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("index.json", b"{\"values\":[]}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
         ("events.jsonl", seeded_log()),
     ]);
     let read_only = data_path("index.json");
-    let written = data_path("issues/one.json");
+    let written = data_path("records/one.json");
     let image = fixture.capture([read_only, written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        vec![put_file(
+            written,
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
+        )],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("index.json", b"{\"issues\":[\"raced\"]}");
+    fixture.write("index.json", b"{\"values\":[\"raced\"]}");
 
     assert!(
         fixture.check(&image, &record).is_ok(),
@@ -2330,11 +2339,11 @@ fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still_absent() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
-    let created = data_path("issues/new.json");
+    let created = data_path("records/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(created, b"{\"id\":\"new\"}")],
+        vec![put_file(created, b"{\"value\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
@@ -2346,17 +2355,17 @@ fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_occupied() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
-    let created = data_path("issues/new.json");
+    let created = data_path("records/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
+        vec![put_file(created.clone(), b"{\"value\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("issues/new.json", b"{\"id\":\"new\",\"raced\":true}");
+    fixture.write("records/new.json", b"{\"value\":\"new\",\"raced\":true}");
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -2474,7 +2483,7 @@ fn test_ensure_write_set_unchanged_admits_an_event_log_edited_before_the_tail_wi
 
 /// An event log longer than the tail window, so a prefix edit falls outside it.
 fn long_log() -> Vec<u8> {
-    let line = b"{\"tag\":\"issue_created\",\"id\":\"padding-padding-padding\"}\n";
+    let line = b"{\"tag\":\"issue_created\",\"padding\":\"padding-padding-padding\"}\n";
     line.iter()
         .copied()
         .cycle()
@@ -2651,10 +2660,10 @@ fn leftover_record() -> RedoRecord {
 }
 
 fn leftover_target() -> VirtualPath {
-    data_path("issues/left.json")
+    data_path("records/left.json")
 }
 
-const LEFTOVER_BYTES: &[u8] = b"{\"id\":\"left\"}";
+const LEFTOVER_BYTES: &[u8] = b"{\"value\":\"left\"}";
 
 fn appended_log() -> Vec<u8> {
     [CAPTURED_LOG, &event_append(0).unwrap().bytes].concat()

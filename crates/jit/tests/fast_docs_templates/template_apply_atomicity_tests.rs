@@ -132,10 +132,13 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }
-    fn load_issue(&self, id: &str) -> Result<Issue> {
+    fn load_issue(&self, id: &jit::domain::identity::IssueId) -> Result<Issue> {
         self.inner.load_issue(id)
     }
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
+    fn load_issue_or_not_found(
+        &self,
+        id: &jit::domain::identity::IssueId,
+    ) -> Result<Issue, PathReadError> {
         self.inner.load_issue_or_not_found(id)
     }
     fn resolve_issue_id(
@@ -162,7 +165,10 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn load_gate_run_result(&self, run_id: &str) -> Result<jit::domain::GateRunResult> {
         self.inner.load_gate_run_result(run_id)
     }
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<jit::domain::GateRunResult>> {
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &jit::domain::identity::IssueId,
+    ) -> Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
     }
     fn find_reusable_gate_run(

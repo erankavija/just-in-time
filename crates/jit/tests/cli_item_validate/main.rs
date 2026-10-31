@@ -22,10 +22,8 @@ fn create_issue(
     executor: &jit::commands::CommandExecutor<jit::storage::JsonFileStorage>,
     title: &str,
     body: &str,
-) -> String {
-    use jit::storage::IssueStore;
-
-    let id = executor
+) -> jit::domain::identity::IssueId {
+    executor
         .issues()
         .create_issue(
             title.to_string(),
@@ -38,8 +36,7 @@ fn create_issue(
             false,
         )
         .unwrap()
-        .0;
-    executor.storage().load_issue(&id).unwrap().short_id()
+        .0
 }
 
 /// The package carrying the generic vocabulary these suites address: the type

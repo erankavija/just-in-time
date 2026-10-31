@@ -8,7 +8,7 @@
 
 use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
@@ -734,7 +734,7 @@ impl JsonFileStorage {
         }
     }
 
-    fn issue_path(&self, id: &str) -> Result<PathBuf> {
+    fn issue_path(&self, id: &IssueId) -> Result<PathBuf> {
         Ok(self
             .resolve_virtual_path(&VirtualPath::ISSUES)?
             .join(format!("{}.json", id)))
@@ -773,7 +773,7 @@ impl JsonFileStorage {
         // every read, parse, version, and membership-structure failure aborts the
         // aggregation instead of exposing a plausible but incomplete issue set.
         let merge_source = |loaded: Result<Option<Index>>,
-                            membership: &mut BTreeMap<String, bool>|
+                            membership: &mut BTreeMap<IssueId, bool>|
          -> Result<()> {
             match loaded {
                 Ok(Some(index)) => {
@@ -901,7 +901,7 @@ impl JsonFileStorage {
     /// Returns `Ok(Some(issue))` when found, `Ok(None)` when absent from git
     /// (git ran successfully but reported the path is missing), and `Err` for
     /// genuine failures (git not available, repo corrupt, parse error, etc.).
-    fn load_issue_from_git(&self, id: &str) -> Result<Option<Issue>> {
+    fn load_issue_from_git(&self, id: &IssueId) -> Result<Option<Issue>> {
         let layout = self.configured_layout()?;
         let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
         else {
@@ -941,7 +941,7 @@ impl JsonFileStorage {
     /// absent or this worktree setup does not have an accessible main worktree
     /// (not in git, already in main worktree, non-standard layout), and `Err`
     /// for genuine I/O or parse failures on a file that does exist.
-    fn load_issue_from_main_worktree(&self, id: &str) -> Result<Option<Issue>> {
+    fn load_issue_from_main_worktree(&self, id: &IssueId) -> Result<Option<Issue>> {
         let Some(layout) = self.primary_layout()? else {
             return Ok(None);
         };
@@ -1190,7 +1190,7 @@ impl IssueStore for JsonFileStorage {
         }
     }
 
-    fn load_issue(&self, id: &str) -> Result<Issue> {
+    fn load_issue(&self, id: &IssueId) -> Result<Issue> {
         // Try local .jit/issues/ first (current behavior)
         let issue_path = self.issue_path(id)?;
         if issue_path.exists() {
@@ -1230,7 +1230,10 @@ impl IssueStore for JsonFileStorage {
         Err(IssueNotFoundError::across_sources(id).into())
     }
 
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
+    fn load_issue_or_not_found(
+        &self,
+        id: &IssueId,
+    ) -> Result<Issue, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
 
         let issue_path = self.issue_path(id).map_err(PathReadError::Other)?;
@@ -1272,15 +1275,11 @@ impl IssueStore for JsonFileStorage {
 
     fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<crate::domain::identity::IssueId> {
         let index = self.load_aggregated_index()?;
-        crate::storage::resolve_unique_issue_id(
-            prefix,
-            index.all_ids.iter().map(String::as_str),
-            |id| {
-                self.load_issue(id)
-                    .ok()
-                    .map(|issue| crate::storage::describe_issue(&issue))
-            },
-        )
+        crate::storage::resolve_unique_issue_id(prefix, index.all_ids.iter(), |id| {
+            self.load_issue(id)
+                .ok()
+                .map(|issue| crate::storage::describe_issue(&issue))
+        })
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
@@ -1437,9 +1436,9 @@ impl IssueStore for JsonFileStorage {
 
     fn list_gate_runs_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        self.read_gate_runs(|result| result.issue_id == issue_id)
+        self.read_gate_runs(|result| &result.issue_id == issue_id)
     }
 
     fn find_reusable_gate_run(
@@ -1848,7 +1847,7 @@ mod tests {
         );
 
         let err = storage
-            .list_gate_runs_for_issue("any-issue")
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
             .expect_err("corrupt gate-run record must produce an error, not a silent drop");
 
         // Top-level context plus the deserialize cause and offending path.
@@ -1886,7 +1885,7 @@ mod tests {
         .unwrap();
 
         assert!(storage
-            .list_gate_runs_for_issue("any-issue")
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
             .unwrap()
             .is_empty());
         assert!(format!(
@@ -1911,7 +1910,9 @@ mod tests {
 
         for error in [
             storage.load_gate_run_result("run-one").unwrap_err(),
-            storage.list_gate_runs_for_issue("issue-one").unwrap_err(),
+            storage
+                .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+                .unwrap_err(),
         ] {
             assert!(format!("{error:#}").contains("ordinary directory"));
         }
@@ -1932,7 +1933,9 @@ mod tests {
 
         for error in [
             storage.load_gate_run_result("directory-run").unwrap_err(),
-            storage.list_gate_runs_for_issue("any-issue").unwrap_err(),
+            storage
+                .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+                .unwrap_err(),
         ] {
             let message = format!("{error:#}");
             assert!(message.contains("directory-run/result.json"));
@@ -2002,7 +2005,7 @@ mod tests {
         let error = storage.load_gate_run_result("escaped-run").unwrap_err();
         assert!(format!("{error:#}").contains("ordinary directory"));
         assert!(storage
-            .list_gate_runs_for_issue("any-issue")
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
             .unwrap()
             .is_empty());
     }
@@ -2898,8 +2901,8 @@ mod tests {
             let index = Index::default();
 
             assert_eq!(index.schema_version, 2);
-            assert_eq!(index.all_ids, Vec::<String>::new());
-            assert_eq!(index.deleted_ids, Vec::<String>::new());
+            assert_eq!(index.all_ids, Vec::<IssueId>::new());
+            assert_eq!(index.deleted_ids, Vec::<IssueId>::new());
         }
 
         #[test]

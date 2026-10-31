@@ -8,6 +8,7 @@
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::ArtifactEvidenceError;
+use crate::domain::identity::IssueId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::State;
@@ -76,7 +77,7 @@ impl ArchiveCandidates {
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum PlanTarget {
     /// A resolved-hierarchy container, identified by its full durable id.
-    Container { id: String },
+    Container { id: IssueId },
     /// An arbitrary repository-relative document path.
     Document { path: String },
 }
@@ -315,7 +316,7 @@ pub enum ArtifactProvenance {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ArtifactOwner {
     /// Full durable issue id.
-    pub issue: String,
+    pub issue: IssueId,
     /// Stable index of the reference within the issue's document list.
     pub document_index: usize,
     /// Lifecycle state used for terminal-owner classification.
@@ -380,7 +381,7 @@ pub struct ArtifactEdge {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReferenceChange {
     /// Full durable issue id.
-    pub issue: String,
+    pub issue: IssueId,
     /// Stable index of the reference within the issue's document list.
     pub document_index: usize,
     /// Existing normalized reference path.

@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::domain::vocabulary::wire_vocabulary;
 
+use super::identity::IssueId;
 use super::{Event, Issue};
 
 wire_vocabulary! {
@@ -48,15 +49,62 @@ wire_vocabulary! {
     }
 }
 
+/// The identity of a divergent issue or event record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum DivergentRecordId {
+    Issue(IssueId),
+    Event(String),
+}
+
+impl DivergentRecordId {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Issue(id) => id.as_str(),
+            Self::Event(id) => id.as_str(),
+        }
+    }
+}
+
+impl std::fmt::Display for DivergentRecordId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 /// One record whose presence or value differs between two stores.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct StoreDivergence {
     /// Which kind of record diverged.
     pub record: DivergentRecord,
     /// How the two stores disagree about it.
     pub class: DivergenceClass,
     /// The record's identity, the key the two stores were matched on.
-    pub id: String,
+    #[schemars(with = "String")]
+    pub id: DivergentRecordId,
+}
+
+impl<'de> Deserialize<'de> for StoreDivergence {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(tag = "record", rename_all = "snake_case")]
+        enum Record {
+            Issue { class: DivergenceClass, id: IssueId },
+            Event { class: DivergenceClass, id: String },
+        }
+        Ok(match Record::deserialize(deserializer)? {
+            Record::Issue { class, id } => Self {
+                record: DivergentRecord::Issue,
+                class,
+                id: DivergentRecordId::Issue(id),
+            },
+            Record::Event { class, id } => Self {
+                record: DivergentRecord::Event,
+                class,
+                id: DivergentRecordId::Event(id),
+            },
+        })
+    }
 }
 
 /// The records one store holds, as one side of a [`compare_stores`] call.
@@ -88,13 +136,15 @@ pub fn compare_stores(
         DivergentRecord::Issue,
         local.issues,
         reference.issues,
-        |issue| issue.id.as_str(),
+        |issue| &issue.id,
+        |id| DivergentRecordId::Issue(id.clone()),
     )
     .chain(compare_records(
         DivergentRecord::Event,
         local.events,
         reference.events,
         Event::id,
+        |id| DivergentRecordId::Event(id.to_string()),
     ))
     .collect()
 }
@@ -103,16 +153,17 @@ pub fn compare_stores(
 ///
 /// Both sides are grouped by identity so a repeated identity compares as the run
 /// of records holding it rather than silently collapsing to one.
-fn compare_records<'a, T: PartialEq>(
+fn compare_records<'a, T: PartialEq, Id: Ord + ?Sized + 'a>(
     record: DivergentRecord,
     local: &'a [T],
     reference: &'a [T],
-    identity: impl Fn(&'a T) -> &'a str + Copy,
+    identity: impl Fn(&'a T) -> &'a Id + Copy,
+    owned_identity: impl Fn(&Id) -> DivergentRecordId,
 ) -> impl Iterator<Item = StoreDivergence> + 'a {
     let local = group_by_identity(local, identity);
     let reference = group_by_identity(reference, identity);
 
-    let identities: BTreeSet<&str> = local.keys().chain(reference.keys()).copied().collect();
+    let identities: BTreeSet<&Id> = local.keys().chain(reference.keys()).copied().collect();
 
     identities
         .into_iter()
@@ -126,7 +177,7 @@ fn compare_records<'a, T: PartialEq>(
             Some(StoreDivergence {
                 record,
                 class,
-                id: id.to_string(),
+                id: owned_identity(id),
             })
         })
         .collect::<Vec<_>>()
@@ -134,10 +185,10 @@ fn compare_records<'a, T: PartialEq>(
 }
 
 /// Group one side's records by the identity the two stores are matched on.
-fn group_by_identity<'a, T>(
+fn group_by_identity<'a, T, Id: Ord + ?Sized>(
     records: &'a [T],
-    identity: impl Fn(&'a T) -> &'a str,
-) -> BTreeMap<&'a str, Vec<&'a T>> {
+    identity: impl Fn(&'a T) -> &'a Id,
+) -> BTreeMap<&'a Id, Vec<&'a T>> {
     records.iter().fold(BTreeMap::new(), |mut grouped, record| {
         grouped.entry(identity(record)).or_default().push(record);
         grouped
@@ -148,6 +199,28 @@ fn group_by_identity<'a, T>(
 mod tests {
     use super::*;
     use crate::test_utils::fixture_issue;
+
+    #[test]
+    fn test_store_divergence_round_trip_preserves_identity_kind() {
+        let id = crate::test_utils::issue_id(153);
+        for (record, id) in [
+            (DivergentRecord::Issue, DivergentRecordId::Issue(id.clone())),
+            (
+                DivergentRecord::Event,
+                DivergentRecordId::Event(id.to_string()),
+            ),
+        ] {
+            let finding = StoreDivergence {
+                record,
+                class: DivergenceClass::LocalOnly,
+                id,
+            };
+            let encoded = serde_json::to_string(&finding).unwrap();
+            let decoded: StoreDivergence = serde_json::from_str(&encoded).unwrap();
+            assert_eq!(decoded, finding);
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
+        }
+    }
 
     /// An event carrying `id`, associated with `issue_id`.
     fn event(id: &str, issue_id: &crate::domain::identity::IssueId, title: &str) -> Event {
@@ -168,11 +241,11 @@ mod tests {
     fn findings_of(
         divergences: &[StoreDivergence],
         kind: DivergentRecord,
-    ) -> Vec<(DivergenceClass, &str)> {
+    ) -> Vec<(DivergenceClass, &DivergentRecordId)> {
         divergences
             .iter()
             .filter(|divergence| divergence.record == kind)
-            .map(|divergence| (divergence.class, divergence.id.as_str()))
+            .map(|divergence| (divergence.class, &divergence.id))
             .collect()
     }
 
@@ -189,15 +262,20 @@ mod tests {
 
         let issues = findings_of(&divergences, DivergentRecord::Issue);
         assert!(
-            issues.contains(&(DivergenceClass::LocalOnly, here.id.as_str())),
+            issues.contains(&(
+                DivergenceClass::LocalOnly,
+                &DivergentRecordId::Issue(here.id.clone())
+            )),
             "the record only the local store holds is reported as local-only: {divergences:?}"
         );
         assert!(
-            issues.contains(&(DivergenceClass::ReferenceOnly, there.id.as_str())),
+            issues.contains(&(DivergenceClass::ReferenceOnly, &DivergentRecordId::Issue(there.id.clone()))),
             "the record only the reference store holds is reported as reference-only: {divergences:?}"
         );
         assert!(
-            !issues.iter().any(|(_, id)| *id == shared.id),
+            !issues
+                .iter()
+                .any(|(_, id)| *id == &DivergentRecordId::Issue(shared.id.clone())),
             "a record both stores hold identically is no divergence: {divergences:?}"
         );
     }
@@ -227,15 +305,23 @@ mod tests {
 
         let events = findings_of(&divergences, DivergentRecord::Event);
         assert!(
-            events.contains(&(DivergenceClass::LocalOnly, here.id())),
+            events.contains(&(
+                DivergenceClass::LocalOnly,
+                &DivergentRecordId::Event(here.id().to_string())
+            )),
             "the event only the local log holds is reported as local-only: {divergences:?}"
         );
         assert!(
-            events.contains(&(DivergenceClass::ReferenceOnly, there.id())),
+            events.contains(&(
+                DivergenceClass::ReferenceOnly,
+                &DivergentRecordId::Event(there.id().to_string())
+            )),
             "the event only the reference log holds is reported as reference-only: {divergences:?}"
         );
         assert!(
-            !events.iter().any(|(_, id)| *id == shared.id()),
+            !events
+                .iter()
+                .any(|(_, id)| *id == &DivergentRecordId::Event(shared.id().to_string())),
             "an event both logs hold identically is no divergence: {divergences:?}"
         );
     }
@@ -270,16 +356,22 @@ mod tests {
 
         let issues = findings_of(&divergences, DivergentRecord::Issue);
         assert!(
-            issues.contains(&(DivergenceClass::Conflicting, here.id.as_str())),
+            issues.contains(&(
+                DivergenceClass::Conflicting,
+                &DivergentRecordId::Issue(here.id.clone())
+            )),
             "an id both stores hold with different values is a conflict: {divergences:?}"
         );
         assert!(
-            issues.contains(&(DivergenceClass::LocalOnly, one_sided.id.as_str())),
+            issues.contains(&(
+                DivergenceClass::LocalOnly,
+                &DivergentRecordId::Issue(one_sided.id.clone())
+            )),
             "a one-sided record keeps its own class beside a conflict: {divergences:?}"
         );
         assert_eq!(
             findings_of(&divergences, DivergentRecord::Event),
-            vec![(DivergenceClass::Conflicting, local_event.id())],
+            vec![(DivergenceClass::Conflicting, &DivergentRecordId::Event(local_event.id().to_string()))],
             "an event id both logs hold with different values is a conflict, not a one-sided record"
         );
         assert!(
@@ -338,7 +430,7 @@ mod tests {
 
         let event_ids: Vec<&str> = findings_of(&divergences, DivergentRecord::Event)
             .into_iter()
-            .map(|(_, id)| id)
+            .map(|(_, id)| id.as_str())
             .collect();
         assert!(
             event_ids.windows(2).all(|pair| pair[0] <= pair[1]),
@@ -361,7 +453,10 @@ mod tests {
                 &compare_stores(side(&[], &local), side(&[], &reference)),
                 DivergentRecord::Event
             ),
-            vec![(DivergenceClass::Conflicting, repeated.id())],
+            vec![(
+                DivergenceClass::Conflicting,
+                &DivergentRecordId::Event(repeated.id().to_string())
+            )],
             "one log holding an identity twice disagrees with a log holding it once"
         );
     }

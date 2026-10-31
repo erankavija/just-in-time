@@ -10,11 +10,10 @@
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
 use crate::domain::artifact_plan::PlanTarget;
-use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::{IssueId, IssueIdPrefix, IssueIdStaging};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder};
 use crate::domain::{
     Event, EventBody, GateRunResult, GateRunStatus, GateStatus, GateVerdictOrigin, Issue,
-    SHORT_ID_LENGTH,
 };
 use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 use crate::repository_state::{
@@ -155,7 +154,7 @@ impl<B: Backend> Repository<B> {
     }
 }
 
-fn issue_path(id: &str) -> VirtualPath {
+fn issue_path(id: &IssueId) -> VirtualPath {
     VirtualPath::data(format!(
         "{}/{id}.json",
         VirtualPath::ISSUES.relative().as_str()
@@ -190,7 +189,7 @@ fn event_line(event: &Event) -> String {
     serde_json::to_string(event).unwrap()
 }
 
-fn issue_created(id: &str) -> Event {
+fn issue_created(event_id: &str) -> Event {
     let issue = Issue::draft(
         crate::test_utils::issue_id(50),
         "Known".to_string(),
@@ -198,7 +197,7 @@ fn issue_created(id: &str) -> Event {
     );
     crate::test_utils::stamped_event(
         EventBody::draft_issue_created(&issue),
-        id,
+        event_id,
         chrono::Utc::now(),
     )
 }
@@ -341,7 +340,7 @@ fn test_load_issue_reports_an_unpublished_id_as_not_found<B: Backend>() {
         "Published".to_string(),
         String::new(),
     )]);
-    let unpublished = uuid::Uuid::new_v4().to_string();
+    let unpublished = crate::test_utils::issue_id(51);
 
     let error = repository.store.load_issue(&unpublished).unwrap_err();
 
@@ -352,12 +351,12 @@ fn test_load_issue_reports_an_unpublished_id_as_not_found<B: Backend>() {
 }
 
 fn test_load_issue_or_not_found_separates_an_absent_issue_from_an_unreadable_one<B: Backend>() {
-    let corrupt = uuid::Uuid::new_v4().to_string();
+    let corrupt = crate::test_utils::issue_id(52);
     let repository = Repository::<B>::seeded(&[(issue_path(&corrupt), "{ corrupt".to_string())]);
 
     let absent = repository
         .store
-        .load_issue_or_not_found(&uuid::Uuid::new_v4().to_string());
+        .load_issue_or_not_found(&crate::test_utils::issue_id(53));
     let unreadable = repository.store.load_issue_or_not_found(&corrupt);
 
     assert!(
@@ -392,9 +391,9 @@ fn test_resolve_issue_id_resolves_prefixes_alike<B: Backend>() {
 
     for requested in [
         id.to_string(),
-        id.to_uppercase(),
-        id.replace('-', ""),
-        id[..SHORT_ID_LENGTH + 2].to_string(),
+        id.as_str().to_uppercase(),
+        id.as_str().replace('-', ""),
+        id.as_str().chars().take(id.short_id().len() + 2).collect(),
     ] {
         assert_eq!(
             resolve(&requested).ok().as_ref(),
@@ -407,7 +406,7 @@ fn test_resolve_issue_id_resolves_prefixes_alike<B: Backend>() {
         unmatched.downcast_ref::<IssueNotFoundError>().is_some(),
         "{unmatched}"
     );
-    let shared = resolve(&id[..SHORT_ID_LENGTH]).unwrap_err();
+    let shared = resolve(id.short_id()).unwrap_err();
     assert!(
         shared.downcast_ref::<AmbiguousIdError>().is_some(),
         "{shared}"
@@ -550,7 +549,7 @@ fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
         ),
     ];
     let repository = Repository::<B>::seeded(&gate_run_seed(&runs));
-    let listed = |issue: &str| {
+    let listed = |issue: &IssueId| {
         repository
             .store
             .list_gate_runs_for_issue(issue)

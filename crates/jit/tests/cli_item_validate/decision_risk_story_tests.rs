@@ -43,6 +43,7 @@
 //!   description (the only source) changes BOTH indexes, and no top-level `.jit/`
 //!   file duplicates either `D-01` or `RISK-01`.
 
+use jit::domain::identity::IssueIdStaging;
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -147,7 +148,8 @@ fn test_story_per_label_resolves_decision() {
     // a `## Risks` section. The coexistence of both kinds must not disrupt label
     // resolution for either kind.
     let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
-    let short = &crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
+    let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
+    let short = issue.short_id();
 
     let label = format!("per:{short}/D-01");
     let resolved = exec
@@ -182,7 +184,8 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // section. Both namespaces are recognized because the configured `risk` kind
     // declares them.
     let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
-    let short = &crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
+    let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
+    let short = issue.short_id();
 
     // mitigates: namespace.
     let mit_label = format!("mitigates:{short}/RISK-01");

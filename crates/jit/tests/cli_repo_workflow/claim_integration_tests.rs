@@ -4,6 +4,7 @@
 //! Verifies actual binary execution, exit codes, and output formats.
 
 use assert_cmd::prelude::*;
+use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
 use predicates::prelude::*;
@@ -199,11 +200,18 @@ fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: Err
     assert!(error["message"].is_string());
 }
 
-fn acquire_lease(cli: &JitCli, issue_id: &str, agent_id: &str) -> String {
+/// The id a binary printed, parsed once where a test hands it to suite helpers.
+fn parse_issue_id(printed: &str) -> IssueId {
+    printed
+        .parse()
+        .expect("the binary prints a canonical issue id")
+}
+
+fn acquire_lease(cli: &JitCli, issue_id: &IssueId, agent_id: &str) -> String {
     cli.run_json([
         "claim",
         "acquire",
-        issue_id,
+        issue_id.as_str(),
         "--ttl",
         "600",
         "--agent-id",
@@ -222,9 +230,10 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
 
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
-    let issue_id = cli
-        .create_issue(["--title", "Permission-denied claim"])
-        .unwrap();
+    let issue_id = parse_issue_id(
+        &cli.create_issue(["--title", "Permission-denied claim"])
+            .unwrap(),
+    );
     let agent = "agent:permission-probe";
     let lease_id = acquire_lease(&cli, &issue_id, agent);
     let index_path = cli.root().join(".git/jit/claims.index.json");
@@ -663,7 +672,7 @@ fn test_recover_empty_claim_log_does_not_warn_about_missing_index() {
 fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
-    let issue_id = cli.create_issue(["--title", "Claim log recovery"]).unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Claim log recovery"]).unwrap());
     acquire_lease(&cli, &issue_id, "agent:recovery-test");
     fs::remove_file(cli.root().join(".git/jit/claims.index.json")).unwrap();
 
@@ -811,7 +820,7 @@ fn test_claim_renew_not_found_error() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
     // A held lease brings up the claim control plane the missing lease is looked up in.
-    let issue_id = cli.create_issue(["--title", "Leased"]).unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
     acquire_lease(&cli, &issue_id, "agent:holder");
     let missing_lease = "00000000-0000-0000-0000-000000000000";
 
@@ -1534,10 +1543,13 @@ fn test_claim_acquire_fails_on_a_malformed_repository_config() {
 fn test_claim_status_issue_filter_resolves_any_spelling_of_a_full_id() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
-    let issue_id = cli.create_issue(["--title", "Leased"]).unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
     let lease_id = acquire_lease(&cli, &issue_id, "agent:status");
 
-    for spelling in [issue_id.to_uppercase(), issue_id.replace('-', "")] {
+    for spelling in [
+        issue_id.as_str().to_uppercase(),
+        issue_id.as_str().replace('-', ""),
+    ] {
         let output = cli
             .command_with_env(
                 ["claim", "status", "--issue", &spelling, "--json"],

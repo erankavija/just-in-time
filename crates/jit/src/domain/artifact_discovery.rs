@@ -19,6 +19,7 @@ use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactEdge, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion,
     BlockerCode, EdgeKind, EdgeResolutionMode, PlanBlocker, PlanError, PlanWarning, WarningCode,
 };
+use crate::domain::identity::IssueId;
 use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
 use pulldown_cmark::{Event, Parser, Tag};
@@ -518,7 +519,7 @@ fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
 /// an archive delete a file another issue's document still reaches.
 fn discover_embedded_owners(
     issues: &[Issue],
-    selected_member_ids: &BTreeSet<String>,
+    selected_member_ids: &BTreeSet<IssueId>,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
 ) -> Vec<EmbeddedArtifactOwner> {
     let mut owners = Vec::new();

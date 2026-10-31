@@ -101,16 +101,16 @@ pub use memory::InMemoryStorage;
 /// the error `ambiguous` builds from the several matches.
 fn resolve_unique_id<'a>(
     prefix: &IssueIdPrefix,
-    ids: impl IntoIterator<Item = &'a str>,
-    ambiguous: impl FnOnce(&[&'a str]) -> AmbiguousIdError,
+    ids: impl IntoIterator<Item = &'a IssueId>,
+    ambiguous: impl FnOnce(&[&'a IssueId]) -> AmbiguousIdError,
 ) -> Result<IssueId> {
     let matches = ids
         .into_iter()
-        .filter(|id| prefix.matches(id))
+        .filter(|id| prefix.matches(id.as_str()))
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(prefix.as_str()).into()),
-        [id] => Ok(id.to_string()),
+        [] => Err(IssueNotFoundError::by_prefix(prefix.clone()).into()),
+        [id] => Ok((*id).clone()),
         _ => Err(ambiguous(&matches).into()),
     }
 }
@@ -119,8 +119,8 @@ fn resolve_unique_id<'a>(
 /// it; `describe` renders each candidate of an ambiguous match.
 pub(crate) fn resolve_unique_issue_id<'a>(
     prefix: &IssueIdPrefix,
-    ids: impl IntoIterator<Item = &'a str>,
-    describe: impl Fn(&str) -> Option<String>,
+    ids: impl IntoIterator<Item = &'a IssueId>,
+    describe: impl Fn(&IssueId) -> Option<String>,
 ) -> Result<IssueId> {
     resolve_unique_id(prefix, ids, |matches| {
         AmbiguousIdError::issue(
@@ -139,13 +139,9 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError::Dependency`] for
 /// several.
 pub fn resolve_dependency_id(prefix: &IssueIdPrefix, dependencies: &[IssueId]) -> Result<IssueId> {
-    resolve_unique_id(
-        prefix,
-        dependencies.iter().map(|id| id.as_str()),
-        |matches| {
-            AmbiguousIdError::dependency(prefix.as_str(), matches.iter().map(|id| id.to_string()))
-        },
-    )
+    resolve_unique_id(prefix, dependencies.iter(), |matches| {
+        AmbiguousIdError::dependency(prefix.as_str(), matches.iter().map(|id| (*id).clone()))
+    })
 }
 
 /// The id of the one of `issues` that `prefix` names.
@@ -154,10 +150,10 @@ pub fn resolve_dependency_id(prefix: &IssueIdPrefix, dependencies: &[IssueId]) -
 ///
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
 pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<IssueId> {
-    resolve_unique_issue_id(prefix, issues.iter().map(|issue| issue.id.as_str()), |id| {
+    resolve_unique_issue_id(prefix, issues.iter().map(|issue| &issue.id), |id| {
         issues
             .iter()
-            .find(|issue| issue.id == id)
+            .find(|issue| &issue.id == id)
             .map(describe_issue)
     })
 }
@@ -228,7 +224,7 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the issue does not exist or cannot be deserialized.
-    fn load_issue(&self, id: &str) -> Result<Issue>;
+    fn load_issue(&self, id: &IssueId) -> Result<Issue>;
 
     /// Load an issue by ID, returning a typed [`PathReadError`].
     ///
@@ -249,7 +245,7 @@ pub trait IssueStore: Clone {
     ///   override to produce this).
     /// - [`PathReadError::Other`] for storage or deserialization failures (and
     ///   for any error from a backend that uses the default implementation).
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
+    fn load_issue_or_not_found(&self, id: &IssueId) -> Result<Issue, PathReadError> {
         // Conservative fallback: map every anyhow error to Other.
         // Backends that can distinguish NotFound structurally must override.
         self.load_issue(id).map_err(PathReadError::Other)
@@ -313,8 +309,10 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if results cannot be loaded.
-    fn list_gate_runs_for_issue(&self, issue_id: &str)
-        -> Result<Vec<crate::domain::GateRunResult>>;
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &IssueId,
+    ) -> Result<Vec<crate::domain::GateRunResult>>;
 
     /// The most recent run of `gate_key` whose verdict an evaluation over
     /// inputs digesting to `digest` may carry.

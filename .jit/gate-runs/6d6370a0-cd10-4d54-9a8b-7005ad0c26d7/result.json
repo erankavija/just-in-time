@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-19d9bd7d",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ce9a4abafc500f19917114e627d819bef81863b3",
+  "completed_at": "2026-10-29T08:00:16.771372039Z",
+  "duration_ms": 240171,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Attributable library-facing test helpers now carry canonical IssueId values, while subprocess boundaries retain strings and parse them only where typed identity behavior is needed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "19d9bd7d-b8ee-4b4a-80b4-eb3315084c79",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6d6370a0-cd10-4d54-9a8b-7005ad0c26d7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:56:16.599714704Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3d2b4fba3, 06c5a3155, ce9a4abaf (all `jit:19d9bd7d`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json\nResolved items: @/issue/2195c98f/requirement/REQ-01; @/charter/D-18; @/invariant/semantic-types; @/invariant/semantic-test-assertions; @/invariant/shared-test-contracts; @/invariant/orthogonal-tests\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T07:54:53Z); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Attributable library-facing test helpers now carry canonical IssueId values, while subprocess boundaries retain strings and parse them only where typed identity behavior is needed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

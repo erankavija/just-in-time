@@ -1,5 +1,6 @@
 //! Pure codec and structural validation for the repository membership index.
 
+use crate::domain::identity::IssueId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
@@ -10,9 +11,9 @@ pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RepositoryIndex {
     pub(crate) schema_version: u32,
-    pub(crate) all_ids: Vec<String>,
+    pub(crate) all_ids: Vec<IssueId>,
     #[serde(default)]
-    pub(crate) deleted_ids: Vec<String>,
+    pub(crate) deleted_ids: Vec<IssueId>,
 }
 
 impl Default for RepositoryIndex {
@@ -38,13 +39,13 @@ pub enum RepositoryIndexError {
     UnsupportedVersion { found: u32, supported: u32 },
     /// The active membership contains the same issue more than once.
     #[error("index.json contains duplicate active issue id '{0}'")]
-    DuplicateActive(String),
+    DuplicateActive(IssueId),
     /// The deleted membership contains the same issue more than once.
     #[error("index.json contains duplicate deleted issue id '{0}'")]
-    DuplicateDeleted(String),
+    DuplicateDeleted(IssueId),
     /// One issue is simultaneously classified as active and deleted.
     #[error("index.json issue id '{0}' is both active and deleted")]
-    ActiveDeletedOverlap(String),
+    ActiveDeletedOverlap(IssueId),
 }
 
 impl RepositoryIndex {
@@ -98,7 +99,7 @@ impl RepositoryIndex {
     ///
     /// The canonical active order is lexical and repeated insertion is a no-op.
     #[allow(dead_code)] // Only called from the test-support-gated fixture seam.
-    pub(crate) fn upsert_active(&mut self, id: String) {
+    pub(crate) fn upsert_active(&mut self, id: IssueId) {
         if !self.all_ids.contains(&id) {
             self.all_ids.push(id.clone());
             self.all_ids.sort();
@@ -116,7 +117,7 @@ impl RepositoryIndex {
     /// unreached.
     #[cfg(any(test, feature = "test-support"))]
     #[allow(dead_code)]
-    pub(crate) fn mark_deleted(&mut self, id: String) {
+    pub(crate) fn mark_deleted(&mut self, id: IssueId) {
         self.all_ids.retain(|active| active != &id);
         if !self.deleted_ids.contains(&id) {
             self.deleted_ids.push(id);

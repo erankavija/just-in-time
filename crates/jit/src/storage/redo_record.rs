@@ -408,7 +408,7 @@ fn take_content<'a>(
 /// The overlap between two operation paths, if any: the same path named by
 /// both, or one a containing directory of the other. Different root classes
 /// never overlap. Components are compared, not string prefixes, so
-/// `issues/a.json` and `issues/ab.json` share a spelling prefix without
+/// `records/a.json` and `records/ab.json` share a spelling prefix without
 /// overlapping.
 fn overlap(a: &VirtualPath, b: &VirtualPath) -> Option<RedoRecordError> {
     if a.root_class() != b.root_class() {
@@ -446,8 +446,8 @@ mod tests {
             make_directories: vec![VirtualPath::data("templates").unwrap()],
             puts: vec![
                 PutFile {
-                    path: VirtualPath::data("issues/a.json").unwrap(),
-                    bytes: br#"{"id":"a"}"#.to_vec(),
+                    path: VirtualPath::data("records/a.json").unwrap(),
+                    bytes: br#"{"value":"a"}"#.to_vec(),
                     mode: FileMode::Regular,
                 },
                 PutFile {
@@ -525,7 +525,7 @@ mod tests {
         let record = sample_record().serialize().unwrap();
         let end = record.iter().position(|byte| *byte == b'\n').unwrap();
         let header = String::from_utf8(record[..end].to_vec()).unwrap().replacen(
-            "issues/a.json",
+            "records/a.json",
             "../outside/a.json",
             1,
         );
@@ -548,8 +548,8 @@ mod tests {
 
     #[test]
     fn test_new_rejects_a_path_that_is_an_ancestor_of_another_operations_path() {
-        let ancestor = VirtualPath::data("issues").unwrap();
-        let descendant = VirtualPath::data("issues/a.json").unwrap();
+        let ancestor = VirtualPath::data("records").unwrap();
+        let descendant = VirtualPath::data("records/a.json").unwrap();
 
         let forward = RedoRecord::new(
             Vec::new(),
@@ -593,8 +593,8 @@ mod tests {
     /// directory itself (OD-7).
     #[test]
     fn test_new_rejects_a_made_directory_an_operations_path_lies_beneath() {
-        let directory = VirtualPath::data("issues").unwrap();
-        let nested = VirtualPath::data("issues/a.json").unwrap();
+        let directory = VirtualPath::data("records").unwrap();
+        let nested = VirtualPath::data("records/a.json").unwrap();
 
         let error = RedoRecord::new(
             vec![directory.clone()],
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_parse_rejects_the_same_overlap_new_rejects() {
-        let path = VirtualPath::data("issues/a.json").unwrap();
+        let path = VirtualPath::data("records/a.json").unwrap();
         let puts = vec![put(path.clone()), put(path)];
         // Built directly through the struct literal: `serialize` carries no
         // validation of its own, so this is the same bytes a corrupted or
@@ -653,12 +653,12 @@ mod tests {
         let record = RedoRecord::new(
             Vec::new(),
             vec![
-                put(VirtualPath::data("issues/ab.json").unwrap()),
-                put(VirtualPath::data("issues/a.json").unwrap()),
+                put(VirtualPath::data("records/ab.json").unwrap()),
+                put(VirtualPath::data("records/a.json").unwrap()),
             ],
             vec![
-                VirtualPath::worktree("issues/a").unwrap(),
-                VirtualPath::worktree("issues/ab").unwrap(),
+                VirtualPath::worktree("records/a").unwrap(),
+                VirtualPath::worktree("records/ab").unwrap(),
             ],
             None,
         )

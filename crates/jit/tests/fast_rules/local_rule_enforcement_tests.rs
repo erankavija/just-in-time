@@ -947,7 +947,7 @@ impl IssueStore for FailingMutationStorage {
         self.inner.acquire_repo_write_lock()
     }
 
-    fn load_issue(&self, id: &str) -> anyhow::Result<Issue> {
+    fn load_issue(&self, id: &jit::domain::identity::IssueId) -> anyhow::Result<Issue> {
         self.inner.load_issue(id)
     }
 
@@ -976,7 +976,7 @@ impl IssueStore for FailingMutationStorage {
 
     fn list_gate_runs_for_issue(
         &self,
-        issue_id: &str,
+        issue_id: &jit::domain::identity::IssueId,
     ) -> anyhow::Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
     }

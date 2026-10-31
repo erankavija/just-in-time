@@ -30,6 +30,7 @@ use crate::config::DocumentationConfig;
 use crate::domain::artifact_classifier::contains_path;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
 use crate::domain::artifact_plan::normalize_artifact_path;
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, SHORT_ID_LENGTH};
 use std::collections::{BTreeMap, BTreeSet};
@@ -41,7 +42,7 @@ pub enum ArtifactDisposition {
     /// that issue owns in this area.
     Nonconforming {
         /// Full id of the owning issue.
-        issue_id: String,
+        issue_id: IssueId,
         /// Repository-relative directory the owner owns in this area.
         canonical_directory: String,
     },
@@ -148,7 +149,7 @@ fn first_reported_occurrence(
     path: &str,
     owners: &BTreeMap<String, Vec<&Issue>>,
     references: &BTreeMap<String, Vec<&Issue>>,
-    canonical_directories: &BTreeMap<String, String>,
+    canonical_directories: &BTreeMap<IssueId, String>,
 ) -> Option<ReportedArtifact> {
     let path = normalize_artifact_path(path);
     let relative = path
@@ -606,7 +607,7 @@ mod tests {
             // The leading run is not delimited from what follows it.
             format!("{AREA}/{short_id}notes.md"),
             // Hexadecimal, but not the printed width.
-            format!("{AREA}/{}-plan.md", &short_id[..SHORT_ID_LENGTH - 1]),
+            format!("{AREA}/deadbee-plan.md"),
             // The printed width, but outside the printed alphabet.
             format!("{AREA}/DEADBEEF-plan.md"),
             format!("{AREA}/deadbeefs-plan.md"),
