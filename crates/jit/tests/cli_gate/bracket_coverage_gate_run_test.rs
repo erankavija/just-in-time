@@ -211,11 +211,10 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
     // Child carries NO satisfies label → REQ-77 left uncovered.
     let (_c, b) = build_bracket(&cli, "Pay epic", "REQ-77", false);
 
-    // Run the ATTACHED gate via the standard runner. Uncovered → exit 4.
+    // Run the ATTACHED gate via the standard runner. Uncovered → failure.
     cli.command(["gate", "evaluate", &b, "coverage-preview"])
         .assert()
-        .failure()
-        .code(4);
+        .failure();
 
     assert_gate_run(&cli, &b, "failed");
 

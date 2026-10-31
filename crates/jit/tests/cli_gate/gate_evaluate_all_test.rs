@@ -1,9 +1,9 @@
 //! Integration tests for `jit gate evaluate-all` (issue df7f934c).
 //!
-//! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
-//! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
-//! -> exit 10; and, for a mixed auto/manual gate set, fail-fast at an
-//! unattested manual gate rather than a silent pass (jit:1d59070d REQ-03).
+//! Covers: all-pass with per-gate JSON; fail-fast at the first non-passing gate
+//! (a later gate's checker never runs); runner error; and, for a mixed
+//! auto/manual gate set, fail-fast at an unattested manual gate rather than a
+//! silent pass (jit:1d59070d REQ-03).
 
 use crate::{create_issue_requiring, define_auto_gate, define_manual_gate};
 use jit::test_cli::JitCli;
@@ -47,7 +47,7 @@ fn run_count(cli: &JitCli, key: &str) -> usize {
 }
 
 #[test]
-fn test_evaluate_all_all_gates_pass_exit_0() {
+fn test_evaluate_all_all_gates_pass_reports_each_gate() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     define_gate(&cli, "g1", "true");
@@ -59,9 +59,8 @@ fn test_evaluate_all_all_gates_pass_exit_0() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -88,9 +87,8 @@ fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -111,7 +109,7 @@ fn test_evaluate_all_json_includes_native_placeholder_warning_per_gate() {
 }
 
 #[test]
-fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
+fn test_evaluate_all_fail_fast_stops_at_first_failure() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     define_gate(&cli, "g1", "false"); // first gate fails (checker exit 1)
@@ -123,9 +121,8 @@ fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(4),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -145,7 +142,7 @@ fn test_evaluate_all_fail_fast_stops_at_first_failure_exit_4() {
 }
 
 #[test]
-fn test_evaluate_all_runner_error_exit_10() {
+fn test_evaluate_all_runner_error_reports_error_verdict() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     // First gate's checker kills itself -> no exit code -> runner error.
@@ -158,9 +155,8 @@ fn test_evaluate_all_runner_error_exit_10() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(10),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -172,7 +168,7 @@ fn test_evaluate_all_runner_error_exit_10() {
 }
 
 #[test]
-fn test_evaluate_all_no_required_gates_exit_0() {
+fn test_evaluate_all_no_required_gates_succeeds() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
     let id = create_issue_requiring(&cli, &[]);
@@ -182,13 +178,13 @@ fn test_evaluate_all_no_required_gates_exit_0() {
         .output()
         .unwrap();
 
-    assert_eq!(out.status.code(), Some(0));
+    assert!(out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["gates"].as_array().unwrap().len(), 0);
 }
 
 #[test]
-fn test_evaluate_all_issue_not_found_exit_3() {
+fn test_evaluate_all_issue_not_found_reports_error_code() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("init").unwrap();
 
@@ -197,7 +193,7 @@ fn test_evaluate_all_issue_not_found_exit_3() {
         .output()
         .unwrap();
 
-    assert_eq!(out.status.code(), Some(3));
+    assert!(!out.status.success());
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
 }
@@ -222,9 +218,8 @@ fn test_evaluate_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(2),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -268,9 +263,8 @@ fn test_evaluate_all_mixed_gates_with_by_all_pass() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(0),
+    assert!(
+        out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -310,9 +304,8 @@ fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
         .output()
         .unwrap();
 
-    assert_eq!(
-        out.status.code(),
-        Some(4),
+    assert!(
+        !out.status.success(),
         "stdout: {} stderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)

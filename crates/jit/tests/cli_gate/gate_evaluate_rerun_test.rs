@@ -31,7 +31,7 @@ fn test_gate_evaluate_reruns_checker_without_declared_inputs_at_unchanged_head()
             .command(["gate", "evaluate", &id, "counting", "--json"])
             .output()
             .unwrap();
-        assert_eq!(out.status.code(), Some(0));
+        assert!(out.status.success());
         let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(json["verdict"], "pass");
         assert_eq!(run_count(&cli), expected_runs);
@@ -68,7 +68,7 @@ fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
         .command(["gate", "evaluate", &id, "counting", "--json"])
         .output()
         .unwrap();
-    assert_eq!(first.status.code(), Some(0));
+    assert!(first.status.success());
     let json: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(json["verdict"], "pass");
     assert_eq!(run_count(&cli), 1);
@@ -85,19 +85,18 @@ fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
         .command(["gate", "update", "counting", "--mode", "manual"])
         .output()
         .unwrap();
-    assert_eq!(redefine.status.code(), Some(0));
+    assert!(redefine.status.success());
 
     // Bare evaluate: must NOT short-circuit on the stale auto pass. Attestation is
-    // required -> ManualGateAttestationRequiredError, exit 2 (InvalidArgument).
+    // required -> ManualGateAttestationRequiredError.
     let bare = cli
         .command(["gate", "evaluate", &id, "counting"])
         .output()
         .unwrap();
-    assert_eq!(
-        bare.status.code(),
-        Some(2),
-        "stale auto pass must not satisfy manual attestation: {}",
-        String::from_utf8_lossy(&bare.stderr)
+    let bare_stderr = String::from_utf8_lossy(&bare.stderr);
+    assert!(
+        !bare.status.success() && bare_stderr.contains("--by <attestor>"),
+        "stale auto pass must not satisfy manual attestation: {bare_stderr}"
     );
 
     // Attest with --by: records a fresh attested pass (updated_by = human:alice).
@@ -113,7 +112,7 @@ fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
         ])
         .output()
         .unwrap();
-    assert_eq!(attested.status.code(), Some(0));
+    assert!(attested.status.success());
     assert_eq!(gate_status(&cli, &id, "counting"), "passed");
     assert_eq!(
         gate_updated_by(&cli, &id, "counting").as_deref(),

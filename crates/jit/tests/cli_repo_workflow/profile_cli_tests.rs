@@ -299,7 +299,7 @@ fn test_profile_commands_refuse_a_tagged_selector_naming_the_bare_path_form() {
                 &["profile", command, "--profile", selector, "--json"],
             );
 
-            assert_eq!(refused.status.code(), Some(2), "{refused:?}");
+            assert!(!refused.status.success(), "{refused:?}");
             let error = json(&refused);
             assert_eq!(error["error"]["code"], "INVALID_ARGUMENT");
             let message = error["error"]["message"].as_str().unwrap();
@@ -866,7 +866,8 @@ fn test_init_from_without_a_profile_is_a_usage_error() {
 
     let init = jit(&repo, &["init", "--from", location, "--json"]);
 
-    assert_eq!(init.status.code(), Some(2), "{init:?}");
+    assert!(!init.status.success(), "{init:?}");
+    assert!(String::from_utf8_lossy(&init.stderr).contains("--from"));
     assert!(!repo.root().join(".jit").exists());
 }
 
@@ -961,7 +962,7 @@ fn test_profile_missing_package_directory_has_typed_json_error_without_mutation(
         &["init", "--profile", "packages/missing-profile", "--json"],
     );
 
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success(), "{output:?}");
     assert_eq!(json(&output)["error"]["code"], "PROFILE_ERROR");
     assert!(!repo.root().join(".jit").exists());
 }

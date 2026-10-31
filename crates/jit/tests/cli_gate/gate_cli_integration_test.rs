@@ -1064,3 +1064,24 @@ fn test_gate_status_shows_complete_report_without_truncation() {
         stdout_str
     );
 }
+
+#[test]
+fn test_gate_fail_gate_not_required_is_invalid_argument() {
+    let temp = JitCli::initialised().unwrap();
+
+    let id = temp.create_issue(["--title", "No gates"]).unwrap();
+
+    let output = temp
+        .command(["gate", "fail", &id, "not-a-gate", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+}
