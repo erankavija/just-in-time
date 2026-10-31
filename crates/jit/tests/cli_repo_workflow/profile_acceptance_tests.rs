@@ -455,6 +455,7 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
         None,
     );
 
+    assert_eq!(failure["error"]["code"], "PROFILE_ERROR", "{failure}");
     // Both packages are named: the one the adopter asked for, and the one it
     // declared that could not be found.
     let message = failure["error"]["message"]
