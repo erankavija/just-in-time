@@ -18,9 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "5408b7b2-5f20-4014-a2cb-44093f91464e",
+      "run_id": "9a961fef-f182-49cd-ae6b-508b25a53df8",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:17.198293986Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d7dfdbd0-1242-4dd3-8094-e7354212fc14",
       "status": "failed",
-      "updated_at": "2026-10-31T23:14:41.970358288Z",
+      "updated_at": "2026-10-31T23:20:41.348112278Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Profile tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-31T23:14:41.970358288Z"
+  "updated_at": "2026-10-31T23:20:41.348112278Z"
 }

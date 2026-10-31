@@ -17,9 +17,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "4992e1f8-66b9-49f8-8b90-5290f8c49398",
+      "run_id": "ab8dfab5-f186-4ca9-a6d7-dc3a942469b8",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:17.925352580Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "34187540-6f13-494f-85ed-1a15c395667a",
       "status": "failed",
-      "updated_at": "2026-10-31T23:14:42.711369508Z",
+      "updated_at": "2026-10-31T23:20:23.167410651Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cli_item_validate tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-31T23:14:42.711369508Z"
+  "updated_at": "2026-10-31T23:20:23.167410651Z"
 }

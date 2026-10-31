@@ -18,9 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9bc791cf-d97b-4c26-bf6a-4b56a2dcb52d",
-      "status": "failed",
-      "updated_at": "2026-10-31T23:14:09.194922363Z",
+      "run_id": "f6cbd154-7d12-49e0-83c2-9a1dbd62399f",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:17:16.969775216Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e00ee6fd-05dc-4f9f-93c7-a1c5e7218d28",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:19:36.062003111Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue-creation tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-31T23:14:09.194922363Z"
+  "updated_at": "2026-10-31T23:19:36.062003111Z"
 }
