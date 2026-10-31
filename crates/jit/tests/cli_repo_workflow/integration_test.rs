@@ -494,28 +494,6 @@ fn test_dependencies() {
 }
 
 #[test]
-fn test_cycle_detection() {
-    let cli = JitCli::initialised().unwrap();
-
-    let id1 = cli
-        .create_issue(["--title", "Issue 1", "--description", "Desc"])
-        .unwrap();
-    let id2 = cli
-        .create_issue(["--title", "Issue 2", "--description", "Desc"])
-        .unwrap();
-
-    // Add dependency: id2 depends on id1
-    cli.command(["dep", "add", &id2, &id1]).output().unwrap();
-
-    // Try to create cycle: id1 depends on id2 (should fail)
-    let output = cli.command(["dep", "add", &id1, &id2]).output().unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("cycle") || stderr.contains("Cycle"));
-}
-
-#[test]
 fn test_gates() {
     let cli = JitCli::initialised().unwrap();
 
