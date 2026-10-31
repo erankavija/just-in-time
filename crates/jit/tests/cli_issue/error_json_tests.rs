@@ -88,6 +88,19 @@ fn test_deletion_not_confirmed_error_json() {
 }
 
 #[test]
+fn test_deletion_not_confirmed_without_json_hints_on_stderr_and_leaves_stdout_empty() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["-t", "Doomed"]).unwrap();
+
+    let output = cli.command(["issue", "delete", &id]).output().unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("JIT_ALLOW_DELETION=1"), "stderr: {stderr}");
+    assert!(output.stdout.is_empty(), "refusal must leave stdout empty");
+}
+
+#[test]
 fn test_invalid_state_error_json() {
     let cli = JitCli::initialised().unwrap();
 
