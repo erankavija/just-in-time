@@ -206,21 +206,21 @@ pub use self::identity::VirtualPath;
 /// const paths.
 ///
 /// The struct's fields are declared here and nowhere else, so a `Cow::Borrowed`
-/// const identity — the one shape that reaches a `VirtualPath` without the
-/// fallible guard — cannot be spelled outside this module: everywhere else in the
+/// const identity cannot be spelled outside this module: everywhere else in the
 /// crate, including the rest of this file, a struct literal is a privacy error.
-/// What the module hands its parent is [`from_parts`](VirtualPath::from_parts)
-/// and the two field accessors. `from_parts` returns a `Result`, so it cannot
-/// serve a const initializer, and every identity minted elsewhere has passed
-/// `checked`.
+/// What the module hands its parent is [`from_parts`](VirtualPath::from_parts),
+/// [`issue_record`](VirtualPath::issue_record), and the two field accessors.
+/// `from_parts` returns a `Result`; `issue_record` is the one infallible derived
+/// path, whose canonical UUID component makes its descendant safe by construction.
 ///
-/// One route survives by construction: a raw struct literal written inside this
-/// module, which no Rust construct can deny a type's own defining scope. The
-/// module is therefore kept to the identity's accessors, its fallible
-/// constructor, the reserved-namespace guard, the const-construction primitive,
-/// and the declaration list that emits every const together with its inventory.
+/// Only this module can write the raw struct literal needed for const identities
+/// and the well-formed issue-record descendant. It is therefore kept to the
+/// identity's accessors, these constructors, the reserved-namespace guard, the
+/// const-construction primitive, and the declaration list that emits every const
+/// together with its inventory.
 mod identity {
     use super::{RepositoryLayoutError, RepositoryRootClass, RootRelativePath};
+    use crate::domain::identity::IssueId;
     use serde::Serialize;
     use std::borrow::Cow;
 
@@ -232,12 +232,18 @@ mod identity {
     }
 
     impl VirtualPath {
-        /// Construct a guarded identity from its parts.
-        ///
-        /// The only route out of this module to a `VirtualPath`, and fallible by
-        /// design: a `Result` cannot initialize a const, so no caller can mint an
-        /// unguarded identity and no well-known const can be declared outside the
-        /// declaration list below.
+        /// Construct the data-root record path from one canonical UUID component.
+        pub fn issue_record(id: &IssueId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::ISSUES
+                    .relative()
+                    .clone()
+                    .join(&[id.as_str(), ".json"].concat()),
+            }
+        }
+
+        /// Route caller-supplied parts through canonical and reserved-path checks.
         pub(super) fn from_parts(
             root: RepositoryRootClass,
             relative: RootRelativePath,
@@ -868,6 +874,22 @@ mod tests {
     }
 
     #[test]
+    fn test_virtual_path_issue_record_uses_data_root_and_canonical_id_leaf() {
+        let id = crate::test_utils::issue_id(1);
+        let path = VirtualPath::issue_record(&id);
+
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(
+            path.relative().as_path().parent(),
+            Some(Path::new("issues"))
+        );
+        assert_eq!(
+            path.file_name().and_then(|name| name.strip_suffix(".json")),
+            Some(id.as_str())
+        );
+    }
+
+    #[test]
     fn test_layout_accepts_distinct_identity_external_and_nested_data_roots() {
         let external = RepositoryLayout::new(root("/repo"), root("/external/data")).unwrap();
         assert_eq!(external.worktree_root(), Path::new("/repo"));
@@ -1067,9 +1089,10 @@ mod tests {
     #[test]
     fn test_layout_rejects_deserialized_worktree_under_data_alias() {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
+        let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
         let encoded = serde_json::json!({
             "root": "worktree",
-            "relative": format!(".jit/issues/{}.json", crate::test_utils::issue_id(1)),
+            "relative": format!(".jit/{}", issue_path.relative().as_str()),
         });
         let error = deserialize_path(&layout, encoded).unwrap_err();
         assert!(error.to_string().contains("aliases the selected data root"));
@@ -1081,7 +1104,10 @@ mod tests {
         // empty descendant string; a non-empty path is a `Descendant`.
         assert_eq!(RootRelativePath::parse("").unwrap(), RootRelativePath::Root);
         assert!(RootRelativePath::parse("").unwrap().is_root());
-        let issue_path = format!("issues/{}.json", crate::test_utils::issue_id(1));
+        let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1))
+            .relative()
+            .as_str()
+            .to_owned();
         match RootRelativePath::parse(&issue_path).unwrap() {
             RootRelativePath::Descendant(text) => assert_eq!(&*text, issue_path),
             RootRelativePath::Root => panic!("a non-empty path must be a descendant"),

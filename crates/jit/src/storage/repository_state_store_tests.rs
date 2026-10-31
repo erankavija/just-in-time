@@ -1123,7 +1123,8 @@ fn capture_listing_errors(
             },
         );
         for (name, bytes) in children {
-            let path = VirtualPath::data(format!("issues/{name}")).unwrap();
+            let path =
+                VirtualPath::data(VirtualPath::ISSUES.relative().as_path().join(name)).unwrap();
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
