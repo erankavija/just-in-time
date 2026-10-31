@@ -292,7 +292,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <span>$ issue #{issue.id.substring(0, 8)}</span>
+          <span>$ issue #{issue.short_id}</span>
           {onFocusInGraph && (
             <button
               onClick={() => onFocusInGraph(issue.id)}
