@@ -912,10 +912,14 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
 }
 
 /// A fresh repository can obtain the shipped workflow from archives made by a
-/// source checkout, then initialize through the documented path selector.
+/// repository holding it, then initialize through the documented path selector.
 #[test]
 fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
-    let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source = JitCli::uninitialised().unwrap();
+    let dogfood = crate::repository_package_at(source.root(), "jit-dogfood");
+    let holding =
+        super::profile_cli_tests::jit(&source, &["init", "--profile", &dogfood, "--json"]);
+    assert!(holding.status.success(), "{holding:?}");
     let exchange = TempDir::new().unwrap();
     let repo = JitCli::uninitialised().unwrap();
     assert!(!repo.root().join(".jit").exists());
@@ -923,19 +927,13 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     for id in ["jit-default", "jit-dogfood"] {
         let archive = exchange.path().join(format!("{id}.tar"));
         let archive = archive.to_str().unwrap();
-        let packed = repo
-            .command([
-                "profile",
-                "pack",
-                "--source",
-                &format!("profiles/{id}"),
-                "--output",
-                archive,
-                "--json",
-            ])
-            .current_dir(&checkout)
-            .output()
-            .expect("failed to run jit");
+        let package = crate::repository_package_at(source.root(), id);
+        let packed = super::profile_cli_tests::jit(
+            &source,
+            &[
+                "profile", "pack", "--source", &package, "--output", archive, "--json",
+            ],
+        );
         assert!(packed.status.success(), "packing {id} failed: {packed:?}");
 
         let initialized = super::profile_cli_tests::jit(&repo, &["init", "--json"]);

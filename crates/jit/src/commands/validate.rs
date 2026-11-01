@@ -549,12 +549,18 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 else {
                     return Ok(SessionStep::Retry);
                 };
+                let Some(record_fidelity) =
+                    capture_record_fidelity_validation(session, &captured.image)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
                 let report =
                     crate::validation::repository::validate_repository_with_materializations(
                         &captured.image,
                         &captured.declarations,
                         captured.plan.as_ref(),
                         document_references,
+                        record_fidelity,
                     );
                 Ok(SessionStep::Done((report, divergences)))
             },
@@ -951,6 +957,30 @@ fn capture_document_reference_validation(
         }
     }
     Ok(Some(Ok(())))
+}
+
+/// Capture every gate-run record and judge the stored records against `image`.
+/// Whole-repository validation pays this read; no mutation's preflight does.
+fn capture_record_fidelity_validation(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<Option<Result<()>>> {
+    let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
+    let Some(gate_runs) = super::capture_discovering(session, spec, |image, spec| {
+        super::discover_gate_run_results(image, spec)
+    })?
+    else {
+        return Ok(None);
+    };
+    let drift = crate::validation::record_fidelity::record_drift(image, &gate_runs)?;
+    Ok(Some(match drift.is_empty() {
+        true => Ok(()),
+        false => Err(anyhow!(
+            "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
+            drift.len(),
+            drift.join("\n  ")
+        )),
+    }))
 }
 
 /// Each breakable container's plan-document path, from its planning node as

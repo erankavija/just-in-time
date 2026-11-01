@@ -1,9 +1,9 @@
 //! Read-only, byte-exact repository validation.
 //!
 //! Declaration, record, rule, and materialization checks read a closed
-//! [`RepositoryImage`]. Full validation supplies the document-reference pass's
-//! verdict separately, allowing its evidence to be captured one reference at a
-//! time. No pass performs live filesystem or Git I/O.
+//! [`RepositoryImage`]. Full validation supplies the document-reference and
+//! record-fidelity verdicts separately, since their evidence lies outside that
+//! image. No pass performs live filesystem or Git I/O.
 
 use crate::config::JitConfig;
 use crate::declarations::rules::{RuleSet, Severity};
@@ -180,7 +180,13 @@ pub fn validate_repository(
                 },
             )
         })?;
-    validate_repository_with_materializations(image, &declarations, expected.as_ref(), Ok(()))
+    validate_repository_with_materializations(
+        image,
+        &declarations,
+        expected.as_ref(),
+        Ok(()),
+        Ok(()),
+    )
 }
 
 pub(crate) fn validate_repository_with_materializations(
@@ -188,6 +194,7 @@ pub(crate) fn validate_repository_with_materializations(
     declarations: &crate::repository_state::CapturedRepositoryDeclarations,
     expected: Option<&crate::repository_state::MaterializationPlan>,
     document_references: Result<()>,
+    record_fidelity: Result<()>,
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
     let read = move |path: &str| image_read(image, path);
     let read: &ReadBytes<'_> = &read;
@@ -239,6 +246,12 @@ pub(crate) fn validate_repository_with_materializations(
             None
         }
     };
+
+    if structural_error.is_none() {
+        structural_error = record_fidelity
+            .context("record-fidelity validation pass")
+            .err();
+    }
 
     if let Some(records) = &records {
         let integrity_error = validate_integrity(&records.issues, &gates, document_references)
@@ -990,6 +1003,100 @@ mod tests {
         let planned = validate_overlaid::<&str>(&executor, []).unwrap();
         assert_eq!(plain, planned);
         assert_eq!(plain.passes.len(), 8);
+    }
+
+    fn seed_attested_gate_run(
+        executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
+    ) -> crate::domain::identity::GateRunId {
+        seed_fixture_issue(
+            executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+        let key: GateKey = "attested".parse().unwrap();
+        executor
+            .define_gate(
+                &key,
+                "Attested".to_string(),
+                String::new(),
+                crate::declarations::GateStage::Postcheck,
+                crate::declarations::GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+        let issue = executor.storage().list_issues().unwrap().remove(0);
+        executor.add_gate(&issue.id, &key).unwrap();
+        executor
+            .pass_gate(&issue.id, &key, Some("human:test".to_string()), false)
+            .unwrap();
+        std::fs::read_dir(data_path(executor, &VirtualPath::GATE_RUNS))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .as_ref()
+            .try_into()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_validate_live_accepts_every_record_the_writers_published() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        seed_attested_gate_run(&mut executor);
+
+        validate_live(&executor).unwrap();
+    }
+
+    #[test]
+    fn test_validate_live_reports_a_gate_run_that_does_not_reproduce() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        let run_id = seed_attested_gate_run(&mut executor);
+        let path = VirtualPath::gate_run_record(&run_id);
+        let stored = read_fixture(&executor, &path.repository_relative()).unwrap();
+        let mut raw: serde_json::Value = serde_json::from_slice(&stored).unwrap();
+        raw["retired_key"] = serde_json::Value::Bool(true);
+        raw["origin"] = serde_json::json!({ "kind": "not-a-recorded-origin" });
+        std::fs::write(
+            data_path(&executor, &path),
+            serde_json::to_vec(&raw).unwrap(),
+        )
+        .unwrap();
+
+        let error = validate_live(&executor).unwrap_err().to_string();
+
+        assert!(
+            error.contains("record-fidelity") && error.contains(run_id.as_str()),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_overlay_validation_does_not_read_gate_run_records() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor.validate_with_fix(true, false).unwrap();
+        let run_id = seed_attested_gate_run(&mut executor);
+        std::fs::write(
+            data_path(&executor, &VirtualPath::gate_run_record(&run_id)),
+            "not json",
+        )
+        .unwrap();
+
+        validate_overlaid::<&str>(&executor, []).unwrap();
     }
 
     #[test]
