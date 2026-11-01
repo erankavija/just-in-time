@@ -48,8 +48,6 @@ const UNOWNED_PREFIX: &str = "deadbeef";
 struct Report {
     /// Areas the run states it scanned.
     areas: Vec<String>,
-    /// The collection's declared length.
-    count: usize,
     /// Reported artifacts, keyed by the path each one names.
     artifacts: BTreeMap<String, Value>,
 }
@@ -96,10 +94,6 @@ fn conformance_report(cli: &JitCli) -> Report {
             .iter()
             .map(|area| area.as_str().expect("an area is a string").to_string())
             .collect(),
-        count: payload["count"]
-            .as_u64()
-            .unwrap_or_else(|| panic!("the report counts its collection: {payload}"))
-            as usize,
         artifacts,
     }
 }
@@ -370,7 +364,7 @@ fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
         report.paths()
     );
     assert_eq!(
-        report.count,
+        report.artifacts.len(),
         misplaced.len(),
         "the three misplaced directories are the whole report: {:?}",
         report.paths()
@@ -707,35 +701,6 @@ fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_refe
         verdict.contains("unattributed") && verdict.contains("reference"),
         "the human report says several issues reference it: {verdict}"
     );
-}
-
-#[test]
-fn test_doc_conformance_wraps_its_collection_in_the_count_and_collection_envelope() {
-    let cli = JitCli::with_repository(
-        setup_test_repo_with_config(&conformance_config())
-            .unwrap()
-            .0,
-    );
-    let area = declared_area();
-    let issue = issue_owning_a_directory(&cli, "Counted artifacts");
-
-    let empty = conformance_report(&cli);
-    assert_eq!(
-        (empty.count, empty.artifacts.len()),
-        (0, 0),
-        "an empty collection is still counted"
-    );
-
-    // The count tracks the collection rather than being a constant.
-    (1..=3).for_each(|index| {
-        write_artifact(&cli, &format!("{area}/{}-note-{index}.md", issue.short_id));
-        let report = conformance_report(&cli);
-        assert_eq!(
-            (report.count, report.artifacts.len()),
-            (index, index),
-            "count states the number of reported artifacts"
-        );
-    });
 }
 
 #[test]

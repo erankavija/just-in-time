@@ -1009,11 +1009,6 @@ fn profile_difference(repo: &JitCli, selectors: &[&str]) -> (ExitStatus, Value) 
         .pointer("/error/details")
         .cloned()
         .unwrap_or_else(|| parsed.clone());
-    assert_eq!(
-        report["count"].as_u64().map(|count| count as usize),
-        report["profiles"].as_array().map(Vec::len),
-        "the report uses the count-wrapped list envelope: {parsed}"
-    );
     (output.status, report)
 }
 

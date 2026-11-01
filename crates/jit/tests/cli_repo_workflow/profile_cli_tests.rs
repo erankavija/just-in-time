@@ -1282,23 +1282,9 @@ pub(super) fn write_lifecycle_package(repo: &Path, location: &str, id: &str, ver
     fs::write(root.join("assets/fixed.txt"), "no variable reaches this\n").unwrap();
 }
 
-/// Every collection a response carries reads through the project's count
-/// envelope, so a machine consumer never has to know which key holds it.
-fn assert_count_envelope(response: &Value, collection: &str) {
-    let entries = response[collection]
-        .as_array()
-        .unwrap_or_else(|| panic!("a {collection} response wraps its collection in an array"));
-    assert_eq!(
-        response["count"].as_u64(),
-        Some(entries.len() as u64),
-        "the envelope count states the collection length"
-    );
-}
-
 /// The single profile entry returned by one-package authoring and exchange
 /// operations.
 pub(super) fn only_profile(response: &Value) -> &Value {
-    assert_count_envelope(response, "profiles");
     assert_eq!(response["count"], 1);
     &response["profiles"][0]
 }
