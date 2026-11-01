@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bbf6e5fc-33a8-495e-acca-55371de4bc5d",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:02:24.311301526Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ab190c6e-45ad-41ed-b655-8dd0014fcb47",
+      "status": "failed",
+      "updated_at": "2026-11-01T20:03:37.971103400Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "edc8544d-5f5e-497e-9706-c7b4e7235036",
   "labels": [
     "epic:lead-friction",
@@ -23,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report derived documents on every issue surface",
-  "updated_at": "2026-11-01T19:52:46.649383124Z"
+  "updated_at": "2026-11-01T20:03:37.971103400Z"
 }

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a0c3144bad5e21d7e2c1aba1a2c29d6ef65607b0",
+  "completed_at": "2026-11-01T20:03:37.697091694Z",
+  "duration_ms": 72952,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/routes.rs",
+        "id": "F1",
+        "line": 146,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-20",
+          "@/issue/3d9a0ce3/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "GET /issues returns explicit document links only, contrary to the required shared derived-document set."
+      }
+    ],
+    "summary": "The server collection endpoint omits derived documents and its new test locks in that inconsistency.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "edc8544d-5f5e-497e-9706-c7b4e7235036",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ab190c6e-45ad-41ed-b655-8dd0014fcb47",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T20:02:24.744771723Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14004 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a198b4-c003-78b0-8a8a-fd6b6f8e259a\n--------\nuser\n--- 13991 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a0c3144ba, bd49f172c (merge has no unique conflict-resolution patch)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-03 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T20:01:00.625436582+00:00)\nTruncation recovery: recovered per-commit/per-file patches, route/test reads, configuration, and item sources after truncated combined output\n\n1. [blocking, issue-impact] `GET /issues` still converts stored `Issue` values directly at `crates/server/src/routes.rs:139-146`, omitting derived documents. The added test explicitly requires that mismatch at `crates/server/src/routes.rs:2524`. This violates the hard criterion that server issue reads match `jit doc list`; the server collection surface must use the shared derivation and the agreement test must cover it. References: `@/charter/D-20`, `@/issue/3d9a0ce3/requirement/REQ-03`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The server collection endpoint omits derived documents and its new test locks in that inconsistency.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"GET /issues returns explicit document links only, contrary to the required shared derived-document set.\",\"file\":\"crates/server/src/routes.rs\",\"line\":146,\"references\":[\"@/charter/D-20\",\"@/issue/3d9a0ce3/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
