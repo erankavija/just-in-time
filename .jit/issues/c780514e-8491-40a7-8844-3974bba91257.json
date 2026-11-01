@@ -61,7 +61,8 @@
     "session-cost-benchmark-selftest",
     "standards-scan-test",
     "standards-fix-test",
-    "manifest-tool-test"
+    "manifest-tool-test",
+    "package-drift"
   ],
   "gates_status": {
     "build-budget-selftest": {
@@ -82,6 +83,11 @@
     "manifest-tool-test": {
       "status": "pending",
       "updated_at": "2026-10-22T14:28:47.735069493Z",
+      "updated_by": null
+    },
+    "package-drift": {
+      "status": "pending",
+      "updated_at": "2026-11-01T08:05:07.349436962Z",
       "updated_by": null
     },
     "profile-suite-selftest": {
@@ -129,5 +135,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-11-01T08:03:33.451538225Z"
+  "updated_at": "2026-11-01T08:05:07.349436962Z"
 }

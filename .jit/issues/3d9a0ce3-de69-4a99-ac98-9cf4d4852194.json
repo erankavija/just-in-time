@@ -5,6 +5,7 @@
   "created_at": "2026-10-15T11:05:36.732638299Z",
   "dependencies": [
     "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
+    "1b0c2b75-acdc-4630-b9ab-e1fa4d534175",
     "39710b3b-2b92-4fc1-bbc2-4c230577e350",
     "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
     "5a3a886f-96cb-420d-9070-5f8e6dcedb1d",
@@ -12,6 +13,7 @@
     "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
     "856f0520-7af9-4c2d-9297-5abbd9eae365",
     "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+    "ab797eed-1d0f-4255-acc3-e327c9001632",
     "aeafc378-3073-4b32-be1b-53a05b656168",
     "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
     "da12ad66-7451-4700-9731-74a36c895bb9",
@@ -72,5 +74,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-11-01T07:36:43.811834487Z"
+  "updated_at": "2026-11-01T08:05:08.615339792Z"
 }
