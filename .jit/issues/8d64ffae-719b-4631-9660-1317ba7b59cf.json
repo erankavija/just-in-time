@@ -20,6 +20,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: command exit codes and the list-envelope count each have one owning test.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite, which fails for a projected row without a binding case. Other subprocess tests assert only what they add.\n- [hard] REQ-02: The list-envelope `count` property is proven by one test that covers each list-emitting command, and no per-command test re-asserts it.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T01:03:27.405723966Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -39,7 +40,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Exit codes and list envelopes each have one owning test",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:03:27.405723966Z"
 }

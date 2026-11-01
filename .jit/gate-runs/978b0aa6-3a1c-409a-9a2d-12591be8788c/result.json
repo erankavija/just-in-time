@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8849248171088baa687e853d62c854fafb3588e4",
+  "completed_at": "2026-11-01T00:55:01.198574999Z",
+  "duration_ms": 166680,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The scoped removal satisfies both hard criteria and leaves the canonical schema-driven envelope test as the sole owner.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e1410936-de60-4752-95e9-cf6790b80972",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "978b0aa6-3a1c-409a-9a2d-12591be8788c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:52:14.517750689Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1374d216c (`jit:e1410936`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; issue descriptions\nResolved items: @/issue/e1410936/requirement/REQ-01, REQ-02; @/issue/c780514e/requirement/REQ-04; @/charter/D-18; @/invariant/orthogonal-tests, semantic-test-assertions, shared-test-contracts, essential-code-prose\nGate evidence: cargo-ci — passed, exit 0, 2026-11-01T00:50:49.989587081+00:00\nTruncation recovery: re-read patches, target ranges, policy sources, and canonical envelope-owner test in bounded calls; excluded unrelated historical gate records\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped removal satisfies both hard criteria and leaves the canonical schema-driven envelope test as the sole owner.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
