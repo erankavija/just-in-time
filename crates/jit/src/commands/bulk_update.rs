@@ -429,7 +429,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// record the issue in its `errors` list and continue best-effort.
     ///
     /// Note: this does NOT call `update_issue_state()` (it skips that path's
-    /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
+    /// prechecks/gate-diversion — see the DESIGN DECISION below), but
     /// the literal state change is routed through the captured transition
     /// derivation, so the dependency and gate guards and
     /// transition-time graph-rule enforcement (CC-2) hold on the bulk path with

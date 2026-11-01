@@ -211,7 +211,7 @@ flowchart LR
     R --> P[in_progress: prechecks pass]
     P --> G[Gated: completion blocked]
     P --> D[Done: gates already passed]
-    G --> D[Done: retry after gates pass]
+    G --> D[Done: last gate passes]
 ```
 
 **1. Creation**
@@ -257,13 +257,12 @@ jit issue claim $ISSUE agent:worker-1
 jit gate status-all $ISSUE
 jit gate evaluate $ISSUE tests
 
-# Once every required gate is passed, request completion again
+# Once every required gate is passed, request completion
 jit issue update $ISSUE --state done
 ```
 
 An explicit `done` request moves an issue with unpassed gates to `gated`; it does
-not run those checkers. Evaluate the gates, inspect their statuses, then retry
-the `done` request.
+not run those checkers. Passing the last gate of a `gated` issue moves it to `done`.
 
 See [States](#states) for complete state machine details.
 
@@ -624,8 +623,7 @@ jit issue update $ISSUE --state done
 **If any gates not passed:**
 - Issue transitions to `gated` (waiting for gate approval)
 - Clear error message shows which gates are blocking
-- Evaluate the listed gates, inspect `jit gate status-all`, then retry the
-  explicit `done` request
+- Passing the last listed gate moves the issue to `done`
 
 **Example:**
 ```bash
@@ -639,16 +637,13 @@ $ jit gate evaluate abc123 tests
 
 $ jit gate evaluate abc123 code-review --by human:alice
 ✓ code-review passed
-
-# Once every required status is green, retry completion.
-$ jit issue update abc123 --state done
-✓ Issue transitioned to 'done'
+# The last pass moved the issue to done.
 ```
 
-Passing a manual gate may auto-transition an already `gated` issue when it
-clears the final blocker. Automated `jit gate evaluate` runs and records its
-checker result; use the explicit retry above for a workflow that works for both
-gate modes.
+A failed gate, or a pass on an issue that isn't `gated`, leaves the state
+unchanged. An `in_progress` issue completes with an explicit `done` request once
+its gates have passed; that request succeeds without change on an issue already
+`done`.
 
 ### Gate Bypass for Terminal States
 
@@ -697,7 +692,7 @@ stateDiagram-v2
     Backlog --> Ready: dependencies effectively terminal
     Ready --> in_progress: prechecks pass
     in_progress --> Gated: done requested with unpassed gates
-    Gated --> Done: done retried after gate statuses pass
+    Gated --> Done: last gate passes
     note right of Gated
         Waiting for gates
     end note
@@ -707,8 +702,8 @@ stateDiagram-v2
 - **Prechecks** gate entry to `in_progress`
 - **Postchecks** gate entry to `done`
 - **Gated state** exists specifically for gate waiting
-- **Automated evaluation** records a gate run; completion is retried explicitly
-  after required statuses pass (manual approval may complete a gated issue)
+- **Gate evaluation** records its result, and the pass that clears a gated issue's
+  last gate completes it
 
 ### Design Philosophy
 
@@ -747,7 +742,7 @@ stateDiagram-v2
     Backlog --> Ready: dependencies satisfied
     Ready --> in_progress: claim / prechecks pass
     in_progress --> Gated: completion attempted
-    Gated --> Done: done retried after gates pass
+    Gated --> Done: last gate passes
     Done --> Archived: retire (records origin)
     Rejected --> Archived: retire (records origin)
     Archived --> Done: revive to recorded origin
@@ -774,7 +769,7 @@ stateDiagram-v2
 **in_progress**: Issue is actively being worked on by an assignee.
 
 **Gated**: Issue has attempted to transition to Done, but quality gates have not
-all passed. Evaluate or attest the gates, then retry `jit issue update --state done`.
+all passed. Evaluating or attesting the last unpassed gate moves it to Done.
 
 **Done**: Completion outcome. A `done` request checks dependencies and required
 gate statuses before entering this state.
@@ -807,6 +802,7 @@ do not rely on it to prohibit a later explicit state update.
 **Auto-transitions:**
 - `Backlog → Ready`: Automatic. When a dependency reaches a terminal state (done or rejected), the completing/rejecting command re-scans dependents and promotes each newly-unblocked issue in the same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`)
 - `Ready → Backlog`: Automatic. The inverse: adding a dependency on a non-terminal issue — through `jit dep add` or through graph-template application — demotes the dependent in the same operation, so stored readiness never contradicts the graph
+- `Gated → Done`: Automatic. `jit gate evaluate` passing the last unpassed gate completes the issue and promotes its dependents in the same operation
 
 **Guarded workflow operations:**
 - `ready → in_progress`: `jit issue claim` attempts this transition and runs prechecks

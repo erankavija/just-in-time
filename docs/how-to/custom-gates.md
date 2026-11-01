@@ -736,12 +736,8 @@ jit gate define tests \
 # Attempt to finish; unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
 
-# Run the required automated postcheck and inspect the result
+# Run the required automated postcheck; its pass moves the issue to done
 jit gate evaluate $ISSUE tests
-jit gate status-all $ISSUE
-
-# Once all required statuses pass, request completion again
-jit issue update $ISSUE --state done
 ```
 
 ### Choosing Stage
@@ -1088,15 +1084,11 @@ jit gate add $ISSUE code-review
 # Attempt completion; the unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
 
-# Run automated gates and record manual review
+# Run automated gates and record manual review; the last pass moves the issue
+# to done
 jit gate evaluate $ISSUE tests
 jit gate evaluate $ISSUE clippy
 jit gate evaluate $ISSUE code-review --by "human:alice"
-
-# Manual approval may complete a gated issue; otherwise retry explicitly after
-# status-all reports every required gate as passed.
-jit gate status-all $ISSUE
-jit issue update $ISSUE --state done
 ```
 
 ## Troubleshooting Gate Failures
