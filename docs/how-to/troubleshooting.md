@@ -113,9 +113,9 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 ### Lease Expired During Work
 
-**Symptom:** Pre-commit hook rejects your commit, or another agent claimed your issue.
+**Symptom:** A `jit` write refuses with no active lease, or another agent claimed your issue.
 
-**Cause:** Your lease expired before you committed.
+**Cause:** Your lease expired before the write.
 
 **Prevention:**
 - Use longer TTL: `jit claim acquire <issue> --ttl 3600`
@@ -306,37 +306,6 @@ then act on the reason:
 
 ## Git Hook Issues
 
-### Pre-Commit Hook Rejection
-
-**Symptom:**
-```
-error: Pre-commit hook: Structural edit to issue abc123 without active lease
-```
-
-**Cause:** You're editing an issue file without holding a lease (in strict mode).
-
-**Solutions:**
-
-1. **Acquire a lease:**
-   ```bash
-   jit claim acquire abc123
-   git commit  # Retry
-   ```
-
-2. **Set your agent identity:**
-   ```bash
-   export JIT_AGENT_ID='agent:your-name'
-   ```
-   Or configure in `~/.config/jit/agent.toml`:
-   ```toml
-   id = "agent:your-name"
-   ```
-
-3. **Bypass (emergency only):**
-   ```bash
-   git commit --no-verify
-   ```
-
 ### Divergence Error
 
 **Symptom:**
@@ -358,7 +327,7 @@ git commit  # Retry
 
 **Symptom:** Hooks don't enforce anything.
 
-**Cause:** Hooks not installed or enforcement is off.
+**Cause:** The hook isn't installed or enforcement is off. The hook checks only branch divergence on shared configuration; leases are enforced when a mutation is written, and a hand edit of an issue record is not caught at commit.
 
 **Solution:**
 1. Install hooks:

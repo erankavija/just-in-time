@@ -5994,9 +5994,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     println!("  - {}", hook);
                                 }
                             }
-                            println!("\nHooks are now active. Configure enforcement in .jit/config.toml:");
-                            println!("  [worktree]");
-                            println!("  enforce_leases = \"strict\"");
+                            println!("\nHooks are now active. Leases are enforced when a mutation is written, not at commit.");
                         }
                     }
                     Err(e) => {

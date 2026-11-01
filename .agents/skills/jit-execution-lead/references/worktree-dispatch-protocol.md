@@ -79,7 +79,7 @@ git status --porcelain    # must be empty: what the gate judges below is then th
 scripts/cargo-ci.sh       # this project's gate; use whichever one your project configures
 ```
 
-`land.sh` holds the repository write lock while it commits pending tracker state as `chore(jit): sync tracker` and merges. On a conflict it aborts the merge, keeps that commit, and names the paths: resolve them with `git merge` by hand. Under `enforce_leases = "strict"` the pre-commit hook refuses a sync commit holding an issue record whose lease the lead does not hold.
+`land.sh` holds the repository write lock while it commits pending tracker state as `chore(jit): sync tracker` and merges. On a conflict it aborts the merge, keeps that commit, and names the paths: resolve them with `git merge` by hand.
 
 This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a pre-merge working tree. A worker branch anchored before a module deletion, merged after it, cleanly re-adds a declaration referencing a file that no longer exists. A branch that changes a function's signature merges cleanly with a branch that adds a caller of the old form. In each case the merge finds no textual overlap and reports no conflict, the leak check reports no leak because the merge is legitimate, and every per-issue gate still reads green because each ran on a tree that predates the combination. Only a check run on the merged tree observes it.
 

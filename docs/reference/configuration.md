@@ -507,6 +507,9 @@ reduction of `jit validate --fix` (its type fix does refuse), `jit archive
 --execute` on a terminal target, and `jit recover`, which replays what already
 committed.
 
+Enforcement happens when a mutation is written; no git hook checks leases, so a
+hand edit of an issue record is not caught at commit.
+
 #### `write_policy`
 
 | Value | Description |
