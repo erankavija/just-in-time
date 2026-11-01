@@ -717,6 +717,35 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
+/// Write a script a test then runs. See [`seal_executable`].
+#[cfg(unix)]
+pub fn write_executable(path: &Path, contents: &str) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::write(path, contents)?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
+    seal_executable(path)
+}
+
+/// Make the executable at `path` safe to run while other threads fork.
+///
+/// A child forked while this process holds a file open for writing keeps a copy
+/// of that descriptor until it execs, and exec of the file fails with
+/// `ETXTBSY` meanwhile. So the bytes move to an inode only a child process ever
+/// wrote, whoever wrote the original.
+#[cfg(unix)]
+pub fn seal_executable(path: &Path) -> Result<()> {
+    let mut sealed = path.as_os_str().to_owned();
+    sealed.push(".sealed");
+    let copied = std::process::Command::new("cp")
+        .arg("-p")
+        .arg(path)
+        .arg(&sealed)
+        .status()?;
+    anyhow::ensure!(copied.success(), "cp {} failed: {copied}", path.display());
+    fs::rename(&sealed, path)?;
+    Ok(())
+}
+
 /// Deep-copies the ordinary files and directories under `source` into the
 /// existing `destination`, preserving modes; any other entry is refused.
 pub fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
@@ -1433,6 +1462,36 @@ pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn test_write_executable_runs_while_other_threads_fork() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let forking = AtomicBool::new(true);
+        let dir = TempDir::new().unwrap();
+        std::thread::scope(|scope| {
+            (0..8).for_each(|_| {
+                scope.spawn(|| {
+                    while forking.load(Ordering::Relaxed) {
+                        std::process::Command::new("true").status().unwrap();
+                    }
+                });
+            });
+            let outcomes = (0..200)
+                .map(|index| {
+                    let script = dir.path().join(format!("script-{index}"));
+                    write_executable(&script, "#!/bin/sh\nexit 0\n").unwrap();
+                    std::process::Command::new(&script).status()
+                })
+                .collect::<Vec<_>>();
+            forking.store(false, Ordering::Relaxed);
+            assert!(
+                outcomes.iter().all(|outcome| outcome.is_ok()),
+                "a script failed to start: {outcomes:?}"
+            );
+        });
+    }
+
     use super::*;
     use crate::repository_state::{BOOTSTRAP_LOCK_FILE, RECORD_SCRATCH_DIR};
     use crate::storage::IssueStore;

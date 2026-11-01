@@ -91,8 +91,6 @@ impl GitStandIn {
     }
 
     fn resolving_on(search_path: &std::ffi::OsStr) -> Self {
-        use std::os::unix::fs::PermissionsExt;
-
         let stand_in = Self {
             dir: tempfile::TempDir::new().unwrap(),
             real_git: resolve_real_git(search_path),
@@ -115,9 +113,7 @@ exec {git} "$@"
             records = shell_quote(&stand_in.records_dir()),
             git = shell_quote(&stand_in.real_git),
         );
-        let program = stand_in.program();
-        std::fs::write(&program, script).unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_utils::write_executable(&stand_in.program(), &script).unwrap();
         stand_in
     }
 

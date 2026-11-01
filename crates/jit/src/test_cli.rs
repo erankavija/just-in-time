@@ -377,12 +377,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_git_command_ignores_global_configuration_under_inherited_home() {
-        use std::os::unix::fs::PermissionsExt;
-
         let home = TempDir::new().unwrap();
-        let hook = home.path().join("pre-commit");
-        std::fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
-        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_utils::write_executable(&home.path().join("pre-commit"), "#!/bin/sh\nexit 1\n")
+            .unwrap();
         std::fs::write(
             home.path().join(".gitconfig"),
             format!("[core]\n\thooksPath = {}\n", home.path().display()),

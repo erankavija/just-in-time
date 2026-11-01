@@ -3,8 +3,6 @@
 use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::process::Output;
 use std::str::FromStr;
 use tempfile::TempDir;
@@ -43,9 +41,8 @@ fn test_search_json_backend_failure_reports_search_failed() {
     let repo = JitCli::initialised().unwrap();
     let tools = TempDir::new().expect("fake tool directory should be created");
     let ripgrep = tools.path().join("rg");
-    fs::write(&ripgrep, "#!/bin/sh\nexit 2\n").expect("fake ripgrep should be written");
-    fs::set_permissions(&ripgrep, fs::Permissions::from_mode(0o755))
-        .expect("fake ripgrep should be executable");
+    jit::test_utils::write_executable(&ripgrep, "#!/bin/sh\nexit 2\n")
+        .expect("fake ripgrep should be written");
 
     let output = repo
         .command_with_env(
