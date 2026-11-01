@@ -247,6 +247,86 @@ EOF
   check "build lock: child exit releases the lock" flock -n "$fixture/build.lock" true
 }
 
+# A wrapper that cannot run is the environment, whichever source selects it and
+# whichever entry point reaches it. Cargo here is real, because the probe compiles
+# through it. The sccache stand-in answers version queries and stdin input and
+# fails every compile, as a daemon with a deleted TMPDIR does.
+test_unrunnable_compiler_wrapper() {
+  local fixture="$scratch/wrapper" out="$scratch/wrapper/gate.out" rc
+  local broken="$fixture/bin/sccache" missing="$fixture/missing-wrapper"
+  local passthrough="$fixture/passthrough-wrapper"
+  mkdir -p "$fixture/bin" "$fixture/cwd" "$fixture/configured/.cargo"
+  cat >"$broken" <<'EOF'
+#!/usr/bin/env bash
+case " $* " in
+  *" -vV "* | *" - "*) exec "$@" ;;
+esac
+echo "sccache: error: Failed to create temp dir" >&2
+exit 254
+EOF
+  cat >"$passthrough" <<'EOF'
+#!/usr/bin/env bash
+exec "$@"
+EOF
+  chmod +x "$broken" "$passthrough"
+  printf '[build]\nrustc-wrapper = "%s"\n' "$missing" >"$fixture/configured/.cargo/config.toml"
+
+  gate_from() { # gate_from <cwd> <gate-args> [VAR=value ...]; sets rc
+    local cwd="$1" args="$2"
+    shift 2
+    # shellcheck disable=SC2086 # <gate-args> is a word list
+    (cd "$cwd" && env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 "$@" "$gate" $args) >"$out" 2>&1
+    rc=$?
+  }
+  focused_gate_from() { # focused_gate_from <cwd> [VAR=value ...]; sets rc
+    local cwd="$1"
+    shift
+    gate_from "$cwd" "--cargo --version" CARGO_CI_NO_SCCACHE=1 "$@"
+  }
+  no_cargo_command_ran() { ! grep -q '^cargo [0-9]' "$out"; }
+
+  echo
+  echo "== compiler wrapper: one that cannot run is an environment fault =="
+  gate_from "$fixture/cwd" ""
+  check "selected sccache fails compiles: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "selected sccache fails compiles: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper 'sccache'" "$out"
+  check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
+    grep -qF "Failed to create temp dir" "$out"
+  check "selected sccache fails compiles: no verdict on repository content" \
+    test "$(grep -c 'repository content' "$out")" -eq 0
+  check "selected sccache fails compiles: no gate step runs" \
+    test "$(grep -cE '^  [✓✗] ' "$out")" -eq 0
+
+  focused_gate_from "$fixture/cwd" RUSTC_WRAPPER="$missing"
+  check "RUSTC_WRAPPER is missing: focused Cargo mode exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "RUSTC_WRAPPER is missing: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$missing'" "$out"
+  check "RUSTC_WRAPPER is missing: the Cargo command never runs" no_cargo_command_ran
+
+  focused_gate_from "$fixture/cwd" RUSTC_WORKSPACE_WRAPPER="$broken"
+  check "RUSTC_WORKSPACE_WRAPPER fails compiles: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "RUSTC_WORKSPACE_WRAPPER fails compiles: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$broken'" "$out"
+
+  focused_gate_from "$fixture/configured"
+  check "build.rustc-wrapper is missing: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "build.rustc-wrapper is missing: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$missing'" "$out"
+
+  focused_gate_from "$fixture/cwd" RUSTC_WRAPPER="$passthrough" RUSTC_WORKSPACE_WRAPPER="$passthrough"
+  check "healthy wrappers: the Cargo command runs" \
+    test "$rc" -eq 0 -a "$(grep -c '^cargo [0-9]' "$out")" -eq 1
+
+  focused_gate_from "$fixture/cwd" RUSTFLAGS=--selftest-invalid-flag
+  check "a probe failure that outlives removing the wrappers is left to the steps" \
+    test "$rc" -eq 0 -a "$(grep -c 'infrastructure fault' "$out")" -eq 0
+}
+
 # Each script that takes the build lock bounds and announces its wait, and
 # no Cargo build starts without the lock. Every run happens in a repository this
 # test owns with every output overridden, because the benchmarks create directories
@@ -870,20 +950,30 @@ test_classifier_exit_paths() {
   expect_classification "unknown load" 1 "" "$TIMEOUT_LINE" "" test
 }
 
+# Without errexit a test that cannot run, such as a missing function, would only
+# print to stderr. Each test ends with a status-0 assertion, so nonzero means it did
+# not complete.
+run_test() { # run_test <function> [args...]
+  "$@" || {
+    echo "FAIL: $1 did not complete (status $?)"
+    fail=1
+  }
+}
+
 echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
-test_wrong_nextest_version_fails_fast
-test_classifier_exit_paths
-test_build_lock_status_propagation
-test_script_build_lock_wait
-test_unrunnable_compiler_wrapper
+run_test test_wrong_nextest_version_fails_fast
+run_test test_classifier_exit_paths
+run_test test_build_lock_status_propagation
+run_test test_script_build_lock_wait
+run_test test_unrunnable_compiler_wrapper
 
-run_scenario healthy "healthy_mainline" "healthy_worker" pass
-run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
-run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
-run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
-test_ignored_test_is_rejected
-test_ignored_doctest_is_rejected
+run_test run_scenario healthy "healthy_mainline" "healthy_worker" pass
+run_test run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
+run_test run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
+run_test run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
+run_test test_ignored_test_is_rejected
+run_test test_ignored_doctest_is_rejected
 
 echo
 if [ "$fail" -eq 0 ]; then
