@@ -449,13 +449,6 @@ pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
 pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
     use crate::repository_state::RepositoryStateError;
 
-    if error
-        .downcast_ref::<crate::errors::NotFoundError>()
-        .is_some()
-    {
-        return Ok(command_json_error(error, ErrorCode::ProfileNotFound)
-            .with_suggestion("Select a package with --profile DIR"));
-    }
     if let Some(crate::commands::ProfileApplyError::UncommittedTargets { paths }) =
         error.downcast_ref::<crate::commands::ProfileApplyError>()
     {
@@ -1122,14 +1115,6 @@ mod repository_state_classifier_tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn test_profile_json_error_maps_not_found_before_variant_match() {
-        let error = anyhow::Error::new(crate::errors::NotFoundError::new("no such profile"));
-        let json = profile_json_error(&error).expect("a not-found error renders a JSON error");
-        assert_eq!(json.error.code, crate::output::ErrorCode::ProfileNotFound);
-        assert_eq!(json.exit_code().code(), 3);
     }
 }
 

@@ -202,7 +202,10 @@ impl ProfilePackage {
 #[derive(Debug, thiserror::Error)]
 pub enum ProfilePackageError {
     /// The package directory is absent or cannot be read.
-    #[error("cannot read profile package directory '{path}': {source}")]
+    #[error(
+        "cannot read profile package directory '{path}': {source}; \
+         a package is a directory holding {MANIFEST_FILE_NAME}"
+    )]
     UnreadableDirectory {
         /// Path whose read failed.
         path: String,

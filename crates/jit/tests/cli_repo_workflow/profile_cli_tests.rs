@@ -324,6 +324,26 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 }
 
 #[test]
+fn test_profile_commands_report_an_absent_package_directory_as_one_error_naming_the_path() {
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+
+    for command in ["show", "diff", "apply"] {
+        let output = jit(
+            &repo,
+            &["profile", command, "--profile", "vendor/absent", "--json"],
+        );
+
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let error = &json(&output)["error"];
+        assert_eq!(error["code"], "PROFILE_ERROR");
+        let message = error["message"].as_str().unwrap();
+        assert!(message.contains("vendor/absent"), "{message}");
+        assert!(message.contains("manifest.toml"), "{message}");
+    }
+}
+
+#[test]
 fn test_profile_show_prints_target_paths_without_hash_values() {
     let repo = JitCli::uninitialised().unwrap();
     assert!(jit(&repo, &["init"]).status.success());
