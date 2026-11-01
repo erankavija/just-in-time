@@ -8,6 +8,7 @@
   ],
   "description": "Profile conflict and target-subject types serialize through derived implementations, and profile conflict error details publish a derived schema; the hand-written wire mirrors are removed.\n\n## Background\n\nIn `crates/jit/src/repository_state/profile_apply.rs` (line numbers at the investigation baseline):\n\n- `ProfileTargetConflictWire` (810) and the hand-written `Serialize` for `ProfileTargetConflict` (827) exist to inject a computed `remedy` field, which no longer exists.\n- `ProfileTargetSubjectWire` (911) and the hand-written `Serialize` for `ProfileTargetSubject` (916) exist to render a virtual path through `repository_relative()`; a field-level serializer or a path newtype derives the same output.\n- `ProfileTargetConflictsError` (969) and `ProfileTargetConflictEntry` (936) derive `Serialize` but not `JsonSchema`, and reach JSON as error details (`crates/jit/src/main.rs:1290`) with no published schema.\n\n## Success Criteria\n\n- [hard] REQ-01: No hand-written `Serialize` or `JsonSchema` implementation, and no wire mirror type, remains for profile conflict or target-subject types.\n- [hard] REQ-02: Profile conflict error details have a published schema derived from their type.\n- [hard] REQ-03: A target subject serializes as its repository-relative path.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:47:41.403157913Z",
   "first_ready_at": "2026-11-01T18:27:10.701020661Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-12"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive profile conflict serialization",
-  "updated_at": "2026-11-01T18:46:09.614562644Z"
+  "updated_at": "2026-11-01T18:47:41.403157913Z"
 }

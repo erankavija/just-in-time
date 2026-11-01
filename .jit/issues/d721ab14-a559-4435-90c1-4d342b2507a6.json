@@ -8,6 +8,8 @@
   ],
   "description": "One conflict-origin type names the parties of a profile conflict, and it holds package identities only, because after charter decision D-8 the repository is never a conflict party.\n\n## Background\n\n`ContributionConflictOwner` (`crates/jit/src/repository_state/profile_apply.rs:241`) and `ProfileConflictOccupant` (`:586`) are one enum, `{Repository, Package(id)}`, with two wire spellings: one derives `Serialize` with default PascalCase tags and no schema, the other uses kebab-case with a schema (line numbers at the investigation baseline). Composition now conflicts only between packages being applied, so the repository variant has no producer.\n\n## Success Criteria\n\n- [hard] REQ-01: One type names a conflict's parties, and it holds package identities only.\n- [hard] REQ-02: The repository variant and the second enum are gone.\n- [hard] REQ-03: Conflict output and its derived schema spell parties one way.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:48:05.849132424Z",
+  "first_ready_at": "2026-11-01T18:47:41.526015789Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -37,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Name profile conflict parties by package only",
-  "updated_at": "2026-11-01T18:46:44.683501863Z"
+  "updated_at": "2026-11-01T18:48:05.849132424Z"
 }
