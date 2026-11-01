@@ -77,9 +77,9 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "d2903e14-ae2c-4c5c-8fad-c442a3f7c31c",
-      "status": "failed",
-      "updated_at": "2026-11-01T20:21:40.720606350Z",
+      "run_id": "8cd298f0-23ef-4159-9734-aa1576377b12",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:33:21.587483802Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -100,5 +100,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-11-01T20:29:55.539190215Z"
+  "updated_at": "2026-11-01T20:33:21.587483802Z"
 }
