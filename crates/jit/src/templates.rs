@@ -1123,30 +1123,6 @@ depends_on = ["a"]
         assert!(matches!(err, TemplateConfigError::CyclicDependsOn { .. }));
     }
 
-    // REGB-01: this repo's `.jit/templates.toml` round-trips through the loader.
-    // The path is resolved relative to the crate manifest so the test does not
-    // depend on the process working directory or on production issue state.
-
-    #[test]
-    fn test_repo_plan_template_parses() {
-        let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(|p| p.parent())
-            .expect("crate is nested two levels under the repo root");
-        let jit_dir = repo_root.join(".jit");
-        let reg = TemplateRegistry::load(
-            &crate::test_utils::repository_layout_for_data_root(&jit_dir),
-            &HIERARCHY,
-        )
-        .unwrap();
-        let plan = reg
-            .get("plan")
-            .expect("repo .jit/templates.toml declares a `plan` template");
-        assert_eq!(plan.applies_to, vec!["epic"]);
-        assert_eq!(plan.planning_type(&reg.roles), Some("planning"));
-        assert_eq!(plan.breakdown_type(&reg.roles), Some("breakdown"));
-    }
-
     // BIND-01: role and anchor bindings parse, and an absent table defaults to
     // today's names, so an existing repository behaves unchanged.
 

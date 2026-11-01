@@ -381,17 +381,44 @@ mode = "manual"
         assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
     }
 
-    /// The repository's authored registry re-serializes to a fixed point holding
-    /// the same declarations, and the stage and mode tokens it carries are the
+    /// An authored registry re-serializes to a fixed point holding the same
+    /// declarations, and the stage and mode tokens it carries are the
     /// vocabulary's own. Authored comments and ordering are not preserved.
     #[test]
-    fn test_gate_registry_serialization_of_repository_gates_is_stable() {
-        let authored = std::fs::read(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../.jit/gates.toml"
-        ))
-        .expect("the repository gates.toml is readable");
-        let registry = parse_gate_registry(&authored).expect("the repository gates parse");
+    fn test_serialize_gate_registry_reaches_a_fixed_point_over_authored_declarations() {
+        let authored = br#"
+# An authored comment the rewrite drops.
+[[gates]]
+version = 1
+key = "workspace"
+title = "Workspace"
+description = "Runs a command over declared inputs."
+stage = "postcheck"
+mode = "auto"
+priority = 50
+
+[gates.checker]
+type = "exec"
+command = "./ci.sh"
+timeout_seconds = 60
+pass_context = true
+prompt_file = "./prompt.md"
+
+[gates.checker.env]
+REVIEWER = "agent"
+
+[gates.inputs]
+roots = ["crates"]
+exclude = ["crates/target/**"]
+
+[[gates]]
+key = "attested"
+title = "Attested"
+description = ""
+stage = "precheck"
+mode = "manual"
+"#;
+        let registry = parse_gate_registry(authored).unwrap();
         let bytes = serialize_gate_registry(&registry).unwrap();
         let text = String::from_utf8(bytes.clone()).unwrap();
 

@@ -59,8 +59,8 @@ pub use materialize::{
     assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
     ValidationCaptureClosure,
 };
-pub(crate) use mutation::captured_gate_run_ids;
 pub(crate) use mutation::MutationContextFactory;
+pub(crate) use mutation::{canonical_json, captured_gate_run_ids};
 pub use mutation::{
     finalize, fresh_index_bytes, prefix_has_torn_tail, serialize_event, serialize_gate_run,
     serialize_issue, IdAuthority, MutationClock, MutationContext, MutationContextAnnotation,

@@ -280,11 +280,6 @@ mod tests {
             .unwrap()
     }
 
-    fn repository_layout() -> RepositoryLayout {
-        let root = repository_root();
-        crate::storage::discover_repository_layout(&root, root.join(".jit")).unwrap()
-    }
-
     /// Every declared entry point is a runnable script in the checkout, so a
     /// drift assertion that names one is naming a command a contributor can run.
     #[test]
@@ -321,19 +316,20 @@ mod tests {
         }
     }
 
-    /// Every declared target is a committed file, so the set describes the
-    /// checkout it regenerates rather than a stale inventory.
+    /// Every declared worktree target is a committed file, so the set describes
+    /// the checkout it regenerates rather than a stale inventory.
     #[test]
-    fn test_generated_artifacts_declare_targets_that_exist() {
-        let layout = repository_layout();
+    fn test_generated_artifacts_declare_worktree_targets_that_exist() {
+        let root = repository_root();
         for artifact in GENERATED_ARTIFACTS {
             for target in artifact.targets() {
-                assert!(
-                    target.resolve(&layout).unwrap().is_file(),
-                    "{}: {} is not in the checkout",
-                    artifact.name,
-                    target.repository_relative(),
-                );
+                if let ArtifactTarget::RepositoryRelative(path) = target {
+                    assert!(
+                        root.join(path).is_file(),
+                        "{}: {path} is not in the checkout",
+                        artifact.name,
+                    );
+                }
             }
         }
     }

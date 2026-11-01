@@ -1210,8 +1210,8 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
     let repo = JitCli::uninitialised().unwrap();
     fs::create_dir_all(repo.root().join(".jit")).unwrap();
-    let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
-    fs::write(repo.root().join(".jit/index.json"), index).unwrap();
+    let index = jit::repository_state::fresh_index_bytes().unwrap();
+    fs::write(repo.root().join(".jit/index.json"), &index).unwrap();
 
     let output = jit(
         &repo,
@@ -1529,39 +1529,34 @@ fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
 }
 
 /// Every shipped package is self-contained at the archive boundary, including
-/// packages whose live consumers are drawn from this checkout while packing.
+/// its live consumers, which a pack draws from the repository holding them.
 #[test]
-fn test_profile_pack_packs_every_shipped_package_from_the_checkout() {
-    let exchange = TempDir::new().unwrap();
-    let cli = JitCli::uninitialised().unwrap();
-    let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-
+fn test_profile_pack_packs_every_shipped_package_from_a_repository_holding_it() {
     for id in jit::test_utils::published_package_ids() {
-        let output = exchange.path().join(format!("{id}.tar"));
-        let output = output.to_str().unwrap();
-        let packed = cli
-            .command([
+        let exchange = TempDir::new().unwrap();
+        let repo = JitCli::uninitialised().unwrap();
+        let package = crate::repository_package_at(repo.root(), &id);
+        let initialized = jit(&repo, &["init", "--profile", &package, "--json"]);
+        assert!(initialized.status.success(), "{initialized:?}");
+        let archive = exchange.path().join(format!("{id}.tar"));
+
+        let packed = jit(
+            &repo,
+            &[
                 "profile",
                 "pack",
                 "--source",
-                &format!("profiles/{id}"),
+                &package,
                 "--output",
-                output,
+                archive.to_str().unwrap(),
                 "--json",
-            ])
-            .current_dir(&checkout)
-            .output()
-            .expect("failed to run jit");
-        assert!(
-            packed.status.success(),
-            "packing shipped package {id} failed\nstdout={}\nstderr={}",
-            String::from_utf8_lossy(&packed.stdout),
-            String::from_utf8_lossy(&packed.stderr)
+            ],
         );
-        assert!(output_path_exists(output), "packing {id} wrote no archive");
+
+        assert!(packed.status.success(), "packing {id} failed: {packed:?}");
+        let tree = jit::profile::read_package_archive(&fs::read(&archive).unwrap())
+            .expect("the shipped archive reads back");
         if id == "jit-dogfood" {
-            let tree = jit::profile::read_package_archive(&fs::read(output).unwrap())
-                .expect("the shipped dogfood archive reads back");
             assert!(
                 tree.files()
                     .contains_key("assets/live/.agents/skills/jit-breakdown/SKILL.md"),
@@ -1569,10 +1564,6 @@ fn test_profile_pack_packs_every_shipped_package_from_the_checkout() {
             );
         }
     }
-}
-
-fn output_path_exists(path: &str) -> bool {
-    Path::new(path).is_file()
 }
 
 /// One package reaches another repository through the archive alone: the
