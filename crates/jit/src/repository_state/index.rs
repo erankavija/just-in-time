@@ -5,14 +5,15 @@ use crate::domain::identity::IssueId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-/// On-disk repository-format version understood by this binary.
+/// The one on-disk repository-format version this binary accepts.
 pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 3;
 
 /// Typed representation of `.jit/index.json`.
 ///
 /// Membership is the issue files; `deleted_ids` lets a store's delete hide a lower
-/// source's file. A format 2 index's `all_ids` is ignored and dropped at its next write.
+/// source's file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RepositoryIndex {
     pub(crate) schema_version: u32,
     #[serde(default)]
@@ -34,9 +35,9 @@ pub enum RepositoryIndexError {
     /// The index is not valid JSON or does not match the index schema.
     #[error("failed to parse index: {0}")]
     Parse(#[from] serde_json::Error),
-    /// The index was written by a repository format newer than this binary.
+    /// The index is in a repository format other than the one this binary accepts.
     #[error(
-        "repository format version {found} is newer than this binary supports (max {supported})"
+        "repository format version {found} is not the version this binary supports ({supported})"
     )]
     UnsupportedVersion { found: u32, supported: u32 },
     /// The deleted membership contains the same issue more than once.
@@ -53,18 +54,17 @@ pub enum RepositoryIndexError {
 impl RepositoryIndex {
     /// Decode and structurally validate one captured index without ambient reads.
     pub(crate) fn parse(bytes: &[u8]) -> Result<Self, RepositoryIndexError> {
-        let index: Self = serde_json::from_slice(bytes)?;
-        index.validate()
+        #[derive(Deserialize)]
+        struct Marker {
+            schema_version: u32,
+        }
+        check_format(serde_json::from_slice::<Marker>(bytes)?.schema_version)?;
+        serde_json::from_slice::<Self>(bytes)?.validate()
     }
 
     /// Validate version and tombstone-set invariants.
     pub(crate) fn validate(self) -> Result<Self, RepositoryIndexError> {
-        if self.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
-            return Err(RepositoryIndexError::UnsupportedVersion {
-                found: self.schema_version,
-                supported: SUPPORTED_INDEX_SCHEMA_VERSION,
-            });
-        }
+        check_format(self.schema_version)?;
         let mut deleted = HashSet::new();
         match self.deleted_ids.iter().find(|id| !deleted.insert(*id)) {
             Some(id) => Err(RepositoryIndexError::DuplicateDeleted(id.clone())),
@@ -92,6 +92,16 @@ impl RepositoryIndex {
             self.deleted_ids.sort();
         }
     }
+}
+
+fn check_format(found: u32) -> Result<(), RepositoryIndexError> {
+    if found == SUPPORTED_INDEX_SCHEMA_VERSION {
+        return Ok(());
+    }
+    Err(RepositoryIndexError::UnsupportedVersion {
+        found,
+        supported: SUPPORTED_INDEX_SCHEMA_VERSION,
+    })
 }
 
 /// The issue ids `names` of `.jit/issues` entries state, ascending as given.
@@ -154,16 +164,34 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_ignores_a_format_2_all_ids_and_keeps_its_marker() {
-        let index = RepositoryIndex::parse(
-            br#"{"schema_version": 2, "all_ids": ["stale"], "deleted_ids": []}"#,
-        )
-        .unwrap();
-        assert_eq!(index.schema_version, 2);
+    fn test_parse_refuses_every_format_but_the_supported_one() {
+        for found in [
+            SUPPORTED_INDEX_SCHEMA_VERSION - 1,
+            SUPPORTED_INDEX_SCHEMA_VERSION + 1,
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!({
+                "schema_version": found,
+                "all_ids": [],
+            }))
+            .unwrap();
+            assert!(matches!(
+                RepositoryIndex::parse(&bytes),
+                Err(RepositoryIndexError::UnsupportedVersion { found: refused, .. }) if refused == found
+            ));
+        }
+    }
 
-        let rewritten: serde_json::Value =
-            serde_json::from_slice(&index.to_pretty_bytes().unwrap()).unwrap();
-        assert!(rewritten.get("all_ids").is_none());
-        assert_eq!(rewritten["schema_version"], 2);
+    #[test]
+    fn test_parse_rejects_all_ids_in_the_supported_format() {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
+            "all_ids": [],
+            "deleted_ids": [],
+        }))
+        .unwrap();
+        assert!(RepositoryIndex::parse(&bytes)
+            .unwrap_err()
+            .to_string()
+            .contains("all_ids"));
     }
 }

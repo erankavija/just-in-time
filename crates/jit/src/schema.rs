@@ -940,7 +940,7 @@ impl CommandSchema {
             row(
                 "*",
                 10,
-                "The repository's on-disk format is newer than this binary, or a \
+                "The repository's on-disk format is not the one this binary accepts, or a \
                  filesystem/subprocess I/O operation failed.",
                 false,
             ),

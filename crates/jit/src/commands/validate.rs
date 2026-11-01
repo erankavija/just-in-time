@@ -396,7 +396,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             }
             // Closure planning is best-effort: a malformed registry cannot fail
             // the capture, because validation itself is the authority that
-            // reports it. A bad config/index/rules yields a conservative closure
+            // reports it. A bad config/listing/rules yields a conservative closure
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent `validate_repository` pass surfaces the parse
             // error as a finding.
@@ -886,19 +886,19 @@ pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget
 pub(crate) struct MutationBase {
     /// Registries, issues, and the plan documents transition rules read.
     pub(crate) image: crate::repository_state::RepositoryImage,
-    /// Every indexed issue in `image`, sorted by id.
+    /// Every issue the listing in `image` states, sorted by id.
     pub(crate) issues: Vec<Issue>,
 }
 
 /// The lease inputs and target issue a mutation reads before taking the claims
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
-    /// Configuration, index, and candidate issues, or the full mutation base
+    /// Configuration and candidate issue, or the full mutation base
     /// when `issues` is present.
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// The issue the request names.
     pub(crate) target: Issue,
-    /// Every indexed issue, when the preflight grew to the full base.
+    /// Every listed issue, when the preflight grew to the full base.
     pub(crate) issues: Option<Vec<Issue>>,
 }
 
@@ -1016,7 +1016,7 @@ pub(crate) fn plan_content_from_image(
 
     // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
     // missing or malformed config (parsed in `plan_content_with_issues`),
-    // index, or issue set yields an empty projection (no
+    // listing, or issue set yields an empty projection (no
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
@@ -3531,7 +3531,7 @@ depends_on = ["planning"]
             .expect("every reference resolves within its own budget");
     }
 
-    /// Preflight reads only the lease configuration, index, and resolved issue.
+    /// Preflight reads only the lease configuration and resolved issue.
     #[test]
     fn test_capture_mutation_preflight_reads_lease_inputs_and_target_only() {
         use crate::commands::test_helpers::{seed_issue, setup};

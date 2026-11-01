@@ -318,7 +318,7 @@ fn init_response_paths(
     Ok((created, modified))
 }
 
-/// Preserve the startup-facing too-new-format error while deriving it from the
+/// Preserve the startup-facing unsupported-format error while deriving it from the
 /// same closed proposed image that init validates. Other structural failures keep
 /// their original validation context.
 fn init_validation_error(
@@ -337,7 +337,7 @@ fn init_validation_error(
             })
     });
     unsupported.map_or(error, |(found, supported)| {
-        crate::storage::RepositoryFormatTooNewError::new(found, supported).into()
+        crate::storage::RepositoryFormatUnsupportedError::new(found, supported).into()
     })
 }
 

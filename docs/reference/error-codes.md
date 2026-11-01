@@ -27,7 +27,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `AMBIGUOUS_ID` | The ID prefix matches more than one candidate. | `2` |
 | `INVALID_ID_PREFIX` | The ID prefix is shorter than the accepted minimum. | `2` |
 | `REPOSITORY_NOT_FOUND` | No JIT repository exists at the resolved path. | `3` |
-| `REPOSITORY_FORMAT_TOO_NEW` | The repository format is newer than this binary supports. | `10` |
+| `REPOSITORY_FORMAT_UNSUPPORTED` | The repository format is not the one this binary supports. | `10` |
 | `DELETION_NOT_CONFIRMED` | Issue deletion lacks the required operator confirmation. | `2` |
 | `LINKED_CHECKOUT_WRITE_REFUSED` | The linked checkout's write stance refuses state-mutating commands. | `2` |
 | `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |

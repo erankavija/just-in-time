@@ -7,17 +7,10 @@ use crate::domain::identity::GateRunId;
 use crate::domain::{GateRunResult, Issue};
 use crate::repository_state::{
     canonical_json, captured_gate_run_ids, captured_issue_ids, serialize_event, serialize_gate_run,
-    serialize_issue, RepositoryImage, RepositoryIndex, VirtualPath, SUPPORTED_INDEX_SCHEMA_VERSION,
+    serialize_issue, RepositoryImage, RepositoryIndex, VirtualPath,
 };
 use anyhow::Result;
 use serde_json::Value;
-
-/// Tags earlier versions wrote, which the log keeps and readers skip.
-const RETIRED_EVENT_TAGS: [&str; 3] = [
-    "document_archived",
-    "lifecycle_timestamps_backfilled",
-    "profile_applied",
-];
 
 /// One message per stored record that does not reproduce. What fails to parse
 /// or is absent from `image` is the records pass's finding.
@@ -70,11 +63,8 @@ pub(crate) fn record_drift(
 }
 
 fn index_drift(bytes: &[u8]) -> Result<Option<String>> {
-    let index = RepositoryIndex::parse(bytes)?;
-    // An older format is read as-is until its explicit rewrite.
-    let current = index.schema_version == SUPPORTED_INDEX_SCHEMA_VERSION;
-    let written = index.to_pretty_bytes()?;
-    Ok((current && written != bytes).then(|| "stored bytes are not canonical".to_string()))
+    let written = RepositoryIndex::parse(bytes)?.to_pretty_bytes()?;
+    Ok((written != bytes).then(|| "stored bytes are not canonical".to_string()))
 }
 
 /// Canonical rather than byte-exact: key order is not part of an issue record.
@@ -122,15 +112,10 @@ fn event_log_drift(bytes: &[u8]) -> Vec<String> {
         return Vec::new();
     };
     log.lines()
-        .filter_map(|line| match parse_known_events(line).ok()?.first() {
-            Some(event) => (serialize_event(event).ok()?.as_slice() != line.as_bytes())
-                .then(|| format!("line does not reproduce: {line}")),
-            None if line.trim().is_empty() => None,
-            None => {
-                let value: Value = serde_json::from_str(line).ok()?;
-                let tag = value["type"].as_str()?;
-                (!RETIRED_EVENT_TAGS.contains(&tag)).then(|| format!("unknown event tag '{tag}'"))
-            }
+        .filter_map(|line| {
+            let event = parse_known_events(line).ok()?.into_iter().next()?;
+            (serialize_event(&event).ok()?.as_slice() != line.as_bytes())
+                .then(|| format!("line does not reproduce: {line}"))
         })
         .collect()
 }
@@ -225,35 +210,24 @@ mod tests {
     }
 
     #[test]
-    fn test_event_log_drift_is_empty_over_every_cataloged_tag_and_retired_tags() {
+    fn test_event_log_drift_is_empty_over_every_cataloged_tag() {
         let log = EventTag::ALL
             .iter()
             .map(|tag| event_line(*tag))
-            .chain(
-                RETIRED_EVENT_TAGS
-                    .iter()
-                    .map(|tag| format!("{{\"type\":\"{tag}\"}}")),
-            )
             .collect::<Vec<_>>()
             .join("\n");
         assert_eq!(event_log_drift(log.as_bytes()), Vec::<String>::new());
     }
 
     #[test]
-    fn test_event_log_drift_is_empty_over_a_profile_applied_line() {
-        let line = r#"{"id":"39dc3e16-4985-440d-a1f3-ca63416ec1cd","profile_id":"jit-default","timestamp":"2026-08-05T12:01:27.128206959Z","type":"profile_applied"}"#;
-        assert_eq!(event_log_drift(line.as_bytes()), Vec::<String>::new());
-    }
-
-    #[test]
-    fn test_event_log_drift_reports_an_unknown_tag_and_a_line_that_does_not_reproduce() {
+    fn test_event_log_drift_reports_a_line_that_does_not_reproduce() {
         let line = event_line(EventTag::ALL[0]);
         let spaced = line.replacen(':', ": ", 1);
-        let log = format!("{line}\n{spaced}\n{{\"type\":\"never_written\"}}\n");
+        let log = format!("{line}\n{spaced}\n");
 
         let drift = event_log_drift(log.as_bytes());
 
-        assert_eq!(drift.len(), 2, "{drift:?}");
-        assert!(drift[0].contains(&spaced) && drift[1].contains("never_written"));
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(drift[0].contains(&spaced));
     }
 }
