@@ -1,10 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use crate::errors;
-use crate::storage::git::{Git, GitCheckout};
+use crate::storage::git::{Git, GitCheckout, ProbedCheckout};
 
 /// Paths for worktree-aware storage.
 ///
@@ -61,17 +59,7 @@ impl WorktreePaths {
         non_git_root: &Path,
         selected_data_root: Option<&Path>,
     ) -> Result<Self> {
-        // Tracked exception to `@/charter/D-21`: detection starts its own git
-        // processes until it moves onto `storage::git::Git::probe` (jit:07663984).
-        let is_repo = Command::new("git")
-            .arg("-C")
-            .arg(current)
-            .args(["rev-parse", "--is-inside-work-tree"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-
-        if !is_repo {
+        let Some(probed) = Git::default().probe(current)? else {
             let worktree_root = non_git_root.to_path_buf();
             let dot_git = worktree_root.join(".git");
             return Ok(Self {
@@ -83,50 +71,11 @@ impl WorktreePaths {
                 worktree_root,
                 shared_jit: dot_git.join("jit"),
             });
-        }
-
-        // Get git common dir (shared .git)
-        let common_dir_output = Command::new("git")
-            .arg("-C")
-            .arg(current)
-            .args(["rev-parse", "--git-common-dir"])
-            .output()
-            .context("Failed to execute git command")?;
-
-        if !common_dir_output.status.success() {
-            let stderr = String::from_utf8_lossy(&common_dir_output.stderr);
-            return Err(anyhow::anyhow!(
-                "{}",
-                errors::git_command_failed("git rev-parse --git-common-dir", &stderr)
-            ));
-        }
-
-        let common_dir_raw = PathBuf::from(String::from_utf8(common_dir_output.stdout)?.trim());
-
-        // Canonicalize common_dir to handle relative paths (e.g., ".git" in main worktree)
-        let common_dir = if common_dir_raw.is_absolute() {
-            common_dir_raw
-        } else {
-            current.join(common_dir_raw).canonicalize()?
         };
-
-        // Get worktree root
-        let worktree_root_output = Command::new("git")
-            .arg("-C")
-            .arg(current)
-            .args(["rev-parse", "--show-toplevel"])
-            .output()
-            .context("Failed to execute git command")?;
-
-        if !worktree_root_output.status.success() {
-            let stderr = String::from_utf8_lossy(&worktree_root_output.stderr);
-            return Err(anyhow::anyhow!(
-                "{}",
-                errors::git_command_failed("git rev-parse --show-toplevel", &stderr)
-            ));
-        }
-
-        let worktree_root = PathBuf::from(String::from_utf8(worktree_root_output.stdout)?.trim());
+        let ProbedCheckout {
+            common_dir,
+            worktree_root,
+        } = probed;
 
         let local_jit = selected_data_root
             .map(Path::to_path_buf)
@@ -274,6 +223,20 @@ mod tests {
 
         assert_eq!(paths.worktree_root, selected_root.path());
         assert_eq!(paths.local_jit, selected_root.path().join(".jit"));
+    }
+
+    #[test]
+    fn test_detect_for_data_root_inside_git_directory_is_outside_version_control() {
+        let dir = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(dir.path().join("repo"));
+        let git_dir = repository.root().join(".git");
+        let non_git_root = tempfile::tempdir().unwrap();
+
+        let paths = WorktreePaths::detect_for_data_root(&git_dir, non_git_root.path()).unwrap();
+
+        assert!(!paths.is_git_repository());
+        assert_eq!(paths.worktree_root, non_git_root.path());
+        assert_eq!(paths.local_jit, git_dir);
     }
 
     #[test]

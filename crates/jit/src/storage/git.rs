@@ -1,8 +1,6 @@
 //! The storage-owned module through which jit starts git (`@/charter/D-21`).
 //! Every process runs as `<program> -C <directory> …`, never in the process
-//! working directory. Layout detection in `worktree_paths.rs` is a tracked
-//! exception that starts its own processes until it adopts [`Git::probe`]
-//! (jit:07663984).
+//! working directory.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -127,8 +125,49 @@ pub struct GitCheckout {
 }
 
 impl GitCheckout {
-    pub(crate) fn new(git: Git, worktree_root: PathBuf) -> Self {
+    pub fn new(git: Git, worktree_root: PathBuf) -> Self {
         Self { git, worktree_root }
+    }
+
+    /// Repository-relative paths that differ from `HEAD`: modified, staged,
+    /// deleted, renamed (both names) or untracked, with ignored files
+    /// excluded. One git process.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails, or reports a path that
+    /// is not UTF-8.
+    pub fn dirty_paths(&self) -> Result<Vec<PathBuf>, GitError> {
+        let args = ["status", "--porcelain=v1", "-z", "--untracked-files=all"];
+        let output = self.git.run(&self.worktree_root, &args)?;
+        let unexpected = |output: String| GitError::UnexpectedOutput {
+            command: args.join(" "),
+            output,
+        };
+        if !output.status.success() {
+            return Err(unexpected(
+                String::from_utf8_lossy(&output.stderr).into_owned(),
+            ));
+        }
+        let stdout = std::str::from_utf8(&output.stdout)
+            .map_err(|_| unexpected(String::from_utf8_lossy(&output.stdout).into_owned()))?;
+        let mut fields = stdout.split('\0').filter(|field| !field.is_empty());
+        let mut paths = Vec::new();
+        while let Some(entry) = fields.next() {
+            let (status, path) = entry
+                .split_at_checked(3)
+                .ok_or_else(|| unexpected(entry.to_owned()))?;
+            paths.push(PathBuf::from(path));
+            if status
+                .bytes()
+                .take(2)
+                .any(|code| matches!(code, b'R' | b'C'))
+            {
+                let original = fields.next().ok_or_else(|| unexpected(entry.to_owned()))?;
+                paths.push(PathBuf::from(original));
+            }
+        }
+        Ok(paths)
     }
 }
 

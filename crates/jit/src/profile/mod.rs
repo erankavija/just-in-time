@@ -14,6 +14,8 @@ mod package;
 pub mod package_archive;
 pub mod package_capture;
 mod repository_package;
+#[cfg(test)]
+pub(crate) mod selection_probe;
 mod variables;
 mod wire;
 // Repository-local generator seam: the render of this repository's generated

@@ -35,6 +35,8 @@ pub fn build_profile_claims_from_resolved(
     package: &ResolvedProfileContent,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
+    #[cfg(test)]
+    super::selection_probe::record(super::selection_probe::SelectionStage::PackageComposition);
     validate_target_overlaps(package)?;
     let contribution_claims = build_resolved_contribution_claims(package);
     let assets = package
