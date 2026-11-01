@@ -216,7 +216,8 @@ jit archive container 2f84c930 --execute --json
 Both target forms use the same planner. Without `--execute`, they are read-only.
 A document target
 includes its recursively supported local bundle. A container target includes
-documents attached to the container and its resolved-hierarchy descendants;
+documents attached to the container and its resolved-hierarchy descendants,
+plus the files under their artifact directories, which they own by location;
 ordinary sequencing dependencies do not define membership.
 
 Human output reports the same target, policy status, eligibility, action counts,
