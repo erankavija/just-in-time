@@ -568,7 +568,7 @@
           "short_id": "0102769f",
           "title": "Issue record paths come from a VirtualPath constructor",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
