@@ -1,60 +1,14 @@
-use super::{
-    profile::validate_variable_inputs, with_mutation_session, CommandExecutor, SessionStep,
-};
+use super::{profile::ProfileSelection, with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
-use crate::profile::{
-    build_profile_claims_from_resolved, resolve_package, ProfileApplicationStatus,
-    ProfileApplyResult, ProfileComposedApplyResult, ProfilePackage, VariableInputs,
-};
+use crate::profile::{ProfileApplicationStatus, ProfileComposedApplyResult};
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
-    ProfileApplicationInput, RepositoryAction, VirtualPath,
+    RepositoryAction, VirtualPath,
 };
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
 use std::path::Path;
-
-/// Keep initialization's dependency work set unique while retaining one result
-/// for every selected root occurrence. A repeated root is an idempotent second
-/// observation of the same durable application, not a second publication.
-fn init_profile_results(
-    applied: &[ProfileApplyResult],
-    roots: &[ProfilePackage],
-) -> Result<ProfileComposedApplyResult> {
-    let root_ids = roots
-        .iter()
-        .map(|root| root.model().id.as_str())
-        .collect::<HashSet<_>>();
-    let applied_by_id = applied
-        .iter()
-        .map(|result| (result.id.as_str(), result))
-        .collect::<HashMap<_, _>>();
-    let mut results = applied
-        .iter()
-        .filter(|result| !root_ids.contains(result.id.as_str()))
-        .cloned()
-        .collect::<Vec<_>>();
-    let mut occurrences = HashMap::<&str, usize>::new();
-    for root in roots {
-        let id = root.model().id.as_str();
-        let Some(source) = applied_by_id.get(id) else {
-            anyhow::bail!("initialized root '{id}' has no applied result");
-        };
-        let occurrence = occurrences.entry(id).or_default();
-        let first = *occurrence == 0;
-        *occurrence += 1;
-        let mut result = (*source).clone();
-        if !first {
-            result.status = ProfileApplicationStatus::Unchanged;
-            result.targets.clear();
-            result.contributions.clear();
-        }
-        results.push(result);
-    }
-    Ok(ProfileComposedApplyResult::new(results))
-}
 
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
@@ -71,30 +25,6 @@ pub struct FreshInitResult {
 }
 
 impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
-    /// Atomically complete neutral initialization and apply the selected profiles.
-    ///
-    /// An absent data directory is published by the init publisher's
-    /// staged-root machinery; an existing partial repository fills only its missing
-    /// neutral scaffold state and the profile's changes in one delta.
-    pub fn initialize_profiled_repository(
-        &self,
-        repo_dir: &Path,
-        selectors: &[super::profile::ProfileSelector],
-    ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, selectors, &VariableInputs::default())
-    }
-
-    /// Initialize and apply profiles after loading command-bound variable
-    /// inputs.
-    pub fn initialize_profiled_repository_from_sources(
-        &self,
-        repo_dir: &Path,
-        selectors: &[super::profile::ProfileSelector],
-        options: &super::profile::ProfileVariableOptions,
-    ) -> Result<FreshInitResult> {
-        self.initialize_from_sources(repo_dir, selectors, options)
-    }
-
     /// Publish a fresh neutral or profiled repository through one mutation
     /// session.
     ///
@@ -102,74 +32,23 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// one held session guard, then published as one exact
     /// [`RepositoryDelta`](crate::repository_state::RepositoryDelta); nothing is
     /// mutated before publication.
+    ///
+    /// The selection was built before this runs, so an unresolvable selector,
+    /// dependency, or variable input fails before a repository is created.
+    /// The complete dependency-first closure and neutral scaffold publish in
+    /// one delta with one aggregate lifecycle event.
     pub fn initialize_fresh_repository(
         &self,
         repo_dir: &Path,
-        selectors: Option<&[super::profile::ProfileSelector]>,
+        selection: Option<&ProfileSelection>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(
-            repo_dir,
-            selectors.unwrap_or_default(),
-            &VariableInputs::default(),
-        )
-    }
-
-    /// Initialize a repository after loading command-bound variable inputs.
-    pub fn initialize_fresh_repository_from_sources(
-        &self,
-        repo_dir: &Path,
-        selectors: Option<&[super::profile::ProfileSelector]>,
-        options: &super::profile::ProfileVariableOptions,
-    ) -> Result<FreshInitResult> {
-        self.initialize_from_sources(repo_dir, selectors.unwrap_or_default(), options)
-    }
-
-    fn initialize_from_sources(
-        &self,
-        repo_dir: &Path,
-        selectors: &[super::profile::ProfileSelector],
-        options: &super::profile::ProfileVariableOptions,
-    ) -> Result<FreshInitResult> {
-        let selected = self.resolve_profile_selectors(selectors)?;
-        let packages = if selected.is_empty() {
-            Vec::new()
-        } else {
-            self.resolve_profile_graph(&selected)?.selected_packages()
-        };
-        let inputs = super::profile::load_profile_variable_inputs(
-            &packages,
-            options.values_file.as_deref(),
-            &options.assignments,
-        )?;
-        self.run_initialization(repo_dir, selectors, &inputs)
-    }
-
-    /// Capture the base under one mutation session, validate the proposed
-    /// scaffold/profile overlay, and publish the complete initialization delta.
-    ///
-    /// A selected profile is resolved into its complete dependency closure
-    /// before anything is published, so an unresolvable id, an unresolvable
-    /// dependency, or a dependency cycle fails before a repository is created.
-    /// The first package of that closure — the one nothing else in it depends
-    /// on — is published together with the scaffold, because a package needs a
-    /// repository to be applied to; the rest follow in closure order through
-    /// the ordinary application and one aggregate lifecycle event.
-    fn run_initialization(
-        &self,
-        repo_dir: &Path,
-        selectors: &[super::profile::ProfileSelector],
-        variable_inputs: &VariableInputs,
-    ) -> Result<FreshInitResult> {
-        let (roots, packages) = if selectors.is_empty() {
-            (Vec::new(), Vec::new())
-        } else {
-            let selected = self.resolve_profile_selectors(selectors)?;
-            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
-            (selected, packages)
-        };
-        validate_variable_inputs(&packages, variable_inputs)?;
-        let contribution_context =
-            self.profile_contribution_candidates(&packages, variable_inputs)?;
+        let members = selection.map(ProfileSelection::members).unwrap_or_default();
+        let contribution_context = selection
+            .map(ProfileSelection::contribution_context)
+            .unwrap_or_default();
+        let profiles = selection
+            .map(ProfileSelection::application_inputs)
+            .unwrap_or_default();
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
@@ -183,24 +62,17 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             |session| {
                 let (config, project_name, config_image) =
                     self.resolve_init_config(&mut *session, repo_dir)?;
-                let profiles = packages
-                    .iter()
-                    .map(|package| {
-                        self.profile_input_with_inputs(package, variable_inputs)
-                            .map(|input| input.with_contribution_context(&contribution_context))
-                    })
-                    .collect::<Result<Vec<_>>>()?;
                 let scaffold = InitializationScaffold::from_config(
                     config.clone(),
                     project_name.clone(),
                     None,
                 )?
                 .with_gitattributes(gitattributes.clone())
-                .with_profiles(profiles);
+                .with_profiles(profiles.clone());
 
                 let mut extra_paths = scaffold.delta_paths()?;
                 extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
-                    &contribution_context,
+                    contribution_context,
                 )?);
                 // Probe capture: the deliberately over-inclusive scaffold overlay yields
                 // a base good enough to finalize the exact delta. That delta's overlay
@@ -292,13 +164,14 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 let gitattributes = scaffold.gitattributes_status(&base)?;
                 let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
 
-                let profile = if packages.is_empty() {
+                let profile = if members.is_empty() {
                     None
                 } else {
                     Some(ProfileComposedApplyResult::new(
-                        packages
+                        members
                             .iter()
-                            .map(|package| {
+                            .map(|member| {
+                                let package = member.package();
                                 let changed = plan.applied_profiles().contains(&package.model().id);
                                 super::profile::applied_profile_result(
                                     &plan,
@@ -329,7 +202,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         result.profile = result
             .profile
             .take()
-            .map(|applied| init_profile_results(&applied.items, &roots))
+            .map(|applied| {
+                super::profile::selection_profile_results(
+                    applied.items,
+                    selection.map(ProfileSelection::roots).unwrap_or_default(),
+                )
+            })
             .transpose()?;
         Ok(result)
     }
@@ -380,52 +258,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             ),
         };
         Ok((config, project_name, image))
-    }
-
-    /// Capture the neutral proposed base and convert one resolved package into
-    /// complete neutral claims.
-    ///
-    /// The base is captured under the held session, overlaid with the neutral
-    /// scaffold state init will publish (schemas always; an existing
-    /// config/gates/rules preserved), so the profile merges over the proposed neutral
-    /// repository. Returns `Ok(None)` on a retryable capture conflict so the caller
-    /// re-attempts the whole initialization.
-    #[cfg(test)]
-    fn profile_input(&self, package: &ProfilePackage) -> Result<ProfileApplicationInput> {
-        self.profile_input_with_inputs(package, &VariableInputs::default())
-    }
-
-    fn profile_input_with_inputs(
-        &self,
-        package: &ProfilePackage,
-        variable_inputs: &VariableInputs,
-    ) -> Result<ProfileApplicationInput> {
-        let layout = self.require_layout()?;
-        let targets = package
-            .hashes()
-            .targets
-            .keys()
-            .map(|target| {
-                layout
-                    .classify_repository_relative(target)
-                    .map_err(Into::into)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        super::profile::reject_reserved_application_targets(targets.iter())?;
-        let metadata = package.model();
-        let resolved = resolve_package(
-            package,
-            &variable_inputs.for_declarations(&package.model().variables),
-        )?;
-        let claims = build_profile_claims_from_resolved(&resolved, &layout)?;
-        Ok(ProfileApplicationInput {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            variables: resolved.variables().clone(),
-            target_hashes: resolved.target_hashes()?,
-            contribution_context: claims.contributions.clone(),
-            claims,
-        })
     }
 }
 
@@ -587,6 +419,7 @@ fn git_events_pattern(relative: &Path) -> String {
 mod tests {
     use super::*;
     use crate::commands::ProfileSelector;
+    use crate::profile::ProfilePackage;
     use crate::repository_state::{Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
     use std::fs;
@@ -666,6 +499,19 @@ mod tests {
     use crate::test_utils::file_executor;
     use std::thread;
     use tempfile::TempDir;
+
+    impl CommandExecutor<JsonFileStorage> {
+        /// Initialize `repo_dir` the way `jit init --profile` does: the
+        /// selection is built before initialization opens its session.
+        fn initialize_selected(
+            &self,
+            repo_dir: &Path,
+            selectors: &[ProfileSelector],
+        ) -> Result<FreshInitResult> {
+            let selection = self.select_profiles(selectors, &Default::default())?;
+            self.initialize_fresh_repository(repo_dir, Some(&selection))
+        }
+    }
 
     #[test]
     fn test_fresh_init_publishes_complete_valid_repo_without_git() {
@@ -865,7 +711,7 @@ mod tests {
 
         let result = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
@@ -913,7 +759,7 @@ mod tests {
 
         let result = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(repo.path(), storage.root()).unwrap())
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
@@ -952,7 +798,7 @@ mod tests {
 
         let error = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
@@ -978,7 +824,7 @@ mod tests {
 
         let result = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[
                     ProfileSelector::path(&location),
@@ -1024,7 +870,7 @@ mod tests {
         let closure = executor.resolve_profile_closure(&workflow).unwrap();
 
         let result = executor
-            .initialize_fresh_repository(repo.path(), Some(&[ProfileSelector::path(&location)]))
+            .initialize_selected(repo.path(), &[ProfileSelector::path(&location)])
             .unwrap();
 
         let ids = closure
@@ -1075,7 +921,7 @@ mod tests {
             .unwrap();
 
         let result = executor
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
@@ -1142,7 +988,7 @@ mod tests {
 
         let error = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
@@ -1163,11 +1009,11 @@ mod tests {
         let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
-            .initialize_fresh_repository(
+            .initialize_selected(
                 repo.path(),
-                Some(&[ProfileSelector::path(
+                &[ProfileSelector::path(
                     crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
-                )]),
+                )],
             )
             .unwrap();
 
@@ -1221,7 +1067,7 @@ mod tests {
         // would be a test artifact, not the real re-init path.
         let reinit = file_executor(repo.path()).unwrap();
         let again = reinit
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(format!(
                     "{}/jit-dogfood",
@@ -1254,7 +1100,7 @@ mod tests {
 
         let repaired = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
             )
@@ -1274,7 +1120,7 @@ mod tests {
 
         let again = file_executor(repo.path())
             .unwrap()
-            .initialize_profiled_repository(
+            .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
             )
@@ -1334,7 +1180,11 @@ mod tests {
             &repo.path().join("profiles/jit-dogfood"),
         )
         .unwrap();
-        let profile = executor.profile_input(&package).unwrap();
+        let profile = super::super::profile::profile_application_input(
+            &crate::profile::resolve_package(&package, &Default::default()).unwrap(),
+            &executor.require_layout().unwrap(),
+        )
+        .unwrap();
         let proposed_config = config.as_bytes().to_vec();
         let scaffold =
             InitializationScaffold::from_config(config, project_name, Some(profile)).unwrap();
@@ -1449,9 +1299,9 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                 thread::spawn(move || {
                     let executor = file_executor(repo.path()).unwrap();
                     barrier.wait();
-                    executor.initialize_fresh_repository(
+                    executor.initialize_selected(
                         repo.path(),
-                        Some(&[ProfileSelector::path(location.as_path())]),
+                        &[ProfileSelector::path(location.as_path())],
                     )
                 })
             })
@@ -1477,6 +1327,40 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             events.lines().count(),
             1,
             "only one aggregate lifecycle event reached the event log"
+        );
+    }
+
+    #[test]
+    fn test_profiled_init_runs_each_selection_stage_once_per_invocation() {
+        let repo = TempDir::new().unwrap();
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &repo.path().join("packages/base"),
+            "base",
+            &[],
+        );
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["base"],
+        );
+        let executor = file_executor(repo.path()).unwrap();
+        let location = repo.path().join("packages/workflow");
+        let closure = executor
+            .resolve_profile_closure(&ProfilePackage::from_directory(&location).unwrap())
+            .unwrap()
+            .len();
+        let selectors = [ProfileSelector::path(location)];
+
+        let (initialized, stages) = crate::profile::selection_probe::observe(|| {
+            executor.initialize_selected(repo.path(), &selectors)
+        });
+
+        initialized.unwrap();
+        assert_eq!(
+            stages,
+            crate::profile::selection_probe::once_per_invocation(closure)
         );
     }
 }

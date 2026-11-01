@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-abe963dd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "40d365e00e9b63cb946ed911633b01ec1939710a",
+  "completed_at": "2026-11-01T13:29:32.866851506Z",
+  "duration_ms": 101017,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The single ProfileSelection path, initialization integration, and stage-counting probes meet all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe963dd-7fba-49c8-930c-1767d3bce945",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a11f9d9a-a292-43c3-97b8-9b2f2f344177",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:27:51.848886933Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: tagged commits deb013162, e0d06007, 6b7e6a720, 3fcfd766, 1242a1ae, ca76bf13, 764cd02, a0f3cd0, c7c18f85, d9cc4e39, e6ab5d822, e00b109, 1abdde76\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 and @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-06 and REQ-10; @/issue/3f217dd2/requirement/REQ-04; @/invariant/architecture-dependency-direction, semantic-types, convention-convergence, orthogonal-tests, essential-code-prose, and no-ignored-tests (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T13:25:59Z); code-review none recorded before this review\nTruncation recovery: narrowed initial truncated repository/merge output to applicable AGENTS discovery, individual code-path patches, merge-parent comparison against 1abdde76^2, and current selection/probe call sites\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The single ProfileSelection path, initialization integration, and stage-counting probes meet all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

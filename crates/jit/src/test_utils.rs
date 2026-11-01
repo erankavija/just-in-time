@@ -346,9 +346,12 @@ fn initialize_profiled_repository_fixture(
     let storage = InMemoryStorage::rooted_at(repository);
     storage.seed_repository_tree_fixture(repository)?;
     let layout = storage.repository_layout();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout.clone())
-        .initialize_fresh_repository(repository, Some(&[ProfileSelector::path(&selected)]))?;
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
+    let selection = executor.select_profiles(
+        &[ProfileSelector::path(&selected)],
+        &crate::commands::ProfileVariableOptions::default(),
+    )?;
+    executor.initialize_fresh_repository(repository, Some(&selection))?;
     write_repository_entries(&storage, &layout)
 }
 
@@ -1618,14 +1621,18 @@ mod tests {
                     .unwrap()
             });
             let jit_root = reference.join(".jit");
-            CommandExecutor::new(JsonFileStorage::new(&jit_root))
-                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap())
-                .initialize_fresh_repository(
-                    &reference,
-                    Some(&[ProfileSelector::path(
+            let executor = CommandExecutor::new(JsonFileStorage::new(&jit_root))
+                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
+            let selection = executor
+                .select_profiles(
+                    &[ProfileSelector::path(
                         reference.join(package_directory).join(spec.id),
-                    )]),
+                    )],
+                    &crate::commands::ProfileVariableOptions::default(),
                 )
+                .unwrap();
+            executor
+                .initialize_fresh_repository(&reference, Some(&selection))
                 .unwrap();
             // Machine-local state the file backend's next session creates on demand.
             fs::remove_file(reference.join(BOOTSTRAP_LOCK_FILE)).unwrap();

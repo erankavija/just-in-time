@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-abe963dd",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "e6ab5d822f0e96194d297353f1861182ee0221b4",
+  "completed_at": "2026-10-22T21:22:04.855565697Z",
+  "duration_ms": 900089,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "4b907a0e58fb379533425cd0f47523a0c34e3c250f4424f393ababec7e8a89d3",
+  "issue_id": "abe963dd-7fba-49c8-930c-1767d3bce945",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d3a0da67-f613-4997-816f-20cbb2e4ab3a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:07:04.765947376Z",
+  "status": "error",
+  "stderr": "",
+  "stdout": ""
+}
