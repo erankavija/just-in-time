@@ -939,7 +939,7 @@ jit issue update --filter <QUERY> [OPTIONS]
 | `--append-description <TEXT>` | Append `TEXT` to the description. |
 | `--append-description-file <PATH>` | Append the contents of `PATH` (`-` reads stdin) to the description. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal`, `high`, or `critical`. |
-| `-s`, `--state <STATE>` | Requested lifecycle state. |
+| `-s`, `--state <STATE>` | Requested lifecycle state. `rejected` is refused with exit code `2`; see Rejecting Issues. |
 | `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
 | `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable; adds to the existing set. |
 | `--remove-label <LABEL>` | Remove labels. Repeatable. Single-issue mode fails, removing nothing, when the issue lacks any named label. |
@@ -1442,7 +1442,7 @@ use `jit issue assign <id> <assignee>` (or `jit issue claim <id> <assignee>
 
 ### Rejecting Issues
 
-Use `jit issue reject` to close an issue without implementation:
+`jit issue reject` is the only command that rejects an issue, and `jit issue update` refuses the `rejected` state. It closes an issue without implementation:
 
 ```bash
 # Reject with reason

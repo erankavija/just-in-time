@@ -25,6 +25,7 @@ mod issue_status_projection_tests;
 mod issue_update_atomicity_tests;
 mod issue_update_description_ops_tests;
 mod issue_update_lean_response_test;
+mod issue_update_rejected_state_tests;
 mod list_envelope_tests;
 mod list_flag_tests;
 mod payload_stream_purity_tests;
