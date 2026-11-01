@@ -179,7 +179,7 @@ one warm run at 24.0 s while the host load climbed to 11.34 by its end, and rebu
 ### Per-test profile
 
 After: `PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.28, warm, at
-`3a1326070` from a clean checkout, recorded in [`suite-profile.json`](../suite-profile.json):
+`3a1326070` from a clean checkout, recorded in `dev/benchmarks/suite-profile.json`:
 4,601 tests, none over 5 s. The slowest is
 `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
 at 3.50 s. The doctest substep ran 2.7 s in every after run above, at load below 10.
