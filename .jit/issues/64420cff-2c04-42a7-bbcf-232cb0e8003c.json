@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Parse assignee text once at the CLI and server boundary, so commands and domain filters carry `Assignee`.\n\n## Background\n\n`executor.query_all` takes its assignee filter as `Option<&str>` (`crates/jit/src/main.rs:1399`). `commands/issue.rs` holds `assignee: Option<String>` at `:40`, `assignee_filter: Option<String>` at `:247`, and `assign_issue` and `claim_issue` take `assignee: String` (`:722,750,799`), and `commands/bulk_update.rs:22` holds `assignee: Option<String>`. `Assignee` is the domain type for this identity, and a query assignee filter that is not one lets a malformed filter match nothing silently.\n\n## Success Criteria\n\n- [hard] REQ-01: Every command and domain signature, field and filter under `crates/jit/src` that carries an assignee uses `Assignee`.\n- [hard] REQ-02: CLI and server assignee text is parsed once at the entry point, and a malformed assignee or assignee filter fails with the existing typed error instead of matching nothing.\n- [hard] REQ-03: Serialized issue and event JSON and the CLI's JSON output for valid assignees are unchanged, and `jit --schema` still describes assignees as strings.\n",
   "documents": [],
+  "done_at": "2026-11-01T05:10:44.266525379Z",
   "first_ready_at": "2026-11-01T04:49:58.669133746Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Commands carry assignees as Assignee",
-  "updated_at": "2026-11-01T05:10:42.214675810Z"
+  "updated_at": "2026-11-01T05:10:44.266525379Z"
 }
