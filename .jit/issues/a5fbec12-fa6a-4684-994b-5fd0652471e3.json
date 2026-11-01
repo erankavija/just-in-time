@@ -26,6 +26,12 @@
       "status": "failed",
       "updated_at": "2026-11-01T15:52:58.592154008Z",
       "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "ec432cb2-455d-4338-b2b1-25d06062e33a",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:21:57.712079482Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
@@ -41,5 +47,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Report profile plans through the apply result type",
-  "updated_at": "2026-11-01T16:08:31.517373074Z"
+  "updated_at": "2026-11-01T18:21:57.712079482Z"
 }
