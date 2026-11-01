@@ -1451,6 +1451,10 @@
     {
       "session": 5,
       "finding": "land.sh disk guard (60 GiB) held both landings in retry for about 2.4 h with free space at 54 GiB; its output is piped through tail, so the wait was silent. Slot B target removed to recover."
+    },
+    {
+      "session": 5,
+      "finding": "8d64ffae holistic review failed: exit-status and count re-proofs outside the owners remain; rework 1 queued for slot A after 952ed1e7, kept serial to stay above the 60 GiB disk guard."
     }
   ],
   "traps": [
