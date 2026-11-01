@@ -270,3 +270,35 @@ proptest! {
         }
     }
 }
+
+/// Two blockers each closed on a separate branch leave the merged dependent in
+/// `Backlog` with nothing unmet. Validation reports it, and `--fix` promotes it.
+#[test]
+fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are_all_terminal() {
+    let mut h = TestHarness::new();
+    let first = h.create_issue("First blocker");
+    let second = h.create_issue("Second blocker");
+    let dependent = h.create_issue("Dependent");
+    h.executor.add_dependency(&dependent, &first).unwrap();
+    h.executor.add_dependency(&dependent, &second).unwrap();
+    assert_eq!(h.get_issue(&dependent).state, State::Backlog);
+    for blocker in [&first, &second] {
+        let mut closed = h.get_issue(blocker);
+        closed.state = State::Done;
+        jit::test_harness::seed_memory_issue(&h.storage, &closed);
+    }
+
+    let rendered = format!(
+        "{:#}",
+        h.executor
+            .validate_silent()
+            .expect_err("a Backlog issue nothing blocks must fail validation")
+    );
+    assert!(rendered.contains(&h.get_issue(&dependent).short_id()));
+    assert!(rendered.contains("jit validate --fix"));
+
+    h.executor.validate_with_fix(true, false).unwrap();
+
+    assert_eq!(h.get_issue(&dependent).state, State::Ready);
+    assert!(h.executor.validate_silent().is_ok());
+}

@@ -1606,6 +1606,7 @@ mod tests {
 
         let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.labels = labels;
+        issue.state = State::Ready;
         issue.gates_required.push(gate_key.clone());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);

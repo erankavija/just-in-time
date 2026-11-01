@@ -8,6 +8,7 @@
 //! folds error-severity findings into validation failure.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
+use jit::domain::State;
 use jit::storage::InMemoryStorage;
 
 /// A `dependency-shape` graph rule: every `type:task` must depend on a
@@ -27,6 +28,7 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     story.labels = vec!["type:story".to_string()];
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
+    task.state = State::Ready;
     // The two issues still need to be connected for the (unrelated) isolated-node
     // check, so make the story depend on the task. This does NOT satisfy the
     // shape rule (which requires task -> story), so the graph rule still fires.
@@ -66,6 +68,7 @@ fn test_validate_passes_when_graph_rule_is_satisfied() {
     // The task DOES depend on the story -> rule satisfied.
     let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
+    story.state = State::Ready;
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     task.dependencies = vec![story.id.clone()];
@@ -104,6 +107,7 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
     story.labels = vec!["type:story".to_string()];
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
+    task.state = State::Ready;
     story.dependencies = vec![task.id.clone()]; // connect, but don't satisfy rule
     let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &story);
@@ -141,6 +145,7 @@ assert = { label-coverage = { } }
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
+    epic.state = State::Ready;
     // A dependent child that carries no satisfies label.
     let mut child = crate::fixture_issue("child".to_string(), String::new());
     child.labels = vec!["type:task".to_string()];
@@ -187,6 +192,7 @@ assert = { label-coverage = { child-link = "bogus" } }
         "## Success Criteria\n\n- [hard] REQ-01: x\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
+    epic.state = State::Ready;
     let storage = InMemoryStorage::new();
     jit::test_harness::seed_memory_issue(&storage, &epic);
 

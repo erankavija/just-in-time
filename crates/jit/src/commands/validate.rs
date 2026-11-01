@@ -3312,6 +3312,8 @@ priority = 100
         // fail integrity before the rule pass).
         let mut node = node;
         node.dependencies = vec![target.id.clone()];
+        let mut target = target;
+        target.state = State::Ready;
         // Register the `satisfies` namespace so the dangling-link pass — not the
         // namespace-registry local rule — is the validation failure.
         let config = format!(

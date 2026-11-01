@@ -513,28 +513,37 @@ fn validate_integrity(
     }
 
     // Stored readiness must agree with the readiness the graph derives
-    // (`@/invariant/derived-state-coherence`): an issue reported as Ready while
-    // its unmet-dependency list is non-empty tells an agent it may start work the
-    // dependency graph withholds.
+    // (`@/invariant/derived-state-coherence`): a Ready issue with unmet
+    // dependencies tells an agent it may start work the graph withholds, and an
+    // unblocked Backlog issue never becomes available.
     let resolved = crate::domain::queries::build_issue_map(issues);
     let incoherent = issues
         .iter()
-        .filter(|issue| {
-            issue.derive_readiness_correction(&resolved) == Some(ReadinessCorrection::Demote)
-        })
-        .map(|issue| {
-            let unmet = crate::domain::queries::unmet_dependencies(issue, &resolved)
-                .into_iter()
-                .map(|dependency| dependency.short_id())
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("'{}' ({}) waits on: {unmet}", issue.short_id(), issue.title)
+        .filter_map(|issue| {
+            issue
+                .derive_readiness_correction(&resolved)
+                .map(|correction| {
+                    let detail = match correction {
+                        ReadinessCorrection::Promote => {
+                            "is Backlog with no unmet dependencies".to_string()
+                        }
+                        ReadinessCorrection::Demote => {
+                            let unmet =
+                                crate::domain::queries::unmet_dependencies(issue, &resolved)
+                                    .into_iter()
+                                    .map(|dependency| dependency.short_id())
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                            format!("is Ready but waits on: {unmet}")
+                        }
+                    };
+                    format!("'{}' ({}) {detail}", issue.short_id(), issue.title)
+                })
         })
         .collect::<Vec<_>>();
     if !incoherent.is_empty() {
         return Err(anyhow!(
-            "Found {} issue(s) stored as Ready while carrying unmet dependencies:\n  {}\n\
-             Stored readiness must agree with the dependency graph.\n\
+            "Found {} issue(s) whose stored readiness disagrees with the dependency graph:\n  {}\n\
              Run 'jit validate --fix' to move them to the state their dependencies imply.",
             incoherent.len(),
             incoherent.join("\n  ")

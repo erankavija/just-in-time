@@ -603,8 +603,7 @@ impl Issue {
     /// that mutates a dependency edge — `jit dep add`/`remove`, graph-template
     /// application, and the `jit validate --fix` repair — decides here, so no two
     /// of them can drift (`@/invariant/derived-state-coherence`). The
-    /// whole-repository check reports a [`ReadinessCorrection::Demote`] as a
-    /// violation.
+    /// whole-repository check reports any correction as a violation.
     ///
     /// Only [`State::Backlog`] and [`State::Ready`] are graph-derived. Every
     /// other state is owned by an explicit transition — an issue already claimed,
