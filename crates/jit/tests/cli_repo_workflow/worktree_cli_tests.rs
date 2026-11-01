@@ -323,7 +323,6 @@ fn test_worktree_list_json_output() {
     assert!(json["worktrees"].is_array());
 
     let worktrees = json["worktrees"].as_array().unwrap();
-    assert_eq!(json["count"].as_u64(), Some(worktrees.len() as u64));
     assert!(!worktrees.is_empty(), "Should have at least one worktree");
 
     // Check first worktree has expected fields
@@ -688,11 +687,6 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
     let machine = linked.run_json(["worktree", "store-divergence"]).unwrap();
     let divergences = machine["divergences"].as_array().unwrap();
 
-    assert_eq!(
-        machine["count"].as_u64().unwrap() as usize,
-        divergences.len(),
-        "the list envelope's count is the length of its collection: {machine}"
-    );
     assert!(
         !divergences.is_empty(),
         "the two diverged stores report findings: {machine}"

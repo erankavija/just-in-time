@@ -8,27 +8,10 @@
 //! this file proves they coexist correctly and that the shared projection
 //! mechanism handles them both without interference.
 //!
-//! ## Kind tuples exercised (as supplied by the package)
-//!
-//! ```text
-//! decision:
-//!   section         = "decisions"     # authored under `## Decisions`
-//!   id-pattern      = "D-[0-9]+"      # self-ids: D-01, D-02, …
-//!   link-namespaces = ["per"]         # `per:<issue>/D-01`
-//!   scope           = "issue"
-//!
-//! risk:
-//!   section         = "risks"         # authored under `## Risks`
-//!   id-pattern      = "RISK-[0-9]+"   # self-ids: RISK-01, RISK-02, …
-//!   link-namespaces = ["mitigates",   # `mitigates:<issue>/RISK-01`
-//!                      "resolves"]    # `resolves:<issue>/RISK-01`
-//!   scope           = "issue"
-//! ```
-//!
 //! ## Coverage of the story's `[hard]` success criteria
 //!
-//! All tests run against a repo whose `[item_kinds]` table declares decision and
-//! risk (the package-supplied shape).
+//! All tests run against a repo whose `[item_kinds]` table declares the shipped
+//! decision and risk kinds, derived from the default package.
 //!
 //! - REQ-01: [`test_story_item_list_decision_and_risk_coexist`] — `jit item list
 //!   --kind decision` returns only decisions; `jit item list --kind risk` returns
@@ -44,30 +27,6 @@
 //!   file duplicates either `D-01` or `RISK-01`.
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
-
-/// The shared taxonomy configuration plus the `decision` (namespace `per`) and
-/// `risk` (namespaces `mitigates`, `resolves`) kind declarations. They mirror
-/// the ones the package supplies (the engine bakes in no kinds), so the tests
-/// exercise the shipped kind shapes.
-fn story_config() -> String {
-    format!(
-        "{}\n[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"per\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n\n\
-         [item_kinds.risk]\n\
-         section = \"risks\"\n\
-         id-pattern = \"RISK-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"mitigates\", \"resolves\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-        jit::test_taxonomy::test_taxonomy().config_fragment()
-    )
-}
 
 /// Description body used throughout the story tests: one `## Decisions` section
 /// with D-01 and one `## Risks` section with RISK-01, both in a single issue.
@@ -88,7 +47,11 @@ fn test_story_item_list_decision_and_risk_coexist() {
     // by BOTH kinds through the SAME generic code path. `jit item list --kind
     // decision` returns ONLY the decision items; `jit item list --kind risk`
     // returns ONLY the risk items — no kind bleeds into the other's index.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&story_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue(["-t", "Architecture + risks", "-d", STORY_BODY])
         .unwrap()[..8]
@@ -145,7 +108,9 @@ fn test_story_per_label_resolves_decision() {
     // through the generic `resolve_link_label`, even when the same issue also carries
     // a `## Risks` section. The coexistence of both kinds must not disrupt label
     // resolution for either kind.
-    let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
+    let (_temp, exec) =
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+            .unwrap();
     let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
     let short = issue.short_id();
 
@@ -181,7 +146,9 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // `resolve_link_label`, even when the same issue also carries a `## Decisions`
     // section. Both namespaces are recognized because the configured `risk` kind
     // declares them.
-    let (_temp, exec) = setup_test_repo_with_config(&story_config()).unwrap();
+    let (_temp, exec) =
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+            .unwrap();
     let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
     let short = issue.short_id();
 
@@ -237,7 +204,11 @@ fn test_story_markdown_sole_source_both_kinds() {
     //   (b) the owning issue file under `.jit/issues/` IS the sole occurrence of
     //       both ids;
     //   (c) editing the description and NOTHING else changes BOTH indexes.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&story_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue(["-t", "Architecture + risks", "-d", STORY_BODY])
         .unwrap()[..8]

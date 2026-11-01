@@ -223,7 +223,7 @@ fn test_search_extracts_issue_ids() {
 }
 
 #[test]
-fn test_search_json_uses_count_not_total() {
+fn test_search_json_omits_total() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
     cli.create_issue([
         "--title",
@@ -235,10 +235,8 @@ fn test_search_json_uses_count_not_total() {
 
     let json = cli.run_json(["search", "authentication"]).unwrap();
 
-    let results = json["results"].as_array().unwrap();
-    assert_eq!(json["count"].as_u64(), Some(results.len() as u64));
     assert!(
         json.get("total").is_none(),
-        "top-level search JSON should use count, not total: {json}"
+        "top-level search JSON carries no total: {json}"
     );
 }

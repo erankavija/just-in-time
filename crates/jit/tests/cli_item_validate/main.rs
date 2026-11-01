@@ -43,3 +43,13 @@ fn create_issue(
 /// hierarchy, the label namespaces, and the addressable item kinds an item is
 /// resolved against.
 pub(crate) const DEFAULT_PACKAGE: &str = "jit-default";
+
+/// The shared taxonomy configuration plus the shipped declarations of the named
+/// item kinds.
+pub(crate) fn config_with_shipped_kinds(kinds: &[&str]) -> String {
+    format!(
+        "{}\n{}",
+        jit::test_taxonomy::test_taxonomy().config_fragment(),
+        jit::test_utils::shipped_item_kind_tables(kinds)
+    )
+}
