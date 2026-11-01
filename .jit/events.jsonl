@@ -21709,3 +21709,10 @@
 {"id":"0ed845e1-e0c6-4c45-a5ef-4b85695c1993","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T03:55:22.831810671Z","type":"issue_completed"}
 {"from":"backlog","id":"f5021329-d28c-4974-ab88-cce9ce62e002","issue_id":"77f3db10-26b7-49f4-85c3-95f7adb843c3","timestamp":"2026-11-01T03:55:22.939304869Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"4a654d90-ad22-40ba-8ac2-fb14793dd92e","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T03:55:23.007556806Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"d78cc66d-ae7f-4604-9c17-a0a880d8c912","issue_id":"952ed1e7-2d3c-4d57-8851-ca3a91babcb0","timestamp":"2026-11-01T03:55:55.737089687Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"a0f2e2e6-1a77-48bb-a85f-358088867019","issue_id":"952ed1e7-2d3c-4d57-8851-ca3a91babcb0","timestamp":"2026-11-01T03:55:55.737089687Z","type":"issue_claimed"}
+{"id":"567b6cbc-7196-4ffe-ad55-d5a0158292d6","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","priority":"normal","timestamp":"2026-11-01T03:56:31.333855822Z","title":"The dependency graph carries typed node ids","type":"issue_created"}
+{"from":"ready","id":"b49168be-9ee8-4551-a441-187a9bf5d9f4","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T03:56:31.932536673Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"2b15fe81-2c3c-45e9-968e-aa72f1b64b2a","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T03:56:31.932536673Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"4516edde-8776-45b7-8b19-f4bd6403a1e1","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","timestamp":"2026-11-01T03:56:32.136426640Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"aef173eb-40b2-4853-b63f-ea3e28978fe0","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","timestamp":"2026-11-01T03:56:32.136426640Z","type":"issue_claimed"}

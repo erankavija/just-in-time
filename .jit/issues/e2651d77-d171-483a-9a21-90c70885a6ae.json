@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
+    "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
     "417be079-1de3-43e3-816a-03f4a70e2f63",
     "75951558-accb-4ee9-be38-e97fee0326ee",
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
@@ -40,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Issue identity is one validated type end to end",
-  "updated_at": "2026-11-01T03:55:23.007556806Z"
+  "updated_at": "2026-11-01T03:56:31.932536673Z"
 }
