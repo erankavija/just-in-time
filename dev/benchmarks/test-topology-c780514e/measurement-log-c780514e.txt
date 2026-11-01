@@ -180,3 +180,128 @@ doctest rc=0 2697 ms load=9.81
 3808 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
 3182 jit::jit$storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed
 rc=0
+
+## Before, 0896fc29b plus the c882f1f8 fixture fix: ./scripts/cargo-ci.sh
+
+100.00    0.000194           1       123           total
+Applied patch to 'scripts/cargo-ci-selftest.sh' cleanly.
+M  scripts/cargo-ci-selftest.sh
+0896fc29b docs(jit:28ccf9a9): own the pinned-read error and 
+== prime start 12:47:58 load=0.51 0.90 2.30 free=69G
+== prime rc=0 end 12:49:14
+  ✓ suite-build: built in 25115 ms, warmed 17 executables (2051874352 bytes) in 69 ms (25187 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17234 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4239 ms)
+  ✓ suite-clock: 21490 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21490ms (93 ms)
+== warm1 start 12:50:14 load=2.54 1.88 2.48 free=69G
+== warm1 rc=0 end 12:50:38
+  ✓ suite-build: built in 519 ms, warmed 17 executables (2051874352 bytes) in 69 ms (591 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17212 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4246 ms)
+  ✓ suite-clock: 21475 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21475ms (95 ms)
+== warm2 start 12:51:38 load=3.14 2.67 2.73 free=69G
+== warm2 rc=0 end 12:52:02
+  ✓ suite-build: built in 522 ms, warmed 17 executables (2051874352 bytes) in 70 ms (595 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17187 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4199 ms)
+  ✓ suite-clock: 21404 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21404ms (94 ms)
+== warm3 start 12:52:32 load=3.71 3.10 2.89 free=69G
+== warm3 rc=0 end 12:52:56
+  ✓ suite-build: built in 523 ms, warmed 17 executables (2051874352 bytes) in 69 ms (595 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17234 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4206 ms)
+  ✓ suite-clock: 21457 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21457ms (93 ms)
+== rebuild1 start 12:53:56 load=3.18 3.45 3.05 free=69G
+== rebuild1 rc=0 end 12:55:13
+  ✓ suite-build: built in 25608 ms, warmed 17 executables (2051874352 bytes) in 70 ms (25681 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17284 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4217 ms)
+  ✓ suite-clock: 21519 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21519ms (97 ms)
+== rebuild2 start 12:55:43 load=3.87 3.76 3.21 free=69G
+== rebuild2 rc=0 end 12:56:58
+  ✓ suite-build: built in 24846 ms, warmed 17 executables (2051874352 bytes) in 72 ms (24920 ms)
+  ✓ test: 4674 passed, 0 failed, 0 skipped (17258 ms)
+  ✓ doctest: 61 passed, 0 failed, 0 ignored (4213 ms)
+  ✓ suite-clock: 21488 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1723676616/2147483648 profile=line-tables-only dep-features=pruned suite-duration=21488ms (96 ms)
+rc=0 12:56:59
+
+
+## Cold profiled-fixture runs, 955aaa9a: sampler summary, pre-fix
+compile 36
+before rc 100 wall 60 samples 9 load max 25.98 load mean 17.7 dirtyMB max 7495 mean 5906
+8 busy lines
+        FAIL [  12.075s] (3137/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes
+        FAIL [  12.081s] (3138/4648) jit commands::validate::tests::test_validate_fix_leaves_a_drifted_profile_owned_target_unrepaired
+        FAIL [  12.096s] (3140/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs
+        FAIL [  12.105s] (3141/4648) jit commands::validate::tests::test_validate_silent_accepts_a_drifted_profile_owned_target
+        FAIL [  12.784s] (3153/4648) jit commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically
+        FAIL [  12.083s] (3770/4648) jit test_utils::tests::test_profiled_in_memory_repository_fixture_preserves_modes_and_clone_isolation
+        FAIL [  12.076s] (3772/4648) jit test_utils::tests::test_profiled_repository_fixture_clones_are_isolated_and_profiled
+     TIMEOUT [  20.444s] (3813/4648) jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+        FAIL [  12.099s] (4645/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_permission_error_classification
+     TIMEOUT [  20.197s] (4648/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_malformed_rules_validation_classification
+     Summary [  38.329s] 4648 tests run: 4638 passed, 8 failed, 2 timed out, 0 skipped
+        FAIL [  12.075s] (3137/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes
+        FAIL [  12.081s] (3138/4648) jit commands::validate::tests::test_validate_fix_leaves_a_drifted_profile_owned_target_unrepaired
+        FAIL [  12.096s] (3140/4648) jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs
+        FAIL [  12.105s] (3141/4648) jit commands::validate::tests::test_validate_silent_accepts_a_drifted_profile_owned_target
+        FAIL [  12.784s] (3153/4648) jit commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically
+        FAIL [  12.083s] (3770/4648) jit test_utils::tests::test_profiled_in_memory_repository_fixture_preserves_modes_and_clone_isolation
+        FAIL [  12.076s] (3772/4648) jit test_utils::tests::test_profiled_repository_fixture_clones_are_isolated_and_profiled
+     TIMEOUT [  20.444s] (3813/4648) jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+        FAIL [  12.099s] (4645/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_permission_error_classification
+     TIMEOUT [  20.197s] (4648/4648) jit::cli_item_validate derived_state_repair_tests::test_cli_validate_fix_preserves_malformed_rules_validation_classification
+slowest [(4.588, 'est_profile_pack_and_add_carry_a_package_at_the_model_limits'), (5.01, 'dd_publishes_a_package_whose_directories_outnumber_its_files'), (6.128, 'reference_succeeds_over_an_event_log_
+slowest profiled [(0.298, 'rofiled_init_detects_projection_source_outside_final_capture'), (1.016, 'profile_cli_tests::test_profiled_init_publishes_a_valid_repo'), (1.073, '_partial_profiled_init_atom
+
+## Fixed, run 1: summary lines
+     Summary [  26.881s] 4651 tests run: 4651 passed, 0 skipped
+
+## Fixed, run 2: summary lines
+     Summary [  26.233s] 4651 tests run: 4651 passed, 0 skipped
+
+## Fixed, run 3: summary lines
+     Summary [  25.863s] 4651 tests run: 4651 passed, 0 skipped
+
+## Cold-fixture sampling script
+# usage: evidence.py <label> <writers> <mb> <spinners>
+import subprocess,time,os,re,sys,shutil,threading,json
+W='.agents/worktrees/agent-de880d9c'; os.chdir(W)
+S=os.path.dirname(os.path.abspath(__file__)); label,wr,mb,sp=sys.argv[1],int(sys.argv[2]),sys.argv[3],int(sys.argv[4])
+env=dict(os.environ,CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true')
+# the crate-source change: one comment byte, so every fixture key is new
+with open('crates/jit/src/lib.rs','a') as f: f.write(f'// cold-key {time.time()}\n')
+# compile unloaded: the link's dirty pages stay in the page cache for the test window
+s0=time.time(); assert subprocess.run(['cargo','nextest','run','--workspace','--no-run'],env=env,capture_output=True).returncode==0; print('compile',round(time.time()-s0))
+load=[subprocess.Popen(['python3',f'{S}/dirty.py',f'target/tmp/load{i}','100000',mb]) for i in range(wr)]
+load+=[subprocess.Popen(['nice','-n',os.environ.get('SPIN_NICE','0'),'python3','-c','while True: pass']) for _ in range(sp)]
+samples=[]; stop=threading.Event()
+def sample():
+    while not stop.wait(5):
+        d=re.search(r'Dirty:\s+(\d+)',open('/proc/meminfo').read()).group(1)
+        samples.append((float(open('/proc/loadavg').read().split()[0]),int(d)//1024))
+threading.Thread(target=sample,daemon=True).start()
+log=f'{S}/evidence-{label}.log'; t=time.time()
+try:
+    with open(log,'w') as f:
+        rc=subprocess.run(['cargo','nextest','run','--workspace','--no-fail-fast'],stdout=f,stderr=subprocess.STDOUT,env=env).returncode
+finally:
+    stop.set()
+    for p in load: p.terminate()
+    for p in load: p.wait()
+    for i in range(wr): shutil.rmtree(f'target/tmp/load{i}',ignore_errors=True)
+    subprocess.run(['git','checkout','--','crates/jit/src/lib.rs'])
+txt=open(log).read()
+print(label,'rc',rc,'wall',round(time.time()-t),'samples',len(samples),'load max',max(s[0] for s in samples),'load mean',round(sum(s[0] for s in samples)/len(samples),1),'dirtyMB max',max(s[1] for s in samples),'mean',sum(s[1] for s in samples)//len(samples))
+print(txt.count(' is busy'),'busy lines')
+print('\n'.join(l[:170] for l in txt.splitlines() if re.search(r'Summary|^ +(FAIL|TIMEOUT)',l))[-3500:])
+ds=[(float(m.group(1)),m.group(2)) for m in re.finditer(r'PASS \[\s*([\d.]+)s\] \(\s*\d+/\d+\) (.*)',txt)]
+print('slowest',[(d,n[-60:]) for d,n in sorted(ds)[-5:]])
+fx=[(d,n[-60:]) for d,n in ds if 'profiled' in n]
+print('slowest profiled',sorted(fx)[-3:])
