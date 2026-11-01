@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9c2434d3-436a-4b22-90f4-f84d5b555edb",
+      "status": "passed",
+      "updated_at": "2026-11-01T16:54:24.569918124Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "91c405c9-ab69-4df4-9242-fc4db0ce0fb3",
+      "status": "failed",
+      "updated_at": "2026-11-01T16:56:53.803426989Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cba1bff8-58ec-4102-b56a-96d767ac05a2",
   "labels": [
     "epic:lead-friction",
@@ -22,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rejecting an issue does not promote its dependents",
-  "updated_at": "2026-11-01T16:48:16.951675351Z"
+  "updated_at": "2026-11-01T16:56:53.803426989Z"
 }

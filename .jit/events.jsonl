@@ -22302,3 +22302,5 @@
 {"from":"ready","id":"ba09c5aa-2447-4c0c-9f58-b295d53aeee7","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:48:16.951675351Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"449fa61e-07fc-499b-9c77-6102cd963a65","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:48:16.951675351Z","type":"issue_claimed"}
 {"from":"backlog","id":"f6517659-293c-484d-b3ca-f1523f49586e","issue_id":"cc6ef886-17a2-48e6-acff-0c206dcd664b","timestamp":"2026-11-01T16:48:21.594658943Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"7e762453-0ad2-465b-8f7f-9e5f7ceb5153","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:54:24.569918124Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"94e4a652-9b47-4ce2-8f61-014e61b8ff7c","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:56:53.803426989Z","type":"gate_failed","updated_by":"auto:executor"}
