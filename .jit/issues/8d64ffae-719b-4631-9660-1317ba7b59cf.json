@@ -21,6 +21,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: command exit codes and the list-envelope count each have one owning test.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite, which fails for a projected row without a binding case. Other subprocess tests assert only what they add.\n- [hard] REQ-02: The list-envelope `count` property is proven by one test that covers each list-emitting command, and no per-command test re-asserts it.\n",
   "documents": [],
+  "done_at": "2026-11-01T08:31:56.413376113Z",
   "first_ready_at": "2026-11-01T01:03:27.405723966Z",
   "gates_required": [
     "cargo-ci",
@@ -28,15 +29,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1f584670-a098-4115-a912-8b5e4c74fa7d",
+      "run_id": "72d5852d-6591-459a-a186-f467a264c88a",
       "status": "passed",
-      "updated_at": "2026-11-01T08:01:50.634525437Z",
+      "updated_at": "2026-11-01T08:29:17.439831761Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "e9341229-4d42-46d9-9766-0f68eb919374",
-      "status": "failed",
-      "updated_at": "2026-11-01T08:03:27.116917929Z",
+      "run_id": "e36f6970-2458-47f0-b8a1-cc8343f7586e",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:30:48.657049667Z",
       "updated_by": "auto:executor"
     }
   },
@@ -54,7 +55,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Exit codes and list envelopes each have one owning test",
-  "updated_at": "2026-11-01T08:03:27.116917929Z"
+  "updated_at": "2026-11-01T08:31:56.413376113Z"
 }

@@ -13,10 +13,17 @@
     "worktree-cache-test"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "797adca0-4f52-4cb3-9b94-08250b02f40a",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:31:07.056160479Z",
+      "updated_by": "auto:executor"
+    },
     "worktree-cache-test": {
-      "status": "pending",
-      "updated_at": "2026-11-01T08:03:08.288980032Z",
-      "updated_by": null
+      "run_id": "7e213851-5f7a-4386-8c90-1dc69a13a9e9",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:31:07.782689236Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "86f78db2-467e-4b3d-b6a6-279b8c3e9bb4",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktrees seeded from the cache pool share no Cargo build state",
-  "updated_at": "2026-11-01T08:30:43.924378224Z"
+  "updated_at": "2026-11-01T08:31:07.782689236Z"
 }
