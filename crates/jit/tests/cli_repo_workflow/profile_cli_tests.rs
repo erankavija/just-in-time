@@ -1285,8 +1285,10 @@ pub(super) fn write_lifecycle_package(repo: &Path, location: &str, id: &str, ver
 /// The single profile entry returned by one-package authoring and exchange
 /// operations.
 pub(super) fn only_profile(response: &Value) -> &Value {
-    assert_eq!(response["count"], 1);
-    &response["profiles"][0]
+    let [profile] = response["profiles"].as_array().unwrap().as_slice() else {
+        panic!("one profile entry: {response}");
+    };
+    profile
 }
 
 fn assert_human_profile_decision(
