@@ -28,7 +28,7 @@
     "satisfies:f8a6b298/REQ-01"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Reused verdicts name their source issue and source run",
-  "updated_at": "2026-11-01T07:31:11.334959780Z"
+  "updated_at": "2026-10-21T10:40:06.137184343Z"
 }

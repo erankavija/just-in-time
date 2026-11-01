@@ -28,7 +28,7 @@
     "satisfies:9876a23a/REQ-12"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Configuration accessors for content format and strictness",
-  "updated_at": "2026-11-01T07:31:12.930336823Z"
+  "updated_at": "2026-10-21T20:31:34.112543831Z"
 }

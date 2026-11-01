@@ -26,7 +26,7 @@
     "satisfies:f8a6b298/REQ-01"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Gate-run records load by issue and run id",
-  "updated_at": "2026-11-01T07:31:07.402216861Z"
+  "updated_at": "2026-10-21T10:40:05.759528164Z"
 }

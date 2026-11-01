@@ -27,7 +27,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Planning-node lookup lives in the template module",
-  "updated_at": "2026-11-01T07:31:18.180204528Z"
+  "updated_at": "2026-10-21T20:31:33.679966059Z"
 }
