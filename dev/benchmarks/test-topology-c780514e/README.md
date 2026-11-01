@@ -112,3 +112,53 @@ for c in $(seq 24); do nice -n 19 sh -c 'while :; do :; done' & done
 CARGO_INCREMENTAL=0 cargo nextest run --workspace --no-fail-fast
 kill $(jobs -p); rm -rf target/tmp/load?; git checkout -- crates/jit/src/lib.rs
 ```
+
+## Build footprint and suite clock before and after — e2764021, 7721a2a9
+
+Every "after" figure is at commit `de34a05906` and comes from one exclusive
+build window on 2026-11-01, entered with `flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock`
+and `CARGO_INCREMENTAL=0`. Each run started at a one-minute load below 4.08 with 75 GB
+free. sccache was on at the `scripts/cargo-ci.sh` default: `RUSTC_WRAPPER` and
+`CARGO_CI_NO_SCCACHE` were unset, and a daemon with no `TMPDIR` override served
+the runs. The before run records no opt-out, so it used the same default.
+
+### Build footprint
+
+The budget checker passes on the after tree. Before is gate run `8e22dd96` at
+commit `0896fc29b`, command `./scripts/cargo-ci.sh`. After is
+`./scripts/rust-build-budget.sh` at load 3.11.
+
+| | Integration targets | Active test executables | Active test-executable bytes | Budget |
+|---|---:|---:|---:|---:|
+| Before | 10/12 | 14 | 1,723,670,208 | 2,147,483,648 |
+| After | 10/12 | 14 | 1,694,388,096 | 2,147,483,648 |
+
+### Suite clock
+
+Before: warm 21.1 s (16.7 s test plus 4.4 s doctest), gate run `8e22dd96` at
+`0896fc29b`; 24-29.6 s after a rebuild. After: `./scripts/cargo-ci.sh`, with
+`touch crates/jit/src/lib.rs` before each rebuild run. The suite clock excludes the
+suite-build step, which is shown separately.
+
+| Run | Start load | Suite build | Test | Doctest | Suite clock |
+|---|---:|---:|---:|---:|---:|
+| Warm, first after a rebuild on main | 3.31 | 0.6 s | 12.8 s | 2.9 s | 15.8 s |
+| Warm 1 | 3.98 | 0.6 s | 21.1 s | 2.8 s | 24.0 s |
+| Warm 2 | 3.09 | 0.5 s | 12.0 s | 2.8 s | 14.7 s |
+| Warm 3 | 3.11 | 0.5 s | 11.9 s | 2.7 s | 14.7 s |
+| Rebuild 1 | 2.55 | 37.8 s | 12.0 s | 2.7 s | 14.7 s |
+| Rebuild 2 | 2.78 | 24.8 s | 12.4 s | 4.9 s | 17.3 s |
+
+Warm 1 ran while the host load climbed to 11.34 by its end, and is the only warm
+run above the before figure. The other warm runs are 14.7-15.8 s against 21.1 s, and
+the rebuild runs are 14.7-17.3 s against 24-29.6 s. The suite went from 4,674 tests
+and 61 doctests to 4,632 tests and 25 doctests.
+
+### Per-test profile
+
+`PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.95, warm,
+recorded in [`suite-profile.json`](../suite-profile.json): 4,632 tests, none over 5 s.
+The slowest is `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
+at 3.62 s; before, the slowest was `server_integration` `graceful_shutdown…force_closes`
+at 5.32 s. The doctest substep ran 2.7-2.9 s warm and at most 4.9 s across the runs above,
+each at load below 10; the before figure was 4.4 s.
