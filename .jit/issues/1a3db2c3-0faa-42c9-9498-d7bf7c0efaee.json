@@ -11,7 +11,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/2195c98f-semantic-types/raw-identity-sites.md"
+      "path": "dev/archive/2195c98f-semantic-types/active/raw-identity-sites.md"
     }
   ],
   "done_at": "2026-11-01T04:32:13.043881582Z",
@@ -48,5 +48,5 @@
   "priority": "normal",
   "state": "done",
   "title": "The dependency graph carries typed node ids",
-  "updated_at": "2026-11-01T04:32:13.043881582Z"
+  "updated_at": "2026-11-01T05:30:35.035154985Z"
 }
