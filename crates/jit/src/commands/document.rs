@@ -401,7 +401,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         validate_repo_relative_path(path)?;
         let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let events_path = VirtualPath::EVENTS;
         let document_path = VirtualPath::worktree(path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
@@ -475,7 +475,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let events_path = VirtualPath::EVENTS;
         let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "document removal", |session| {
@@ -975,7 +975,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
-        let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+        let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)?;
         let events_path = VirtualPath::EVENTS;
         let source = DocumentScanSource::Worktree(document_path);
@@ -2055,7 +2055,7 @@ mod tests {
         storage.add_worktree_file("docs/new.png", "new bytes");
 
         let layout = storage.repository_layout();
-        let issue_path = VirtualPath::data(format!("issues/{id}.json")).unwrap();
+        let issue_path = VirtualPath::issue_record(&id);
         let events_path = VirtualPath::data("events.jsonl").unwrap();
         let document_path = VirtualPath::worktree("docs/guide.md").unwrap();
         let old_asset_path = VirtualPath::worktree("docs/old.png").unwrap();

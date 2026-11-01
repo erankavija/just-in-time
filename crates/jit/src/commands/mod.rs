@@ -684,18 +684,15 @@ fn captured_precheck_plan(
     let mut paths = if broad_builtin {
         image.entries().keys().cloned().collect::<BTreeSet<_>>()
     } else {
-        BTreeSet::from([
-            VirtualPath::data(format!("issues/{}.json", issue.id))?,
-            VirtualPath::GATES,
-        ])
+        BTreeSet::from([VirtualPath::issue_record(&issue.id), VirtualPath::GATES])
     };
     if !broad_builtin {
         paths.extend(
             issue
                 .dependencies
                 .iter()
-                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                .collect::<std::result::Result<Vec<_>, _>>()?,
+                .map(VirtualPath::issue_record)
+                .collect::<Vec<_>>(),
         );
         if consumes_history {
             let run_paths = crate::repository_state::captured_gate_run_result_paths(image)?
@@ -2073,7 +2070,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
         .all_ids
         .iter()
         .map(|id| {
-            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let path = VirtualPath::issue_record(id);
             let bytes = match image.entry(&path)? {
                 RepositoryEntry::File { content, .. } => content.bytes(),
                 RepositoryEntry::Absent => {
@@ -2348,7 +2345,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     Vec::new()
                 };
                 let mut paths = BTreeSet::from([
-                    VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
+                    VirtualPath::issue_record(request.issue_id()),
                     VirtualPath::EVENTS,
                 ]);
                 if request.captures_gate_registry() {
@@ -2367,7 +2364,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
-                let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
+                let issue_path = VirtualPath::issue_record(request.issue_id());
                 let issue: Issue = match image.entry(&issue_path)? {
                     RepositoryEntry::File { content, .. } => {
                         crate::repository_state::decode_issue_record(&issue_path, content.bytes())?
@@ -2430,10 +2427,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(crate::commands::validate::MutationBase { image, .. }) = self
                 .capture_mutation_base(
                     session,
-                    &[
-                        VirtualPath::ISSUES,
-                        VirtualPath::data(format!("issues/{issue_id}.json"))?,
-                    ],
+                    &[VirtualPath::ISSUES, VirtualPath::issue_record(&issue_id)],
                     None,
                 )?
             else {
@@ -3783,7 +3777,8 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.add_data_file("issues/existing.json", "{}");
+        let occupied_issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        storage.add_data_file(occupied_issue_path.relative().as_str(), "{}");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
         storage.inject_repository_state_apply_conflicts(1);
@@ -3927,7 +3922,7 @@ mod tests {
     fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let paths = std::collections::BTreeSet::from([
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(id),
             VirtualPath::data("events.jsonl").unwrap(),
         ]);
         CaptureSpec::new(
@@ -3949,7 +3944,7 @@ mod tests {
     ) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let mut paths = std::collections::BTreeSet::from([
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(id),
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
@@ -3966,7 +3961,7 @@ mod tests {
     }
 
     fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {
-        let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json")).unwrap();
+        let path = crate::repository_state::VirtualPath::issue_record(id);
         serde_json::from_slice(image.file_bytes(&path).unwrap().unwrap()).unwrap()
     }
 
@@ -4628,8 +4623,10 @@ mod mutation_session_contract_tests {
     use crate::storage::RepositoryStateStoreError;
 
     fn retryable() -> RepositoryStateStoreError {
+        let record =
+            crate::repository_state::VirtualPath::issue_record(&crate::test_utils::issue_id(1));
         RepositoryStateStoreError::RetryableConflict {
-            path: "issues/x.json".to_string(),
+            path: record.relative().as_str().to_owned(),
         }
     }
 

@@ -302,7 +302,9 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         // Build issue file paths
         let issue_files: Vec<String> = issues
             .iter()
-            .map(|i| format!(".jit/issues/{}.json", i.id))
+            .map(|issue| {
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative()
+            })
             .collect();
 
         let issues_info = IssuesInfo {
@@ -453,10 +455,9 @@ This is a read-only export. Future versions may support:
         // Copy issue files
         for issue in issues {
             let issue_json = serde_json::to_string_pretty(issue)?;
-            let relative = crate::repository_state::RootRelativePath::parse(format!(
-                ".jit/issues/{}.json",
-                issue.id
-            ))?;
+            let relative = crate::repository_state::RootRelativePath::parse(
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative(),
+            )?;
             let issue_path = base.join(relative.as_path());
             std::fs::write(issue_path, issue_json)?;
         }
