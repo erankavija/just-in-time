@@ -26,7 +26,7 @@
     "satisfies:b697a3f7/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive discovery resolves each reference once",
-  "updated_at": "2026-10-24T21:23:36.563782869Z"
+  "updated_at": "2026-11-01T13:37:04.975214121Z"
 }

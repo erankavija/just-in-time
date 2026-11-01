@@ -895,7 +895,6 @@ struct PrecheckPreflight {
 }
 
 struct CapturedLifecycleOutcome {
-    target_id: IssueId,
     changed: bool,
     warnings: Vec<String>,
     storage_warnings: Vec<crate::storage::StorageWarning>,
@@ -3064,7 +3063,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }
                         if issue.state == State::InProgress {
                             return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                                target_id: expected_target.clone(),
                                 changed: false,
                                 warnings: Vec::new(),
                                 storage_warnings,
@@ -3109,7 +3107,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let resolved = crate::domain::queries::build_issue_map(&issues);
                     if !issue.should_auto_transition_to_ready(&resolved) {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            target_id: expected_target.clone(),
                             changed: false,
                             warnings: Vec::new(),
                             storage_warnings,
@@ -3123,7 +3120,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         != Some(ReadinessCorrection::Demote)
                     {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            target_id: expected_target.clone(),
                             changed: false,
                             warnings: Vec::new(),
                             storage_warnings,
@@ -3134,7 +3130,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            target_id: expected_target.clone(),
                             changed: false,
                             warnings: Vec::new(),
                             storage_warnings,
@@ -3261,7 +3256,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return match after_apply_error {
                     Some(error) => Err(error.into()),
                     None => Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                        target_id: expected_target.clone(),
                         changed,
                         warnings,
                         storage_warnings,
@@ -3276,7 +3270,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
             }
             Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                target_id: expected_target.clone(),
                 changed,
                 warnings,
                 storage_warnings,

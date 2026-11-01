@@ -1386,6 +1386,9 @@ pub enum GateCommands {
     /// run's verdict over the same content, and its run record names the run
     /// that verdict came from. Every manual evaluation records a fresh
     /// attestation. Use --force to execute an automated checker unconditionally.
+    ///
+    /// A pass that clears the last unpassed gate of a gated issue moves it to
+    /// done and promotes its dependents.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1429,7 +1432,8 @@ pub enum GateCommands {
     /// Automated gates inherit declared-input verdict reuse; every manual gate
     /// records a fresh attestation. Use --force to execute every automated
     /// checker. An issue with no required gates
-    /// succeeds (exit 0) with an empty result set.
+    /// succeeds (exit 0) with an empty result set. A gated issue moves to done
+    /// once every gate in the run has passed.
     EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,

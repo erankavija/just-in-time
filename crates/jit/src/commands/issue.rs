@@ -656,10 +656,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         })
     }
 
-    /// Update issue state with precheck/postcheck hooks
-    ///
-    /// This method runs prechecks before transitioning to in_progress
-    /// and postchecks when transitioning to Gated.
+    /// Update issue state, running prechecks before a transition to in_progress.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
     ///
@@ -676,18 +673,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let outcome = self.exec.publish_captured_state_transition(
-            id,
-            new_state,
-            false,
-            new_state == State::Done,
-            true,
-        )?;
-        if new_state == State::Gated {
-            self.exec.run_postchecks(&outcome.target_id)?;
-        }
-
-        Ok(outcome.warnings)
+        Ok(self
+            .exec
+            .publish_captured_state_transition(
+                id,
+                new_state,
+                false,
+                new_state == State::Done,
+                true,
+            )?
+            .warnings)
     }
 
     /// Reject an issue, recording `reason` as its `resolution:` label in the
@@ -1591,38 +1586,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_gated_postchecks_keep_resolved_target_after_a_new_issue_appears() {
-        let storage = InMemoryStorage::new();
-        seed_scenario_gates(&storage);
-        let executor = memory_executor_declaring(
-            storage,
-            MemoryDeclarations {
-                config: Some(&scenario_config()),
-                ..MemoryDeclarations::default()
-            },
-        );
-        let mut issue = crate::test_utils::fixture_issue("Target".to_string(), String::new());
-        issue.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_abcd_1111);
-        issue.state = State::InProgress;
-        crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
-
-        let outcome = executor
-            .publish_captured_state_transition(&issue.id, State::Gated, false, false, true)
-            .unwrap();
-        let mut collision =
-            crate::test_utils::fixture_issue("Collision".to_string(), String::new());
-        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_abcd_2222);
-        crate::commands::test_helpers::seed_issue(&executor.storage, collision);
-
-        executor.run_postchecks(&outcome.target_id).unwrap();
-        assert_eq!(outcome.target_id, issue.id);
-        assert_eq!(
-            executor.storage.load_issue(&issue.id).unwrap().state,
-            State::Done
-        );
-    }
-
-    #[test]
     fn test_rejected_state_bypasses_gates() {
         let storage = InMemoryStorage::new();
         seed_scenario_gates(&storage);
@@ -1782,6 +1745,38 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             after.updated_at, updated_after_first,
             "retrying done on a gated issue must not bump updated_at"
         );
+    }
+
+    #[test]
+    fn test_update_issue_done_request_on_done_issue_succeeds_as_noop() {
+        let executor =
+            memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
+        issue.state = State::Done;
+        let issue_id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+
+        executor
+            .issues()
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().state,
+            State::Done
+        );
+        assert!(executor.storage.read_events().unwrap().is_empty());
     }
 
     /// The CLI path `jit issue update <id> --state done` goes through
