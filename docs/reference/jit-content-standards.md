@@ -12,6 +12,6 @@ and review prompts. Ordinary `jit init` does not install it;
 `jit profile apply --profile packages/jit-dogfood` do.
 See
 [Repository Profiles](profiles.md) for how that package is obtained and
-applied, and for the lifecycle contract.
+applied.
 The content standard is profile-installed workflow policy, not an engine
 default or a requirement for repositories that use plain initialization.
