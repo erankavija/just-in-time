@@ -170,6 +170,22 @@ assert "a dirty path outside .jit refuses" equal "$STATUS" 1
 assert "the refusal names the path" contains "$OUT" uncommitted.txt
 assert "the dirty refusal commits nothing" equal "$(git rev-parse HEAD)" "$prior"
 
+new_repo typo
+issue Pending > /dev/null
+prior="$(git rev-parse HEAD)"
+land_status no-such-branch
+assert "an unknown branch refuses" equal "$STATUS" 1
+assert "the refusal names the branch" contains "$OUT" no-such-branch
+assert "an unknown branch makes no sync commit" equal "$(git rev-parse HEAD)" "$prior"
+
+new_repo data-dir
+issue Pending > /dev/null
+prior="$(git rev-parse HEAD)"
+OUT="$(JIT_DATA_DIR="$PWD/.jit" "$LAND" side 2>&1)"; STATUS=$?
+assert "JIT_DATA_DIR refuses" equal "$STATUS" 1
+assert "the refusal names JIT_DATA_DIR" contains "$OUT" JIT_DATA_DIR
+assert "JIT_DATA_DIR commits nothing" equal "$(git rev-parse HEAD)" "$prior"
+
 new_repo refused-hook
 issue Pending > /dev/null
 printf '#!/bin/sh\necho hook refused >&2\nexit 1\n' > .git/hooks/pre-commit

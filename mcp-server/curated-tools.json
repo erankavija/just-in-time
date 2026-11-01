@@ -1,12 +1,16 @@
 {
   "policy": [
     "Every tool generated from `jit --schema` appears exactly once in `include` or `exclude`, with a one-line rationale.",
+    "A command in `forbidden` generates no tool at all, so neither `JIT_MCP_ALL_TOOLS=1` nor a call by name reaches it.",
     "Include a command when an autonomous agent drives it directly: find work, claim it, inspect it, transition it, check gates, read repository structure.",
     "Exclude interactive setup, destructive operations, registry and host administration, alias spellings, and human-ergonomics reporting.",
     "A command hidden in the CLI schema is always excluded here; this manifest may narrow the set further, never widen it.",
     "Adding a CLI command fails the coverage test until it is curated. `JIT_MCP_ALL_TOOLS=1` exposes the full generated set for operators who want it.",
     "max_curated_tools is the ceiling the test suite enforces: the curated count plus 11 slots (25% headroom). One maintenance batch's worth of deliberate inclusions fits without touching the bound; the next one forces a re-curation, which is the point of the bound. Each advertised tool spends client context, so the ceiling is a budget rather than a formality."
   ],
+  "forbidden": {
+    "jit_worktree_exec": "Runs an arbitrary host command, which no MCP client reaches through the tracker."
+  },
   "max_curated_tools": 55,
   "include": {
     "jit_status": "Repository-wide counts: the cheapest orientation call an agent can make.",
@@ -69,7 +73,6 @@
     "jit_snapshot_export": "Archival export for maintainers.",
     "jit_profile_pack": "Writes a package archive to hand to someone outside this repository; distribution is a maintainer step, not work an agent drives here.",
     "jit_profile_add": "Places a package obtained out of band into the worktree; which archive to trust is a human decision made before any agent connects.",
-    "jit_worktree_exec": "Runs an arbitrary host command, which no MCP client should reach through the tracker.",
     "jit_worktree_info": "Worktree identity is host state the agent already has from its shell.",
     "jit_worktree_list": "Fleet-wide worktree inspection is a coordinating lead's view.",
     "jit_worktree_store-divergence": "Cross-checkout store divergence is a recovery diagnostic a human runs on a suspect checkout; the report names no repair an agent can perform.",

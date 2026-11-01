@@ -17,6 +17,8 @@ refuse() { echo "land: $*" >&2; exit 1; }
 
 land() { # branch
     local foreign conflicts
+    git rev-parse --verify --quiet --end-of-options "$1^{commit}" > /dev/null ||
+        refuse "'$1' names no commit"
     foreign="$(git status --short -uall -- . ':(exclude).jit' ':(exclude,glob)**/.jit-bootstrap.lock')"
     [[ -z "$foreign" ]] || refuse "uncommitted changes outside .jit:"$'\n'"$foreign"
     if [[ -n "$(git status --short -uall -- "${TRACKER[@]}")" ]]; then
@@ -37,6 +39,7 @@ if [[ "$1" == --locked ]]; then
     exit
 fi
 [[ $# -eq 1 ]] || refuse "usage: land.sh <branch>"
+[[ -z "${JIT_DATA_DIR:-}" ]] || refuse "JIT_DATA_DIR is set, but this script commits .jit only"
 root="$(git rev-parse --show-toplevel 2> /dev/null)" || refuse "requires a git repository"
 cd "$root"
 exec jit worktree exec -- bash "${BASH_SOURCE[0]}" --locked "$1"

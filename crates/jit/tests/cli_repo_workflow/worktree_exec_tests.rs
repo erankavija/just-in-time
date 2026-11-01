@@ -79,6 +79,10 @@ fn test_worktree_exec_refuses_a_leftover_redo_record_without_applying_it() {
     let output = exec(&cli, &["sh", "-c", "touch ran"]);
 
     assert_refused(&output, ErrorCode::GenericError);
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let message = envelope["error"]["message"].as_str().unwrap();
+    assert!(message.contains(record.to_str().unwrap()), "{message}");
+    assert!(message.contains("jit recover"), "{message}");
     assert!(!cli.root().join("ran").exists());
     assert_eq!(std::fs::read_to_string(&record).unwrap(), "leftover");
 }
