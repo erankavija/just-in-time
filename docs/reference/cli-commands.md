@@ -696,12 +696,14 @@ Human output shows one line per profile with its ID, version, origin, and status
 decision with its action — targets first, then declarations — and the
 reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
-return, with `status` additionally reporting `would_conflict`.
+return, with `status` additionally reporting `would_conflict`. A selection whose
+proposed repository fails final validation, such as one leaving a configured
+projection stale, also reports `would_conflict`, with `refusal` stating why on
+each profile that would publish.
 
 The report writes nothing: no target and no audit event.
 It exits `0` when every participating profile can be published and `4` when any
-decided a target or a declaration that cannot be, so it serves as a repository
-check. The report
+cannot be, so it serves as a repository check. The report
 is the answer either way, carried by the shared typed error envelope when the
 command exits `4`.
 

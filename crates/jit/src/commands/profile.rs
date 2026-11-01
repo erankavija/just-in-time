@@ -1116,16 +1116,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             if plan.delta().actions().is_empty() {
                 return Ok(SessionStep::Done(results(&|_| false)?));
             }
-            let overrides = super::validation_overlay(plan.image(), plan.delta())?;
-            let proposed = apply_overlay(plan.image(), overrides).map_err(anyhow::Error::from)?;
-            let validation = crate::validation::repository::validate_repository(&proposed)
-                .map_err(ProfileApplyError::from)?;
-            if validation.rule_report.has_errors() {
-                return Err(ProfileApplyError::FinalValidationFindings {
-                    error_count: validation.rule_report.error_count(),
-                }
-                .into());
-            }
             let applied =
                 results(&|package| plan.applied_profiles().contains(&package.model().id))?;
             Ok(SessionStep::Apply(plan, applied))
@@ -1159,16 +1149,31 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             else {
                 return Ok(SessionStep::Retry);
             };
+            // A plan its decisions already refuse never reaches final validation
+            // in the publication this previews, and its overlay omits what they
+            // refuse.
+            let refusal = match response {
+                ProfileConflictResponse::Report
+                    if crate::profile::ensure_publishable_targets(&plan).is_ok() =>
+                {
+                    final_validation_refusal(&plan)?.map(|refusal| refusal.to_string())
+                }
+                _ => None,
+            };
             let rehearsed = selection
                 .members
                 .iter()
                 .map(|member| {
-                    Ok(profile_plan_entry(
+                    let entry = profile_plan_entry(
                         &plan,
                         &member.package.model().id,
                         &member.package.model().version,
                         package_origin(&member.package, &layout)?,
-                    ))
+                    );
+                    Ok(match &refusal {
+                        Some(refusal) => entry.refused_by(refusal),
+                        None => entry,
+                    })
                 })
                 .collect::<Result<Vec<_>>>()?;
             let plans = selection_observations(rehearsed, &selection.roots)?;
@@ -1213,10 +1218,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// the final aggregate plan reaches `session.apply`.
     ///
     /// `response` decides what a decision that cannot be published does here.
-    /// Every route that publishes or rehearses a publication refuses it, and
-    /// the difference report is the sole reader that carries it through, so a
-    /// conflicting target or declaration reaches an adopter as a report entry
-    /// exactly once and as a refusal everywhere else.
+    /// Every route that publishes or rehearses a publication refuses it, final
+    /// validation included, and the difference report is the sole reader that
+    /// carries it through, so a conflicting target or declaration reaches an
+    /// adopter as a report entry exactly once and as a refusal everywhere else.
     fn prepare_profile_selection(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
@@ -1340,9 +1345,32 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 &self.require_layout()?,
                 self.require_worktree_paths()?,
             )?;
+            if let Some(refusal) = final_validation_refusal(&plan)? {
+                return Err(refusal.into());
+            }
         }
         Ok(Some(plan))
     }
+}
+
+/// Why final validation refuses the repository `plan` would publish, if it does.
+fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<ProfileApplyError>> {
+    if plan.delta().actions().is_empty() {
+        return Ok(None);
+    }
+    let overrides = super::validation_overlay(plan.image(), plan.delta())?;
+    let proposed = apply_overlay(plan.image(), overrides)?;
+    Ok(
+        match crate::validation::repository::validate_repository(&proposed) {
+            Err(failure) => Some(failure.into()),
+            Ok(validation) if validation.rule_report.has_errors() => {
+                Some(ProfileApplyError::FinalValidationFindings {
+                    error_count: validation.rule_report.error_count(),
+                })
+            }
+            Ok(_) => None,
+        },
+    )
 }
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
@@ -4568,6 +4596,53 @@ template = true
             .expect("an applied declaration is reportable");
         let published = declared(&reported(&republished, "workflow"), &identity);
         assert_eq!(published.action, ProfileTargetAction::Unchanged);
+    }
+
+    /// A selection final validation refuses, as it does one leaving a configured
+    /// projection stale, is refused by the rehearsal and stated by the report in
+    /// the words the application refuses in.
+    #[test]
+    fn test_profile_previews_report_the_final_validation_refusal_apply_raises() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let config = temp.path().join(".jit/config.toml");
+        let authored = fs::read_to_string(&config).unwrap();
+        fs::write(
+            &config,
+            format!("{authored}{}", crate::test_utils::GATE_PROJECTION_CONFIG),
+        )
+        .unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        executor.project_render(None).unwrap();
+        let package = authored_package(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "docs/workflow.txt",
+            "workflow",
+            crate::test_utils::NEW_GATE_CONTRIBUTION,
+        );
+        let selectors = [package_selector(&package)];
+        let options = supplied_values(&[]);
+        let before = repository_files(&temp);
+
+        let refusal = apply_selected(&executor, &selectors, &options)
+            .expect_err("the package leaves the projection stale")
+            .to_string();
+        let rehearsal = plan_selected(&executor, &selectors, &options)
+            .expect_err("a rehearsal fails where its publication would");
+        let report = diff_selected(&executor, &selectors, &options)
+            .expect("the report states the refusal rather than raising it");
+
+        assert!(refusal.contains("docs/gates.md"), "{refusal}");
+        assert!(matches!(
+            rehearsal.downcast_ref::<ProfileApplyError>(),
+            Some(ProfileApplyError::FinalValidation(_))
+        ));
+        assert_eq!(rehearsal.to_string(), refusal);
+        let entry = reported(&report, "workflow");
+        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.refusal.as_deref(), Some(refusal.as_str()));
+        assert_eq!(repository_files(&temp), before, "nothing is written");
     }
 
     /// A package reapplied with a changed definition of its own declaration

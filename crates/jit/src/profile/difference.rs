@@ -129,6 +129,7 @@ pub(crate) fn profile_plan_entry(
         status,
         targets,
         contributions,
+        refusal: None,
     }
 }
 
