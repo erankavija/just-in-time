@@ -22308,3 +22308,4 @@
 {"assignee":"agent:worker","id":"14e5f456-b095-4a46-a46a-418ad12df525","issue_id":"945f9181-1066-4c5b-ac0f-5225bd59a6b0","timestamp":"2026-11-01T17:31:18.617777413Z","type":"issue_claimed"}
 {"fields":["description"],"id":"a876c78a-57f2-4210-b7f7-bc1d296353bd","issue_id":"945f9181-1066-4c5b-ac0f-5225bd59a6b0","timestamp":"2026-11-01T17:31:18.716181846Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["assignee"],"id":"58767481-17d2-4b93-9055-9b5a7392dcca","issue_id":"945f9181-1066-4c5b-ac0f-5225bd59a6b0","timestamp":"2026-11-01T17:31:18.751963524Z","type":"issue_updated","updated_by":"issue-unassign"}
+{"gate_key":"code-review","id":"ac23f807-8c3b-4bcb-ad52-84054a4af1b3","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T17:34:01.520981881Z","type":"gate_failed","updated_by":"auto:executor"}

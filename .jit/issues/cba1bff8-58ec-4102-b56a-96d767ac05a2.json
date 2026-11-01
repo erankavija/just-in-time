@@ -19,9 +19,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "91c405c9-ab69-4df4-9242-fc4db0ce0fb3",
+      "run_id": "0a5bd967-c7c5-406e-80ea-a4fbc132a317",
       "status": "failed",
-      "updated_at": "2026-11-01T16:56:53.803426989Z",
+      "updated_at": "2026-11-01T17:34:01.520981881Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rejecting an issue does not promote its dependents",
-  "updated_at": "2026-11-01T17:31:18.531858902Z"
+  "updated_at": "2026-11-01T17:34:01.520981881Z"
 }
