@@ -69,12 +69,11 @@ Fixed code is commit `61a07d756`; pre-fix code is its parent's `test_utils.rs` a
 
 ### Where a cold build spent its time
 
-A pre-fix cold `jit-dogfood` build issues 171 `fsync` calls. On a quiet host they
-take 0.96 s of a roughly 1.1 s build (`strace -f -T`), and 24 concurrent consumers all
-finish within 1.29 s, so lock queueing, polling and retirement are not the cost. With
-7.5 GB of unsynced writes on the same filesystem, the same single-process build took
-77.6 s and 13.9 s, because ext4's ordered-mode journal commit makes each `fsync` wait
-on that backlog. The fix initializes over memory and writes the tree without a sync.
+A cold `jit-dogfood` build's time goes to `fsync`, and with a large backlog of unsynced
+writes on the same filesystem ext4's ordered-mode journal commit makes each `fsync` wait on
+that backlog. The fix initializes over memory and writes the tree without a sync. To see it,
+run `strace -f -T -e trace=fsync` over a cold build, with and without the writers in the
+reproduction below.
 
 Raw output of these runs is in [`measurement-log-c780514e.txt`](measurement-log-c780514e.txt), with the sampling script.
 
