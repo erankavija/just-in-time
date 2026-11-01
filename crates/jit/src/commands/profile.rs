@@ -13,7 +13,7 @@ use crate::profile::{
     VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::repository_state::{
-    apply_overlay, classify_repository_export, derive_materialization,
+    apply_overlay, classify_repository_export, derive_materialization, drop_overridden_claims,
     finalize_package_tree_capture, CaptureBudget, CapturedTreeFile, FileMode, MaterializationPlan,
     MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
     ProfileContributionClaim, RepositoryAction, RepositoryEntry, RepositoryExportDestination,
@@ -867,16 +867,26 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        let contribution_context = members
+        let claims = drop_overridden_claims(
+            members
+                .iter()
+                .map(|member: &SelectedProfile| member.input.claims.clone())
+                .collect(),
+            &graph.transitive_dependencies(),
+        );
+        let contribution_context = claims
             .iter()
-            .flat_map(|member| member.input.claims.contributions.iter().cloned())
+            .flat_map(|claims| claims.contributions.iter().cloned())
             .collect::<Vec<_>>();
         let members = members
             .into_iter()
-            .map(|member| SelectedProfile {
-                input: member
-                    .input
-                    .with_contribution_context(&contribution_context),
+            .zip(claims)
+            .map(|(member, claims)| SelectedProfile {
+                input: ProfileApplicationInput {
+                    claims,
+                    ..member.input
+                }
+                .with_contribution_context(&contribution_context),
                 ..member
             })
             .collect();
@@ -1804,9 +1814,9 @@ mod tests {
         ProfileContributionChange, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
     };
     use crate::repository_state::{
-        Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
-        ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
-        RepositoryStateError, RootRelativePath, ScalarTarget, SetStringTarget,
+        Contribution, ContributionConflictOwner, MapEntryTarget, ProfileTargetConflict,
+        ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
+        ScalarTarget, SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{
@@ -2225,38 +2235,6 @@ mod tests {
                 panic!("this refusal is about a target, not the declaration '{identity}'")
             }
         }
-    }
-
-    /// The one declaration `error` refused, beside every owner defining it.
-    ///
-    /// A contested declaration reaches an adopter as a refused decision of the
-    /// same shape a contested target does, so a test reads it out of the one
-    /// refusal rather than out of a second error family
-    /// (`@/invariant/semantic-test-assertions`). Every profile that declares it
-    /// decides it, so a selection carrying two of them refuses the same
-    /// declaration once per profile and states one answer.
-    fn refused_declaration(
-        error: &anyhow::Error,
-    ) -> (ContributionIdentity, Vec<ContributionConflictOwner>) {
-        let declarations = refused_targets(error)
-            .iter()
-            .filter_map(|entry| match (&entry.subject, &entry.conflict) {
-                (
-                    ProfileTargetSubject::Contribution(identity),
-                    ProfileTargetConflict::Contested { owners },
-                ) => Some((identity.clone(), owners.clone())),
-                _ => None,
-            })
-            .collect::<BTreeSet<_>>();
-        assert_eq!(
-            declarations.len(),
-            1,
-            "this selection refuses one declaration: {error:#}"
-        );
-        declarations
-            .into_iter()
-            .next()
-            .expect("the refused declaration")
     }
 
     #[test]
@@ -3692,10 +3670,10 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_preflights_a_conflicting_dependency_closure() {
+    fn test_apply_profile_package_publishes_the_dependents_value_of_a_shared_declaration() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
-        let namespace = "closure-conflict";
+        let namespace = "closure-override";
         package_declaring_contribution(
             &temp,
             "vendor/base",
@@ -3713,22 +3691,11 @@ template = true
             "Workflow definition.",
         );
 
-        let error = executor.apply_profile_package(&workflow).unwrap_err();
+        executor.apply_profile_package(&workflow).unwrap();
 
-        let (_, owners) = refused_declaration(&error);
-        assert_eq!(
-            owners,
-            vec![
-                ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
-                ContributionConflictOwner::Package(ProfileId::try_from("workflow").unwrap()),
-            ]
-        );
-        for path in ["docs/base.txt", "docs/workflow.txt"] {
-            assert!(
-                !temp.path().join(path).exists(),
-                "the conflicting closure published {path}"
-            );
-        }
+        let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+        assert!(config.contains("Workflow definition."));
+        assert!(!config.contains("Base definition."));
     }
 
     #[test]

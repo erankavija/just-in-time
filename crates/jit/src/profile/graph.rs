@@ -188,6 +188,26 @@ impl ResolvedProfileGraph {
             .collect()
     }
 
+    /// Each participating package's transitive dependencies.
+    pub fn transitive_dependencies(&self) -> BTreeMap<ProfileId, BTreeSet<ProfileId>> {
+        self.order.iter().fold(BTreeMap::new(), |mut closure, id| {
+            let required = self.dependencies.get(id).into_iter().flatten();
+            let reached = required
+                .flat_map(|dependency| {
+                    closure
+                        .get(dependency)
+                        .into_iter()
+                        .flatten()
+                        .chain(std::iter::once(dependency))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            closure.insert(id.clone(), reached);
+            closure
+        })
+    }
+
     /// Return the selected roots and their dependency closure in canonical
     /// dependency-first order. Unselected applied packages are constraints,
     /// not packages to publish again.
@@ -345,6 +365,46 @@ mod tests {
                 .map(|package| package.model().id.to_string())
                 .collect::<Vec<_>>(),
             vec!["alpha", "zulu"]
+        );
+    }
+
+    #[test]
+    fn test_transitive_dependencies_closes_over_a_chain() {
+        let temp = TempDir::new().unwrap();
+        let packages = [("top", Some("middle")), ("middle", Some("base")), ("base", None)]
+            .map(|(id, dependency)| {
+                let _ = package_tree(&temp, id);
+                let declared = dependency
+                    .map(|dependency| format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n"))
+                    .unwrap_or_default();
+                std::fs::write(
+                    temp.path().join(id).join("manifest.toml"),
+                    format!(
+                        "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n{declared}\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"docs/{id}.txt\"\n"
+                    ),
+                )
+                .unwrap();
+                let package = ProfilePackage::from_directory(&temp.path().join(id)).unwrap();
+                (package.model().id.clone(), package)
+            })
+            .into_iter()
+            .collect();
+
+        let closure = ResolvedProfileGraph::resolve(
+            packages,
+            selected(&["top"]),
+            &EngineVersion::running().unwrap(),
+        )
+        .unwrap()
+        .transitive_dependencies();
+
+        assert_eq!(
+            closure[&ProfileId::try_from("top").unwrap()],
+            selected(&["middle", "base"])
+        );
+        assert_eq!(
+            closure[&ProfileId::try_from("base").unwrap()],
+            selected(&[])
         );
     }
 

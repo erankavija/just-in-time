@@ -160,7 +160,8 @@ pub use profile_apply::{
     ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    drop_overridden_claims, profile_capture_closure, profile_contribution_overrides,
+    profile_contribution_target_paths,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,

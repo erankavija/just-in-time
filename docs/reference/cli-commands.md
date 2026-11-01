@@ -676,9 +676,9 @@ would `create` or `update`, the derived files it would `remove`, the ones alread
 reason. The targets include every file the publication writes, among them the
 default schemas it derives from a changed registry. The event log is left out:
 a publication only appends its lifecycle event there. A conflict arises only
-when selected packages define one target or declaration differently, and its
-reason names those packages; the repository's current content is never a party
-to it.
+when packages with no dependency path between them define one target or
+declaration differently, and its reason names those packages; the repository's
+current content is never a party to it.
 
 Beside those targets it states the registry declarations that profile decided,
 in the same vocabulary and each named by its semantic identity — the registry,

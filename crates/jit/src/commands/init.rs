@@ -792,7 +792,7 @@ mod tests {
             &repo,
             "packages/workflow",
             "workflow",
-            &["base"],
+            &[],
             "Workflow initialization definition.",
         );
 
@@ -800,7 +800,10 @@ mod tests {
             .unwrap()
             .initialize_selected(
                 repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
+                &[
+                    ProfileSelector::path(repo.path().join("packages/base")),
+                    ProfileSelector::path(repo.path().join("packages/workflow")),
+                ],
             )
             .unwrap_err();
 
