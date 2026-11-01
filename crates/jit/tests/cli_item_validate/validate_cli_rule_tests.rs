@@ -858,15 +858,6 @@ fn test_mcp_generates_validate_tool_with_id_and_explain() {
     let schema_json = String::from_utf8(schema_out.stdout).unwrap();
 
     let mcp_dir = mcp_server_dir();
-    // Skip gracefully if node is unavailable in the environment.
-    let node = match Command::new("node").arg("--version").output() {
-        Ok(o) if o.status.success() => "node",
-        _ => {
-            eprintln!("node not available; skipping MCP parity assertion");
-            return;
-        }
-    };
-
     let script = r#"
 import { generateTools } from './lib/tool-generator.js';
 let data = '';
@@ -887,14 +878,16 @@ process.stdin.on('end', () => {
 });
 "#;
 
-    let mut child = Command::new(node)
+    let mut child = Command::new("node")
         .current_dir(&mcp_dir)
         .args(["--input-type=module", "-e", script])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .expect("spawn node");
+        .expect(
+            "node is required for the MCP tool-generation parity test and could not be spawned",
+        );
     {
         use std::io::Write;
         child
