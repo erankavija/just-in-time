@@ -1,0 +1,40 @@
+{
+  "branch": "worktree-agent-1a3db2c3",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2f90720e40ff901d4d5a8a805012a9c341d7b44",
+  "completed_at": "2026-11-01T04:15:06.354286177Z",
+  "duration_ms": 201737,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1a3db2c3/requirement/REQ-03",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "REQ-03 requires a report listing and justifying remaining raw identity sites, but no such report was included."
+      }
+    ],
+    "summary": "REQ-03's required raw-identity-site report is missing.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "65249190-f03e-4f36-98fa-4530f86f90e3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:11:44.617231547Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15069 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7abcc22d\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1954e-6311-7fa0-b9e1-98d0747b227e\n--------\nuser\n--- 15056 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0adedfa67, e34855dd2, e2f90720e\nPolicy sources: AGENTS.md\nResolved items: @/issue/1a3db2c3/requirement/REQ-01–REQ-04 (.jit/issues/1a3db2c3-0faa-42c9-9498-d7bf7c0efaee.json); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/2195c98f/requirement/REQ-17 (issue record)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T04:10:22Z); code-review pending (no run)\nTruncation recovery: reread e34855dd2 per changed-path group; inspected current graph property tests and all graph call sites\n1. **Blocking, issue-impact:** REQ-03 requires the change’s report to list and justify every remaining raw issue-id, gate-key, and gate-run-id site. The implementation commit changes 20 Rust files but no report/documentation file, and its commit message contains no such report. The scoped scan found raw identity fields only in permitted CLI boundaries, but the required inventory and justification are absent. Add the report. References: @/issue/1a3db2c3/requirement/REQ-03, @/invariant/semantic-types.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-03's required raw-identity-site report is missing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-03 requires a report listing and justifying remaining raw identity sites, but no such report was included.\",\"references\":[\"@/issue/1a3db2c3/requirement/REQ-03\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

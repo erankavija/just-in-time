@@ -5,7 +5,15 @@
   "created_at": "2026-11-01T03:56:31.333855822Z",
   "dependencies": [],
   "description": "Carry node ids through the dependency graph as the node's own typed id, so issue ids stay `IssueId` across every graph operation.\n\n## Background\n\n`GraphNode` (`crates/jit/src/graph/mod.rs`) exposes `fn id(&self) -> &str`, and `DependencyGraph` takes and returns string ids: `validate_add_dependency(from_id: &str, to_id: &str)`, `get_dependents(node_id: &str)`, `get_transitive_dependents`, `get_transitive_dependencies`, `compute_transitive_reduction` and `GraphError::NodeNotFound { id: String }`. Callers convert with `as_str()` at each call. Implementors are `Issue`, the template-expansion prospective node (`crates/jit/src/commands/template_expand.rs`), the hierarchy edge view and test fixtures. `HierarchyNode` already declares an associated `Id` type, the form to converge on (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphNode` declares an associated id type, and `Issue`'s is `IssueId`.\n- [hard] REQ-02: `DependencyGraph` methods take and return that id type, and graph errors carry it, so no production caller converts an issue id to a string to call the graph.\n- [hard] REQ-03: Across `crates/`, no production code outside CLI argument structs, server extractors, serde impls and rendering holds an issue id, gate key or gate-run id as a raw string, with each remaining site listed and justified in the change's report.\n- [hard] REQ-04: Graph property tests still run over non-UUID fixture ids, and CLI and server JSON is unchanged.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/2195c98f-semantic-types/raw-identity-sites.md"
+    }
+  ],
   "first_ready_at": "2026-11-01T03:56:31.333855822Z",
   "gates_required": [
     "cargo-ci",
@@ -16,6 +24,12 @@
       "run_id": "c241c921-e397-4ca3-aab5-5222c9c15843",
       "status": "passed",
       "updated_at": "2026-11-01T04:11:44.138467946Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "65249190-f03e-4f36-98fa-4530f86f90e3",
+      "status": "failed",
+      "updated_at": "2026-11-01T04:15:06.598511032Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The dependency graph carries typed node ids",
-  "updated_at": "2026-11-01T04:11:44.138467946Z"
+  "updated_at": "2026-11-01T04:15:28.281507128Z"
 }
