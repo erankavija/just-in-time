@@ -3189,6 +3189,39 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
+    fn test_label_target_validation_records_ambiguous_target_as_error_run_naming_label() {
+        let executor = setup();
+        for id in [
+            crate::test_utils::issue_id(0xdead_beef),
+            crate::test_utils::issue_id(0x1_deadbeef),
+        ] {
+            let mut target =
+                crate::test_utils::fixture_issue(format!("Ambiguous target {id}"), String::new());
+            target.id = id;
+            seed_issue(executor.storage(), target);
+        }
+        let issue_id = add_builtin_gate(
+            &executor,
+            &"arbitrary-coverage-key".parse().unwrap(),
+            GateChecker::LabelTargetValidation {
+                label_namespace: "coverage-target".to_string(),
+            },
+            vec![
+                "type:task".to_string(),
+                "coverage-target:deadbeef".to_string(),
+            ],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert!(result.stderr.contains("coverage-target:deadbeef"));
+        assert!(result.stderr.to_lowercase().contains("ambiguous"));
+    }
+
+    #[test]
     fn test_label_target_validation_passes_for_short_id_target() {
         let executor = setup();
         let mut target =
