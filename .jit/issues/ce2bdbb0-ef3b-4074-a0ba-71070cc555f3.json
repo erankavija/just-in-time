@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "1503eff8-fb47-4463-bcc0-a67998d849af",
+      "run_id": "3c4e1d4c-d7f1-4781-9a47-1ae04725b617",
       "status": "passed",
-      "updated_at": "2026-10-31T23:37:15.478316651Z",
+      "updated_at": "2026-11-01T00:28:22.988341823Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Server issue responses carry the domain short id",
-  "updated_at": "2026-10-31T23:41:00.083408761Z"
+  "updated_at": "2026-11-01T00:28:22.988341823Z"
 }
