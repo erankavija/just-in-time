@@ -394,6 +394,7 @@ fn test_reflected_executable_arm_paths_from_keeps_leaves_and_parents_with_own_fl
                     required: false,
                     description: String::new(),
                     aliases: Vec::new(),
+                    values: Vec::new(),
                 })
                 .into_iter()
                 .collect(),
