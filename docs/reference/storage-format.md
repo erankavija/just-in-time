@@ -363,9 +363,11 @@ Multi-agent coordination state (claim leases and locks) lives under `.git/jit/`,
 the **shared control plane**, not `.jit/`. `.jit/` is per-worktree data;
 `.git/jit/` is shared across every worktree of the same repository (via git's
 common directory), because a lease must be visible to every worktree racing to
-claim the same issue. `jit claim` requires a git repository for this reason:
-outside one, it fails with a typed `ClaimRequiresGitError` (exit code 10) rather
-than falling back to a per-worktree lease store.
+claim the same issue. The repository is the one holding the data root; for a
+data root outside every checkout, it is the one holding the invoking directory.
+`jit claim` requires a git repository for this reason: with neither, it fails
+with a typed `ClaimRequiresGitError` (exit code 10) rather than falling back to a
+per-worktree lease store.
 
 ```
 .git/jit/

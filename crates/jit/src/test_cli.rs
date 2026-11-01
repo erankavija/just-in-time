@@ -83,6 +83,31 @@ impl JitCli {
         Ok((primary, linked))
     }
 
+    /// A primary checkout with one base commit, a linked checkout of it, and a
+    /// store `jit init` made outside both, answered as `(primary, linked, store)`.
+    /// Neither checkout holds a `.jit`.
+    pub fn linked_checkouts_over_external_store() -> Result<(Self, Self, PathBuf)> {
+        let dir = Arc::new(TempDir::new().context("create temporary checkouts")?);
+        let checkout = |name: &str| Self {
+            _dir: Arc::clone(&dir),
+            root: dir.path().join(name),
+        };
+        let (primary, linked) = (checkout("main"), checkout("feature"));
+        let store = dir.path().join("store");
+        std::fs::create_dir(primary.root()).context("create the primary checkout")?;
+        let linked_root = linked.root().to_str().context("utf-8 checkout path")?;
+        primary
+            .init_git()?
+            .commit("base")?
+            .git(["worktree", "add", "-q", linked_root])?;
+        let init = primary
+            .command_with_env(["init"], [("JIT_DATA_DIR", &store)])
+            .output()
+            .context("spawn jit init")?;
+        ensure!(init.status.success(), "jit init failed: {init:?}");
+        Ok((primary, linked, store))
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

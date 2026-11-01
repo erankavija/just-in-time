@@ -752,7 +752,7 @@ fn claims_mutation_guard(
 ) -> Result<Option<crate::storage::claim_coordinator::ClaimsMutationGuard>> {
     use crate::storage::{ClaimCoordinator, FileLocker};
 
-    if !paths.is_git_repository() {
+    if !paths.has_claims_coordination() {
         return Ok(None);
     }
     let agent = crate::agent_config::resolve_agent_id(None)

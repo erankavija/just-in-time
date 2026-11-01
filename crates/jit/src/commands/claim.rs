@@ -686,7 +686,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
 /// Like every mutating command, `jit recover` applies a leftover redo record
 /// when its session opens, before this runs. The routines, in sequence:
 /// - Repairs declaration-derived state through the `jit validate --fix` path
-/// - In a Git repository: cleans up stale claim locks from crashed processes
+/// - With claims coordination: cleans up stale claim locks from crashed processes
 ///   (PID check), rebuilds a corrupted claims index from its append-only log,
 ///   and evicts expired leases; without Git, skips these with a warning
 /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
@@ -717,7 +717,7 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
         report.derived_state_repaired = executor.repair_derived_state(false)?.0;
     }
 
-    if paths.git_repository {
+    if paths.has_claims_coordination() {
         execute_git_recovery(paths, &mut report)?;
     } else {
         report.claims_lease_recovery = RecoveryPhase::Skipped {

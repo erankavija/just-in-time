@@ -530,7 +530,8 @@ repository write, lock, lease, or event append: that checkout's store and event
 log are left exactly as they were, and the refusal names the checkout, the
 stance that refused it, and both ways to permit the operation. Read-only
 commands, commands in the primary checkout, and commands outside version
-control are unaffected by either stance.
+control are unaffected by either stance. A store outside every checkout belongs
+to no linked checkout, so the policy does not govern writes to it.
 
 The classifier is deliberately broader than the divergent-store hazard that
 motivates it: a command that writes only the shared control plane or
