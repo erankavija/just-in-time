@@ -26,7 +26,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Run graph queries on one traversal, one cycle detector and one reverse index",
-  "updated_at": "2026-10-20T20:36:50.388100682Z"
+  "updated_at": "2026-11-01T05:30:04.128579205Z"
 }
