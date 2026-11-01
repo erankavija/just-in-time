@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f704ec08af5b881e819cd4c9fda77c59f399363f",
+  "completed_at": "2026-11-01T14:49:17.698617578Z",
+  "duration_ms": 105495,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/schema.rs",
+        "id": "F1",
+        "line": 438,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/da12ad66/requirement/REQ-02",
+          "@/invariant/canonical-cutover",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "The issue-update state input remains an unconstrained string in the generated schema and MCP tool, so MCP clients can still submit rejected through the removed form."
+      }
+    ],
+    "summary": "The removed rejection form remains accepted by the generated schema and MCP input surface.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "da12ad66-7451-4700-9731-74a36c895bb9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0b427273-f330-44ca-95fb-f7f0a1e6ade6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T14:47:32.202918633Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12315 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19794-9657-7903-88b5-4428f5771f3b\n--------\nuser\n--- 12302 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:da12ad66` commits 32a227da1, 868b55b50, ed712116e, f704ec08a\nPolicy sources: AGENTS.md\nResolved items: @/issue/da12ad66/requirement/REQ-01 and REQ-02 (issue description); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T14:47:06.789538618+00:00)\nTruncation recovery: split tagged patches by commit/path; re-read current CLI, schema, MCP, test, and policy sources in bounded calls\n\n1. **F1 — blocking, issue-impact, high:** REQ-02 is incomplete: the generated `issue_update` schema still represents `--state` as an unrestricted string. [`schema.rs:438`](crates/jit/src/schema.rs:438) derives that type from `Option<String>` in [`cli.rs:946`](crates/jit/src/cli.rs:946), and MCP copies it into `jit_issue_update` then validates any string. Thus MCP clients can still submit `state: \"rejected\"` through the removed form; it merely fails later in CLI dispatch. Add a command-specific state constraint excluding `rejected` and MCP/schema coverage. References: @/issue/da12ad66/requirement/REQ-02, @/invariant/canonical-cutover, @/charter/D-18.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The removed rejection form remains accepted by the generated schema and MCP input surface.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The issue-update state input remains an unconstrained string in the generated schema and MCP tool, so MCP clients can still submit rejected through the removed form.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":438,\"references\":[\"@/issue/da12ad66/requirement/REQ-02\",\"@/invariant/canonical-cutover\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

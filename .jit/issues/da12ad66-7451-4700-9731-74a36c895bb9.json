@@ -17,9 +17,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2c55a366-bb10-4fa6-917f-1437e7d83d22",
+      "run_id": "069bfabe-ad36-4aaa-9867-1121265e709d",
+      "status": "passed",
+      "updated_at": "2026-11-01T14:47:28.423384932Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0b427273-f330-44ca-95fb-f7f0a1e6ade6",
       "status": "failed",
-      "updated_at": "2026-11-01T14:43:40.967326219Z",
+      "updated_at": "2026-11-01T14:49:17.970619582Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Give issue rejection one command form",
-  "updated_at": "2026-11-01T14:43:40.967326219Z"
+  "updated_at": "2026-11-01T14:49:17.970619582Z"
 }
