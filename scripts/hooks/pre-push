@@ -26,7 +26,7 @@ fi
 
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
-  echo "⚠️  Pre-push hook: jq not found, skipping lease validation" >&2
+  echo "warning: Pre-push hook: jq not found, skipping lease validation" >&2
   echo "   Install jq to enable lease checks" >&2
   exit 0
 fi
@@ -62,7 +62,7 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
   
   if [ -z "$agent_id" ]; then
-    echo "❌ Pre-push hook: Pushing structural edits without agent identity" >&2
+    echo "error: Pre-push hook: Pushing structural edits without agent identity" >&2
     echo "   Set JIT_AGENT_ID environment variable or configure ~/.config/jit/agent.toml" >&2
     echo "" >&2
     echo "   Example:" >&2
@@ -76,7 +76,7 @@ while read local_ref local_sha remote_ref remote_sha; do
   # Check each issue has an active, non-stale lease
   claims_index=".git/jit/claims.index.json"
   if [ ! -f "$claims_index" ]; then
-    echo "⚠️  Pre-push hook: No claims index found, skipping lease validation" >&2
+    echo "warning: Pre-push hook: No claims index found, skipping lease validation" >&2
     echo "   Expected: $claims_index" >&2
     exit 0
   fi
@@ -89,7 +89,7 @@ while read local_ref local_sha remote_ref remote_sha; do
       "$claims_index" 2>/dev/null || echo "")
     
     if [ -z "$has_claim" ]; then
-      echo "❌ Pre-push hook: Lease expired for issue $issue_id" >&2
+      echo "error: Pre-push hook: Lease expired for issue $issue_id" >&2
       echo "   Agent: $agent_id" >&2
       echo "" >&2
       echo "   Your changes are being pushed but the lease has expired." >&2
