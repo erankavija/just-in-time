@@ -299,8 +299,10 @@ packages are selected in.
 
 Applying writes the composed value over an existing entry under the same
 identity, replacing the whole entry; fields the package does not state are
-dropped. A local edit to a declared entry or target is overwritten by the next
-application.
+dropped. A committed local edit to a declared entry or target is replaced by the
+next application, and git keeps the prior version. In a git repository an
+application refuses while a path it would write holds uncommitted changes
+([`PROFILE_UNCOMMITTED_TARGETS`](error-codes.md)).
 
 ## Inspect and rehearse
 
