@@ -157,8 +157,7 @@ half-applied profile becomes a fully applied one.
 
 This guarantee covers the files JIT publishes under its own locks and recovery
 protocol; writes another process makes to those files stay outside it. The
-canonical command, conflict, record-location, provenance, and lifecycle contract
-is in [Repository Profiles](../reference/profiles.md).
+canonical package, composition, and lifecycle-event contract is in [Repository Profiles](../reference/profiles.md).
 
 ### Event Logging
 
@@ -657,7 +656,7 @@ jit validate --leases
 # Auto-fix what is mechanically fixable
 jit validate --fix
 # Applies repairable rule/graph/state fixes and derived-state repairs
-# Publishes derived repairs recoverably; ambiguous ownership writes nothing
+# Publishes derived repairs recoverably; an ambiguous target writes nothing
 ```
 
 ## See Also

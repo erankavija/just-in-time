@@ -354,11 +354,11 @@ behavior depends on the arguments.
   pass.
 
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
-fixes, transitive-reduction violations, pending state transitions) and owned
+fixes, transitive-reduction violations, pending state transitions) and
 derived-state drift (default rules and schemas, configured projections). Derived
 repairs publish through one redo record
 ([Publication and Recovery](storage-format.md#publication-and-recovery)) and
-preserve authored or unmanaged bytes. Ambiguous ownership is reported without
+preserve authored or unmanaged bytes. An ambiguous target is reported without
 writes. Coordination state — stale
 locks, the claims index, expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
@@ -427,7 +427,7 @@ Warnings: 1
 Error-severity rule findings print with a leading `error [<rule>]`, warnings with
 `warning [<rule>]`.
 
-If `--fix` cannot prove ownership, human output includes the complete actionable
+If `--fix` cannot repair a target unambiguously, human output includes the complete actionable
 cause chain. With `--json`, the same failure is a standard error object whose
 code is `VALIDATION_FAILED` and whose message retains that chain (for example,
 the target and duplicate delimiter); see
