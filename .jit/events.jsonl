@@ -22008,3 +22008,10 @@
 {"assignee":"agent:jit-execution-lead","id":"8ce0d4bd-205c-4fb5-b10e-7f0da9b3a8c1","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:29:05.741554212Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"8c97dde2-73a1-45a8-891a-5ee25bdea2e8","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:29:23.383445304Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"6d7cbfac-94b0-4b20-b794-57a2c2ff7913","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:30:52.873222034Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"3dffabd2-469b-46d9-8312-413e495693b8","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:36:17.499939107Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"7341c083-9d28-4067-a653-c3d42d4157c8","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:39:29.458866011Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"72bcefca-d32e-477a-8ec0-0d307b3a3c01","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:40:24.261454595Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"f34c7a55-9c2b-4069-a230-41cdb2254f22","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:43:00.457135872Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"f1f897f2-20ce-4d4e-aab0-227bb2a0277c","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:43:28.421305198Z","to":"done","type":"issue_state_changed"}
+{"id":"1b2388f7-4a9b-4832-87ee-afd7c9d2244e","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:43:28.421305198Z","type":"issue_completed"}
+{"from":"backlog","id":"fb5f5edf-b4f3-4dba-a5dd-7944870ecfb6","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:43:28.521606771Z","to":"ready","type":"issue_state_changed"}

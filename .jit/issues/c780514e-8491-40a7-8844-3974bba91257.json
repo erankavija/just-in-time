@@ -133,7 +133,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-11-01T08:05:07.349436962Z"
+  "updated_at": "2026-11-01T10:43:28.521606771Z"
 }
