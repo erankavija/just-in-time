@@ -22469,3 +22469,7 @@
 {"gate_key":"repo-validate","id":"6f343963-763e-41e6-9423-d8ed026e4336","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T19:51:47.065482441Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"6597c5a5-8759-4f8d-ab6c-560aa4cb7543","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T19:52:02.935912170Z","to":"done","type":"issue_state_changed"}
 {"id":"81e29410-fbae-4d8b-83d8-80ad9b8ddf14","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T19:52:02.935912170Z","type":"issue_completed"}
+{"id":"b73f9da2-b710-4d9b-9ce7-dd3872fb6c74","issue_id":"edc8544d-5f5e-497e-9706-c7b4e7235036","priority":"normal","timestamp":"2026-11-01T19:52:46.012160930Z","title":"Report derived documents on every issue surface","type":"issue_created"}
+{"fields":["dependencies"],"id":"edfbfe64-c081-4596-b9a4-655e9fec8015","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T19:52:46.476613863Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"e6fac41e-f777-4250-8683-af338359de08","issue_id":"edc8544d-5f5e-497e-9706-c7b4e7235036","timestamp":"2026-11-01T19:52:46.649383124Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"f644acd0-d6a8-456c-8404-eb853028c82d","issue_id":"edc8544d-5f5e-497e-9706-c7b4e7235036","timestamp":"2026-11-01T19:52:46.649383124Z","type":"issue_claimed"}
