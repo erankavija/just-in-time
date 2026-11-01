@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c82fd86a57c8d2e23dfc1af8cef72d2e6a4399dd",
+  "completed_at": "2026-11-01T15:03:56.986824561Z",
+  "duration_ms": 74888,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Registry renderers now replace differing values by identity, preserve unrelated entries, and provide focused unit coverage across contribution kinds.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5c0bd3ad-1d1b-4eae-a003-08e08a7a3206",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b5df578f-3264-4657-b2fb-bf19159dd46b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:02:42.098807134Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5552d38f9, c82fd86a (the latter is a multi-issue merge; review scoped to its profile-rendering impact)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (.jit issue description); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T15:01:18Z)\nTruncation recovery: reread profile_apply.rs renderer lines 1488–1555 and tests 2328–2528 after aggregate-output truncation\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Registry renderers now replace differing values by identity, preserve unrelated entries, and provide focused unit coverage across contribution kinds.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
