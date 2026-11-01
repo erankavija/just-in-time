@@ -837,6 +837,31 @@ roots = [
 
 [[gates]]
 version = 1
+key = "land-script-test"
+title = "Landing script test suite"
+description = "Runs the jit-execution-lead skill's test-land.sh, which drives land.sh through `jit worktree exec` over fixture repositories it owns: sync commit, merge, conflict abort, refusals and the real pre-commit hook. Any non-zero exit fails the gate."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./.agents/skills/jit-execution-lead/scripts/test-land.sh"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+  ".agents/skills/jit-execution-lead/scripts/land.sh",
+  ".agents/skills/jit-execution-lead/scripts/test-land.sh",
+]
+
+[gates.reserved]
+
+[[gates]]
+version = 1
 key = "package-drift"
 title = "Package Drift"
 description = "The generated registry regions hold what the jit-dogfood package declares, and gate inputs hold their footprints. Runs the dev-only package-drift example."
