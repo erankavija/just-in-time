@@ -308,7 +308,7 @@ pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, Package
         archive: ArchiveMetadata {
             archive_version: ARCHIVE_VERSION,
             id: model.id.clone(),
-            version: model.version.clone(),
+            version: model.version.to_string(),
             package_hash: package.package_hash().clone(),
         },
     })
@@ -640,7 +640,7 @@ fn require_metadata_agreement(
             disagreement(
                 "version",
                 metadata.version.clone(),
-                tree.model().version.clone(),
+                tree.model().version.to_string(),
             )
         });
     if let Some(error) = mismatch {

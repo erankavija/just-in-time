@@ -1,4 +1,5 @@
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
+use semver::{Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -78,10 +79,12 @@ pub struct ProfilePackageModel {
     /// Stable lowercase-kebab package identity.
     pub id: ProfileId,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Semantic range of compatible JIT engine versions.
     #[serde(rename = "compatible-jit")]
-    pub compatible_jit: String,
+    #[schemars(with = "String")]
+    pub compatible_jit: VersionReq,
     /// Ordered dependency requirements.
     #[serde(rename = "dependency")]
     pub dependencies: Vec<ProfileDependencyRequirement>,
@@ -137,7 +140,8 @@ pub struct ProfileDependencyRequirement {
     /// Stable lowercase-kebab dependency identity.
     pub id: ProfileId,
     /// Semantic version requirement for the dependency.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: VersionReq,
 }
 
 /// A package incompatibility and the version requirement it declares.
@@ -146,7 +150,8 @@ pub struct ProfileIncompatibility {
     /// Stable lowercase-kebab incompatible package identity.
     pub id: ProfileId,
     /// Semantic version requirement for the incompatible package.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: VersionReq,
 }
 
 /// A canonical profile-variable name.

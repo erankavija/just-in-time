@@ -3,6 +3,7 @@ use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
 use crate::repository_state::RootRelativePath;
 use schemars::JsonSchema;
+use semver::Version;
 use serde::Serialize;
 use std::collections::BTreeSet;
 
@@ -53,7 +54,8 @@ pub struct ProfileApplyResult {
     /// Stable profile identifier.
     pub id: String,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package bytes were read from.
     pub origin: RootRelativePath,
     /// What this run found or did for this profile.
@@ -143,7 +145,8 @@ pub struct ProfileShowEntry {
     /// Stable profile identifier.
     pub id: String,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Canonical package model produced from the immutable manifest bytes.
     pub manifest: ProfilePackageModel,
     /// Worktree-relative directory the package bytes were read from.
@@ -242,7 +245,8 @@ pub struct ProfilePackEntry {
     /// Stable identifier the packed manifest declares.
     pub id: String,
     /// Semantic version the packed manifest declares.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package bytes were read from.
     pub origin: RootRelativePath,
     /// Identity digest of the packed package.
@@ -274,7 +278,8 @@ pub struct ProfileAddEntry {
     /// Stable identifier the added manifest declares.
     pub id: String,
     /// Semantic version the added manifest declares.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package will be readable at after
     /// publication.
     pub origin: RootRelativePath,

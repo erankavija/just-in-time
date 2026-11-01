@@ -1147,7 +1147,7 @@ mod tests {
     fn profile_input(id: &str) -> ProfileApplicationInput {
         ProfileApplicationInput {
             id: ProfileId::try_from(id).unwrap(),
-            version: "1.0.0".to_string(),
+            version: semver::Version::new(1, 0, 0),
             variables: serde_json::from_value(serde_json::json!({
                 "NAME": {"value": "value", "source": "set"}
             }))

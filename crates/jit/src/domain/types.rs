@@ -1110,7 +1110,8 @@ pub struct ProfileLifecycleProfile {
     /// Stable profile identifier.
     pub id: ProfileId,
     /// The package version applied.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: semver::Version,
     /// The action observed for this profile.
     pub status: ProfileLifecycleStatus,
     /// The variable values applied, by name.

@@ -7,7 +7,7 @@
 
 use super::ProfilePackage;
 use crate::domain::identity::ProfileId;
-use semver::{Version, VersionReq};
+use semver::Version;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// The semantic version of the running JIT engine.
@@ -62,24 +62,10 @@ impl ResolvedProfileGraph {
 
         for package in packages.values() {
             let model = package.model();
-            Version::parse(&model.version).map_err(|source| {
-                ProfileGraphError::InvalidPackageVersion {
-                    package: model.id.to_string(),
-                    value: model.version.clone(),
-                    source,
-                }
-            })?;
-            let requirement = VersionReq::parse(&model.compatible_jit).map_err(|source| {
-                ProfileGraphError::InvalidEngineRequirement {
-                    package: model.id.to_string(),
-                    value: model.compatible_jit.clone(),
-                    source,
-                }
-            })?;
-            if !requirement.matches(&engine.0) {
+            if !model.compatible_jit.matches(&engine.0) {
                 return Err(ProfileGraphError::IncompatibleEngine {
                     package: model.id.to_string(),
-                    required: model.compatible_jit.clone(),
+                    required: model.compatible_jit.to_string(),
                     actual: engine.to_string(),
                 });
             }
@@ -95,27 +81,12 @@ impl ResolvedProfileGraph {
                         dependency: dependency.id.to_string(),
                     });
                 };
-                let version = Version::parse(&resolved.model().version).map_err(|source| {
-                    ProfileGraphError::InvalidPackageVersion {
-                        package: resolved.model().id.to_string(),
-                        value: resolved.model().version.clone(),
-                        source,
-                    }
-                })?;
-                let requirement = VersionReq::parse(&dependency.version).map_err(|source| {
-                    ProfileGraphError::InvalidDependencyRequirement {
-                        package: id.to_string(),
-                        dependency: dependency.id.to_string(),
-                        value: dependency.version.clone(),
-                        source,
-                    }
-                })?;
-                if !requirement.matches(&version) {
+                if !dependency.version.matches(&resolved.model().version) {
                     return Err(ProfileGraphError::DependencyVersionMismatch {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
-                        required: dependency.version.clone(),
-                        found: resolved.model().version.clone(),
+                        required: dependency.version.to_string(),
+                        found: resolved.model().version.to_string(),
                     });
                 }
                 declared.insert(dependency.id.clone());
@@ -125,37 +96,22 @@ impl ResolvedProfileGraph {
 
         for (id, package) in &packages {
             let mut incompatibilities = package.model().incompatibilities.clone();
-            incompatibilities.sort_by(|left, right| {
-                left.id
-                    .cmp(&right.id)
-                    .then_with(|| left.version.cmp(&right.version))
+            incompatibilities.sort_by_cached_key(|incompatibility| {
+                (
+                    incompatibility.id.clone(),
+                    incompatibility.version.to_string(),
+                )
             });
             for incompatibility in incompatibilities {
                 let Some(other) = packages.get(&incompatibility.id) else {
                     continue;
                 };
-                let version = Version::parse(&other.model().version).map_err(|source| {
-                    ProfileGraphError::InvalidPackageVersion {
-                        package: other.model().id.to_string(),
-                        value: other.model().version.clone(),
-                        source,
-                    }
-                })?;
-                let requirement =
-                    VersionReq::parse(&incompatibility.version).map_err(|source| {
-                        ProfileGraphError::InvalidIncompatibilityRequirement {
-                            package: id.to_string(),
-                            other: incompatibility.id.to_string(),
-                            value: incompatibility.version.clone(),
-                            source,
-                        }
-                    })?;
-                if requirement.matches(&version) {
+                if incompatibility.version.matches(&other.model().version) {
                     return Err(ProfileGraphError::IncompatiblePackages {
                         package: id.to_string(),
                         other: incompatibility.id.to_string(),
-                        requirement: incompatibility.version,
-                        other_version: other.model().version.clone(),
+                        requirement: incompatibility.version.to_string(),
+                        other_version: other.model().version.to_string(),
                     });
                 }
             }
@@ -227,20 +183,6 @@ pub enum ProfileGraphError {
     /// A selected id was not present in the candidate map.
     #[error("selected profile '{id}' is missing from the package graph")]
     SelectedPackageMissing { id: String },
-    /// A package version was not semantic.
-    #[error("profile '{package}' has invalid version '{value}': {source}")]
-    InvalidPackageVersion {
-        package: String,
-        value: String,
-        source: semver::Error,
-    },
-    /// A package compatibility range was not semantic.
-    #[error("profile '{package}' has invalid compatible-jit range '{value}': {source}")]
-    InvalidEngineRequirement {
-        package: String,
-        value: String,
-        source: semver::Error,
-    },
     /// A package's engine range excludes the running engine.
     #[error(
         "profile '{package}' requires compatible-jit '{required}', but the running engine is '{actual}'"
@@ -253,16 +195,6 @@ pub enum ProfileGraphError {
     /// A declared dependency is not in the participating map.
     #[error("profile '{package}' declares missing dependency '{dependency}'")]
     MissingDependency { package: String, dependency: String },
-    /// A declared dependency requirement was not semantic.
-    #[error(
-        "profile '{package}' has invalid dependency requirement for '{dependency}' '{value}': {source}"
-    )]
-    InvalidDependencyRequirement {
-        package: String,
-        dependency: String,
-        value: String,
-        source: semver::Error,
-    },
     /// A dependency exists but has the wrong version.
     #[error(
         "profile '{package}' requires dependency '{dependency}' at '{required}', but the participating package provides '{found}'"
@@ -272,16 +204,6 @@ pub enum ProfileGraphError {
         dependency: String,
         required: String,
         found: String,
-    },
-    /// A declared incompatibility requirement was not semantic.
-    #[error(
-        "profile '{package}' has invalid incompatibility requirement for '{other}' '{value}': {source}"
-    )]
-    InvalidIncompatibilityRequirement {
-        package: String,
-        other: String,
-        value: String,
-        source: semver::Error,
     },
     /// A participating package pair violates an incompatibility declaration.
     #[error(

@@ -54,7 +54,7 @@ jsonschema = { version = "0.46", default-features = false }
 toml = "0.8"
 toml_edit = "0.22"
 sha2 = "0.10"
-semver = "1.0"
+semver = { version = "1.0", features = ["serde"] }
 tar = "0.4"
 pulldown-cmark = { workspace = true }
 # Remote document access (external-link reachability checks, commands::document)

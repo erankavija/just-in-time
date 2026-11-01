@@ -249,7 +249,7 @@ impl EventTag {
                     id: "example"
                         .try_into()
                         .expect("sample profile id is canonical"),
-                    version: "1.0.0".to_string(),
+                    version: semver::Version::new(1, 0, 0),
                     status: crate::domain::ProfileLifecycleStatus::Installed,
                     variables: [(
                         "NAME"

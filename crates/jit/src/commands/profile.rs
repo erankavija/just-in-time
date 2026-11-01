@@ -846,10 +846,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("profile '{id}' left the graph being built"))?;
             let mut dependencies = declaring.model().dependencies.clone();
-            dependencies.sort_by(|left, right| {
-                left.id
-                    .cmp(&right.id)
-                    .then_with(|| left.version.cmp(&right.version))
+            dependencies.sort_by_cached_key(|dependency| {
+                (dependency.id.clone(), dependency.version.to_string())
             });
             for dependency in dependencies {
                 if packages.contains_key(&dependency.id) {
@@ -3697,7 +3695,7 @@ template = true
                 ProfileLifecycleOperation::Apply,
                 vec![crate::domain::ProfileLifecycleProfile {
                     id: "prior".try_into().unwrap(),
-                    version: "1.0.0".to_string(),
+                    version: semver::Version::new(1, 0, 0),
                     status: ProfileLifecycleStatus::Installed,
                     variables: Default::default(),
                 }],

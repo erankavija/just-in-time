@@ -1072,20 +1072,9 @@ mod repository_state_classifier_tests {
     fn test_every_profile_graph_error_variant_classifies_as_profile_error_with_its_exit_status() {
         use crate::profile::ProfileGraphError as Graph;
 
-        let semver_error = || semver::Version::parse("not-semver").unwrap_err();
         let text = |value: &str| value.to_string();
         let variants = vec![
             Graph::SelectedPackageMissing { id: text("a") },
-            Graph::InvalidPackageVersion {
-                package: text("a"),
-                value: text("x"),
-                source: semver_error(),
-            },
-            Graph::InvalidEngineRequirement {
-                package: text("a"),
-                value: text("x"),
-                source: semver_error(),
-            },
             Graph::IncompatibleEngine {
                 package: text("a"),
                 required: text("x"),
@@ -1095,23 +1084,11 @@ mod repository_state_classifier_tests {
                 package: text("a"),
                 dependency: text("b"),
             },
-            Graph::InvalidDependencyRequirement {
-                package: text("a"),
-                dependency: text("b"),
-                value: text("x"),
-                source: semver_error(),
-            },
             Graph::DependencyVersionMismatch {
                 package: text("a"),
                 dependency: text("b"),
                 required: text("x"),
                 found: text("y"),
-            },
-            Graph::InvalidIncompatibilityRequirement {
-                package: text("a"),
-                other: text("b"),
-                value: text("x"),
-                source: semver_error(),
             },
             Graph::IncompatiblePackages {
                 package: text("a"),

@@ -6,7 +6,6 @@ use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry};
-use semver::{Version, VersionReq};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -264,42 +263,6 @@ pub enum ProfilePackageError {
         package: String,
         /// Offending dependency entry.
         dependency: String,
-    },
-    /// Invalid semantic package version.
-    #[error("invalid profile version '{value}': {source}")]
-    InvalidVersion {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid compatible JIT version requirement.
-    #[error("invalid compatible JIT requirement '{value}': {source}")]
-    InvalidCompatibility {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid semantic dependency requirement.
-    #[error("invalid dependency requirement for '{dependency}' '{value}': {source}")]
-    InvalidDependencyRequirement {
-        /// Dependency identity.
-        dependency: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
-    },
-    /// Invalid semantic incompatibility requirement.
-    #[error("invalid incompatibility requirement for '{package}' '{value}': {source}")]
-    InvalidIncompatibilityRequirement {
-        /// Incompatible package identity.
-        package: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
     },
     /// Unsafe absolute, traversal, platform-prefix, or empty path.
     #[error("unsafe {field} path '{path}'")]
@@ -592,35 +555,6 @@ fn validate_manifest_declarations(
             dependency: dependency.id.to_string(),
         });
     }
-    Version::parse(&manifest.version).map_err(|source| ProfilePackageError::InvalidVersion {
-        value: manifest.version.clone(),
-        source,
-    })?;
-    VersionReq::parse(&manifest.compatible_jit).map_err(|source| {
-        ProfilePackageError::InvalidCompatibility {
-            value: manifest.compatible_jit.clone(),
-            source,
-        }
-    })?;
-    for dependency in &manifest.dependencies {
-        VersionReq::parse(&dependency.version).map_err(|source| {
-            ProfilePackageError::InvalidDependencyRequirement {
-                dependency: dependency.id.to_string(),
-                value: dependency.version.clone(),
-                source,
-            }
-        })?;
-    }
-    for incompatibility in &manifest.incompatibilities {
-        VersionReq::parse(&incompatibility.version).map_err(|source| {
-            ProfilePackageError::InvalidIncompatibilityRequirement {
-                package: incompatibility.id.to_string(),
-                value: incompatibility.version.clone(),
-                source,
-            }
-        })?;
-    }
-
     let mut contribution_ids = BTreeSet::new();
     for (index, contribution) in manifest.contributions.iter().enumerate() {
         validate_contribution(index, contribution)?;
@@ -1040,7 +974,7 @@ mod tests {
             package.model().dependencies,
             vec![ProfileDependencyRequirement {
                 id: ProfileId::try_from("jit-default").unwrap(),
-                version: "*".to_string(),
+                version: semver::VersionReq::STAR,
             }]
         );
 
@@ -1466,23 +1400,13 @@ name = "NAME"
     }
 
     #[test]
-    fn test_validation_rejects_invalid_identity_version_and_compatibility() {
+    fn test_validation_rejects_invalid_identity_and_manifest_version() {
         let package = package();
         let cases = [
             (
                 "id = \"synthetic-workflow\"",
                 "id = \"Synthetic Workflow\"",
                 "invalid profile id",
-            ),
-            (
-                "version = \"1.2.3\"",
-                "version = \"01.2.3\"",
-                "invalid profile version",
-            ),
-            (
-                "compatible-jit = \">=0.2.0, <2.0.0\"",
-                "compatible-jit = \"not a requirement\"",
-                "invalid compatible JIT requirement",
             ),
             (
                 "manifest-version = 2",

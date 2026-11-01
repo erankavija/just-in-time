@@ -973,8 +973,8 @@ mod tests {
 
         let model = ProfilePackageModel {
             id: "package".try_into().unwrap(),
-            version: "1.0.0".to_string(),
-            compatible_jit: "*".to_string(),
+            version: semver::Version::new(1, 0, 0),
+            compatible_jit: semver::VersionReq::STAR,
             dependencies: Vec::new(),
             incompatibilities: Vec::new(),
             variables: vec![declaration("NAME", Some("value"), None)],

@@ -700,7 +700,7 @@ fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
 pub struct ProfileApplicationInput {
     /// Stable package identity carried from the resolved manifest.
     pub id: ProfileId,
-    pub version: String,
+    pub version: semver::Version,
     /// Exact public values and source kinds that produced `claims`.
     pub variables: ResolvedVariables,
     /// Repository paths the package writes.

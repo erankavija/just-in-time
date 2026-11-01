@@ -2749,7 +2749,7 @@ mod tests {
                 id: "example"
                     .try_into()
                     .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
+                version: semver::Version::new(1, 0, 0),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
                 variables: Default::default(),
             }],

@@ -607,7 +607,7 @@ fn print_profile_decision(
 /// heading shape.
 fn print_profile_heading(
     id: &str,
-    version: &str,
+    version: &semver::Version,
     origin: &jit::repository_state::RootRelativePath,
     status: &str,
 ) {
