@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T03:49:17.859960521Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c42dee3a-510b-4cd6-bd30-aed7b3fd42e1",
+      "status": "passed",
+      "updated_at": "2026-11-01T03:54:04.898313695Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "417be079-1de3-43e3-816a-03f4a70e2f63",
@@ -38,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue gate fields are keyed by GateKey",
-  "updated_at": "2026-11-01T03:49:17.859960521Z"
+  "updated_at": "2026-11-01T03:54:04.898313695Z"
 }
