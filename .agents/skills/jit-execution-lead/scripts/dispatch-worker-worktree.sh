@@ -16,8 +16,9 @@
 #
 # Effects:
 #   - Snapshots `git status -uall --porcelain` of main to
-#     /tmp/lead-pre-dispatch-<ts>.txt and symlinks
-#     /tmp/lead-pre-dispatch-latest.txt to it.
+#     <dir>/lead-pre-dispatch-<ts>.txt and symlinks
+#     <dir>/lead-pre-dispatch-latest.txt to it, where <dir> is
+#     LEAD_SNAPSHOT_DIR, default /tmp.
 #   - Creates one worktree per short-id at
 #     .agents/worktrees/agent-<short-id> on branch
 #     worktree-agent-<short-id> anchored to current main HEAD.
@@ -32,6 +33,18 @@
 #   2 — bad invocation
 
 set -euo pipefail
+
+# Build tools rewrite files under these directories in place, which would write
+# through a hardlink into the pool and every sibling worktree, so they get their
+# own copies. Replacing the outermost match covers everything nested in it.
+unshare_mutable_build_state() {
+    local source="${1%/}" seeded="$2" dir
+    find "$seeded" -type d \( -name .fingerprint -o -name build \) -prune -print0 \
+        | while IFS= read -r -d '' dir; do
+            rm -rf "$dir"
+            cp -a "$source${dir#"$seeded"}" "$dir"
+        done
+}
 
 if [[ $# -lt 1 ]]; then
     echo "usage: $0 <short-id> [<short-id>...]" >&2
@@ -58,12 +71,13 @@ short_main_sha="$(git rev-parse --short HEAD)"
 echo "[ok] main at ${short_main_sha} (${main_sha}); working tree clean"
 
 ts="$(date -u +%Y%m%d-%H%M%S)"
-snapshot="/tmp/lead-pre-dispatch-${ts}.txt"
+snapshot_dir="${LEAD_SNAPSHOT_DIR:-/tmp}"
+snapshot="${snapshot_dir}/lead-pre-dispatch-${ts}.txt"
 git status -uall --porcelain > "$snapshot"
-ln -sfn "$snapshot" /tmp/lead-pre-dispatch-latest.txt
+ln -sfn "$snapshot" "${snapshot_dir}/lead-pre-dispatch-latest.txt"
 snapshot_lines="$(wc -l < "$snapshot")"
 echo "[ok] snapshot: $snapshot (${snapshot_lines} entries)"
-echo "     latest -> /tmp/lead-pre-dispatch-latest.txt"
+echo "     latest -> ${snapshot_dir}/lead-pre-dispatch-latest.txt"
 
 mkdir -p .agents/worktrees
 created=()
@@ -95,6 +109,7 @@ for sid in "$@"; do
             [[ -d "$cache_dir" ]] || continue
             name="$(basename "$cache_dir")"
             if cp -al "$cache_dir" "$wt_path/$name" 2>/dev/null; then
+                unshare_mutable_build_state "$cache_dir" "$wt_path/$name"
                 seed_mode="hardlink"
             else
                 rm -rf "${wt_path:?}/${name:?}"
