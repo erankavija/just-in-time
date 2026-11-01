@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d37662aeb6ee0e326cf709c38bc27d9270db3bb3",
+  "completed_at": "2026-11-01T13:46:30.274092526Z",
+  "duration_ms": 234409,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable implementation satisfies all four hard criteria with focused regression coverage and consistent documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ddca5431-273f-473c-a897-548fa5e62054",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21a41d27-4ed1-4dad-ade6-a24fbe4ba620",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:42:35.864775033Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cb6a95cb0, 1bf5f56b8, 07b51a0e0, d8e9f34a5, d37662aeb (`jit:ddca5431`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T13:42:30Z); code-review pending (current review)\nTruncation recovery: recovered bounded per-path patches, combined merge patch, transition/test source ranges, and scoped documentation sweep\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation satisfies all four hard criteria with focused regression coverage and consistent documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
