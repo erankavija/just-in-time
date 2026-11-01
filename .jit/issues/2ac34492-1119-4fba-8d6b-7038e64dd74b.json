@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0c77d9cd-a640-4895-8333-4a7df248ab6e",
+      "status": "failed",
+      "updated_at": "2026-11-01T01:57:05.940488813Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2ac34492-1119-4fba-8d6b-7038e64dd74b",
   "labels": [
     "epic:semantic-types",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Criteria checks bind through check labels only",
-  "updated_at": "2026-11-01T01:34:29.851649694Z"
+  "updated_at": "2026-11-01T01:57:05.940488813Z"
 }
