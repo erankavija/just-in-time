@@ -64,4 +64,5 @@ names, gate keys, and checkers your project declares.
 - **@/gate/tdd-reminder** — TDD Reminder: Write tests first
 - **@/gate/tests** — All Tests Pass: Full test suite must pass
 - **@/gate/workflow-contract-selftest** — Workflow-contract harness self-test: Runs scripts/workflow-contract-selftest.sh, which shows the workflow-contract harness rejects each defect in its case vectors and that the actionlint wiring rejects an actionlint-only defect. Any non-zero exit fails the gate, including exit 2 for a missing python3 and the failure reported when actionlint is unavailable.
+- **@/gate/worktree-cache-test** — Worktree cache seed and harvest test suite: Runs the jit-execution-lead skill's test-worktree-cache.sh, which drives dispatch-worker-worktree.sh and reclaim-worker-worktree.sh over a fixture repository and pool it owns. Any non-zero exit fails the gate, including exit 2 for a missing git, rsync, stat or diff.
 <!-- jit:rules-and-gates:end -->

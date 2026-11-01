@@ -5,7 +5,6 @@
   "created_at": "2026-10-20T20:12:37.837021516Z",
   "dependencies": [
     "45e3e442-e157-4d73-918c-2fc7df04accc",
-    "8c6adea6-3c14-48c8-a25e-bcba658c0570",
     "952ed1e7-2d3c-4d57-8851-ca3a91babcb0",
     "e7d98542-456d-4421-9e17-faf4f739a800"
   ],
@@ -130,5 +129,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-11-01T07:34:20.842038715Z"
+  "updated_at": "2026-11-01T08:03:33.451538225Z"
 }
