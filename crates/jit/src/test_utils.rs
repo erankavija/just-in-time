@@ -160,17 +160,18 @@ mod fixture_issue_tests {
 /// packages this repository ships, one directory per package id.
 pub const PROFILE_PACKAGE_SOURCES: &str = "profiles";
 
-const PROFILED_REPOSITORY_FIXTURE_SCHEMA: u32 = 1;
-const PROFILED_REPOSITORY_FIXTURE_DIRECTORY: &str = "jit-profiled-repository-fixtures";
+const KEYED_FIXTURE_SCHEMA: u32 = 1;
+const KEYED_FIXTURE_DIRECTORY: &str = "jit-keyed-fixtures";
+const KEYED_FIXTURE_TREE: &str = "tree";
 const PROFILED_REPOSITORY_FIXTURE_SETUP: &str = "command-executor.initialize-fresh-repository.v1";
-const PROFILED_REPOSITORY_FIXTURE_STAGING: &str = ".profiled-repository-staging-";
-const PROFILED_REPOSITORY_FIXTURE_RETIRED: &str = ".profiled-repository-retired-";
+const KEYED_FIXTURE_STAGING: &str = ".keyed-fixture-staging-";
+const KEYED_FIXTURE_RETIRED: &str = ".keyed-fixture-retired-";
 /// Digest of the `jit` crate source this setup implementation was compiled from (`build.rs`).
-const CRATE_SOURCE_SHA256: &str = env!("JIT_CRATE_SOURCE_SHA256");
+pub const CRATE_SOURCE_SHA256: &str = env!("JIT_CRATE_SOURCE_SHA256");
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProfiledRepositoryFixtureManifest {
+struct KeyedFixtureManifest {
     schema_version: u32,
     key: String,
     tree_sha256: String,
@@ -205,30 +206,57 @@ static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<
 
 /// A published fixture entry, kept from retirement while the lease lives.
 #[derive(Debug)]
-struct ProfiledRepositoryFixtureLease {
+pub struct KeyedFixtureLease {
     entry: PathBuf,
-    _profile_lock: LockGuard,
+    _family_lock: LockGuard,
 }
 
-/// A fresh repository carrying this checkout's profile package.
+impl KeyedFixtureLease {
+    /// The immutable tree the entry's build wrote.
+    pub fn tree(&self) -> PathBuf {
+        self.entry.join(KEYED_FIXTURE_TREE)
+    }
+}
+
+/// Leases `family`'s immutable tree for `key`, built by `build` on first use
+/// under the Cargo target directory. A family keeps only its newest key.
 ///
-/// On first use, its immutable baseline is built under the Cargo target
-/// directory in an input-keyed cache. The key covers every captured package
-/// path, byte, and mode, the `jit` crate source, and the setup contract. Every
-/// caller receives an ordinary deep copy in a fresh temporary directory, so
-/// process-level tests retain real filesystem and CLI boundaries without
-/// sharing mutable repository state.
-///
-/// The shared profile lock protects readers; the exclusive lock protects
+/// The shared family lock protects readers; the exclusive lock protects
 /// builders and retirement. A builder stages beside the keyed entry and
 /// publishes it with one atomic no-replace rename. If a valid entry wins that
 /// rename race, the builder uses it; corrupt or unrelated occupied entries
 /// fail closed. A waiter waits for as long as the build runs: it fails with the
 /// cause of a build that fails, and builds itself when the holder dies.
+pub fn keyed_fixture(
+    family: &str,
+    key: &str,
+    build: impl FnOnce(&Path) -> Result<()>,
+) -> Result<KeyedFixtureLease> {
+    let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
+    let cache_root = keyed_fixture_cache_root(&fixture_setup)?;
+    ensure_keyed_fixture(&cache_root, family, key, build)
+}
+
+/// The cache key over `fields`, each framed by its length.
+pub fn keyed_fixture_key(fields: &[&[u8]]) -> String {
+    let mut hasher = Sha256::new();
+    fields
+        .iter()
+        .for_each(|field| hash_field(&mut hasher, field));
+    format!("{:x}", hasher.finalize())
+}
+
+/// A fresh repository carrying this checkout's profile package.
+///
+/// Its immutable baseline lives in the [`keyed_fixture`] cache, keyed on every
+/// captured package path, byte, and mode, the `jit` crate source, and the setup
+/// contract. Every caller receives an ordinary deep copy in a fresh temporary
+/// directory, so process-level tests retain real filesystem and CLI boundaries
+/// without sharing mutable repository state.
 pub fn profiled_repository_fixture(id: &str, package_directory: &str) -> Result<TempDir> {
     let lease = cached_profiled_repository_fixture(id, package_directory)?;
     let clone = TempDir::new()?;
-    copy_tree_exact(&lease.entry.join("repository"), clone.path())?;
+    copy_tree_exact(&lease.tree(), clone.path())?;
     Ok(clone)
 }
 
@@ -253,7 +281,7 @@ pub fn profiled_in_memory_repository_fixture(
 fn cached_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
-) -> Result<ProfiledRepositoryFixtureLease> {
+) -> Result<KeyedFixtureLease> {
     let profile = fixture_profile(id, package_directory);
     let inputs = {
         let mut memo = DIRECT_PROFILED_REPOSITORY_FIXTURES
@@ -269,9 +297,7 @@ fn cached_profiled_repository_fixture(
         }
     };
     let package_root = VirtualPath::worktree(package_directory)?;
-    let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
-    let cache_root = profiled_repository_fixture_cache_root(&fixture_setup)?;
-    ensure_profiled_repository_fixture(&cache_root, &profile, &inputs.key, |repository| {
+    keyed_fixture(&profile, &inputs.key, |repository| {
         initialize_profiled_repository_fixture(
             repository,
             id,
@@ -396,15 +422,11 @@ fn profiled_repository_fixture_key(
     package_closure_sha256: &str,
     crate_source_sha256: &str,
 ) -> String {
-    let mut hasher = Sha256::new();
-    [
-        PROFILED_REPOSITORY_FIXTURE_SETUP,
-        package_closure_sha256,
-        crate_source_sha256,
-    ]
-    .iter()
-    .for_each(|field| hash_field(&mut hasher, field.as_bytes()));
-    format!("{:x}", hasher.finalize())
+    keyed_fixture_key(&[
+        PROFILED_REPOSITORY_FIXTURE_SETUP.as_bytes(),
+        package_closure_sha256.as_bytes(),
+        crate_source_sha256.as_bytes(),
+    ])
 }
 
 /// Derive the cache context Cargo used to place a running artifact.
@@ -415,35 +437,35 @@ fn profiled_repository_fixture_key(
 /// uses the artifact Cargo actually ran, so it stays stable when a reused
 /// executable embeds a different checkout in `CARGO_MANIFEST_DIR` or when a
 /// relative `CARGO_TARGET_DIR` was resolved from a different process directory.
-fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
+fn keyed_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
     let metadata = fs::symlink_metadata(runtime_artifact).with_context(|| {
         format!(
-            "inspect profiled-repository fixture runtime artifact {}",
+            "inspect keyed fixture runtime artifact {}",
             runtime_artifact.display()
         )
     })?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         bail!(
-            "profiled-repository fixture runtime artifact {} must be an ordinary file",
+            "keyed fixture runtime artifact {} must be an ordinary file",
             runtime_artifact.display()
         );
     }
     let artifact = fs::canonicalize(runtime_artifact).with_context(|| {
         format!(
-            "canonicalize profiled-repository fixture runtime artifact {}",
+            "canonicalize keyed fixture runtime artifact {}",
             runtime_artifact.display()
         )
     })?;
     let artifact_directory = artifact.parent().with_context(|| {
         format!(
-            "profiled-repository fixture runtime artifact {} has no parent directory",
+            "keyed fixture runtime artifact {} has no parent directory",
             artifact.display()
         )
     })?;
     let profile_directory = if artifact_directory.file_name() == Some("deps".as_ref()) {
         artifact_directory.parent().with_context(|| {
             format!(
-                "profiled-repository fixture deps directory {} has no profile parent",
+                "keyed fixture deps directory {} has no profile parent",
                 artifact_directory.display()
             )
         })?
@@ -452,81 +474,84 @@ fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<Pat
     };
     let target_context = profile_directory.parent().with_context(|| {
         format!(
-            "profiled-repository fixture profile directory {} has no target parent",
+            "keyed fixture family directory {} has no target parent",
             profile_directory.display()
         )
     })?;
-    Ok(target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY))
+    Ok(target_context.join(KEYED_FIXTURE_DIRECTORY))
 }
 
 /// What a failed build leaves for the consumers that were waiting on it.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProfiledRepositoryFixtureBuildFailure {
+struct KeyedFixtureBuildFailure {
     key: String,
     /// Tells this failure from an earlier one with the same cause.
     attempt: u64,
     cause: String,
 }
 
-/// The locations one profile's consumers coordinate through.
-struct ProfiledRepositoryFixturePaths {
-    profile_root: PathBuf,
+/// The locations one family's consumers coordinate through.
+struct KeyedFixturePaths {
+    family_root: PathBuf,
     lock: PathBuf,
     build_failure: PathBuf,
 }
 
-impl ProfiledRepositoryFixturePaths {
-    fn new(cache_root: &Path, profile: &str) -> Self {
+impl KeyedFixturePaths {
+    fn new(cache_root: &Path, family: &str) -> Self {
         let lock_root = cache_root.join("locks");
         Self {
-            profile_root: cache_root.join(profile),
-            lock: lock_root.join(format!("{profile}.lock")),
-            build_failure: lock_root.join(format!("{profile}.failure.json")),
+            family_root: cache_root.join(family),
+            lock: lock_root.join(format!("{family}.lock")),
+            build_failure: lock_root.join(format!("{family}.failure.json")),
         }
     }
 }
 
-fn ensure_profiled_repository_fixture(
+fn ensure_keyed_fixture(
     cache_root: &Path,
-    profile: &str,
+    family: &str,
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<ProfiledRepositoryFixtureLease> {
-    let paths = ProfiledRepositoryFixturePaths::new(cache_root, profile);
+) -> Result<KeyedFixtureLease> {
+    let paths = KeyedFixturePaths::new(cache_root, family);
     let observed_failure = read_fixture_build_failure(&paths, key)?;
-    ensure_profiled_repository_fixture_observing(
-        &paths,
-        profile,
-        key,
-        observed_failure.as_ref(),
-        build,
-    )
+    ensure_keyed_fixture_observing(&paths, family, key, observed_failure.as_ref(), build)
 }
 
-/// Leases the profile's entry for `key`, building and publishing it under the
-/// exclusive profile lock when absent. A failure recorded other than
+/// Leases the family's entry for `key`, building and publishing it under the
+/// exclusive family lock when absent. A failure recorded other than
 /// `observed_failure` came from a build this consumer waited on, so its cause
-/// becomes this consumer's error; an observed one predates the wait and is
-/// retried. The kernel releases a dead holder's lock, so lock waits are unbounded.
-fn ensure_profiled_repository_fixture_observing(
-    paths: &ProfiledRepositoryFixturePaths,
-    profile: &str,
+/// becomes this consumer's error even when a later retry has since published the
+/// entry; an observed one predates the wait, so this consumer reads the entry or
+/// retries the build. The record outlives a successful retry, which keeps it
+/// visible to every waiter and `attempt` monotonic per key. The kernel releases a
+/// dead holder's lock, so lock waits are unbounded.
+fn ensure_keyed_fixture_observing(
+    paths: &KeyedFixturePaths,
+    family: &str,
     key: &str,
-    observed_failure: Option<&ProfiledRepositoryFixtureBuildFailure>,
+    observed_failure: Option<&KeyedFixtureBuildFailure>,
     build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<ProfiledRepositoryFixtureLease> {
-    fs::create_dir_all(&paths.profile_root)?;
+) -> Result<KeyedFixtureLease> {
+    fs::create_dir_all(&paths.family_root)?;
     fs::create_dir_all(paths.lock.parent().context("fixture lock has no parent")?)?;
-    let entry = paths.profile_root.join(key);
+    let entry = paths.family_root.join(key);
     let locker = FileLocker::new(Duration::MAX);
     loop {
         let shared = locker.lock_shared(&paths.lock)?;
+        refuse_unobserved_fixture_build_failure(
+            read_fixture_build_failure(paths, key)?.as_ref(),
+            observed_failure,
+            family,
+            key,
+        )?;
         if is_published_fixture(&entry)? {
-            validate_profiled_repository_fixture(&entry, key)?;
-            return Ok(ProfiledRepositoryFixtureLease {
+            validate_keyed_fixture(&entry, key)?;
+            return Ok(KeyedFixtureLease {
                 entry,
-                _profile_lock: shared,
+                _family_lock: shared,
             });
         }
         drop(shared);
@@ -536,26 +561,18 @@ fn ensure_profiled_repository_fixture_observing(
             ));
             continue;
         };
+        let failure = read_fixture_build_failure(paths, key)?;
+        refuse_unobserved_fixture_build_failure(failure.as_ref(), observed_failure, family, key)?;
         if is_published_fixture(&entry)? {
             continue;
         }
-        let failure = read_fixture_build_failure(paths, key)?;
-        if let Some(failure) = failure.as_ref().filter(|&f| Some(f) != observed_failure) {
-            bail!(
-                "profiled-repository fixture {profile} key {key} failed to build: {}",
-                failure.cause
-            );
-        }
-        return match publish_profiled_repository_fixture(&paths.profile_root, &entry, key, build) {
-            Ok(()) => {
-                remove_fixture_build_failure(paths)?;
-                Ok(ProfiledRepositoryFixtureLease {
-                    entry,
-                    _profile_lock: exclusive,
-                })
-            }
+        return match publish_keyed_fixture(&paths.family_root, &entry, key, build) {
+            Ok(()) => Ok(KeyedFixtureLease {
+                entry,
+                _family_lock: exclusive,
+            }),
             Err(error) => {
-                let recorded = ProfiledRepositoryFixtureBuildFailure {
+                let recorded = KeyedFixtureBuildFailure {
                     key: key.to_string(),
                     attempt: failure.map_or(1, |failure| failure.attempt + 1),
                     cause: format!("{error:#}"),
@@ -568,23 +585,38 @@ fn ensure_profiled_repository_fixture_observing(
     }
 }
 
-/// Builds in staging, publishes `entry` and retires the profile's older entries.
-fn publish_profiled_repository_fixture(
-    profile_root: &Path,
+fn refuse_unobserved_fixture_build_failure(
+    failure: Option<&KeyedFixtureBuildFailure>,
+    observed_failure: Option<&KeyedFixtureBuildFailure>,
+    family: &str,
+    key: &str,
+) -> Result<()> {
+    match failure.filter(|&failure| Some(failure) != observed_failure) {
+        Some(failure) => bail!(
+            "keyed fixture {family} key {key} failed to build: {}",
+            failure.cause
+        ),
+        None => Ok(()),
+    }
+}
+
+/// Builds in staging, publishes `entry` and retires the family's older entries.
+fn publish_keyed_fixture(
+    family_root: &Path,
     entry: &Path,
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<()> {
     let staging = tempfile::Builder::new()
-        .prefix(PROFILED_REPOSITORY_FIXTURE_STAGING)
-        .tempdir_in(profile_root)?;
-    let repository = staging.path().join("repository");
-    fs::create_dir(&repository)?;
-    build(&repository)?;
-    let manifest = ProfiledRepositoryFixtureManifest {
-        schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
+        .prefix(KEYED_FIXTURE_STAGING)
+        .tempdir_in(family_root)?;
+    let tree = staging.path().join(KEYED_FIXTURE_TREE);
+    fs::create_dir(&tree)?;
+    build(&tree)?;
+    let manifest = KeyedFixtureManifest {
+        schema_version: KEYED_FIXTURE_SCHEMA,
         key: key.to_string(),
-        tree_sha256: tree_sha256(&repository)?,
+        tree_sha256: tree_sha256(&tree)?,
     };
     fs::write(
         staging.path().join("manifest.json"),
@@ -595,43 +627,39 @@ fn publish_profiled_repository_fixture(
     if let Err(error) = crate::storage::publish_fixture_directory_noreplace(&staging_path, entry) {
         let _ = fs::remove_dir_all(&staging_path);
         if !is_published_fixture(entry)? {
-            return Err(error).with_context(|| {
-                format!(
-                    "atomically publish profiled-repository fixture {}",
-                    entry.display()
-                )
-            });
+            return Err(error)
+                .with_context(|| format!("atomically publish keyed fixture {}", entry.display()));
         }
-        validate_profiled_repository_fixture(entry, key).map_err(|validation_error| {
+        validate_keyed_fixture(entry, key).map_err(|validation_error| {
             error.context(format!(
-                "atomically publish profiled-repository fixture {}; concurrent entry is invalid: {validation_error:#}",
+                "atomically publish keyed fixture {}; concurrent entry is invalid: {validation_error:#}",
                 entry.display()
             ))
         })?;
     } else {
-        validate_profiled_repository_fixture(entry, key)?;
+        validate_keyed_fixture(entry, key)?;
     }
-    retire_older_fixture_entries(profile_root, key)
+    retire_older_fixture_entries(family_root, key)
 }
 
 fn read_fixture_build_failure(
-    paths: &ProfiledRepositoryFixturePaths,
+    paths: &KeyedFixturePaths,
     key: &str,
-) -> Result<Option<ProfiledRepositoryFixtureBuildFailure>> {
+) -> Result<Option<KeyedFixtureBuildFailure>> {
     let bytes = match fs::read(&paths.build_failure) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.into()),
     };
-    let failure: ProfiledRepositoryFixtureBuildFailure = serde_json::from_slice(&bytes)
+    let failure: KeyedFixtureBuildFailure = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse fixture failure {}", paths.build_failure.display()))?;
     Ok((failure.key == key).then_some(failure))
 }
 
 /// Replaces the record atomically: a waiter reads it before taking any lock.
 fn write_fixture_build_failure(
-    paths: &ProfiledRepositoryFixturePaths,
-    failure: &ProfiledRepositoryFixtureBuildFailure,
+    paths: &KeyedFixturePaths,
+    failure: &KeyedFixtureBuildFailure,
 ) -> Result<()> {
     let directory = paths
         .build_failure
@@ -643,83 +671,61 @@ fn write_fixture_build_failure(
     Ok(())
 }
 
-fn remove_fixture_build_failure(paths: &ProfiledRepositoryFixturePaths) -> Result<()> {
-    match fs::remove_file(&paths.build_failure) {
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
-        _ => Ok(()),
-    }
-}
-
 fn is_published_fixture(entry: &Path) -> Result<bool> {
     match fs::symlink_metadata(entry) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error).with_context(|| {
-            format!(
-                "inspect profiled-repository fixture entry {}",
-                entry.display()
-            )
-        }),
+        Err(error) => {
+            Err(error).with_context(|| format!("inspect keyed fixture entry {}", entry.display()))
+        }
     }
 }
 
-/// Removes every profile entry but `current`, including abandoned staging and
-/// retirement directories. The caller holds the exclusive profile lock, so no
+/// Removes every family entry but `current`, including abandoned staging and
+/// retirement directories. The caller holds the exclusive family lock, so no
 /// reader is copying a retired entry; each is renamed out of its key before
 /// removal, so an interrupted retirement never leaves a partial entry at a key.
-fn retire_older_fixture_entries(profile_root: &Path, current: &str) -> Result<()> {
+fn retire_older_fixture_entries(family_root: &Path, current: &str) -> Result<()> {
     let retired = tempfile::Builder::new()
-        .prefix(PROFILED_REPOSITORY_FIXTURE_RETIRED)
-        .tempdir_in(profile_root)?;
+        .prefix(KEYED_FIXTURE_RETIRED)
+        .tempdir_in(family_root)?;
     let retired_name = retired.path().file_name().map(OsStr::to_os_string);
-    fs::read_dir(profile_root)?
+    fs::read_dir(family_root)?
         .map(|entry| entry.map(|entry| entry.file_name()))
         .collect::<std::io::Result<Vec<_>>>()?
         .into_iter()
         .filter(|name| name != current && Some(name) != retired_name.as_ref())
-        .try_for_each(|name| fs::rename(profile_root.join(&name), retired.path().join(&name)))
-        .with_context(|| {
-            format!(
-                "retire older profiled-repository fixtures in {}",
-                profile_root.display()
-            )
-        })?;
-    retired.close().with_context(|| {
-        format!(
-            "remove retired profiled-repository fixtures in {}",
-            profile_root.display()
-        )
-    })
+        .try_for_each(|name| fs::rename(family_root.join(&name), retired.path().join(&name)))
+        .with_context(|| format!("retire older keyed fixtures in {}", family_root.display()))?;
+    retired
+        .close()
+        .with_context(|| format!("remove retired keyed fixtures in {}", family_root.display()))
 }
 
-fn validate_profiled_repository_fixture(entry: &Path, expected_key: &str) -> Result<()> {
+fn validate_keyed_fixture(entry: &Path, expected_key: &str) -> Result<()> {
     let metadata = fs::symlink_metadata(entry)?;
     if !metadata.file_type().is_dir() {
         bail!(
-            "profiled-repository fixture entry {} is occupied by a non-directory",
+            "keyed fixture entry {} is occupied by a non-directory",
             entry.display()
         );
     }
     let manifest_path = entry.join("manifest.json");
-    let manifest: ProfiledRepositoryFixtureManifest =
-        serde_json::from_slice(&fs::read(&manifest_path).with_context(|| {
-            format!(
-                "read profiled-repository fixture manifest {}",
-                manifest_path.display()
-            )
-        })?)
-        .context("parse profiled-repository fixture manifest")?;
-    if manifest.schema_version != PROFILED_REPOSITORY_FIXTURE_SCHEMA || manifest.key != expected_key
-    {
+    let manifest: KeyedFixtureManifest = serde_json::from_slice(
+        &fs::read(&manifest_path)
+            .with_context(|| format!("read keyed fixture manifest {}", manifest_path.display()))?,
+    )
+    .context("parse keyed fixture manifest")?;
+    if manifest.schema_version != KEYED_FIXTURE_SCHEMA || manifest.key != expected_key {
         bail!(
-            "profiled-repository fixture manifest identity mismatch at {}",
+            "keyed fixture manifest identity mismatch at {}",
             manifest_path.display()
         );
     }
-    let actual = tree_sha256(&entry.join("repository"))?;
+    let actual = tree_sha256(&entry.join(KEYED_FIXTURE_TREE))?;
     if actual != manifest.tree_sha256 {
         bail!(
-            "profiled-repository fixture content mismatch at {}: expected {}, found {}",
+            "keyed fixture content mismatch at {}: expected {}, found {}",
             entry.display(),
             manifest.tree_sha256,
             actual
@@ -810,7 +816,9 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
-fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
+/// Deep-copies the ordinary files and directories under `source` into the
+/// existing `destination`, preserving modes; any other entry is refused.
+pub fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
     for entry in fs::read_dir(source)? {
         let entry = entry?;
         let source_path = entry.path();
@@ -818,7 +826,7 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
         let metadata = fs::symlink_metadata(&source_path)?;
         if metadata.file_type().is_symlink() {
             bail!(
-                "profiled-repository fixture contains symbolic link {}",
+                "fixture tree contains symbolic link {}",
                 source_path.display()
             );
         }
@@ -830,7 +838,7 @@ fn copy_tree_exact(source: &Path, destination: &Path) -> Result<()> {
             fs::set_permissions(&destination_path, metadata.permissions())?;
         } else {
             bail!(
-                "profiled-repository fixture contains irregular entry {}",
+                "fixture tree contains irregular entry {}",
                 source_path.display()
             );
         }
@@ -1702,7 +1710,7 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_publication_is_concurrent_and_corruption_fails_closed() {
+    fn test_keyed_fixture_publication_is_concurrent_and_corruption_fails_closed() {
         let cache = TempDir::new().unwrap();
         let cache_root = cache.path().to_path_buf();
         let builds = Arc::new(AtomicUsize::new(0));
@@ -1714,16 +1722,11 @@ mod tests {
                 let start = Arc::clone(&start);
                 std::thread::spawn(move || {
                     start.wait();
-                    ensure_profiled_repository_fixture(
-                        &cache_root,
-                        "profile",
-                        "same-key",
-                        |repository| {
-                            builds.fetch_add(1, Ordering::SeqCst);
-                            fs::write(repository.join("state"), b"coherent")?;
-                            Ok(())
-                        },
-                    )
+                    ensure_keyed_fixture(&cache_root, "family", "same-key", |repository| {
+                        builds.fetch_add(1, Ordering::SeqCst);
+                        fs::write(repository.join("state"), b"coherent")?;
+                        Ok(())
+                    })
                     .unwrap()
                     .entry
                 })
@@ -1737,15 +1740,14 @@ mod tests {
         assert_eq!(builds.load(Ordering::SeqCst), 1);
         assert_eq!(entries[0], entries[1]);
         assert_eq!(
-            fs::read(entries[0].join("repository/state")).unwrap(),
+            fs::read(entries[0].join("tree/state")).unwrap(),
             b"coherent"
         );
-        let repeated =
-            ensure_profiled_repository_fixture(&cache_root, "profile", "same-key", |_| {
-                builds.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            })
-            .unwrap();
+        let repeated = ensure_keyed_fixture(&cache_root, "family", "same-key", |_| {
+            builds.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .unwrap();
         assert_eq!(repeated.entry, entries[0]);
         drop(repeated);
         assert_eq!(
@@ -1754,8 +1756,8 @@ mod tests {
             "an equivalent later consumer must reuse the same publication"
         );
 
-        fs::write(entries[0].join("repository/state"), b"corrupt").unwrap();
-        let error = ensure_profiled_repository_fixture(&cache_root, "profile", "same-key", |_| {
+        fs::write(entries[0].join("tree/state"), b"corrupt").unwrap();
+        let error = ensure_keyed_fixture(&cache_root, "family", "same-key", |_| {
             builds.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -1766,14 +1768,14 @@ mod tests {
         );
         assert_eq!(builds.load(Ordering::SeqCst), 1);
         assert_eq!(
-            fs::read(entries[0].join("repository/state")).unwrap(),
+            fs::read(entries[0].join("tree/state")).unwrap(),
             b"corrupt",
             "a corrupt immutable entry must not be silently replaced"
         );
     }
 
     #[test]
-    fn test_profiled_repository_fixture_cold_concurrent_consumers_build_once_within_budget() {
+    fn test_keyed_fixture_cold_concurrent_consumers_build_once_within_budget() {
         const CONSUMERS: usize = 6;
         let cache = TempDir::new().unwrap();
         let builds = AtomicUsize::new(0);
@@ -1784,17 +1786,12 @@ mod tests {
                 .map(|_| {
                     scope.spawn(|| {
                         start.wait();
-                        ensure_profiled_repository_fixture(
-                            cache.path(),
-                            "profile",
-                            "cold-key",
-                            |repository| {
-                                builds.fetch_add(1, Ordering::SeqCst);
-                                std::thread::sleep(Duration::from_millis(200));
-                                fs::write(repository.join("state"), b"built")?;
-                                Ok(())
-                            },
-                        )
+                        ensure_keyed_fixture(cache.path(), "family", "cold-key", |repository| {
+                            builds.fetch_add(1, Ordering::SeqCst);
+                            std::thread::sleep(Duration::from_millis(200));
+                            fs::write(repository.join("state"), b"built")?;
+                            Ok(())
+                        })
                         .unwrap()
                         .entry
                     })
@@ -1811,16 +1808,16 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_failed_build_reports_its_cause_to_every_waiter() {
+    fn test_keyed_fixture_failed_build_reports_its_cause_to_every_waiter() {
         const WAITERS: usize = 4;
         let cache = TempDir::new().unwrap();
-        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
         let waiter_builds = AtomicUsize::new(0);
         let held = Barrier::new(2);
 
         std::thread::scope(|scope| {
             let builder = scope.spawn(|| {
-                ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |_| {
+                ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
                     held.wait();
                     std::thread::sleep(Duration::from_millis(200));
                     bail!("the build's own cause")
@@ -1830,16 +1827,10 @@ mod tests {
             let waiters = (0..WAITERS)
                 .map(|_| {
                     scope.spawn(|| {
-                        ensure_profiled_repository_fixture_observing(
-                            &paths,
-                            "profile",
-                            "key",
-                            None,
-                            |_| {
-                                waiter_builds.fetch_add(1, Ordering::SeqCst);
-                                Ok(())
-                            },
-                        )
+                        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
+                            waiter_builds.fetch_add(1, Ordering::SeqCst);
+                            Ok(())
+                        })
                     })
                 })
                 .collect::<Vec<_>>();
@@ -1858,50 +1849,91 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_consumer_arriving_after_a_failure_retries_the_build() {
+    fn test_keyed_fixture_consumer_arriving_after_a_failure_retries_the_build() {
         let cache = TempDir::new().unwrap();
-        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
 
-        ensure_profiled_repository_fixture(cache.path(), "profile", "key", |_| {
+        ensure_keyed_fixture(cache.path(), "family", "key", |_| {
             bail!("a transient cause")
         })
         .unwrap_err();
-        let lease = ensure_profiled_repository_fixture(cache.path(), "profile", "key", |repo| {
+        let lease = ensure_keyed_fixture(cache.path(), "family", "key", |repo| {
             fs::write(repo.join("state"), b"built")?;
             Ok(())
         })
         .unwrap();
 
-        assert_eq!(
-            fs::read(lease.entry.join("repository/state")).unwrap(),
-            b"built"
-        );
-        assert_eq!(read_fixture_build_failure(&paths, "key").unwrap(), None);
+        assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
     }
 
     #[test]
-    fn test_profiled_repository_fixture_failure_of_another_key_does_not_reach_a_waiter() {
+    fn test_keyed_fixture_waiter_reports_a_failure_a_later_retry_recovered_from() {
         let cache = TempDir::new().unwrap();
-        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
-        ensure_profiled_repository_fixture_observing(&paths, "profile", "other", None, |_| {
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
+        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
+            bail!("the build's own cause")
+        })
+        .unwrap_err();
+        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
+        ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |_| Ok(()))
+            .unwrap();
+
+        let error = ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
+            bail!("a waiter must not build")
+        })
+        .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains("the build's own cause"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_keyed_fixture_consumer_observing_a_failure_reads_a_retrys_entry() {
+        let cache = TempDir::new().unwrap();
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
+        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
+            bail!("a transient cause")
+        })
+        .unwrap_err();
+        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
+        ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |repo| {
+            fs::write(repo.join("state"), b"built")?;
+            Ok(())
+        })
+        .unwrap();
+
+        let lease =
+            ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |_| {
+                bail!("the published entry must be read")
+            })
+            .unwrap();
+
+        assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
+    }
+
+    #[test]
+    fn test_keyed_fixture_failure_of_another_key_does_not_reach_a_waiter() {
+        let cache = TempDir::new().unwrap();
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
+        ensure_keyed_fixture_observing(&paths, "family", "other", None, |_| {
             bail!("the other key's cause")
         })
         .unwrap_err();
 
-        let lease =
-            ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |repo| {
-                fs::write(repo.join("state"), b"built")?;
-                Ok(())
-            })
-            .unwrap();
+        let lease = ensure_keyed_fixture_observing(&paths, "family", "key", None, |repo| {
+            fs::write(repo.join("state"), b"built")?;
+            Ok(())
+        })
+        .unwrap();
 
-        assert!(lease.entry.join("repository/state").is_file());
+        assert!(lease.entry.join("tree/state").is_file());
     }
 
     #[test]
-    fn test_profiled_repository_fixture_waiter_builds_when_the_holder_dies_without_an_outcome() {
+    fn test_keyed_fixture_waiter_builds_when_the_holder_dies_without_an_outcome() {
         let cache = TempDir::new().unwrap();
-        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
         fs::create_dir_all(paths.lock.parent().unwrap()).unwrap();
         let holder = FileLocker::new(Duration::from_secs(1))
             .lock_exclusive(&paths.lock)
@@ -1910,7 +1942,7 @@ mod tests {
 
         let lease = std::thread::scope(|scope| {
             let waiter = scope.spawn(|| {
-                ensure_profiled_repository_fixture(cache.path(), "profile", "key", |repo| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |repo| {
                     built.fetch_add(1, Ordering::SeqCst);
                     fs::write(repo.join("state"), b"built")?;
                     Ok(())
@@ -1923,18 +1955,18 @@ mod tests {
         });
 
         assert_eq!(built.load(Ordering::SeqCst), 1);
-        assert!(lease.entry.join("repository/state").is_file());
+        assert!(lease.entry.join("tree/state").is_file());
     }
 
     #[test]
-    fn test_profiled_repository_fixture_refuses_an_occupied_publication_path() {
+    fn test_keyed_fixture_refuses_an_occupied_publication_path() {
         let cache = TempDir::new().unwrap();
-        let occupied = cache.path().join("profile/occupied");
+        let occupied = cache.path().join("family/occupied");
         fs::create_dir_all(occupied.parent().unwrap()).unwrap();
         fs::write(&occupied, b"not a fixture").unwrap();
         let built = AtomicUsize::new(0);
 
-        let error = ensure_profiled_repository_fixture(cache.path(), "profile", "occupied", |_| {
+        let error = ensure_keyed_fixture(cache.path(), "family", "occupied", |_| {
             built.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })
@@ -1949,19 +1981,18 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_no_replace_preserves_raced_occupied_directory() {
+    fn test_keyed_fixture_no_replace_preserves_raced_occupied_directory() {
         let cache = TempDir::new().unwrap();
-        let profile_root = cache.path().join("profile");
-        let occupied = profile_root.join("raced");
+        let family_root = cache.path().join("family");
+        let occupied = family_root.join("raced");
 
-        let error =
-            ensure_profiled_repository_fixture(cache.path(), "profile", "raced", |repository| {
-                fs::write(repository.join("state"), b"candidate")?;
-                fs::create_dir(&occupied)?;
-                fs::write(occupied.join("bystander"), b"wins")?;
-                Ok(())
-            })
-            .unwrap_err();
+        let error = ensure_keyed_fixture(cache.path(), "family", "raced", |repository| {
+            fs::write(repository.join("state"), b"candidate")?;
+            fs::create_dir(&occupied)?;
+            fs::write(occupied.join("bystander"), b"wins")?;
+            Ok(())
+        })
+        .unwrap_err();
 
         assert!(
             format!("{error:#}").contains("atomically publish"),
@@ -1969,57 +2000,52 @@ mod tests {
         );
         assert_eq!(fs::read(occupied.join("bystander")).unwrap(), b"wins");
         assert!(
-            fs::read_dir(&profile_root)
+            fs::read_dir(&family_root)
                 .unwrap()
                 .filter_map(Result::ok)
                 .all(|entry| !entry
                     .file_name()
                     .to_string_lossy()
-                    .starts_with(PROFILED_REPOSITORY_FIXTURE_STAGING)),
+                    .starts_with(KEYED_FIXTURE_STAGING)),
             "a refused publication must clean its private staging directory"
         );
     }
 
     #[test]
-    fn test_profiled_repository_fixture_uses_a_valid_concurrent_publication() {
+    fn test_keyed_fixture_uses_a_valid_concurrent_publication() {
         let cache = TempDir::new().unwrap();
-        let entry = cache.path().join("profile/raced-key");
-        let winner = ensure_profiled_repository_fixture(
-            cache.path(),
-            "profile",
-            "raced-key",
-            |repository| {
-                fs::write(repository.join("state"), b"candidate")?;
-                let winner_repository = entry.join("repository");
-                fs::create_dir_all(&winner_repository)?;
-                fs::write(winner_repository.join("state"), b"winner")?;
-                let manifest = ProfiledRepositoryFixtureManifest {
-                    schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
-                    key: "raced-key".to_string(),
-                    tree_sha256: tree_sha256(&winner_repository)?,
-                };
-                fs::write(
-                    entry.join("manifest.json"),
-                    serde_json::to_vec_pretty(&manifest)?,
-                )?;
-                Ok(())
-            },
-        )
+        let entry = cache.path().join("family/raced-key");
+        let winner = ensure_keyed_fixture(cache.path(), "family", "raced-key", |repository| {
+            fs::write(repository.join("state"), b"candidate")?;
+            let winner_repository = entry.join(KEYED_FIXTURE_TREE);
+            fs::create_dir_all(&winner_repository)?;
+            fs::write(winner_repository.join("state"), b"winner")?;
+            let manifest = KeyedFixtureManifest {
+                schema_version: KEYED_FIXTURE_SCHEMA,
+                key: "raced-key".to_string(),
+                tree_sha256: tree_sha256(&winner_repository)?,
+            };
+            fs::write(
+                entry.join("manifest.json"),
+                serde_json::to_vec_pretty(&manifest)?,
+            )?;
+            Ok(())
+        })
         .unwrap();
 
         assert_eq!(winner.entry, entry);
         assert_eq!(
-            fs::read(winner.entry.join("repository/state")).unwrap(),
+            fs::read(winner.entry.join("tree/state")).unwrap(),
             b"winner"
         );
         assert!(
-            fs::read_dir(cache.path().join("profile"))
+            fs::read_dir(cache.path().join("family"))
                 .unwrap()
                 .filter_map(Result::ok)
                 .all(|entry| !entry
                     .file_name()
                     .to_string_lossy()
-                    .starts_with(PROFILED_REPOSITORY_FIXTURE_STAGING)),
+                    .starts_with(KEYED_FIXTURE_STAGING)),
             "a losing builder must clean up its private staging directory"
         );
     }
@@ -2096,7 +2122,7 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_cache_root_follows_runtime_artifact_layouts() {
+    fn test_keyed_fixture_cache_root_follows_runtime_artifact_layouts() {
         let workspace = TempDir::new().unwrap();
         let default_target = workspace.path().join("default-target");
         let absolute_custom_target = TempDir::new().unwrap();
@@ -2121,8 +2147,8 @@ mod tests {
             fs::create_dir_all(artifact.parent().unwrap()).unwrap();
             fs::write(&artifact, b"fixture runtime artifact").unwrap();
             assert_eq!(
-                profiled_repository_fixture_cache_root(&artifact).unwrap(),
-                expected_target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY),
+                keyed_fixture_cache_root(&artifact).unwrap(),
+                expected_target_context.join(KEYED_FIXTURE_DIRECTORY),
                 "{} must select the cache context Cargo placed it under",
                 artifact.display()
             );
@@ -2131,7 +2157,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_profiled_repository_fixture_cache_root_refuses_non_ordinary_runtime_artifact() {
+    fn test_keyed_fixture_cache_root_refuses_non_ordinary_runtime_artifact() {
         use std::os::unix::fs::symlink;
 
         let workspace = TempDir::new().unwrap();
@@ -2139,7 +2165,7 @@ mod tests {
         fs::create_dir_all(target.parent().unwrap()).unwrap();
         symlink(std::env::current_exe().unwrap(), &target).unwrap();
 
-        let error = profiled_repository_fixture_cache_root(&target).unwrap_err();
+        let error = keyed_fixture_cache_root(&target).unwrap_err();
         assert!(error.to_string().contains("must be an ordinary file"));
     }
 
@@ -2206,36 +2232,36 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_publication_retires_the_profiles_older_entries() {
+    fn test_keyed_fixture_publication_retires_the_profiles_older_entries() {
         let cache = TempDir::new().unwrap();
         let publish = |profile: &str, key: &str| {
-            ensure_profiled_repository_fixture(cache.path(), profile, key, |repository| {
+            ensure_keyed_fixture(cache.path(), profile, key, |repository| {
                 fs::write(repository.join("state"), key)?;
                 Ok(())
             })
             .unwrap()
             .entry
         };
-        publish("profile", "first");
+        publish("family", "first");
         let neighbour = publish("neighbour", "first");
         let abandoned = cache
             .path()
-            .join("profile")
-            .join(format!("{PROFILED_REPOSITORY_FIXTURE_STAGING}abandoned"));
+            .join("family")
+            .join(format!("{KEYED_FIXTURE_STAGING}abandoned"));
         fs::create_dir(&abandoned).unwrap();
 
-        let current = publish("profile", "second");
+        let current = publish("family", "second");
 
-        let remaining = fs::read_dir(cache.path().join("profile"))
+        let remaining = fs::read_dir(cache.path().join("family"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect::<Vec<_>>();
         assert_eq!(remaining, [current]);
-        validate_profiled_repository_fixture(&neighbour, "first").unwrap();
+        validate_keyed_fixture(&neighbour, "first").unwrap();
     }
 
     #[test]
-    fn test_profiled_repository_fixture_retirement_waits_for_a_concurrent_reader() {
+    fn test_keyed_fixture_retirement_waits_for_a_concurrent_reader() {
         let cache = TempDir::new().unwrap();
         let write_key = |key: &'static str| {
             move |repository: &Path| -> Result<()> {
@@ -2243,36 +2269,22 @@ mod tests {
                 Ok(())
             }
         };
-        let reader = ensure_profiled_repository_fixture(
-            cache.path(),
-            "profile",
-            "current",
-            write_key("current"),
-        )
-        .unwrap();
+        let reader =
+            ensure_keyed_fixture(cache.path(), "family", "current", write_key("current")).unwrap();
 
         let current = reader.entry.clone();
         let next = std::thread::scope(|scope| {
-            let next = scope.spawn(|| {
-                ensure_profiled_repository_fixture(
-                    cache.path(),
-                    "profile",
-                    "next",
-                    write_key("next"),
-                )
-            });
+            let next = scope
+                .spawn(|| ensure_keyed_fixture(cache.path(), "family", "next", write_key("next")));
             std::thread::sleep(Duration::from_millis(200));
             assert!(!next.is_finished(), "retirement must wait for the reader");
             let clone = TempDir::new().unwrap();
-            copy_tree_exact(&reader.entry.join("repository"), clone.path()).unwrap();
+            copy_tree_exact(&reader.entry.join(KEYED_FIXTURE_TREE), clone.path()).unwrap();
             assert_eq!(fs::read(clone.path().join("state")).unwrap(), b"current");
             drop(reader);
             next.join().unwrap().unwrap()
         });
-        assert_eq!(
-            fs::read(next.entry.join("repository/state")).unwrap(),
-            b"next"
-        );
+        assert_eq!(fs::read(next.entry.join("tree/state")).unwrap(), b"next");
         assert!(!current.exists(), "the released entry must be retired");
     }
 

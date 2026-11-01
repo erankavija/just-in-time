@@ -89,7 +89,7 @@ pub use repository_state_store::{
 };
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
-pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
+pub use test_support::publish_fixture_directory_noreplace;
 pub use warnings::StorageWarning;
 pub use worktree_paths::WorktreePaths;
 
