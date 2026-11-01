@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T01:48:44.532515908Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a56771e0-9578-4c13-bba3-c0938586aea0",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:50:54.095683198Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "855d027d-2575-4c9d-8c6a-049f406fe397",
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Commands take issue record paths from the VirtualPath constructor",
-  "updated_at": "2026-11-01T01:48:44.532515908Z"
+  "updated_at": "2026-11-01T01:50:54.095683198Z"
 }
