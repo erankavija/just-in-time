@@ -4,6 +4,8 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
 use crate::domain::event_catalog::EventTag;
+use crate::domain::State;
+use clap::Arg;
 
 /// Just-In-Time Issue Tracker
 ///
@@ -944,7 +946,7 @@ pub enum IssueCommands {
         priority: Option<String>,
 
         /// Target state (`rejected` is set by `jit issue reject`)
-        #[arg(short, long)]
+        #[arg(short, long, value_parser = UpdateStateParser)]
         state: Option<String>,
 
         /// Issue type (e.g. `task`, `story`, `epic`). Must be declared in
@@ -2191,6 +2193,49 @@ pub enum QueryCommands {
 pub enum CountDimension {
     /// Count by lifecycle state.
     State,
+}
+
+/// Value parser for `issue update --state`: every [`State`] except `rejected`,
+/// which only `jit issue reject` sets.
+#[derive(Clone, Copy)]
+pub struct UpdateStateParser;
+
+impl UpdateStateParser {
+    fn accepted() -> impl Iterator<Item = State> {
+        State::ALL
+            .into_iter()
+            .filter(|state| *state != State::Rejected)
+    }
+}
+
+impl clap::builder::TypedValueParser for UpdateStateParser {
+    type Value = String;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        arg: Option<&Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<String, clap::Error> {
+        if value == State::Rejected.as_str() {
+            return Err(cmd.clone().error(
+                clap::error::ErrorKind::InvalidValue,
+                "`issue update` cannot set state rejected; use `jit issue reject <id> [--reason <reason>]`",
+            ));
+        }
+        clap::builder::PossibleValuesParser::new(
+            Self::accepted().map(|state| clap::builder::PossibleValue::new(state.as_str())),
+        )
+        .parse_ref(cmd, arg, value)
+    }
+
+    fn possible_values(
+        &self,
+    ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        Some(Box::new(Self::accepted().map(|state| {
+            clap::builder::PossibleValue::new(state.as_str())
+        })))
+    }
 }
 
 #[derive(Subcommand)]

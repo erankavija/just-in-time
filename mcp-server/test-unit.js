@@ -196,6 +196,21 @@ await runTest('maps array<string> to JSON Schema array type', () => {
   assert.deepStrictEqual(labelProp.items, { type: 'string' });
 });
 
+await runTest('closed flag vocabularies become enum constraints', () => {
+  const schema = {
+    version: '0.0.0-test',
+    commands: {
+      pick: {
+        description: 'Pick',
+        args: [],
+        flags: [{ name: 'state', type: 'string', required: false, description: 's', values: ['ready', 'done'] }],
+      },
+    },
+  };
+  const [tool] = generateTools(schema);
+  assert.deepStrictEqual(tool.inputSchema.properties.state.enum, ['ready', 'done']);
+});
+
 await runTest('propagates required fields to inputSchema', () => {
   const tools = generateTools(testSchema);
   const createTool = tools.find(t => t.name === 'jit_issue_create');
