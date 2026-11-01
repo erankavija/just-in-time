@@ -99,10 +99,14 @@ Canonical rules:
   applies the preset to nothing).
 - **A list modifier is a repeated flag.** Where a list tunes the verb rather
   than naming its subjects, it is a flag repeated once per value:
-  `--label a:b --label c:d`. A value is taken whole, so a comma inside it is
-  part of the value and fails that value's own validation. This governs
-  `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
-  `--except`, and `--fields`.
+  `--label a:b --label c:d`. A value is taken whole and a comma is part of it,
+  never a separator. `--label` stores it only under `--force`, because the
+  label-format rule blocks the write otherwise. `--gate`, `--add-gate`,
+  `--remove-gate`, `--except` and `--fields` always fail on it, as an invalid
+  gate key or unknown field. `--remove-label` treats it as the name of one
+  label: it removes a stored label of that exact name and fails only when the
+  issue lacks it. This governs `--label`, `--gate`, `--add-gate`,
+  `--remove-label`, `--remove-gate`, `--except`, and `--fields`.
 
 The positional-list-versus-flag-list split is the canonical reason
 `jit gate add abc tests clippy` (subjects) reads differently from

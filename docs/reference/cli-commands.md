@@ -466,7 +466,7 @@ it from a client; the generation model in brief:
 jit issue create --title "Task" --label epic:auth --label type:task --label component:core
 ```
 
-A comma is part of the value, so `--label epic:auth,type:task` names one malformed label and is refused.
+A comma is part of the value, never a separator: `--label epic:auth,type:task` names one malformed label, which the label-format rule blocks unless `--force` is passed. Gate-key and field flags always fail on a comma. `--remove-label` removes a stored label of that exact name and fails only when the issue lacks it.
 
 **Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`, `--except`, `--fields`
 
