@@ -340,8 +340,11 @@ behavior depends on the arguments.
   the registry, DAG cycles, issues isolated from the dependency graph, redundant
   (transitively-reducible) edges, claims-index consistency, and record fidelity:
   the index, issue records, gate-run results, and event log each
-  decode and reproduce what the writer would publish. Advisory
-  membership-vs-DAG divergences are reported but do not fail the run.
+  decode and reproduce what the writer would publish, and no event id appears on
+  more than one line. Advisory membership-vs-DAG divergences are reported but do
+  not fail the run. A built-in `repository_validation` gate runs this same
+  computation and never passes where it fails; see
+  [gate presets](gate-presets.md) for its `failed` and `error` runs.
 - **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
   issue. The id accepts a full UUID, 8-char short id, or unique prefix.
 - **Selected rule** (`jit validate <id> --rule <rule>`): applies exactly one

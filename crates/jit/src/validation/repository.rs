@@ -61,6 +61,17 @@ pub struct RepositoryValidationReport {
     pub rule_report: RuleReport,
 }
 
+/// Validation read the repository and found it wrong: a verdict on its content,
+/// where every other structural failure means it could not load or read what it
+/// needed.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub(crate) struct RepositoryJudgedInvalid(pub(crate) String);
+
+fn judged_invalid(error: anyhow::Error) -> anyhow::Error {
+    RepositoryJudgedInvalid(format!("{error:#}")).into()
+}
+
 /// A structural repository-validation failure with all semantic findings that
 /// could still be collected from the already captured [`RepositoryImage`].
 ///
@@ -100,6 +111,13 @@ impl RepositoryValidationFailure {
                 rule_report: RuleReport::default(),
             },
         )
+    }
+
+    /// Whether validation judged the repository wrong rather than being unable to judge.
+    pub fn is_judged_invalid(&self) -> bool {
+        self.error
+            .downcast_ref::<RepositoryJudgedInvalid>()
+            .is_some()
     }
 
     /// Partial validation report collected from the exact supplied view.
@@ -255,6 +273,7 @@ pub(crate) fn validate_repository_with_materializations(
 
     if let Some(records) = &records {
         let integrity_error = validate_integrity(&records.issues, &gates, document_references)
+            .map_err(judged_invalid)
             .context("repository-integrity validation pass")
             .err();
         if let Some(error) = integrity_error {
@@ -378,18 +397,19 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         &read(&index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
-    .context(format!("invalid {index_path}"))?;
+    .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
     let issues = captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id).repository_relative();
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
-                .with_context(|| format!("invalid {path}"))?;
+                .with_context(|| RepositoryJudgedInvalid(format!("invalid {path}")))?;
             if &issue.id != id {
-                return Err(anyhow!(
+                return Err(RepositoryJudgedInvalid(format!(
                     "issue file '{path}' contains id '{}' instead of '{id}'",
                     issue.id
-                ));
+                ))
+                .into());
             }
             Ok(issue)
         })
@@ -398,10 +418,10 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
     let mut event_count = 0;
     if let Some(events) = read_text(read, &VirtualPath::EVENTS.repository_relative())? {
         event_count = parse_known_events(&events)
-            .context(format!(
+            .context(RepositoryJudgedInvalid(format!(
                 "invalid {}",
                 VirtualPath::EVENTS.repository_relative()
-            ))?
+            )))?
             .len();
     }
     Ok(Records {
@@ -530,12 +550,13 @@ fn validate_integrity(
 fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
     if !crate::test_mode::is_enabled() {
         let index_issues = crate::commands::validate_claims_index_at(repository_root)
-            .unwrap_or_else(|error| vec![format!("Failed to validate claims index: {error}")]);
+            .context("Failed to validate claims index")?;
         if !index_issues.is_empty() {
-            return Err(anyhow!(
+            return Err(RepositoryJudgedInvalid(format!(
                 "Claims index validation failed:\n  {}",
                 index_issues.join("\n  ")
-            ));
+            ))
+            .into());
         }
     }
     Ok(())
@@ -824,9 +845,10 @@ fn validate_materializations(
             })
             .collect::<Vec<_>>()
             .join("\n");
-        return Err(anyhow!(
+        return Err(RepositoryJudgedInvalid(format!(
             "derived-state drift (repair with `jit validate --fix`):\n{details}"
-        ));
+        ))
+        .into());
     }
     Ok(())
 }

@@ -592,16 +592,31 @@ fn gate_findings_from_rule_report(
 /// Convert one whole-repository validation result into the built-in gate finding
 /// contract.
 ///
-/// A structural failure or an unloadable rules declaration is a fault the checker
-/// cannot judge through, so it returns `Err`; rule findings about content convert through the
-/// same severity/disposition mapping as any validation report.
+/// A repository validation judged wrong is a verdict, reported beside the rule
+/// findings. Failing to load or read what it needed, an unloadable rules declaration
+/// included, is a fault the checker cannot judge through, so it returns `Err`.
 fn gate_findings_from_report(
     result: std::result::Result<
         crate::validation::repository::RepositoryValidationReport,
         crate::validation::repository::RepositoryValidationFailure,
     >,
 ) -> Result<(Vec<GateFinding>, bool)> {
-    let report = result.map_err(|failure| failure.into_error())?;
+    let report = match result {
+        Ok(report) => report,
+        Err(failure) if failure.is_judged_invalid() => {
+            let (error, report) = failure.into_parts();
+            let mut findings = gate_findings_from_rule_report(&report.rule_report);
+            findings.push(GateFinding::builtin(
+                "repository-invalid",
+                FindingSeverity::High,
+                FindingDisposition::Blocking,
+                FindingOrigin::PreExisting,
+                format!("{error:#}"),
+            ));
+            return Ok((findings, true));
+        }
+        Err(failure) => return Err(failure.into_error()),
+    };
     if !report
         .passes
         .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas)
@@ -995,11 +1010,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// whose verdict is not a function of repository content running every
     /// time — or when this executor is not rooted at a real worktree, where
     /// there is no content to digest and so nothing a later run could prove
-    /// identical.
+    /// identical. Repository validation is also `None` whatever it declares: its
+    /// verdict depends on the records the digest excludes.
     fn declared_inputs_digest(
         &self,
         gate: &crate::declarations::GateDefinition,
     ) -> Result<Option<crate::domain::repository_inputs::InputsDigest>> {
+        if matches!(
+            gate.checker,
+            Some(crate::declarations::GateChecker::RepositoryValidation)
+        ) {
+            return Ok(None);
+        }
         let (Some(inputs), Some(layout)) = (gate.inputs.as_ref(), self.real_repo_layout()) else {
             return Ok(None);
         };
@@ -1016,6 +1038,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Execute a built-in checker against one exact repository image.
+    /// [`GateChecker::RepositoryValidation`] instead runs the computation behind
+    /// `jit validate`, which captures the evidence it needs from the live repository.
     fn execute_builtin_checker_with_repository_view(
         &self,
         subject: GateRunSubject<'_>,
@@ -1047,9 +1071,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // An `Err` is a fault: the checker could not judge the repository.
         // An `Ok` carries a verdict on the content.
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
-            GateChecker::RepositoryValidation => gate_findings_from_report(
-                crate::validation::repository::validate_repository(repository_image),
-            ),
+            GateChecker::RepositoryValidation => self
+                .validate_repository_report()
+                .and_then(gate_findings_from_report),
             GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
                 .map(|report| (gate_findings_from_rule_report(&report), report.has_errors())),
             GateChecker::RuleValidation { rule } => {
@@ -1504,7 +1528,6 @@ mod tests {
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
-    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
     struct FailNthPublication {
@@ -2877,80 +2900,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_repository_validation_checker_uses_injected_overlay_result_path() {
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config = format!(
-            "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            taxonomy.config_fragment()
-        );
-        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
-        let live_image = executor
-            .capture_validation_image_with(&std::collections::BTreeMap::new())
-            .unwrap();
-        let live = executor
-            .execute_builtin_checker_with_repository_view(
-                GateRunSubject {
-                    run_id: &crate::test_utils::gate_run_id(1),
-                    gate_key: &"not-a-reserved-repository-key".parse().unwrap(),
-                    issue_id: &issue_id,
-                    stage: GateStage::Postcheck,
-                },
-                &GateChecker::RepositoryValidation,
-                &live_image,
-            )
-            .unwrap();
-        assert_eq!(live.status, GateRunStatus::Passed);
-        assert!(live.findings.unwrap().findings.iter().any(|finding| {
-            finding.severity == "low"
-                && finding.disposition.as_deref() == Some("advisory")
-                && finding.summary.contains("review-placeholder")
-                && finding.summary.contains("editable-review")
-        }));
-
-        let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
-        planned_issue.dependencies.push(crate::test_utils::issue_id(
-            0x96bf59db932e7f49ee5cc6bb5a1f6645,
-        ));
-        let overrides = crate::commands::overrides_from_repo_changes(
-            live_image.layout(),
-            [
-                (
-                    PathBuf::from(".jit/rules.toml"),
-                    Some(late_rule.as_bytes().to_vec()),
-                ),
-                (
-                    PathBuf::from(VirtualPath::issue_record(&issue_id).repository_relative()),
-                    Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
-                ),
-            ],
-        )
-        .unwrap();
-        let planned_image = executor.capture_validation_image_with(&overrides).unwrap();
-        let planned = executor
-            .execute_builtin_checker_with_repository_view(
-                GateRunSubject {
-                    run_id: &crate::test_utils::gate_run_id(1),
-                    gate_key: &"not-a-reserved-repository-key".parse().unwrap(),
-                    issue_id: &issue_id,
-                    stage: GateStage::Postcheck,
-                },
-                &GateChecker::RepositoryValidation,
-                &planned_image,
-            )
-            .unwrap();
-
-        assert_eq!(planned.command, "builtin:repository_validation");
-        assert_eq!(planned.status, GateRunStatus::Error);
-        assert!(
-            planned.stderr.contains("does not exist"),
-            "{}",
-            planned.stderr
-        );
-    }
-
-    #[test]
     fn test_check_gate_file_repository_ignores_legacy_cached_rules() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
@@ -2982,8 +2931,57 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .any(|finding| finding.summary.contains("planned-task-needs-summary")));
     }
 
-    #[test]
-    fn test_repository_validation_file_backend_reports_missing_index_through_view() {
+    type RepositoryChange = fn(&std::path::Path, &IssueId);
+
+    fn leave_unchanged(_: &std::path::Path, _: &IssueId) {}
+
+    fn respell_created_at(root: &std::path::Path, issue_id: &IssueId) {
+        let path = root.join(VirtualPath::issue_record(issue_id).repository_relative());
+        let mut raw: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let created = raw["created_at"].as_str().unwrap().replace('Z', "+00:00");
+        raw["created_at"] = created.into();
+        std::fs::write(path, serde_json::to_vec_pretty(&raw).unwrap()).unwrap();
+    }
+
+    fn repeat_last_event(root: &std::path::Path, _: &IssueId) {
+        let path = root.join(".jit/events.jsonl");
+        let log = std::fs::read_to_string(&path).unwrap();
+        let last = log.lines().last().unwrap().to_string();
+        std::fs::write(path, format!("{log}{last}\n")).unwrap();
+    }
+
+    fn append_undecodable_event(root: &std::path::Path, _: &IssueId) {
+        let path = root.join(".jit/events.jsonl");
+        let log = std::fs::read_to_string(&path).unwrap();
+        let line = r#"{"type":"issue_claimed","id":"not-an-event-id"}"#;
+        std::fs::write(path, format!("{log}{line}\n")).unwrap();
+    }
+
+    fn add_rule_finding(root: &std::path::Path, _: &IssueId) {
+        let rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
+        std::fs::write(root.join(".jit/rules.toml"), rule).unwrap();
+    }
+
+    fn break_rules_file(root: &std::path::Path, _: &IssueId) {
+        std::fs::write(root.join(".jit/rules.toml"), "[[rules\nnot toml").unwrap();
+    }
+
+    fn remove_index(root: &std::path::Path, _: &IssueId) {
+        std::fs::remove_file(root.join(".jit/index.json")).unwrap();
+    }
+
+    fn add_dangling_dependency(root: &std::path::Path, issue_id: &IssueId) {
+        let path = root.join(VirtualPath::issue_record(issue_id).repository_relative());
+        let mut raw: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let absent = crate::test_utils::issue_id(0x96bf59db932e7f49ee5cc6bb5a1f6645);
+        raw["dependencies"] = serde_json::json!([absent]);
+        std::fs::write(path, serde_json::to_vec_pretty(&raw).unwrap()).unwrap();
+    }
+
+    /// Whether `jit validate` passes after `change`, and the built-in checker's run.
+    fn judge_repository_after(change: RepositoryChange) -> (bool, GateRunResult) {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -2991,12 +2989,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
         let image = executor
             .capture_validation_image_with(&std::collections::BTreeMap::new())
             .unwrap();
-
-        let result = executor
+        change(repo.path(), &issue_id);
+        let validate = executor
+            .validate_repository_report()
+            .unwrap()
+            .is_ok_and(|report| !report.rule_report.has_errors());
+        let run = executor
             .execute_builtin_checker_with_repository_view(
                 GateRunSubject {
                     run_id: &crate::test_utils::gate_run_id(1),
@@ -3008,9 +3009,108 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &image,
             )
             .unwrap();
+        (validate, run)
+    }
 
-        assert_eq!(result.status, GateRunStatus::Error);
-        assert!(result.stderr.contains("index.json"), "{}", result.stderr);
+    #[test]
+    fn test_repository_validation_checker_passes_exactly_where_validate_passes() {
+        let changes: [(RepositoryChange, bool); 8] = [
+            (leave_unchanged, true),
+            (respell_created_at, false),
+            (repeat_last_event, false),
+            (append_undecodable_event, false),
+            (add_rule_finding, false),
+            (break_rules_file, false),
+            (remove_index, false),
+            (add_dangling_dependency, false),
+        ];
+        for (index, (change, passes)) in changes.into_iter().enumerate() {
+            let (validate, run) = judge_repository_after(change);
+            assert_eq!(validate, passes, "change {index}: jit validate");
+            assert_eq!(
+                run.status == GateRunStatus::Passed,
+                passes,
+                "change {index}: {} {}",
+                run.stdout,
+                run.stderr
+            );
+        }
+    }
+
+    #[test]
+    fn test_repository_validation_records_a_repository_judged_wrong_as_a_failed_run() {
+        let changes: [RepositoryChange; 4] = [
+            respell_created_at,
+            repeat_last_event,
+            append_undecodable_event,
+            add_dangling_dependency,
+        ];
+        for (index, change) in changes.into_iter().enumerate() {
+            let (_, run) = judge_repository_after(change);
+            assert_eq!(run.status, GateRunStatus::Failed, "change {index}");
+            assert_eq!(run.exit_code, Some(4), "change {index}");
+            let findings = run.findings.unwrap().findings;
+            assert!(
+                findings.iter().any(|finding| finding.is_blocking()),
+                "change {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_repository_validation_never_reuses_a_verdict_when_the_gate_declares_inputs() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let gate_key: GateKey = "not-a-reserved-repository-key".parse().unwrap();
+        std::fs::create_dir_all(repo.path().join("workspace")).unwrap();
+        std::fs::write(repo.path().join("workspace/lib.rs"), "fn main() {}\n").unwrap();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.get_mut(&gate_key).unwrap().inputs = Some(
+            crate::domain::repository_inputs::RepositoryInputs::parse(&["workspace"], &[]).unwrap(),
+        );
+        std::fs::write(
+            repo.path().join(".jit/gates.toml"),
+            crate::declarations::serialize_gate_registry(&registry).unwrap(),
+        )
+        .unwrap();
+
+        let passed = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(passed.status, GateRunStatus::Passed, "{}", passed.stdout);
+
+        repeat_last_event(repo.path(), &issue_id);
+        let after_break = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(after_break.status, GateRunStatus::Failed);
+        assert!(after_break.origin.is_executed());
+
+        let log = repo.path().join(".jit/events.jsonl");
+        let mut seen = std::collections::HashSet::new();
+        let repaired = std::fs::read_to_string(&log)
+            .unwrap()
+            .lines()
+            .filter(|line| seen.insert(line.to_string()))
+            .map(|line| format!("{line}\n"))
+            .collect::<String>();
+        std::fs::write(&log, repaired).unwrap();
+        let after_repair = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(
+            after_repair.status,
+            GateRunStatus::Passed,
+            "{}",
+            after_repair.stdout
+        );
+        assert!(after_repair.origin.is_executed());
+    }
+
+    #[test]
+    fn test_repository_validation_records_a_missing_index_as_an_error_run() {
+        let (_, run) = judge_repository_after(remove_index);
+        assert_eq!(run.status, GateRunStatus::Error);
+        assert!(run.stderr.contains("index.json"), "{}", run.stderr);
     }
 
     #[test]
