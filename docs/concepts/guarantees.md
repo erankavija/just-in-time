@@ -44,7 +44,7 @@ jit dep add a1b2c3 d4e5f6  # A depends on B
 jit dep add d4e5f6 g7h8i9  # B depends on C
 
 # Try to create a cycle: C ← A
-jit dep add g7h8i9 a1b2c3  # Error: Cycle detected
+jit dep add g7h8i9 a1b2c3  # fails: Cycle detected
 ```
 
 **Why this matters:**
@@ -261,14 +261,14 @@ jit issue claim <task2> agent:worker-1
 # All basic operations and issue assignment work (task2 has no unmet dependencies)
 
 jit claim acquire <task2> --agent-id agent:worker-1
-# Error: Claims and leases require a git repository (exit code 10)
+# fails with exit code 10: Claims and leases require a git repository
 
 # git init alone is not enough - HEAD must resolve to a commit
 git init
 git config user.email "you@example.com"
 git config user.name "Your Name"
 jit claim acquire <task2> --agent-id agent:worker-1
-# Error: Claims and leases require a git repository (exit code 10) - no commits yet
+# fails with exit code 10: HEAD has no commit yet
 
 git commit --allow-empty -m "Initial commit"
 jit claim acquire <task2> --agent-id agent:worker-1
@@ -613,8 +613,8 @@ Warning: External URL not validated: https://example.com/diagram.png
   Referenced in: dev/design.md
 
 # Core functionality still works
-jit query available  # Works
-jit issue update abc123 --state done  # Works
+jit query available  # succeeds
+jit issue update abc123 --state done  # succeeds
 ```
 
 **Mitigation:** Download critical assets locally using per-document asset pattern.

@@ -84,7 +84,7 @@ need shared access; an atomic rename alone does not serialize competing writers.
 ```bash
 # Agent 1
 jit claim acquire $TASK --agent-id agent:worker-1
-# Acquired lease: <lease-id> (atomic via file lock)
+# Acquired lease: <lease-id>
 
 # Agent 2 (simultaneously, same task)
 jit claim acquire $TASK --agent-id agent:worker-2

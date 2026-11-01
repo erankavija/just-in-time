@@ -163,8 +163,12 @@ TASK_B=$(jit issue create --title "Task B" --json | jq -r '.id')
 TASK_C=$(jit issue create --title "Task C" --json | jq -r '.id')
 
 # Build chain: A → B → C
-jit dep add $TASK_A $TASK_B  # ok
-jit dep add $TASK_B $TASK_C  # ok
+jit dep add $TASK_A $TASK_B
+# Added 1 dependency:
+#   • <task-a> → <task-b>
+jit dep add $TASK_B $TASK_C
+# Added 1 dependency:
+#   • <task-b> → <task-c>
 
 # Try to create cycle: C → A
 jit dep add $TASK_C $TASK_A
