@@ -22343,3 +22343,4 @@
 {"gate_key":"code-review","id":"17013097-01a8-4b42-9b1d-c9a3d88705a7","issue_id":"03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1","timestamp":"2026-11-01T18:18:49.761045722Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"f3aa86b2-36da-462e-9c1e-b6c9c00c79ae","issue_id":"2ded6cd5-89a3-428a-abbf-1590089ed2ec","timestamp":"2026-11-01T18:19:25.662757584Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"a309e0c5-625a-45b5-b65d-79d0fec4c126","issue_id":"0838348a-2fb7-4a57-a75c-c3a7f1252f42","timestamp":"2026-11-01T18:21:19.170570918Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"5399a059-2828-43ba-ac11-4a892b49e857","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:23:42.936600440Z","type":"issue_updated","updated_by":"issue-update"}
