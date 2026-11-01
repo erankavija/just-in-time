@@ -2198,9 +2198,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn validate_branch_drift(&self) -> Result<()> {
         use std::process::Command;
 
+        let layout = self
+            .real_repo_layout()
+            .context("Branch drift needs a repository on disk")?;
+        let repository = layout.data_root();
+
         // Get merge-base between HEAD and origin/main
         let merge_base_output = Command::new("git")
             .args(["merge-base", "HEAD", "origin/main"])
+            .current_dir(repository)
             .output()
             .context("Failed to execute git merge-base")?;
 
@@ -2219,6 +2225,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Get current origin/main commit
         let main_commit_output = Command::new("git")
             .args(["rev-parse", "origin/main"])
+            .current_dir(repository)
             .output()
             .context("Failed to execute git rev-parse")?;
 
@@ -2581,10 +2588,6 @@ mod tests {
         let repaired = stale.replacen(STALE_LABEL_ASSERTION, DEFAULT_LABEL_ASSERTION, 1);
         (stale, repaired)
     }
-
-    // Note: validate_leases() and validate_branch_drift() require git repository setup
-    // and are integration-tested through manual testing and real usage.
-    // Unit tests focus on pure functions like format_duration().
 
     #[test]
     fn test_find_planning_node_resolves_template_declared_container_label() {
@@ -3319,7 +3322,6 @@ priority = 100
         seed_issue(exec.storage(), target);
         seed_issue(exec.storage(), node);
 
-        crate::test_mode::enable();
         let err = exec.validate_silent().unwrap_err();
         let msg = err.to_string();
         assert!(

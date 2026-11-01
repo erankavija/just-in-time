@@ -66,7 +66,6 @@ mode = "manual"
 
 #[test]
 fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -118,7 +117,6 @@ fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
 
 #[test]
 fn test_blocked_transition_records_event_in_log() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -176,7 +174,6 @@ fn test_blocked_transition_records_event_in_log() {
 
 #[test]
 fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -248,7 +245,6 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -305,7 +301,6 @@ severity = "warn"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -364,7 +359,6 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     // lands in `gated` with the gate error. (A gated-keyed rule WOULD block
     // the diversion; see
     // `test_gated_diversion_enforces_gated_keyed_graph_rule`.)
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -429,7 +423,6 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -489,7 +482,6 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -548,7 +540,6 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -600,7 +591,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 fn test_update_issue_state_path_enforces_done_graph_rule() {
     // The state-only path (`update_issue_state`) must also enforce graph rules
     // at the Done arm.
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -631,7 +621,6 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
     // enforce-at-done rule fails) must stay Gated with the block surfaced.
     use jit::domain::{GateState, GateStatus};
 
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -699,7 +688,6 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -735,7 +723,6 @@ severity = "error"
 enforce = true
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -766,7 +753,6 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    jit::test_mode::enable();
     let mut executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -824,7 +810,6 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    jit::test_mode::enable();
     let mut executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -884,7 +869,6 @@ fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    jit::test_mode::enable();
     let mut executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -927,7 +911,6 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
     // encoded inside the chokepoint). An enforcing rule that WOULD block a done
     // transition must NOT block a transition to Rejected, regardless of which
     // entry point is used.
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -961,7 +944,6 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
 fn test_done_rule_does_not_fire_on_non_done_transition() {
     // A `state = "done"` rule must not fire when transitioning to ready: the
     // selector does not match the issue in the ready target state.
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {

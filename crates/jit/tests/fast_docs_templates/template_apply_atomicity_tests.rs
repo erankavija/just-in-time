@@ -395,7 +395,6 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
     executor: CommandExecutor<PublicationProbeStore<S>>,
     taxonomy: &TestTaxonomy,
 ) -> (CommandExecutor<PublicationProbeStore<S>>, IssueId, IssueId) {
-    jit::test_mode::enable();
     assert!(executor
         .storage()
         .read_repo_file(".jit/config.toml")

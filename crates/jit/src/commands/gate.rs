@@ -1117,7 +1117,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -1175,7 +1175,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::declarations::{GateMode, GateStage};
     /// use jit::InMemoryStorage;
     ///
-    /// jit::test_mode::enable(); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();
@@ -1210,7 +1209,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
         match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
             key: key.clone(),
             update,
@@ -1225,7 +1224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations()?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
             key: key.clone(),

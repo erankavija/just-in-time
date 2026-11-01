@@ -131,7 +131,6 @@ fn type_of(issue: &Issue) -> Option<String> {
 
 #[test]
 fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
-    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     let unchecked_hierarchy: [&str; 0] = [];
     for template in jit::templates::TemplateRegistry::from_toml_str(
@@ -218,7 +217,6 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
 
 #[test]
 fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
-    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     let unchecked_hierarchy: [&str; 0] = [];
     for template in jit::templates::TemplateRegistry::from_toml_str(
@@ -268,7 +266,6 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 /// so the CLI's auto-bind is unchanged where nothing is configured.
 #[test]
 fn test_container_anchor_defaults_without_a_templates_file() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
     assert_eq!(executor.container_anchor().unwrap(), "container");
 }

@@ -584,11 +584,8 @@ ran rather than what the sources appear to declare.
 
 Three environment behaviors matter when writing tests:
 
-- **`JIT_TEST_MODE`** disables the git guards that global operations enforce in a live
-  repository: the branch-drift check against main history (`enforce_main_only_operations`) and the
-  claims-index validation inside `jit validate`. In-process tests call
-  `jit::test_mode::enable()` (`TestHarness::new()` does), which never touches the process
-  environment; tests that spawn the binary pass the variable with `Command::env`.
+- **`JIT_TEST_MODE`** disables the claims-index validation inside `jit validate` in a live
+  repository. Tests that spawn the binary pass the variable with `Command::env`; `JitCli` does.
 - **Process-wide state** (environment variables, working directory) is never changed, so tests
   read it and run in parallel without a lock. A test that varies a value passes it explicitly
   (`Command::env`, `Command::current_dir`, a function parameter, an absolute path).

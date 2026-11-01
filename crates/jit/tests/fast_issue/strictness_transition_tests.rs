@@ -57,7 +57,6 @@ fn state_of(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> State 
 
 #[test]
 fn test_warn_graph_rule_blocks_transition_under_strict() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -81,7 +80,6 @@ fn test_warn_graph_rule_blocks_transition_under_strict() {
 
 #[test]
 fn test_warn_graph_rule_does_not_block_transition_under_loose() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -103,7 +101,6 @@ fn test_warn_graph_rule_does_not_block_transition_under_loose() {
 
 #[test]
 fn test_enforced_graph_rule_blocks_transition_under_loose() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -123,7 +120,6 @@ fn test_enforced_graph_rule_blocks_transition_under_loose() {
 
 #[test]
 fn test_enforced_graph_rule_allowed_under_permissive() {
-    jit::test_mode::enable();
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
