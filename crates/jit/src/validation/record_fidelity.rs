@@ -11,6 +11,7 @@ use crate::repository_state::{
 };
 use anyhow::Result;
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 /// Tags earlier versions wrote, which the log keeps and readers skip.
 const RETIRED_EVENT_TAGS: [&str; 3] = [
@@ -112,7 +113,7 @@ fn gate_run_drift(id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
 }
 
 /// Every current-vocabulary line reproduces its bytes; every other line carries
-/// a retired tag. A line alone that fails to parse is the log's certified torn
+/// a retired tag; every event id names one line. A line alone that fails to parse is the log's certified torn
 /// tail, since the whole log parsed.
 fn event_log_drift(bytes: &[u8]) -> Vec<String> {
     let Some(log) = std::str::from_utf8(bytes)
@@ -121,6 +122,17 @@ fn event_log_drift(bytes: &[u8]) -> Vec<String> {
     else {
         return Vec::new();
     };
+    let ids = log
+        .lines()
+        .filter_map(|line| {
+            serde_json::from_str::<Value>(line).ok()?["id"]
+                .as_str()
+                .map(str::to_owned)
+        })
+        .fold(BTreeMap::<String, usize>::new(), |mut ids, id| {
+            *ids.entry(id).or_default() += 1;
+            ids
+        });
     log.lines()
         .filter_map(|line| match parse_known_events(line).ok()?.first() {
             Some(event) => (serialize_event(event).ok()?.as_slice() != line.as_bytes())
@@ -132,6 +144,11 @@ fn event_log_drift(bytes: &[u8]) -> Vec<String> {
                 (!RETIRED_EVENT_TAGS.contains(&tag)).then(|| format!("unknown event tag '{tag}'"))
             }
         })
+        .chain(
+            ids.into_iter()
+                .filter(|(_, lines)| *lines > 1)
+                .map(|(id, lines)| format!("event id '{id}' appears on {lines} lines")),
+        )
         .collect()
 }
 
@@ -154,8 +171,13 @@ mod tests {
         .unwrap()
     }
 
+    /// A catalog sample's line, under an event id only this tag's lines use.
     fn event_line(tag: EventTag) -> String {
-        String::from_utf8(serialize_event(&tag.sample()).unwrap()).unwrap()
+        let position = EventTag::ALL.iter().position(|each| *each == tag).unwrap();
+        let mut value: Value =
+            serde_json::from_slice(&serialize_event(&tag.sample()).unwrap()).unwrap();
+        value["id"] = format!("00000000-0000-0000-0000-{position:012x}").into();
+        value.to_string()
     }
 
     #[test]
@@ -246,9 +268,23 @@ mod tests {
     }
 
     #[test]
+    fn test_event_log_drift_names_an_id_on_more_than_one_line_whether_or_not_they_match() {
+        let first = event_line(EventTag::ALL[0]);
+        let id = serde_json::from_str::<Value>(&first).unwrap()["id"].clone();
+        let mut other = serde_json::from_str::<Value>(&event_line(EventTag::ALL[1])).unwrap();
+        other["id"] = id.clone();
+        let log = format!("{first}\n{first}\n{other}\n");
+
+        let drift = event_log_drift(log.as_bytes());
+
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(drift[0].contains(id.as_str().unwrap()), "{drift:?}");
+    }
+
+    #[test]
     fn test_event_log_drift_reports_an_unknown_tag_and_a_line_that_does_not_reproduce() {
         let line = event_line(EventTag::ALL[0]);
-        let spaced = line.replacen(':', ": ", 1);
+        let spaced = event_line(EventTag::ALL[1]).replacen(':', ": ", 1);
         let log = format!("{line}\n{spaced}\n{{\"type\":\"never_written\"}}\n");
 
         let drift = event_log_drift(log.as_bytes());

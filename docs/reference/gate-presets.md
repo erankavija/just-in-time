@@ -28,8 +28,8 @@ Automated gate definitions can use `exec` or one of five in-process checker type
 The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the
 configured gate key does not change their behavior:
 
-- `repository_validation` runs structural and declarative validation for the whole
-repository.
+- `repository_validation` runs the whole-repository `jit validate` computation and
+fails where it fails.
 - `issue_validation` runs declarative validation for the gated issue.
 - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
 from the gated issue, where the target is a full issue id or unique prefix, and
