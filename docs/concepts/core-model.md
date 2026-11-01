@@ -631,18 +631,30 @@ jit issue update $ISSUE --state done
 ```bash
 $ jit issue update abc123 --state done
 Error: Gate validation failed: Cannot transition to 'done': 2 gate(s) not passed
+
+Blockers:
+  - tests [pending]
+  - code-review [pending]
+
+To fix:
+  - jit gate status-all abc123
+  - jit gate evaluate abc123 tests
+  - jit gate status abc123 tests --all  # run history
+  - jit gate evaluate abc123 code-review --by <attestor>
+  - jit gate status abc123 code-review --all  # run history
+
 Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
 
 # Fix and evaluate gates
 $ jit gate evaluate abc123 tests
-✓ tests passed
+Passed gate 'tests' for issue abc123
 
 $ jit gate evaluate abc123 code-review --by human:alice
-✓ code-review passed
+Passed gate 'code-review' for issue abc123
 
 # Once every required status is green, retry completion.
 $ jit issue update abc123 --state done
-✓ Issue transitioned to 'done'
+Updated issue: abc123
 ```
 
 Passing a manual gate may auto-transition an already `gated` issue when it

@@ -38,7 +38,7 @@ if echo "$changed" | grep -E '^\.jit/(config|gates)\.toml$' >/dev/null; then
   main=$(git rev-parse origin/main 2>/dev/null || git rev-parse main 2>/dev/null || echo "")
   
   if [ -n "$base" ] && [ -n "$main" ] && [ "$base" != "$main" ]; then
-    echo "❌ Pre-commit hook: Global .jit/ changes require common history with main" >&2
+    echo "error: Pre-commit hook: Global .jit/ changes require common history with main" >&2
     echo "   Your branch has diverged from origin/main" >&2
     echo "" >&2
     echo "   To proceed:" >&2
@@ -57,7 +57,7 @@ fi
 
 # Check if jq is available
 if ! command -v jq &> /dev/null; then
-  echo "⚠️  Pre-commit hook: jq not found, skipping lease validation" >&2
+  echo "warning: Pre-commit hook: jq not found, skipping lease validation" >&2
   echo "   Install jq to enable lease checks" >&2
   exit 0
 fi
@@ -77,7 +77,7 @@ for f in $changed; do
     fi
     
     if [ -z "$agent_id" ]; then
-      echo "❌ Pre-commit hook: Structural edit to issue $issue_id without agent identity" >&2
+      echo "error: Pre-commit hook: Structural edit to issue $issue_id without agent identity" >&2
       echo "   Set JIT_AGENT_ID environment variable or configure ~/.config/jit/agent.toml" >&2
       echo "" >&2
       echo "   Example:" >&2
@@ -103,7 +103,7 @@ for f in $changed; do
     fi
 
     if [ -z "$has_claim" ]; then
-      echo "❌ Pre-commit hook: Structural edit to issue $issue_id without active lease" >&2
+      echo "error: Pre-commit hook: Structural edit to issue $issue_id without active lease" >&2
       echo "   Agent: $agent_id" >&2
       if [ -n "$worktree_id" ]; then
         echo "   Worktree: $worktree_id" >&2

@@ -546,10 +546,10 @@ jit gate status-all $ISSUE_ID --json > gate-results.json || true
 # recorded runs only, so filtering it would miss gates never evaluated; `.gates`
 # lists every required gate with its status.
 if [ "$(jq -r '.all_passed' gate-results.json)" = "true" ]; then
-  echo "✅ All required gates passed"
+  echo "ok: All required gates passed"
   exit 0
 else
-  echo "❌ Required gates not all passed:"
+  echo "error: Required gates not all passed:"
   jq -r '.gates[] | select(.status != "passed") | "  - \(.key): \(.status)"' gate-results.json
   exit 1
 fi
@@ -613,7 +613,7 @@ if command -v jit &> /dev/null; then
   if [ -n "$ISSUE_ID" ]; then
     echo "Running local gates for issue $ISSUE_ID..."
     jit gate evaluate $ISSUE_ID fmt || {
-      echo "❌ Format check failed. Run 'cargo fmt' first."
+      echo "error: Format check failed. Run 'cargo fmt' first."
       exit 1
     }
   fi

@@ -3973,16 +3973,16 @@ ISSUE_ID=$1
 
 # tests and clippy are automated gates: evaluate runs their checkers.
 if jit gate evaluate "$ISSUE_ID" tests --quiet; then
-  echo "✓ Tests passed for $ISSUE_ID"
+  echo "ok: Tests passed for $ISSUE_ID"
 else
-  echo "✗ Tests failed for $ISSUE_ID"
+  echo "error: Tests failed for $ISSUE_ID"
   exit 1
 fi
 
 if jit gate evaluate "$ISSUE_ID" clippy --quiet; then
-  echo "✓ Clippy passed for $ISSUE_ID"
+  echo "ok: Clippy passed for $ISSUE_ID"
 else
-  echo "✗ Clippy failed for $ISSUE_ID"
+  echo "error: Clippy failed for $ISSUE_ID"
   exit 1
 fi
 ```
