@@ -8,6 +8,7 @@
   ],
   "description": "An adopter's gate using the built-in `repository_validation` checker can pass where `jit validate` fails, because the two compute validation differently. They must judge through one computation.\n\n## Background\n\n`jit validate` passes record-fidelity and materialization inputs to validation; the built-in checker calls the narrower entry point and skips them. This repository's own `repo-validate` gate runs `jit validate` as an exec command, so it sees the full verdict and hides the gap. Commit c36c6a393 removed tests of stored-record properties on the basis that the gate covers them, which is false for any repository using the built-in checker.\n\n## Success Criteria\n\n- [hard] REQ-01: The built-in `repository_validation` checker and whole-repository `jit validate` reach the same verdict over the same repository, through one computation.\n- [hard] REQ-02: A repository holding a record that does not reproduce fails the built-in checker.\n- [hard] REQ-03: Each property whose test c36c6a393 removed on that basis has one owning test that does not depend on this repository's live tracker.\n\n## Notes\n\nThis must land only after gf2 passes whole-repository validation on the installed binary, because 44 open gf2 issues require a gate using the built-in checker. The pure report function planned for repository validation is expected to absorb this code.\n\n- [hard] REQ-04: Whole-repository validation reports an event id that appears on more than one line of the event log, whether or not the lines match, and each finding names the id. All known logs hold none today, so this fails nothing on adoption. `merge=union` creates such lines silently.\n- [hard] REQ-05: A `repository_validation` verdict is never reused, whether or not the gate declares inputs, because it depends on records the input digest excludes.\n\nOne rule classifies a built-in repository validation run: if the checker read the repository and found it wrong, the run is `failed`; if it could not load or read what it needed, the run is `error`. A dangling dependency, a cycle, stale readiness or an undecodable record is `failed`; unloadable configuration or rules, a missing index or an unreadable repository is `error`. This refines REQ-02 of the built-in checker fault issue (39710b3b): its \"repository-integrity fault\" no longer records `error`.\n\nAdoption: the unified checker passed on the format 3 repositories gf2, mealie-fi and inflected-messages. `research` is checked once it converts to format 3.\n",
   "documents": [],
+  "done_at": "2026-11-01T18:23:55.877152100Z",
   "first_ready_at": "2026-11-01T13:24:02.997122490Z",
   "gates_required": [
     "cargo-ci",
@@ -42,7 +43,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Judge the built-in repository validation checker and jit validate through one computation",
-  "updated_at": "2026-11-01T18:23:42.936600440Z"
+  "updated_at": "2026-11-01T18:23:55.877152100Z"
 }
