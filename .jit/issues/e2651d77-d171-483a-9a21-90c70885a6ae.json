@@ -41,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Issue identity is one validated type end to end",
-  "updated_at": "2026-11-01T03:56:31.932536673Z"
+  "updated_at": "2026-11-01T04:32:13.156250663Z"
 }

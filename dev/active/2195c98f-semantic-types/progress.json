@@ -656,7 +656,9 @@
       "reason": "Story 83d04069 holistic-review round 2: State token list in rules.rs test; Debug-rendered vocabularies in output.rs. Written as a class sweep to end per-instance rounds. Depends on 8acca4f4 (output.rs overlap).",
       "status": "pending"
     },
-    "83413035"
+    "83413035",
+    "2ac34492",
+    "1a3db2c3"
   ],
   "escalations": [
     {
@@ -776,6 +778,12 @@
       "reason": "REQ-07 byte identity is unmet by 4793 of 5924 historic gate-run records (missing evaluation_stability/origin or retired tree_dirty; no id differs). Same wording on 488eb3c1, 79aa3aa7, e2651d77.",
       "status": "resolved",
       "resolution": "Invoker: current-format gate-run records are byte-identical; every other stored gate-run record decodes and reproduces its id fields. Amended on the four issues."
+    },
+    {
+      "issue": "488eb3c1,417be079",
+      "reason": "Byte-identity criteria unmeetable for gates.toml and 53 issue records; gate-prefix keys fail the gate-key grammar.",
+      "status": "resolved",
+      "resolution": "just-in-time-c9: round-trip wording for registry and issue records; remove gate-prefix (2ac34492)."
     }
   ],
   "rework_counts": {
@@ -795,7 +803,8 @@
     "13190465": 1,
     "b73b3e5a": 1,
     "641bd14e": 1,
-    "ce2bdbb0": 1
+    "ce2bdbb0": 1,
+    "488eb3c1": 2
   },
   "external_blockers": "19d9bd7d waits on c780514e 3f01cb72 (after 2916a306 → 168a9c16) and 6a13eeac (after c5c933f2 → 966d0627), led by just-in-time-4f. c797b59b waits on 19d9bd7d.",
   "dispatch_policy": "Tier by difficulty, no Fable. Alternate Claude and Codex per implementation dispatch; contract-setting work stays on Claude opus. Codex via codex-subagents skill (gpt-6-luna xhigh default, gpt-6.1-sol high for moderate). One worktree per worker; new worktree only with >=60 GiB free.",
@@ -1609,6 +1618,11 @@
       "source": "7abcc22d",
       "note": "NodeHierarchy holds ids as strings, so main.rs graph tree truncates by SHORT_ID_LENGTH, which epic REQ-03 forbids.",
       "resolved": "gap task 83413035"
+    },
+    {
+      "source": "story e2651d77 pre-review sweep",
+      "note": "DependencyGraph passes issue ids as &str, which story REQ-02 forbids.",
+      "resolved": "gap task 1a3db2c3"
     }
   ],
   "started_at": "2026-10-24T23:06:41.581082+00:00",
@@ -1638,7 +1652,8 @@
     "Parallel retypes that touch one test file conflict at landing (89e7a273 vs 19d9bd7d in scope_validation_tests.rs, same retype on both sides); resolve to main and re-land.",
     "Stored gate-run records predate format changes; test byte identity over records whose decoded key set equals the stored one, and ids over the rest.",
     "The lead's Bash cwd must not end inside a worker worktree: the harness pins the session there. Lead state runs via env -C <root>; do not reclaim the pinned worktree while it is the cwd.",
-    "A branch's first cargo-ci after a main merge can fail crate_source_digest self-check from a stale target; cargo clean -p jit in that worktree and re-land."
+    "A branch's first cargo-ci after a main merge can fail crate_source_digest self-check from a stale target; cargo clean -p jit in that worktree and re-land.",
+    "cargo clean -p jit before every gated cargo-ci: merging main leaves a stale compiled-in source digest often enough to cost a gate cycle per landing."
   ],
   "session_note": "Session 6 (lead just-in-time-ad): 7abcc22d landed; next wave 0102769f, 488eb3c1, ce2bdbb0, 83413035. Escalations go to just-in-time-c9 per invoker rule.",
   "decisions": [
