@@ -59,7 +59,7 @@ fn dep_add_batch_json_error(
     // batch was made atomic (jit:a05b87ae).
     let edge_code = |err: &anyhow::Error| -> &'static str {
         if matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::CycleDetected)
         ) {
             ErrorCode::CycleDetected.as_str()
@@ -72,7 +72,7 @@ fn dep_add_batch_json_error(
             .downcast_ref::<jit::storage::IssueNotFoundError>()
             .is_some()
             || matches!(
-                err.downcast_ref::<GraphError>(),
+                err.downcast_ref::<GraphError<IssueId>>(),
                 Some(GraphError::NodeNotFound { .. })
             )
         {
@@ -95,7 +95,7 @@ fn dep_add_batch_json_error(
         // The nicer templated cycle message names both ends of the edge;
         // every other kind's `Display` already names what's needed.
         if matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::CycleDetected)
         ) {
             format!("Adding dependency would create a cycle: {from_id} -> {to}")
@@ -132,7 +132,7 @@ fn dep_add_batch_json_error(
     let (to, err) = &batch.rejected()[dominant_index];
 
     let mut json_error = if matches!(
-        err.downcast_ref::<GraphError>(),
+        err.downcast_ref::<GraphError<IssueId>>(),
         Some(GraphError::CycleDetected)
     ) {
         JsonError::cycle_detected(from_id, to)
@@ -145,7 +145,7 @@ fn dep_add_batch_json_error(
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
         || matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::NodeNotFound { .. })
         )
     {

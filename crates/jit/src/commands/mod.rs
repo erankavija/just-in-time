@@ -1138,13 +1138,13 @@ fn derive_state_transition(
             let mut ids = HashSet::from([projected.id.clone()]);
             ids.extend(
                 graph
-                    .get_transitive_dependents(projected.id.as_str())
+                    .get_transitive_dependents(&projected.id)
                     .into_iter()
                     .map(|candidate| candidate.id.clone()),
             );
             ids.extend(
                 graph
-                    .get_transitive_dependencies(projected.id.as_str())
+                    .get_transitive_dependencies(&projected.id)
                     .into_iter()
                     .map(|candidate| candidate.id.clone()),
             );

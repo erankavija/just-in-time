@@ -608,7 +608,7 @@ fn derive_single_dependency_add(
     let full_issue_id = full_issue_id.clone();
     let full_dependency_id = super::require_issue_in_capture(issues, dependency_id)?;
     let graph = dependency_graph(issues);
-    graph.validate_add_dependency(full_issue_id.as_str(), full_dependency_id.as_str())?;
+    graph.validate_add_dependency(&full_issue_id, &full_dependency_id)?;
     let from = captured_issue(issues, &full_issue_id)?;
     if from.dependencies.contains(&full_dependency_id) {
         return Ok(DerivedDependencyMutation {
@@ -636,7 +636,7 @@ fn derive_single_dependency_add(
         .into());
     }
     let reduced = candidate_graph
-        .compute_transitive_reduction(full_issue_id.as_str())
+        .compute_transitive_reduction(&full_issue_id)
         .into_iter()
         .map(|node| node.id.clone())
         .collect::<HashSet<_>>();
@@ -692,9 +692,7 @@ fn derive_batch_dependency_add(
     let candidate_graph = dependency_graph(&candidate);
     let mut cycle_failed = HashSet::new();
     for (ordinal, text, full_id) in &new_edges {
-        if let Err(error) =
-            candidate_graph.validate_add_dependency(full_issue_id.as_str(), full_id.as_str())
-        {
+        if let Err(error) = candidate_graph.validate_add_dependency(&full_issue_id, full_id) {
             cycle_failed.insert(*ordinal);
             rejected.push((*ordinal, text.clone(), error.into()));
         }
@@ -773,7 +771,7 @@ fn derive_batch_dependency_add(
             }
         }
         reduced_from = graph
-            .compute_transitive_reduction(full_issue_id.as_str())
+            .compute_transitive_reduction(&full_issue_id)
             .into_iter()
             .map(|node| node.id.clone())
             .collect();
@@ -824,7 +822,7 @@ fn derive_dependency_repair(issues: &[Issue], dry_run: bool) -> Result<DerivedDe
     let reductions = issues
         .iter()
         .filter_map(|issue| {
-            let reduced = graph.compute_transitive_reduction(issue.id.as_str());
+            let reduced = graph.compute_transitive_reduction(&issue.id);
             let removed = issue.dependencies.len().saturating_sub(reduced.len());
             (removed > 0).then_some((issue, reduced, removed))
         })
@@ -908,7 +906,7 @@ fn derive_reduced_graph_intents(
                 source_reduced.clone()
             }
             _ => graph
-                .compute_transitive_reduction(candidate_issue.id.as_str())
+                .compute_transitive_reduction(&candidate_issue.id)
                 .into_iter()
                 .map(|node| node.id.clone())
                 .collect(),

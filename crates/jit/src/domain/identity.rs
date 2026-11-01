@@ -342,8 +342,8 @@ impl IssueIdPrefix {
     }
 
     /// Whether this prefix names `id`.
-    pub fn matches(&self, id: &str) -> bool {
-        normalise(id).starts_with(&self.normalised)
+    pub fn matches(&self, id: &IssueId) -> bool {
+        normalise(id.as_str()).starts_with(&self.normalised)
     }
 }
 
@@ -862,8 +862,9 @@ mod tests {
         /// parsed form.
         #[test]
         fn test_from_issue_id_names_the_id_as_its_parse_does(id in canonical_id()) {
-            let prefix = IssueIdPrefix::from(&IssueId::try_from(id.as_str()).unwrap());
-            prop_assert!(prefix.matches(&id));
+            let parsed = IssueId::try_from(id.as_str()).unwrap();
+            let prefix = IssueIdPrefix::from(&parsed);
+            prop_assert!(prefix.matches(&parsed));
             prop_assert_eq!(Ok(prefix), IssueIdPrefix::try_from(id.as_str()));
         }
 
@@ -886,7 +887,7 @@ mod tests {
                     format!("{c}{}", "-".repeat(*hyphens))
                 })
                 .collect();
-            prop_assert!(IssueIdPrefix::try_from(requested.as_str()).unwrap().matches(&id));
+            prop_assert!(IssueIdPrefix::try_from(requested.as_str()).unwrap().matches(&IssueId::try_from(id).unwrap()));
         }
     }
 
@@ -908,10 +909,10 @@ mod tests {
     #[test]
     fn test_matches_refuses_an_id_the_prefix_diverges_from() {
         let prefix = IssueIdPrefix::try_from("b53beebb").unwrap();
-        assert!(!prefix.matches(ID));
+        assert!(!prefix.matches(&IssueId::try_from(ID).unwrap()));
         assert!(!IssueIdPrefix::try_from(format!("{ID}0"))
             .unwrap()
-            .matches(ID));
+            .matches(&IssueId::try_from(ID).unwrap()));
     }
 
     #[test]

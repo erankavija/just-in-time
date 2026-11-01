@@ -116,11 +116,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
-        let forest = graph.expand(full_id.as_str(), Direction::Dependencies, depth);
+        let forest = graph.expand(&full_id, Direction::Dependencies, depth);
         // An issue unfolded along several paths is a diamond in the DAG.
         let occurrences = Expansion::occurrences(&forest);
         let to_tree_node = |issue: &Issue, level: u32, children: Vec<DependencyTreeNode>| {
-            let shared = occurrences.get(issue.id.as_str()).is_some_and(|&n| n > 1);
+            let shared = occurrences.get(&issue.id).is_some_and(|&n| n > 1);
             DependencyTreeNode {
                 shared: shared.then_some(true),
                 children,
@@ -172,7 +172,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph = DependencyGraph::new(&issue_refs);
 
         Ok(graph
-            .traverse(full_id.as_str(), direction, depth)
+            .traverse(&full_id, direction, depth)
             .into_iter()
             .cloned()
             .collect())
@@ -323,7 +323,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::labels::type_label_value(&issue.labels)
                 .is_some_and(|t| bracket_types.contains(t))
         };
-        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
         let short_of = |id: &IssueId| -> String { id.short_id().to_string() };
 
         // Batch node set: in-scope, non-bracket nodes, ordered by short id.
@@ -333,7 +333,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter(|i| in_scope(&i.id) && !is_bracket(i))
             .collect();
         nodes.sort_by_key(|i| i.short_id());
-        let node_ids: HashSet<&str> = nodes.iter().map(|i| i.id.as_str()).collect();
+        let node_ids: HashSet<&IssueId> = nodes.iter().map(|i| &i.id).collect();
 
         let mut boundary_edges: Vec<BoundaryEdge> = Vec::new();
         let defs: Vec<BatchIssueDef> = nodes
@@ -341,12 +341,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|issue| {
                 let mut depends_on: Vec<String> = Vec::new();
                 for dep in &issue.dependencies {
-                    if node_ids.contains(dep.as_str()) {
+                    if node_ids.contains(dep) {
                         // Internal edge: reference the dependency by its key.
                         depends_on.push(short_of(dep));
-                    } else if by_id.get(dep.as_str()).is_some_and(|d| is_bracket(d)) {
+                    } else if by_id.get(dep).is_some_and(|d| is_bracket(d)) {
                         // Edge to a bracket node: dropped with the bracket (REQ-05).
-                    } else if by_id.contains_key(dep.as_str()) {
+                    } else if by_id.contains_key(dep) {
                         // A real issue outside the membership scope: a boundary
                         // edge — excluded but reported, never dropped silently.
                         boundary_edges.push(BoundaryEdge {
@@ -502,7 +502,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let scope: Option<std::collections::HashSet<IssueId>> = root_id.as_ref().map(|root_id| {
             let graph = DependencyGraph::new(&issue_refs);
             let mut set: std::collections::HashSet<IssueId> = graph
-                .get_transitive_dependencies(root_id.as_str())
+                .get_transitive_dependencies(root_id)
                 .into_iter()
                 .map(|i| i.id.clone())
                 .collect();
@@ -580,11 +580,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let divergences =
             crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
 
-        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
         let views = divergences
             .into_iter()
             .map(|d| {
-                let issue = by_id.get(d.issue_id.as_str());
+                let issue = by_id.get(&d.issue_id);
                 DivergenceView {
                     short_id: d.issue_id.short_id().to_string(),
                     title: issue.map(|i| i.title.clone()).unwrap_or_default(),

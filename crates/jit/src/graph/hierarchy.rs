@@ -155,8 +155,8 @@ use std::hash::Hash;
 /// node to a level via the [`HierarchyConfig`]. Implemented for
 /// [`Issue`](crate::domain::Issue) and symbolic-id test fixtures.
 pub trait HierarchyNode {
-    /// Identity preserved in resolved facts; its string view keys graph queries.
-    type Id: Clone + Eq + Hash + Ord + AsRef<str>;
+    /// Identity preserved in resolved facts and graph queries.
+    type Id: Clone + Eq + Hash + Ord;
 
     /// Unique identifier for this node.
     fn id(&self) -> &Self::Id;
@@ -465,11 +465,13 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
     struct EdgeView<'a, T>(&'a T);
 
     impl<T: HierarchyNode> GraphNode for EdgeView<'_, T> {
-        fn id(&self) -> &str {
-            self.0.id().as_ref()
+        type Id = T::Id;
+
+        fn id(&self) -> &T::Id {
+            self.0.id()
         }
-        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-            self.0.dependencies().map(AsRef::as_ref)
+        fn dependencies(&self) -> impl Iterator<Item = &T::Id> + '_ {
+            self.0.dependencies()
         }
     }
 
@@ -480,7 +482,7 @@ fn transitively_reduced_edges<'a, T: HierarchyNode>(
         .iter()
         .map(|node| {
             let deps = graph
-                .compute_transitive_reduction(node.id().as_ref())
+                .compute_transitive_reduction(node.id())
                 .into_iter()
                 .map(|view| view.0.id())
                 .collect();
@@ -567,8 +569,8 @@ pub fn detect_membership_divergences(
 ) -> Vec<MembershipDivergence> {
     use crate::labels::{parse_label, type_label_values};
 
-    let by_id: HashMap<&str, &crate::domain::Issue> =
-        issues.iter().map(|i| (i.id.as_str(), *i)).collect();
+    let by_id: HashMap<&IssueId, &crate::domain::Issue> =
+        issues.iter().map(|i| (&i.id, *i)).collect();
 
     // Membership namespaces declared by the config (e.g. {"epic", "milestone"}).
     let membership_namespaces: HashSet<&str> = config
@@ -578,7 +580,7 @@ pub fn detect_membership_divergences(
 
     // Anchor containers per label: an issue whose type maps to namespace `ns`
     // and that carries label `ns:val` anchors that membership group.
-    let mut anchors: HashMap<String, Vec<&str>> = HashMap::new();
+    let mut anchors: HashMap<String, Vec<&IssueId>> = HashMap::new();
     for issue in issues.iter().copied() {
         for type_value in type_label_values(&issue.labels) {
             let Some(ns) = config.get_membership_namespace(type_value) else {
@@ -587,10 +589,7 @@ pub fn detect_membership_divergences(
             for label in &issue.labels {
                 if let Ok((label_ns, _)) = parse_label(label) {
                     if label_ns == ns {
-                        anchors
-                            .entry(label.clone())
-                            .or_default()
-                            .push(issue.id.as_str());
+                        anchors.entry(label.clone()).or_default().push(&issue.id);
                     }
                 }
             }
@@ -598,7 +597,7 @@ pub fn detect_membership_divergences(
     }
 
     // Dependency closures for anchor containers, computed on demand and cached.
-    let mut closure_cache: HashMap<&str, HashSet<String>> = HashMap::new();
+    let mut closure_cache: HashMap<&IssueId, HashSet<IssueId>> = HashMap::new();
 
     let mut divergences = Vec::new();
     for issue in issues.iter().copied() {
@@ -612,14 +611,14 @@ pub fn detect_membership_divergences(
             let Some(anchor_ids) = anchors.get(label) else {
                 continue; // no anchor container → not a divergence here
             };
-            if anchor_ids.contains(&issue.id.as_str()) {
+            if anchor_ids.contains(&&issue.id) {
                 continue; // the issue is itself the anchor
             }
             let contained = anchor_ids.iter().any(|anchor| {
                 closure_cache
                     .entry(anchor)
                     .or_insert_with(|| dependency_closure(anchor, &by_id))
-                    .contains(issue.id.as_str())
+                    .contains(&issue.id)
             });
             if !contained {
                 divergences.push(MembershipDivergence {
@@ -643,19 +642,18 @@ pub fn detect_membership_divergences(
 /// The set of ids `start` transitively depends on (its DAG descendants),
 /// excluding `start` itself.
 fn dependency_closure(
-    start: &str,
-    by_id: &HashMap<&str, &crate::domain::Issue>,
-) -> HashSet<String> {
-    let mut result: HashSet<String> = HashSet::new();
-    let mut stack: Vec<&str> = vec![start];
-    let mut visited: HashSet<&str> = HashSet::new();
+    start: &IssueId,
+    by_id: &HashMap<&IssueId, &crate::domain::Issue>,
+) -> HashSet<IssueId> {
+    let mut result: HashSet<IssueId> = HashSet::new();
+    let mut stack: Vec<&IssueId> = vec![start];
+    let mut visited: HashSet<&IssueId> = HashSet::new();
     visited.insert(start);
     while let Some(cur) = stack.pop() {
         if let Some(node) = by_id.get(cur) {
             for dep in &node.dependencies {
-                let dep = dep.as_str();
                 if by_id.contains_key(dep) && visited.insert(dep) {
-                    result.insert(dep.to_string());
+                    result.insert(dep.clone());
                     stack.push(dep);
                 }
             }

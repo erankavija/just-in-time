@@ -809,12 +809,14 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
 
 /// Implement GraphNode for Issue to enable dependency graph operations
 impl crate::graph::GraphNode for Issue {
-    fn id(&self) -> &str {
-        self.id.as_str()
+    type Id = IssueId;
+
+    fn id(&self) -> &IssueId {
+        &self.id
     }
 
-    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-        self.dependencies.iter().map(IssueId::as_str)
+    fn dependencies(&self) -> impl Iterator<Item = &IssueId> + '_ {
+        self.dependencies.iter()
     }
 }
 

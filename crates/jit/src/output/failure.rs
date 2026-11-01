@@ -209,7 +209,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
 
     // Graph errors are typed: a cycle is a validation failure, a missing node is
     // a not-found condition. Classified by downcast, not by message text.
-    if let Some(graph_error) = error.downcast_ref::<crate::graph::GraphError>() {
+    if let Some(graph_error) =
+        error.downcast_ref::<crate::graph::GraphError<crate::domain::identity::IssueId>>()
+    {
         return match graph_error {
             crate::graph::GraphError::CycleDetected => ErrorCode::CycleDetected,
             crate::graph::GraphError::NodeNotFound { .. } => ErrorCode::IssueNotFound,
@@ -636,7 +638,11 @@ mod exit_code_projection_tests {
                 "*",
             ),
             // Command-family rows, each pinned by the error that command raises.
-            (crate::graph::GraphError::CycleDetected.into(), 4, "dep add"),
+            (
+                crate::graph::GraphError::<crate::domain::identity::IssueId>::CycleDetected.into(),
+                4,
+                "dep add",
+            ),
             (
                 crate::errors::RedundantDependencyError::new(
                     (
