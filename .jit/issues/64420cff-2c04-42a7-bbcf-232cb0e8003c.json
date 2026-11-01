@@ -16,7 +16,6 @@
   "labels": [
     "epic:semantic-types",
     "milestone:v1.0",
-    "story:actor-identity",
     "component:core",
     "per:@/charter/D-18",
     "enforces:@/invariant/semantic-types",
@@ -27,5 +26,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Commands carry assignees as Assignee",
-  "updated_at": "2026-11-01T04:49:59.375284433Z"
+  "updated_at": "2026-11-01T04:50:35.496231674Z"
 }

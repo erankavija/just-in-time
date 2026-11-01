@@ -16,7 +16,6 @@
   "labels": [
     "epic:semantic-types",
     "milestone:v1.0",
-    "story:repository-paths",
     "component:core",
     "per:@/charter/D-18",
     "enforces:@/invariant/semantic-types",
@@ -27,5 +26,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A profile has one identity type",
-  "updated_at": "2026-11-01T04:50:00.187651105Z"
+  "updated_at": "2026-11-01T04:50:35.832564354Z"
 }
