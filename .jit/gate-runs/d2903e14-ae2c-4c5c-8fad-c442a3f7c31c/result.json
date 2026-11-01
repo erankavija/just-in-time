@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "854ae914bb35e120b21b9787f3525cce3b79fe5e",
+  "completed_at": "2026-11-01T20:21:40.425057449Z",
+  "duration_ms": 104623,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/path.rs",
+        "id": "F1",
+        "line": 373,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3d9a0ce3/requirement/REQ-04",
+          "@/charter/D-8",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The obsolete .jit/profiles ownership namespace remains declared and actively reserved for profile application."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/3d9a0ce3-lead-friction/handoff-2.md",
+        "id": "F2",
+        "line": 23,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/holistic-review"
+        ],
+        "severity": "medium",
+        "summary": "The handoff's claimed 210 published attested runs conflicts with the 211 gate-run result files added by its cited commit, and its other backfill counts lack preserved tooling."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/3d9a0ce3-lead-friction/handoff-4.md",
+        "id": "F3",
+        "line": 22,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/holistic-review"
+        ],
+        "severity": "medium",
+        "summary": "The handoff's exact prebuild and disk metrics have no preserved output artifact; its named ephemeral logs are absent."
+      }
+    ],
+    "summary": "The profile ownership cutover remains incomplete, and linked handoff metrics are not fully substantiated.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d2903e14-ae2c-4c5c-8fad-c442a3f7c31c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T20:19:55.801732141Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18859 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a198c4-c9b6-7f12-87a9-bcdf069e976c\n--------\nuser\n--- 18846 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [high] The removed ownership model remains active: `.jit/profiles` is still declared as “Applied-profile state” and profile application rejects it as application-owned. This is an orphaned D-8 mechanism, contradicting REQ-04’s no-ownership-record cutover. Evidence: `crates/jit/src/repository_state/path.rs:373,400-404`.\n\n2. [medium] The linked handoff’s backfill counts are not substantiated and conflict with its cited commit: `e2f2693d8` adds 211 gate-run result files, not the claimed 210. The cited conversion tool is out of tree, leaving the asserted status-entry counts unreproducible. Evidence: `dev/active/3d9a0ce3-lead-friction/handoff-2.md:23`.\n\n3. [medium] The linked handoff self-attests exact prebuild timing, CPU, RSS, and disk figures while naming only ephemeral `/tmp` logs that no longer exist; no recorded gate artifact contains those measurements. Evidence: `dev/active/3d9a0ce3-lead-friction/handoff-4.md:22,25`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The profile ownership cutover remains incomplete, and linked handoff metrics are not fully substantiated.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The obsolete .jit/profiles ownership namespace remains declared and actively reserved for profile application.\",\"file\":\"crates/jit/src/repository_state/path.rs\",\"line\":373,\"references\":[\"@/issue/3d9a0ce3/requirement/REQ-04\",\"@/charter/D-8\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The handoff's claimed 210 published attested runs conflicts with the 211 gate-run result files added by its cited commit, and its other backfill counts lack preserved tooling.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/handoff-2.md\",\"line\":23,\"references\":[\"@/gate/holistic-review\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The handoff's exact prebuild and disk metrics have no preserved output artifact; its named ephemeral logs are absent.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/handoff-4.md\",\"line\":22,\"references\":[\"@/gate/holistic-review\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

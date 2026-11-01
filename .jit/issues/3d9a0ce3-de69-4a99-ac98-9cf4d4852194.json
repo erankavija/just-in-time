@@ -19,6 +19,7 @@
     "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
     "856f0520-7af9-4c2d-9297-5abbd9eae365",
     "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+    "998eedbc-50e0-4202-ae51-a836b7474f88",
     "9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7",
     "9c008d2d-decc-4845-b309-e01a42e98eda",
     "ab797eed-1d0f-4255-acc3-e327c9001632",
@@ -74,7 +75,20 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "d2903e14-ae2c-4c5c-8fad-c442a3f7c31c",
+      "status": "failed",
+      "updated_at": "2026-11-01T20:21:40.720606350Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "8f25e005-d028-4d52-ac35-59e6eb694a79",
+      "status": "passed",
+      "updated_at": "2026-11-01T20:19:55.395092903Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
   "labels": [
     "type:epic",
@@ -84,7 +98,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-11-01T20:17:27.807116454Z"
+  "updated_at": "2026-11-01T20:22:04.927481973Z"
 }

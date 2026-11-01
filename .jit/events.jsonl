@@ -22492,3 +22492,10 @@
 {"from":"in_progress","id":"00d67d6e-38ac-4f1f-9391-efd7ed812fe4","issue_id":"edc8544d-5f5e-497e-9706-c7b4e7235036","timestamp":"2026-11-01T20:17:27.713163217Z","to":"done","type":"issue_state_changed"}
 {"id":"dc48cd2b-6f54-4e83-96fc-8174c3a69404","issue_id":"edc8544d-5f5e-497e-9706-c7b4e7235036","timestamp":"2026-11-01T20:17:27.713163217Z","type":"issue_completed"}
 {"from":"backlog","id":"de383704-5661-494d-9b51-7d902a9521bd","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:17:27.807116454Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"repo-validate","id":"9d084312-ff5b-4eb6-a813-fdc9a34144df","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:19:55.395092903Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"cc5639d5-7852-4f0f-8065-2e5fb433a519","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:21:40.720606350Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"7e3c669d-20a8-4994-8045-a8c117ca306d","issue_id":"998eedbc-50e0-4202-ae51-a836b7474f88","priority":"normal","timestamp":"2026-11-01T20:22:04.462769776Z","title":"Remove the applied-profile path namespace","type":"issue_created"}
+{"from":"ready","id":"0f76fa6a-5388-4faf-b0d4-580da906d027","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:22:04.927481973Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"8da15fc6-368a-4ac8-8a15-c29032f0fb95","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:22:04.927481973Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"ecf106af-221d-4bca-b3ab-b2bd55dce489","issue_id":"998eedbc-50e0-4202-ae51-a836b7474f88","timestamp":"2026-11-01T20:22:05.102361772Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"0e73bd6f-0039-4abc-9887-3378046bd8ed","issue_id":"998eedbc-50e0-4202-ae51-a836b7474f88","timestamp":"2026-11-01T20:22:05.102361772Z","type":"issue_claimed"}
