@@ -693,16 +693,21 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let Some(reason) = reason else {
-            return self.update_issue_state(id, State::Rejected);
+        let warnings = match reason {
+            None => self.update_issue_state(id, State::Rejected)?,
+            Some(reason) => {
+                let mut request = CapturedFieldUpdate::label_edit(
+                    id.clone(),
+                    CapturedLabelEdit::AppendUnchecked(crate::labels::resolution_label(reason)?),
+                );
+                request.state = Some(State::Rejected);
+                request.enforce_lease = true;
+                self.exec.publish_captured_field_update(request)?.warnings
+            }
         };
-        let mut request = CapturedFieldUpdate::label_edit(
-            id.clone(),
-            CapturedLabelEdit::AppendUnchecked(crate::labels::resolution_label(reason)?),
-        );
-        request.state = Some(State::Rejected);
-        request.enforce_lease = true;
-        Ok(self.exec.publish_captured_field_update(request)?.warnings)
+        // Rejected is terminal, so dependents may now be ready.
+        self.exec.check_auto_transitions()?;
+        Ok(warnings)
     }
 
     /// Assign an issue to someone.
@@ -3442,6 +3447,25 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
+    fn test_reject_issue_promotes_dependent_whose_last_blocker_it_removes() {
+        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+        let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+        let blocker_id = blocker.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+        let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+        dependent.dependencies.push(blocker_id.clone());
+        let dependent_id = dependent.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+
+        executor.issues().reject_issue(&blocker_id, None).unwrap();
+
+        assert_eq!(
+            executor.storage.load_issue(&dependent_id).unwrap().state,
+            State::Ready
+        );
+    }
+
+    #[test]
     fn test_reject_issue_with_reason_records_state_events_and_resolution_label() {
         let storage = InMemoryStorage::new();
         seed_scenario_gates(&storage);
@@ -3452,7 +3476,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 ..MemoryDeclarations::default()
             },
         );
-        let template = crate::test_utils::fixture_issue("Reject".into(), String::new());
+        let mut template = crate::test_utils::fixture_issue("Reject".into(), String::new());
+        template.state = State::InProgress;
         let mut twin = template.clone();
         twin.id = crate::test_utils::fixture_issue(String::new(), String::new()).id;
         let with_reason = seed_fixture_issue(&executor, template);
@@ -3462,10 +3487,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .issues()
             .reject_issue(&with_reason, Some("duplicate"))
             .unwrap();
-        executor
-            .issues()
-            .update_issue_state(&state_only, State::Rejected)
-            .unwrap();
+        executor.issues().reject_issue(&state_only, None).unwrap();
 
         let issue = executor.storage.load_issue(&with_reason).unwrap();
         assert_eq!(issue.state, State::Rejected);
