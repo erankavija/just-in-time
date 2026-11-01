@@ -501,6 +501,14 @@ impl VirtualPath {
     pub fn repository_relative(&self) -> String {
         repository_relative_path(self.root_class(), self.relative())
     }
+
+    /// Field serializer naming this identity by its repository-relative spelling.
+    pub(crate) fn serialize_repository_relative<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.repository_relative())
+    }
 }
 
 /// The adopter-facing repository-relative spelling of a path below `root`.

@@ -845,6 +845,13 @@ impl CommandSchema {
             serde_json::to_value(crate::profile::profile_package_model_schema())
                 .unwrap_or(json!({})),
         );
+        types.insert(
+            "ProfileTargetConflictsError".to_string(),
+            serde_json::to_value(schema_for!(
+                crate::repository_state::ProfileTargetConflictsError
+            ))
+            .unwrap_or(json!({})),
+        );
 
         types.insert(
             "Issue".to_string(),

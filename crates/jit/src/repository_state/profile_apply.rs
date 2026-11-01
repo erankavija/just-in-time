@@ -223,7 +223,7 @@ pub struct ComposedContribution {
 }
 
 /// Origin of one differing definition in a semantic contribution conflict.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 pub enum ContributionConflictOwner {
     /// A package being applied authored one of the definitions.
     Package(ProfileId),
@@ -518,7 +518,7 @@ pub struct ProfileRegionClaim {
 ///
 /// Only the packages being applied are parties to a conflict; the repository's
 /// current value never is. [`Self::message`] is how a conflict reaches a reader.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProfileTargetConflict {
     /// Packages with no dependency path between them define one target or
@@ -560,50 +560,31 @@ impl ProfileTargetConflict {
 /// it declares inside a registry. The registry file is not the identity's
 /// subject — several packages contribute distinct identities to one registry —
 /// so an identity is named by its canonical spelling.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProfileTargetSubject {
     /// A repository file the package publishes.
-    File(VirtualPath),
+    File {
+        #[serde(serialize_with = "VirtualPath::serialize_repository_relative")]
+        #[schemars(with = "String")]
+        path: VirtualPath,
+    },
     /// A semantic identity the package declares in a registry.
-    Contribution(ContributionIdentity),
+    Contribution { identity: ContributionIdentity },
 }
 
 impl std::fmt::Display for ProfileTargetSubject {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::File(path) => write!(formatter, "target '{}'", path.repository_relative()),
-            Self::Contribution(identity) => write!(formatter, "declaration '{identity}'"),
+            Self::File { path } => write!(formatter, "target '{}'", path.repository_relative()),
+            Self::Contribution { identity } => write!(formatter, "declaration '{identity}'"),
         }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum ProfileTargetSubjectWire<'a> {
-    File { path: String },
-    Contribution { identity: &'a ContributionIdentity },
-}
-
-impl Serialize for ProfileTargetSubject {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let wire = match self {
-            // Rendered through the same repository-relative spelling a message
-            // names it with, not the wrapper type that carries it.
-            Self::File(path) => ProfileTargetSubjectWire::File {
-                path: path.repository_relative(),
-            },
-            Self::Contribution(identity) => ProfileTargetSubjectWire::Contribution { identity },
-        };
-        wire.serialize(serializer)
     }
 }
 
 /// One decision a profile selection cannot publish, named the way its reader
 /// acts on it: the profile that decided it, what it decided about, and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileTargetConflictEntry {
     /// Profile whose contribution was refused.
     pub owner: ProfileId,
@@ -631,7 +612,7 @@ impl std::fmt::Display for ProfileTargetConflictEntry {
 /// that refused it rather than the first one a composition reached: an adopter
 /// that only ever sees one conflict per run cannot tell how much work resolving
 /// the selection is.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, JsonSchema)]
 #[error(
     "{} profile decision(s) cannot be published: {}",
     .conflicts.len(),
@@ -2571,8 +2552,10 @@ mod tests {
     fn test_profile_target_conflict_entry_message_names_profile_subject_and_packages() {
         let identity = namespace_contribution("shared", "Shared vocabulary.").semantic_identity();
         let entries = [
-            ProfileTargetSubject::File(VirtualPath::data("custom.txt").unwrap()),
-            ProfileTargetSubject::Contribution(identity),
+            ProfileTargetSubject::File {
+                path: VirtualPath::data("custom.txt").unwrap(),
+            },
+            ProfileTargetSubject::Contribution { identity },
         ]
         .map(|subject| ProfileTargetConflictEntry {
             owner: "workflow".try_into().expect("a canonical profile id"),
@@ -2591,8 +2574,8 @@ mod tests {
                 );
             }
             let subject = match &entry.subject {
-                ProfileTargetSubject::File(path) => path.repository_relative(),
-                ProfileTargetSubject::Contribution(identity) => identity.to_string(),
+                ProfileTargetSubject::File { path } => path.repository_relative(),
+                ProfileTargetSubject::Contribution { identity } => identity.to_string(),
             };
             assert!(
                 message.contains(&subject)
@@ -2607,9 +2590,9 @@ mod tests {
     fn test_profile_target_conflict_entry_serializes_owner_subject_and_conflict() {
         let entry = ProfileTargetConflictEntry {
             owner: ProfileId::try_from("captured").expect("a canonical test profile id"),
-            subject: ProfileTargetSubject::File(
-                VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
-            ),
+            subject: ProfileTargetSubject::File {
+                path: VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
+            },
             conflict: ProfileTargetConflict::Contested {
                 owners: package_owners(&["captured", "other"]),
             },
@@ -2630,12 +2613,14 @@ mod tests {
 
     #[test]
     fn test_profile_target_subject_serializes_a_contribution_by_its_canonical_identity() {
-        let subject = ProfileTargetSubject::Contribution(ContributionIdentity {
-            registry: ContributionRegistry::Config,
-            target: ContributionIdentityTarget::Projection {
-                name: "docs".to_string(),
+        let subject = ProfileTargetSubject::Contribution {
+            identity: ContributionIdentity {
+                registry: ContributionRegistry::Config,
+                target: ContributionIdentityTarget::Projection {
+                    name: "docs".to_string(),
+                },
             },
-        });
+        };
 
         let serialized = serde_json::to_value(&subject).expect("a subject serializes");
 
@@ -2649,9 +2634,9 @@ mod tests {
     fn test_profile_target_conflicts_error_serializes_as_its_conflict_list() {
         let entry = ProfileTargetConflictEntry {
             owner: ProfileId::try_from("captured").expect("a canonical test profile id"),
-            subject: ProfileTargetSubject::File(
-                VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
-            ),
+            subject: ProfileTargetSubject::File {
+                path: VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
+            },
             conflict: ProfileTargetConflict::Contested {
                 owners: package_owners(&["captured", "other"]),
             },

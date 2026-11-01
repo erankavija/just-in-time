@@ -896,18 +896,18 @@ mod repository_state_classifier_tests {
         ProfileTargetConflictsError::new(vec![
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
-                subject: ProfileTargetSubject::File(path()),
+                subject: ProfileTargetSubject::File { path: path() },
                 conflict: contested(),
             },
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
-                subject: ProfileTargetSubject::Contribution(
-                    Contribution::Scalar {
+                subject: ProfileTargetSubject::Contribution {
+                    identity: Contribution::Scalar {
                         target: ScalarTarget::ValidationDefaultType,
                         value: "task".to_string(),
                     }
                     .semantic_identity(),
-                ),
+                },
                 conflict: contested(),
             },
         ])
@@ -1043,6 +1043,26 @@ mod repository_state_classifier_tests {
             json.error.suggestions.is_empty(),
             "{:?}",
             json.error.suggestions
+        );
+    }
+
+    #[test]
+    fn test_profile_json_error_conflict_details_conform_to_the_published_schema() {
+        let error = anyhow::Error::new(RepositoryStateError::from(target_conflicts()));
+        let details = profile_json_error(&error)
+            .expect("a conflict renders a JSON error")
+            .error
+            .details
+            .expect("a conflict attaches details");
+
+        let schema = crate::schema::CommandSchema::generate();
+        let validator = jsonschema::validator_for(&schema.types["ProfileTargetConflictsError"])
+            .expect("the published conflict schema compiles");
+
+        assert!(validator.is_valid(&details), "{details}");
+        assert!(
+            !validator.is_valid(&serde_json::json!({ "conflicts": [{}] })),
+            "the schema constrains each conflict entry"
         );
     }
 

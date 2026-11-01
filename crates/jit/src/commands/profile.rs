@@ -1986,8 +1986,8 @@ mod tests {
     /// The repository target one refused decision names.
     fn refused_path(entry: &ProfileTargetConflictEntry) -> String {
         match &entry.subject {
-            ProfileTargetSubject::File(path) => path.repository_relative(),
-            ProfileTargetSubject::Contribution(identity) => {
+            ProfileTargetSubject::File { path } => path.repository_relative(),
+            ProfileTargetSubject::Contribution { identity } => {
                 panic!("this refusal is about a target, not the declaration '{identity}'")
             }
         }
@@ -4185,9 +4185,9 @@ template = true
             refused_targets(&error)
                 .iter()
                 .filter_map(|refused| match &refused.subject {
-                    ProfileTargetSubject::Contribution(identity) =>
+                    ProfileTargetSubject::Contribution { identity } =>
                         Some((identity.to_string(), refused.conflict.message())),
-                    ProfileTargetSubject::File(_) => None,
+                    ProfileTargetSubject::File { .. } => None,
                 })
                 .collect::<BTreeMap<_, _>>(),
             "the report and the refusal describe each declaration in one vocabulary"
