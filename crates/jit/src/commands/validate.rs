@@ -402,7 +402,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // error as a finding.
             let config = effective_config(image, &effective_virtual_path)
                 .unwrap_or_else(|_| empty_materialization_config());
-            let all_ids =
+            let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
@@ -411,7 +411,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
             });
             let closure =
-                validate_capture_closure(image.layout(), &config, &all_ids, schema_rules)?;
+                validate_capture_closure(image.layout(), &config, &issue_ids, schema_rules)?;
             let read = image.capture_spec();
             let closure_read = closure.paths.iter().all(|path| read.contains_path(path))
                 && closure
@@ -437,7 +437,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 let parsed = if mutation {
                     super::captured_active_issues(image)?
                 } else {
-                    effective_issues(image, &all_ids, &effective_repo_path)?
+                    effective_issues(image, &issue_ids, &effective_repo_path)?
                 };
                 if matches!(
                     purpose,
@@ -760,10 +760,10 @@ fn empty_materialization_config() -> JitConfig {
 /// Parse every named issue record (possibly overlaid).
 fn effective_issues(
     image: &crate::repository_state::RepositoryImage,
-    all_ids: &[IssueId],
+    issue_ids: &[IssueId],
     effective: &EffectiveRepoPath<'_>,
 ) -> Result<Vec<Issue>> {
-    all_ids
+    issue_ids
         .iter()
         .map(|id| {
             let path = crate::repository_state::VirtualPath::issue_record(id);
@@ -1020,8 +1020,8 @@ pub(crate) fn plan_content_from_image(
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
-    let all_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
-    let all_issues = effective_issues(image, &all_ids, effective_repo_path).unwrap_or_default();
+    let issue_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
+    let all_issues = effective_issues(image, &issue_ids, effective_repo_path).unwrap_or_default();
     plan_content_with_issues(image, &all_issues, emit_for)
 }
 

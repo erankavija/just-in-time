@@ -592,8 +592,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// of deletion, not a user-initiated edit to the dependent — like
     /// `add_dependency`'s Ready-to-Backlog demotion, it intentionally bypasses
     /// the active-lease check on the dependents; only the issue actually being
-    /// deleted is lease-checked (above). The dependent rewrites, deletion, index
-    /// update, and audit events publish through one redo record,
+    /// deleted is lease-checked (above). The dependent rewrites, deletion, tombstone,
+    /// and audit events publish through one redo record,
     /// so the repository ends with either the complete old graph or the complete new
     /// graph. `jit dep rm` (which matches a raw stored dependency id without
     /// requiring target resolution) and `jit issue show --json`'s
@@ -2964,7 +2964,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // A depends on B, then B's file disappears without A's `dependencies`
         // being cleaned up. `jit dep rm` (the plural `remove_dependencies`)
         // must still remove the edge by matching A's raw stored id, even
-        // though B can no longer be resolved through the repo index
+        // though B can no longer be resolved through the issue files
         // (jit:f847df3f).
         let storage = InMemoryStorage::new();
         seed_scenario_gates(&storage);

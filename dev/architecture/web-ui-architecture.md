@@ -95,7 +95,7 @@
                             │
 ┌───────────────────────────▼──────────────────────────────────────────┐
 │                   STORAGE LAYER (JSON Files)                         │
-│  • .jit/index.json         → Issue index                            │
+│  • .jit/index.json         → Format, tombstones                      │
 │  • .jit/issues/*.json      → Individual issues                      │
 │  • .jit/gates.toml         → Gate registry                          │
 │  • .jit/events.jsonl       → Event log                              │

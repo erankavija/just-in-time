@@ -340,8 +340,7 @@ behavior depends on the arguments.
   the registry, DAG cycles, issues isolated from the dependency graph, redundant
   (transitively-reducible) edges, claims-index consistency, and record fidelity:
   the index, issue records, gate-run results, and event log each
-  decode and reproduce what the writer would publish, and every event-log line
-  outside the current vocabulary carries a retired tag. Advisory
+  decode and reproduce what the writer would publish. Advisory
   membership-vs-DAG divergences are reported but do not fail the run.
 - **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
   issue. The id accepts a full UUID, 8-char short id, or unique prefix.

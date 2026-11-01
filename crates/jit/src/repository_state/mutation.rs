@@ -9,7 +9,7 @@
 //! first transition), so retries reuse identical record identities and times while
 //! a no-op mutation samples neither identity nor time. The
 //! finalizer serializes every repository-owned record (issue upserts/deletes,
-//! `index.json` membership, gate-run/audit artifacts, and events) into one exact
+//! `index.json` tombstones, gate-run/audit artifacts, and events) into one exact
 //! [`RepositoryDelta`] published through one redo record, preserving
 //! `@/inv/event-log` and `@/inv/atomic-writes`.
 //!
@@ -407,8 +407,7 @@ pub enum MutationIntent {
         preset: Box<crate::gate_presets::GatePresetDefinition>,
     },
     /// Delete an issue that ALREADY EXISTS in the captured image. The finalizer
-    /// removes the issue record and transfers its id from active to deleted index
-    /// membership in the same delta. Audit events remain explicit intents so the
+    /// removes the issue record and records its tombstone in the same delta. Audit events remain explicit intents so the
     /// caller can compose deletion with dependent-edge repairs atomically.
     DeleteIssue {
         /// Canonical full issue id whose captured record must exist.
@@ -548,11 +547,11 @@ pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationErr
     canonical_json(result, true)
 }
 
-/// Serialize a fresh (empty) membership index to its exact on-disk bytes.
+/// Serialize a fresh (empty) index to its exact on-disk bytes.
 ///
 /// The finalizer is the sole authority over `index.json` serialization, so
 /// repository initialization renders its empty index through the same canonical
-/// serializer a later membership update uses; the two never disagree.
+/// serializer a later tombstone write uses; the two never disagree.
 pub fn fresh_index_bytes() -> Result<Vec<u8>, MutationError> {
     super::RepositoryIndex::default()
         .to_pretty_bytes()

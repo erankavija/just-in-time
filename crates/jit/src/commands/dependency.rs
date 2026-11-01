@@ -224,7 +224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Capture the complete active issue graph and publish one dependency mutation.
     ///
-    /// The index is the sole discovery authority. The second phase captures every
+    /// The issues listing is the sole discovery authority. The second phase captures every
     /// issue record, the complete issues-directory listing, and the event log;
     /// semantic derivation reads only that closed image. A conflict restarts both
     /// phases in a fresh mutation session while reusing one mutation context.
