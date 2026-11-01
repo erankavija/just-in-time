@@ -34,13 +34,13 @@
 
 set -euo pipefail
 
-# Build tools rewrite dep-info files and files under these directories in place,
-# which would write through a hardlink into the pool and every sibling worktree,
-# so they get their own copies. Replacing the outermost match covers everything
-# nested in it.
+# Build tools rewrite these in place or lock them (dep-info, build-script output,
+# dot-named fingerprints, lock files and caches). A hardlink would carry those
+# writes and locks into the pool and every sibling worktree, so each gets its own
+# copy. Replacing the outermost match covers everything nested in it.
 unshare_mutable_build_state() {
     local source="${1%/}" seeded="$2" entry
-    find "$seeded" -type d \( -name .fingerprint -o -name build \) -prune -print0 \
+    find "$seeded" \( -name '.*' -o -type d -name build \) -prune -print0 \
         -o -type f -name '*.d' -print0 \
         | while IFS= read -r -d '' entry; do
             rm -rf "$entry"

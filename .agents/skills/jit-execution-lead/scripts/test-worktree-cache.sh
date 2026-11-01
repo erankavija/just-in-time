@@ -55,6 +55,9 @@ new_pool() { # dir
     local pool="$1" rel
     for rel in \
         target/CACHEDIR.TAG \
+        target/.rustc_info.json \
+        target/debug/.cargo-lock \
+        target/debug/tmp/.jit/issues/leftover.json \
         target/debug/deps/libpkg.rlib \
         target/debug/deps/build \
         target/debug/deps/pkg-1.d \
@@ -72,9 +75,10 @@ new_pool() { # dir
         touch -d '2020-01-02 03:04:05' "$pool/$rel"
     done
     ln "$pool/target/debug/build/pkg-1/output" "$pool/target/debug/build/pkg-1/output-alias"
+    ln -s libpkg.rlib "$pool/target/debug/deps/.link"
 }
 
-is_mutable_state() { [[ "/$1" == */.fingerprint/* || "/$1" == */build/* || "$1" == *.d ]]; }
+is_mutable_state() { [[ "/$1" == */.* || "/$1" == */build/* || "$1" == *.d ]]; }
 
 # --- Hardlink seed --------------------------------------------------------
 repo="$FIX/seed"; pool="$FIX/seed-pool"; snapshots="$FIX/seed-snapshots"
@@ -94,6 +98,8 @@ while IFS= read -r rel; do
     assert "$rel keeps its mtime" same_mtime "$pool/$rel" "$wt/$rel"
 done < <(cd "$pool" && find . -type f -printf '%P\n')
 
+assert "a dot-named symlink shares no inode with the pool" different_inode \
+    "$pool/target/debug/deps/.link" "$wt/target/debug/deps/.link"
 assert "the seed matches the pool's content" diff -r "$pool/target" "$wt/target"
 assert "a hardlink inside copied build state survives" same_inode \
     "$wt/target/debug/build/pkg-1/output" "$wt/target/debug/build/pkg-1/output-alias"
