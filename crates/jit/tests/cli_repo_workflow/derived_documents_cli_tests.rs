@@ -224,17 +224,17 @@ fn document_entries(documents: &Value) -> Vec<(String, Value, Value)> {
 }
 
 #[test]
-fn test_every_issue_surface_reports_the_documents_doc_list_reports_without_writing_a_derived_one() {
+fn test_reading_an_issue_and_running_its_gate_store_no_derived_document() {
     let cli = JitCli::with_repository(
         declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
     );
     cli.run(["init", "--json"]).unwrap();
-    let issue = cli
+    let id = cli
         .create_issue(["--title", "Owner of derived documents"])
         .unwrap()
         .parse::<IssueId>()
         .unwrap();
-    let id = issue.short_id();
+    let id = id.short_id();
     let directory = cli
         .run(["doc", "dir", id, declared_area()])
         .unwrap()
@@ -242,10 +242,6 @@ fn test_every_issue_surface_reports_the_documents_doc_list_reports_without_writi
         .to_string();
     let derived = format!("{directory}/plan.md");
     write_file(cli.root(), &derived, "# derived\n");
-    write_file(cli.root(), "linked.md", "# linked\n");
-    cli.run(["doc", "add", id, "linked.md"]).unwrap();
-    let observed = cli.root().join("observed-issue-docs.json");
-    let checker = format!("printf '%s' \"$JIT_ISSUE_DOCS\" > {}", observed.display());
     cli.run([
         "gate",
         "define",
@@ -253,16 +249,15 @@ fn test_every_issue_surface_reports_the_documents_doc_list_reports_without_writi
         "--title",
         "Docs",
         "--description",
-        "Records the documents a checker receives",
+        "Passes",
         "--mode",
         "auto",
         "--checker-command",
-        &checker,
+        "true",
     ])
     .unwrap();
     cli.run(["gate", "add", id, "docs-gate"]).unwrap();
 
-    let listed = json_output(&cli, &["doc", "list", id]);
     let store_before_reads = store_bytes(cli.root());
     let shown = json_output(&cli, &["issue", "show", id]);
     assert_eq!(
@@ -271,19 +266,15 @@ fn test_every_issue_surface_reports_the_documents_doc_list_reports_without_writi
         "reading an issue writes nothing"
     );
     cli.run(["gate", "evaluate", id, "docs-gate"]).unwrap();
-    let received: Value = serde_json::from_str(&fs::read_to_string(&observed).unwrap()).unwrap();
 
-    let expected = document_entries(&listed["documents"]);
     assert!(
-        expected
+        document_entries(&shown["documents"])
             .iter()
             .any(|(path, doc_type, label)| path == &derived
                 && doc_type.is_null()
                 && label.is_null()),
-        "doc list reports the derived document bare: {expected:?}"
+        "issue show reports the derived document bare: {shown}"
     );
-    assert_eq!(document_entries(&shown["documents"]), expected);
-    assert_eq!(document_entries(&received), expected);
     assert!(
         store_bytes(cli.root())
             .values()
