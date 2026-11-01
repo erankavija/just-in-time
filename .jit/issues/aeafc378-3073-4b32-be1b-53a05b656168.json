@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T07:36:43.277712236Z",
+  "dependencies": [],
+  "description": "Landing a branch on a shared checkout forces the lead to commit other sessions' pending tracker lines, so tracker history misattributes work and commits carry state their author never reviewed.\n\n## Background\n\nSeveral sessions write `.jit/events.jsonl` in one primary checkout, and each leaves appended lines uncommitted until its own next tracker commit. A branch that changed the same log cannot merge there, because git refuses to overwrite a dirty file, even though the log uses the union merge driver. The only available route is to commit the log first, which publishes every other session's pending lines under the landing issue's attribution. Commit `99100d61e` did this deliberately to land 12a0a694. Commit `bbcf19b7d` did it by accident when filing that issue, since a tracker commit naming the log takes the whole file. Other sessions' issue records can be dirty in the same checkout, and an unrelated completion can sweep their readiness changes into the landing branch as well.\n\n## Success Criteria\n\n- [hard] REQ-01: A landing never has to commit another session's pending tracker lines.\n- [hard] REQ-02: A session committing its own tracker changes in a shared checkout publishes only its own event lines.\n\n## Notes\n\nThe mechanism is open: per-session pending state, a landing path that merges without touching the shared working tree, or an event log whose uncommitted tail does not live in a tracked file are all candidates. Prefer the option that removes mechanism.",
+  "documents": [],
+  "first_ready_at": "2026-11-01T07:36:43.277712236Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "aeafc378-3073-4b32-be1b-53a05b656168",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Land branches without committing other sessions' pending tracker lines",
+  "updated_at": "2026-11-01T07:36:43.277712236Z"
+}

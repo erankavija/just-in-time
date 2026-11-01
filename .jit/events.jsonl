@@ -21837,3 +21837,5 @@
 {"gate_key":"cargo-ci","id":"979a60a8-f79e-44b6-9f41-bb5ee69fb643","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:30:39.883574642Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"3298fd8a-93f2-48e8-a474-d2c67e758259","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:30:53.028336655Z","to":"done","type":"issue_state_changed"}
 {"id":"71616c79-1a7c-498c-83f9-a39c340c52e2","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:30:53.028336655Z","type":"issue_completed"}
+{"id":"aea846b5-ade1-4794-93a1-1b896456d11d","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","priority":"normal","timestamp":"2026-11-01T07:36:43.277712236Z","title":"Land branches without committing other sessions' pending tracker lines","type":"issue_created"}
+{"fields":["dependencies"],"id":"9b57e877-a4d0-4f4b-849f-1adedc6cd1c5","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T07:36:43.811834487Z","type":"issue_updated","updated_by":"dependency-add"}
