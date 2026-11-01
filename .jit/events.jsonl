@@ -21720,3 +21720,7 @@
 {"gate_key":"code-review","id":"ae990981-1f37-46a9-b505-db97bdb41a1a","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","timestamp":"2026-11-01T04:15:06.598511032Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["documents"],"id":"8ffcc77e-1ea0-472d-80cb-14ebb8bfec23","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","timestamp":"2026-11-01T04:15:28.281507128Z","type":"issue_updated","updated_by":"doc-add"}
 {"gate_key":"code-review","id":"1cc6ecce-0fc2-4241-91a8-6b4caa91ac89","issue_id":"1a3db2c3-0faa-42c9-9498-d7bf7c0efaee","timestamp":"2026-11-01T04:18:46.282822227Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"a41650c6-f15e-445a-a166-a9d816123b3e","issue_id":"14c08f51-2cbe-4e4b-8004-2f433d838ba4","priority":"high","timestamp":"2026-11-01T04:15:19.570262439Z","title":"Package drift over the registries runs as a gate","type":"issue_created"}
+{"fields":["dependencies"],"id":"0feb20a0-8c69-414b-8124-63b4077d69f7","issue_id":"952ed1e7-2d3c-4d57-8851-ca3a91babcb0","timestamp":"2026-11-01T04:15:20.065174266Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"40e3f536-160f-4213-870c-eb0286eb5ac3","issue_id":"14c08f51-2cbe-4e4b-8004-2f433d838ba4","timestamp":"2026-11-01T04:15:20.248787980Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"ca6be9ba-a1d6-4a26-852c-92e4c5eee560","issue_id":"14c08f51-2cbe-4e4b-8004-2f433d838ba4","timestamp":"2026-11-01T04:15:20.248787980Z","type":"issue_claimed"}
