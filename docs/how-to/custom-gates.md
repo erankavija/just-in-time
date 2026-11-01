@@ -50,7 +50,7 @@ jit gate add $ISSUE tests
 
 # Run the checker
 jit gate evaluate $ISSUE tests
-# ✓ Gate 'tests' passed
+# Passed gate 'tests' for issue <issue-id>
 
 # Inspect the most recent recorded gate runs
 jit gate status-all $ISSUE
@@ -344,10 +344,10 @@ verdict is fabricated.
 
 # Run tests
 if cargo test --quiet; then
-  echo "✓ All tests passed"
+  echo "ok: All tests passed"
   exit 0
 else
-  echo "✗ Tests failed"
+  echo "error: Tests failed"
   exit 1   # a finding; use 75 when the checker itself could not run
 fi
 ```
@@ -482,7 +482,7 @@ cargo test --lib
 **2. Provide clear output**
 ```bash
 # Good: Specific error message
-echo "✗ Clippy found 3 warnings in src/main.rs"
+echo "error: Clippy found 3 warnings in src/main.rs"
 
 # Avoid: Generic failure
 echo "Failed"
@@ -530,7 +530,7 @@ cargo clippy --all-targets -- -D warnings
 echo "3/3 Running tests..."
 cargo test --lib
 
-echo "✓ All quality checks passed"
+echo "ok: All quality checks passed"
 exit 0
 ```
 

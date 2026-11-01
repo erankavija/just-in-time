@@ -1390,9 +1390,13 @@ fn selected_destination_roots(
             let permanent = policy.is_permanent(source);
             let managed = policy.is_managed(source);
             let selected = match target {
-                PlanTarget::Container { .. } => entry.owners().iter().any(|owner| {
-                    owner.inside_subtree && owner.is_effectively_terminal() && !owner.pinned
-                }),
+                // An ownerless root is a document its subtree owns by location.
+                PlanTarget::Container { .. } => {
+                    entry.owners().is_empty()
+                        || entry.owners().iter().any(|owner| {
+                            owner.inside_subtree && owner.is_effectively_terminal() && !owner.pinned
+                        })
+                }
                 PlanTarget::Document { .. } => document_all_terminal,
             };
             if selected && !archived && !permanent && !managed {

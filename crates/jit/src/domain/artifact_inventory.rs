@@ -7,6 +7,8 @@
 //! hierarchy, grouping, and owner association deterministic and independently
 //! testable.
 
+use crate::config::DocumentationConfig;
+use crate::domain::artifact_directory::{derive_issue_documents, owned_artifact_directories};
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactAction, ArtifactPlanEntry, ArtifactProvenance,
     ArtifactVersion, BlockerCode, PlanBlocker, PlanError, PlanTarget, PlanWarning, WarningCode,
@@ -90,6 +92,31 @@ impl ExplicitRootInventory {
         &self.blockers
     }
 
+    /// Add working-tree roots no link names; each is ownerless, the shape a
+    /// document owned by location takes.
+    ///
+    /// A path already inventoried keeps its linked entry, so it is planned once.
+    pub fn with_unlinked_roots(
+        mut self,
+        paths: impl IntoIterator<Item = String>,
+    ) -> Result<Self, InventoryError> {
+        let present = self
+            .artifacts
+            .iter()
+            .filter(|entry| !entry.version().is_pinned())
+            .map(|entry| entry.source().to_string())
+            .collect::<BTreeSet<_>>();
+        for path in paths.into_iter().filter(|path| !present.contains(path)) {
+            let mut entry =
+                ArtifactPlanEntry::new(path, ArtifactVersion::WorkingTree, ArtifactAction::Retain)
+                    .with_provenance(vec![ArtifactProvenance::Explicit]);
+            entry.normalize()?;
+            self.artifacts.push(entry);
+        }
+        self.artifacts.sort_by_key(ArtifactPlanEntry::identity);
+        Ok(self)
+    }
+
     /// Consume the inventory into fields accepted directly by
     /// [`crate::domain::artifact_plan::ArtifactPlan::new`].
     pub fn into_plan_parts(self) -> (PlanTarget, Vec<ArtifactPlanEntry>, Vec<PlanBlocker>) {
@@ -107,6 +134,49 @@ impl ExplicitRootInventory {
     ) {
         (self.target, self.member_ids, self.artifacts, self.blockers)
     }
+}
+
+/// Directories whose files may be documents owned by location by the members
+/// of the container `root`'s resolved subtree.
+pub fn member_document_directories(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    root: &IssueId,
+    documentation: &DocumentationConfig,
+) -> BTreeSet<String> {
+    let members = resolved_subtree_members(issues, hierarchy, root);
+    issues
+        .iter()
+        .filter(|issue| members.contains(&issue.id))
+        .flat_map(|issue| owned_artifact_directories(issue, documentation, hierarchy))
+        .collect()
+}
+
+/// The files of `files` that effectively terminal members of the container
+/// `root`'s resolved subtree own by location ([`derive_issue_documents`]).
+///
+/// A file an issue outside the subtree links is left to that issue's link.
+pub fn member_derived_documents(
+    issues: &[Issue],
+    hierarchy: &HierarchyConfig,
+    root: &IssueId,
+    files: &[String],
+    documentation: &DocumentationConfig,
+) -> BTreeSet<String> {
+    let members = resolved_subtree_members(issues, hierarchy, root);
+    let outside_links = issues
+        .iter()
+        .filter(|issue| !members.contains(&issue.id))
+        .flat_map(|issue| issue.documents.iter())
+        .map(|document| normalize_artifact_path(&document.path))
+        .collect::<BTreeSet<_>>();
+    issues
+        .iter()
+        .filter(|issue| members.contains(&issue.id) && issue.is_effectively_terminal())
+        .flat_map(|issue| derive_issue_documents(issue, files, documentation, hierarchy))
+        .map(|document| document.path)
+        .filter(|path| !outside_links.contains(path))
+        .collect()
 }
 
 /// Failures in deterministic inventory construction itself.

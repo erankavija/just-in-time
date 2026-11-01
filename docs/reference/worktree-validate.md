@@ -379,19 +379,19 @@ jit validate --json
 
 Whole-repository, clean:
 ```
-✓ Repository validation passed
+Repository validation passed
 ```
 
 Whole-repository, with an integrity error and a warning-severity finding:
 ```
-❌ Repository integrity error: Invalid dependency: issue 'a1b2c3d4' depends on 'deadbeef' which does not exist
-⚠ [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no parent association label
+error: Repository integrity error: Invalid repository: repository-integrity validation pass: Invalid dependency: issue 'a1b2c3d4' depends on 'deadbeef' which does not exist
+warning [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no parent association label
 
 Warnings: 1
 ```
 
-Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
-`⚠ [<rule>]`.
+Error-severity rule findings print with a leading `error [<rule>]`, warnings with
+`warning [<rule>]`.
 
 If `--fix` cannot prove ownership, human output includes the complete actionable
 cause chain. With `--json`, the same failure is a standard error object whose

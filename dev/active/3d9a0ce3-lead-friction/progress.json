@@ -248,7 +248,7 @@
           "title": "Build one profile selection per invocation",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework"
+          "status": "paused; merge approved; latest full gate pending"
         }
       ]
     },
@@ -532,6 +532,14 @@
     {
       "topic": "fixture contention TIMEOUT/lock-wait signature in cargo-ci",
       "resolution": "steward: force allowed for that exact signature until c780514e's cold-key fix lands"
+    },
+    {
+      "topic": "abe963dd rework limit: code-review assumed parent-traversal aliases were admitted",
+      "resolution": "2026-10-22 parent approved one additional focused attempt: preserve existing parent-traversal rejection, prove rejected inputs never reach model validation, deduplicate admitted aliases, rerun full gates and review. Failed code-review a9d77cf0 and cargo-ci 00bccea4 preserved. Existing repository_state/path.rs lexical_absolute rejects ParentDir via non-Normal component; no path-acceptance expansion authorized."
+    },
+    {
+      "topic": "Automatic approval review rejected direct main merge",
+      "resolution": "User explicitly approved: \"I approve the merge\", coordinating thread 01a164c8-d7ba-7812-a630-db8dddcee05b, user message 01a1656c-cc39-72b2-a487-871d742b823a. Read directly on resume; parent authorized reconciliation, required checks, main merge and gate/closure records."
     }
   ],
   "surfaced_pitfalls": [
@@ -556,11 +564,13 @@
     "8673dc5e": 2,
     "f866d9d8": 1,
     "39710b3b": 1,
-    "abe963dd": 1
+    "abe963dd": 3
   },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock",
   "notes": [
-    "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence."
-  ]
+    "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence.",
+    "2026-10-23 paused for user handoff. See handoff-4.md. Owning branch checkpoint 01f148ba4 includes main through ba02afa0d. Timeout d3a0da67 preserved in e00b10914; subsequent compile-only check passed in 34.19s, final cargo-ci not launched. No active workers/builds/locks; main/build window released. Explicit merge approval retained, no merge performed. Future bounded workers Luna xhigh; no new worktrees/caches; all builds incremental=0."
+  ],
+  "latest_handoff": "handoff-4.md"
 }

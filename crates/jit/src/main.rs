@@ -21,7 +21,9 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
     ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
+use jit::commands::{
+    CommandExecutor, DescriptionUpdate, ProfileSelection, ProfileSelector, ProfileVariableOptions,
+};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -533,13 +535,11 @@ fn run_profile_lifecycle<Plan, Apply>(
 where
     Plan: FnOnce(
         &CommandExecutor<JsonFileStorage>,
-        &[ProfileSelector],
-        &ProfileVariableOptions,
+        &ProfileSelection,
     ) -> Result<jit::profile::ProfilePlanResult>,
     Apply: FnOnce(
         &CommandExecutor<JsonFileStorage>,
-        &[ProfileSelector],
-        &ProfileVariableOptions,
+        &ProfileSelection,
     ) -> Result<jit::profile::ProfileComposedApplyResult>,
 {
     let ProfileLifecycleInvocation {
@@ -563,15 +563,22 @@ where
         values_file,
         assignments,
     };
+    let selection = executor.select_profiles(&selectors, &options);
     if dry_run {
-        let plans = profile_result(plan(executor, &selectors, &options), json)?;
+        let plans = profile_result(
+            selection.and_then(|selection| plan(executor, &selection)),
+            json,
+        )?;
         if json {
             println!("{}", JsonOutput::success(&plans).to_json_string()?);
         } else {
             print_profile_plans(&plans);
         }
     } else {
-        let applied = profile_result(apply(executor, &selectors, &options), json)?;
+        let applied = profile_result(
+            selection.and_then(|selection| apply(executor, &selection)),
+            json,
+        )?;
         if json {
             println!("{}", JsonOutput::success(&applied).to_json_string()?);
         } else {
@@ -1760,10 +1767,19 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         let output_ctx = OutputContext::new(quiet, json);
         let selectors = parse_profile_selectors(profile, json)?;
         let assignments = parse_profile_variable_assignments(set, json)?;
-        profile_result(executor.validate_profile_selection(&selectors), json)?;
+        let selection = profile_result(
+            executor.select_profiles(
+                &selectors,
+                &ProfileVariableOptions {
+                    values_file: values_file.clone(),
+                    assignments,
+                },
+            ),
+            json,
+        )?;
 
         // Every init and re-init — plain, profiled, or over an existing root —
-        // publishes through one mutation session: `run_initialization` fills
+        // publishes through one mutation session: initialization fills
         // only the missing neutral scaffold state (authored config/gates/rules
         // preserved), seeds `[project]` and `rules.toml` when absent, computes
         // the worktree `.gitattributes` merge-driver claim, and routes
@@ -1771,14 +1787,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
         // profiled init, closing the prior re-init gap.
         let init_result = profile_result(
-            executor.initialize_fresh_repository_from_sources(
-                &current_dir,
-                Some(&selectors),
-                &ProfileVariableOptions {
-                    values_file: values_file.clone(),
-                    assignments,
-                },
-            ),
+            executor.initialize_fresh_repository(&current_dir, Some(&selection)),
             json,
         )?;
         // Machine-local worktree identity (gitignored, not repository state)
@@ -1911,7 +1920,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     assignments,
                 };
                 let plans = profile_result(
-                    executor.diff_profiles_from_sources(&selectors, &options),
+                    executor
+                        .select_profiles(&selectors, &options)
+                        .and_then(|selection| executor.diff_profiles(&selection)),
                     json,
                 )?;
                 render_profile_difference(&plans, json)?;
@@ -1932,8 +1943,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     dry_run,
                     json,
                 },
-                CommandExecutor::plan_profiles_from_sources,
-                CommandExecutor::apply_profile_from_sources,
+                CommandExecutor::plan_profiles,
+                CommandExecutor::apply_profiles,
             )?,
             ProfileCommands::Pack {
                 source,

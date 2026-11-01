@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:f4d9502a-lead",
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-24T19:06:20.387120948Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9e908b95-cfc2-46e0-b4f8-fa1b3b81b28f",
-      "status": "failed",
-      "updated_at": "2026-10-24T19:24:26.266695019Z",
+      "run_id": "959b467a-e2ac-4ec1-9981-36093aa40467",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:16:41.345995230Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "ff37c97e-6ac4-441e-b776-bf193650ca8f",
+      "run_id": "ad39157b-e251-4158-8282-d4e8bbfb271d",
       "status": "failed",
-      "updated_at": "2026-10-24T19:20:01.385537227Z",
+      "updated_at": "2026-11-01T13:18:23.396895270Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Storage-owned git module with a one-process probe",
-  "updated_at": "2026-10-24T19:24:26.266695019Z"
+  "updated_at": "2026-11-01T13:18:23.396895270Z"
 }

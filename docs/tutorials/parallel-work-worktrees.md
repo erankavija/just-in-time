@@ -124,7 +124,7 @@ jit claim acquire <issue-id>
 You should see:
 
 ```
-✓ Acquired lease: abc123-def456...
+Acquired lease: abc123-def456...
   Issue: <issue-id>
   TTL: <seconds> seconds
 ```

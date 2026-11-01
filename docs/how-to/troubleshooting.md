@@ -136,7 +136,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Symptom:**
 ```
-⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
 
 **Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the built-in claim stale threshold ([Runtime Defaults](../reference/runtime-defaults.md)).
@@ -310,7 +310,7 @@ then act on the reason:
 
 **Symptom:**
 ```
-❌ Pre-commit hook: Structural edit to issue abc123 without active lease
+error: Pre-commit hook: Structural edit to issue abc123 without active lease
 ```
 
 **Cause:** You're editing an issue file without holding a lease (in strict mode).
@@ -341,7 +341,7 @@ then act on the reason:
 
 **Symptom:**
 ```
-❌ Pre-commit hook: Global .jit/ changes require common history with main
+error: Pre-commit hook: Global .jit/ changes require common history with main
    Your branch has diverged from origin/main
 ```
 
