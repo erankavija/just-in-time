@@ -2,8 +2,8 @@
 //! point that brings each one back into agreement with its source.
 //!
 //! Each artifact is committed, and each carries a drift assertion that fails
-//! when the committed bytes differ from what its source now renders; the
-//! template region's is the `package-drift` example, which a gate runs. That
+//! when the committed bytes differ from what its source now renders; a registry
+//! region's is the `package-drift` example, which a gate runs. That
 //! assertion makes drift visible; the entry point declared here repairs it. Both
 //! sides read the render named in [`ArtifactRender::InCrate`], so the repair and
 //! the assertion cannot disagree about what the artifact should hold.
@@ -22,9 +22,8 @@
 //! dev-dependency-active builds the example needs, so an adopter build carries
 //! none of it.
 
-use crate::profile::template_region;
+use crate::profile::registry_region;
 
-use crate::profile::template_region::TEMPLATE_REGION_PACKAGE_ID;
 use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use std::path::PathBuf;
 
@@ -196,11 +195,20 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     },
     GeneratedArtifact {
         name: "template-region",
-        generator: template_region::TEMPLATE_REGION_GENERATOR,
+        generator: registry_region::TEMPLATE_REGION_GENERATOR,
         holds: "the packaged template declarations",
         render: ArtifactRender::InCrate {
-            target: ArtifactTarget::Virtual(template_region::TEMPLATE_REGISTRY_PATH),
+            target: ArtifactTarget::Virtual(VirtualPath::TEMPLATES),
             render: render_template_region,
+        },
+    },
+    GeneratedArtifact {
+        name: "invariant-region",
+        generator: registry_region::INVARIANT_REGION_GENERATOR,
+        holds: "the packaged invariant declarations",
+        render: ArtifactRender::InCrate {
+            target: ArtifactTarget::Virtual(VirtualPath::INVARIANTS),
+            render: render_invariant_region,
         },
     },
 ];
@@ -238,32 +246,39 @@ fn render_storage_records_reference(_committed: &[u8]) -> Result<Vec<u8>, String
         .map_err(|error| error.to_string())
 }
 
-/// The registry's bytes with the packaged declarations spliced into its
-/// generated region.
-///
-/// The declarations come from this repository's workflow package captured from
-/// the checkout, so a run renders what the checkout currently declares.
+fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
+    render_registry_region(&registry_region::TEMPLATE_REGION, committed)
+}
+
+fn render_invariant_region(committed: &[u8]) -> Result<Vec<u8>, String> {
+    render_registry_region(&registry_region::INVARIANT_REGION, committed)
+}
+
+/// Render `region` over `committed`, from this repository's workflow package
+/// captured from the checkout.
 ///
 /// A render that moved a byte outside the delimiters is a defect in the splice
 /// rather than an edit to publish, so it is reported instead of returned.
-fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
-    let outside = |registry: &[u8]| {
-        template_region::outside_template_region(registry).map_err(|error| error.to_string())
-    };
+fn render_registry_region(
+    region: &registry_region::RegistryRegion,
+    committed: &[u8],
+) -> Result<Vec<u8>, String> {
+    let outside = |registry: &[u8]| region.outside(registry).map_err(|error| error.to_string());
     let destination = tempfile::TempDir::new().map_err(|error| error.to_string())?;
     let package = crate::test_utils::capture_repository_package(
-        TEMPLATE_REGION_PACKAGE_ID,
-        &destination.path().join(TEMPLATE_REGION_PACKAGE_ID),
+        registry_region::REGION_PACKAGE_ID,
+        &destination.path().join(registry_region::REGION_PACKAGE_ID),
     )
     .map_err(|error| error.to_string())?;
-    let rendered = template_region::render_template_registry(committed, &package)
+    let rendered = region
+        .render(committed, &package)
         .map_err(|error| error.to_string())?;
     (outside(&rendered)? == outside(committed)?)
         .then_some(rendered)
         .ok_or_else(|| {
             format!(
                 "the render changed {} outside the delimiters",
-                template_region::TEMPLATE_REGISTRY_PATH.repository_relative()
+                region.registry.repository_relative()
             )
         })
 }

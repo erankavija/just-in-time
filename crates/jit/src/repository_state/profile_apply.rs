@@ -1701,37 +1701,6 @@ fn json_object_to_table(value: &JsonValue, registry: &str) -> Result<Table, Repo
         })
 }
 
-/// The value one contribution declares, as its own model states it.
-///
-/// Every variant carries its declaration in one `value`, so this is the single
-/// answer to "what does this contribution say" for the packaged-carrier
-/// comparison.
-///
-/// # Errors
-///
-/// Returns [`RepositoryStateError`] when a projection configuration does not
-/// serialize.
-#[cfg(any(test, feature = "test-support"))]
-pub(crate) fn contributed_json_value(
-    contribution: &Contribution,
-) -> Result<JsonValue, RepositoryStateError> {
-    match contribution {
-        Contribution::KeyedArray { value, .. } | Contribution::MapEntry { value, .. } => {
-            Ok(value.clone())
-        }
-        Contribution::Scalar { value, .. } | Contribution::SetString { value, .. } => {
-            Ok(JsonValue::String(value.clone()))
-        }
-        Contribution::Projection { value, .. } => serde_json::to_value(value).map_err(|error| {
-            let registry = contribution.registry_path().repository_relative();
-            profile_registry_error(
-                &registry,
-                ProfileRegistryParseError::ProjectionDefinition(error.to_string()),
-            )
-        }),
-    }
-}
-
 fn json_to_item(value: &JsonValue, registry: &str) -> Result<Item, RepositoryStateError> {
     match value {
         JsonValue::Object(_) => Ok(Item::Value(Value::InlineTable(json_to_inline_table(
