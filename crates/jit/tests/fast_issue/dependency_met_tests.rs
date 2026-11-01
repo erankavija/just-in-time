@@ -17,10 +17,12 @@ fn reject(h: &TestHarness, id: &IssueId) {
 #[test]
 fn test_transition_to_ready_allows_rejected_dependency() {
     let h = TestHarness::new();
-    let dependent = h.create_issue("Dependent");
     let dependency = h.create_issue("Abandoned upstream");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
     reject(&h, &dependency);
+    let dependent = h.create_issue("Dependent");
+    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
+    assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Ready).unwrap();
 
