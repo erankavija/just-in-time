@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:34:29.851649694Z",
   "context": {},
   "created_at": "2026-11-01T01:33:40.527510216Z",
   "dependencies": [],
@@ -23,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Criteria checks bind through check labels only",
-  "updated_at": "2026-11-01T01:33:40.527510216Z"
+  "updated_at": "2026-11-01T01:34:29.851649694Z"
 }
