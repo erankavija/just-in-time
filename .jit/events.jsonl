@@ -22136,3 +22136,6 @@
 {"from":"backlog","id":"38e901b7-e66a-4735-99ec-b6d1560a99a3","issue_id":"4ba18af4-dcf3-480d-a785-40dc4533349c","timestamp":"2026-11-01T14:05:18.430019023Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"0e82c345-8143-4d69-9a3f-cf889e822a51","issue_id":"bb5040a8-1341-4e8e-ac13-6eef116574f4","timestamp":"2026-11-01T14:05:18.523910827Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"a80a9c6a-b25d-4e9c-925c-ae2d39b004b3","issue_id":"cc9f213e-7683-47a5-91fe-fedbba10043b","timestamp":"2026-11-01T14:05:18.621291811Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"a4e5d072-06bd-4de0-951a-db8c1f2173d3","issue_id":"07663984-071b-4aa1-963a-e6ec2791f8d8","timestamp":"2026-11-01T14:05:43.118720518Z","to":"done","type":"issue_state_changed"}
+{"id":"22bae8e5-01b1-48d0-a931-d829b1c2a3fd","issue_id":"07663984-071b-4aa1-963a-e6ec2791f8d8","timestamp":"2026-11-01T14:05:43.118720518Z","type":"issue_completed"}
+{"from":"backlog","id":"e30d4105-c92a-4045-a8aa-bfea1ef709b1","issue_id":"c5062e21-331d-4ab8-8468-3535d16d634f","timestamp":"2026-11-01T14:05:43.239550705Z","to":"ready","type":"issue_state_changed"}
