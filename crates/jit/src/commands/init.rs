@@ -663,35 +663,14 @@ mod tests {
             "back/slash/events.jsonl"
         );
     }
+    use crate::test_utils::file_executor;
     use std::thread;
     use tempfile::TempDir;
-
-    /// A file-backed executor carrying the canonical layout for `worktree`.
-    fn executor_with_layout(
-        storage: &JsonFileStorage,
-        worktree: &Path,
-    ) -> CommandExecutor<JsonFileStorage> {
-        let layout = discover_repository_layout(worktree, storage.root()).unwrap();
-        CommandExecutor::new(storage.clone()).with_layout(layout)
-    }
-
-    /// Assert the published repository validates cleanly through the closed-image
-    /// pipeline.
-    fn assert_repo_valid(worktree: &Path) {
-        let data = worktree.join(".jit");
-        let layout = discover_repository_layout(worktree, &data).unwrap();
-        CommandExecutor::new(JsonFileStorage::new(&data))
-            .with_layout(layout)
-            .validate_repository_report()
-            .unwrap()
-            .unwrap();
-    }
 
     #[test]
     fn test_fresh_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_fresh_repository(repo.path(), None)
@@ -712,16 +691,18 @@ mod tests {
             );
         }
         assert!(repo.path().join(".jit/issues").is_dir());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
     fn test_fresh_init_over_memory_store_writes_the_files_the_json_backend_writes() {
         let repo = TempDir::new().unwrap();
-        let json = JsonFileStorage::new(repo.path().join(".jit"));
-        executor_with_layout(&json, repo.path())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let json = file_executor(repo.path()).unwrap();
+        json.initialize_fresh_repository(repo.path(), None).unwrap();
 
         let memory = crate::storage::InMemoryStorage::rooted_at(repo.path());
         let layout = memory.repository_layout();
@@ -738,7 +719,7 @@ mod tests {
             ".jit/events.jsonl",
             ".jit/rules.toml",
         ] {
-            let expected = json.read_repo_file(path).unwrap();
+            let expected = json.storage().read_repo_file(path).unwrap();
             assert!(expected.is_some(), "JSON backend wrote no {path}");
             assert_eq!(memory.read_repo_file(path).unwrap(), expected, "{path}");
         }
@@ -758,8 +739,7 @@ mod tests {
             repo.path(),
             &crate::test_utils::shipped_item_kind_tables(&["invariant"]),
         );
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_fresh_repository(repo.path(), None)
@@ -785,7 +765,11 @@ mod tests {
             .unwrap()
             .items
             .is_empty());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
@@ -795,8 +779,7 @@ mod tests {
             repo.path(),
             &crate::test_utils::shipped_item_kind_tables(&["invariant"]),
         );
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         executor
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
@@ -817,12 +800,17 @@ mod tests {
         )
         .unwrap();
 
-        let resolved = executor_with_layout(&storage, repo.path())
+        let resolved = file_executor(repo.path())
+            .unwrap()
             .show_item("@/invariant/authored-here")
             .unwrap();
         assert_eq!(resolved.item.self_id, "authored-here");
         assert!(resolved.issue_full_id.is_none());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     /// The checked-in fixture tree every composition case below stages copies
@@ -860,7 +848,6 @@ mod tests {
     #[test]
     fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         // Two packages beside each other inside the worktree the repository is
         // created in, which is where an adopter puts an obtained set.
         crate::test_utils::write_package_declaring(
@@ -876,7 +863,8 @@ mod tests {
             &["base"],
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -923,7 +911,8 @@ mod tests {
             publications.clone(),
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(repo.path(), storage.root()).unwrap())
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -946,7 +935,6 @@ mod tests {
     #[test]
     fn test_fresh_profile_init_refuses_a_conflicting_closure_before_scaffolding() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         composition_package_with_namespace(
             &repo,
             "packages/base",
@@ -962,7 +950,8 @@ mod tests {
             "Workflow initialization definition.",
         );
 
-        let error = executor_with_layout(&storage, repo.path())
+        let error = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -979,7 +968,6 @@ mod tests {
     #[test]
     fn test_fresh_profile_init_preserves_repeated_root_occurrences_in_order() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let location = repo.path().join("packages/workflow");
         crate::test_utils::write_package_declaring(
             &composition_package(),
@@ -988,7 +976,8 @@ mod tests {
             &[],
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[
@@ -1026,8 +1015,7 @@ mod tests {
     #[test]
     fn test_fresh_profile_init_applies_every_package_of_the_selected_closure() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         // The set initialization has to apply is the selected package's whole
         // dependency closure. It is named from the staged package itself, so
         // the two sides reach it by different routes.
@@ -1054,13 +1042,16 @@ mod tests {
             ids,
             "initialization applies the whole set the named profile resolves to"
         );
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
     fn test_fresh_profile_init_applies_a_declared_dependency_under_a_retained_session() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         // The dependency is named and no location is supplied for it, so it is
         // resolved from the directory beside the package declaring it — the
         // shape an obtained set of packages arrives in.
@@ -1075,15 +1066,15 @@ mod tests {
             "workflow",
             &["jit-default"],
         );
-        let layout = discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = file_executor(repo.path()).unwrap();
         // The shape every `jit init` runs in: startup recovers and retains its
         // session, and initialization publishes and applies inside it.
-        let retained = storage
-            .open_and_retain_mutation_session(layout.clone())
+        let retained = executor
+            .storage()
+            .open_and_retain_mutation_session(executor.require_layout().unwrap())
             .unwrap();
 
-        let result = CommandExecutor::new(storage.clone())
-            .with_layout(layout)
+        let result = executor
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -1131,14 +1122,17 @@ mod tests {
             Vec::<&str>::new(),
             "each entry is a type the dependency declares that the published configuration lacks"
         );
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
         drop(retained);
     }
 
     #[test]
     fn test_fresh_profile_init_creates_no_repository_when_a_dependency_cannot_be_resolved() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         crate::test_utils::write_package_declaring(
             &composition_package(),
             &repo.path().join("packages/workflow"),
@@ -1146,7 +1140,8 @@ mod tests {
             &["absent-base"],
         );
 
-        let error = executor_with_layout(&storage, repo.path())
+        let error = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -1165,8 +1160,7 @@ mod tests {
     #[test]
     fn test_fresh_profile_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_fresh_repository(
@@ -1206,7 +1200,11 @@ mod tests {
         )
         .unwrap()
         .contains("planning"));
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
@@ -1216,13 +1214,12 @@ mod tests {
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
         )
         .unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let before_events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
         // A second `jit init` is a fresh process that re-discovers the layout over
         // the now-published root; reuse of the first executor's absent-root layout
         // would be a test artifact, not the real re-init path.
-        let reinit = executor_with_layout(&storage, repo.path());
+        let reinit = file_executor(repo.path()).unwrap();
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
@@ -1247,7 +1244,6 @@ mod tests {
     fn test_single_profile_reinit_attributes_coupled_schema_repair() {
         let repo =
             crate::test_utils::profiled_repository_fixture("jit-default", "packages").unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let schema = repo
             .path()
             .join(".jit/schemas/default-namespace-registry.json");
@@ -1256,7 +1252,8 @@ mod tests {
         let events_path = repo.path().join(".jit/events.jsonl");
         let events_before = fs::read_to_string(&events_path).unwrap();
 
-        let repaired = executor_with_layout(&storage, repo.path())
+        let repaired = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
@@ -1275,7 +1272,8 @@ mod tests {
             "a coupled-only repair keeps the current per-profile audit event"
         );
 
-        let again = executor_with_layout(&storage, repo.path())
+        let again = file_executor(repo.path())
+            .unwrap()
             .initialize_profiled_repository(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
@@ -1294,8 +1292,7 @@ mod tests {
     #[test]
     fn test_profiled_init_detects_projection_source_outside_final_capture() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         executor
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
@@ -1381,8 +1378,8 @@ unique = true\n";
         // Re-initialization refreshes what the repository's own registry
         // generates, so the repository declares that registry first.
         declare_before_init(repo.path(), &taxonomy.config_fragment());
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1408,7 +1405,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         ) + authored_rule;
         fs::write(&rules_path, authored_rules).unwrap();
 
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1424,7 +1422,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         .contains("planning"));
 
         fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         let refreshed = fs::read_to_string(&rules_path).unwrap();
@@ -1448,8 +1447,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                 let location = Arc::clone(&location);
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
-                    let storage = JsonFileStorage::new(repo.path().join(".jit"));
-                    let executor = executor_with_layout(&storage, repo.path());
+                    let executor = file_executor(repo.path()).unwrap();
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
@@ -1469,7 +1467,11 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             .collect::<Vec<_>>();
         assert_eq!(winner.len(), 1);
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
         assert_eq!(
             events.lines().count(),

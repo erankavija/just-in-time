@@ -1894,6 +1894,7 @@ mod tests {
     use crate::storage::{
         discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
     };
+    use crate::test_utils::{file_executor, setup_test_repo, setup_test_repo_with_config};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -1954,33 +1955,11 @@ mod tests {
         crate::test_utils::profile_package_fixture("planner-asset-only")
     }
 
-    /// Worktree-relative location [`fixture`] stages its package at.
+    /// Worktree-relative location the cases stage the fixture package at.
     ///
     /// A package is applied from inside the repository it is applied to,
     /// because application refuses a package outside the worktree.
     const FIXTURE_LOCATION: &str = "packages/planner";
-
-    /// A file-backed executor over a canonically initialized repository carrying
-    /// its canonical layout, with the fixture package staged inside its
-    /// worktree.
-    fn fixture() -> (
-        TempDir,
-        JsonFileStorage,
-        CommandExecutor<JsonFileStorage>,
-        ProfilePackage,
-    ) {
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        let initializer = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        initializer
-            .initialize_fresh_repository(temp.path(), None)
-            .unwrap();
-        let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        (temp, storage, executor, package)
-    }
 
     /// The fixture package, written into the repository at `relative` and read
     /// back from there.
@@ -2331,7 +2310,8 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
-        let (temp, _storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
         let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
@@ -2346,7 +2326,8 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_resolves_a_declared_dependency_beside_the_declaring_package() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let config_path = temp.path().join(".jit/config.toml");
         let scaffolded = fs::read_to_string(&config_path).unwrap();
         let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
@@ -2374,7 +2355,8 @@ mod tests {
 
     #[test]
     fn test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let config_path = temp.path().join(".jit/config.toml");
         let scaffolded = fs::read_to_string(&config_path).unwrap();
         let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
@@ -2515,7 +2497,8 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_path_selector_uses_the_directory_package_id() {
-        let (temp, _storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/supplied");
         let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
         let resolved = executor.resolve_profile_package(&selector).unwrap();
@@ -2524,7 +2507,8 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reports_a_supplied_location_holding_no_package() {
-        let (temp, _storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
 
         let selector = ProfileSelector::path(temp.path().join("vendor/absent"));
         let error = executor.resolve_profile_package(&selector).unwrap_err();
@@ -2541,7 +2525,8 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_reports_the_worktree_location_it_read_the_package_from() {
-        let (temp, _storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/profiles/planner");
 
         let applied = executor.apply_profile_package(&package).unwrap();
@@ -2562,8 +2547,10 @@ mod tests {
         // Two directories inside the worktree hold byte-identical packages.
         // Nothing but the directory a package was read through distinguishes
         // them, so the reported location must follow that and only that.
-        let (first_temp, _first_storage, first_executor, _package) = fixture();
-        let (second_temp, _second_storage, second_executor, _package) = fixture();
+        let (first_temp, _) = setup_test_repo().unwrap();
+        let first_executor = file_executor(first_temp.path()).unwrap();
+        let (second_temp, _) = setup_test_repo().unwrap();
+        let second_executor = file_executor(second_temp.path()).unwrap();
         let first = package_read_from(&first_temp, "vendor/first");
         let second = package_read_from(&second_temp, "packages/second/tree");
         assert_eq!(first.hashes(), second.hashes());
@@ -2583,7 +2570,9 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_refuses_a_package_read_from_outside_the_worktree() {
-        let (temp, storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let elsewhere = TempDir::new().unwrap();
         let root = crate::test_utils::copy_package_tree(
             &fixture_package_tree(),
@@ -2609,7 +2598,9 @@ mod tests {
     fn test_apply_profile_package_refuses_a_package_read_from_the_data_root() {
         // The selected data root is not a worktree location, so a package
         // placed under it has no worktree-relative location to report.
-        let (temp, storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let package = package_read_from(&temp, ".jit/vendored");
 
         let error = executor.apply_profile_package(&package).unwrap_err();
@@ -2626,12 +2617,6 @@ mod tests {
         assert!(storage.read_events().unwrap().is_empty());
     }
 
-    /// This repository's generic vocabulary package, assembled from its
-    /// checkout, with the directory holding the assembled tree.
-    fn assembled_default_package() -> (TempDir, ProfilePackage) {
-        crate::test_utils::temporary_repository_package("jit-default")
-    }
-
     /// This repository's `id` package, assembled from its checkout into
     /// `worktree`, which is where a package has to sit to be applied to the
     /// repository rooted there.
@@ -2640,48 +2625,10 @@ mod tests {
             .expect("this repository's package captures")
     }
 
-    /// The project name every repository built by
-    /// [`bare_repository_beside_shipped_packages`] carries, so two of them
-    /// differ in what was applied to them rather than in where they sit.
-    const COMPOSITION_PROJECT_NAME: &str = "composition";
-
-    /// A repository declaring nothing, with the two shipped package trees
-    /// beside each other inside its worktree.
-    ///
-    /// The configuration is reduced to what an initialization derives from the
-    /// repository itself — the schema version and the project name — so what an
-    /// application writes afterwards is what the applied packages declare and
-    /// nothing that survived the reduction. The package directories sit side by
-    /// side because that is where an adopter puts an obtained set, and where a
-    /// package's declared dependency is looked for.
-    ///
-    /// Answers with the repository, an executor over it, and the `jit-default`
-    /// and `jit-dogfood` packages read back from the trees inside it.
-    fn bare_repository_beside_shipped_packages() -> (
-        TempDir,
-        CommandExecutor<JsonFileStorage>,
-        ProfilePackage,
-        ProfilePackage,
-    ) {
-        let (temp, storage, _executor, _fixture_package) = fixture();
-        let config_path = temp.path().join(".jit/config.toml");
-        let mut bare = fs::read_to_string(&config_path)
-            .unwrap()
-            .parse::<toml_edit::DocumentMut>()
-            .unwrap();
-        bare.as_table_mut()
-            .retain(|key, _| matches!(key, "version" | "project"));
-        bare["project"]["name"] = toml_edit::value(COMPOSITION_PROJECT_NAME);
-        fs::write(&config_path, bare.to_string()).unwrap();
-
-        let default = shipped_package_in(temp.path(), "jit-default");
-        let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
-        // Re-discovered over the reduced configuration, as a fresh process
-        // would read it.
-        let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        (temp, executor, default, dogfood)
-    }
+    /// A configuration declaring only the project, whose name both routes of a
+    /// composition share, so what an application writes afterwards is what the
+    /// applied packages declare and the repositories differ only in that.
+    const COMPOSITION_CONFIG: &str = "[project]\nname = \"composition\"\n";
 
     /// The configuration a repository carries, parsed rather than read as
     /// bytes: key order and formatting are not what a comparison is about.
@@ -2731,8 +2678,9 @@ mod tests {
 
     #[test]
     fn test_from_directory_reads_jit_default_with_a_stable_content_address() {
-        let (_workspace, package) = assembled_default_package();
-        let (_repeated_workspace, repeated) = assembled_default_package();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-default");
+        let (_repeated_workspace, repeated) =
+            crate::test_utils::temporary_repository_package("jit-default");
         let (_workflow_workspace, workflow) =
             crate::test_utils::temporary_repository_package("jit-dogfood");
 
@@ -2751,7 +2699,7 @@ mod tests {
 
     #[test]
     fn test_jit_default_carries_no_asset_and_no_workflow_registry_content() {
-        let (_workspace, package) = assembled_default_package();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-default");
         let manifest = package.model();
 
         // The manifest is the whole package: no file is published with it, so
@@ -2773,8 +2721,8 @@ mod tests {
 
     #[test]
     fn test_jit_default_declares_every_kind_an_initialized_repository_can_carry() {
-        let (temp, _storage, _executor, _fixture_package) = fixture();
-        let (_workspace, package) = assembled_default_package();
+        let (temp, _) = setup_test_repo().unwrap();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-default");
         let kinds = declared_item_kinds(&package);
 
         assert!(
@@ -2821,7 +2769,8 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_repairs_a_generated_schema_outside_the_package_targets() {
-        let (temp, _storage, executor, _fixture_package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = shipped_package_in(temp.path(), "jit-default");
         // The package writes the configuration, so applying it re-derives the
         // default rules and the schemas they reference — targets it names none
@@ -2855,7 +2804,7 @@ mod tests {
         // package declares is the whole of the repository's vocabulary. Each
         // assertion below reads the manifest rather than a copy of its values,
         // so the repository is compared against the package's own declaration.
-        let (temp, storage, _executor, _fixture_package) = fixture();
+        let (temp, storage) = setup_test_repo().unwrap();
         let config_path = temp.path().join(".jit/config.toml");
         let initialized: serde_json::Value =
             toml_edit::de::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -2979,7 +2928,8 @@ mod tests {
 
     #[test]
     fn test_jit_dogfood_declares_default_dependency_and_only_additive_contributions() {
-        let (_default_workspace, default) = assembled_default_package();
+        let (_default_workspace, default) =
+            crate::test_utils::temporary_repository_package("jit-default");
         let (_workflow_workspace, dogfood) =
             crate::test_utils::temporary_repository_package("jit-dogfood");
 
@@ -3036,10 +2986,14 @@ mod tests {
         // workflow package and receives the default as its declared
         // dependency. They start identical, so the configurations they end with
         // may differ only by the route that reached them.
-        let (explicit_temp, explicit_executor, explicit_default, explicit_dogfood) =
-            bare_repository_beside_shipped_packages();
-        let (resolved_temp, resolved_executor, _, resolved_dogfood) =
-            bare_repository_beside_shipped_packages();
+        let (explicit_temp, explicit_executor) =
+            setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+        let explicit_default = shipped_package_in(explicit_temp.path(), "jit-default");
+        let explicit_dogfood = shipped_package_in(explicit_temp.path(), "jit-dogfood");
+        let (resolved_temp, resolved_executor) =
+            setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+        shipped_package_in(resolved_temp.path(), "jit-default");
+        let resolved_dogfood = shipped_package_in(resolved_temp.path(), "jit-dogfood");
 
         let explicit_default_result = explicit_executor.apply_profile_package(&explicit_default);
         let explicit_dogfood_result = explicit_executor.apply_profile_package(&explicit_dogfood);
@@ -3134,7 +3088,7 @@ mod tests {
 
     #[test]
     fn test_jit_default_states_the_coordination_guidance_without_its_engine_defaults() {
-        let (_workspace, package) = assembled_default_package();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-default");
         let manifest = std::str::from_utf8(
             package
                 .source_bytes(crate::profile::MANIFEST_FILE_NAME)
@@ -3160,7 +3114,10 @@ mod tests {
 
     #[test]
     fn test_profile_application_commits_targets_and_event_and_reapplies_as_exact_no_op() {
-        let (temp, storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
 
         let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
@@ -3188,7 +3145,9 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_rejects_each_reserved_application_target() {
-        let (temp, storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
 
         for (index, target) in [".jit/events.jsonl", ".jit/profiles", ".git/config"]
             .into_iter()
@@ -3218,7 +3177,9 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_reapplies_changed_content() {
-        let (temp, _storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         executor.apply_profile_package(&package).unwrap();
         let unowned = temp.path().join("docs/repository-note.txt");
         fs::write(&unowned, "repository-authored\n").unwrap();
@@ -3248,7 +3209,10 @@ mod tests {
 
     #[test]
     fn test_profile_application_audits_the_values_it_substituted() {
-        let (temp, storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        package_read_from(&temp, FIXTURE_LOCATION);
         let package_root = temp.path().join(FIXTURE_LOCATION);
         fs::write(
             package_root.join(crate::profile::MANIFEST_FILE_NAME),
@@ -3321,7 +3285,9 @@ template = true
 
     #[test]
     fn test_profile_preparation_returns_one_complete_canonical_plan() {
-        let (_temp, _storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
         let context = MutationContext::deterministic(
@@ -3349,7 +3315,9 @@ template = true
 
     #[test]
     fn test_profile_dry_run_plan_is_stable_across_repeated_plans() {
-        let (_temp, _storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
         let context = MutationContext::preview();
@@ -3369,7 +3337,10 @@ template = true
 
     #[test]
     fn test_profile_plan_collection_preserves_selector_occurrences_without_events() {
-        let (temp, storage, executor, _package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        package_read_from(&temp, FIXTURE_LOCATION);
         let before = storage.read_events().unwrap();
         let selector = ProfileSelector::path(FIXTURE_LOCATION);
 
@@ -3392,7 +3363,10 @@ template = true
 
     #[test]
     fn test_profile_application_revalidates_locked_snapshot_before_any_write() {
-        let (temp, storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         fs::write(temp.path().join(".jit/config.toml"), b"not = [valid").unwrap();
 
         assert!(executor.apply_profile_package(&package).is_err());
@@ -3402,7 +3376,10 @@ template = true
 
     #[test]
     fn test_profile_application_preserves_and_certifies_torn_event_tail_end_to_end() {
-        let (temp, storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         let torn = b"{\"torn\":";
         fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
 
@@ -3427,7 +3404,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_applies_a_declared_dependency_before_the_package() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
@@ -3513,7 +3492,8 @@ template = true
 
     #[test]
     fn test_apply_profile_selection_is_a_complete_noop_when_every_member_is_present() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
         let right = package_declaring(&temp, "vendor/right", "right", &[]);
         executor
@@ -3590,7 +3570,8 @@ template = true
     #[test]
     fn test_apply_profile_selection_keeps_duplicate_root_observation_without_duplicate_publication()
     {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = package_declaring(&temp, "vendor/duplicate", "duplicate", &[]);
 
         let applied = executor
@@ -3616,7 +3597,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_applies_a_transitive_dependency_chain_deepest_first() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/vocabulary", "vocabulary", &[]);
         package_declaring(&temp, "vendor/base", "base", &["vocabulary"]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
@@ -3641,7 +3624,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_applies_a_shared_dependency_once() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/shared", "shared", &[]);
         package_declaring(&temp, "vendor/left", "left", &["shared"]);
         package_declaring(&temp, "vendor/right", "right", &["shared"]);
@@ -3675,7 +3660,9 @@ template = true
 
     #[test]
     fn test_effective_configuration_loads_an_authored_edit_of_a_published_registry() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let namespace = "registry-derived";
         let package = package_contributing(
             &temp,
@@ -3708,7 +3695,8 @@ template = true
 
     #[test]
     fn test_apply_profile_package_preflights_a_conflicting_dependency_closure() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let namespace = "closure-conflict";
         package_declaring_contribution(
             &temp,
@@ -3747,7 +3735,8 @@ template = true
 
     #[test]
     fn test_apply_profile_from_sources_names_both_packages_of_a_conflicting_asset_target() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let target = "docs/shared.txt";
         let base = package_publishing(&temp, "vendor/base", "base", target, "first\n");
         let workflow = package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
@@ -3785,7 +3774,8 @@ template = true
 
     #[test]
     fn test_apply_profile_package_merges_an_identical_restatement_of_an_applied_target() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let target = "docs/shared.txt";
         let namespace = "shared-namespace";
         let contribution = namespace_contribution(namespace, "One meaning.");
@@ -3823,7 +3813,8 @@ template = true
 
     #[test]
     fn test_apply_profile_package_recontributes_its_own_semantic_identity() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = package_contributing(
             &temp,
             "vendor/workflow",
@@ -3843,7 +3834,8 @@ template = true
 
     #[test]
     fn test_apply_profile_package_keeps_distinct_identities_in_one_registry_independent() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let first = package_contributing(
             &temp,
             "vendor/base",
@@ -3868,7 +3860,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_rejects_a_dependency_cycle_before_applying_anything() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &["workflow"]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
@@ -3892,7 +3886,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_reports_a_dependency_that_cannot_be_resolved() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         // Nothing sits beside the package under that name, so no route
         // resolves the dependency.
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["absent-base"]);
@@ -3918,7 +3914,9 @@ template = true
 
     #[test]
     fn test_apply_profile_rejects_a_dependency_version_mismatch_before_publication() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_v2(
             &temp,
             "vendor/base",
@@ -3959,7 +3957,9 @@ template = true
 
     #[test]
     fn test_apply_profile_rejects_a_package_outside_the_running_engine_range() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let package = package_v2(
             &temp,
             "vendor/future",
@@ -3989,7 +3989,9 @@ template = true
     #[test]
     fn test_apply_profile_rejects_incompatibilities_symmetrically_and_independently_of_selector_order(
     ) {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let left = package_v2(
             &temp,
             "vendor/left",
@@ -4029,7 +4031,9 @@ template = true
 
     #[test]
     fn test_apply_profile_excludes_a_previously_applied_package_from_incompatibility_checks() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let base = package_v2(
             &temp,
             "vendor/base",
@@ -4062,7 +4066,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_reports_no_work_for_an_applied_unchanged_closure() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
         executor.apply_profile_package(&dependant).unwrap();
@@ -4089,7 +4095,9 @@ template = true
 
     #[test]
     fn test_apply_profile_package_refuses_a_dependency_only_a_previous_application_supplied() {
-        let (temp, storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
         let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
         executor.apply_profile_package(&dependency).unwrap();
         // A dependant elsewhere in the worktree, with no `base` beside it. The
@@ -4113,7 +4121,8 @@ template = true
 
     #[test]
     fn test_resolve_profile_closure_reads_a_dependency_from_beside_the_declaring_package() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         // The package beside the declaring package is the one its declaration
         // means.
         let beside = package_declaring(&temp, "vendor/base", "base", &[]);
@@ -4132,7 +4141,8 @@ template = true
 
     #[test]
     fn test_resolve_profile_closure_reports_an_unreadable_package_beside_the_declaring_one() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
         // A directory that is there under the dependency's name and holds no
         // readable package: passing over it would answer with bytes the adopter
@@ -4159,7 +4169,8 @@ template = true
 
     #[test]
     fn test_resolve_profile_closure_passes_over_a_neighbour_declaring_another_profile() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         // The directory beside the declarant is named for the dependency but
         // holds a different package, so it is not that dependency and nothing
         // else answers either.
@@ -4180,7 +4191,9 @@ template = true
 
     #[test]
     fn test_resolve_profile_closure_of_a_package_declaring_nothing_is_that_package() {
-        let (_temp, _storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
 
         let closure = executor.resolve_profile_closure(&package).unwrap();
 
@@ -4195,7 +4208,10 @@ template = true
 
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
-        let (temp, storage, executor, package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let storage = executor.storage().clone();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         let prior_event = crate::test_utils::stamped_event(
             EventBody::draft_profile_lifecycle(
                 ProfileLifecycleOperation::Apply,
@@ -4333,7 +4349,8 @@ template = true
     /// that set — while the report itself writes nothing (REQ-01, REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_states_every_unpublishable_target_the_apply_refuses() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let targets = ["docs/first.txt", "docs/second.txt", "docs/third.txt"];
         let package = package_publishing_each(
             &temp,
@@ -4403,7 +4420,8 @@ template = true
     /// applying it (REQ-04).
     #[test]
     fn test_diff_profiles_from_sources_reports_a_package_this_repository_has_not_applied() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let package = package_publishing_each(
             &temp,
             "packages/unapplied",
@@ -4433,7 +4451,9 @@ template = true
     /// target, because both read one decision (REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_decides_the_targets_the_apply_it_precedes_publishes() {
-        let (temp, _storage, executor, fixture_package) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let fixture_package = package_read_from(&temp, FIXTURE_LOCATION);
         let selectors = [package_selector(&fixture_package)];
 
         let report = executor
@@ -4481,7 +4501,8 @@ template = true
     /// declaration for that same reason (REQ-01, REQ-02, REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_states_a_contested_declaration_the_apply_refuses() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let namespace = "contested-vocabulary";
         let base =
             package_contributing(&temp, "vendor/base", "base", namespace, "The base meaning.");
@@ -4547,7 +4568,8 @@ template = true
     /// publication the same declaration is unchanged (REQ-01, REQ-03).
     #[test]
     fn test_diff_profiles_from_sources_decides_the_declarations_the_apply_it_precedes_publishes() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let namespace = "published-vocabulary";
         let description = "The workflow meaning.";
         let package =
@@ -4584,7 +4606,8 @@ template = true
     /// never contests the package being applied.
     #[test]
     fn test_apply_profile_package_reapplies_a_changed_contribution_without_a_conflict() {
-        let (temp, _storage, executor, _fixture) = fixture();
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
         let namespace = "reviewed";
         executor
             .apply_profile_package(&package_contributing(
