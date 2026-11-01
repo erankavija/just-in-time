@@ -1,9 +1,9 @@
 //! Pure codec for `.jit/index.json` and the issue membership the issue files state.
 
-use super::{RepositoryImage, VirtualPath};
+use super::{canonical_json, RepositoryImage, VirtualPath};
 use crate::domain::identity::IssueId;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 /// The one on-disk repository-format version this binary accepts.
 pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 3;
@@ -76,11 +76,7 @@ impl RepositoryIndex {
         self.clone().validate().map_err(|error| {
             serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
         })?;
-        let fields = BTreeMap::from([
-            ("deleted_ids", serde_json::to_value(&self.deleted_ids)?),
-            ("schema_version", serde_json::to_value(self.schema_version)?),
-        ]);
-        serde_json::to_vec_pretty(&fields)
+        canonical_json(self, true)
     }
 
     /// Record one issue's tombstone idempotently.
