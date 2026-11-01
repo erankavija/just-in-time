@@ -249,9 +249,11 @@ EOF
 
 # Each script that takes the build lock bounds and announces its wait, and
 # no Cargo build starts without the lock. Every run happens in a repository this
-# test owns with every output overridden, because the benchmarks write before they
-# lock. The flock shim hands over at the script's first attempt, so a lock arriving
-# after the script started is deterministic on either side of that attempt.
+# test owns with every output overridden, because the benchmarks create directories
+# before they lock. The flock shim hands over at the script's first attempt, so a
+# lock arriving after the script started is deterministic on either side of that
+# attempt. A benchmark-rust-build.sh timeout also keeps its samples, and leaves no
+# target directory even after its first release.
 test_script_build_lock_wait() {
   local fixture="$scratch/script-lock" repo="$scratch/script-lock/repo" bound=0.01
   local lock="$fixture/build.lock" cargo_ran="$fixture/cargo-ran"
@@ -282,6 +284,11 @@ hand_over() {
 }
 [ ! -e "$SELFTEST_FIRST_ATTEMPT" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
 case "$SELFTEST_LOCK_ARRIVES" in
+  after-release)
+    [ "${1:-}" = "-u" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
+    "$SELFTEST_REAL_FLOCK" "$@"
+    hand_over
+    ;;
   before-attempt)
     hand_over
     exec "$SELFTEST_REAL_FLOCK" "$@"
@@ -313,7 +320,7 @@ EOF
   }
   # Runs <script> until its first flock attempt, takes the lock if it is free, and
   # lets the script finish.
-  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt>
+  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt|after-release>
     rm -f "$first_attempt" "$proceed"
     run_script "$1" "$fixture/shim:$fixture/bin" SELFTEST_LOCK_ARRIVES="$2" \
       SELFTEST_REAL_FLOCK="$real_flock" SELFTEST_FIRST_ATTEMPT="$first_attempt" \
@@ -333,6 +340,7 @@ EOF
     exec {arrival_fd}>&-
   }
   wait_is_announced() { grep -F "waiting up to ${bound}s" "$out" | grep -qF "$lock"; }
+  no_target_dir_remains() { ! compgen -G "$fixture/bench-target/target.*" >/dev/null; }
 
   echo
   echo "== script build lock: the wait is bounded, announced and builds nothing =="
@@ -341,6 +349,11 @@ EOF
     script="$here/$script"
     out="$fixture/$name.out"
     rm -f "$cargo_ran"
+    if [ "$name" = benchmark-rust-build.sh ]; then
+      mkdir -p "$fixture/bench-out/raw"
+      printf '{"sample":1}\n' | tee "$fixture/seed" "$fixture/bench-out/raw/clean-samples.jsonl" \
+        >"$fixture/bench-out/raw/rebuild-samples.jsonl"
+    fi
 
     exec {lock_fd}>"$lock"
     flock "$lock_fd"
@@ -354,6 +367,17 @@ EOF
     check "$name lock held throughout: no Cargo build starts" test ! -e "$cargo_ran"
     check "$name lock held throughout: the repository is unchanged" \
       test -z "$(git -C "$repo" status --porcelain)"
+    if [ "$name" = benchmark-rust-build.sh ]; then
+      check "$name lock held throughout: the clean samples are unchanged" \
+        cmp -s "$fixture/seed" "$fixture/bench-out/raw/clean-samples.jsonl"
+      check "$name lock held throughout: the rebuild samples are unchanged" \
+        cmp -s "$fixture/seed" "$fixture/bench-out/raw/rebuild-samples.jsonl"
+      check "$name lock held throughout: no target directory remains" no_target_dir_remains
+
+      run_with_arriving_lock "$script" after-release
+      check "$name lock taken after the first release: the wait passing exits 2" test "$rc" -eq 2
+      check "$name lock taken after the first release: no target directory remains" no_target_dir_remains
+    fi
 
     run_with_arriving_lock "$script" before-attempt
     check "$name lock arrives after the start: the wait is announced" wait_is_announced
