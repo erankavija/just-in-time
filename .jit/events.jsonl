@@ -22347,3 +22347,11 @@
 {"fields":["description"],"id":"5399a059-2828-43ba-ac11-4a892b49e857","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:23:42.936600440Z","type":"issue_updated","updated_by":"issue-update"}
 {"from":"ready","id":"e13df101-832c-4b79-a904-8aa9c5a88a84","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:23:55.877152100Z","to":"done","type":"issue_state_changed"}
 {"id":"9b02baf8-92c4-4229-afad-d447c928b1bb","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:23:55.877152100Z","type":"issue_completed"}
+{"gate_key":"code-review","id":"1a00abdf-9df8-4172-bc2a-af038cc2a016","issue_id":"a5fbec12-fa6a-4684-994b-5fd0652471e3","timestamp":"2026-11-01T18:26:35.098245887Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"d1c61b72-924a-430d-b2d5-ef2195d27c2b","issue_id":"a5fbec12-fa6a-4684-994b-5fd0652471e3","timestamp":"2026-11-01T18:27:10.602924953Z","to":"done","type":"issue_state_changed"}
+{"id":"97d7365a-edff-4d75-81ee-b157a49fe933","issue_id":"a5fbec12-fa6a-4684-994b-5fd0652471e3","timestamp":"2026-11-01T18:27:10.602924953Z","type":"issue_completed"}
+{"from":"backlog","id":"33d825e7-e2fc-4df2-9ab2-4bec4ec186a8","issue_id":"9e703435-4257-45f1-8c19-d1478d4b77b7","timestamp":"2026-11-01T18:27:10.701020661Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"b16ed677-9a8e-4ab6-b449-62a2dc6d4ba3","issue_id":"2ded6cd5-89a3-428a-abbf-1590089ed2ec","timestamp":"2026-11-01T18:27:33.982256484Z","to":"done","type":"issue_state_changed"}
+{"id":"336e0dab-e978-4847-9c36-235fd9234e05","issue_id":"2ded6cd5-89a3-428a-abbf-1590089ed2ec","timestamp":"2026-11-01T18:27:33.982256484Z","type":"issue_completed"}
+{"from":"in_progress","id":"216cb5ae-c9c1-40c2-a51d-a44d874682f4","issue_id":"03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1","timestamp":"2026-11-01T18:27:57.421171240Z","to":"done","type":"issue_state_changed"}
+{"id":"96fd727a-8f5a-4633-8045-0a9061ac7098","issue_id":"03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1","timestamp":"2026-11-01T18:27:57.421171240Z","type":"issue_completed"}
