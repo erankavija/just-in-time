@@ -67,7 +67,7 @@ cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
 
 # Fixtures select their own wrapper, so the host's cannot decide their outcome.
-unset RUSTC_WRAPPER
+unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_BUILD_RUSTC_WRAPPER CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER
 
 fail=0
 real_cargo_version=$(cargo --version)
@@ -167,8 +167,9 @@ nextest_runtime_failure_reported() {
 # The gate must reject any reporter version other than the provisioned pin
 # before it reaches fmt or another gate step. A cargo shim answers the real
 # cargo's version, captured up front because a PATH-scanning host cargo would
-# resolve back to this shim, and injects an older nextest version; any later
-# Cargo invocation is an assertion failure in the fixture itself.
+# resolve back to this shim, and injects an older nextest version; any Cargo
+# invocation after the wrapper probe's `check` is an assertion failure in the
+# fixture itself.
 test_wrong_nextest_version_fails_fast() {
   local fixture="$scratch/wrong-nextest-version"
   local fake_bin="$fixture/bin"
@@ -184,6 +185,9 @@ if [ "${1:-}" = "--version" ]; then
 fi
 if [ "${1:-}" = "nextest" ] && [ "${2:-}" = "--version" ]; then
   echo "cargo-nextest 0.9.132 (injected selftest fixture)"
+  exit 0
+fi
+if [ "${1:-}" = "check" ]; then
   exit 0
 fi
 printf '%s\n' "$*" >"$SELFTEST_UNEXPECTED_CARGO"
@@ -257,40 +261,47 @@ EOF
   check "build lock: timeout never starts the child" test ! -e "$fixture/ran"
 }
 
-# A wrapper that cannot run is the environment, whichever way it was selected
-# and whichever entry point reaches it. The sccache stand-in answers version
-# queries and fails every compile, as a daemon with a deleted TMPDIR does.
+# A wrapper that cannot run is the environment, whichever source selects it and
+# whichever entry point reaches it. Cargo here is real, because the probe compiles
+# through it. The sccache stand-in answers version queries and stdin input and
+# fails every compile, as a daemon with a deleted TMPDIR does.
 test_unrunnable_compiler_wrapper() {
   local fixture="$scratch/wrapper" out="$scratch/wrapper/gate.out" rc
-  local cargo_ran="$fixture/cargo-ran" missing="$fixture/missing-wrapper"
-  mkdir -p "$fixture/bin"
-  cat >"$fixture/bin/cargo" <<'EOF'
-#!/usr/bin/env bash
-if [ "${1:-}" = "--version" ]; then
-  echo "cargo 1.90.0 (selftest fixture)"
-  exit 0
-fi
-printf '%s\n' "$*" >"$SELFTEST_CARGO_RAN"
-EOF
-  cat >"$fixture/bin/sccache" <<'EOF'
+  local broken="$fixture/bin/sccache" missing="$fixture/missing-wrapper"
+  local passthrough="$fixture/passthrough-wrapper"
+  mkdir -p "$fixture/bin" "$fixture/cwd" "$fixture/configured/.cargo"
+  cat >"$broken" <<'EOF'
 #!/usr/bin/env bash
 case " $* " in
-  *" -vV "*) exec "$@" ;;
+  *" -vV "* | *" - "*) exec "$@" ;;
 esac
 echo "sccache: error: Failed to create temp dir" >&2
 exit 254
 EOF
-  cat >"$fixture/passthrough-wrapper" <<'EOF'
+  cat >"$passthrough" <<'EOF'
 #!/usr/bin/env bash
 exec "$@"
 EOF
-  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache" "$fixture/passthrough-wrapper"
+  chmod +x "$broken" "$passthrough"
+  printf '[build]\nrustc-wrapper = "%s"\n' "$missing" >"$fixture/configured/.cargo/config.toml"
+
+  gate_from() { # gate_from <cwd> <gate-args> [VAR=value ...]; sets rc
+    local cwd="$1" args="$2"
+    shift 2
+    # shellcheck disable=SC2086 # <gate-args> is a word list
+    (cd "$cwd" && env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 "$@" "$gate" $args) >"$out" 2>&1
+    rc=$?
+  }
+  focused_gate_from() { # focused_gate_from <cwd> [VAR=value ...]; sets rc
+    local cwd="$1"
+    shift
+    gate_from "$cwd" "--cargo --version" CARGO_CI_NO_SCCACHE=1 "$@"
+  }
+  no_cargo_command_ran() { ! grep -q '^cargo [0-9]' "$out"; }
 
   echo
   echo "== compiler wrapper: one that cannot run is an environment fault =="
-  env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 \
-    SELFTEST_CARGO_RAN="$cargo_ran" "$gate" >"$out" 2>&1
-  rc=$?
+  gate_from "$fixture/cwd" ""
   check "selected sccache fails compiles: the gate exits with the infrastructure status" \
     test "$rc" -eq 75
   check "selected sccache fails compiles: the diagnosis names the wrapper" \
@@ -299,24 +310,35 @@ EOF
     grep -qF "Failed to create temp dir" "$out"
   check "selected sccache fails compiles: no verdict on repository content" \
     test "$(grep -c 'repository content' "$out")" -eq 0
-  check "selected sccache fails compiles: no Cargo command runs" test ! -e "$cargo_ran"
+  check "selected sccache fails compiles: no gate step runs" \
+    test "$(grep -cE '^  [✓✗] ' "$out")" -eq 0
 
-  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
-    RUSTC_WRAPPER="$missing" SELFTEST_CARGO_RAN="$cargo_ran" \
-    "$gate" --cargo selftest >"$out" 2>&1
-  rc=$?
-  check "operator wrapper is missing: focused Cargo mode exits with the infrastructure status" \
+  focused_gate_from "$fixture/cwd" RUSTC_WRAPPER="$missing"
+  check "RUSTC_WRAPPER is missing: focused Cargo mode exits with the infrastructure status" \
     test "$rc" -eq 75
-  check "operator wrapper is missing: the diagnosis names the wrapper" \
+  check "RUSTC_WRAPPER is missing: the diagnosis names the wrapper" \
     grep -qF "compiler wrapper '$missing'" "$out"
-  check "operator wrapper is missing: Cargo never runs" test ! -e "$cargo_ran"
+  check "RUSTC_WRAPPER is missing: the Cargo command never runs" no_cargo_command_ran
 
-  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
-    RUSTC_WRAPPER="$fixture/passthrough-wrapper" SELFTEST_CARGO_RAN="$cargo_ran" \
-    "$gate" --cargo selftest >"$out" 2>&1
-  rc=$?
-  check "healthy wrapper: the check lets the Cargo command run" \
-    test "$rc" -eq 0 -a -e "$cargo_ran"
+  focused_gate_from "$fixture/cwd" RUSTC_WORKSPACE_WRAPPER="$broken"
+  check "RUSTC_WORKSPACE_WRAPPER fails compiles: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "RUSTC_WORKSPACE_WRAPPER fails compiles: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$broken'" "$out"
+
+  focused_gate_from "$fixture/configured"
+  check "build.rustc-wrapper is missing: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "build.rustc-wrapper is missing: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$missing'" "$out"
+
+  focused_gate_from "$fixture/cwd" RUSTC_WRAPPER="$passthrough" RUSTC_WORKSPACE_WRAPPER="$passthrough"
+  check "healthy wrappers: the Cargo command runs" \
+    test "$rc" -eq 0 -a "$(grep -c '^cargo [0-9]' "$out")" -eq 1
+
+  focused_gate_from "$fixture/cwd" RUSTFLAGS=--selftest-invalid-flag
+  check "a probe failure that outlives removing the wrappers is left to the steps" \
+    test "$rc" -eq 0 -a "$(grep -c 'infrastructure fault' "$out")" -eq 0
 }
 
 # --- fixture construction ----------------------------------------------------
