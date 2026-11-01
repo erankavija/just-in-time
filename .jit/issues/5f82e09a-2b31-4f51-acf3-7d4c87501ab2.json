@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T01:07:35.782511225Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
@@ -27,5 +27,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Refuse a profile apply over uncommitted target changes",
-  "updated_at": "2026-11-01T13:41:37.805592125Z"
+  "updated_at": "2026-11-01T13:49:48.189952112Z"
 }
