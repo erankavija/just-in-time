@@ -1,7 +1,7 @@
 //! Integration tests for cross-worktree issue visibility.
 //!
 //! These tests verify that issues can be read across git worktrees using
-//! the 3-tier fallback chain: local .jit → git HEAD → main worktree .jit
+//! the fallback chain: this checkout's store, then the primary checkout's store.
 
 use jit::test_cli::JitCli;
 
@@ -10,9 +10,11 @@ use jit::test_cli::JitCli;
 /// (jit:f52567ed REQ-05). The write policy's own behaviour is covered by
 /// `linked_checkout_write_policy_tests`.
 #[test]
-fn test_issue_show_reads_from_git_in_secondary_worktree() {
+fn test_issue_show_reads_committed_issue_from_linked_checkout_store() {
     let (primary, linked) = JitCli::linked_checkouts().unwrap();
-    let issue_id = primary.create_issue(["--title", "Issue in Git"]).unwrap();
+    let issue_id = primary
+        .create_issue(["--title", "Committed Issue"])
+        .unwrap();
     primary.commit("Add issue").unwrap();
     linked.git(["merge", "-q", "--ff-only", "main"]).unwrap();
     assert!(linked
@@ -23,7 +25,7 @@ fn test_issue_show_reads_from_git_in_secondary_worktree() {
 
     let loaded = linked.run_json(["issue", "show", &issue_id]).unwrap();
 
-    assert_eq!(loaded["title"].as_str().unwrap(), "Issue in Git");
+    assert_eq!(loaded["title"].as_str().unwrap(), "Committed Issue");
 }
 
 #[test]
@@ -68,7 +70,7 @@ fn test_query_all_shows_issues_from_all_sources() {
     let id_c = jit::test_cli::created_issue_id(&serde_json::from_slice(&created_c.stdout).unwrap())
         .unwrap();
 
-    // Query all from secondary - should see A (git), B (main), C (local)
+    // Query all from secondary - should see A (merged), B (primary), C (local)
     let result = linked.run_json(["query", "all"]).unwrap();
     let issues_array = result["issues"].as_array().unwrap();
 
@@ -81,7 +83,7 @@ fn test_query_all_shows_issues_from_all_sources() {
 
     assert!(
         ids.contains(&id_a.as_str()),
-        "Should include issue A from git"
+        "Should include issue A from the local store"
     );
     assert!(
         ids.contains(&id_b.as_str()),
@@ -135,7 +137,7 @@ fn test_partial_id_resolution_across_worktrees() {
         .unwrap()
         .success());
 
-    // Should resolve partial ID from git
+    // Should resolve partial ID from the merged record
     let loaded = linked.run_json(["issue", "show", partial_id]).unwrap();
 
     assert_eq!(loaded["id"].as_str().unwrap(), full_id);
@@ -143,7 +145,7 @@ fn test_partial_id_resolution_across_worktrees() {
 }
 
 #[test]
-fn test_local_overrides_git_and_main() {
+fn test_local_overrides_main() {
     let (primary, linked) = JitCli::linked_checkouts().unwrap();
     let issue_id = primary.create_issue(["--title", "Original"]).unwrap();
     primary.commit("Add original issue").unwrap();
@@ -170,7 +172,7 @@ fn test_local_overrides_git_and_main() {
         .unwrap()
         .success());
 
-    // Should read modified version (local overrides git)
+    // Should read modified version (local overrides primary)
     let loaded = linked.run_json(["issue", "show", &issue_id]).unwrap();
 
     assert_eq!(loaded["title"].as_str().unwrap(), "Modified in Secondary");
@@ -185,6 +187,38 @@ fn test_local_overrides_git_and_main() {
 // longer a rule of its own: it is one governed case of the linked-checkout write
 // policy, covered under every stance by `linked_checkout_write_policy_tests`
 // (jit:1b6925a9).
+
+#[test]
+fn test_issue_creates_on_two_branches_merge_without_an_index_conflict() {
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let primary_id = primary.create_issue(["-t", "Primary"]).unwrap();
+    primary.commit("Primary issue").unwrap();
+    let created = linked
+        .command_with_env(
+            ["issue", "create", "-t", "Linked", "--json"],
+            [crate::ALLOW_LINKED_WRITES],
+        )
+        .output()
+        .unwrap();
+    assert!(created.status.success(), "{created:?}");
+    let linked_id =
+        jit::test_cli::created_issue_id(&serde_json::from_slice(&created.stdout).unwrap()).unwrap();
+    linked.commit("Linked issue").unwrap();
+    let branch = linked.git(["branch", "--show-current"]).unwrap();
+
+    primary
+        .git(["merge", "-q", "--no-edit", branch.trim()])
+        .unwrap();
+
+    let listed = primary.run_json(["query", "all"]).unwrap();
+    let ids: Vec<&str> = listed["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|issue| issue["id"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&primary_id.as_str()) && ids.contains(&linked_id.as_str()));
+}
 
 #[test]
 fn test_deletion_requires_env_var() {

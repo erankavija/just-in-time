@@ -203,8 +203,7 @@ jit worktree store-divergence [OPTIONS]
 #### Description
 
 Each checkout owns a store under its own `.jit/`. Issue records are read with a
-fallback across the local store, version-control history, and the primary
-checkout, but event history has no such fallback, so a linked checkout's events
+fallback from the local store to the primary checkout, but event history has no such fallback, so a linked checkout's events
 are visible only from inside it. This check compares the two stores as they
 physically sit — no fallback, no aggregation — and names every issue record and
 every event record they hold differently.

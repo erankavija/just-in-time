@@ -2067,17 +2067,11 @@ pub(crate) fn validation_overlay(
     )?)
 }
 
-/// Parse the active issue set from the captured index and issue records.
+/// Parse the active issue set from the captured listing and issue records, in id order.
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let index_path = VirtualPath::INDEX;
-    let index_bytes = image
-        .file_bytes(&index_path)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-    let index = crate::storage::json::parse_repository_index(index_bytes)?;
-    let mut issues = index
-        .all_ids
+    crate::repository_state::captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id);
@@ -2086,20 +2080,18 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
                 RepositoryEntry::Absent => {
                     return Err(crate::storage::IssueNotFoundError::new(id.clone()).into())
                 }
-                _ => return Err(anyhow!("indexed issue {id} is not an ordinary file")),
+                _ => return Err(anyhow!("issue {id} is not an ordinary file")),
             };
             let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
             if issue.id != *id {
                 return Err(anyhow!(
-                    "indexed issue {id} contains mismatched embedded id {}",
+                    "issue {id} contains mismatched embedded id {}",
                     issue.id
                 ));
             }
             Ok(issue)
         })
-        .collect::<Result<Vec<_>>>()?;
-    issues.sort_by(|left, right| left.id.cmp(&right.id));
-    Ok(issues)
+        .collect()
 }
 
 /// Add the gate-run root and its complete listing to `spec`, then each run

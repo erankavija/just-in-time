@@ -184,9 +184,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         return match index_error {
             RepositoryIndexError::Parse(_) => ErrorCode::ParseError,
             RepositoryIndexError::UnsupportedVersion { .. } => ErrorCode::RepositoryFormatTooNew,
-            RepositoryIndexError::DuplicateActive(_)
-            | RepositoryIndexError::DuplicateDeleted(_)
-            | RepositoryIndexError::ActiveDeletedOverlap(_) => ErrorCode::ValidationFailed,
+            RepositoryIndexError::DuplicateDeleted(_)
+            | RepositoryIndexError::IssueFileName(_)
+            | RepositoryIndexError::IssuesListingNotCaptured => ErrorCode::ValidationFailed,
         };
     }
 

@@ -1107,11 +1107,11 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 - labels that are not `namespace:value`,
 - gates not present in the gate registry.
 
-On success, issues, index membership, events, and dependency edges publish as one
+On success, issues, events, and dependency edges publish as one
 redo record.
 
 **Dry-run.** `--dry-run` performs the same native validation and preserves exit
-code `2` for validation errors, but allocates no ids and writes no issues, index,
+code `2` for validation errors, but allocates no ids and writes no issues,
 events, or edges. Human output reports counts. JSON returns:
 
 ```json

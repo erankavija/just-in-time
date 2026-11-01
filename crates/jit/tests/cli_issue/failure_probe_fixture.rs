@@ -454,14 +454,6 @@ impl FailureFixture {
                     serde_json::to_vec(&issue).unwrap(),
                 )
                 .unwrap();
-                let index_path = self.root().join(".jit/index.json");
-                let mut index: serde_json::Value =
-                    serde_json::from_slice(&std::fs::read(&index_path).unwrap()).unwrap();
-                index["all_ids"]
-                    .as_array_mut()
-                    .unwrap()
-                    .push(serde_json::json!(issue.id));
-                std::fs::write(index_path, serde_json::to_vec(&index).unwrap()).unwrap();
             }
             SetupStep::ActiveClaimIndex => {
                 let created = self.require_setup_jit(&[

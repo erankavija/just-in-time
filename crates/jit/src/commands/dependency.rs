@@ -1174,24 +1174,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .is_empty());
     }
 
-    /// Mark `id` deleted in the fixture's index, as a concurrent deletion leaves
-    /// it.
-    fn mark_index_deleted(storage: &InMemoryStorage, id: &IssueId) {
-        let bytes = storage
-            .read_repo_file(".jit/index.json")
-            .unwrap()
-            .expect("fixture index exists");
-        let mut index = crate::repository_state::RepositoryIndex::parse(bytes.as_bytes()).unwrap();
-        index.mark_deleted(id.clone());
-        crate::commands::test_helpers::seed_repo_file(
-            storage,
-            ".jit/index.json",
-            std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
-        );
-    }
-
     #[test]
-    fn test_remove_dependency_removes_a_target_the_index_marks_deleted() {
+    fn test_remove_dependency_removes_a_target_whose_record_is_gone() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::test_utils::fixture_issue("dep".into(), String::new());
@@ -1200,8 +1184,6 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         source.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_1111_1111);
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
-        crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
-        mark_index_deleted(&storage, &dependency.id);
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         executor

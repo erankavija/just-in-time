@@ -14,12 +14,8 @@
 //! check reporting nothing. Splitting them would prove each phase against a
 //! different divergence than the one before it.
 //!
-//! Two points in the procedure gave no usable instruction when this was first
-//! run — the index conflict a two-sided merge raises, and the second merge the
-//! confirming re-run needs — and both were defects in the page rather than in
-//! the check. The page now instructs them (jit:62518095), so the sequence below
-//! is the documented one step for step; each such step names the page step it
-//! executes.
+//! The sequence below is the documented one step for step; each such step names
+//! the page step it executes.
 
 use crate::linked_checkout_write_policy_tests::durable_events;
 use jit::domain::store_divergence::DivergenceClass;
@@ -29,16 +25,6 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 const WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
-
-/// Every path git left unmerged in `checkout`; empty once no merge is pending.
-fn unmerged_paths(checkout: &JitCli) -> BTreeSet<String> {
-    checkout
-        .git(["diff", "--name-only", "--diff-filter=U"])
-        .unwrap()
-        .lines()
-        .map(str::to_owned)
-        .collect()
-}
 
 /// The store `checkout` owns.
 fn store_of(checkout: &Path) -> PathBuf {
@@ -150,86 +136,8 @@ fn issue_record_ids(checkout: &Path) -> BTreeSet<String> {
         .collect()
 }
 
-/// The id set `checkout`'s committed index claims the store holds.
-fn indexed_ids(checkout: &Path) -> BTreeSet<String> {
-    let path = store_of(checkout).join("index.json");
-    let raw = std::fs::read_to_string(&path)
-        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-    let index: Value = serde_json::from_str(&raw)
-        .unwrap_or_else(|error| panic!("the index is one JSON document ({error}): {raw}"));
-    index["all_ids"]
-        .as_array()
-        .unwrap_or_else(|| panic!("the index carries its id collection: {index}"))
-        .iter()
-        .map(|id| {
-            id.as_str()
-                .unwrap_or_else(|| panic!("every indexed id is a string: {index}"))
-                .to_owned()
-        })
-        .collect()
-}
-
-/// The `.jit/index.json` content git staged for `stage` of the pending merge.
-fn index_stage(checkout: &JitCli, stage: u8) -> Value {
-    let specifier = format!(":{stage}:.jit/index.json");
-    let raw = checkout.git(["show", &specifier]).unwrap();
-    serde_json::from_str(&raw)
-        .unwrap_or_else(|error| panic!("merge stage {stage} of the index parses ({error}): {raw}"))
-}
-
-/// Resolve a conflicted `.jit/index.json` by keeping every record either side
-/// indexed.
-///
-/// This is the resolution the procedure's step 4 instructs: a merge of two
-/// stores that each created an issue conflicts here rather than in
-/// `.jit/issues/`, every time, because both sides inserted an id into one small
-/// array over a common base, and the union of the two sides is what the
-/// finding-class table's one-sided rows already decided
-/// to keep. The page also stops routing this conflict to `jit validate --fix`,
-/// which fails to parse the conflicted file and, once it is resolved to one
-/// side alone, reports that no fixes were needed while `jit validate` rejects
-/// the same repository for the index disagreeing with the issue files
-/// (jit:62518095).
-///
-/// The union is read out of git's own merge stages rather than reconstructed,
-/// so the resolution inherits whatever the two sides actually indexed
-/// (jit:86ec2c50).
-fn resolve_index_conflict_keeping_every_record(checkout: &JitCli) {
-    let ours = index_stage(checkout, 2);
-    let theirs = index_stage(checkout, 3);
-    assert_eq!(
-        ours["schema_version"], theirs["schema_version"],
-        "both sides of a store divergence carry one repository format version; \
-         ours: {ours}, theirs: {theirs}"
-    );
-    let side_ids = |side: &Value, field: &str| -> BTreeSet<String> {
-        side[field]
-            .as_array()
-            .unwrap_or_else(|| panic!("an index side carries {field}: {side}"))
-            .iter()
-            .map(|id| {
-                id.as_str()
-                    .unwrap_or_else(|| panic!("every id under {field} is a string: {side}"))
-                    .to_owned()
-            })
-            .collect()
-    };
-    let union =
-        |field: &str| -> BTreeSet<String> { &side_ids(&ours, field) | &side_ids(&theirs, field) };
-    let resolved = serde_json::json!({
-        "all_ids": union("all_ids"),
-        "deleted_ids": union("deleted_ids"),
-        "schema_version": ours["schema_version"],
-    });
-    std::fs::write(
-        store_of(checkout.root()).join("index.json"),
-        serde_json::to_vec_pretty(&resolved).expect("the resolved index serializes"),
-    )
-    .expect("write the resolved index");
-}
-
 /// Stage exactly what the procedure's commit steps stage in `checkout`: the
-/// records the check reports and the index that has to agree with them.
+/// records the check reports and the index holding their tombstones.
 ///
 /// The page names these paths rather than `.jit/` wholesale, because a
 /// repository that has not gitignored the machine-local runtime files would
@@ -439,36 +347,16 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
 
     // Procedure step 4: merge the checkout's branch into the branch being kept,
     // from the primary. This is the step that actually preserves a record.
-    let merge = primary.git([
-        "merge",
-        &checkout_branch,
-        "-m",
-        "merge the linked checkout's records",
-    ]);
-    let conflicted = unmerged_paths(&primary);
-    assert!(
-        conflicted.iter().all(|path| path == ".jit/index.json"),
-        "one-sided findings must merge without a decision in the records themselves — the event \
-         log merges by union and each issue is its own file; unmerged: {conflicted:?}, merge \
-         output: {}",
-        merge
-            .as_ref()
-            .err()
-            .map_or_else(String::new, |error| error.to_string())
-    );
-    if !conflicted.is_empty() {
-        // Step 4's index resolution; see
-        // `resolve_index_conflict_keeping_every_record`.
-        resolve_index_conflict_keeping_every_record(&primary);
-        stage_documented_store_paths(&primary);
-        primary.git(["commit", "-q", "--no-edit"]).unwrap();
-    }
+    primary
+        .git([
+            "merge",
+            &checkout_branch,
+            "-m",
+            "merge the linked checkout's records",
+        ])
+        .unwrap();
 
-    // The recovered store validates as it stands. This is what makes the index
-    // resolution above a repair rather than a patch that merely parses: plain
-    // validation is the check that rejects an index disagreeing with the issue
-    // files, so its passing here says the union kept exactly the records the
-    // merge preserved.
+    // The recovered store validates as it stands.
     let validation = primary.command(["validate"]).output().unwrap();
     assert!(
         validation.status.success(),
@@ -488,11 +376,6 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
         issue_record_ids(primary.root()),
         expected_records,
         "the merged store must hold the shared record and both checkouts' own"
-    );
-    assert_eq!(
-        indexed_ids(primary.root()),
-        expected_records,
-        "the merged store's index must claim exactly the records the merge preserved"
     );
     assert_eq!(
         issue_record(primary.root(), &primary_issue),

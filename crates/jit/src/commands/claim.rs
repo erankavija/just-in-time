@@ -1059,15 +1059,6 @@ mod tests {
             .repository_layout()?
             .resolve(&crate::repository_state::VirtualPath::issue_record(id))?;
         std::fs::write(issue_path, issue_bytes)?;
-
-        let index_path = storage.root().join("index.json");
-        let mut index =
-            crate::repository_state::RepositoryIndex::parse(&std::fs::read(&index_path)?)?;
-        index.all_ids.push(id.clone());
-        index.all_ids.sort();
-        index.all_ids.dedup();
-        index.deleted_ids.retain(|deleted| deleted != id);
-        std::fs::write(index_path, index.to_pretty_bytes()?)?;
         Ok(id.clone())
     }
 

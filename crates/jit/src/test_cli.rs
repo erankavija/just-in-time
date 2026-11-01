@@ -226,14 +226,6 @@ pub fn seed_ambiguous_prefix(cli: &JitCli) -> Result<(String, Vec<String>)> {
             serde_json::to_string_pretty(&issue)?,
         )?;
     }
-    let index_path = cli.root().join(".jit").join("index.json");
-    let mut index: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&index_path)?)?;
-    index["all_ids"]
-        .as_array_mut()
-        .context("index has no `all_ids` array")?
-        .extend(IDS.iter().map(|id| serde_json::json!(id)));
-    std::fs::write(&index_path, serde_json::to_string_pretty(&index)?)?;
     Ok((PREFIX.to_string(), IDS.map(str::to_string).to_vec()))
 }
 

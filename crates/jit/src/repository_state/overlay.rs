@@ -94,6 +94,31 @@ pub fn apply_overlay(
     )?)
 }
 
+/// The issue ids `base`'s listing states with `overrides` applied over it.
+pub(crate) fn overlaid_issue_ids(
+    base: &RepositoryImage,
+    overrides: &BTreeMap<VirtualPath, Option<Vec<u8>>>,
+) -> Result<Vec<crate::domain::identity::IssueId>, super::RepositoryIndexError> {
+    let mut names = base
+        .directory_listings()
+        .get(&VirtualPath::ISSUES)
+        .ok_or(super::RepositoryIndexError::IssuesListingNotCaptured)?
+        .names()
+        .clone();
+    for (path, value) in overrides {
+        match parent_and_name(path) {
+            Some((parent, name)) if parent == VirtualPath::ISSUES => {
+                match value {
+                    Some(_) => names.insert(name),
+                    None => names.remove(&name),
+                };
+            }
+            _ => {}
+        }
+    }
+    super::listed_issue_ids(&names)
+}
+
 /// The overrides `actions` project to over `base`: written bytes, deletions'
 /// absence, and the event log as its append leaves it.
 pub fn action_overrides<'a>(

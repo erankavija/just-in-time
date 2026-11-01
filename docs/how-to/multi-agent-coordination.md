@@ -181,7 +181,8 @@ When merging branches with overlapping issue edits:
 git merge main
 
 # Resolve the conflicts in the files themselves: git marks the .jit/issues/*.json
-# both branches edited, and .jit/index.json whenever both added issues.
+# both branches edited, and .jit/index.json when both deleted issues; keep every
+# id either side lists under deleted_ids.
 # `jit validate --fix` is not a resolver — it parses no file still holding
 # conflict markers.
 git add .jit/issues/ .jit/events.jsonl .jit/index.json
@@ -201,8 +202,7 @@ Stores](#divergent-checkout-stores) below for that starting point.
 
 ```mermaid
 flowchart TD
-    local["1. Local .jit/<br/>Issues modified in this worktree"] --> head["2. Git HEAD<br/>Committed issues (canonical)"]
-    head --> main["3. Main .jit/<br/>Uncommitted issues from the main worktree"]
+    local["1. This checkout's .jit/<br/>Everything this checkout holds"] --> main["2. Primary checkout's .jit/<br/>Issues only the primary holds"]
 ```
 
 ### Reading Issues
@@ -403,39 +403,27 @@ do the actual merging; this procedure only sequences them safely.
    retained branch is what survives a later `git branch -D` of the
    checkout's own branch, which committing alone (step 2) did not.
 
-   Expect a conflict in `.jit/index.json` even when no record conflicts: each
-   side inserted its own ids into the same list over one common base, so git
-   leaves the decision to you every time. Resolve it to the union of the ids
-   present under `.jit/issues/` after the merge — keep every id from both
-   sides of the conflict, minding the commas the markers hid — which is what
-   step 3's one-sided rows already decided: keep both records. Conflict
-   markers inside a record under `.jit/issues/` mean the same id was edited on
-   both sides; resolve those files with the decision from step 3. Then stage
-   every file you resolved — the same record paths step 2 stages, for the same
-   reason — and commit the merge:
+   Records only one side holds merge without a decision: each is its own file,
+   and membership is the files themselves. `.jit/index.json` conflicts only when
+   both sides deleted issues; keep every id either side lists under
+   `deleted_ids`, minding the commas the markers hid. Conflict markers inside a
+   record under `.jit/issues/` mean the same id was edited on both sides;
+   resolve those files with the decision from step 3. Then stage every file you
+   resolved — the same record paths step 2 stages, for the same reason — and
+   commit the merge:
    ```bash
    git merge <linked-branch>
-   # Edit .jit/index.json: keep every id both sides list.
    # Edit any .jit/issues/<id>.json git marked, per step 3.
+   # Edit .jit/index.json if marked: keep every id under deleted_ids.
    git add .jit/issues/ .jit/events.jsonl .jit/index.json && git commit --no-edit
    ```
 
    Verify with plain `jit validate`, not `jit validate --fix`: `--fix` parses
    no file that still holds conflict markers, and where it applies no fix it
-   reports `No fixes needed` and exits 0 without re-checking the repository,
-   so an index resolved to one side alone passes it while the store is still
-   inconsistent. Plain `jit validate` names that disagreement —
-   `issue files disagree with .jit/index.json`, listing the ids it expected
-   against the record files it found — and the absence of *that* failure is
-   the confirmation, not a zero exit code: other rules fail the same run for
-   reasons this recovery did not cause, such as issues reported as isolated
-   in a repository whose graph has no edges yet. Where the repository has no
-   such finding of its own, the union-resolved store validates as it stands.
-
-   Until the index agrees with the record files, the records you just
-   preserved are invisible to everything that reads through it: `jit list`
-   omits them and `jit issue show <id>` answers that the id is not found,
-   with the record file sitting right there.
+   reports `No fixes needed` and exits 0 without re-checking the repository.
+   Other rules can fail the same run for reasons this recovery did not cause,
+   such as issues reported as isolated in a repository whose graph has no edges
+   yet; read the findings rather than the exit code.
 
    A `conflicting` finding that merges silently — the two edits touched
    different lines, so git needed no markers — still needs the decision from

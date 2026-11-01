@@ -17,7 +17,7 @@ where each comes up.
 ```
 .jit/
 ├── .gitignore        # Engine-owned ignore entries for the data root
-├── index.json        # Issue index for fast queries; carries the format version
+├── index.json        # Format version and deletion tombstones
 ├── config.toml       # Repository configuration
 ├── gates.toml        # Gate registry definitions
 ├── templates.toml    # Graph template registry
@@ -397,8 +397,17 @@ The repository's on-disk **format version** is the `schema_version` field in
 `index.json`:
 
 ```json
-{ "schema_version": 2, "all_ids": [], "deleted_ids": [] }
+{ "schema_version": 3, "deleted_ids": [] }
 ```
+
+Issue membership is the `.json` files under `issues/`. `deleted_ids` holds
+tombstones, which let a linked checkout's delete hide the primary checkout's
+file. The first store that mentions an id decides, and within a store a file
+wins over a tombstone.
+
+A format 2 index also carries `all_ids`. This binary ignores that field and
+drops it when a delete rewrites the index, keeping the marker at 2 until the
+repository's index is rewritten to format 3.
 
 This single marker is the authoritative compatibility check, bumped whenever an
 on-disk layout or interpretation changes. On startup every command that opens

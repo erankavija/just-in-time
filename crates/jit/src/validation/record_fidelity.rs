@@ -6,8 +6,8 @@ use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
 use crate::domain::{GateRunResult, Issue};
 use crate::repository_state::{
-    canonical_json, captured_gate_run_ids, serialize_event, serialize_gate_run, serialize_issue,
-    RepositoryImage, RepositoryIndex, VirtualPath,
+    canonical_json, captured_gate_run_ids, captured_issue_ids, serialize_event, serialize_gate_run,
+    serialize_issue, RepositoryImage, RepositoryIndex, VirtualPath, SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use anyhow::Result;
 use serde_json::Value;
@@ -31,10 +31,8 @@ pub(crate) fn record_drift(
             .map(|reason| format!("{}: {reason}", path.repository_relative()))
     };
     let index = image.file_bytes(&VirtualPath::INDEX)?;
-    let index_ids = index
-        .and_then(|bytes| RepositoryIndex::parse(bytes).ok())
-        .map_or_else(Vec::new, |index| index.all_ids);
-    let issues = index_ids
+    let issues = captured_issue_ids(image)
+        .unwrap_or_default()
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id);
@@ -72,8 +70,11 @@ pub(crate) fn record_drift(
 }
 
 fn index_drift(bytes: &[u8]) -> Result<Option<String>> {
-    let written = RepositoryIndex::parse(bytes)?.to_pretty_bytes()?;
-    Ok((written != bytes).then(|| "stored bytes are not canonical".to_string()))
+    let index = RepositoryIndex::parse(bytes)?;
+    // An older format is read as-is until its explicit rewrite.
+    let current = index.schema_version == SUPPORTED_INDEX_SCHEMA_VERSION;
+    let written = index.to_pretty_bytes()?;
+    Ok((current && written != bytes).then(|| "stored bytes are not canonical".to_string()))
 }
 
 /// Canonical rather than byte-exact: key order is not part of an issue record.
