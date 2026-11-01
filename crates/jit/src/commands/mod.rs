@@ -846,6 +846,7 @@ enum CapturedLifecycleMutation {
     Release {
         issue_id: IssueId,
         reason: String,
+        released_by: crate::domain::Assignee,
     },
     AutoReady {
         issue_id: IssueId,
@@ -2780,9 +2781,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let released_by = claim::resolve_release_actor(self.require_layout()?.worktree_root())?;
         self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
             issue_id: issue_id.clone(),
             reason,
+            released_by,
         })?;
         Ok(())
     }
@@ -3220,7 +3223,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                             update = Some(issue);
                         }
                     }
-                    CapturedLifecycleMutation::Release { reason, .. } => {
+                    CapturedLifecycleMutation::Release {
+                        reason,
+                        released_by,
+                        ..
+                    } => {
                         if let Some(assignee) = record.assignee.take() {
                             events.push((
                                 4,
@@ -3228,6 +3235,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                                     record.id.clone(),
                                     assignee,
                                     reason.clone(),
+                                    released_by.clone(),
                                 ),
                             ));
                             if update.is_none() {
@@ -3424,6 +3432,49 @@ impl<S: IssueStore> CommandExecutor<S> {
         });
 
         Ok(has_active_lease)
+    }
+
+    /// Refuse, in `strict` mode, a write to any of `targets` another agent holds an
+    /// active lease on, naming each; `warn` mode answers the same findings as
+    /// warnings.
+    ///
+    /// Named `@/inv/convention-convergence` exception to
+    /// [`Self::require_active_lease`]: `dep add`, `dep rm`, `doc add`, `doc remove`
+    /// and `issue update --filter` routinely touch issues nobody leases, such as
+    /// containers, so they refuse only another agent's lease. Converging the two
+    /// rules is an open question on jit:17fbcf25.
+    pub(crate) fn refuse_foreign_leases(
+        &self,
+        targets: &[IssueId],
+    ) -> Result<Vec<(IssueId, String)>> {
+        use crate::agent_config::resolve_agent_id;
+        use crate::config::EnforcementMode;
+        use crate::storage::claim_coordinator::ClaimsIndex;
+
+        let mode = self.cached_config()?.enforcement_mode();
+        if mode == EnforcementMode::Off {
+            return Ok(Vec::new());
+        }
+        let claims = ClaimsIndex::load(self.require_worktree_paths()?)?;
+        let agent = resolve_agent_id(None).ok();
+        let now = chrono::Utc::now();
+        let findings = targets
+            .iter()
+            .filter_map(|id| {
+                claims
+                    .conflicting_lease(id, agent.as_ref(), now)
+                    .map(|lease| (id.clone(), format!("{id} is leased by {}", lease.agent_id)))
+            })
+            .collect::<Vec<_>>();
+        if mode == EnforcementMode::Strict && !findings.is_empty() {
+            let named = findings
+                .iter()
+                .map(|(_, finding)| finding.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            anyhow::bail!("Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end.");
+        }
+        Ok(findings)
     }
 
     /// Require an active lease for the given issue, respecting enforcement mode.

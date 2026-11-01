@@ -3146,6 +3146,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     executor.add_dependencies_with_policy(&from_id, &to_ids, policy)
                 }) {
                     Ok(result) => {
+                        for warning in &result.warnings {
+                            output_ctx.print_warning(warning)?;
+                        }
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -3221,6 +3224,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
                     |(to_ids, unmatched)| {
                         let result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        for warning in &result.warnings {
+                            output_ctx.print_warning(warning)?;
+                        }
                         let not_found = result
                             .not_found
                             .iter()
@@ -4992,7 +4998,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DocCommands::Remove { id, path } => {
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.remove_document_reference(&id, &path)?;
+                let (result, warnings) = executor.remove_document_reference(&id, &path)?;
+                let output_ctx = OutputContext::new(quiet, json);
+                for warning in warnings {
+                    output_ctx.print_warning(&warning)?;
+                }
 
                 if json {
                     use jit::output::JsonOutput;

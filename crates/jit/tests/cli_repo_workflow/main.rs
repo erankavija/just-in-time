@@ -23,6 +23,7 @@ mod init_item_kinds_golden;
 mod init_tests;
 mod integration_schema;
 mod integration_test;
+mod lease_enforcement_tests;
 mod linked_checkout_write_policy_tests;
 mod lock_contention_tests;
 mod profile_acceptance_tests;

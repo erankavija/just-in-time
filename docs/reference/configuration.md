@@ -485,14 +485,27 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 
 | Value | Description |
 |-------|-------------|
-| `"strict"` | Require an active lease for structural issue operations; fail without one |
-| `"warn"` | Warn if no lease but allow operation |
+| `"strict"` | Refuse a structural issue operation without an active lease of your own. `jit dep add`, `jit dep rm`, `jit doc add`, `jit doc remove`, and `jit issue update --filter` refuse only when another agent holds an active lease |
+| `"warn"` | Warn where `strict` would refuse, and allow the operation |
 | `"off"` | No lease enforcement |
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
 with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
 section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; environment variables do not change it.
+
+The lighter rule on those five commands is a named exception to one lease rule:
+they routinely touch issues nobody leases, such as containers. `jit issue
+update --filter` checks every matched issue and refuses the whole operation
+before writing, naming the leased ones.
+
+Some writes reach a leased issue without either check: `jit issue release`
+(timeout recovery with a required reason; its event names who released),
+`jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
+dependents when a dependency is deleted, the derived repair and transitive
+reduction of `jit validate --fix` (its type fix does refuse), `jit archive
+--execute` on a terminal target, and `jit recover`, which replays what already
+committed.
 
 #### `write_policy`
 

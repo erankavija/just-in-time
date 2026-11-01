@@ -67,6 +67,8 @@ pub struct DependenciesAddResult {
     pub added: Vec<IssueId>,
     pub already_exist: Vec<IssueId>,
     pub skipped: Vec<(IssueId, String)>, // (id, reason)
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 /// Result of removing multiple dependencies
@@ -74,6 +76,8 @@ pub struct DependenciesAddResult {
 pub struct DependenciesRemoveResult {
     pub removed: Vec<IssueId>,
     pub not_found: Vec<IssueId>,
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -199,12 +203,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
+        let warnings = self.refuse_foreign_leases(std::slice::from_ref(issue_id))?;
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
             issue_id: issue_id.clone(),
             dependency_ids: dep_ids.to_vec(),
             policy,
         })? {
-            CapturedDependencyOutcome::Batch(result) => Ok(result),
+            CapturedDependencyOutcome::Batch(result) => Ok(DependenciesAddResult {
+                warnings: warnings.into_iter().map(|(_, warning)| warning).collect(),
+                ..result
+            }),
             _ => unreachable!("batch dependency request returns a batch outcome"),
         }
     }
@@ -434,13 +442,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Ok(DependenciesRemoveResult::default());
         }
+        let warnings = self.refuse_foreign_leases(std::slice::from_ref(issue_id))?;
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
                 issue_id: issue_id.clone(),
                 dependency_ids: dep_ids.to_vec(),
             },
         )? {
-            CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
+            CapturedDependencyOutcome::RemovedBatch(result) => Ok(DependenciesRemoveResult {
+                warnings: warnings.into_iter().map(|(_, warning)| warning).collect(),
+                ..result
+            }),
             _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
     }
@@ -811,6 +823,7 @@ fn derive_batch_dependency_add(
             added,
             already_exist,
             skipped,
+            warnings: Vec::new(),
         }),
         intents,
         error_after_apply: None,

@@ -285,7 +285,7 @@ fn sanitize_actor(name: Option<&str>) -> Option<String> {
 /// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
 /// configured agent id nor a git `user.name` is available. A release must be
 /// attributable, so no placeholder identity is invented.
-fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee> {
+pub(super) fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domain::Assignee> {
     use crate::agent_config::resolve_agent_id;
 
     if let Ok(agent) = resolve_agent_id(None) {

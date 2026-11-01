@@ -1269,6 +1269,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                             old_type, new_type, issue_id
                         ));
                     } else {
+                        messages.extend(
+                            self.refuse_foreign_leases(std::slice::from_ref(issue_id))?
+                                .into_iter()
+                                .map(|(_, warning)| warning),
+                        );
                         self.apply_type_fix(issue_id, old_type, new_type)?;
                         messages.push(format!(
                             "Replaced type '{}' with '{}' for issue {}",

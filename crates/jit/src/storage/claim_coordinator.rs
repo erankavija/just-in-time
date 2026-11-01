@@ -224,6 +224,22 @@ impl ClaimsIndex {
             .collect()
     }
 
+    /// The first active lease on `issue_id` not held by `current_agent`; with no
+    /// identity, the first active lease.
+    pub(crate) fn conflicting_lease(
+        &self,
+        issue_id: &IssueId,
+        current_agent: Option<&Assignee>,
+        now: DateTime<Utc>,
+    ) -> Option<&Lease> {
+        self.leases.iter().find(|lease| {
+            &lease.issue_id == issue_id
+                && !lease.is_expired(now)
+                && !lease.is_stale(now)
+                && current_agent.is_none_or(|agent| &lease.agent_id != agent)
+        })
+    }
+
     /// Find active lease for an issue
     pub fn find_lease(&self, issue_id: &IssueId) -> Option<&Lease> {
         self.leases.iter().find(|l| &l.issue_id == issue_id)
@@ -299,8 +315,8 @@ impl ClaimsMutationGuard {
         issue_id: &IssueId,
         current_agent: Option<&Assignee>,
     ) -> Option<Lease> {
-        self.active_leases(issue_id)
-            .find(|lease| current_agent.is_none_or(|agent| &lease.agent_id != agent))
+        self.index
+            .conflicting_lease(issue_id, current_agent, self.now)
             .cloned()
     }
 
