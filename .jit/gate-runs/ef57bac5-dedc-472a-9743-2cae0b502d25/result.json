@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "175a7a0cb33b9f6827a38a0fc06bf61a97c63edc",
+  "completed_at": "2026-11-01T08:11:15.411639841Z",
+  "duration_ms": 211792,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The configured dev-only package-drift gate satisfies the issue criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "14c08f51-2cbe-4e4b-8004-2f433d838ba4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ef57bac5-dedc-472a-9743-2cae0b502d25",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:07:43.619370335Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:14c08f51 commits 0bb4110e, b6874b7d, 640ecf80, 175a7a0c\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/package-drift and @/gate/jit-validate (.jit/gates.toml); @/issue/e204e63d/decision/D-1 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T08:05:29Z); package-drift passed (exit 0, 2026-11-01T08:07:17Z)\nTruncation recovery: targeted per-file diffs and bounded current-file reads for the example, removed tests, gate registry, and merge changes\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The configured dev-only package-drift gate satisfies the issue criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
