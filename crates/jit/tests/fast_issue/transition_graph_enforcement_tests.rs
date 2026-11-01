@@ -588,9 +588,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
-fn test_update_issue_state_path_enforces_done_graph_rule() {
-    // The state-only path (`update_issue_state`) must also enforce graph rules
-    // at the Done arm.
+fn test_state_update_enforces_done_graph_rule() {
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -603,8 +601,8 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
     );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.issues().update_issue_state(&epic, State::Done);
-    let err = result.expect_err("update_issue_state done must enforce graph rules");
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
+    let err = result.expect_err("a done transition must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
     let after = executor.storage().load_issue(&epic).unwrap();
@@ -665,7 +663,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
 }
 
 #[test]
-fn test_update_issue_state_enforces_non_terminal_arm_transition() {
+fn test_state_update_enforces_non_terminal_arm_transition() {
     // M3: the `_` arm (e.g. ready -> in_progress) previously skipped graph
     // enforcement. An enforcing rule scoped to the in_progress state must now
     // block this state-only transition too.
@@ -689,9 +687,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::Ready);
 
-    let result = executor
-        .issues()
-        .update_issue_state(&epic, State::InProgress);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::InProgress);
     let err = result.expect_err("the `_` arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -700,7 +696,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 }
 
 #[test]
-fn test_update_issue_state_enforces_explicit_gated_transition() {
+fn test_state_update_enforces_explicit_gated_transition() {
     // The explicit `--state gated` arm previously saved and returned before
     // graph enforcement, so a `state = "gated"` enforce rule was bypassable.
     // It must now block before anything persists.
@@ -724,7 +720,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     );
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
-    let result = executor.issues().update_issue_state(&epic, State::Gated);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Gated);
     let err = result.expect_err("the gated arm must enforce graph rules");
     assert!(err.downcast_ref::<TransitionBlockedError>().is_some());
 
@@ -913,7 +909,7 @@ fn test_rejected_transition_bypasses_enforcement_through_chokepoint() {
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
 
     // The state-only path (`jit issue reject`) routes through the chokepoint.
-    let result = executor.issues().update_issue_state(&epic, State::Rejected);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Rejected);
     assert!(
         result.is_ok(),
         "rejection must bypass enforcement even with a violated enforce rule"

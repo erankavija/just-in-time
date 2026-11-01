@@ -1329,6 +1329,26 @@ pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateSt
         .and_then(|selection| executor.apply_profiles(&selection))
 }
 
+/// Move `id` to `state` the way `jit issue update --state` does.
+pub fn transition_issue<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    id: &IssueId,
+    state: crate::domain::State,
+) -> Result<Vec<String>> {
+    executor.issues().update_issue(
+        id,
+        None,
+        None,
+        None,
+        Some(state),
+        Vec::new(),
+        Vec::new(),
+        None,
+        None,
+        false,
+    )
+}
+
 /// The selector naming the directory `package` was read from.
 fn selector_of(package: &crate::profile::ProfilePackage) -> crate::commands::ProfileSelector {
     let crate::profile::ProfilePackageSource::Directory(path) = package.source();

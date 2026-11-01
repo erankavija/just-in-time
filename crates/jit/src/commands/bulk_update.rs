@@ -429,13 +429,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// state transition (if any).  Returns `Err` on hard failures so the caller can
     /// record the issue in its `errors` list and continue best-effort.
     ///
-    /// Note: this does NOT call `update_issue_state()` (it skips that path's
-    /// prechecks/gate-diversion — see the DESIGN DECISION below), but
-    /// the literal state change is routed through the captured transition
-    /// derivation, so the dependency and gate guards and
-    /// transition-time graph-rule enforcement (CC-2) hold on the bulk path with
-    /// exactly the semantics of a single-issue transition (jit bc86f54c,
-    /// jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
+    /// The state change is routed through the captured transition derivation,
+    /// so the dependency and gate guards and transition-time graph-rule
+    /// enforcement (CC-2) hold on the bulk path with exactly the semantics of a
+    /// single-issue transition (jit bc86f54c, jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
     /// issue's update like any other per-issue failure; `apply_bulk_update` records
     /// it in `errors` and continues best-effort with the remaining matched issues.
     fn apply_operations_to_issue(
