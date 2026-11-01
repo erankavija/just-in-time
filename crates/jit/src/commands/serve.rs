@@ -1265,11 +1265,7 @@ mod tests {
     }
 
     fn executable_script(path: PathBuf, body: &str) -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(&path, body).unwrap();
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&path, perms).unwrap();
+        crate::test_utils::write_executable(&path, body).unwrap();
         path
     }
 

@@ -175,7 +175,14 @@ mod tests {
         git(repo, &["add", "-A"]);
         git(repo, &["commit", "-q", "-m", "main advances"]);
         git(repo, &["checkout", "-q", "feature"]);
-        install_hooks(&repo.join(".git")).unwrap();
+        let git_dir = repo.join(".git");
+        install_hooks(&git_dir)
+            .unwrap()
+            .installed
+            .iter()
+            .for_each(|hook| {
+                crate::test_utils::seal_executable(&git_dir.join("hooks").join(hook)).unwrap();
+            });
     }
 
     fn commit_succeeds(repo: &Path, path: &str, content: &str) -> bool {

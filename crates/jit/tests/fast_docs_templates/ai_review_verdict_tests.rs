@@ -5,7 +5,6 @@
 //! packaged wrapper, contrib/gates/ai-review.sh.
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
@@ -42,8 +41,8 @@ fn write_fake_agent(dir: &TempDir, output: &str) -> std::path::PathBuf {
     let path = dir.path().join("fake_agent.sh");
     // Use printf with escaped newlines so the script is a single line.
     let escaped = output.replace('\\', "\\\\").replace('\n', "\\n");
-    fs::write(&path, format!("#!/usr/bin/env bash\nprintf '{escaped}'\n")).unwrap();
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    jit::test_utils::write_executable(&path, &format!("#!/usr/bin/env bash\nprintf '{escaped}'\n"))
+        .unwrap();
     path
 }
 

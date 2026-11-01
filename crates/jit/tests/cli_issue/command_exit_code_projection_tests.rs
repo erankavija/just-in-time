@@ -560,22 +560,18 @@ fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
 /// the documented taxonomy: observing it proves pass-through behavior.
 #[cfg(unix)]
 fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
-    use std::os::unix::fs::PermissionsExt;
-
     let bin_dir = cli.root().join("serve-fg-bin");
     fs::create_dir(&bin_dir).unwrap();
 
     let jit_copy = bin_dir.join("jit");
     fs::copy(jit_binary(), &jit_copy).unwrap();
-    let mut jit_permissions = fs::metadata(&jit_copy).unwrap().permissions();
-    jit_permissions.set_mode(0o755);
-    fs::set_permissions(&jit_copy, jit_permissions).unwrap();
+    jit::test_utils::seal_executable(&jit_copy).unwrap();
 
-    let server = bin_dir.join("jit-server");
-    fs::write(&server, format!("#!/bin/sh\nexit {exit_code}\n")).unwrap();
-    let mut server_permissions = fs::metadata(&server).unwrap().permissions();
-    server_permissions.set_mode(0o755);
-    fs::set_permissions(&server, server_permissions).unwrap();
+    jit::test_utils::write_executable(
+        &bin_dir.join("jit-server"),
+        &format!("#!/bin/sh\nexit {exit_code}\n"),
+    )
+    .unwrap();
 
     jit_copy
 }
