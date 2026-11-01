@@ -21628,3 +21628,10 @@
 {"fields":["dependencies"],"id":"43edc943-2895-407d-98a0-3f73c7e5345f","issue_id":"c5aafdc0-998c-46a0-a286-7f853f0b814a","timestamp":"2026-11-01T01:29:55.417746021Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"f793a9aa-0b22-4afe-ac02-64853dfbe77d","issue_id":"c882f1f8-623c-46a0-8440-53de6da2b3e9","timestamp":"2026-11-01T01:29:55.599357260Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"bd0a53a0-4a98-4052-94bc-1d9c3eab1a4d","issue_id":"c882f1f8-623c-46a0-8440-53de6da2b3e9","timestamp":"2026-11-01T01:29:55.599357260Z","type":"issue_claimed"}
+{"fields":["description"],"id":"f289ca25-4d23-4f53-980f-bdd97b286a57","issue_id":"488eb3c1-50d1-4c54-bac0-339063d5ef20","timestamp":"2026-11-01T01:33:40.407406497Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"41dc2794-8680-4a95-a3d7-f5b2de0107ff","issue_id":"2ac34492-1119-4fba-8d6b-7038e64dd74b","priority":"normal","timestamp":"2026-11-01T01:33:40.527510216Z","title":"Criteria checks bind through check labels only","type":"issue_created"}
+{"assignee":"agent:jit-execution-lead","id":"9aebec05-5826-4074-ac5f-d4b84890c964","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T01:34:00.762857131Z","type":"issue_claimed"}
+{"fields":["dependencies"],"id":"0f3e01a3-4ae8-46be-8b35-79d5f4b3b9d4","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T01:34:01.136007027Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"66171092-4c05-4c31-9538-cd6d090bdf23","issue_id":"9a2563fd-61ed-45c2-9cfa-b5f006c47afa","priority":"normal","timestamp":"2026-11-01T01:34:01.389559147Z","title":"Gate registry edits keep the authored file","type":"issue_created"}
+{"assignee":"agent:jit-execution-lead","id":"331fdca5-6964-4f22-9724-055a70a7b136","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-01T01:34:01.637721594Z","type":"issue_claimed"}
+{"fields":["dependencies"],"id":"967040a9-21a0-4f35-944d-e1a924ec61e2","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-01T01:34:02.006870085Z","type":"issue_updated","updated_by":"dependency-add"}
