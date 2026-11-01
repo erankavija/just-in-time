@@ -728,7 +728,6 @@ pub(super) fn finalize_delta(
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
     let mut pending_events: Vec<PendingEvent> = Vec::new();
-    let mut index_creations: Vec<IssueId> = Vec::new();
     let mut index_deletions: Vec<IssueId> = Vec::new();
 
     if intents.iter().any(|intent| {
@@ -778,7 +777,6 @@ pub(super) fn finalize_delta(
                 gate.updated_at = now;
             }
             actions.push(write_issue_action(image, &issue)?);
-            index_creations.push(id.clone());
             pending_events.push(PendingEvent {
                 phase: 0,
                 tag: EventTag::IssueCreated,
@@ -815,7 +813,6 @@ pub(super) fn finalize_delta(
                 issue.updated_at = now;
                 issue.first_ready_at = (issue.state == State::Ready).then_some(now);
                 actions.push(write_issue_action(image, &issue)?);
-                index_creations.push(issue.id.clone());
                 pending_events.push(PendingEvent {
                     phase: 0,
                     tag: EventTag::IssueCreated,
@@ -1089,14 +1086,9 @@ pub(super) fn finalize_delta(
         actions.push(action);
     }
 
-    // Index membership: creations extend `all_ids` and clear any `deleted_ids`
-    // entry, derived from the captured index preimage in the same delta.
-    if !index_creations.is_empty() || !index_deletions.is_empty() {
-        actions.push(index_membership_action(
-            image,
-            &index_creations,
-            &index_deletions,
-        )?);
+    // Deletions record their tombstones over the captured index preimage.
+    if !index_deletions.is_empty() {
+        actions.push(index_tombstone_action(image, &index_deletions)?);
     }
 
     RepositoryDelta::new(layout, actions).map_err(Into::into)
@@ -1281,31 +1273,24 @@ fn expected_of(
     Ok(ExpectedPreimage::of(image.entry(path)?))
 }
 
-/// Derive the deterministic membership index write from the captured preimage.
-fn index_membership_action(
+/// Derive the deterministic tombstone write from the captured preimage.
+fn index_tombstone_action(
     image: &RepositoryImage,
-    created_ids: &[IssueId],
     deleted_ids: &[IssueId],
 ) -> Result<RepositoryAction, MutationError> {
     let path = VirtualPath::INDEX;
     let expected = expected_of(image, &path)?;
-    let mut index = match captured_file_bytes(image, &path)? {
-        Some(bytes) => super::RepositoryIndex::parse(bytes).map_err(|error| {
-            MutationError::MalformedRecord {
-                path: path.clone(),
-                reason: error.to_string(),
-            }
-        })?,
-        None => super::RepositoryIndex::default(),
-    };
-    for id in created_ids {
-        if !index.all_ids.contains(id) {
-            index.all_ids.push(id.clone());
-        }
-        index.deleted_ids.retain(|deleted| deleted != id);
-    }
+    let bytes =
+        captured_file_bytes(image, &path)?.ok_or_else(|| MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: "the repository has no index".to_string(),
+        })?;
+    let mut index =
+        super::RepositoryIndex::parse(bytes).map_err(|error| MutationError::MalformedRecord {
+            path: path.clone(),
+            reason: error.to_string(),
+        })?;
     for id in deleted_ids {
-        index.all_ids.retain(|active| active != id);
         if !index.deleted_ids.contains(id) {
             index.deleted_ids.push(id.clone());
         }
@@ -1471,7 +1456,6 @@ mod tests {
 
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: 2,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -1538,7 +1522,6 @@ mod tests {
     fn creation_image() -> RepositoryImage {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -1853,7 +1836,6 @@ mod tests {
             .collect::<HashMap<_, _>>();
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -2407,7 +2389,6 @@ mod tests {
             .collect::<Vec<_>>();
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -2477,10 +2458,9 @@ mod tests {
     }
 
     #[test]
-    fn test_create_issue_stamps_lifecycle_and_membership() {
+    fn test_create_issue_stamps_lifecycle_and_writes_no_index() {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: 2,
-            all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -2525,18 +2505,11 @@ mod tests {
         assert_eq!(written.id, expected_id);
         assert_eq!(written.created_at, fixed_instant());
         assert_eq!(written.first_ready_at, Some(fixed_instant()));
-        // Membership index carries the new id.
-        let index_action = delta
+        assert!(!delta
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &VirtualPath::INDEX)
-            .expect("index write present");
-        let RepositoryAction::WriteFile { bytes, .. } = index_action else {
-            panic!("expected index write");
-        };
-        let index: RepositoryIndex = serde_json::from_slice(bytes).unwrap();
-        assert!(index.all_ids.contains(&expected_id));
+            .any(|action| action.path() == &VirtualPath::INDEX));
     }
 
     #[test]
@@ -2549,7 +2522,6 @@ mod tests {
         let index_bytes = canonical_json(
             &RepositoryIndex {
                 schema_version: 2,
-                all_ids: vec![issue.id.clone(), crate::test_utils::issue_id(49)],
                 deleted_ids: Vec::new(),
             },
             true,
@@ -2587,45 +2559,7 @@ mod tests {
             panic!("expected index write");
         };
         let index: RepositoryIndex = serde_json::from_slice(bytes).unwrap();
-        assert_eq!(index.all_ids, [crate::test_utils::issue_id(49)]);
         assert_eq!(index.deleted_ids, [issue.id]);
-    }
-
-    #[test]
-    fn test_create_issue_rejects_future_index_without_a_plan() {
-        let draft = Issue::draft(created_id(), "New".into(), "Body".into());
-        let created_id = created_id();
-        let index_bytes = serde_json::to_vec(&serde_json::json!({
-            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION + 1,
-            "all_ids": [],
-            "deleted_ids": []
-        }))
-        .unwrap();
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (
-                VirtualPath::issue_record(&created_id),
-                RepositoryEntry::Absent,
-            ),
-        ]);
-
-        let error = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::CreateIssue {
-                draft: Box::new(draft),
-            }],
-        )
-        .expect_err("a future index must prevent plan construction");
-        assert!(error
-            .to_string()
-            .contains("newer than this binary supports"));
     }
 
     #[test]
@@ -2637,7 +2571,6 @@ mod tests {
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = serde_json::to_vec(&serde_json::json!({
             "schema_version": 2,
-            "all_ids": [issue.id],
             "deleted_ids": [crate::test_utils::issue_id(1), crate::test_utils::issue_id(1)]
         }))
         .unwrap();

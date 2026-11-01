@@ -1421,6 +1421,17 @@ impl RepositoryDelta {
     pub fn actions(&self) -> &[RepositoryAction] {
         &self.actions
     }
+
+    /// The actions replacing, changing or removing a file: everything but
+    /// directory creation and the event-log append, which keeps every prior line.
+    pub(crate) fn file_writes(&self) -> impl Iterator<Item = &RepositoryAction> {
+        self.actions.iter().filter(|action| {
+            !matches!(
+                action,
+                RepositoryAction::CreateDirectory { .. } | RepositoryAction::AppendEvents { .. }
+            )
+        })
+    }
 }
 
 fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {

@@ -1021,15 +1021,6 @@ mod tests {
 
     /// Seed an exact file-backed issue precondition without exercising command mutation behavior.
     fn seed_archive_issue_precondition(storage: &JsonFileStorage, issue: Issue) {
-        let index_path = storage.root().join("index.json");
-        let mut index = crate::repository_state::RepositoryIndex::parse(
-            &fs::read(&index_path).expect("initialized repository index"),
-        )
-        .expect("valid repository index");
-        index.all_ids.push(issue.id.clone());
-        index.all_ids.sort();
-        index.all_ids.dedup();
-        index.deleted_ids.retain(|id| id != &issue.id);
         let issue_path = storage
             .repository_layout()
             .unwrap()
@@ -1040,11 +1031,6 @@ mod tests {
         fs::write(
             issue_path,
             crate::repository_state::serialize_issue(&issue).expect("serialize fixture issue"),
-        )
-        .unwrap();
-        fs::write(
-            index_path,
-            index.to_pretty_bytes().expect("serialize fixture index"),
         )
         .unwrap();
     }

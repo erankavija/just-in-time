@@ -104,6 +104,7 @@ impl SelectionObservation for ProfilePlanEntry {
         self.status = ProfilePlanStatus::Unchanged;
         self.targets.clear();
         self.contributions.clear();
+        self.refusal = None;
     }
 }
 
@@ -211,7 +212,7 @@ pub enum ProfilePlanStatus {
     /// Applying the plan would publish at least one change.
     WouldApply,
     /// The profile decided at least one target or declaration that cannot be
-    /// published.
+    /// published, or what it would publish fails final validation.
     ///
     /// A rehearsal of a publication fails before it can report this; a
     /// difference report states it, which is what lets an adopter inspect the
@@ -240,9 +241,24 @@ pub struct ProfilePlanEntry {
     /// An observation that would publish nothing decides no declaration, so a
     /// repeated selector's later observations carry none.
     pub contributions: Vec<ProfileContributionChange>,
+    /// Why final validation refuses what this profile would publish, absent
+    /// otherwise. A refusal concerns the selection's proposed repository rather
+    /// than one decision of this profile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusal: Option<String>,
 }
 
 impl ProfilePlanEntry {
+    /// This entry under a selection final validation refuses. A profile
+    /// publishing nothing takes no part in the refusal.
+    pub(crate) fn refused_by(mut self, refusal: &str) -> Self {
+        if self.status != ProfilePlanStatus::Unchanged {
+            self.status = ProfilePlanStatus::WouldConflict;
+            self.refusal = Some(refusal.to_string());
+        }
+        self
+    }
+
     /// The targets this profile decided `action` about, in report order.
     pub fn decided(
         &self,

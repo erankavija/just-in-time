@@ -14,7 +14,7 @@ use std::fs;
 fn make_repository_too_new(cli: &JitCli) {
     fs::write(
         cli.root().join(".jit/index.json"),
-        r#"{"schema_version": 99, "all_ids": [], "deleted_ids": []}"#,
+        r#"{"schema_version": 99, "deleted_ids": []}"#,
     )
     .unwrap();
 }
@@ -27,8 +27,8 @@ fn assert_too_new_refusal(out: &std::process::Output, cmd: &str) {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("99") && stderr.contains("2"),
-        "{cmd} error must name both the repo version (99) and the binary's supported version (2); got: {stderr}"
+        stderr.contains("99") && stderr.contains("3"),
+        "{cmd} error must name both the repo version (99) and the binary's supported version (3); got: {stderr}"
     );
     // Single-line message (one trailing newline at most).
     let msg = stderr.trim_end();
@@ -66,4 +66,81 @@ fn test_init_refuses_reinitializing_too_new_repo_format() {
     make_repository_too_new(&cli);
     let out = cli.command(["init"]).output().unwrap();
     assert_too_new_refusal(&out, "init");
+}
+
+fn listed_ids(cli: &JitCli) -> std::collections::BTreeSet<String> {
+    cli.run_json(["query", "all"]).unwrap()["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|issue| issue["id"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn test_format_2_repository_reads_and_writes_from_its_issue_files() {
+    let cli = JitCli::initialised().unwrap();
+    let root = cli.create_issue(["-t", "Root"]).unwrap();
+    let listed_only_in_index = cli.create_issue(["-t", "Indexed"]).unwrap();
+    let unindexed = cli.create_issue(["-t", "Unindexed"]).unwrap();
+    for dependent in [&listed_only_in_index, &unindexed] {
+        cli.run(["dep", "add", dependent, &root]).unwrap();
+    }
+    let index_path = cli.root().join(".jit/index.json");
+    let format_2 = serde_json::to_vec_pretty(&serde_json::json!({
+        "all_ids": [root, listed_only_in_index],
+        "deleted_ids": [],
+        "schema_version": 2,
+    }))
+    .unwrap();
+    fs::write(&index_path, &format_2).unwrap();
+
+    assert_eq!(
+        listed_ids(&cli),
+        [
+            root.clone(),
+            listed_only_in_index.clone(),
+            unindexed.clone()
+        ]
+        .into_iter()
+        .collect()
+    );
+
+    let created = cli.create_issue(["-t", "Created"]).unwrap();
+    assert!(listed_ids(&cli).contains(&created));
+    cli.run(["dep", "add", &created, &root]).unwrap();
+    assert_eq!(
+        fs::read(&index_path).unwrap(),
+        format_2,
+        "a create must leave a format 2 index as it stands"
+    );
+    let validation = cli.command(["validate"]).output().unwrap();
+    assert!(validation.status.success(), "{validation:?}");
+
+    let deleted = cli
+        .command_with_env(
+            ["issue", "delete", &unindexed],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
+        .output()
+        .unwrap();
+    assert!(deleted.status.success(), "{deleted:?}");
+    assert!(!listed_ids(&cli).contains(&unindexed));
+    let index: serde_json::Value = serde_json::from_slice(&fs::read(&index_path).unwrap()).unwrap();
+    assert_eq!(index["schema_version"], 2, "a write must keep the marker");
+    assert_eq!(index["deleted_ids"], serde_json::json!([unindexed]));
+    assert!(index.get("all_ids").is_none());
+    let validation = cli.command(["validate"]).output().unwrap();
+    assert!(validation.status.success(), "{validation:?}");
+}
+
+#[test]
+fn test_missing_issues_directory_lists_as_empty_through_capture() {
+    let cli = JitCli::initialised().unwrap();
+    fs::remove_dir_all(cli.root().join(".jit/issues")).unwrap();
+
+    let validation = cli.command(["validate"]).output().unwrap();
+    assert!(validation.status.success(), "{validation:?}");
+    let created = cli.create_issue(["-t", "First"]).unwrap();
+    assert_eq!(listed_ids(&cli), [created].into_iter().collect());
 }

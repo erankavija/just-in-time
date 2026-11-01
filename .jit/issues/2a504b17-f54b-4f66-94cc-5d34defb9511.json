@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:21:22.199002466Z",
+  "context": {},
+  "created_at": "2026-11-01T15:20:45.314454897Z",
+  "dependencies": [
+    "c47d78c8-f74b-4659-9d48-e5cbb50b1bab"
+  ],
+  "description": "Cross all four repositories to format 3 in one window: this one, mealie-fi, inflected-messages and gf2.\n\n## Background\n\nc47d78c8 makes the binary accept exactly format 3 (`@/inv/canonical-cutover`). An older binary and a newer one each refuse the other's repository, so install and rewrites happen together, with no sessions mid-gate. One script outside the product rewrites `index.json` to `{deleted_ids, schema_version: 3}` and drops event lines with retired tags, committed explicitly in each repository. There is no migration code. Unmerged gf2 branches are refused until they merge main; that refusal is the intended result.\n\n## Success Criteria\n\n- [hard] REQ-01: All four repositories carry the explicit rewrite commit, with `jit validate` passing before (old binary) and after (new binary), and each SHA recorded here.\n- [hard] REQ-02: Before the window, the script runs on a clone at gf2's current main, each of the 20 predicted-conflict branches merged with main using the resolution rule (take main's index, union `deleted_ids`), and `jit validate` on each result with the exact-version binary. The 8 stale branches run for information. Results and script go to the invoker.\n- [hard] REQ-03: gf2's owner approval is recorded before gf2 crosses.\n\n## Notes\n\n- 3d9a0ce3 depends on this issue, so the epic does not close until all four have crossed.\n- `dev/active/9c9ac88e/subsample-repo.py` and `bench.sh` read `all_ids` and break after the rewrite.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T15:20:45.314454897Z",
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "2a504b17-f54b-4f66-94cc-5d34defb9511",
+  "labels": [
+    "component:storage",
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Rewrite other repositories' index to format 3",
+  "updated_at": "2026-11-01T15:23:37.860382568Z"
+}

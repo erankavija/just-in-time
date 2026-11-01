@@ -388,8 +388,8 @@ jit worktree info
 
 **Symptom:** `jit query all` returns nothing in secondary worktree.
 
-**Cause:** The aggregated read path could not find the issue in this worktree,
-Git `HEAD`, or the recognized main worktree.
+**Cause:** The aggregated read path could not find the issue in this checkout's
+store or the primary checkout's store.
 
 **Solutions:**
 
@@ -399,16 +399,16 @@ Git `HEAD`, or the recognized main worktree.
    git rev-parse --git-common-dir
    ```
 
-2. **Verify the repository data is available from an aggregation source:**
+2. **Verify the issue record is in one of the two stores:**
    ```bash
-   git show HEAD:.jit/index.json
    git worktree list
+   ls .jit/issues/
+   ls "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.jit/issues/"
    ```
 
-3. **If the issue exists only as an uncommitted change,** keep the main
-   worktree available at the path Git reports. Secondary-worktree reads fall
-   back to that main worktree automatically when the standard Git layout can be
-   resolved.
+3. **If the issue exists only in the primary checkout,** keep that checkout
+   available at the path Git reports. Linked-checkout reads fall back to it
+   automatically when the standard Git layout can be resolved.
 
 ---
 

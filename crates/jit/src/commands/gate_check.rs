@@ -109,22 +109,6 @@ struct CapturedGateRuns {
     inputs: Vec<crate::repository_state::VirtualPath>,
 }
 
-fn captured_repository_index(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<crate::repository_state::RepositoryIndex> {
-    use crate::repository_state::{RepositoryEntry, VirtualPath};
-
-    let path = VirtualPath::INDEX;
-    match image.entry(&path)? {
-        RepositoryEntry::File { content, .. } => {
-            crate::storage::json::parse_repository_index(content.bytes())
-                .context("failed to parse captured issue index")
-        }
-        RepositoryEntry::Absent => Err(anyhow!("captured repository has no .jit/index.json")),
-        _ => Err(anyhow!("captured .jit/index.json is not a regular file")),
-    }
-}
-
 fn captured_issue_record(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &IssueId,
@@ -152,10 +136,6 @@ fn captured_bound_issue(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &IssueId,
 ) -> Result<Issue> {
-    let index = captured_repository_index(image)?;
-    if !index.all_ids.iter().any(|id| id == issue_id) {
-        return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into());
-    }
     captured_issue_record(image, issue_id)?
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
 }
@@ -764,37 +744,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
         use std::collections::BTreeMap;
 
-        let mut candidates = Vec::new();
         let spec = CaptureSpec::new(
-            [VirtualPath::INDEX],
+            [VirtualPath::issue_record(issue_id)],
             super::validate::MUTATION_CAPTURE_BUDGET,
         )?;
-        let Some(bound) = super::capture_discovering(session, spec, |image, spec| {
-            candidates = captured_repository_index(image)?
-                .all_ids
-                .into_iter()
-                .filter(|id| id == issue_id)
-                .collect();
-            Ok(spec.discover_paths(
-                candidates
-                    .iter()
-                    .map(VirtualPath::issue_record)
-                    .collect::<Vec<_>>(),
-            )?)
-        })?
-        else {
+        let Some(bound) = super::capture_discovering(session, spec, |_, _| Ok(()))? else {
             return Ok(None);
         };
-        let issues = candidates
-            .iter()
-            .map(|id| {
-                captured_issue_record(&bound, id)?
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let issues = Vec::from_iter(captured_issue_record(&bound, issue_id)?);
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let mut paths = vec![
-            VirtualPath::INDEX,
             VirtualPath::issue_record(&target_id),
             VirtualPath::GATES,
             VirtualPath::EVENTS,
@@ -2765,7 +2724,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             taxonomy.config_fragment()
         );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         add_exec_gate(
             &executor,
@@ -2790,14 +2749,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .resolve(&VirtualPath::issue_record(&unrelated))
             .unwrap();
         std::fs::write(unrelated_path, []).unwrap();
-        let index_path = repo.path().join(".jit/index.json");
-        let mut index: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(&index_path).unwrap()).unwrap();
-        index["all_ids"]
-            .as_array_mut()
-            .unwrap()
-            .push(unrelated.as_str().into());
-        std::fs::write(index_path, serde_json::to_vec_pretty(&index).unwrap()).unwrap();
 
         let result = executor
             .check_gate(&issue_id, &"selected-safe".parse().unwrap())
@@ -5015,15 +4966,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         std::fs::write(
             issue_path,
             crate::repository_state::serialize_issue(&original).unwrap(),
-        )
-        .unwrap();
-        let index = crate::repository_state::RepositoryIndex {
-            all_ids: vec![issue_id.clone()],
-            ..Default::default()
-        };
-        std::fs::write(
-            repo.path().join(".jit/index.json"),
-            index.to_pretty_bytes().unwrap(),
         )
         .unwrap();
         add_exec_gate(

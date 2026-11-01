@@ -10,7 +10,7 @@
 //! (`@/inv/domain-agnostic`).
 
 use crate::domain::identity::GateKey;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::template_expand::{
     declared_container_label, expand_template, located_document_area_error, node_description,
@@ -387,8 +387,7 @@ fn capture_template_image(
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
     spec.discover_listings([presets_dir.clone(), VirtualPath::ISSUES])?;
     capture_discovering(session, spec, |image, spec| {
-        let declarations = parse_template_index(image)?
-            .all_ids
+        let declarations = crate::repository_state::captured_issue_ids(image)?
             .iter()
             .map(|id| Ok(VirtualPath::issue_record(id)))
             .chain(listed_json_paths(image, &presets_dir)?.into_iter().map(Ok))
@@ -598,15 +597,6 @@ fn template_declarations_from_image(
     )
 }
 
-fn parse_template_index(
-    image: &RepositoryImage,
-) -> Result<crate::repository_state::RepositoryIndex> {
-    image
-        .file_bytes(&VirtualPath::INDEX)?
-        .ok_or_else(|| anyhow!("index.json is absent during template apply"))
-        .and_then(crate::storage::json::parse_repository_index)
-}
-
 fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<VirtualPath>> {
     let Some(listing) = image.directory_listings().get(dir) else {
         return Err(anyhow!("complete listing is absent for {dir:?}"));
@@ -622,30 +612,7 @@ fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<V
 }
 
 fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
-    let index = parse_template_index(image)?;
-    let dir = VirtualPath::ISSUES;
-    let listing = image
-        .directory_listings()
-        .get(&dir)
-        .ok_or_else(|| anyhow!("complete issues listing is absent from template capture"))?;
-    let indexed = index
-        .all_ids
-        .iter()
-        .filter_map(|id| VirtualPath::issue_record(id).file_name().map(str::to_owned))
-        .collect::<BTreeSet<_>>();
-    let listed = listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    if indexed != listed {
-        return Err(anyhow!(
-            "issues directory membership does not match captured index"
-        ));
-    }
-    index
-        .all_ids
+    crate::repository_state::captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id);
@@ -655,7 +622,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
             let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
             if issue.id != *id {
                 return Err(anyhow!(
-                    "indexed issue {id} contains mismatched embedded id {}",
+                    "issue {id} contains mismatched embedded id {}",
                     issue.id
                 ));
             }

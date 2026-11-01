@@ -104,10 +104,9 @@ This shows issues that are:
 - In "ready" state
 - Not blocked by dependencies
 
-The issue visibility works through a 3-tier fallback:
-1. **Local `.jit/`** — Issues you've modified in this worktree
-2. **Git HEAD** — Committed issues (canonical state)
-3. **Main worktree `.jit/`** — Uncommitted issues from main
+Issue reads come from two sources, in order:
+1. **This checkout's `.jit/`** — Everything this checkout holds, including its uncommitted changes
+2. **Primary checkout's `.jit/`** — Issues only the primary holds, committed or not
 
 ## Step 4: Claim an Issue
 

@@ -37,10 +37,9 @@ pub enum IssueNotFoundError {
         /// The unresolved input.
         prefix: IssueIdPrefix,
     },
-    /// The issue was absent from every read source: local `.jit/`, git `HEAD`,
-    /// and the main worktree (the [`JsonFileStorage`](crate::storage::JsonFileStorage)
-    /// fallback chain).
-    #[error("Issue {id} not found in local storage, git, or main worktree")]
+    /// The issue was absent from this checkout's store and the primary checkout's
+    /// (the [`JsonFileStorage`](crate::storage::JsonFileStorage) fallback chain).
+    #[error("Issue {id} not found in this checkout's store or the primary checkout")]
     AcrossSources {
         /// The fully-qualified id that was searched for.
         id: IssueId,
@@ -347,7 +346,7 @@ mod tests {
         let err = IssueNotFoundError::across_sources(&id);
         assert_eq!(
             err.to_string(),
-            format!("Issue {id} not found in local storage, git, or main worktree")
+            format!("Issue {id} not found in this checkout's store or the primary checkout")
         );
         assert_eq!(err.id(), id.as_str());
     }

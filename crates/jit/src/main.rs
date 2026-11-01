@@ -598,6 +598,9 @@ fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
         };
         print_profile_heading(&plan.id, &plan.version, &plan.origin, status);
         print_profile_decisions(&plan.targets, &plan.contributions);
+        if let Some(refusal) = &plan.refusal {
+            println!("  refused: {refusal}");
+        }
     }
 }
 

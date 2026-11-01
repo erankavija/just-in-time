@@ -672,8 +672,11 @@ The selection is resolved, closed over the packages it depends on, and planned
 through the same preparation a publication runs, so the report is the decision
 the publication would act on rather than a second opinion about it. For each
 participating profile it states every target that profile decided: the values it
-would `create` or `update`, the ones already `unchanged`, and the targets it
-cannot publish at all (`conflict`), each with its reason. A conflict arises only
+would `create` or `update`, the derived files it would `remove`, the ones already
+`unchanged`, and the targets it cannot publish at all (`conflict`), each with its
+reason. The targets include every file the publication writes, among them the
+default schemas it derives from a changed registry. The event log is left out:
+a publication only appends its lifecycle event there. A conflict arises only
 when selected packages define one target or declaration differently, and its
 reason names those packages; the repository's current content is never a party
 to it.
@@ -697,12 +700,14 @@ Human output shows one line per profile with its ID, version, origin, and status
 decision with its action — targets first, then declarations — and the
 reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
-return, with `status` additionally reporting `would_conflict`.
+return, with `status` additionally reporting `would_conflict`. A selection whose
+proposed repository fails final validation, such as one leaving a configured
+projection stale, also reports `would_conflict`, with `refusal` stating why on
+each profile that would publish.
 
 The report writes nothing: no target and no audit event.
 It exits `0` when every participating profile can be published and `4` when any
-decided a target or a declaration that cannot be, so it serves as a repository
-check. The report
+cannot be, so it serves as a repository check. The report
 is the answer either way, carried by the shared typed error envelope when the
 command exits `4`.
 
@@ -1102,11 +1107,11 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 - labels that are not `namespace:value`,
 - gates not present in the gate registry.
 
-On success, issues, index membership, events, and dependency edges publish as one
+On success, issues, events, and dependency edges publish as one
 redo record.
 
 **Dry-run.** `--dry-run` performs the same native validation and preserves exit
-code `2` for validation errors, but allocates no ids and writes no issues, index,
+code `2` for validation errors, but allocates no ids and writes no issues,
 events, or edges. Human output reports counts. JSON returns:
 
 ```json

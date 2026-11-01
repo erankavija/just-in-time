@@ -170,12 +170,11 @@ impl InMemoryStorage {
     /// repository codec and index invariants used by production publishers.
     #[doc(hidden)]
     pub fn seed_issue_fixture(&self, issue: &Issue) {
-        let mut index = self
+        let index = self
             .read_repo_file(".jit/index.json")
             .expect("fixture index path is valid")
             .map(|bytes| RepositoryIndex::parse(bytes.as_bytes()).expect("fixture index is valid"))
             .unwrap_or_default();
-        index.upsert_active(issue.id.clone());
 
         let issue_bytes = serialize_issue(issue).expect("fixture issue serializes");
         let index_bytes = index.to_pretty_bytes().expect("fixture index serializes");

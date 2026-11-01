@@ -45,7 +45,9 @@ pub use image::{
     RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
-pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
+pub(crate) use index::{
+    captured_issue_ids, listed_issue_ids, RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION,
+};
 pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
@@ -144,6 +146,7 @@ pub enum GateRegistryEditError {
     #[error(transparent)]
     Overlay(#[from] OverlayError),
 }
+pub(crate) use overlay::overlaid_issue_ids;
 pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
@@ -508,6 +511,8 @@ pub(crate) enum ProfileTargetDisposition {
     Create,
     /// The target holds another value this profile replaces.
     Update,
+    /// The target is a derived file the profile's composition no longer yields.
+    Remove,
     /// The target cannot be published, for the reason it carries.
     Conflict(ProfileTargetConflict),
 }

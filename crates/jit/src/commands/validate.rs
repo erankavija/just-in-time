@@ -246,29 +246,17 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
-        let mut candidates = Vec::new();
+        let record = VirtualPath::issue_record(issue_id);
         let spec = CaptureSpec::new(
-            [VirtualPath::CONFIG, VirtualPath::INDEX],
+            [VirtualPath::CONFIG, record.clone()],
             MUTATION_CAPTURE_BUDGET,
         )?;
-        let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-            let index_bytes = image
-                .file_bytes(&VirtualPath::INDEX)?
-                .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-            candidates = crate::storage::json::parse_repository_index(index_bytes)?
-                .all_ids
-                .into_iter()
-                .filter(|id| id == issue_id)
-                .collect();
-            Ok(spec.discover_paths(
-                candidates
-                    .iter()
-                    .map(VirtualPath::issue_record)
-                    .collect::<Vec<_>>(),
-            )?)
-        })?
-        else {
+        let Some(image) = super::capture_discovering(session, spec, |_, _| Ok(()))? else {
             return Ok(None);
+        };
+        let candidates = match image.file_bytes(&record)? {
+            Some(_) => vec![issue_id.clone()],
+            None => Vec::new(),
         };
         let effective =
             |image: &crate::repository_state::RepositoryImage,
@@ -373,6 +361,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .into_iter()
                 .chain(extra_paths.iter().cloned()),
             )?;
+            spec.discover_listings([VirtualPath::ISSUES])?;
             // A mutation appends to the log, so it reads the log's length and
             // tail; validation parses it, so it reads it whole.
             match mutation {
@@ -413,7 +402,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // error as a finding.
             let config = effective_config(image, &effective_virtual_path)
                 .unwrap_or_else(|_| empty_materialization_config());
-            let all_ids = effective_index_ids(image, &effective_virtual_path).unwrap_or_default();
+            let all_ids =
+                crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
                 .transpose()?;
@@ -442,10 +432,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             if issues.is_none() {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
-                // image; a repository without an index yet has none. Validation
-                // parses the overlaid set leniently and reports defects as
-                // findings.
-                let parsed = if mutation && image.file_bytes(&VirtualPath::INDEX)?.is_some() {
+                // image. Validation parses the overlaid set leniently and reports
+                // defects as findings.
+                let parsed = if mutation {
                     super::captured_active_issues(image)?
                 } else {
                     effective_issues(image, &all_ids, &effective_repo_path)?
@@ -768,22 +757,7 @@ fn empty_materialization_config() -> JitConfig {
         .materialization_config(crate::declarations::invariants::InvariantRegistry::empty())
 }
 
-/// Parse the (possibly overlaid) repository index's live issue ids.
-fn effective_index_ids(
-    image: &crate::repository_state::RepositoryImage,
-    effective: &EffectiveVirtualPath<'_>,
-) -> Result<Vec<IssueId>> {
-    #[derive(serde::Deserialize)]
-    struct IndexIds {
-        #[serde(default)]
-        all_ids: Vec<IssueId>,
-    }
-    let bytes = effective(image, &crate::repository_state::VirtualPath::INDEX)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-    Ok(serde_json::from_slice::<IndexIds>(&bytes)?.all_ids)
-}
-
-/// Parse every ordinary issue record named by the index (possibly overlaid).
+/// Parse every named issue record (possibly overlaid).
 fn effective_issues(
     image: &crate::repository_state::RepositoryImage,
     all_ids: &[IssueId],
@@ -1038,12 +1012,7 @@ pub(crate) fn plan_content_from_image(
         |img: &crate::repository_state::RepositoryImage,
          repo_rel: &str|
          -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
-    let effective_virtual_path =
-        |img: &crate::repository_state::RepositoryImage,
-         path: &crate::repository_state::VirtualPath|
-         -> Result<Option<Vec<u8>>> { super::image_virtual_bytes(img, path) };
     let effective_repo_path: &EffectiveRepoPath<'_> = &effective_repo_path;
-    let effective_virtual_path: &EffectiveVirtualPath<'_> = &effective_virtual_path;
 
     // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
     // missing or malformed config (parsed in `plan_content_with_issues`),
@@ -1051,7 +1020,7 @@ pub(crate) fn plan_content_from_image(
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
-    let all_ids = effective_index_ids(image, effective_virtual_path).unwrap_or_default();
+    let all_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
     let all_issues = effective_issues(image, &all_ids, effective_repo_path).unwrap_or_default();
     plan_content_with_issues(image, &all_issues, emit_for)
 }

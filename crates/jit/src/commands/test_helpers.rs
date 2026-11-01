@@ -4,9 +4,8 @@
 
 use crate::commands::CommandExecutor;
 use crate::declarations::GateRegistry;
-use crate::domain::identity::IssueId;
 use crate::domain::Issue;
-use crate::repository_state::{RepositoryIndex, VirtualPath};
+use crate::repository_state::VirtualPath;
 use crate::storage::{InMemoryStorage, IssueStore, MutationPoint};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -152,7 +151,6 @@ impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
 
 pub(crate) enum SessionRaceAction {
     Save(Box<crate::domain::Issue>),
-    Delete(IssueId),
     WriteRepoFile {
         path: String,
         content: String,
@@ -179,20 +177,6 @@ impl crate::storage::MutationInterruptionInjector for SessionRace {
             let storage = self.storage.lock().unwrap().clone().unwrap();
             match self.action.lock().unwrap().take().unwrap() {
                 SessionRaceAction::Save(issue) => seed_issue(&storage, *issue),
-                SessionRaceAction::Delete(id) => {
-                    let bytes = storage
-                        .read_repo_file(".jit/index.json")
-                        .unwrap()
-                        .expect("race fixture index exists");
-                    let mut index = RepositoryIndex::parse(bytes.as_bytes()).unwrap();
-                    index.mark_deleted(id);
-                    let index = index.to_pretty_bytes().unwrap();
-                    seed_repo_file(
-                        &storage,
-                        ".jit/index.json",
-                        std::str::from_utf8(&index).unwrap(),
-                    );
-                }
                 SessionRaceAction::WriteRepoFile { path, content } => {
                     seed_repo_file(&storage, &path, &content);
                 }
