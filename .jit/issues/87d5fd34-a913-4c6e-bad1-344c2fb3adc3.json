@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T09:21:45.485444934Z",
+  "context": {},
+  "created_at": "2026-11-01T09:21:44.900259272Z",
+  "dependencies": [],
+  "description": "Make the suite pass when tests share a process, as `cargo test` runs them.\n\n## Background\n\n`.github/workflows/ci.yml:158` runs `cargo test --workspace`, which runs a target's tests as threads of one process; `cargo-ci` runs each test in its own process through nextest. Thirteen shuffled shared-process runs (`--shuffle-seed` 1-13, at `0b4874edf`) found failures that nextest cannot see:\n\n- `test_command_exit_codes_serve_foreground_passthrough_is_dual_form`: `Text file busy` on spawning a script the test just wrote, on 4 of 13 seeds. A thread forking while the test still holds the script open for writing keeps it busy until that child execs.\n- `test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree` (seed 3) and `test_probe_runs_one_git_process_in_the_probed_directory` (seed 13): both use a git stand-in, and the cause is unconfirmed.\n- `test_run_shutdown_sequence_keeps_a_stalled_connection_running_for_the_whole_deadline` (seed 10): `ConnectionReset` reading the closed connection.\n\nSerial, 32-thread and hash-partitioned nextest runs of the whole workspace all pass.\n\n## Success Criteria\n\n- [hard] REQ-01: A shared test-support mechanism writes an executable a test then runs, without the write racing another thread's fork; no test writes one any other way.\n- [hard] REQ-02: The other three failures each have a stated cause, and each is fixed or shown to be that same race.\n- [hard] REQ-03: 20 shuffled shared-process runs of every target in the workspace, with distinct seeds, pass; the seeds and command are recorded on this issue.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T09:21:44.900259272Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "87d5fd34-a913-4c6e-bad1-344c2fb3adc3",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "The suite passes when tests share a process",
+  "updated_at": "2026-11-01T09:21:45.485444934Z"
+}
