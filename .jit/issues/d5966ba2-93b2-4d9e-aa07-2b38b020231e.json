@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9715166c-d398-4894-9cf5-0f3d581c20d0",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:23:48.431650065Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f8ec2887-2dec-4d66-9c19-d8f110e54ebf",
+      "status": "failed",
+      "updated_at": "2026-11-01T13:28:22.949468264Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
   "labels": [
     "type:task",
@@ -25,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive derived documents with their issue",
-  "updated_at": "2026-11-01T13:07:08.311014075Z"
+  "updated_at": "2026-11-01T13:28:22.949468264Z"
 }
