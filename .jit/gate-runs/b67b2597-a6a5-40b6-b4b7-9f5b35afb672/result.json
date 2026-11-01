@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9e7e29915e9abc0840d288d398c4917e9fd0b579",
+  "completed_at": "2026-11-01T09:55:14.777083337Z",
+  "duration_ms": 208542,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Current isolated keyed-fixture behavior, shared-process repeat evidence, and the no-nextest-setup guard support all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d2b7d19b-3ffe-4fae-bb2b-2cc43847e491",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b67b2597-a6a5-40b6-b4b7-9f5b35afb672",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T09:51:46.234312898Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d124adcc8, 2bab8a437, 9e7e29915\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T09:51:27Z); code-review pending\nTruncation recovery: narrowed reads of current fixture implementation/tests and nextest-policy test; excluded truncated unrelated historical patches not tagged `jit:d2b7d19b`\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current isolated keyed-fixture behavior, shared-process repeat evidence, and the no-nextest-setup guard support all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
