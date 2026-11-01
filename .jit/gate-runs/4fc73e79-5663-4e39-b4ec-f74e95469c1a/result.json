@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "cargo run --quiet -p jit --example package-drift",
+  "commit": "51cb2fecbe2ad23a6c1c027ef8688a146bb5bd06",
+  "completed_at": "2026-11-01T08:36:48.606495678Z",
+  "duration_ms": 24426,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "package-drift",
+  "inputs_digest": "1834fbc402bee21ab632abafc1700ba7b65711c50782a24481ef808d694cd8d4",
+  "issue_id": "e7d98542-456d-4421-9e17-faf4f739a800",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4fc73e79-5663-4e39-b4ec-f74e95469c1a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T08:36:24.180406049Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "OK: the generated regions hold the package, and gate inputs hold\n"
+}
