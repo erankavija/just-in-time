@@ -1100,7 +1100,7 @@ fn resolve_issue_filter_arg<S: IssueStore>(storage: &S, requested: &str) -> Resu
 }
 
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
-/// issue id, loading its enriched dependencies and gate runs.
+/// issue id.
 ///
 /// Shared by the multi-id `--json` array path and the multi-id non-JSON loop so
 /// each issue renders from the same shape as `issue show --json`.
@@ -1112,15 +1112,7 @@ fn build_issue_show_response<S: IssueStore>(
         .issues()
         .show_issue(id)
         .with_context(|| format!("Failed to load issue {}", id))?;
-    let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-    let gate_runs = executor
-        .list_gate_runs(&issue.id, None)
-        .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
-    Ok(jit::output::IssueShowResponse::from_issue(
-        issue,
-        enriched_deps,
-        &gate_runs,
-    ))
+    executor.issues().show_response(issue)
 }
 
 /// Render a single resolved addressable item as a JSON envelope or a short block.
@@ -2328,18 +2320,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Ok(issue) => {
                             // Field projection: print the named field(s) and return.
                             if projecting {
-                                let enriched_deps =
-                                    executor.issues().get_dependencies_enriched(&issue);
-                                let gate_runs = executor
-                                    .list_gate_runs(&issue.id, None)
-                                    .with_context(|| {
-                                        format!("Failed to load gate runs for issue {}", issue.id)
-                                    })?;
-                                let response = jit::output::IssueShowResponse::from_issue(
-                                    issue,
-                                    enriched_deps,
-                                    &gate_runs,
-                                );
+                                let response = executor.issues().show_response(issue)?;
                                 let value = serde_json::to_value(&response).with_context(|| {
                                     "Failed to serialize issue for field projection".to_string()
                                 })?;
@@ -2380,16 +2361,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 println!("{}", output.to_json_string()?);
                                 return Ok(());
                             }
-                            let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                            let gate_runs =
-                                executor.list_gate_runs(&issue.id, None).with_context(|| {
-                                    format!("Failed to load gate runs for issue {}", issue.id)
-                                })?;
-                            let response = jit::output::IssueShowResponse::from_issue(
-                                issue,
-                                enriched_deps,
-                                &gate_runs,
-                            );
+                            let response = executor.issues().show_response(issue)?;
 
                             let show_msg = format!(
                                 "Issue {}: {} [{}]",

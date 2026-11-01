@@ -204,3 +204,117 @@ fn test_doc_list_includes_artifacts_merged_from_a_linked_worktree_without_a_trac
         "listing the merged artifact writes nothing to the tracker"
     );
 }
+
+/// The `(path, type, label)` of each document in `documents`, sorted by path.
+fn document_entries(documents: &Value) -> Vec<(String, Value, Value)> {
+    let mut entries = documents
+        .as_array()
+        .unwrap_or_else(|| panic!("documents is an array: {documents}"))
+        .iter()
+        .map(|document| {
+            (
+                document["path"].as_str().unwrap().to_string(),
+                document["doc_type"].clone(),
+                document["label"].clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    entries
+}
+
+#[test]
+fn test_every_issue_surface_reports_the_documents_doc_list_reports_without_writing_a_derived_one() {
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config())]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let issue = cli
+        .create_issue(["--title", "Owner of derived documents"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
+    let id = issue.short_id();
+    let directory = cli
+        .run(["doc", "dir", id, declared_area()])
+        .unwrap()
+        .trim()
+        .to_string();
+    let derived = format!("{directory}/plan.md");
+    write_file(cli.root(), &derived, "# derived\n");
+    write_file(cli.root(), "linked.md", "# linked\n");
+    cli.run(["doc", "add", id, "linked.md"]).unwrap();
+    let observed = cli.root().join("observed-issue-docs.json");
+    let checker = format!("printf '%s' \"$JIT_ISSUE_DOCS\" > {}", observed.display());
+    cli.run([
+        "gate",
+        "define",
+        "docs-gate",
+        "--title",
+        "Docs",
+        "--description",
+        "Records the documents a checker receives",
+        "--mode",
+        "auto",
+        "--checker-command",
+        &checker,
+    ])
+    .unwrap();
+    cli.run(["gate", "add", id, "docs-gate"]).unwrap();
+
+    let listed = json_output(&cli, &["doc", "list", id]);
+    let store_before_reads = store_bytes(cli.root());
+    let shown = json_output(&cli, &["issue", "show", id]);
+    assert_eq!(
+        store_bytes(cli.root()),
+        store_before_reads,
+        "reading an issue writes nothing"
+    );
+    cli.run(["gate", "evaluate", id, "docs-gate"]).unwrap();
+    let received: Value = serde_json::from_str(&fs::read_to_string(&observed).unwrap()).unwrap();
+
+    let expected = document_entries(&listed["documents"]);
+    assert!(
+        expected
+            .iter()
+            .any(|(path, doc_type, label)| path == &derived
+                && doc_type.is_null()
+                && label.is_null()),
+        "doc list reports the derived document bare: {expected:?}"
+    );
+    assert_eq!(document_entries(&shown["documents"]), expected);
+    assert_eq!(document_entries(&received), expected);
+    assert!(
+        store_bytes(cli.root())
+            .values()
+            .all(|bytes| !String::from_utf8_lossy(bytes).contains(&derived)),
+        "no stored record names the derived document"
+    );
+}
+
+#[test]
+fn test_issue_show_reports_explicit_links_only_when_no_area_is_declared() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli
+        .create_issue(["--title", "No areas"])
+        .unwrap()
+        .parse::<IssueId>()
+        .unwrap();
+    write_file(cli.root(), "linked.md", "# linked\n");
+    write_file(
+        cli.root(),
+        &format!("workspace/drafts/{}/plan.md", id.short_id()),
+        "x\n",
+    );
+    cli.run(["doc", "add", id.short_id(), "linked.md"]).unwrap();
+
+    let shown = json_output(&cli, &["issue", "show", id.short_id()]);
+
+    assert_eq!(
+        document_entries(&shown["documents"])
+            .into_iter()
+            .map(|(path, ..)| path)
+            .collect::<Vec<_>>(),
+        ["linked.md"]
+    );
+}

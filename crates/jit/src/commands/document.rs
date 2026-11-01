@@ -113,35 +113,46 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((result, lease_warnings.into_iter().chain(warnings).collect()))
     }
 
+    /// The no-follow listing of the tree rooted at `root` at `scope`; a root
+    /// that is absent, a file, or a symlink lists nothing.
+    fn list_artifact_tree(
+        &self,
+        root: &str,
+        scope: crate::domain::artifact_discovery::ArtifactListingScope,
+    ) -> Result<Vec<String>> {
+        use crate::domain::artifact_discovery::ArtifactEvidence;
+
+        Ok(
+            match crate::storage::artifact_planning::inspect_artifact_evidence(
+                &self.storage,
+                root,
+                scope,
+            )? {
+                ArtifactEvidence::Directory { entries, .. } => entries,
+                _ => Vec::new(),
+            },
+        )
+    }
+
     /// Each declared issue-scoped area paired with its no-follow recursive
     /// listing at `scope`.
     ///
     /// The registry is read through the accessor that decides area membership
     /// everywhere else: a declared entry that normalizes to nothing names no
     /// area, so it is neither walked nor named. Each surviving area is named in
-    /// its normalized spelling. An area that is absent, a file, or a symlink
-    /// lists nothing.
+    /// its normalized spelling.
     fn list_issue_scoped_areas(
         &self,
         documentation: &crate::config::DocumentationConfig,
         scope: crate::domain::artifact_discovery::ArtifactListingScope,
     ) -> Result<Vec<(String, Vec<String>)>> {
-        use crate::domain::artifact_discovery::ArtifactEvidence;
-
         documentation
             .issue_scoped_areas()
             .into_iter()
             .filter(|area| documentation.is_issue_scoped_area(area))
             .map(|area| {
                 let area = crate::domain::artifact_plan::normalize_artifact_path(&area);
-                let entries = match crate::storage::artifact_planning::inspect_artifact_evidence(
-                    &self.storage,
-                    &area,
-                    scope,
-                )? {
-                    ArtifactEvidence::Directory { entries, .. } => entries,
-                    _ => Vec::new(),
-                };
+                let entries = self.list_artifact_tree(&area, scope)?;
                 Ok((area, entries))
             })
             .collect()
@@ -151,8 +162,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// by the documents it owns by location
     /// ([`derive_issue_documents`](crate::domain::artifact_directory::derive_issue_documents)).
     ///
-    /// The declared issue-scoped areas are listed once for the whole set, so a
-    /// repository declaring none reads no tree.
+    /// One issue lists only the directories it owns; several share one listing
+    /// of the declared areas. A repository declaring none reads no tree.
     fn with_issue_documents(
         &self,
         issues: Vec<crate::domain::Issue>,
@@ -165,11 +176,26 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documentation
             .unwrap_or_default();
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let files = self
-            .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+        let files = match issues.as_slice() {
+            [issue] => crate::domain::artifact_directory::owned_artifact_directories(
+                issue,
+                &documentation,
+                &hierarchy,
+            )
+            .iter()
+            .map(|directory| {
+                self.list_artifact_tree(directory, ArtifactListingScope::RecursiveFiles)
+            })
+            .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .flat_map(|(_, files)| files)
-            .collect::<Vec<_>>();
+            .flatten()
+            .collect::<Vec<_>>(),
+            _ => self
+                .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+                .into_iter()
+                .flat_map(|(_, files)| files)
+                .collect::<Vec<_>>(),
+        };
         Ok(issues
             .into_iter()
             .map(|issue| {
@@ -186,6 +212,19 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect();
                 (issue, documents)
             })
+            .collect())
+    }
+
+    /// `issue`'s documents as every reader reports them: its explicit links,
+    /// then the files it owns by location. Nothing derived is stored.
+    pub fn issue_documents(
+        &self,
+        issue: &crate::domain::Issue,
+    ) -> Result<Vec<crate::domain::DocumentReference>> {
+        Ok(self
+            .with_issue_documents(vec![issue.clone()])?
+            .into_iter()
+            .flat_map(|(_, documents)| documents)
             .collect())
     }
 
@@ -242,11 +281,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::commands::DocumentListResult> {
         let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
-        let documents = self
-            .with_issue_documents(vec![issue])?
-            .into_iter()
-            .flat_map(|(_, documents)| documents)
-            .collect::<Vec<_>>();
+        let documents = self.issue_documents(&issue)?;
 
         Ok(crate::commands::DocumentListResult::with_extras(
             documents,

@@ -166,21 +166,24 @@ fn resolve_issue_path_id<S: IssueStore>(
         })
 }
 
-/// Get single issue by ID
+/// Get single issue by ID, its `documents` explicit and derived.
+///
+/// The issue list keeps explicit links only: reporting derived documents there
+/// would list the declared areas on every list read.
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<IssueResponse>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
-    state
-        .executor
-        .issues()
-        .show_issue(&id)
-        .map(|issue| Json(IssueResponse::from(issue)))
-        .map_err(|e| {
-            tracing::error!("Failed to get issue {}: {:?}", id, e);
-            StatusCode::NOT_FOUND
-        })
+    let mut issue = state.executor.issues().show_issue(&id).map_err(|e| {
+        tracing::error!("Failed to get issue {}: {:?}", id, e);
+        StatusCode::NOT_FOUND
+    })?;
+    issue.documents = state.executor.issue_documents(&issue).map_err(|e| {
+        tracing::error!("Failed to list documents of issue {}: {:?}", id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(IssueResponse::from(issue)))
 }
 
 /// Graph data for visualization: one node per issue, one edge per dependency.
@@ -2479,6 +2482,48 @@ unique = false
 
     /// Every issue-scoped document read, and the search universe, accept a
     /// file under the issue's artifact directory that no link names.
+    #[tokio::test]
+    async fn test_get_issue_reports_a_derived_document_the_list_keeps_unlisted() {
+        use jit::domain::Priority;
+
+        let (temp, executor) =
+            setup_test_repo_with_config("[documentation]\nissue_scoped_areas = [\"notes\"]\n")
+                .unwrap();
+        let (id, _) = executor
+            .issues()
+            .create_issue(
+                "Derived document reads".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        let directory = executor
+            .resolve_issue_artifact_directory(&id, "notes")
+            .unwrap()
+            .directory;
+        let doc_rel = format!("{directory}/plan.md");
+        std::fs::create_dir_all(temp.path().join(&directory)).unwrap();
+        std::fs::write(temp.path().join(&doc_rel), "plan\n").unwrap();
+        let state = AppState {
+            executor: Arc::new(executor),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let issue: serde_json::Value = server.get(&format!("/issues/{id}")).await.json();
+        let listed: serde_json::Value = server.get("/issues").await.json();
+
+        assert_eq!(issue["documents"][0]["path"], doc_rel.as_str());
+        assert!(listed[0]["documents"].as_array().unwrap().is_empty());
+    }
+
     #[tokio::test]
     async fn test_document_reads_serve_a_derived_document_without_a_link() {
         use jit::domain::Priority;
