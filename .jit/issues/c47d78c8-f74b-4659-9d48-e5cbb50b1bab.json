@@ -21,7 +21,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Derive issue membership from the issue files",
-  "updated_at": "2026-11-01T14:08:13.476991377Z"
+  "updated_at": "2026-11-01T14:17:54.536252532Z"
 }
