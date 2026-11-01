@@ -33,7 +33,9 @@ set -uo pipefail
 # The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
 # over synthetic step output and load samples, one assertion per exit path. A
 # compiler wrapper that cannot run exits 75 before any step, driven through
-# wrappers this self-test owns.
+# wrappers this self-test owns. The build-lock wait of this gate and of the
+# profiling and benchmark scripts is driven against a lock it owns, in a repository
+# it owns.
 #
 # The signature and stale-expect scenarios also assert that `cargo build
 # --workspace` SUCCEEDS on the same tree: that is the recorded reason a
@@ -48,7 +50,7 @@ set -uo pipefail
 #   1 — one or more assertions failed
 #   2 — environment error (missing tooling)
 
-for tool in git cargo jq; do
+for tool in git cargo jq python3 flock; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "selftest: '$tool' not on PATH" >&2
     exit 2
@@ -67,7 +69,7 @@ cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
 
 # Fixtures select their own wrapper, so the host's cannot decide their outcome.
-unset RUSTC_WRAPPER
+unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_BUILD_RUSTC_WRAPPER CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER
 
 fail=0
 real_cargo_version=$(cargo --version)
@@ -167,8 +169,9 @@ nextest_runtime_failure_reported() {
 # The gate must reject any reporter version other than the provisioned pin
 # before it reaches fmt or another gate step. A cargo shim answers the real
 # cargo's version, captured up front because a PATH-scanning host cargo would
-# resolve back to this shim, and injects an older nextest version; any later
-# Cargo invocation is an assertion failure in the fixture itself.
+# resolve back to this shim, and injects an older nextest version; any Cargo
+# invocation after the wrapper probe's `check` is an assertion failure in the
+# fixture itself.
 test_wrong_nextest_version_fails_fast() {
   local fixture="$scratch/wrong-nextest-version"
   local fake_bin="$fixture/bin"
@@ -184,6 +187,9 @@ if [ "${1:-}" = "--version" ]; then
 fi
 if [ "${1:-}" = "nextest" ] && [ "${2:-}" = "--version" ]; then
   echo "cargo-nextest 0.9.132 (injected selftest fixture)"
+  exit 0
+fi
+if [ "${1:-}" = "check" ]; then
   exit 0
 fi
 printf '%s\n' "$*" >"$SELFTEST_UNEXPECTED_CARGO"
@@ -212,7 +218,7 @@ EOF
 
 # The real wrapper must distinguish lock acquisition from every child status.
 test_build_lock_status_propagation() {
-  local fixture="$scratch/build-lock" rc status lock_fd
+  local fixture="$scratch/build-lock" rc status
   mkdir -p "$fixture/bin"
   cat >"$fixture/bin/cargo" <<'EOF'
 #!/usr/bin/env bash
@@ -220,7 +226,6 @@ if [ "${1:-}" = "--version" ]; then
   echo "cargo 1.90.0 (selftest fixture)"
   exit 0
 fi
-printf 'ran\n' >"$SELFTEST_CHILD_RAN"
 if flock -n "$CARGO_CI_BUILD_LOCK" true; then
   echo "child ran without the build lock" >&2
   exit 98
@@ -232,7 +237,7 @@ EOF
     env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK \
       PATH="$fixture/bin:$PATH" CARGO_CI_NO_SCCACHE=1 \
       CARGO_CI_BUILD_LOCK="$fixture/build.lock" CARGO_CI_LOCK_TIMEOUT=0.01 \
-      SELFTEST_CHILD_RAN="$fixture/ran" SELFTEST_CHILD_STATUS="$status" \
+      SELFTEST_CHILD_STATUS="$status" \
       "$gate" --cargo selftest >"$fixture/out" 2>&1
     rc=$?
     check "build lock: child status $status survives while the lock is held" test "$rc" -eq "$status"
@@ -240,30 +245,23 @@ EOF
       test "$(grep -c 'timed out' "$fixture/out")" -eq 0
   done
   check "build lock: child exit releases the lock" flock -n "$fixture/build.lock" true
-
-  rm -f "$fixture/ran"
-  exec {lock_fd}>"$fixture/build.lock"
-  flock "$lock_fd"
-  env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK \
-    PATH="$fixture/bin:$PATH" CARGO_CI_NO_SCCACHE=1 \
-    CARGO_CI_BUILD_LOCK="$fixture/build.lock" CARGO_CI_LOCK_TIMEOUT=0.01 \
-    SELFTEST_CHILD_RAN="$fixture/ran" SELFTEST_CHILD_STATUS=0 \
-    "$gate" --cargo selftest >"$fixture/out" 2>&1
-  rc=$?
-  exec {lock_fd}>&-
-  check "build lock: acquisition timeout is an environment error" test "$rc" -eq 2
-  check "build lock: timeout names the duration and lock" \
-    grep -qF "timed out after 0.01s waiting for $fixture/build.lock" "$fixture/out"
-  check "build lock: timeout never starts the child" test ! -e "$fixture/ran"
 }
 
-# A wrapper that cannot run is the environment, whichever way it was selected
-# and whichever entry point reaches it. The sccache stand-in answers version
-# queries and fails every compile, as a daemon with a deleted TMPDIR does.
-test_unrunnable_compiler_wrapper() {
-  local fixture="$scratch/wrapper" out="$scratch/wrapper/gate.out" rc
-  local cargo_ran="$fixture/cargo-ran" missing="$fixture/missing-wrapper"
-  mkdir -p "$fixture/bin"
+# Each script that takes the build lock bounds and announces its wait, and
+# no Cargo build starts without the lock. Every run happens in a repository this
+# test owns with every output overridden, because the benchmarks create directories
+# before they lock. The flock shim hands over at the script's first attempt, so a
+# lock arriving after the script started is deterministic on either side of that
+# attempt. A benchmark-rust-build.sh timeout also keeps its samples, and leaves no
+# target directory even after its first release.
+test_script_build_lock_wait() {
+  local fixture="$scratch/script-lock" repo="$scratch/script-lock/repo" bound=0.01
+  local lock="$fixture/build.lock" cargo_ran="$fixture/cargo-ran"
+  local first_attempt="$fixture/first-attempt" proceed="$fixture/proceed"
+  local real_flock script name out rc lock_fd arrival_fd pid arrival_took_lock
+  real_flock=$(command -v flock)
+  mkdir -p "$fixture/bin" "$fixture/shim"
+  seed_base "$repo"
   cat >"$fixture/bin/cargo" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = "--version" ]; then
@@ -271,52 +269,126 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 printf '%s\n' "$*" >"$SELFTEST_CARGO_RAN"
+exit 97
 EOF
-  cat >"$fixture/bin/sccache" <<'EOF'
+  printf '#!/usr/bin/env bash\n' >"$fixture/bin/rg"
+  cat >"$fixture/shim/flock" <<'EOF'
 #!/usr/bin/env bash
-case " $* " in
-  *" -vV "*) exec "$@" ;;
+hand_over() {
+  : >"$SELFTEST_FIRST_ATTEMPT"
+  local waited=0
+  while [ ! -e "$SELFTEST_PROCEED" ] && [ "$waited" -lt 3000 ]; do
+    sleep 0.01
+    waited=$((waited + 1))
+  done
+}
+[ ! -e "$SELFTEST_FIRST_ATTEMPT" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
+case "$SELFTEST_LOCK_ARRIVES" in
+  after-release)
+    [ "${1:-}" = "-u" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
+    "$SELFTEST_REAL_FLOCK" "$@"
+    hand_over
+    ;;
+  before-attempt)
+    hand_over
+    exec "$SELFTEST_REAL_FLOCK" "$@"
+    ;;
+  after-attempt)
+    rc=0
+    "$SELFTEST_REAL_FLOCK" "$@" || rc=$?
+    hand_over
+    exit "$rc"
+    ;;
 esac
-echo "sccache: error: Failed to create temp dir" >&2
-exit 254
 EOF
-  cat >"$fixture/passthrough-wrapper" <<'EOF'
-#!/usr/bin/env bash
-exec "$@"
-EOF
-  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache" "$fixture/passthrough-wrapper"
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/rg" "$fixture/shim/flock"
+
+  run_script() { # run_script <script> <PATH-prefix> [VAR=value ...]
+    local path_prefix="$2" script_path="$1"
+    shift 2
+    (
+      cd "$repo" || exit 3
+      env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK -u PROFILE_TEST_SUITE_LOCKED -u SESSION_BENCH_BIN \
+        PATH="$path_prefix:$PATH" SELFTEST_CARGO_RAN="$cargo_ran" \
+        CARGO_CI_BUILD_LOCK="$lock" CARGO_CI_LOCK_TIMEOUT="$bound" \
+        PROFILE_TEST_SUITE_OUTPUT="$fixture/profile.json" \
+        SESSION_BENCH_OUT_DIR="$fixture/session-out" SESSION_BENCH_WORK_DIR="$fixture/session-work" \
+        SESSION_BENCH_TARGET_DIR="$fixture/session-target" \
+        BENCH_OUT_DIR="$fixture/bench-out" BENCH_TARGET_BASE="$fixture/bench-target" \
+        BENCH_PROBE_FILE=src/lib.rs "$@" "$script_path"
+    ) >"$out" 2>&1
+  }
+  # Runs <script> until its first flock attempt, takes the lock if it is free, and
+  # lets the script finish.
+  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt|after-release>
+    rm -f "$first_attempt" "$proceed"
+    run_script "$1" "$fixture/shim:$fixture/bin" SELFTEST_LOCK_ARRIVES="$2" \
+      SELFTEST_REAL_FLOCK="$real_flock" SELFTEST_FIRST_ATTEMPT="$first_attempt" \
+      SELFTEST_PROCEED="$proceed" &
+    pid=$!
+    while [ ! -e "$first_attempt" ] && kill -0 "$pid" 2>/dev/null; do
+      sleep 0.01
+    done
+    exec {arrival_fd}>"$lock"
+    arrival_took_lock=no
+    if flock -n "$arrival_fd"; then
+      arrival_took_lock=yes
+    fi
+    : >"$proceed"
+    wait "$pid"
+    rc=$?
+    exec {arrival_fd}>&-
+  }
+  wait_is_announced() { grep -F "waiting up to ${bound}s" "$out" | grep -qF "$lock"; }
+  no_target_dir_remains() { ! compgen -G "$fixture/bench-target/target.*" >/dev/null; }
 
   echo
-  echo "== compiler wrapper: one that cannot run is an environment fault =="
-  env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 \
-    SELFTEST_CARGO_RAN="$cargo_ran" "$gate" >"$out" 2>&1
-  rc=$?
-  check "selected sccache fails compiles: the gate exits with the infrastructure status" \
-    test "$rc" -eq 75
-  check "selected sccache fails compiles: the diagnosis names the wrapper" \
-    grep -qF "compiler wrapper 'sccache'" "$out"
-  check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
-    grep -qF "Failed to create temp dir" "$out"
-  check "selected sccache fails compiles: no verdict on repository content" \
-    test "$(grep -c 'repository content' "$out")" -eq 0
-  check "selected sccache fails compiles: no Cargo command runs" test ! -e "$cargo_ran"
+  echo "== script build lock: the wait is bounded, announced and builds nothing =="
+  for script in cargo-ci.sh profile-test-suite.sh benchmark-session-cost.sh benchmark-rust-build.sh; do
+    name=$script
+    script="$here/$script"
+    out="$fixture/$name.out"
+    rm -f "$cargo_ran"
+    if [ "$name" = benchmark-rust-build.sh ]; then
+      mkdir -p "$fixture/bench-out/raw"
+      printf '{"sample":1}\n' | tee "$fixture/seed" "$fixture/bench-out/raw/clean-samples.jsonl" \
+        >"$fixture/bench-out/raw/rebuild-samples.jsonl"
+    fi
 
-  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
-    RUSTC_WRAPPER="$missing" SELFTEST_CARGO_RAN="$cargo_ran" \
-    "$gate" --cargo selftest >"$out" 2>&1
-  rc=$?
-  check "operator wrapper is missing: focused Cargo mode exits with the infrastructure status" \
-    test "$rc" -eq 75
-  check "operator wrapper is missing: the diagnosis names the wrapper" \
-    grep -qF "compiler wrapper '$missing'" "$out"
-  check "operator wrapper is missing: Cargo never runs" test ! -e "$cargo_ran"
+    exec {lock_fd}>"$lock"
+    flock "$lock_fd"
+    run_script "$script" "$fixture/bin"
+    rc=$?
+    exec {lock_fd}>&-
+    check "$name lock held throughout: the wait passing exits 2" test "$rc" -eq 2
+    check "$name lock held throughout: the wait names the lock and the bound" wait_is_announced
+    check "$name lock held throughout: the timeout names the lock and the bound" \
+      grep -qF "timed out after ${bound}s waiting for $lock" "$out"
+    check "$name lock held throughout: no Cargo build starts" test ! -e "$cargo_ran"
+    check "$name lock held throughout: the repository is unchanged" \
+      test -z "$(git -C "$repo" status --porcelain)"
+    if [ "$name" = benchmark-rust-build.sh ]; then
+      check "$name lock held throughout: the clean samples are unchanged" \
+        cmp -s "$fixture/seed" "$fixture/bench-out/raw/clean-samples.jsonl"
+      check "$name lock held throughout: the rebuild samples are unchanged" \
+        cmp -s "$fixture/seed" "$fixture/bench-out/raw/rebuild-samples.jsonl"
+      check "$name lock held throughout: no target directory remains" no_target_dir_remains
 
-  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
-    RUSTC_WRAPPER="$fixture/passthrough-wrapper" SELFTEST_CARGO_RAN="$cargo_ran" \
-    "$gate" --cargo selftest >"$out" 2>&1
-  rc=$?
-  check "healthy wrapper: the check lets the Cargo command run" \
-    test "$rc" -eq 0 -a -e "$cargo_ran"
+      run_with_arriving_lock "$script" after-release
+      check "$name lock taken after the first release: the wait passing exits 2" test "$rc" -eq 2
+      check "$name lock taken after the first release: no target directory remains" no_target_dir_remains
+    fi
+
+    run_with_arriving_lock "$script" before-attempt
+    check "$name lock arrives after the start: the wait is announced" wait_is_announced
+    check "$name lock arrives after the start: the wait passing exits 2" test "$rc" -eq 2
+    check "$name lock arrives after the start: no Cargo build starts" test ! -e "$cargo_ran"
+
+    run_with_arriving_lock "$script" after-attempt
+    check "$name lock free at the first attempt: that attempt holds it, so no wait goes silent" \
+      test "$arrival_took_lock" = no
+    git -C "$repo" clean -fdxq
+  done
 }
 
 # --- fixture construction ----------------------------------------------------
@@ -786,6 +858,7 @@ echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
 test_classifier_exit_paths
 test_build_lock_status_propagation
+test_script_build_lock_wait
 test_unrunnable_compiler_wrapper
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass

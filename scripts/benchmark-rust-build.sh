@@ -65,7 +65,9 @@ set -euo pipefail
 #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
 #   CARGO_CI_LOCK_TIMEOUT   seconds to wait for that lock (default 1800);
-#                           the benchmark exits 2 when the wait passes
+#                           the benchmark exits 2 when the wait passes, with
+#                           the sample logs of a run that never held the lock
+#                           unchanged
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -161,7 +163,8 @@ GIT_REVISION="${BENCH_GIT_REVISION_OVERRIDE:-$(git rev-parse HEAD)}"
 mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 
 # --- host-wide build lock (shared with cargo-ci.sh) ---
-# Acquired around each sample's cargo invocations only (not the whole script),
+# Acquired around replacing the sample logs and each sample's cargo invocations
+# only (not the whole script),
 # so a multi-hour benchmark run does not starve concurrent gate builds between
 # samples. A blocking flock queues our request rather than running concurrently
 # with another lock holder, satisfying "refuses to overlap another repository
@@ -169,7 +172,8 @@ mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 # --- interruption safety for the rebuild probe ---
 # While a rebuild sample holds the probe appended to $PROBE_FILE, an
 # interruption (INT/TERM) or unexpected exit must not leave the tree modified:
-# the EXIT trap restores the captured original whenever a restore is pending.
+# the EXIT trap restores the captured original whenever a restore is pending,
+# and removes the current sample's target directory.
 PROBE_PENDING_BACKUP=""
 restore_probe_if_pending() {
   if [[ -n "$PROBE_PENDING_BACKUP" && -f "$PROBE_PENDING_BACKUP" ]]; then
@@ -178,7 +182,12 @@ restore_probe_if_pending() {
     echo "[benchmark] interrupted: probe file restored from backup" >&2
   fi
 }
-trap restore_probe_if_pending EXIT
+PENDING_TARGET_DIR=""
+clean_up_on_exit() {
+  restore_probe_if_pending
+  [[ -z "$PENDING_TARGET_DIR" ]] || rm -rf "$PENDING_TARGET_DIR"
+}
+trap clean_up_on_exit EXIT
 trap 'restore_probe_if_pending; exit 130' INT
 trap 'restore_probe_if_pending; exit 143' TERM
 
@@ -582,8 +591,11 @@ append_jsonl_atomic() {
 CLEAN_JSONL="$OUT_DIR/raw/clean-samples.jsonl"
 REBUILD_JSONL="$OUT_DIR/raw/rebuild-samples.jsonl"
 if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
+  # Only a run that gets the lock replaces the recorded samples.
+  acquire_lock
   init_empty_jsonl "$CLEAN_JSONL"
   init_empty_jsonl "$REBUILD_JSONL"
+  release_lock
 else
   echo "[benchmark] BENCH_SKIP_SAMPLING set: assembling from existing $CLEAN_JSONL / $REBUILD_JSONL, no new sampling" >&2
   [[ -s "$CLEAN_JSONL" ]] || { echo "ERROR: BENCH_SKIP_SAMPLING set but $CLEAN_JSONL is missing or empty." >&2; exit 2; }
@@ -598,6 +610,7 @@ run_clean_sample() {
 
   local target_dir
   target_dir=$(new_isolated_target_dir)
+  PENDING_TARGET_DIR="$target_dir"
   echo "[benchmark] clean sample $idx/$CLEAN_SAMPLES: target dir $target_dir" >&2
 
   acquire_lock
@@ -655,6 +668,7 @@ run_rebuild_sample() {
 
   local target_dir
   target_dir=$(new_isolated_target_dir)
+  PENDING_TARGET_DIR="$target_dir"
   echo "[benchmark] rebuild sample $idx/$REBUILD_SAMPLES: target dir $target_dir (setup clean build)" >&2
 
   acquire_lock
