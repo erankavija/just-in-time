@@ -252,13 +252,15 @@ EOF
 # test owns with every output overridden, because the benchmarks create directories
 # before they lock. The flock shim hands over at the script's first attempt, so a
 # lock arriving after the script started is deterministic on either side of that
-# attempt. A benchmark-rust-build.sh timeout also keeps its samples, and leaves no
-# target directory even after its first release.
+# attempt. A benchmark-rust-build.sh timeout before it first holds the lock keeps
+# its samples; one after a finished sample reports the partial set; neither leaves
+# a target directory.
 test_script_build_lock_wait() {
   local fixture="$scratch/script-lock" repo="$scratch/script-lock/repo" bound=0.01
   local lock="$fixture/build.lock" cargo_ran="$fixture/cargo-ran"
   local first_attempt="$fixture/first-attempt" proceed="$fixture/proceed"
   local real_flock script name out rc lock_fd arrival_fd pid arrival_took_lock
+  local clean_written rebuild_written
   real_flock=$(command -v flock)
   mkdir -p "$fixture/bin" "$fixture/shim"
   seed_base "$repo"
@@ -269,7 +271,7 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 printf '%s\n' "$*" >"$SELFTEST_CARGO_RAN"
-exit 97
+exit "${SELFTEST_CARGO_STATUS:-97}"
 EOF
   printf '#!/usr/bin/env bash\n' >"$fixture/bin/rg"
   cat >"$fixture/shim/flock" <<'EOF'
@@ -284,10 +286,13 @@ hand_over() {
 }
 [ ! -e "$SELFTEST_FIRST_ATTEMPT" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
 case "$SELFTEST_LOCK_ARRIVES" in
-  after-release)
+  after-second-release)
     [ "${1:-}" = "-u" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
     "$SELFTEST_REAL_FLOCK" "$@"
-    hand_over
+    if [ -e "$SELFTEST_FIRST_ATTEMPT.released" ]; then
+      hand_over
+    fi
+    : >"$SELFTEST_FIRST_ATTEMPT.released"
     ;;
   before-attempt)
     hand_over
@@ -320,11 +325,13 @@ EOF
   }
   # Runs <script> until its first flock attempt, takes the lock if it is free, and
   # lets the script finish.
-  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt|after-release>
-    rm -f "$first_attempt" "$proceed"
-    run_script "$1" "$fixture/shim:$fixture/bin" SELFTEST_LOCK_ARRIVES="$2" \
+  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt|after-second-release> [VAR=value ...]
+    local arriving_script="$1" arrival="$2"
+    shift 2
+    rm -f "$first_attempt" "$first_attempt.released" "$proceed"
+    run_script "$arriving_script" "$fixture/shim:$fixture/bin" SELFTEST_LOCK_ARRIVES="$arrival" \
       SELFTEST_REAL_FLOCK="$real_flock" SELFTEST_FIRST_ATTEMPT="$first_attempt" \
-      SELFTEST_PROCEED="$proceed" &
+      SELFTEST_PROCEED="$proceed" "$@" &
     pid=$!
     while [ ! -e "$first_attempt" ] && kill -0 "$pid" 2>/dev/null; do
       sleep 0.01
@@ -373,10 +380,20 @@ EOF
       check "$name lock held throughout: the rebuild samples are unchanged" \
         cmp -s "$fixture/seed" "$fixture/bench-out/raw/rebuild-samples.jsonl"
       check "$name lock held throughout: no target directory remains" no_target_dir_remains
+      check "$name lock held throughout: the run is not reported as partial" \
+        test "$(grep -c 'partial' "$out")" -eq 0
 
-      run_with_arriving_lock "$script" after-release
-      check "$name lock taken after the first release: the wait passing exits 2" test "$rc" -eq 2
-      check "$name lock taken after the first release: no target directory remains" no_target_dir_remains
+      run_with_arriving_lock "$script" after-second-release SELFTEST_CARGO_STATUS=0 \
+        BENCH_INVENTORY_SAMPLE=0
+      clean_written=$(wc -l <"$fixture/bench-out/raw/clean-samples.jsonl")
+      rebuild_written=$(wc -l <"$fixture/bench-out/raw/rebuild-samples.jsonl")
+      check "$name lock taken after a finished sample: that sample is recorded" \
+        test "$clean_written" -gt 0
+      check "$name lock taken after a finished sample: the wait passing exits 2" test "$rc" -eq 2
+      check "$name lock taken after a finished sample: the message counts the partial set" \
+        grep -qE "partial.*\b$clean_written clean and $rebuild_written rebuild samples" "$out"
+      check "$name lock taken after a finished sample: no target directory remains" no_target_dir_remains
+      rm -f "$cargo_ran"
     fi
 
     run_with_arriving_lock "$script" before-attempt

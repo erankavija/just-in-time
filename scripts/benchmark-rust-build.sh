@@ -67,7 +67,7 @@ set -euo pipefail
 #   CARGO_CI_LOCK_TIMEOUT   seconds to wait for that lock (default 1800);
 #                           the benchmark exits 2 when the wait passes, with
 #                           the sample logs of a run that never held the lock
-#                           unchanged
+#                           unchanged; a later timeout reports the partial set
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -195,6 +195,7 @@ trap 'restore_probe_if_pending; exit 143' TERM
 # repository Cargo build). There is no opt-out, and a host without flock is a
 # hard environment error rather than a silent unlocked run.
 LOCK_FD=""
+RUN_HELD_LOCK=""
 acquire_lock() {
   command -v flock >/dev/null 2>&1 || {
     echo "ERROR: 'flock' is required (the benchmark must not run unlocked alongside other Cargo builds)." >&2
@@ -207,10 +208,14 @@ acquire_lock() {
     flock -w "$LOCK_TIMEOUT" -E 75 "$LOCK_FD" || lock_status=$?
     if [[ $lock_status -eq 75 ]]; then
       echo "ERROR: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
+      if [[ -n "$RUN_HELD_LOCK" ]]; then
+        echo "ERROR: this run did not finish; its sample set is partial: $(wc -l <"$CLEAN_JSONL") clean and $(wc -l <"$REBUILD_JSONL") rebuild samples written to $OUT_DIR/raw" >&2
+      fi
       exit 2
     fi
     [[ $lock_status -eq 0 ]] || exit "$lock_status"
   fi
+  RUN_HELD_LOCK=1
 }
 release_lock() {
   [[ -n "$LOCK_FD" ]] || return 0
