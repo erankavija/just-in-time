@@ -29,7 +29,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Issue gate fields are keyed by GateKey",
-  "updated_at": "2026-11-01T02:39:10.282903415Z"
+  "updated_at": "2026-11-01T02:57:11.912539337Z"
 }
