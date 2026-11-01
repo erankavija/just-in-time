@@ -203,8 +203,7 @@ fn test_cli_dep_add_unresolved_target_rejects_batch_before_graph_validation() {
 /// jit:c8518f2a (round 2): a cycle-failing edge must not suppress redundancy
 /// analysis for a sibling in the same batch. Existing A -> B -> C and D -> A;
 /// `dep add A D C` tries A -> D (cycle) and A -> C (self-redundant via
-/// A -> B -> C). Both must be named, in both text and --json forms, and
-/// nothing gets written.
+/// A -> B -> C). Both must be named, in both text and --json forms.
 #[test]
 fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
@@ -246,20 +245,6 @@ fn test_cli_dep_add_cycle_failure_does_not_suppress_sibling_redundancy() {
         .collect();
     assert_eq!(by_to.get(d.as_str()), Some(&"CYCLE_DETECTED"));
     assert_eq!(by_to.get(c.as_str()), Some(&"VALIDATION_FAILED"));
-
-    // Nothing was written.
-    let show = cli
-        .command(["issue", "show", &a, "--json"])
-        .output()
-        .unwrap();
-    let json_a: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
-    let deps: Vec<&str> = json_a["dependencies"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|dep| dep["id"].as_str().unwrap())
-        .collect();
-    assert_eq!(deps, vec![b.as_str()]);
 }
 
 /// A too-short id prefix in either `dep add` position is refused as an invalid

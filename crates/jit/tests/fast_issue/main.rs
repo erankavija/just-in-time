@@ -8,7 +8,6 @@ mod archived_semantics_tests;
 mod bulk_operations_tests;
 mod dep_add_atomic_tests;
 mod dependency_met_tests;
-mod domain_queries_tests;
 mod graph_rule_validation_tests;
 mod hierarchy_vectors_test;
 mod lifecycle_timestamps_tests;

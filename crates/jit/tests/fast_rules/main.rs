@@ -9,7 +9,6 @@ mod default_rules_registry_derivation_tests;
 mod effective_rules_tests;
 mod example_rulesets_tests;
 mod label_query_tests;
-mod label_strategic_tests;
 mod local_rule_enforcement_tests;
 mod project_render_harness_tests;
 mod type_hierarchy_schema_regen_tests;

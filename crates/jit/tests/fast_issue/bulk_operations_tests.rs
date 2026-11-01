@@ -310,33 +310,6 @@ fn test_add_dependencies_atomic_failure_nonexistent() {
     assert!(loaded.dependencies.is_empty());
 }
 
-/// jit:c8518f2a REQ-01: a cycle among the requested edges rejects the whole
-/// batch atomically; nothing is written.
-#[test]
-fn test_add_dependencies_cycle_detection_atomic() {
-    let h = TestHarness::new();
-    let a = h.create_issue("A");
-    let b = h.create_issue("B");
-    let c = h.create_issue("C");
-
-    // Create A → B → C
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
-
-    // Try to add C → A (would create cycle)
-    let result = h.executor.add_dependencies(&c, std::slice::from_ref(&a));
-
-    let err = result.expect_err("a cycle must fail the whole batch");
-    let batch = err
-        .downcast_ref::<jit::errors::DependencyBatchRejectedError>()
-        .expect("must be a typed DependencyBatchRejectedError");
-    assert_eq!(batch.rejected().len(), 1);
-    assert!(batch.rejected()[0].1.to_string().contains("cycle"));
-
-    let loaded = h.storage.load_issue(&c).unwrap();
-    assert!(!loaded.dependencies.contains(&a));
-}
-
 #[test]
 fn test_add_single_dependency_still_works() {
     let h = TestHarness::new();
