@@ -206,32 +206,24 @@ impl GateAlreadyExistsError {
     }
 }
 
-/// Error raised when a repository's on-disk format version is newer than the
-/// running `jit` binary supports.
+/// Error raised when a repository's on-disk format version is not the one this
+/// binary accepts.
 ///
-/// The repository carries a single format marker (`schema_version` in
-/// `.jit/index.json`). On startup the storage layer compares that marker against
-/// the version this binary understands; if the repository's is greater, it fails
-/// fast with this typed error instead of letting an out-of-date binary misread newer
-/// data (which previously surfaced as opaque file-read or phantom-validation
-/// failures). The CLI downcasts to this type to classify the failure as an
-/// external-dependency condition (exit code `10`): the binary, not the
-/// repository, is out of date, and the fix is upgrading `jit`. `Display` is a
-/// single line naming both the repository's version and the version the binary
-/// supports.
+/// Reported as an external-dependency condition (exit code `10`): the binary and
+/// the repository disagree, and neither is corrupt. `Display` is a single line
+/// naming both versions.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error(
-    "JIT repository format version {repository_version} is newer than this jit \
-     binary supports (max {supported_version}); upgrade jit (e.g. `cargo install \
-     --path crates/jit`) to operate on this repository."
+    "Repository format version {repository_version} is not the version this binary \
+     supports ({supported_version}); install the jit matching this repository's format."
 )]
-pub struct RepositoryFormatTooNewError {
+pub struct RepositoryFormatUnsupportedError {
     repository_version: u32,
     supported_version: u32,
 }
 
-impl RepositoryFormatTooNewError {
-    /// Build a [`RepositoryFormatTooNewError`] from the repository's on-disk
+impl RepositoryFormatUnsupportedError {
+    /// Build a [`RepositoryFormatUnsupportedError`] from the repository's on-disk
     /// format version and the version this binary supports.
     pub fn new(repository_version: u32, supported_version: u32) -> Self {
         Self {
@@ -240,12 +232,12 @@ impl RepositoryFormatTooNewError {
         }
     }
 
-    /// The repository's on-disk format version (the marker that was too new).
+    /// The repository's on-disk format version .
     pub fn repository_version(&self) -> u32 {
         self.repository_version
     }
 
-    /// The maximum format version this binary understands.
+    /// The one format version this binary accepts.
     pub fn supported_version(&self) -> u32 {
         self.supported_version
     }
@@ -435,8 +427,8 @@ mod tests {
     }
 
     #[test]
-    fn test_repository_format_too_new_message_and_accessors() {
-        let err = RepositoryFormatTooNewError::new(3, 2);
+    fn test_repository_format_unsupported_message_and_accessors() {
+        let err = RepositoryFormatUnsupportedError::new(3, 2);
         assert_eq!(err.repository_version(), 3);
         assert_eq!(err.supported_version(), 2);
         let msg = err.to_string();
@@ -448,9 +440,9 @@ mod tests {
     }
 
     #[test]
-    fn test_repository_format_too_new_downcasts_from_anyhow() {
-        let err: anyhow::Error = RepositoryFormatTooNewError::new(3, 2).into();
-        let typed = err.downcast_ref::<RepositoryFormatTooNewError>();
+    fn test_repository_format_unsupported_downcasts_from_anyhow() {
+        let err: anyhow::Error = RepositoryFormatUnsupportedError::new(3, 2).into();
+        let typed = err.downcast_ref::<RepositoryFormatUnsupportedError>();
         assert!(typed.is_some());
         assert_eq!(typed.unwrap().repository_version(), 3);
     }

@@ -1455,7 +1455,7 @@ mod tests {
         );
 
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
-            schema_version: 2,
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -2460,7 +2460,7 @@ mod tests {
     #[test]
     fn test_create_issue_stamps_lifecycle_and_writes_no_index() {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
-            schema_version: 2,
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             deleted_ids: Vec::new(),
         })
         .unwrap();
@@ -2513,7 +2513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_issue_removes_record_and_moves_index_membership() {
+    fn test_delete_issue_removes_record_and_records_its_tombstone() {
         let issue = seeded_issue(
             &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
             None,
@@ -2521,7 +2521,7 @@ mod tests {
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = canonical_json(
             &RepositoryIndex {
-                schema_version: 2,
+                schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
                 deleted_ids: Vec::new(),
             },
             true,
@@ -2570,7 +2570,7 @@ mod tests {
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let index_bytes = serde_json::to_vec(&serde_json::json!({
-            "schema_version": 2,
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
             "deleted_ids": [crate::test_utils::issue_id(1), crate::test_utils::issue_id(1)]
         }))
         .unwrap();

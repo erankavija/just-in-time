@@ -45,9 +45,9 @@ pub use image::{
     RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
-pub(crate) use index::{
-    captured_issue_ids, listed_issue_ids, RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION,
-};
+#[cfg(test)]
+pub(crate) use index::SUPPORTED_INDEX_SCHEMA_VERSION;
+pub(crate) use index::{captured_issue_ids, listed_issue_ids, RepositoryIndex};
 pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,

@@ -611,9 +611,9 @@ lists it under `modified_paths`; if it already carried the block, neither list
 mentions it.
 
 `repository_id` is `null` outside a git repository. The
-repository-format-too-new startup failure (see **Scripting and Automation
+unsupported-repository-format startup failure (see **Scripting and Automation
 § Exit Codes** below) emits the standard `--json` error envelope
-(`REPOSITORY_FORMAT_TOO_NEW` / exit `10`).
+(`REPOSITORY_FORMAT_UNSUPPORTED` / exit `10`).
 
 When `--profile` is present, `profile` contains the same
 `ProfileComposedApplyResult` returned by `jit profile apply`; dependency-only
