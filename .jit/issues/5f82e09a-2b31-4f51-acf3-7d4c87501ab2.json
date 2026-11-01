@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "5247d723-9ee5-4061-ae9d-813f54e649ab",
+      "run_id": "69f8bc29-260d-411f-bf2e-3d40f3eddd19",
       "status": "passed",
-      "updated_at": "2026-11-01T14:00:02.190060260Z",
+      "updated_at": "2026-11-01T14:24:40.628807704Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Refuse a profile apply over uncommitted target changes",
-  "updated_at": "2026-11-01T14:23:07.185435806Z"
+  "updated_at": "2026-11-01T14:24:40.628807704Z"
 }

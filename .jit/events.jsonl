@@ -22170,3 +22170,11 @@
 {"from":"ready","id":"0531370c-7472-4027-9092-873b2f9538b0","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:17:54.536252532Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"389676df-d166-4922-ad35-335099eebf47","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:17:54.536252532Z","type":"issue_claimed"}
 {"fields":["description"],"id":"b57f1dff-61b4-46c6-b7cf-1dfd41bc742b","issue_id":"5f82e09a-2b31-4f51-acf3-7d4c87501ab2","timestamp":"2026-11-01T14:23:07.185435806Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"920f69a4-2fcc-4d63-8056-7a08561a9cf3","issue_id":"5f82e09a-2b31-4f51-acf3-7d4c87501ab2","timestamp":"2026-11-01T14:24:40.628807704Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:worker","id":"b50b5f2a-72fd-40ba-b6e6-b8aee6ab91ae","issue_id":"d7cce445-436d-43d7-9ac9-7c21251b19fa","timestamp":"2026-11-01T14:26:00.159916267Z","type":"issue_claimed"}
+{"assignee":"agent:worker","id":"56c29715-8e8b-4699-93c9-3d4a4f931c35","issue_id":"b3a768b3-5d32-4ebb-ab92-9b9854e5b703","timestamp":"2026-11-01T14:26:00.271663203Z","type":"issue_claimed"}
+{"fields":["description"],"id":"4874a1f6-cf3e-495b-8c5a-7f74505e3df1","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:26:00.674744707Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["dependencies"],"id":"2254898d-b6ff-480e-aca2-0f18257bfe06","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:26:01.078083221Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["description"],"id":"b44612f2-b6db-47ab-bff4-dbb79996d5c2","issue_id":"b3a768b3-5d32-4ebb-ab92-9b9854e5b703","timestamp":"2026-11-01T14:26:28.176928695Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["dependencies"],"id":"401f7e5d-0c2b-4b02-81e5-d35599f7ea33","issue_id":"b3a768b3-5d32-4ebb-ab92-9b9854e5b703","timestamp":"2026-11-01T14:26:37.680317055Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["assignee"],"id":"f7a29404-11f8-44f5-a531-60e0a8648dd1","issue_id":"b3a768b3-5d32-4ebb-ab92-9b9854e5b703","timestamp":"2026-11-01T14:26:37.825460101Z","type":"issue_updated","updated_by":"issue-unassign"}
