@@ -592,9 +592,9 @@ fn gate_findings_from_rule_report(
 /// Convert one whole-repository validation result into the built-in gate finding
 /// contract.
 ///
-/// An invalid stored record is a verdict on content, reported beside the rule
-/// findings. Any other structural failure or an unloadable rules declaration is a
-/// fault the checker cannot judge through, so it returns `Err`.
+/// A repository validation judged wrong is a verdict, reported beside the rule
+/// findings. Failing to load or read what it needed, an unloadable rules declaration
+/// included, is a fault the checker cannot judge through, so it returns `Err`.
 fn gate_findings_from_report(
     result: std::result::Result<
         crate::validation::repository::RepositoryValidationReport,
@@ -603,11 +603,11 @@ fn gate_findings_from_report(
 ) -> Result<(Vec<GateFinding>, bool)> {
     let report = match result {
         Ok(report) => report,
-        Err(failure) if failure.is_invalid_stored_record() => {
+        Err(failure) if failure.is_judged_invalid() => {
             let (error, report) = failure.into_parts();
             let mut findings = gate_findings_from_rule_report(&report.rule_report);
             findings.push(GateFinding::builtin(
-                "invalid-stored-record",
+                "repository-invalid",
                 FindingSeverity::High,
                 FindingDisposition::Blocking,
                 FindingOrigin::PreExisting,
@@ -3031,11 +3031,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_repository_validation_records_an_invalid_stored_record_as_a_failed_run() {
-        let changes: [RepositoryChange; 3] = [
+    fn test_repository_validation_records_a_repository_judged_wrong_as_a_failed_run() {
+        let changes: [RepositoryChange; 4] = [
             respell_created_at,
             repeat_last_event,
             append_undecodable_event,
+            add_dangling_dependency,
         ];
         for (index, change) in changes.into_iter().enumerate() {
             let (_, run) = judge_repository_after(change);
@@ -3050,16 +3051,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_repository_validation_records_what_it_cannot_judge_as_an_error_run() {
-        let changes: [(RepositoryChange, &str); 2] = [
-            (remove_index, "index.json"),
-            (add_dangling_dependency, "does not exist"),
-        ];
-        for (change, cause) in changes {
-            let (_, run) = judge_repository_after(change);
-            assert_eq!(run.status, GateRunStatus::Error, "{cause}");
-            assert!(run.stderr.contains(cause), "{}", run.stderr);
-        }
+    fn test_repository_validation_records_a_missing_index_as_an_error_run() {
+        let (_, run) = judge_repository_after(remove_index);
+        assert_eq!(run.status, GateRunStatus::Error);
+        assert!(run.stderr.contains("index.json"), "{}", run.stderr);
     }
 
     #[test]

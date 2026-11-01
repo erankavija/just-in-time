@@ -959,12 +959,14 @@ fn capture_record_fidelity_validation(
     let drift = crate::validation::record_fidelity::record_drift(image, &gate_runs)?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
-        false => Err(crate::validation::repository::InvalidStoredRecord(format!(
-            "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
-            drift.len(),
-            drift.join("\n  ")
-        ))
-        .into()),
+        false => Err(
+            crate::validation::repository::RepositoryJudgedInvalid(format!(
+                "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
+                drift.len(),
+                drift.join("\n  ")
+            ))
+            .into(),
+        ),
     }))
 }
 

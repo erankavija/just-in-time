@@ -29,9 +29,9 @@ The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, a
 configured gate key does not change their behavior:
 
 - `repository_validation` runs the whole-repository `jit validate` computation, so
-it never passes where that fails. A rule finding or an invalid stored record
-records `failed`; a configuration or integrity fault it cannot judge through
-records `error`, which is never reused.
+it never passes where that fails. Finding the repository wrong records `failed`;
+being unable to load or read what it needs records `error`, which is never
+reused.
 - `issue_validation` runs declarative validation for the gated issue.
 - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
 from the gated issue, where the target is a full issue id or unique prefix, and
