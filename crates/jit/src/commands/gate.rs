@@ -315,7 +315,7 @@ fn capture_gate_preset_image(
         let issue_paths = crate::storage::json::parse_repository_index(index_bytes)?
             .all_ids
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+            .map(|id| Ok(VirtualPath::issue_record(id)))
             .collect::<Result<Vec<_>>>()?;
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
@@ -355,7 +355,7 @@ fn capture_gate_preset_image(
     let indexed = current_index
         .all_ids
         .iter()
-        .map(|id| format!("{id}.json"))
+        .filter_map(|id| VirtualPath::issue_record(id).file_name().map(str::to_owned))
         .collect::<std::collections::BTreeSet<_>>();
     if listed != indexed {
         return Ok(None);
@@ -381,7 +381,7 @@ fn captured_gate_preset_issue(
     issue_id: &IssueId,
 ) -> Result<Issue> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
-    let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+    let path = VirtualPath::issue_record(issue_id);
     let issue = match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
             crate::repository_state::decode_issue_record(&path, content.bytes())?

@@ -183,10 +183,7 @@ where
     }];
     let build_spec = || -> Result<CaptureSpec> {
         Ok(CaptureSpec::new(
-            [
-                VirtualPath::data(format!("issues/{full_id}.json"))?,
-                VirtualPath::EVENTS,
-            ],
+            [VirtualPath::issue_record(full_id), VirtualPath::EVENTS],
             super::issue_mutation_capture_budget(),
         )?)
     };
@@ -1058,10 +1055,10 @@ mod tests {
             crate::test_utils::fixture_issue(title.to_string(), "Test description".to_string());
         issue.id = id.clone();
         let issue_bytes = crate::repository_state::serialize_issue(&issue)?;
-        std::fs::write(
-            storage.root().join("issues").join(format!("{id}.json")),
-            issue_bytes,
-        )?;
+        let issue_path = storage
+            .repository_layout()?
+            .resolve(&crate::repository_state::VirtualPath::issue_record(id))?;
+        std::fs::write(issue_path, issue_bytes)?;
 
         let index_path = storage.root().join("index.json");
         let mut index =

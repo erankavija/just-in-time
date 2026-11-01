@@ -125,7 +125,7 @@ fn captured_issue_record(
 ) -> Result<Option<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
+    let path = VirtualPath::issue_record(issue_id);
     match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
             let issue = crate::repository_state::decode_issue_record(&path, content.bytes())?;
@@ -328,14 +328,14 @@ fn captured_gate_evaluation(
     let mut paths = if broad_validation {
         image.entries().keys().cloned().collect::<BTreeSet<_>>()
     } else {
-        BTreeSet::from([VirtualPath::data(format!("issues/{}.json", issue.id))?])
+        BTreeSet::from([VirtualPath::issue_record(&issue.id)])
     };
     paths.extend(
         issue
             .dependencies
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-            .collect::<std::result::Result<Vec<_>, _>>()?,
+            .map(VirtualPath::issue_record)
+            .collect::<Vec<_>>(),
     );
     paths.extend(gate_runs.inputs.iter().cloned());
 
@@ -781,8 +781,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             Ok(spec.discover_paths(
                 candidates
                     .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
+                    .map(VirtualPath::issue_record)
+                    .collect::<Vec<_>>(),
             )?)
         })?
         else {
@@ -798,7 +798,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let mut paths = vec![
             VirtualPath::INDEX,
-            VirtualPath::data(format!("issues/{target_id}.json"))?,
+            VirtualPath::issue_record(&target_id),
             VirtualPath::GATES,
             VirtualPath::EVENTS,
             VirtualPath::GATE_RUNS,
@@ -827,8 +827,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 issue
                     .dependencies
                     .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
+                    .map(VirtualPath::issue_record)
+                    .collect::<Vec<_>>(),
             )?;
             if matches!(checker, GateChecker::Exec { .. }) {
                 super::validate::discover_document_references(&issue.documents, spec)?;
@@ -1573,6 +1573,7 @@ mod tests {
     use crate::domain::gate_findings::GateFindings;
     use crate::domain::identity::IssueId;
     use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
+    use crate::repository_state::VirtualPath;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
@@ -2747,11 +2748,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             Some("../../outside".to_string()),
         );
         let unrelated = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000);
-        std::fs::write(
-            repo.path().join(format!(".jit/issues/{unrelated}.json")),
-            [],
-        )
-        .unwrap();
+        let unrelated_path = executor
+            .require_layout()
+            .unwrap()
+            .resolve(&VirtualPath::issue_record(&unrelated))
+            .unwrap();
+        std::fs::write(unrelated_path, []).unwrap();
         let index_path = repo.path().join(".jit/index.json");
         let mut index: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&index_path).unwrap()).unwrap();
@@ -2830,7 +2832,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             taxonomy.config_fragment()
         );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         executor
             .add_gate(&issue_id, "editable-review".to_string())
@@ -2838,11 +2840,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let mut issue = executor.storage.load_issue(&issue_id).unwrap();
         issue.documents.push(document_reference("../../outside"));
         let bytes = crate::repository_state::serialize_issue(&issue).unwrap();
-        std::fs::write(
-            repo.path().join(format!(".jit/issues/{issue_id}.json")),
-            bytes,
-        )
-        .unwrap();
+        let issue_path = executor
+            .require_layout()
+            .unwrap()
+            .resolve(&VirtualPath::issue_record(&issue_id))
+            .unwrap();
+        std::fs::write(issue_path, bytes).unwrap();
 
         let result = executor.check_gate(&issue_id, "editable-review").unwrap();
 
@@ -2912,7 +2915,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     Some(late_rule.as_bytes().to_vec()),
                 ),
                 (
-                    PathBuf::from(format!(".jit/issues/{issue_id}.json")),
+                    PathBuf::from(VirtualPath::issue_record(&issue_id).repository_relative()),
                     Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
                 ),
             ],
@@ -4149,13 +4152,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let issue_path = VirtualPath::issue_record(&issue_id).repository_relative();
         add_exec_gate(
             &executor,
             &issue_id,
             "precheck-race",
             "Precheck race",
             format!(
-                "if [ ! -f .precheck-race-seen ]; then : > .precheck-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; true"
+                "if [ ! -f .precheck-race-seen ]; then : > .precheck-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' {issue_path}; fi; printf x >> checker-count; true"
             ),
             None,
         );
@@ -4669,7 +4673,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let issue_path = format!(".jit/issues/{issue_id}.json");
+        let issue_path = VirtualPath::issue_record(&issue_id).repository_relative();
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4731,7 +4735,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
         executor.add_dependency(&issue_id, &dependency_id).unwrap();
-        let dependency_path = format!(".jit/issues/{dependency_id}.json");
+        let dependency_path = VirtualPath::issue_record(&dependency_id).repository_relative();
         add_exec_gate(
             &executor,
             &issue_id,
@@ -4834,9 +4838,18 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let replacement_id = crate::test_utils::issue_id(0xffff_4fff_8fff_ffff_ffff_ffff_0f0e_0d0c);
         let mut original = executor.storage.load_issue(&created_id).unwrap();
         original.id = issue_id.clone();
-        std::fs::remove_file(repo.path().join(format!(".jit/issues/{created_id}.json"))).unwrap();
+        let layout = executor.require_layout().unwrap();
+        let created_path = layout
+            .resolve(&VirtualPath::issue_record(&created_id))
+            .unwrap();
+        let issue_path = layout
+            .resolve(&VirtualPath::issue_record(&issue_id))
+            .unwrap();
+        let issue_path_relative = VirtualPath::issue_record(&issue_id).repository_relative();
+        let replacement_path = VirtualPath::issue_record(&replacement_id).repository_relative();
+        std::fs::remove_file(created_path).unwrap();
         std::fs::write(
-            repo.path().join(format!(".jit/issues/{issue_id}.json")),
+            issue_path,
             crate::repository_state::serialize_issue(&original).unwrap(),
         )
         .unwrap();
@@ -4855,7 +4868,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "target-race",
             "Target race",
             format!(
-                "if [ ! -f .target-race-seen ]; then : > .target-race-seen; sed -i 's/{issue_id}/{replacement_id}/g' .jit/index.json; rm .jit/issues/{issue_id}.json; cp replacement.json .jit/issues/{replacement_id}.json; fi; true"
+                "if [ ! -f .target-race-seen ]; then : > .target-race-seen; sed -i 's/{issue_id}/{replacement_id}/g' .jit/index.json; rm {issue_path_relative}; cp replacement.json {replacement_path}; fi; true"
             ),
             None,
         );
@@ -5050,13 +5063,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let issue_path = VirtualPath::issue_record(&issue_id).repository_relative();
         add_exec_gate(
             &executor,
             &issue_id,
             "single-record-race",
             "Single record race",
             format!(
-                "if [ ! -f .single-record-race-seen ]; then : > .single-record-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; true"
+                "if [ ! -f .single-record-race-seen ]; then : > .single-record-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' {issue_path}; fi; printf x >> checker-count; true"
             ),
             None,
         );
@@ -5114,13 +5128,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let issue_path = VirtualPath::issue_record(&issue_id).repository_relative();
         add_exec_gate(
             &executor,
             &issue_id,
             "failing-race",
             "Failing race",
             format!(
-                r#"if [ ! -f .failing-race-seen ]; then : > .failing-race-seen; sed -i 's/"title": "Test"/"title": "Moved"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; printf '%s\n' '<<<JIT-FINDINGS-JSON' '{{"verdict":"fail","summary":"blocking finding","findings":[{{"id":"F1","severity":"high","disposition":"blocking","summary":"broken contract"}}]}}' 'JIT-FINDINGS-JSON>>>'; exit 1"#
+                r#"if [ ! -f .failing-race-seen ]; then : > .failing-race-seen; sed -i 's/"title": "Test"/"title": "Moved"/' {issue_path}; fi; printf x >> checker-count; printf '%s\n' '<<<JIT-FINDINGS-JSON' '{{"verdict":"fail","summary":"blocking finding","findings":[{{"id":"F1","severity":"high","disposition":"blocking","summary":"broken contract"}}]}}' 'JIT-FINDINGS-JSON>>>'; exit 1"#
             ),
             None,
         );
