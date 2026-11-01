@@ -19,9 +19,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "cc291833-3e93-458a-a2af-bba65a6b0f3b",
+      "run_id": "3038f3d6-6f5e-47c6-b35e-32df52d792cb",
       "status": "passed",
-      "updated_at": "2026-11-01T10:40:24.261454595Z",
+      "updated_at": "2026-11-01T11:12:05.003638815Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
@@ -50,5 +50,5 @@
   "priority": "normal",
   "state": "done",
   "title": "The default suite runs within its time and footprint budgets",
-  "updated_at": "2026-11-01T10:43:28.421305198Z"
+  "updated_at": "2026-11-01T11:12:05.003638815Z"
 }

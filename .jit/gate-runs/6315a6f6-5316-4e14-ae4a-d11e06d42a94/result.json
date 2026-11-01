@@ -1,0 +1,51 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "81bdd4a2137e561ec5c845017f832dfd49a86899",
+  "completed_at": "2026-11-01T10:47:31.068635746Z",
+  "duration_ms": 215319,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/test-topology-c780514e/README.md",
+        "id": "F1",
+        "line": 154,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-13",
+          "@/issue/7721a2a9/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "REQ-13's before suite-clock evidence excludes a test and is not a cargo-ci measurement; unfiltered recorded cargo-ci runs failed instead."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/benchmarks/test-topology-c780514e/README.md",
+        "id": "F2",
+        "line": 72,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Cold profiled-fixture timing, load, dirty-memory, result, and fsync figures lack raw recorded evidence or a reproducible capture command."
+      }
+    ],
+    "summary": "REQ-13 lacks a compliant before cargo-ci measurement; cold-fixture quantitative claims are unsubstantiated.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6315a6f6-5316-4e14-ae4a-d11e06d42a94",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T10:43:55.749102736Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12330 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a196b5-7185-7b01-87a1-81c77f270843\n--------\nuser\n--- 12317 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[high, blocking]** REQ-13 is not met. The reported “before” measurements exclude `test_cargo_ci_selftest_fails_seeded_broken_merges`, so they are not `cargo-ci` suite-clock measurements. The recorded unfiltered baseline `cargo-ci` runs instead failed at roughly 35.7–39.8 seconds; the historical 21.1-second gate result has no recorded load. [README.md](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-topology-c780514e/README.md:154) `@/issue/c780514e/requirement/REQ-13`\n\n2. **[medium, advisory]** The cold profiled-fixture section’s quantitative claims (171 `fsync`s; 0.96/1.1/1.29/77.6/13.9 seconds; load, dirty-memory, result, and duration table values) have no raw recording. The linked measurement log covers the later footprint/suite-clock windows, not these figures, and the reproduction recipe does not record the stated `strace` or sampling outputs. [README.md](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-topology-c780514e/README.md:72)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-13 lacks a compliant before cargo-ci measurement; cold-fixture quantitative claims are unsubstantiated.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-13's before suite-clock evidence excludes a test and is not a cargo-ci measurement; unfiltered recorded cargo-ci runs failed instead.\",\"file\":\"dev/benchmarks/test-topology-c780514e/README.md\",\"line\":154,\"references\":[\"@/issue/c780514e/requirement/REQ-13\",\"@/issue/7721a2a9/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Cold profiled-fixture timing, load, dirty-memory, result, and fsync figures lack raw recorded evidence or a reproducible capture command.\",\"file\":\"dev/benchmarks/test-topology-c780514e/README.md\",\"line\":72}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

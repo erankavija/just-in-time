@@ -22015,3 +22015,10 @@
 {"from":"in_progress","id":"f1f897f2-20ce-4d4e-aab0-227bb2a0277c","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:43:28.421305198Z","to":"done","type":"issue_state_changed"}
 {"id":"1b2388f7-4a9b-4832-87ee-afd7c9d2244e","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T10:43:28.421305198Z","type":"issue_completed"}
 {"from":"backlog","id":"fb5f5edf-b4f3-4dba-a5dd-7944870ecfb6","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:43:28.521606771Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"f26ebda3-c71c-4a42-8d57-0ad68ee55d09","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:43:51.275392575Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"ba281aa9-a662-4d92-b9a2-6009d41d8eb3","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:43:51.275392575Z","type":"issue_claimed"}
+{"gate_key":"repo-validate","id":"0e56ef5a-ab12-4029-a814-462fdb887bcb","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:43:55.432374799Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"cbbf1279-f55e-440c-9586-1a679d9c163e","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:47:31.363346382Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"repo-validate","id":"164bb325-8fa1-486c-bdc9-e0fed1b6a1b5","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T10:57:40.020903279Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"44155e68-b3b7-4856-8a43-4de3cb52c8d1","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T11:01:45.823271998Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"3c6bf2c9-2e75-44a8-8876-d8611fa2a2e5","issue_id":"45e3e442-e157-4d73-918c-2fc7df04accc","timestamp":"2026-11-01T11:12:05.003638815Z","type":"gate_passed","updated_by":"auto:executor"}
