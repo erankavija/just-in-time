@@ -1447,6 +1447,10 @@
       "session": 5,
       "finding": "land.sh jq filter printed {} for failed cargo-ci and exited 0; 7 cold-fixture failures looked like success",
       "disposition": "land.sh now prints gate status. Check gate status before review."
+    },
+    {
+      "session": 5,
+      "finding": "land.sh disk guard (60 GiB) held both landings in retry for about 2.4 h with free space at 54 GiB; its output is piped through tail, so the wait was silent. Slot B target removed to recover."
     }
   ],
   "traps": [
