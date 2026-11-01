@@ -25,7 +25,20 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9d67d071-32d7-4af5-9abb-c1ed9faec757",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:41:47.423020615Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "a90d7860-6905-4a4e-a128-484330195534",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:43:59.067277218Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e2651d77-d171-483a-9a21-90c70885a6ae",
   "labels": [
     "type:story",
@@ -43,5 +56,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue identity is one validated type end to end",
-  "updated_at": "2026-11-01T04:32:13.740465211Z"
+  "updated_at": "2026-11-01T04:43:59.067277218Z"
 }
