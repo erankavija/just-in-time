@@ -606,7 +606,7 @@ fn print_profile_decision(
 /// Render one profile identity and operation outcome in the family-wide human
 /// heading shape.
 fn print_profile_heading(
-    id: &str,
+    id: &jit::domain::identity::ProfileId,
     version: &semver::Version,
     origin: &jit::repository_state::RootRelativePath,
     status: &str,

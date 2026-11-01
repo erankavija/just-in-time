@@ -122,7 +122,7 @@ pub(crate) fn profile_run_entry(
         (false, false, _) => ProfileApplicationStatus::Unchanged,
     };
     ProfileApplyResult {
-        id: id.to_string(),
+        id: id.clone(),
         version: version.clone(),
         origin,
         status,

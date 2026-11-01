@@ -387,7 +387,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;
         Ok((
             ProfilePackResult::new(vec![ProfilePackEntry {
-                id: package.model().id.to_string(),
+                id: package.model().id.clone(),
                 version: package.model().version.clone(),
                 origin: source.relative().clone(),
                 package_hash: package.package_hash().clone(),
@@ -461,7 +461,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
         let targets = self.publish_package_tree(&layout, &destination, &tree, publish)?;
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
-            id: tree.model().id.to_string(),
+            id: tree.model().id.clone(),
             version: tree.model().version.clone(),
             origin: destination.relative().clone(),
             package_hash: tree.package_hash().clone(),
@@ -629,7 +629,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         layout: &RepositoryLayout,
     ) -> Result<ProfileShowEntry> {
         Ok(ProfileShowEntry {
-            id: package.model().id.to_string(),
+            id: package.model().id.clone(),
             version: package.model().version.clone(),
             manifest: package.model().clone(),
             origin: package_origin(package, layout)?,
@@ -2613,8 +2613,8 @@ mod tests {
                 .map(|profile| (profile.id.clone(), profile.status))
                 .collect::<Vec<_>>()
         };
-        let default_id = explicit_default.model().id.to_string();
-        let dogfood_id = explicit_dogfood.model().id.to_string();
+        let default_id = explicit_default.model().id.clone();
+        let dogfood_id = explicit_dogfood.model().id.clone();
         assert_eq!(
             published_by(&explicit_default_result),
             vec![(default_id.clone(), ProfileApplicationStatus::Applied)]
@@ -2961,7 +2961,7 @@ template = true
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-        assert_eq!(applied.requested().unwrap().id, "workflow");
+        assert_eq!(applied.requested().unwrap().id.as_str(), "workflow");
         assert!(applied
             .items
             .iter()
@@ -3809,7 +3809,7 @@ template = true
         report
             .items
             .iter()
-            .find(|entry| entry.id == id)
+            .find(|entry| entry.id.as_str() == id)
             .unwrap_or_else(|| panic!("the report names profile {id}: {report:?}"))
             .clone()
     }

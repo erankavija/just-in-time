@@ -1,3 +1,4 @@
+use crate::domain::identity::ProfileId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
@@ -52,7 +53,7 @@ pub type ProfileCollection<T> = ListEnvelope<ProfilesKey, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileApplyResult {
     /// Stable profile identifier.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic package version.
     #[schemars(with = "String")]
     pub version: Version,
@@ -143,7 +144,7 @@ impl ProfileCollection<ProfileApplyResult> {
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowEntry {
     /// Stable profile identifier.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic package version.
     #[schemars(with = "String")]
     pub version: Version,
@@ -243,7 +244,7 @@ pub struct ProfileContributionChange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfilePackEntry {
     /// Stable identifier the packed manifest declares.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic version the packed manifest declares.
     #[schemars(with = "String")]
     pub version: Version,
@@ -276,7 +277,7 @@ pub type ProfilePackResult = ProfileCollection<ProfilePackEntry>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileAddEntry {
     /// Stable identifier the added manifest declares.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic version the added manifest declares.
     #[schemars(with = "String")]
     pub version: Version,
