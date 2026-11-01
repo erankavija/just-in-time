@@ -22092,3 +22092,6 @@
 {"gate_key":"code-review","id":"2834ed37-e3c4-4151-a454-84ca52a60777","issue_id":"81664a6a-958e-4e4d-9403-7b6210dc9d6c","timestamp":"2026-11-01T13:37:16.476264101Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"a414c98f-5493-403d-a5f1-ed8619f2a21b","issue_id":"07663984-071b-4aa1-963a-e6ec2791f8d8","timestamp":"2026-11-01T13:38:58.016062465Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"35e4fbb7-5240-41bf-8f4a-29c9fbd1168c","issue_id":"3a3b86cf-1aee-416a-88c9-e3ab8cdbe124","timestamp":"2026-11-01T13:39:14.448888846Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["dependencies"],"id":"ee76f712-3408-4e72-8f93-abf3d7732aec","issue_id":"5f82e09a-2b31-4f51-acf3-7d4c87501ab2","timestamp":"2026-11-01T13:41:37.805592125Z","type":"issue_updated","updated_by":"dependency-remove"}
+{"fields":["dependencies"],"id":"d034aca8-0a3d-4d00-9d89-c8d810c6dd4b","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T13:41:38.144134513Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"09685e8d-b9ba-4ffe-9362-bc8f97c012a9","issue_id":"ddca5431-273f-473c-a897-548fa5e62054","timestamp":"2026-11-01T13:42:30.272851403Z","type":"gate_passed","updated_by":"auto:executor"}
