@@ -1991,13 +1991,14 @@ mod tests {
 
     #[test]
     fn test_close_enforces_depth_for_listed_children() {
-        let name = format!("{}.json", crate::test_utils::issue_id(1));
-        let result = close_listing("issues", &[&name], &[], listing_budget(64, 1));
+        let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let name = issue_path.file_name().unwrap();
+        let result = close_listing("issues", &[name], &[], listing_budget(64, 1));
 
         assert!(matches!(
             result,
             Err(CaptureError::DepthBudgetExceeded(path))
-                if path == VirtualPath::data(format!("issues/{name}")).unwrap()
+                if path == issue_path
         ));
     }
 

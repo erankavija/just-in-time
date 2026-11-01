@@ -347,17 +347,6 @@ impl InMemoryStorage {
             .expect("add_worktree_file requires a canonical repository path");
     }
 
-    /// Canonical `Data(...)` identity for one issue record.
-    fn issue_vpath(id: &IssueId) -> Result<VirtualPath> {
-        VirtualPath::data(
-            VirtualPath::ISSUES
-                .relative()
-                .as_path()
-                .join(format!("{id}.json")),
-        )
-        .context("invalid issue record path")
-    }
-
     /// Canonical `Data(...)` identity for one gate-run result.
     fn gate_run_vpath(run_id: &str) -> Result<VirtualPath> {
         Ok(VirtualPath::data(
@@ -493,7 +482,7 @@ impl InMemoryStorage {
 
     /// Deserialize one captured issue record, if present.
     fn load_issue_entry(state: &MemoryRepositoryState, id: &IssueId) -> Result<Option<Issue>> {
-        let path = Self::issue_vpath(id)?;
+        let path = VirtualPath::issue_record(id);
         Self::data_entry_bytes(state, &path)
             .map(|bytes| {
                 serde_json::from_slice::<Issue>(&bytes).with_context(|| {
@@ -1317,12 +1306,7 @@ mod record_tests {
     }
 
     fn issue_data(relative: &str) -> VirtualPath {
-        VirtualPath::data(format!(
-            "{}/{}",
-            VirtualPath::ISSUES.relative().as_str(),
-            relative
-        ))
-        .unwrap()
+        VirtualPath::data(VirtualPath::ISSUES.relative().as_path().join(relative)).unwrap()
     }
 
     fn worktree(relative: &str) -> VirtualPath {
@@ -1667,10 +1651,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
-        storage.add_data_file(
-            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
-            "residual",
-        );
+        storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
         let record = RedoRecord::new(
             Vec::new(),
             vec![put(VirtualPath::ISSUES, b"occupier")],
@@ -1715,10 +1696,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
         let storage = seeded(&[], false);
-        storage.add_data_file(
-            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
-            "residual",
-        );
+        storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
         let record = RedoRecord::new(
             Vec::new(),
             vec![
