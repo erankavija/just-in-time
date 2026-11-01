@@ -65,7 +65,7 @@ cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
 
 fail=0
-real_cargo=$(command -v cargo)
+real_cargo_version=$(cargo --version)
 
 # Records one assertion. The condition is a command so each call reads as the
 # property it asserts rather than as a bare status code.
@@ -160,9 +160,10 @@ nextest_runtime_failure_reported() {
 }
 
 # The gate must reject any reporter version other than the provisioned pin
-# before it reaches fmt or another gate step. A cargo shim delegates the real
-# cargo probe but injects an older nextest version; any later Cargo invocation
-# is an assertion failure in the fixture itself.
+# before it reaches fmt or another gate step. A cargo shim answers the real
+# cargo's version, captured up front because a PATH-scanning host cargo would
+# resolve back to this shim, and injects an older nextest version; any later
+# Cargo invocation is an assertion failure in the fixture itself.
 test_wrong_nextest_version_fails_fast() {
   local fixture="$scratch/wrong-nextest-version"
   local fake_bin="$fixture/bin"
@@ -173,7 +174,8 @@ test_wrong_nextest_version_fails_fast() {
   cat >"$fake_bin/cargo" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = "--version" ]; then
-  exec "$SELFTEST_REAL_CARGO" "$@"
+  echo "$SELFTEST_CARGO_VERSION"
+  exit 0
 fi
 if [ "${1:-}" = "nextest" ] && [ "${2:-}" = "--version" ]; then
   echo "cargo-nextest 0.9.132 (injected selftest fixture)"
@@ -187,7 +189,7 @@ EOF
   (
     cd "$fixture/repo" || exit 3
     PATH="$fake_bin:$PATH" \
-      SELFTEST_REAL_CARGO="$real_cargo" \
+      SELFTEST_CARGO_VERSION="$real_cargo_version" \
       SELFTEST_UNEXPECTED_CARGO="$unexpected" \
       CARGO_CI_NO_LOCK=1 \
       CARGO_CI_NO_SCCACHE=1 \
