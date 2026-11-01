@@ -1317,8 +1317,8 @@ pub enum EventBody {
         assignee: Assignee,
         /// Reason for release
         reason: String,
-        /// Who released it; absent from records that predate this field
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        /// Who released it; null means recorded before the field existed
+        #[serde(deserialize_with = "Option::deserialize")]
         released_by: Option<Assignee>,
     },
     /// A dependency-aware archive execution reached its durable commit point.
@@ -2889,6 +2889,26 @@ mod tests {
 
             let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_issue_released_records_the_acting_identity_and_requires_the_key() {
+            let holder = Assignee::from_str("agent:holder").unwrap();
+            let actor = Assignee::from_str("agent:actor").unwrap();
+            let event = EventBody::draft_issue_released(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0001),
+                holder,
+                "timeout".to_string(),
+                actor,
+            );
+            let mut json = serde_json::to_value(&event).unwrap();
+            assert_eq!(json["released_by"], "agent:actor");
+
+            json["released_by"] = serde_json::Value::Null;
+            assert!(serde_json::from_value::<EventBody>(json.clone()).is_ok());
+
+            json.as_object_mut().unwrap().remove("released_by");
+            assert!(serde_json::from_value::<EventBody>(json).is_err());
         }
 
         #[test]
