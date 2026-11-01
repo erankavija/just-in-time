@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1b7ed26abaead20f37d2de56fa5d71784dd0cee6",
+  "completed_at": "2026-11-01T20:17:15.264388080Z",
+  "duration_ms": 202548,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented; the prior cross-surface test finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "edc8544d-5f5e-497e-9706-c7b4e7235036",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6589f4b4-6bd7-49cc-a2c6-87632917066d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T20:13:52.716295256Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bd49f172c, a0c3144b, d0ff8e00c, 2a55b22a, 0163a652, f5fbad64, d1addc37, 1b7ed26a (`jit:edc8544d`); uncommitted JIT records excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-13, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml); @/issue/edc8544d/requirement/REQ-01–REQ-04 and @/issue/3d9a0ce3/requirement/REQ-03 (.jit/issues/)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T20:13:28.376428891+00:00)\nTruncation recovery: recovered merge-parent file lists and bounded current implementation, route, test, domain, web-type, and policy reads after a combined patch view truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented; the prior cross-surface test finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
