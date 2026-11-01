@@ -21,13 +21,14 @@ set -euo pipefail
 #   0 — all steps passed
 #   1 — one or more steps failed on repository content (a verdict)
 #   2 — environment problem: Cargo prerequisites are missing or mismatched
-#  75 — infrastructure fault (EX_TEMPFAIL): every failing step is
-#       environment-sensitive and the host was loaded while the suite ran
+#  75 — infrastructure fault (EX_TEMPFAIL): the selected compiler wrapper cannot
+#       run, so no step ran; or every failing step is environment-sensitive and
+#       the host was loaded while the suite ran
 #
 # Exit 75 is the exec-checker convention that records an `error` gate run
 # instead of `failed`. An `error` run never passes and is never reused through
-# digest reuse, so a load-induced failure is rerun rather than carried to
-# another issue as a verdict. A step is environment-sensitive only when it is
+# digest reuse, so such a failure is rerun rather than carried to another
+# issue as a verdict. A step is environment-sensitive only when it is
 #   - `test` with at least one nextest TIMEOUT result and no FAIL or ABORT
 #     result, or
 #   - `budget` whose only violation is the suite-duration budget.
@@ -190,6 +191,31 @@ ensure_real_cargo
 if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
   export RUSTC_WRAPPER=sccache
 fi
+
+# A wrapper that cannot compile would fail every compiling step as if on repository
+# content, so try one first. The probe is a cacheable compile of an empty crate
+# because sccache passes `rustc -vV` and stdin input through without reaching
+# the temp directory a compile needs. Its output goes to a file because a daemon
+# the wrapper starts could hold a pipe open.
+ensure_compiler_wrapper_runs() {
+  [ -n "${RUSTC_WRAPPER:-}" ] || return 0
+  local probe rc=0
+  probe=$(mktemp -d)
+  : >"$probe/probe.rs"
+  "$RUSTC_WRAPPER" "${RUSTC:-rustc}" "$probe/probe.rs" --crate-name cargo_ci_wrapper_probe \
+    --crate-type lib --emit=metadata --out-dir "$probe" >"$probe/out" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "cargo-ci: infrastructure fault (exit 75): compiler wrapper '$RUSTC_WRAPPER' cannot compile an empty crate (exit $rc); no step ran"
+    tail -20 "$probe/out"
+    echo "       Repair the wrapper and retry: a shared daemon may need stopping"
+    echo "       (e.g. sccache --stop-server), and CARGO_CI_NO_SCCACHE=1 bypasses sccache."
+    rm -rf "$probe"
+    exit 75
+  fi
+  rm -rf "$probe"
+}
+
+ensure_compiler_wrapper_runs
 
 if [ "${1:-}" = "--cargo" ]; then
   shift
