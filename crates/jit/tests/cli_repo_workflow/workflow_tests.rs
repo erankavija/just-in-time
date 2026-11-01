@@ -346,6 +346,42 @@ fn test_reject_convenience_command() {
 }
 
 #[test]
+fn test_reject_refuses_reason_that_cannot_form_a_label_leaving_repository_valid() {
+    let cli = JitCli::initialised().unwrap();
+    let task_id = cli.create_issue(["-t", "Task"]).unwrap();
+
+    let output = cli
+        .command(["issue", "reject", &task_id, "--reason", "not needed, see x"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("label"));
+    let issue = cli.run_json(["issue", "show", &task_id]).unwrap();
+    assert_eq!(issue["state"], "ready");
+    cli.run(["validate"]).unwrap();
+}
+
+#[test]
+fn test_remove_label_absent_from_the_issue_fails_loudly() {
+    let cli = JitCli::initialised().unwrap();
+    let task_id = cli.create_issue(["-t", "Task"]).unwrap();
+
+    let output = cli
+        .command([
+            "issue",
+            "update",
+            &task_id,
+            "--remove-label",
+            "component:none",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+}
+
+#[test]
 fn test_reject_without_reason() {
     let cli = JitCli::initialised().unwrap();
 

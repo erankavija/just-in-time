@@ -956,8 +956,9 @@ pub enum IssueCommands {
         #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]
         label: Vec<String>,
 
-        /// Remove label(s) (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        /// Remove a label (repeatable; the value is taken whole, so a malformed
+        /// label containing a comma stays removable)
+        #[arg(long)]
         remove_label: Vec<String>,
 
         /// Add gate(s) to issue (gate keys from registry, repeatable)
@@ -1038,7 +1039,7 @@ pub enum IssueCommands {
         /// Issue ID
         id: String,
 
-        /// Reason for rejection (adds resolution:REASON label)
+        /// Reason for rejection (adds resolution:REASON label; the reason must be a valid label value)
         #[arg(long)]
         reason: Option<String>,
     },

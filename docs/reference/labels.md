@@ -391,8 +391,10 @@ jit issue update <id> --remove-label "epic:auth" --label "epic:billing"
 jit issue update <id> --type bug
 ```
 
-`--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
-`--remove-label` are repeatable and accept comma-separated values.
+`--label` has the alias `--add-label` and the short form `-l`. `--label` is repeatable and
+accepts comma-separated values. `--remove-label` is repeatable and takes each value
+whole, so a stored label that violates the format rule is removable by its exact
+text; removing a label the issue lacks fails.
 
 ---
 

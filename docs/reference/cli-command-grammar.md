@@ -100,8 +100,9 @@ Canonical rules:
 - **A list modifier is a repeatable/comma-joined flag.** Where a list tunes the
   verb rather than naming its subjects, it is a flag that accepts both repetition
   and comma-separation: `--label a:b --label c:d` or `--label a:b,c:d`. This
-  governs `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
-  and `--except`.
+  governs `--label`, `--gate`, `--add-gate`, `--remove-gate`, and `--except`.
+  `--remove-label` is repeatable only: each value is one whole label, so a
+  malformed stored label containing a comma is removable.
 
 The positional-list-versus-flag-list split is the canonical reason
 `jit gate add abc tests clippy` (subjects) reads differently from

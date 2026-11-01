@@ -134,15 +134,13 @@ fn test_validate_fix_ignores_ready_issues() {
     // Create issues already in ready state
     let issue1 = h.create_issue("Ready issue 1");
     let issue2 = h.create_issue("Ready issue 2");
+    // Connected, so the repository carries no isolated-issue finding.
+    h.executor.add_dependency(&issue2, &issue1).unwrap();
 
     // Manually set to ready
     let mut issue1_loaded = h.storage.load_issue(&issue1).unwrap();
     issue1_loaded.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &issue1_loaded);
-
-    let mut issue2_loaded = h.storage.load_issue(&issue2).unwrap();
-    issue2_loaded.state = State::Ready;
-    jit::test_harness::seed_memory_issue(&h.storage, &issue2_loaded);
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();

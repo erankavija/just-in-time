@@ -105,6 +105,25 @@ pub fn parse_label(label: &str) -> Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
+/// The `resolution:<reason>` label recording why an issue was rejected.
+///
+/// # Errors
+///
+/// Returns [`InvalidArgumentError`](crate::errors::InvalidArgumentError) naming
+/// the label-format constraint when `reason` cannot form a valid label value.
+pub fn resolution_label(reason: &str) -> Result<String> {
+    let label = format!("resolution:{reason}");
+    if label_regex().is_match(&label) {
+        return Ok(label);
+    }
+    Err(crate::errors::InvalidArgumentError::new(format!(
+        "--reason {reason:?} cannot form a valid label ('{label}'): a label value starts \
+         with a letter or digit and contains only letters, digits, '.', '_', '/' and '-' \
+         (@/invariant/label-format)"
+    ))
+    .into())
+}
+
 /// Suggest a corrected label format for common mistakes
 fn suggest_label_fix(label: &str) -> Option<String> {
     // No colon: suggest adding namespace
@@ -242,6 +261,21 @@ mod tests {
             e.downcast_ref::<crate::errors::InvalidLabelPatternError>()
                 .is_some()
         })
+    }
+
+    #[test]
+    fn test_resolution_label_accepts_a_token_and_refuses_what_cannot_form_a_label() {
+        assert_eq!(resolution_label("wont-fix").unwrap(), "resolution:wont-fix");
+        for reason in ["", "not needed", "Won't fix: dup.", "-lead", "a:b", "über"] {
+            let error = resolution_label(reason).unwrap_err();
+            assert!(
+                error
+                    .downcast_ref::<crate::errors::InvalidArgumentError>()
+                    .is_some(),
+                "{reason:?} not refused as an invalid argument"
+            );
+            assert!(error.to_string().contains("label-format"));
+        }
     }
 
     #[test]

@@ -29,7 +29,7 @@ Terminal state for issues that won't be completed. Common reasons include duplic
 
 **Resolution Label**: Documents why an issue was rejected
 
-Format: `resolution:reason` (e.g., `resolution:duplicate`, `resolution:wont-fix`). Added automatically via `jit issue reject --reason <REASON>` command.
+Format: `resolution:reason` (e.g., `resolution:duplicate`, `resolution:wont-fix`). Added via `jit issue reject --reason <REASON>`, which refuses a reason that cannot form a valid label value.
 
 **Archived**: Retired lifecycle state, parked out of active views
 

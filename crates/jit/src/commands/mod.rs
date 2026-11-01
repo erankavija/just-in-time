@@ -1309,6 +1309,13 @@ fn derive_field_update(
         }
     }
     for label in &request.remove_labels {
+        if !request.bulk && !issue.labels.contains(label) {
+            return Err(crate::errors::NotFoundError::new(format!(
+                "issue {} has no label '{label}' to remove",
+                issue.id
+            ))
+            .into());
+        }
         issue.labels.retain(|candidate| candidate != label);
     }
     match &request.label_edit {
