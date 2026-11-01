@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:44:13.571112036Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -12,7 +13,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "76d4d348-8e12-470f-9571-52bc52bab0f2",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:47:35.882544442Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b31bc27e-3e05-43a1-b429-5a2bf1401a4a",
+      "status": "failed",
+      "updated_at": "2026-11-01T15:52:58.592154008Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
   "labels": [
     "type:task",
@@ -26,5 +40,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Report profile plans through the apply result type",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T15:52:58.592154008Z"
 }
