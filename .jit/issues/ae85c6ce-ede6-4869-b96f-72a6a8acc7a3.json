@@ -13,7 +13,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "7626cfa3-6f1f-4171-9d3b-71e02079410f",
+      "status": "failed",
+      "updated_at": "2026-11-01T18:55:59.059323831Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "c555fa27-7c0f-4d74-ab7a-7000b5f48257",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:53:10.629138549Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ae85c6ce-ede6-4869-b96f-72a6a8acc7a3",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rewrite the profiles reference around apply-once",
-  "updated_at": "2026-11-01T18:49:05.545516491Z"
+  "updated_at": "2026-11-01T18:55:59.059323831Z"
 }
