@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T01:07:36.149103498Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
@@ -9,11 +9,26 @@
   ],
   "description": "The surviving profile model names packages by the domain `ProfileId`, and the separate unvalidated package identifier type `ProfilePackageId` is removed.\n\n## Background\n\n`ProfilePackageId` is defined at `crates/jit/src/repository_state/profile_apply.rs:608`. Before the record deletion it appeared 71 times; roughly a third survive (line numbers at the investigation baseline):\n\n- Contribution claims (`ProfileContributionClaim.package_id`, `ProfileClaims.package_id`).\n- Composed owners (`ComposedContribution.owners`).\n- The conflict-origin type.\n- Constructors in `crates/jit/src/profile/apply_claims.rs` (109, 128).\n\nTest uses sit in `profile_apply.rs`, `crates/jit/src/repository_state/materialize.rs`, `crates/jit/src/repository_state/initialize.rs`, `crates/jit/src/commands/profile.rs` and `crates/jit/src/main.rs`. The validated `ProfileId` lives in the domain layer.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfilePackageId` type remains, and each former use holds the domain `ProfileId`.\n- [hard] REQ-02: Conflict parties, contribution claims and composed owners carry `ProfileId`.\n- [hard] REQ-03: Serialized output of these fields is unchanged.\n\n## Notes\n\nThe record deletion removes the profile-id string comparisons in record code. The surviving comparisons in dependency resolution belong to the domain identity work.\n",
   "documents": [],
+  "done_at": "2026-11-01T19:49:09.674903398Z",
+  "first_ready_at": "2026-11-01T19:48:46.148316024Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6c992793-459e-45ef-b11f-a54beeb0ab1c",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:42:39.674038280Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f65ae3ac-7607-4a42-a0f8-cdae66478376",
+      "status": "passed",
+      "updated_at": "2026-11-01T19:43:54.812317265Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dbbfcd6c-562a-4691-86e7-feb687c79ce5",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:3d9a0ce3/REQ-14"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Identify profile packages by the domain profile id",
-  "updated_at": "2026-10-21T05:34:14.733677169Z"
+  "updated_at": "2026-11-01T19:49:09.674903398Z"
 }

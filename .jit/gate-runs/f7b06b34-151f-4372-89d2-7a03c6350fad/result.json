@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9e1ac051e7e6ae631a362560f170de922f2535f",
+  "completed_at": "2026-11-01T19:46:32.849768308Z",
+  "duration_ms": 232389,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four issue criteria are satisfied by the attributable current implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "536a48ef-97bc-4f34-a813-54f70572b91e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f7b06b34-151f-4372-89d2-7a03c6350fad",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T19:42:40.460613988Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ec46185f2; a9e1ac051 (merge, both parents inspected)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18; @/issue/3d9a0ce3/requirement/REQ-08; @/issue/3d9a0ce3/requirement/REQ-09; @/invariant/essential-code-prose; @/invariant/orthogonal-tests; @/invariant/architecture-dependency-direction; @/gate/cargo-ci; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T19:41:14Z); code-review pending\nTruncation recovery: file-level diffs and current-line reads for package hashing, variable resolution, CLI, application, repository state, tests, and docs; unrelated sibling-tag merge changes excluded\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four issue criteria are satisfied by the attributable current implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9e1ac051e7e6ae631a362560f170de922f2535f",
+  "completed_at": "2026-11-01T19:46:24.434149725Z",
+  "duration_ms": 223348,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The unreachable code, its failure branch, and generated reference entry are removed; absent package directories consistently report actionable PROFILE_ERROR output.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "901db063-88b5-4c3e-946b-80e7c5f3dd45",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T19:42:41.085763588Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4587b9eb6; a9e1ac051 (merge, first-parent patch)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint, @/invariant/no-ignored-tests (.jit/invariants.toml); @/gate/jit-validate, @/gate/cargo-ci (.jit/gates.toml); @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit code none; 2026-11-01T19:42:39Z, reused); code-review pending\nTruncation recovery: narrowed focused and merge first-parent patches by path, including package ranges; reread bounded current code, tests, documentation, and policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The unreachable code, its failure branch, and generated reference entry are removed; absent package directories consistently report actionable PROFILE_ERROR output.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
