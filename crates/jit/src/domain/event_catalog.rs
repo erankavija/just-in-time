@@ -6,14 +6,18 @@
 //! `issue_id` claims with serialized events and `Event`, then compare the
 //! committed reference with the projection (`@/inv/single-source-prose`).
 
+#[cfg(any(test, feature = "test-support"))]
 use crate::domain::identity::IssueId;
+#[cfg(any(test, feature = "test-support"))]
 use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::vocabulary::wire_vocabulary;
 
-use super::{Assignee, Event, EventBody, Issue, LinkedCheckoutWriteStance, State};
+use super::EventBody;
+#[cfg(any(test, feature = "test-support"))]
+use super::{Assignee, Event, Issue, LinkedCheckoutWriteStance, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -167,6 +171,7 @@ impl EventTag {
     /// catalog's claims are tested against these samples rather than against a
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn sample(self) -> Event {
         let issue_id = IssueId::from_uuid(uuid::Uuid::from_u128(1));
         let gate_key: crate::domain::identity::GateKey =

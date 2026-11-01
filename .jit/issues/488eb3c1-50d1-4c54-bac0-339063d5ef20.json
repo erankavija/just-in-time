@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T01:38:55.759132103Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3ea9e19b-7efc-44d4-8c57-814f852bee2d",
+      "status": "failed",
+      "updated_at": "2026-11-01T01:43:47.404186131Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate keys are a validated GateKey in the registry and gate runs",
-  "updated_at": "2026-11-01T01:38:55.759132103Z"
+  "updated_at": "2026-11-01T01:43:47.404186131Z"
 }
