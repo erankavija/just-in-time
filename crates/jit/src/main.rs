@@ -467,20 +467,6 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
-/// Parse `issue update --state`; `rejected` is reachable only through
-/// `jit issue reject`, so one command form records the optional reason.
-fn parse_update_state(state: Option<String>, json: bool) -> Result<Option<State>> {
-    let state = state.map(|s| State::from_str(&s)).transpose()?;
-    match state {
-        Some(State::Rejected) => Err(invalid_argument(
-            "`issue update` cannot set state rejected; use `jit issue reject <id> [--reason <reason>]`"
-                .to_string(),
-            json,
-        )),
-        other => Ok(other),
-    }
-}
-
 /// Parse the one ordered selector stream accepted by profile commands.
 fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileSelector>> {
     values
@@ -2676,7 +2662,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // Single issue mode
                     if let Some(id_str) = id {
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
-                        let st = parse_update_state(state, json)?;
+                        let st = state.map(|s| State::from_str(&s)).transpose()?;
                         // Resolve the (mutually exclusive, clap-enforced) description
                         // flags into a single operation. Replace forms take TEXT
                         // directly; the `-file` forms read PATH (or stdin for `-`)
@@ -2776,7 +2762,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                         // Build update operations
                         let operations = UpdateOperations {
-                            state: parse_update_state(state, json)?,
+                            state: state.map(|s| State::from_str(&s)).transpose()?,
                             add_labels: label,
                             remove_labels: remove_label,
                             assignee,

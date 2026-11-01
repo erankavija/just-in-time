@@ -69,6 +69,10 @@ function generateToolFromCommand(path, cmd, globalTypes = {}, includeOutputSchem
       if (isArray) {
         properties[flag.name].items = { type: "string" };
       }
+
+      if (flag.values?.length) {
+        properties[flag.name].enum = flag.values;
+      }
       
       if (flag.required) {
         required.push(flag.name);

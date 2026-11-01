@@ -101,6 +101,9 @@ pub struct Flag {
     /// serialized schema.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The closed set of accepted values, when the flag declares one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
 }
 
 /// Output schema - contains actual JSON Schema for structured responses
@@ -219,6 +222,7 @@ impl CommandSchema {
                     _ => "Print version".to_string(),
                 },
                 aliases: Vec::new(),
+                values: Vec::new(),
             })
             .collect()
     }
@@ -391,6 +395,13 @@ impl CommandSchema {
             .map(|names| names.into_iter().map(|s| s.to_string()).collect())
             .unwrap_or_default();
 
+        let values = arg
+            .get_possible_values()
+            .iter()
+            .filter(|value| !value.is_hide_set())
+            .map(|value| value.get_name().to_string())
+            .collect();
+
         let description = arg
             .get_help()
             .map(|s| s.to_string())
@@ -403,6 +414,7 @@ impl CommandSchema {
             required,
             description,
             aliases,
+            values,
         }
     }
 
@@ -1375,6 +1387,28 @@ mod tests {
             assert_eq!(properties["children"]["items"]["type"], "string");
             assert_eq!(properties["rank"]["type"], "integer");
         }
+    }
+
+    /// `issue update` accepts every state but `rejected`, which only
+    /// `jit issue reject` sets; the schema (and so the MCP tool) lists exactly those.
+    #[test]
+    fn test_schema_issue_update_state_values_exclude_rejected() {
+        use crate::domain::State;
+
+        let schema = CommandSchema::generate();
+        let update = &schema.commands["issue"].subcommands.as_ref().unwrap()["update"];
+        let state = update
+            .flags
+            .iter()
+            .find(|flag| flag.name == "state")
+            .unwrap();
+
+        let expected: Vec<&str> = State::ALL
+            .into_iter()
+            .filter(|state| *state != State::Rejected)
+            .map(State::as_str)
+            .collect();
+        assert_eq!(state.values, expected);
     }
 
     /// REQ-01: the schema's `State` enum must list every real `State` variant,
