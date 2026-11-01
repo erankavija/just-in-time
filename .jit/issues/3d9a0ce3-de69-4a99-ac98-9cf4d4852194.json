@@ -43,6 +43,13 @@
       "format": "markdown",
       "label": "handoff",
       "path": "dev/archive/3d9a0ce3-lead-friction/active/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/completion-report.md"
     }
   ],
   "done_at": "2026-11-01T20:36:11.650253791Z",
@@ -76,5 +83,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-11-01T20:36:14.630258209Z"
+  "updated_at": "2026-11-01T20:36:41.366218511Z"
 }
