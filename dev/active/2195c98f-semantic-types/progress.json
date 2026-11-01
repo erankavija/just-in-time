@@ -601,7 +601,7 @@
           "short_id": "417be079",
           "title": "Issue gate fields are keyed by GateKey",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
