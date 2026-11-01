@@ -1540,9 +1540,9 @@ mod tests {
     use crate::profile::selection_probe;
     use crate::profile::{ProfileApplyResult, ProfileContributionChange, ProfileTargetAction};
     use crate::repository_state::{
-        Contribution, ContributionConflictOwner, MapEntryTarget, ProfileTargetConflict,
-        ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
-        ScalarTarget, SetStringTarget,
+        Contribution, MapEntryTarget, ProfileTargetConflict, ProfileTargetConflictEntry,
+        ProfileTargetSubject, RepositoryStateError, RootRelativePath, ScalarTarget,
+        SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{
@@ -3482,10 +3482,8 @@ template = true
                 entry.conflict,
                 ProfileTargetConflict::Contested {
                     owners: vec![
-                        ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
-                        ContributionConflictOwner::Package(
-                            ProfileId::try_from("workflow").unwrap()
-                        ),
+                        ProfileId::try_from("base").unwrap(),
+                        ProfileId::try_from("workflow").unwrap(),
                     ]
                 }
             );

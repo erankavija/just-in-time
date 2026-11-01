@@ -823,7 +823,7 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
-    contested_files: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<ProfileId>>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composed = super::profile_apply::compose_profile_targets_with_context(
         base,

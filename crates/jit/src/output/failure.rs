@@ -873,11 +873,10 @@ mod repository_state_classifier_tests {
     use super::{classify, profile_json_error};
     use crate::domain::identity::ProfileId;
     use crate::repository_state::{
-        AmbiguousOwnershipError, ArchiveExecutionError, Contribution, ContributionConflictOwner,
-        GateRegistryEditError, InitializationError, ManagedDocumentError, ProducerError,
-        ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetConflictsError,
-        ProfileTargetSubject, ProjectionError, RepositoryLayoutError, RepositoryStateError,
-        ScalarTarget, VirtualPath,
+        AmbiguousOwnershipError, ArchiveExecutionError, Contribution, GateRegistryEditError,
+        InitializationError, ManagedDocumentError, ProducerError, ProfileTargetConflict,
+        ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject,
+        ProjectionError, RepositoryLayoutError, RepositoryStateError, ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
@@ -889,8 +888,8 @@ mod repository_state_classifier_tests {
     fn target_conflicts() -> ProfileTargetConflictsError {
         let contested = || ProfileTargetConflict::Contested {
             owners: vec![
-                ContributionConflictOwner::Package(ProfileId::try_from("candidate").unwrap()),
-                ContributionConflictOwner::Package(ProfileId::try_from("occupant").unwrap()),
+                ProfileId::try_from("candidate").unwrap(),
+                ProfileId::try_from("occupant").unwrap(),
             ],
         };
         ProfileTargetConflictsError::new(vec![

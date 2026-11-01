@@ -222,21 +222,6 @@ pub struct ComposedContribution {
     pub owners: Vec<ProfileId>,
 }
 
-/// Origin of one differing definition in a semantic contribution conflict.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
-pub enum ContributionConflictOwner {
-    /// A package being applied authored one of the definitions.
-    Package(ProfileId),
-}
-
-impl std::fmt::Display for ContributionConflictOwner {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Package(package_id) => write!(formatter, "package {package_id}"),
-        }
-    }
-}
-
 /// What composition decided about one semantic identity.
 ///
 /// Composition decides every identity it is asked about rather than refusing
@@ -254,7 +239,7 @@ pub enum ContributionOutcome {
         identity: ContributionIdentity,
         /// Every package defining a conflicting definition, sorted
         /// independently of selector occurrence.
-        owners: Vec<ContributionConflictOwner>,
+        owners: Vec<ProfileId>,
     },
 }
 
@@ -308,10 +293,7 @@ fn compose_contribution_identity(
     Some(if contested {
         ContributionOutcome::Contested {
             identity,
-            owners: owners
-                .into_iter()
-                .map(ContributionConflictOwner::Package)
-                .collect(),
+            owners: owners.into_iter().collect(),
         }
     } else {
         ContributionOutcome::Agreed(ComposedContribution {
@@ -529,7 +511,7 @@ pub enum ProfileTargetConflict {
     Contested {
         /// Every package whose differing definition remains, sorted
         /// independently of selector occurrence.
-        owners: Vec<ContributionConflictOwner>,
+        owners: Vec<ProfileId>,
     },
 }
 
@@ -545,7 +527,7 @@ impl ProfileTargetConflict {
                 "is defined differently by {}",
                 owners
                     .iter()
-                    .map(ToString::to_string)
+                    .map(|owner| format!("package {owner}"))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -929,7 +911,7 @@ fn overridden_declarations<'a, K: Ord + Clone, V: PartialEq + 'a>(
 /// conflict naming every declaring package.
 pub(super) fn contested_file_targets<'a>(
     selection: impl IntoIterator<Item = &'a ProfileClaims>,
-) -> BTreeMap<VirtualPath, Vec<ContributionConflictOwner>> {
+) -> BTreeMap<VirtualPath, Vec<ProfileId>> {
     let mut declared = BTreeMap::<FileKey, Vec<(&ProfileId, FileValue<'_>)>>::new();
     for (key, package, value) in selection
         .into_iter()
@@ -951,13 +933,7 @@ pub(super) fn contested_file_targets<'a>(
     }
     contested
         .into_iter()
-        .map(|(path, owners)| {
-            let owners = owners
-                .into_iter()
-                .map(ContributionConflictOwner::Package)
-                .collect();
-            (path, owners)
-        })
+        .map(|(path, owners)| (path, owners.into_iter().collect()))
         .collect()
 }
 
@@ -987,7 +963,7 @@ pub(super) fn compose_profile_targets_with_context(
     base: &RepositoryImage,
     claims: ProfileClaims,
     contribution_context: Vec<ProfileContributionClaim>,
-    contested_files: &BTreeMap<VirtualPath, Vec<ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<ProfileId>>,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
     let declared_identities = claims
         .contributions
@@ -1957,12 +1933,10 @@ mod tests {
         }
     }
 
-    fn package_owners(packages: &[&str]) -> Vec<ContributionConflictOwner> {
+    fn package_owners(packages: &[&str]) -> Vec<ProfileId> {
         packages
             .iter()
-            .map(|package| {
-                ContributionConflictOwner::Package(ProfileId::try_from(*package).unwrap())
-            })
+            .map(|package| ProfileId::try_from(*package).unwrap())
             .collect()
     }
 
@@ -2021,7 +1995,7 @@ mod tests {
     /// it.
     fn contested_outcome(
         outcomes: Vec<ContributionOutcome>,
-    ) -> (ContributionIdentity, Vec<ContributionConflictOwner>) {
+    ) -> (ContributionIdentity, Vec<ProfileId>) {
         let mut contested = outcomes.into_iter().filter_map(|outcome| match outcome {
             ContributionOutcome::Contested { identity, owners } => Some((identity, owners)),
             ContributionOutcome::Agreed(_) => None,
@@ -2567,7 +2541,7 @@ mod tests {
 
         for entry in &entries {
             let message = entry.to_string();
-            for leaked in ["ContributionConflictOwner", "Package(", "{"] {
+            for leaked in ["ProfileId", "{"] {
                 assert!(
                     !message.contains(leaked),
                     "a refusal names facts, not Rust syntax: {message}"
@@ -2609,6 +2583,24 @@ mod tests {
             Some(2)
         );
         assert!(serialized["conflict"].get("remedy").is_none());
+    }
+
+    #[test]
+    fn test_profile_target_conflict_output_and_schema_spell_parties_as_package_ids() {
+        let conflict = ProfileTargetConflict::Contested {
+            owners: package_owners(&["base", "workflow"]),
+        };
+        let spelled =
+            |owners: JsonValue| serde_json::json!({ "kind": "contested", "owners": owners });
+        let schema = serde_json::to_value(schemars::schema_for!(ProfileTargetConflict)).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+
+        assert_eq!(
+            serde_json::to_value(&conflict).unwrap(),
+            spelled(serde_json::json!(["base", "workflow"]))
+        );
+        assert!(validator.is_valid(&spelled(serde_json::json!(["base"]))));
+        assert!(!validator.is_valid(&spelled(serde_json::json!([{ "Package": "base" }]))));
     }
 
     #[test]

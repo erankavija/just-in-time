@@ -155,11 +155,11 @@ pub use path::{
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,
-    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
-    ContributionOutcome, ContributionRegistry, KeyedArrayTarget, MapEntryTarget,
-    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
-    ProfileRegionClaim, ProfileTargetConflict, ProfileTargetConflictEntry,
-    ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
+    ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
+    KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput, ProfileAssetClaim, ProfileClaims,
+    ProfileContributionClaim, ProfileRegionClaim, ProfileTargetConflict,
+    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
+    SetStringTarget,
 };
 pub(crate) use profile_apply::{
     drop_overridden_claims, profile_capture_closure, profile_contribution_overrides,
