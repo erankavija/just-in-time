@@ -1010,11 +1010,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// whose verdict is not a function of repository content running every
     /// time — or when this executor is not rooted at a real worktree, where
     /// there is no content to digest and so nothing a later run could prove
-    /// identical.
+    /// identical. Repository validation is also `None` whatever it declares: its
+    /// verdict depends on the records the digest excludes.
     fn declared_inputs_digest(
         &self,
         gate: &crate::declarations::GateDefinition,
     ) -> Result<Option<crate::domain::repository_inputs::InputsDigest>> {
+        if matches!(
+            gate.checker,
+            Some(crate::declarations::GateChecker::RepositoryValidation)
+        ) {
+            return Ok(None);
+        }
         let (Some(inputs), Some(layout)) = (gate.inputs.as_ref(), self.real_repo_layout()) else {
             return Ok(None);
         };
@@ -3048,6 +3055,55 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 "change {index}"
             );
         }
+    }
+
+    #[test]
+    fn test_repository_validation_never_reuses_a_verdict_when_the_gate_declares_inputs() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let gate_key: GateKey = "not-a-reserved-repository-key".parse().unwrap();
+        std::fs::create_dir_all(repo.path().join("workspace")).unwrap();
+        std::fs::write(repo.path().join("workspace/lib.rs"), "fn main() {}\n").unwrap();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.get_mut(&gate_key).unwrap().inputs = Some(
+            crate::domain::repository_inputs::RepositoryInputs::parse(&["workspace"], &[]).unwrap(),
+        );
+        std::fs::write(
+            repo.path().join(".jit/gates.toml"),
+            crate::declarations::serialize_gate_registry(&registry).unwrap(),
+        )
+        .unwrap();
+
+        let passed = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(passed.status, GateRunStatus::Passed, "{}", passed.stdout);
+
+        repeat_last_event(repo.path(), &issue_id);
+        let after_break = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(after_break.status, GateRunStatus::Failed);
+        assert!(after_break.origin.is_executed());
+
+        let log = repo.path().join(".jit/events.jsonl");
+        let mut seen = std::collections::HashSet::new();
+        let repaired = std::fs::read_to_string(&log)
+            .unwrap()
+            .lines()
+            .filter(|line| seen.insert(line.to_string()))
+            .map(|line| format!("{line}\n"))
+            .collect::<String>();
+        std::fs::write(&log, repaired).unwrap();
+        let after_repair = executor.check_gate(&issue_id, &gate_key).unwrap();
+        assert_eq!(
+            after_repair.status,
+            GateRunStatus::Passed,
+            "{}",
+            after_repair.stdout
+        );
+        assert!(after_repair.origin.is_executed());
     }
 
     #[test]
