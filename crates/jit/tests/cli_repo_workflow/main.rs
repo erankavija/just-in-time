@@ -40,6 +40,7 @@ mod test_cli_consistency;
 mod version_cli_tests;
 mod workflow_tests;
 mod worktree_cli_tests;
+mod worktree_exec_tests;
 mod worktree_identity_tests;
 
 /// Stage every profile package this repository authors inside `repo`, and

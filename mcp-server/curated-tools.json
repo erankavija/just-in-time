@@ -69,6 +69,7 @@
     "jit_snapshot_export": "Archival export for maintainers.",
     "jit_profile_pack": "Writes a package archive to hand to someone outside this repository; distribution is a maintainer step, not work an agent drives here.",
     "jit_profile_add": "Places a package obtained out of band into the worktree; which archive to trust is a human decision made before any agent connects.",
+    "jit_worktree_exec": "Runs an arbitrary host command, which no MCP client should reach through the tracker.",
     "jit_worktree_info": "Worktree identity is host state the agent already has from its shell.",
     "jit_worktree_list": "Fleet-wide worktree inspection is a coordinating lead's view.",
     "jit_worktree_store-divergence": "Cross-checkout store divergence is a recovery diagnostic a human runs on a suspect checkout; the report names no repair an agent can perform.",

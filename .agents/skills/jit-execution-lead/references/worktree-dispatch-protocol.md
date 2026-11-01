@@ -74,10 +74,12 @@ Re-run the leak check until it returns clean before doing any commits on main.
 Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — run the project's build-and-test gate on the result:
 
 ```bash
-git merge --no-ff worktree-agent-<short-id>
+.agents/skills/jit-execution-lead/scripts/land.sh worktree-agent-<short-id>
 git status --porcelain    # must be empty: what the gate judges below is then the merge commit's tree
 scripts/cargo-ci.sh       # this project's gate; use whichever one your project configures
 ```
+
+`land.sh` holds the repository write lock while it commits pending tracker state as `chore(jit): sync tracker` and merges. On a conflict it aborts the merge, keeps that commit, and names the paths: resolve them with `git merge` by hand. Under `enforce_leases = "strict"` the pre-commit hook refuses a sync commit holding an issue record whose lease the lead does not hold.
 
 This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a pre-merge working tree. A worker branch anchored before a module deletion, merged after it, cleanly re-adds a declaration referencing a file that no longer exists. A branch that changes a function's signature merges cleanly with a branch that adds a caller of the old form. In each case the merge finds no textual overlap and reports no conflict, the leak check reports no leak because the merge is legitimate, and every per-issue gate still reads green because each ran on a tree that predates the combination. Only a check run on the merged tree observes it.
 
@@ -169,6 +171,7 @@ The scripts live in this skill's `scripts/` subdirectory and are project-agnosti
 - `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh`
 - `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh`
 - `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh`
+- `.agents/skills/jit-execution-lead/scripts/land.sh`
 
 Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Their only configuration is the optional `LEAD_CACHE_POOL`, `LEAD_CACHE_DIRS` and `LEAD_SNAPSHOT_DIR`.
 
