@@ -508,6 +508,8 @@ pub(crate) enum ProfileTargetDisposition {
     Create,
     /// The target holds another value this profile replaces.
     Update,
+    /// The target is a derived file the profile's composition no longer yields.
+    Remove,
     /// The target cannot be published, for the reason it carries.
     Conflict(ProfileTargetConflict),
 }

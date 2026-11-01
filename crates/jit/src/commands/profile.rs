@@ -1375,8 +1375,7 @@ fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<Profile
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
 ///
-/// A path outside the detected checkout proceeds. An event-log append is left
-/// out because it keeps every uncommitted line.
+/// A path outside the detected checkout proceeds.
 fn ensure_committed_write_targets(
     plan: &MaterializationPlan,
     layout: &RepositoryLayout,
@@ -1387,9 +1386,7 @@ fn ensure_committed_write_targets(
     };
     let written = plan
         .delta()
-        .actions()
-        .iter()
-        .filter(|action| !matches!(action, RepositoryAction::AppendEvents { .. }))
+        .file_writes()
         .map(RepositoryAction::path)
         .collect::<Vec<_>>();
     if written.is_empty() {
@@ -4643,6 +4640,87 @@ template = true
         assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
         assert_eq!(entry.refusal.as_deref(), Some(refusal.as_str()));
         assert_eq!(repository_files(&temp), before, "nothing is written");
+    }
+
+    /// Every file an application changes, the ones it derives included, appears
+    /// in the report before it and the result after it.
+    #[test]
+    fn test_profile_reports_list_every_file_the_application_changes() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_contributing(&temp, "vendor/workflow", "workflow", "added", "Added.");
+        let selectors = [package_selector(&package)];
+        let options = supplied_values(&[]);
+        let before = repository_files(&temp);
+
+        let report = diff_selected(&executor, &selectors, &options).unwrap();
+        let applied = apply_selected(&executor, &selectors, &options).unwrap();
+
+        let after = repository_files(&temp);
+        let changed = after
+            .iter()
+            .filter(|(path, bytes)| before.get(*path) != Some(*bytes))
+            .map(|(path, _)| path.to_string_lossy().into_owned())
+            .filter(|path| path != ".jit/events.jsonl")
+            .collect::<BTreeSet<_>>();
+        assert!(
+            changed.contains(".jit/schemas/default-namespace-registry.json"),
+            "the application derives a schema: {changed:?}"
+        );
+        let reported_paths = report
+            .items
+            .iter()
+            .flat_map(|entry| &entry.targets)
+            .map(|target| target.path.clone())
+            .collect::<BTreeSet<_>>();
+        let result_paths = applied
+            .items
+            .iter()
+            .flat_map(|entry| &entry.targets)
+            .map(|target| target.path.clone())
+            .collect::<BTreeSet<_>>();
+        assert!(changed.is_subset(&reported_paths), "{reported_paths:?}");
+        assert!(changed.is_subset(&result_paths), "{result_paths:?}");
+    }
+
+    /// A derived file the application deletes is reported as a removal.
+    #[test]
+    fn test_diff_profiles_reports_an_obsolete_default_schema_as_removed() {
+        let temp = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+        )
+        .unwrap();
+        let dogfood =
+            ProfilePackage::from_directory(&temp.path().join("profiles/jit-dogfood")).unwrap();
+        let schema = ".jit/schemas/default-obsolete-profile-selection.json";
+        fs::write(temp.path().join(schema), "{}").unwrap();
+        let rules_path = temp.path().join(".jit/rules.toml");
+        let rules = fs::read_to_string(&rules_path).unwrap();
+        fs::write(
+            &rules_path,
+            format!(
+                "{rules}\n[[rules]]\nname = \"obsolete-profile-selection\"\norigin = \"default\"\n\
+                 assert = {{ json-schema = \"schemas/default-obsolete-profile-selection.json\" }}\n"
+            ),
+        )
+        .unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+
+        let report = diff_selected(
+            &executor,
+            &[package_selector(&dogfood)],
+            &supplied_values(&[]),
+        )
+        .unwrap();
+
+        assert!(
+            report
+                .items
+                .iter()
+                .any(|entry| decided_targets(entry, ProfileTargetAction::Remove).contains(schema)),
+            "{report:#?}"
+        );
     }
 
     /// A package reapplied with a changed definition of its own declaration

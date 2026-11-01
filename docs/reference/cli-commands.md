@@ -671,8 +671,11 @@ The selection is resolved, closed over the packages it depends on, and planned
 through the same preparation a publication runs, so the report is the decision
 the publication would act on rather than a second opinion about it. For each
 participating profile it states every target that profile decided: the values it
-would `create` or `update`, the ones already `unchanged`, and the targets it
-cannot publish at all (`conflict`), each with its reason. A conflict arises only
+would `create` or `update`, the derived files it would `remove`, the ones already
+`unchanged`, and the targets it cannot publish at all (`conflict`), each with its
+reason. The targets include every file the publication writes, among them the
+default schemas it derives from a changed registry. The event log is left out:
+a publication only appends its lifecycle event there. A conflict arises only
 when selected packages define one target or declaration differently, and its
 reason names those packages; the repository's current content is never a party
 to it.
