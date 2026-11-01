@@ -22252,3 +22252,5 @@
 {"from":"backlog","id":"309776e2-02d9-4d00-9e58-b7aac2a15c5d","issue_id":"7297f922-d3fd-4118-b533-c9d0b7638bc1","timestamp":"2026-11-01T15:24:28.560623130Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"ae2d6801-0fa7-402e-bc65-3d6809d0eeb4","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-01T15:24:29.781632298Z","to":"ready","type":"issue_state_changed"}
 {"fields":["description"],"id":"bef3209d-6421-4314-be9d-1f7632871650","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T15:24:57.663307823Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"f8b0f679-6dc9-4643-b5a7-cce53c692792","issue_id":"180e7f33-2d61-4e21-8548-fc533e06e400","priority":"normal","timestamp":"2026-11-01T15:34:13.037076092Z","title":"jit validate leaves a bootstrap lock file in the repository","type":"issue_created"}
+{"fields":["dependencies"],"id":"fdd4fa7f-3559-429e-8d74-7f623d395005","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T15:34:14.808599188Z","type":"issue_updated","updated_by":"dependency-add"}
