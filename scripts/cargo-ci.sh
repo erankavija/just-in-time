@@ -130,13 +130,13 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
   LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
   if command -v flock >/dev/null 2>&1; then
-    if ! flock -n -o "$BUILD_LOCK" true 2>/dev/null; then
-      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
-      report_build_lock_holders "$BUILD_LOCK" >&2
-    fi
     lock_status=0
     exec {build_lock_fd}>"$BUILD_LOCK"
-    flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
+    if ! flock -n "$build_lock_fd" 2>/dev/null; then
+      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
+      report_build_lock_holders "$BUILD_LOCK" >&2
+      flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
+    fi
     if [ "$lock_status" -eq 75 ]; then
       echo "ERROR: cargo-ci: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
       report_build_lock_holders "$BUILD_LOCK" >&2
