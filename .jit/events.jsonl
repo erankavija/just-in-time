@@ -21756,3 +21756,12 @@
 {"from":"in_progress","id":"906b99a3-dc9c-4eff-a0d8-48d11f803c83","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T04:44:12.991018748Z","to":"done","type":"issue_state_changed"}
 {"id":"10bfc4c3-be8a-468f-8c6a-7a9eaaf85331","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T04:44:12.991018748Z","type":"issue_completed"}
 {"from":"backlog","id":"ba5dd27f-2e70-411b-a9ff-3b9504ad0740","issue_id":"2195c98f-95a9-45d0-8582-d93c1d1fec45","timestamp":"2026-11-01T04:44:13.130155125Z","to":"ready","type":"issue_state_changed"}
+{"id":"b73fbbff-3867-42b3-9627-0eeec48198ce","issue_id":"64420cff-2c04-42a7-bbcf-232cb0e8003c","priority":"normal","timestamp":"2026-11-01T04:49:58.669133746Z","title":"Commands carry assignees as Assignee","type":"issue_created"}
+{"from":"ready","id":"25435266-f085-49f3-95bd-8cfca90834a0","issue_id":"2195c98f-95a9-45d0-8582-d93c1d1fec45","timestamp":"2026-11-01T04:49:59.191890997Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"81165505-40c9-40c5-bc12-2b6207b40632","issue_id":"2195c98f-95a9-45d0-8582-d93c1d1fec45","timestamp":"2026-11-01T04:49:59.191890997Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"355bcc55-f416-4440-b56b-adba04b1be85","issue_id":"64420cff-2c04-42a7-bbcf-232cb0e8003c","timestamp":"2026-11-01T04:49:59.375284433Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"db8ac85e-6d1c-4867-968d-b62211e0f412","issue_id":"64420cff-2c04-42a7-bbcf-232cb0e8003c","timestamp":"2026-11-01T04:49:59.375284433Z","type":"issue_claimed"}
+{"id":"696cb8fb-69ce-4834-ac73-a56eec06034b","issue_id":"592d663e-f516-4167-8449-d2b467ea32f4","priority":"normal","timestamp":"2026-11-01T04:49:59.468776481Z","title":"A profile has one identity type","type":"issue_created"}
+{"fields":["dependencies"],"id":"37b984c7-6a28-424c-9ded-15cb9de5772c","issue_id":"2195c98f-95a9-45d0-8582-d93c1d1fec45","timestamp":"2026-11-01T04:50:00.005037953Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"c97846d4-bfea-4559-b51a-9a631876da50","issue_id":"592d663e-f516-4167-8449-d2b467ea32f4","timestamp":"2026-11-01T04:50:00.187651105Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"1c7afdbd-171b-40c8-8e62-c309079dd9fc","issue_id":"592d663e-f516-4167-8449-d2b467ea32f4","timestamp":"2026-11-01T04:50:00.187651105Z","type":"issue_claimed"}
