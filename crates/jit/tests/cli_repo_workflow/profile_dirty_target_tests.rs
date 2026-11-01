@@ -71,6 +71,11 @@ fn refused(cli: &JitCli, events_root: &Path, args: &[&str]) -> Value {
     json(&output)["error"].clone()
 }
 
+fn refused_run(output: &Output) -> Value {
+    assert!(!output.status.success(), "{output:?}");
+    json(output)["error"].clone()
+}
+
 fn refused_paths(error: &Value) -> Vec<&str> {
     assert_eq!(error["code"], "PROFILE_UNCOMMITTED_TARGETS");
     error["details"]["paths"]
@@ -234,17 +239,13 @@ fn test_profile_apply_reports_a_relocated_data_root_target_at_its_checkout_path(
     )
     .unwrap();
 
-    let output = run(&["profile", "apply", "--profile", package, "--json"]);
+    let error = refused_run(&run(&["profile", "apply", "--profile", package, "--json"]));
 
-    assert!(!output.status.success(), "{output:?}");
-    assert_eq!(
-        refused_paths(&json(&output)["error"]),
-        ["state/config.toml"]
-    );
+    assert_eq!(refused_paths(&error), ["state/config.toml"]);
 }
 
 #[test]
-fn test_profile_apply_with_data_root_outside_every_checkout_proceeds_as_without_git() {
+fn test_profile_apply_refuses_a_worktree_target_when_the_data_root_is_outside_every_checkout() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap();
     let store = tempfile::TempDir::new().unwrap();
@@ -256,9 +257,10 @@ fn test_profile_apply_with_data_root_outside_every_checkout_proceeds_as_without_
     cli.commit("track the package").unwrap();
     write(&cli, TARGET, LOCAL_EDIT);
 
-    let output = run(&apply_args(&[PACKAGE]));
+    let error = refused_run(&run(&apply_args(&[PACKAGE])));
 
-    assert!(output.status.success(), "{output:?}");
+    assert_eq!(refused_paths(&error), [TARGET]);
+    assert_eq!(read(cli.root(), TARGET), LOCAL_EDIT);
 }
 
 #[cfg(unix)]
@@ -283,6 +285,27 @@ fn test_profile_apply_starts_no_git_probe_beyond_what_profile_diff_starts() {
     let apply_probes = probes_of(&apply_args(&[PACKAGE]));
 
     assert_eq!(apply_probes, diff_probes);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_profile_commands_probe_no_second_root_when_the_data_root_is_not_relocated() {
+    use jit::test_harness::git::GitStandIn;
+
+    let cli = repository(false);
+    let stand_in = GitStandIn::new();
+    let env = [("PATH", stand_in.search_path())];
+
+    let output = cli
+        .command_with_env(apply_args(&[PACKAGE]), env)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(stand_in
+        .invocations()
+        .iter()
+        .all(|invocation| invocation.directory() != Some(cli.root())));
 }
 
 #[test]

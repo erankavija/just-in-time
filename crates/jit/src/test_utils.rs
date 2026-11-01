@@ -1443,17 +1443,29 @@ pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
-/// Create test WorktreePaths from a TempDir
-///
-/// Generates a WorktreePaths structure suitable for testing,
-/// with standard paths relative to the temp directory.
+/// Create test WorktreePaths from a TempDir, as a primary checkout.
 pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
+    primary_checkout_paths(temp.path())
+}
+
+/// The detected paths of a primary checkout at `root`.
+pub fn primary_checkout_paths(root: impl AsRef<Path>) -> WorktreePaths {
+    linked_checkout_paths(&root, &root)
+}
+
+/// The detected paths of the checkout at `checkout`, whose primary is at `primary`.
+pub fn linked_checkout_paths(
+    primary: impl AsRef<Path>,
+    checkout: impl AsRef<Path>,
+) -> WorktreePaths {
+    let (primary, checkout) = (primary.as_ref(), checkout.as_ref());
     WorktreePaths {
         git_repository: true,
-        common_dir: temp.path().join(".git"),
-        worktree_root: temp.path().to_path_buf(),
-        local_jit: temp.path().join(".jit"),
-        shared_jit: temp.path().join(".git/jit"),
+        common_dir: primary.join(".git"),
+        worktree_root: checkout.to_path_buf(),
+        local_jit: checkout.join(".jit"),
+        shared_jit: primary.join(".git/jit"),
+        relocated_worktree_checkout: None,
     }
 }
 

@@ -3481,13 +3481,7 @@ mod tests {
     fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join("worktree with spaces");
-        let paths = crate::storage::WorktreePaths {
-            git_repository: true,
-            common_dir: root.join(".git"),
-            local_jit: root.join(".jit"),
-            shared_jit: root.join(".git/jit"),
-            worktree_root: root.clone(),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(&root);
         let error = claims_mutation_guard(&paths).err().unwrap();
         assert!(error.to_string().contains("root path"));
         assert!(error.to_string().contains(root.to_str().unwrap()));

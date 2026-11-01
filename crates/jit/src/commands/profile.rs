@@ -1347,15 +1347,14 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
 ///
-/// `paths` is the invocation's one git classification, so a repository whose
-/// data root lies outside every checkout has no git here.
-/// An event-log append is left out because it keeps every uncommitted line.
+/// A path outside the detected checkout proceeds. An event-log append is left
+/// out because it keeps every uncommitted line.
 fn ensure_committed_write_targets(
     plan: &MaterializationPlan,
     layout: &RepositoryLayout,
     paths: &WorktreePaths,
 ) -> Result<()> {
-    let Some(checkout) = paths.git() else {
+    let Some(checkout) = paths.write_checkout() else {
         return Ok(());
     };
     let written = plan
@@ -1384,7 +1383,7 @@ fn ensure_committed_write_targets(
     let uncommitted = checkout
         .dirty_paths()?
         .into_iter()
-        .filter(|dirty| written.contains(&paths.worktree_root.join(dirty)))
+        .filter(|dirty| written.contains(&checkout.worktree_root().join(dirty)))
         .map(|dirty| dirty.display().to_string())
         .collect::<BTreeSet<_>>();
     if uncommitted.is_empty() {
@@ -2448,6 +2447,51 @@ mod tests {
             ),
             "{error:#}"
         );
+    }
+
+    #[test]
+    fn test_apply_profile_package_judges_only_paths_inside_the_data_roots_checkout() {
+        let temp = TempDir::new().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path().join("repo"));
+        let outside = temp.path().join("outside");
+        fs::create_dir(&outside).unwrap();
+        let storage = JsonFileStorage::new(repository.root().join("state"));
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(&outside, storage.root()).unwrap());
+        executor
+            .initialize_fresh_repository(&outside, None)
+            .unwrap();
+        repository.commit("track the store");
+        let package = authored_package(
+            &temp,
+            "outside/packages/first",
+            "first",
+            "docs/first.txt",
+            "rendered\n",
+            "\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"shared\"\nvalue = { description = \"shared\", unique = false }\n",
+        );
+        let outside_target = outside.join("docs/first.txt");
+        fs::create_dir(outside.join("docs")).unwrap();
+        fs::write(&outside_target, "a local edit\n").unwrap();
+        let config = repository.root().join("state/config.toml");
+        fs::write(
+            &config,
+            format!("{}\n# a local edit\n", fs::read_to_string(&config).unwrap()),
+        )
+        .unwrap();
+
+        let error = executor.apply_profile_package(&package).unwrap_err();
+
+        assert!(matches!(
+            error.downcast_ref::<ProfileApplyError>(),
+            Some(ProfileApplyError::UncommittedTargets { paths })
+                if paths.as_slice() == ["state/config.toml"]
+        ));
+
+        repository.git(&["checkout", "--", "state/config.toml"]);
+        executor.apply_profile_package(&package).unwrap();
+
+        assert_eq!(fs::read_to_string(outside_target).unwrap(), "rendered\n");
     }
 
     #[test]
