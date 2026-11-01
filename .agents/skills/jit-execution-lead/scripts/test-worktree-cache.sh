@@ -57,6 +57,9 @@ new_pool() { # dir
         target/CACHEDIR.TAG \
         target/debug/deps/libpkg.rlib \
         target/debug/deps/build \
+        target/debug/deps/pkg-1.d \
+        target/debug/pkg.d \
+        target/debug/conf.d/settings \
         target/debug/build/pkg-1/output \
         target/debug/.fingerprint/pkg-1/dep-lib \
         target/release/build/pkg-2/out/build/generated.rs \
@@ -71,7 +74,7 @@ new_pool() { # dir
     ln "$pool/target/debug/build/pkg-1/output" "$pool/target/debug/build/pkg-1/output-alias"
 }
 
-is_mutable_state() { [[ "/$1" == */.fingerprint/* || "/$1" == */build/* ]]; }
+is_mutable_state() { [[ "/$1" == */.fingerprint/* || "/$1" == */build/* || "$1" == *.d ]]; }
 
 # --- Hardlink seed --------------------------------------------------------
 repo="$FIX/seed"; pool="$FIX/seed-pool"; snapshots="$FIX/seed-snapshots"

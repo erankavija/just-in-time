@@ -34,15 +34,17 @@
 
 set -euo pipefail
 
-# Build tools rewrite files under these directories in place, which would write
-# through a hardlink into the pool and every sibling worktree, so they get their
-# own copies. Replacing the outermost match covers everything nested in it.
+# Build tools rewrite dep-info files and files under these directories in place,
+# which would write through a hardlink into the pool and every sibling worktree,
+# so they get their own copies. Replacing the outermost match covers everything
+# nested in it.
 unshare_mutable_build_state() {
-    local source="${1%/}" seeded="$2" dir
+    local source="${1%/}" seeded="$2" entry
     find "$seeded" -type d \( -name .fingerprint -o -name build \) -prune -print0 \
-        | while IFS= read -r -d '' dir; do
-            rm -rf "$dir"
-            cp -a "$source${dir#"$seeded"}" "$dir"
+        -o -type f -name '*.d' -print0 \
+        | while IFS= read -r -d '' entry; do
+            rm -rf "$entry"
+            cp -a "$source${entry#"$seeded"}" "$entry"
         done
 }
 
