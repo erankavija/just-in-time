@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0163a652088c86f9e16efbb5723f7557e09fa850",
+  "completed_at": "2026-11-01T20:10:52.514084971Z",
+  "duration_ms": 174867,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/derived_documents_cli_tests.rs",
+        "id": "F1",
+        "line": 285,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/edc8544d/requirement/REQ-04",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "No single test proves that both server issue reads, issue show, gate context, and doc list report the same document set."
+      }
+    ],
+    "summary": "The required single cross-surface agreement test is missing.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "edc8544d-5f5e-497e-9706-c7b4e7235036",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea5ae2bf-600b-4e91-aa0c-2e4ac05b1460",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T20:07:57.646500110Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6848 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a198b9-d466-7923-ac0b-1fbe337283d3\n--------\nuser\n--- 6835 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a0c3144ba, bd49f172c, d0ff8e00c, 2a55b22a6, 0163a6520\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/edc8544d-5f5e-497e-9706-c7b4e7235036.json\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/edc8544d/requirement/REQ-01–REQ-04 (.jit/issues/edc8544d-5f5e-497e-9706-c7b4e7235036.json); @/issue/3d9a0ce3/requirement/REQ-03 (.jit/issues/3d9a0ce3-de69-4a99-ac98-9cf4d4852194.json)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T20:06:31.790532462+00:00)\nTruncation recovery: reread bounded per-commit/path patches and current derivation, route, test, web-type, and policy sources after combined output truncation\n\n1. [blocking, issue-impact] No single test owns agreement across every required surface. The CLI test compares `jit doc list`, `jit issue show`, and `JIT_ISSUE_DOCS` at `crates/jit/tests/cli_repo_workflow/derived_documents_cli_tests.rs:265-286`; the server test separately compares only its collection and single-item endpoints at `crates/server/src/routes.rs:2518-2522`. Neither establishes that server output equals `jit doc list`, leaving the hard cross-surface agreement criterion without its required owner. References: `@/issue/edc8544d/requirement/REQ-04`, `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required single cross-surface agreement test is missing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No single test proves that both server issue reads, issue show, gate context, and doc list report the same document set.\",\"file\":\"crates/jit/tests/cli_repo_workflow/derived_documents_cli_tests.rs\",\"line\":285,\"references\":[\"@/issue/edc8544d/requirement/REQ-04\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
