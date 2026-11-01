@@ -21624,3 +21624,7 @@
 {"gate_key":"code-review","id":"33823448-4f20-45a7-ba2a-09fe4b544915","issue_id":"8d959c96-0fa7-4a0f-980a-88ddf42a9ab8","timestamp":"2026-11-01T01:09:07.575935Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"5bec8fad-317f-4216-854b-09953c2ab85e","issue_id":"8d959c96-0fa7-4a0f-980a-88ddf42a9ab8","timestamp":"2026-11-01T01:09:24.680159482Z","to":"done","type":"issue_state_changed"}
 {"id":"c195b8b2-6946-4535-a5d4-d7596e951a76","issue_id":"8d959c96-0fa7-4a0f-980a-88ddf42a9ab8","timestamp":"2026-11-01T01:09:24.680159482Z","type":"issue_completed"}
+{"id":"6f820e6d-752c-4080-a7e8-ae81f33f8697","issue_id":"c882f1f8-623c-46a0-8440-53de6da2b3e9","priority":"high","timestamp":"2026-11-01T01:29:54.921264771Z","title":"cargo-ci self-test fixture does not loop through a cargo shim","type":"issue_created"}
+{"fields":["dependencies"],"id":"43edc943-2895-407d-98a0-3f73c7e5345f","issue_id":"c5aafdc0-998c-46a0-a286-7f853f0b814a","timestamp":"2026-11-01T01:29:55.417746021Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"f793a9aa-0b22-4afe-ac02-64853dfbe77d","issue_id":"c882f1f8-623c-46a0-8440-53de6da2b3e9","timestamp":"2026-11-01T01:29:55.599357260Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"bd0a53a0-4a98-4052-94bc-1d9c3eab1a4d","issue_id":"c882f1f8-623c-46a0-8440-53de6da2b3e9","timestamp":"2026-11-01T01:29:55.599357260Z","type":"issue_claimed"}
