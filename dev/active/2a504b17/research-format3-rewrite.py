@@ -101,7 +101,7 @@ severity = "error"
 enforce = false
 assert = { json-schema = "schemas/default-type-hierarchy-known.json" }
 '''
-CUSTOM_RULES = '''# Limits this repository declared in config.toml until format 3, which moved them here.
+CUSTOM_RULES = r'''# Limits this repository declared in config.toml until format 3, which moved them here.
 
 [[rules]]
 name = "type-required"
