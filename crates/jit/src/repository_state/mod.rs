@@ -68,7 +68,6 @@ pub use mutation::{
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
-    TreeFileDisposition, TreeFileOutcome,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled

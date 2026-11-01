@@ -18,7 +18,7 @@ use crate::repository_state::{
     MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
     ProfileContributionClaim, RepositoryAction, RepositoryEntry, RepositoryExportDestination,
     RepositoryExportIntent, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryStateError, RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    RepositoryStateError, RootRelativePath, VirtualPath,
 };
 use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -306,28 +306,6 @@ pub enum ProfileApplyError {
     },
 }
 
-/// Project package-tree materialization outcomes into the profile family's one
-/// public target-decision vocabulary.
-fn tree_target_changes(outcomes: &[TreeFileOutcome]) -> Vec<ProfileTargetChange> {
-    outcomes
-        .iter()
-        .map(|outcome| {
-            let action = match outcome.disposition {
-                TreeFileDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                TreeFileDisposition::Create => ProfileTargetAction::Create,
-                TreeFileDisposition::Update => ProfileTargetAction::Update,
-                TreeFileDisposition::Remove => ProfileTargetAction::Remove,
-            };
-            ProfileTargetChange::new(
-                outcome.path.repository_relative(),
-                action,
-                outcome.mode,
-                None,
-            )
-        })
-        .collect()
-}
-
 /// Read-only command options for the package's non-secret input channels.
 ///
 /// The command boundary turns these filesystem and process inputs into the
@@ -612,8 +590,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
-        let (status, outcomes) =
-            self.publish_package_tree(&layout, &destination, &tree, publish)?;
+        let targets = self.publish_package_tree(&layout, &destination, &tree, publish)?;
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
             id: tree.model().id.to_string(),
             version: tree.model().version.clone(),
@@ -623,26 +600,29 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             destination: destination.repository_relative(),
             file_count: tree.file_count(),
             byte_size: tree.byte_size(),
-            targets: tree_target_changes(&outcomes),
-            status,
+            targets,
+            status: if publish {
+                ProfileApplicationStatus::Applied
+            } else {
+                ProfileApplicationStatus::WouldApply
+            },
         }]))
     }
 
-    /// Publish one validated package tree at `destination`.
+    /// Publish one validated package tree at `destination`, answering every path
+    /// it creates.
     ///
-    /// A package tree reaches the worktree through one redo record. The
-    /// destination must be absent, which is enforced against the same captured
-    /// image the plan is derived from rather than by a separate look at the
-    /// filesystem. An occupied destination is refused here; one that becomes
-    /// occupied afterwards is refused at apply, because the plan creates it
-    /// with an absent preimage.
+    /// The destination must be absent, which is enforced against the same
+    /// captured image the plan is derived from. One that becomes occupied
+    /// afterwards is refused at apply, because the plan creates it with an absent
+    /// preimage.
     fn publish_package_tree(
         &self,
         layout: &RepositoryLayout,
         destination: &VirtualPath,
         tree: &CapturedPackageTree,
         publish: bool,
-    ) -> Result<(ProfileApplicationStatus, Vec<TreeFileOutcome>)> {
+    ) -> Result<Vec<ProfileTargetChange>> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
             tree.files()
@@ -659,14 +639,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let budget = package_tree_capture_budget(destination);
 
         with_mutation_session(self.storage(), layout, "profile package tree", |session| {
-            // The destination's whole subtree must be read before the delta is
-            // derived, because a file it holds that the tree no longer declares
-            // is one a republication removes.
-            let Some(image) = super::capture_discovering(
-                session,
-                capture.capture_spec(budget)?,
-                |image, spec| Ok(capture.expand_destination_closure(image, spec)?),
-            )?
+            let Some(image) =
+                super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -677,18 +651,26 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .into());
             }
 
-            let (plan, outcomes) = finalize_package_tree_capture(&image, &capture)?;
-            let status = if plan.delta().actions().is_empty() {
-                ProfileApplicationStatus::Unchanged
-            } else if !publish {
-                ProfileApplicationStatus::WouldApply
-            } else {
-                ProfileApplicationStatus::Applied
-            };
+            let plan = finalize_package_tree_capture(&image, &capture)?;
+            let targets = plan
+                .delta()
+                .file_writes()
+                .filter_map(|action| match action {
+                    RepositoryAction::WriteFile { path, mode, .. } => {
+                        Some(ProfileTargetChange::new(
+                            path.repository_relative(),
+                            ProfileTargetAction::Create,
+                            *mode,
+                            None,
+                        ))
+                    }
+                    _ => None,
+                })
+                .collect();
             if publish {
-                Ok(SessionStep::Apply(plan, (status, outcomes)))
+                Ok(SessionStep::Apply(plan, targets))
             } else {
-                Ok(SessionStep::Done((status, outcomes)))
+                Ok(SessionStep::Done(targets))
             }
         })
     }
@@ -1414,55 +1396,25 @@ fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
     }
 }
 
-/// How many package-model byte budgets one package-tree publication may span.
+/// How many package-model byte budgets one package-tree capture may read.
 ///
-/// One is the tree being published. One more is what the destination already
-/// holds, which a previous publication left there as a package tree bounded the
-/// same way. The rest is headroom for content an adopter added beside it, so a
-/// republication is refused for what the destination holds rather than for the
-/// shape of the package arriving at it.
+/// A publication writes only over absent paths, so this bounds what an occupied
+/// destination holds at the tree's paths: past it, an add is refused for the
+/// budget rather than for the occupant.
 const PACKAGE_TREE_MODEL_BUDGETS: usize = 8;
 
 /// Bounds for publishing one package tree at `destination`.
 ///
-/// Every bound here is derived from what the package model constrains. That
-/// matters because the model bounds a package's file count
-/// ([`MAX_PROFILE_PACKAGE_FILES`]) and its total size
-/// ([`MAX_PROFILE_PACKAGE_BYTES`]) and says nothing about how deep or how long
-/// its paths are, so a bound assuming a path shape refuses packages the model
-/// admits — an archive `jit profile pack` writes that `jit profile add` will
-/// not take.
-///
-/// One property of the model carries all three. The manifest declares every
-/// file the package holds besides itself, by name, and no source may be
-/// declared twice, so the package's declared path lengths sum to less than the
-/// manifest's own size — which is itself part of the same byte budget its
-/// content is. From that:
-///
-/// * **Listings.** A republication takes one per directory beneath the
-///   destination. Each directory the package needs is a proper prefix of a
-///   declared path ending at a separator, so the package contributes fewer of
-///   them than its declared paths have bytes.
-/// * **Depth.** A path's component count is below its own byte length, so no
-///   declared path reaches a package byte budget's worth of components below
-///   the destination the caller named.
-/// * **Bytes.** What actually binds a publication: the tree's content is at
-///   most one package byte budget, and a republication also reads what the
-///   destination already holds.
-///
-/// Nothing bounds how many paths the capture declares, because the same
-/// property already bounds them: the closure is the declared files plus their
-/// directory prefixes, so it stays under `MAX_PROFILE_PACKAGE_FILES` plus a
-/// package byte budget. A budget stating a number that large refuses no package
-/// the model admits, and any smaller number refuses packages it does admit.
-///
-/// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
-/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
+/// Each bound derives from what the package model constrains: the model bounds
+/// a package's file count and total size and leaves its paths' depth and length
+/// free, so a bound assuming a path shape would refuse an archive `jit profile
+/// pack` writes. The manifest names every file besides itself and no source
+/// twice, so the declared path lengths sum below the package byte budget. That
+/// bounds the directories the tree can need ([`CaptureBudget::max_listings`])
+/// and the components of any one path ([`CaptureBudget::max_depth`]).
 fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
     // Saturating throughout: a bound that wrapped would be smaller than the
-    // model demands, which is the failure this function exists to prevent. The
-    // only term this build cannot compute at compile time is the destination's
-    // own depth, which the caller supplies.
+    // model demands.
     const READ_BYTES: usize =
         PACKAGE_TREE_MODEL_BUDGETS.saturating_mul(crate::profile::MAX_PROFILE_PACKAGE_BYTES);
 
