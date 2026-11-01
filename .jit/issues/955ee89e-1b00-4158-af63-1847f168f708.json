@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "90a85681-8386-496f-a598-0811cbec0746",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:35:05.251436267Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "da72d8ca-6c98-4d7e-8072-336de22f07bd",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:36:39.657554686Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "955ee89e-1b00-4158-af63-1847f168f708",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Init and profile command tests use the shared file-backed constructors",
-  "updated_at": "2026-11-01T00:55:21.646322797Z"
+  "updated_at": "2026-11-01T01:36:39.657554686Z"
 }
