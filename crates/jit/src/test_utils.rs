@@ -501,8 +501,11 @@ fn ensure_profiled_repository_fixture(
 /// Leases the profile's entry for `key`, building and publishing it under the
 /// exclusive profile lock when absent. A failure recorded other than
 /// `observed_failure` came from a build this consumer waited on, so its cause
-/// becomes this consumer's error; an observed one predates the wait and is
-/// retried. The kernel releases a dead holder's lock, so lock waits are unbounded.
+/// becomes this consumer's error even when a later retry has since published the
+/// entry; an observed one predates the wait, so this consumer reads the entry or
+/// retries the build. The record outlives a successful retry, which keeps it
+/// visible to every waiter and `attempt` monotonic per key. The kernel releases a
+/// dead holder's lock, so lock waits are unbounded.
 fn ensure_profiled_repository_fixture_observing(
     paths: &ProfiledRepositoryFixturePaths,
     profile: &str,
@@ -516,6 +519,12 @@ fn ensure_profiled_repository_fixture_observing(
     let locker = FileLocker::new(Duration::MAX);
     loop {
         let shared = locker.lock_shared(&paths.lock)?;
+        refuse_unobserved_fixture_build_failure(
+            read_fixture_build_failure(paths, key)?.as_ref(),
+            observed_failure,
+            profile,
+            key,
+        )?;
         if is_published_fixture(&entry)? {
             validate_profiled_repository_fixture(&entry, key)?;
             return Ok(ProfiledRepositoryFixtureLease {
@@ -530,24 +539,16 @@ fn ensure_profiled_repository_fixture_observing(
             ));
             continue;
         };
+        let failure = read_fixture_build_failure(paths, key)?;
+        refuse_unobserved_fixture_build_failure(failure.as_ref(), observed_failure, profile, key)?;
         if is_published_fixture(&entry)? {
             continue;
         }
-        let failure = read_fixture_build_failure(paths, key)?;
-        if let Some(failure) = failure.as_ref().filter(|&f| Some(f) != observed_failure) {
-            bail!(
-                "profiled-repository fixture {profile} key {key} failed to build: {}",
-                failure.cause
-            );
-        }
         return match publish_profiled_repository_fixture(&paths.profile_root, &entry, key, build) {
-            Ok(()) => {
-                remove_fixture_build_failure(paths)?;
-                Ok(ProfiledRepositoryFixtureLease {
-                    entry,
-                    _profile_lock: exclusive,
-                })
-            }
+            Ok(()) => Ok(ProfiledRepositoryFixtureLease {
+                entry,
+                _profile_lock: exclusive,
+            }),
             Err(error) => {
                 let recorded = ProfiledRepositoryFixtureBuildFailure {
                     key: key.to_string(),
@@ -559,6 +560,21 @@ fn ensure_profiled_repository_fixture_observing(
                 Err(error)
             }
         };
+    }
+}
+
+fn refuse_unobserved_fixture_build_failure(
+    failure: Option<&ProfiledRepositoryFixtureBuildFailure>,
+    observed_failure: Option<&ProfiledRepositoryFixtureBuildFailure>,
+    profile: &str,
+    key: &str,
+) -> Result<()> {
+    match failure.filter(|&failure| Some(failure) != observed_failure) {
+        Some(failure) => bail!(
+            "profiled-repository fixture {profile} key {key} failed to build: {}",
+            failure.cause
+        ),
+        None => Ok(()),
     }
 }
 
@@ -635,13 +651,6 @@ fn write_fixture_build_failure(
     fs::write(staged.path(), serde_json::to_vec_pretty(failure)?)?;
     staged.persist(&paths.build_failure)?;
     Ok(())
-}
-
-fn remove_fixture_build_failure(paths: &ProfiledRepositoryFixturePaths) -> Result<()> {
-    match fs::remove_file(&paths.build_failure) {
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
-        _ => Ok(()),
-    }
 }
 
 fn is_published_fixture(entry: &Path) -> Result<bool> {
@@ -1854,7 +1863,6 @@ mod tests {
     #[test]
     fn test_profiled_repository_fixture_consumer_arriving_after_a_failure_retries_the_build() {
         let cache = TempDir::new().unwrap();
-        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
 
         ensure_profiled_repository_fixture(cache.path(), "profile", "key", |_| {
             bail!("a transient cause")
@@ -1870,7 +1878,72 @@ mod tests {
             fs::read(lease.entry.join("repository/state")).unwrap(),
             b"built"
         );
-        assert_eq!(read_fixture_build_failure(&paths, "key").unwrap(), None);
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_waiter_reports_a_failure_a_later_retry_recovered_from() {
+        let cache = TempDir::new().unwrap();
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |_| {
+            bail!("the build's own cause")
+        })
+        .unwrap_err();
+        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
+        ensure_profiled_repository_fixture_observing(
+            &paths,
+            "profile",
+            "key",
+            Some(&observed),
+            |_| Ok(()),
+        )
+        .unwrap();
+
+        let error =
+            ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |_| {
+                bail!("a waiter must not build")
+            })
+            .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains("the build's own cause"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_consumer_observing_a_failure_reads_a_retrys_entry() {
+        let cache = TempDir::new().unwrap();
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |_| {
+            bail!("a transient cause")
+        })
+        .unwrap_err();
+        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
+        ensure_profiled_repository_fixture_observing(
+            &paths,
+            "profile",
+            "key",
+            Some(&observed),
+            |repo| {
+                fs::write(repo.join("state"), b"built")?;
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        let lease = ensure_profiled_repository_fixture_observing(
+            &paths,
+            "profile",
+            "key",
+            Some(&observed),
+            |_| bail!("the published entry must be read"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            fs::read(lease.entry.join("repository/state")).unwrap(),
+            b"built"
+        );
     }
 
     #[test]
