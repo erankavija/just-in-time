@@ -119,8 +119,10 @@ pub fn render_reference_markdown() -> String {
          The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the\n\
          configured gate key does not change their behavior:\n\
          \n\
-         - `repository_validation` runs the whole-repository `jit validate` computation and\n\
-           fails where it fails.\n\
+         - `repository_validation` runs the whole-repository `jit validate` computation, so\n\
+           it never passes where that fails. A rule finding or an invalid stored record\n\
+           records `failed`; a configuration or integrity fault it cannot judge through\n\
+           records `error`, which is never reused.\n\
          - `issue_validation` runs declarative validation for the gated issue.\n\
          - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
            from the gated issue, where the target is a full issue id or unique prefix, and\n\

@@ -61,6 +61,12 @@ pub struct RepositoryValidationReport {
     pub rule_report: RuleReport,
 }
 
+/// A stored record that exists and cannot stand: a verdict on repository content,
+/// where every other structural failure means validation could not judge.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub(crate) struct InvalidStoredRecord(pub(crate) String);
+
 /// A structural repository-validation failure with all semantic findings that
 /// could still be collected from the already captured [`RepositoryImage`].
 ///
@@ -100,6 +106,11 @@ impl RepositoryValidationFailure {
                 rule_report: RuleReport::default(),
             },
         )
+    }
+
+    /// Whether the failure judges a stored record rather than an inability to judge.
+    pub fn is_invalid_stored_record(&self) -> bool {
+        self.error.downcast_ref::<InvalidStoredRecord>().is_some()
     }
 
     /// Partial validation report collected from the exact supplied view.
@@ -378,18 +389,19 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         &read(&index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
-    .context(format!("invalid {index_path}"))?;
+    .context(InvalidStoredRecord(format!("invalid {index_path}")))?;
     let issues = captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id).repository_relative();
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
-                .with_context(|| format!("invalid {path}"))?;
+                .with_context(|| InvalidStoredRecord(format!("invalid {path}")))?;
             if &issue.id != id {
-                return Err(anyhow!(
+                return Err(InvalidStoredRecord(format!(
                     "issue file '{path}' contains id '{}' instead of '{id}'",
                     issue.id
-                ));
+                ))
+                .into());
             }
             Ok(issue)
         })
@@ -398,10 +410,10 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
     let mut event_count = 0;
     if let Some(events) = read_text(read, &VirtualPath::EVENTS.repository_relative())? {
         event_count = parse_known_events(&events)
-            .context(format!(
+            .context(InvalidStoredRecord(format!(
                 "invalid {}",
                 VirtualPath::EVENTS.repository_relative()
-            ))?
+            )))?
             .len();
     }
     Ok(Records {

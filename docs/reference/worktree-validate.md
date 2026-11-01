@@ -343,7 +343,9 @@ behavior depends on the arguments.
   decode and reproduce what the writer would publish, and every event-log line
   outside the current vocabulary carries a retired tag, and no event id appears
   on more than one line. Advisory
-  membership-vs-DAG divergences are reported but do not fail the run.
+  membership-vs-DAG divergences are reported but do not fail the run. A built-in
+  `repository_validation` gate runs this same computation and never passes where
+  it fails; see [gate presets](gate-presets.md) for its `failed` and `error` runs.
 - **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
   issue. The id accepts a full UUID, 8-char short id, or unique prefix.
 - **Selected rule** (`jit validate <id> --rule <rule>`): applies exactly one
