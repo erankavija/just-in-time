@@ -1682,10 +1682,10 @@ mod tests {
         let first = capture_repository_package(&id, &destination).unwrap();
         let second = capture_repository_package(&id, &destination).unwrap();
 
-        assert_eq!(second.hashes(), first.hashes());
+        assert_eq!(second.package_hash(), first.package_hash());
         let reread = ProfilePackage::from_directory(&destination)
             .expect("the republished destination holds a package");
-        assert_eq!(reread.hashes(), second.hashes());
+        assert_eq!(reread.package_hash(), second.package_hash());
         assert_eq!(reread.file_count(), second.file_count());
     }
 

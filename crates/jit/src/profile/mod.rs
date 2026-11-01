@@ -47,8 +47,8 @@ pub use manifest::{
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
 pub use package::{
-    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes,
-    MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
+    PackageHash, ProfilePackage, ProfilePackageError, MAX_PROFILE_PACKAGE_BYTES,
+    MAX_PROFILE_PACKAGE_FILES,
 };
 pub use package_archive::{
     pack_package_archive, read_package_archive, PackageArchiveError,

@@ -12,12 +12,10 @@ use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const REFERENCE_PREFIX: &str = "{{jit:";
 const REFERENCE_KIND: &str = "var:";
-const RESOLVED_TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-resolved-target-v1\0";
 
 /// Inputs captured by a command before it enters pure package resolution.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -300,86 +298,6 @@ fn resolve_package_content(
         source_bytes,
         variables,
     })
-}
-
-impl ResolvedProfileContent {
-    /// Hash resolved semantic contributions and resolved file bytes by their
-    /// repository target without exposing the resolved values themselves.
-    pub fn target_hashes(&self) -> Result<BTreeMap<String, String>, VariableError> {
-        let variable_frame = canonical_json_bytes(&self.variables)?;
-        let mut frames = BTreeMap::<String, Vec<Vec<u8>>>::new();
-        for contribution in &self.model.contributions {
-            frames
-                .entry(contribution.registry().path().repository_relative())
-                .or_default()
-                .push(canonical_json_bytes(contribution)?);
-        }
-        for asset in &self.model.assets {
-            let mut frame = canonical_json_bytes(asset)?;
-            append_frame(
-                &mut frame,
-                self.source_bytes(&asset.source)
-                    .ok_or_else(|| VariableError::MissingSource(asset.source.clone()))?,
-            );
-            frames.entry(asset.target.clone()).or_default().push(frame);
-        }
-        for region in &self.model.regions {
-            let mut frame = canonical_json_bytes(region)?;
-            append_frame(
-                &mut frame,
-                self.source_bytes(&region.source)
-                    .ok_or_else(|| VariableError::MissingSource(region.source.clone()))?,
-            );
-            frames.entry(region.target.clone()).or_default().push(frame);
-        }
-        frames
-            .into_iter()
-            .map(|(target, target_frames)| {
-                let mut hasher = Sha256::new();
-                hasher.update(RESOLVED_TARGET_HASH_DOMAIN);
-                hash_frame(&mut hasher, b"variables");
-                hash_frame(&mut hasher, &variable_frame);
-                hash_frame(&mut hasher, target.as_bytes());
-                target_frames
-                    .iter()
-                    .for_each(|frame| hash_frame(&mut hasher, frame));
-                Ok((target, format!("{:x}", hasher.finalize())))
-            })
-            .collect()
-    }
-}
-
-fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, VariableError> {
-    serde_json::to_vec(&canonicalize_json(
-        serde_json::to_value(value)
-            .map_err(|error| VariableError::Serialization(error.to_string()))?,
-    ))
-    .map_err(|error| VariableError::Serialization(error.to_string()))
-}
-
-fn canonicalize_json(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
-        Value::Object(values) => Value::Object(
-            values
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_json(value)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect(),
-        ),
-        scalar => scalar,
-    }
-}
-
-fn append_frame(frame: &mut Vec<u8>, bytes: &[u8]) {
-    frame.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
-    frame.extend_from_slice(bytes);
-}
-
-fn hash_frame<D: Digest>(hasher: &mut D, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
-    hasher.update(bytes);
 }
 
 /// Validate reference syntax and positions without requiring input values.
@@ -895,9 +813,6 @@ pub enum VariableError {
     /// A declared package source was absent from the package image.
     #[error("declared package source '{0}' is unavailable")]
     MissingSource(String),
-    /// A resolved semantic definition could not be serialized for hashing.
-    #[error("failed to serialize resolved profile content for hashing: {0}")]
-    Serialization(String),
 }
 
 #[cfg(test)]

@@ -703,7 +703,8 @@ pub struct ProfileApplicationInput {
     pub version: String,
     /// Exact public values and source kinds that produced `claims`.
     pub variables: ResolvedVariables,
-    pub target_hashes: BTreeMap<String, String>,
+    /// Repository paths the package writes.
+    pub targets: BTreeSet<String>,
     pub claims: ProfileClaims,
     /// Resolved candidates sharing one of this package's semantic identities.
     ///
@@ -741,11 +742,11 @@ impl ProfileApplicationInput {
     /// reference, so an application of it reaches the generated schema
     /// directory whether or not the package names a target under it.
     pub(crate) fn owns_default_rule_authority(&self) -> bool {
-        self.target_hashes
-            .contains_key(VirtualPath::CONFIG.repository_relative().as_str())
+        self.targets
+            .contains(VirtualPath::CONFIG.repository_relative().as_str())
             || self
-                .target_hashes
-                .contains_key(VirtualPath::RULES.repository_relative().as_str())
+                .targets
+                .contains(VirtualPath::RULES.repository_relative().as_str())
     }
 }
 

@@ -324,6 +324,30 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 }
 
 #[test]
+fn test_profile_show_prints_target_paths_without_hash_values() {
+    let repo = JitCli::uninitialised().unwrap();
+    assert!(jit(&repo, &["init"]).status.success());
+    let location = package_at(repo.root(), "vendor/planner");
+
+    let shown = json(&jit(
+        &repo,
+        &["profile", "show", "--profile", location, "--json"],
+    ));
+    let targets = shown["profiles"][0]["targets"].as_array().unwrap();
+    assert!(!targets.is_empty());
+
+    let text = jit(&repo, &["profile", "show", "--profile", location]);
+    let text = String::from_utf8_lossy(&text.stdout);
+    for target in targets {
+        let target = target.as_str().unwrap();
+        assert!(
+            text.lines().any(|line| line.trim() == target),
+            "'{target}' is not its own line in: {text}"
+        );
+    }
+}
+
+#[test]
 fn test_profile_show_json_preserves_repeated_selectors_in_order() {
     let repo = JitCli::uninitialised().unwrap();
     assert!(jit(&repo, &["init"]).status.success());

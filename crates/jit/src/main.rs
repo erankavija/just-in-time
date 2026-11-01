@@ -1864,7 +1864,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     "Files: {} ({} bytes)",
                                     result.file_count, result.byte_size
                                 );
-                                println!("Targets: {}", result.target_hashes.len());
+                                println!("Targets:");
+                                result
+                                    .targets
+                                    .iter()
+                                    .for_each(|target| println!("  {target}"));
                             }
                         }
                     }

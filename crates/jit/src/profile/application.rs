@@ -4,7 +4,7 @@ use crate::repository_state::FileMode;
 use crate::repository_state::RootRelativePath;
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// What one profile command's run found or did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -150,8 +150,8 @@ pub struct ProfileShowEntry {
     pub origin: RootRelativePath,
     /// Hash of the complete canonical package.
     pub package_hash: String,
-    /// Per-target package hashes.
-    pub target_hashes: BTreeMap<String, String>,
+    /// Repository paths the package writes.
+    pub targets: BTreeSet<String>,
     /// Package file count, including `manifest.toml`.
     pub file_count: usize,
     /// Total package byte size.

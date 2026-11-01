@@ -997,7 +997,7 @@ kind = "advisory"
                 .expect("test profile id is canonical"),
             version: "1.0.0".into(),
             variables: crate::profile::ResolvedVariables::default(),
-            target_hashes: BTreeMap::new(),
+            targets: Default::default(),
             claims: ProfileClaims {
                 package_id: ProfileId::try_from("identity-test").unwrap(),
                 contributions: Vec::new(),

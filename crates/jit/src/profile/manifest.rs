@@ -1,5 +1,6 @@
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
 use serde::{de, Deserialize, Deserializer, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::domain::identity::{is_lowercase_kebab, ProfileId};
@@ -117,6 +118,16 @@ impl ProfilePackageModel {
         } else {
             FileMode::Regular
         }
+    }
+
+    /// The repository paths this package's contributions, assets and regions write.
+    pub fn targets(&self) -> BTreeSet<String> {
+        self.contributions
+            .iter()
+            .map(|contribution| contribution.registry().path().repository_relative())
+            .chain(self.assets.iter().map(|asset| asset.target.clone()))
+            .chain(self.regions.iter().map(|region| region.target.clone()))
+            .collect()
     }
 }
 
