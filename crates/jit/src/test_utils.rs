@@ -717,23 +717,17 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
-/// Write a script a test then runs. See [`seal_executable`].
+/// Write an executable a test then runs, while other threads may fork.
+///
+/// A child forked while this process holds a file open for writing keeps a copy
+/// of that descriptor until it execs, and exec of the file fails with `ETXTBSY`
+/// meanwhile. So the file ends up as an inode only a child process ever wrote:
+/// that child has exited, and no descriptor of this process ever named the inode.
 #[cfg(unix)]
-pub fn write_executable(path: &Path, contents: &str) -> Result<()> {
+pub fn write_executable(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fs::write(path, contents)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
-    seal_executable(path)
-}
-
-/// Make the executable at `path` safe to run while other threads fork.
-///
-/// A child forked while this process holds a file open for writing keeps a copy
-/// of that descriptor until it execs, and exec of the file fails with
-/// `ETXTBSY` meanwhile. So the bytes move to an inode only a child process ever
-/// wrote, whoever wrote the original.
-#[cfg(unix)]
-pub fn seal_executable(path: &Path) -> Result<()> {
     let mut sealed = path.as_os_str().to_owned();
     sealed.push(".sealed");
     let copied = std::process::Command::new("cp")

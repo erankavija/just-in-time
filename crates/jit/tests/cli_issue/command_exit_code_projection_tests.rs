@@ -564,12 +564,11 @@ fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
     fs::create_dir(&bin_dir).unwrap();
 
     let jit_copy = bin_dir.join("jit");
-    fs::copy(jit_binary(), &jit_copy).unwrap();
-    jit::test_utils::seal_executable(&jit_copy).unwrap();
+    jit::test_utils::write_executable(&jit_copy, fs::read(jit_binary()).unwrap()).unwrap();
 
     jit::test_utils::write_executable(
         &bin_dir.join("jit-server"),
-        &format!("#!/bin/sh\nexit {exit_code}\n"),
+        format!("#!/bin/sh\nexit {exit_code}\n"),
     )
     .unwrap();
 
