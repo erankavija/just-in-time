@@ -22251,3 +22251,4 @@
 {"id":"545316c8-bdfe-4556-8006-c3f551036102","issue_id":"d7cce445-436d-43d7-9ac9-7c21251b19fa","timestamp":"2026-11-01T15:24:26.333289362Z","type":"issue_completed"}
 {"from":"backlog","id":"309776e2-02d9-4d00-9e58-b7aac2a15c5d","issue_id":"7297f922-d3fd-4118-b533-c9d0b7638bc1","timestamp":"2026-11-01T15:24:28.560623130Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"ae2d6801-0fa7-402e-bc65-3d6809d0eeb4","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-01T15:24:29.781632298Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"bef3209d-6421-4314-be9d-1f7632871650","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T15:24:57.663307823Z","type":"issue_updated","updated_by":"issue-update"}
