@@ -26,7 +26,7 @@
     "satisfies:9876a23a/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Graph findings record their firing subject",
-  "updated_at": "2026-10-21T20:31:34.547934339Z"
+  "updated_at": "2026-11-01T02:13:12.950383589Z"
 }

@@ -26,7 +26,7 @@
     "satisfies:f8a6b298/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Repository validation stops parsing the event log",
-  "updated_at": "2026-10-21T10:40:08.481676769Z"
+  "updated_at": "2026-11-01T02:13:13.279720954Z"
 }

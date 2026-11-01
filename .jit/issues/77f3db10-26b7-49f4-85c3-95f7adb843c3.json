@@ -28,7 +28,7 @@
     "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate state names the run that produced it",
-  "updated_at": "2026-10-21T10:40:05.381715103Z"
+  "updated_at": "2026-11-01T03:55:22.939304869Z"
 }

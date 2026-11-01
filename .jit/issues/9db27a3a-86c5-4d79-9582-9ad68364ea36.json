@@ -33,7 +33,6 @@
     "b9255f47-dc01-4ad2-b6c0-a8f6756cb761",
     "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
     "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
-    "df129d9e-c795-4d92-9ee5-ffd776339252",
     "e204e63d-60de-4fc5-a1b7-933cb41d1695",
     "e57095a4-0500-4bb5-adde-8734d2b64602",
     "f16cfe8c-970e-450b-9ac5-050243c6741d",
@@ -70,5 +69,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 Production Release",
-  "updated_at": "2026-10-29T07:07:55.665979642Z"
+  "updated_at": "2026-11-01T13:04:21.587471061Z"
 }
