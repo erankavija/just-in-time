@@ -121,8 +121,8 @@ All figures below come from exclusive build windows on 2026-11-01, entered with
 `CARGO_INCREMENTAL=0`, except the footprint's first before row. Each run started at a one-minute
 load below 4.08. sccache was on: after runs used the `scripts/cargo-ci.sh` default, and
 before runs set `RUSTC_WRAPPER=sccache`, the value that default selects at that commit.
-After is commit `de34a0590`; before is commit `0896fc29b`, measured in a seeded
-worktree with isolated build state.
+After is commit `3a1326070`, the tree with every child of this epic, from a clean checkout; before is
+commit `0896fc29b`. Both were measured in a seeded worktree with isolated build state.
 
 [`measurement-log-c780514e.txt`](measurement-log-c780514e.txt) holds the raw output of
 these windows, including the load sampled immediately before each command.
@@ -130,28 +130,27 @@ these windows, including the load sampled immediately before each command.
 ### Build footprint
 
 The budget checker passes on the after tree. Before is gate run `8e22dd96` at
-commit `0896fc29b`, command `./scripts/cargo-ci.sh`. After is
-`./scripts/rust-build-budget.sh` at load 3.11.
+commit `0896fc29b`, command `./scripts/cargo-ci.sh`. After is the budget step of the
+`./scripts/cargo-ci.sh` warm 3 run below.
 
 | | Integration targets | Active test executables | Active test-executable bytes | Budget |
 |---|---:|---:|---:|---:|
 | Before | 10/12 | 14 | 1,723,670,208 | 2,147,483,648 |
 | Before, re-measured with the suite clock below at load 3.87 | 10/12 | 14 | 1,723,676,616 | 2,147,483,648 |
-| After | 10/12 | 14 | 1,694,388,096 | 2,147,483,648 |
+| After, at load 3.71 | 10/12 | 14 | 1,693,962,856 | 2,147,483,648 |
 
 ### Suite clock
 
-After runs are `./scripts/cargo-ci.sh`, with `touch crates/jit/src/lib.rs` before each
+After runs are `./scripts/cargo-ci.sh`, with `touch crates/jit/src/lib.rs` before the
 rebuild run. The suite clock excludes the suite build, which is shown separately.
 
 | After | Start load | Suite build | Test | Doctest | Suite clock |
 |---|---:|---:|---:|---:|---:|
-| Warm, first of the window | 3.31 | 0.6 s | 12.8 s | 2.9 s | 15.8 s |
-| Warm 1 | 3.98 | 0.6 s | 21.1 s | 2.8 s | 24.0 s |
-| Warm 2 | 3.09 | 0.5 s | 12.0 s | 2.8 s | 14.7 s |
-| Warm 3 | 3.11 | 0.5 s | 11.9 s | 2.7 s | 14.7 s |
-| Rebuild 1 | 2.55 | 37.8 s | 12.0 s | 2.7 s | 14.7 s |
-| Rebuild 2 | 2.78 | 24.8 s | 12.4 s | 4.9 s | 17.3 s |
+| Warm, first of the window | 2.59 | 0.6 s | 11.9 s | 2.7 s | 14.6 s |
+| Warm 1 | 3.46 | 0.6 s | 11.9 s | 2.7 s | 14.6 s |
+| Warm 2 | 3.12 | 0.6 s | 11.9 s | 2.7 s | 14.7 s |
+| Rebuild 1 | 3.76 | 37.6 s | 12.0 s | 2.7 s | 14.7 s |
+| Warm 3 | 3.71 | 0.6 s | 12.0 s | 2.7 s | 14.7 s |
 
 Before runs are the same `./scripts/cargo-ci.sh` commands at `0896fc29b`, with one change
 applied to the working tree: `git show e96ef929b -- scripts/cargo-ci-selftest.sh`, the c882f1f8
@@ -172,19 +171,18 @@ Those agree with the figures this work started from, which carry no recorded loa
 `8e22dd96` at `0896fc29b` (`./scripts/cargo-ci.sh`) reported 21.1 s warm, and earlier
 runs 24-29.6 s after a rebuild.
 
-Warm 1 ran while the host load climbed to 11.34 by its end, and is the only after run
-above the before figure. The other after runs are 14.7-17.3 s against 21.4-21.5 s. The suite went
-from 4,674 tests and 61 doctests to 4,632 tests and 25 doctests.
+After runs are 14.6-14.7 s against 21.4-21.5 s before. The suite went from 4,674 tests and 61
+doctests to 4,601 tests and 25 doctests. An earlier window at `de34a0590`, in the log below, had
+one warm run at 24.0 s while the host load climbed to 11.34 by its end, and rebuild runs at
+14.7 s and 17.3 s.
 
 ### Per-test profile
 
-After: `PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.95, warm,
-at `de34a0590`: 4,632 tests, none over 5 s. The slowest is
+After: `PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.28, warm, at
+`3a1326070` from a clean checkout, recorded in [`suite-profile.json`](../suite-profile.json):
+4,601 tests, none over 5 s. The slowest is
 `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
-at 3.62 s. The doctest substep ran 2.7-2.9 s warm and at most 4.9 s across the runs above.
-The same command at `613a46025`, from a clean checkout, at load 3.15, is recorded in
-[`suite-profile.json`](../suite-profile.json): 4,633 tests, none over 5 s, the same test
-slowest at 3.81 s. `cargo test --doc --workspace` there took 2.7 s, with load 9.81 at its end.
+at 3.50 s. The doctest substep ran 2.7 s in every after run above, at load below 10.
 
 Before: `cargo nextest run --workspace --message-format libtest-json-plus` excluding that one test by `-E 'not test(test_cargo_ci_selftest_fails_seeded_broken_merges)'`, at load 3.51,
 warm, unpatched `0896fc29b`: 4,673 tests, the slowest being `server_integration`

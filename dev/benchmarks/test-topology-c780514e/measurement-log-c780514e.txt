@@ -305,3 +305,46 @@ ds=[(float(m.group(1)),m.group(2)) for m in re.finditer(r'PASS \[\s*([\d.]+)s\] 
 print('slowest',[(d,n[-60:]) for d,n in sorted(ds)[-5:]])
 fx=[(d,n[-60:]) for d,n in ds if 'profiled' in n]
 print('slowest profiled',sorted(fx)[-3:])
+
+## Final tree, 3a1326070, clean checkout: ./scripts/cargo-ci.sh and the profile recorded in suite-profile.json
+head 3a1326070
+== prime start 13:13:27 load=2.59 3.44 2.92
+== prime rc=0 end 13:14:12
+  ✓ suite-build: built in 516 ms, warmed 18 executables (2096874448 bytes) in 71 ms (591 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11894 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2724 ms)
+  ✓ suite-clock: 14635 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14635ms (97 ms)
+== warm1 start 13:14:42 load=3.46 3.58 3.01
+== warm1 rc=0 end 13:14:59
+  ✓ suite-build: built in 514 ms, warmed 18 executables (2096874448 bytes) in 73 ms (590 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11902 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2705 ms)
+  ✓ suite-clock: 14625 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14625ms (97 ms)
+== warm2 start 13:15:29 load=3.12 3.57 3.04
+== warm2 rc=0 end 13:15:46
+  ✓ suite-build: built in 515 ms, warmed 18 executables (2096874448 bytes) in 70 ms (588 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11939 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2726 ms)
+  ✓ suite-clock: 14682 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14682ms (95 ms)
+== rebuild1 start 13:16:16 load=3.76 3.84 3.16
+== rebuild1 rc=0 end 13:17:37
+  ✓ suite-build: built in 37477 ms, warmed 18 executables (2096874448 bytes) in 73 ms (37553 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11960 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2691 ms)
+  ✓ suite-clock: 14668 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14668ms (93 ms)
+== warm3 start 13:18:07 load=3.71 3.88 3.26
+== warm3 rc=0 end 13:18:24
+  ✓ suite-build: built in 513 ms, warmed 18 executables (2096874448 bytes) in 72 ms (588 ms)
+  ✓ test: 4601 passed, 0 failed, 0 skipped (11971 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2710 ms)
+  ✓ suite-clock: 14699 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1693962856/2147483648 profile=line-tables-only dep-features=pruned suite-duration=14699ms (96 ms)
+profile load=3.28
+profile rc=0
+{"source":{"dirty":false,"revision":"3a13260701100ef1b20e3c8aa6c4486f84e0165e"},"n":4601,"max":3495,"over5":0}
+3495 jit::jit$commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling
+rc=0 13:19:49
