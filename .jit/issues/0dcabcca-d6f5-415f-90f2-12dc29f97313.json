@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:07:30.083018804Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Let the dependent package win a key both packages declare",
-  "updated_at": "2026-11-01T15:06:07.953622327Z"
+  "updated_at": "2026-11-01T15:07:30.083018804Z"
 }
