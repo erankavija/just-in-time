@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "abcf5c01c4e0cb4558e9c14586c9726948520e52",
+  "completed_at": "2026-11-01T13:16:51.307622261Z",
+  "duration_ms": 118215,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/dependency-management.md",
+        "id": "F1",
+        "line": 166,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The dependency-add examples say '# ok', but the CLI prints 'Added N dependency…' and the added edge."
+      }
+    ],
+    "summary": "Dependency-add success examples were updated with an invented status marker instead of the CLI output.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b020f676-28f9-427c-b061-6a901e21e24d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:14:53.091646791Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 34714 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1973f-a5ca-7530-9743-efd8db686669\n--------\nuser\n--- 34701 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf task; inspected its two reachable `jit:7f9268ed` commits individually (one implementation commit and its merge). No renames or deletions. Current tree verified; uncommitted `.jit` gate-run state was not attributed.\n\nDocumentation impact is incomplete: the updated dependency-add success examples do not reproduce the CLI’s actual output.\n\n1. **F1 — blocking, issue-impact, medium:** [`docs/how-to/dependency-management.md:166`](/home/vkaskivuo/Projects/just-in-time/docs/how-to/dependency-management.md:166) and line 167 replace the former markers with `# ok`, but `jit dep add` prints `Added N dependency…` followed by the added edge(s). Replace the placeholder comments with the actual word-based CLI output (or remove claimed output entirely).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Dependency-add success examples were updated with an invented status marker instead of the CLI output.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The dependency-add examples say '# ok', but the CLI prints 'Added N dependency…' and the added edge.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":166}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
