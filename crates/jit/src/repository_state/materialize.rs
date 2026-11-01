@@ -240,7 +240,7 @@ pub fn validate_capture_closure(
     // Every ordinary issue record named by the index, plus the complete listing
     // whole-repository validation reconciles against those ids.
     for id in all_ids {
-        paths.push(layout.classify_repository_relative(format!(".jit/issues/{id}.json"))?);
+        paths.push(VirtualPath::issue_record(id));
     }
     let listings = vec![VirtualPath::ISSUES];
 
@@ -817,7 +817,7 @@ kind = "advisory"
             VirtualPath::data("templates.toml").unwrap(),
             VirtualPath::data("index.json").unwrap(),
             VirtualPath::data("events.jsonl").unwrap(),
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(&id),
             VirtualPath::worktree("AGENTS.md").unwrap(),
         ] {
             assert!(paths.contains(&expected), "closure missing {expected:?}");

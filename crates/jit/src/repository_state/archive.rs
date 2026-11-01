@@ -218,7 +218,7 @@ pub fn finalize_archive_execution(
     }
     let mut changed_issue_ids = Vec::new();
     for (id, issue) in &issues {
-        let path = issue_path(id)?;
+        let path = VirtualPath::issue_record(id);
         let RepositoryEntry::File { content, .. } = captured_entry(image, &path)? else {
             return Err(ArchiveExecutionError::NonFileSource {
                 role: "captured issue",
@@ -422,18 +422,13 @@ fn captured_entry<'a>(
     Ok(image.entry(path).map_err(ProducerError::from)?)
 }
 
-/// Canonical data-root-relative path for one captured issue record.
-fn issue_path(id: &IssueId) -> Result<VirtualPath, ArchiveExecutionError> {
-    Ok(VirtualPath::data(format!("issues/{id}.json")).map_err(ProducerError::from)?)
-}
-
 fn captured_issue<'a>(
     image: &RepositoryImage,
     id: &IssueId,
     issues: &'a mut BTreeMap<IssueId, Issue>,
 ) -> Result<&'a mut Issue, ArchiveExecutionError> {
     if !issues.contains_key(id) {
-        let path = issue_path(id)?;
+        let path = VirtualPath::issue_record(id);
         let bytes = image
             .file_bytes(&path)
             .map_err(ProducerError::from)?
@@ -702,7 +697,7 @@ mod tests {
 
     fn captured_issue_entry(id: &IssueId, issue: &Issue) -> (VirtualPath, RepositoryEntry) {
         (
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(id),
             file_entry(&crate::repository_state::serialize_issue(issue).unwrap()),
         )
     }
@@ -914,7 +909,7 @@ mod tests {
         };
         let plan = relink_plan(change);
         let image = image_with(vec![(
-            VirtualPath::data(format!("issues/{}.json", crate::test_utils::issue_id(166))).unwrap(),
+            VirtualPath::issue_record(&crate::test_utils::issue_id(166)),
             RepositoryEntry::Absent,
         )]);
         let error = archive_execution_error(&image, &plan);
@@ -934,7 +929,7 @@ mod tests {
         };
         let plan = relink_plan(change);
         let image = image_with(vec![(
-            VirtualPath::data(format!("issues/{}.json", crate::test_utils::issue_id(167))).unwrap(),
+            VirtualPath::issue_record(&crate::test_utils::issue_id(167)),
             file_entry(b"not json"),
         )]);
         let error = archive_execution_error(&image, &plan);
@@ -956,7 +951,7 @@ mod tests {
         };
         let plan = relink_plan(change);
         let image = image_with(vec![(
-            VirtualPath::data(format!("issues/{}.json", crate::test_utils::issue_id(168))).unwrap(),
+            VirtualPath::issue_record(&crate::test_utils::issue_id(168)),
             file_entry(&crate::repository_state::serialize_issue(&issue).unwrap()),
         )]);
         let error = archive_execution_error(&image, &plan);

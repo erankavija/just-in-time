@@ -100,7 +100,7 @@ impl<B: Backend> Repository<B> {
         let layout = self.layout();
         let issue_paths = issues
             .iter()
-            .map(|issue| issue_path(&issue.id))
+            .map(|issue| VirtualPath::issue_record(&issue.id))
             .collect::<Vec<_>>();
         let roots = [
             VirtualPath::data("").unwrap(),
@@ -152,14 +152,6 @@ impl<B: Backend> Repository<B> {
             .apply(&MaterializationPlan::new(&image, delta))
             .unwrap();
     }
-}
-
-fn issue_path(id: &IssueId) -> VirtualPath {
-    VirtualPath::data(format!(
-        "{}/{id}.json",
-        VirtualPath::ISSUES.relative().as_str()
-    ))
-    .unwrap()
 }
 
 fn index_bytes(issues: &[Issue]) -> Vec<u8> {
@@ -352,7 +344,8 @@ fn test_load_issue_reports_an_unpublished_id_as_not_found<B: Backend>() {
 
 fn test_load_issue_or_not_found_separates_an_absent_issue_from_an_unreadable_one<B: Backend>() {
     let corrupt = crate::test_utils::issue_id(52);
-    let repository = Repository::<B>::seeded(&[(issue_path(&corrupt), "{ corrupt".to_string())]);
+    let repository =
+        Repository::<B>::seeded(&[(VirtualPath::issue_record(&corrupt), "{ corrupt".to_string())]);
 
     let absent = repository
         .store
@@ -435,7 +428,7 @@ fn test_resolve_issue_id_reports_a_non_canonical_id_as_not_found<B: Backend>() {
 fn test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record<B: Backend>() {
     let id = crate::test_utils::issue_id(0xabcd);
     let non_canonical = |seed| crate::test_utils::issue_id(seed).as_str().to_uppercase();
-    let path = issue_path(&id);
+    let path = VirtualPath::issue_record(&id);
     for (field, value) in [
         ("id", serde_json::json!(non_canonical(0xabcd))),
         ("dependencies", serde_json::json!([non_canonical(0xbcde)])),
