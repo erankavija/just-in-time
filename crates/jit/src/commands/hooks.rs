@@ -181,7 +181,8 @@ mod tests {
             .installed
             .iter()
             .for_each(|hook| {
-                crate::test_utils::seal_executable(&git_dir.join("hooks").join(hook)).unwrap();
+                let hook = git_dir.join("hooks").join(hook);
+                crate::test_utils::write_executable(&hook, fs::read(&hook).unwrap()).unwrap();
             });
     }
 
