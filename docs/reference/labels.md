@@ -390,8 +390,7 @@ jit issue update <id> --type bug
 ```
 
 `--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
-`--remove-label` are repeatable, one label per flag. Removing a label
-the issue lacks fails and removes nothing.
+`--remove-label` are repeatable, one label per flag, and a comma is part of the label's name. `--label epic:a,component:b` names one malformed label, which the format rule blocks unless `--force` is passed. `--remove-label` removes a stored label of that exact name; removing a label the issue lacks fails and removes nothing.
 
 ---
 
