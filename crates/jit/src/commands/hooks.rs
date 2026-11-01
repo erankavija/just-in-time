@@ -207,7 +207,9 @@ mod tests {
 
     #[test]
     fn test_pre_commit_hook_blocks_issue_file_without_lease_in_strict_mode() {
-        let issue = format!(".jit/issues/{}.json", crate::test_utils::issue_id(1));
+        let issue =
+            crate::repository_state::VirtualPath::issue_record(&crate::test_utils::issue_id(1))
+                .repository_relative();
         let (no_index, _) = crate::test_utils::setup_test_repo_with_config(STRICT_CONFIG).unwrap();
         seed_diverged_history(no_index.path());
         assert!(!commit_succeeds(no_index.path(), &issue, "{}"));
@@ -226,7 +228,8 @@ mod tests {
         grant_lease(temp.path(), AGENT);
         assert!(commit_succeeds(
             temp.path(),
-            &format!(".jit/issues/{}.json", crate::test_utils::issue_id(1)),
+            &crate::repository_state::VirtualPath::issue_record(&crate::test_utils::issue_id(1),)
+                .repository_relative(),
             "{}"
         ));
     }

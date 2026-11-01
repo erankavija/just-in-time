@@ -950,18 +950,9 @@ mod nyquist {
             .to_string()
     }
 
-    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via gates.
-    fn epic_with_both_verified() -> Issue {
+    /// An epic with check labels for [hard] criteria REQ-01 and REQ-02.
+    fn epic_with_both_checked() -> Issue {
         let mut epic = crate::fixture_issue("Feature X".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()];
-        // Both [hard] criteria are verified via gates_required.
-        epic.gates_required = vec!["verify:REQ-01".to_string(), "verify:REQ-02".to_string()];
-        epic
-    }
-
-    /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via labels.
-    fn epic_with_label_verification() -> Issue {
-        let mut epic = crate::fixture_issue("Feature Y".to_string(), nyquist_compliant_body());
         let short = epic.short_id();
         epic.labels = vec![
             "type:epic".to_string(),
@@ -972,26 +963,14 @@ mod nyquist {
     }
 
     #[test]
-    fn test_nyquist_compliant_via_gates_passes_graph() {
-        let set = load_example("nyquist");
-        let rules = graph_rules(&set);
-        let epic = epic_with_both_verified();
-        let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
-        assert!(
-            findings.is_empty(),
-            "an epic with all [hard] criteria gate-verified must pass: {findings:?}"
-        );
-    }
-
-    #[test]
     fn test_nyquist_compliant_via_labels_passes_graph() {
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        let epic = epic_with_label_verification();
+        let epic = epic_with_both_checked();
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         assert!(
             findings.is_empty(),
-            "an epic with all [hard] criteria label-verified must pass: {findings:?}"
+            "an epic with check labels for all [hard] criteria must pass: {findings:?}"
         );
     }
 
@@ -999,10 +978,10 @@ mod nyquist {
     fn test_nyquist_unmapped_criterion_reports_finding() {
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        // Only REQ-01 is verified; REQ-02 is unmapped.
+        // Only REQ-01 has a check label; REQ-02 is unmapped.
         let mut epic = crate::fixture_issue("Feature Z".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()];
-        epic.gates_required = vec!["verify:REQ-01".to_string()];
+        let short = epic.short_id();
+        epic.labels = vec!["type:epic".to_string(), format!("checks:{short}/REQ-01")];
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         // REQ-02 must be reported as unmapped; REQ-01 must not.
@@ -1016,18 +995,17 @@ mod nyquist {
             !findings
                 .iter()
                 .any(|f| f.finding.message.contains("REQ-01")),
-            "verified criterion REQ-01 must not be reported: {findings:?}"
+            "checked criterion REQ-01 must not be reported: {findings:?}"
         );
     }
 
     #[test]
-    fn test_nyquist_finding_names_both_mechanisms() {
-        // When both gate-prefix and check-namespace are configured (as in the
-        // nyquist example), the unmapped-criterion finding mentions both.
+    fn test_nyquist_finding_names_expected_check_label() {
+        // An unmapped criterion names its expected issue-scoped check label.
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
         let mut epic = crate::fixture_issue("Feature W".to_string(), nyquist_compliant_body());
-        epic.labels = vec!["type:epic".to_string()]; // no gates, no checks labels
+        epic.labels = vec!["type:epic".to_string()];
         let short = epic.short_id();
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
@@ -1040,10 +1018,6 @@ mod nyquist {
         );
         let msg = &req01_finding.unwrap().finding.message;
         assert!(
-            msg.contains("verify:REQ-01"),
-            "finding must name the expected gate: {msg}"
-        );
-        assert!(
             msg.contains(&format!("checks:{short}/REQ-01")),
             "finding must name the expected label: {msg}"
         );
@@ -1055,8 +1029,8 @@ mod nyquist {
         // filter must exclude REQ-03 (marked [aspirational]).
         let set = load_example("nyquist");
         let rules = graph_rules(&set);
-        // An epic that verifies REQ-01 and REQ-02 but leaves REQ-03 unmapped.
-        let epic = epic_with_both_verified();
+        // An epic with check labels for REQ-01 and REQ-02 but not REQ-03.
+        let epic = epic_with_both_checked();
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         // REQ-03 is [aspirational] and must not be required.
@@ -1076,8 +1050,8 @@ mod nyquist {
         let rule = set
             .rules
             .iter()
-            .find(|r| r.name == "nyquist-criteria-verified-at-done")
-            .expect("example must define nyquist-criteria-verified-at-done");
+            .find(|r| r.name == "nyquist-criteria-checked-at-done")
+            .expect("example must define nyquist-criteria-checked-at-done");
         assert_eq!(rule.severity, jit::declarations::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped rule must enforce");
         assert_eq!(rule.scope, RuleScope::Graph);

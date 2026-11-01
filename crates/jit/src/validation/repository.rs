@@ -369,10 +369,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .all_ids
         .iter()
         .map(|id| {
-            let mut path = VirtualPath::ISSUES.repository_relative();
-            path.push('/');
-            path.push_str(id.as_str());
-            path.push_str(".json");
+            let path = VirtualPath::issue_record(id).repository_relative();
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
             if issue.id.as_str() != id.as_str() {
@@ -395,7 +392,11 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
     let expected: BTreeSet<String> = index
         .all_ids
         .iter()
-        .map(|id| format!("{id}.json"))
+        .filter_map(|id| {
+            crate::repository_state::VirtualPath::issue_record(id)
+                .file_name()
+                .map(str::to_owned)
+        })
         .collect();
     let actual: BTreeSet<String> = listing
         .names()
@@ -900,12 +901,7 @@ mod tests {
     }
 
     fn issue_path(id: &IssueId) -> VirtualPath {
-        VirtualPath::data(format!(
-            "{}/{}.json",
-            VirtualPath::ISSUES.relative().as_str(),
-            id
-        ))
-        .unwrap()
+        VirtualPath::issue_record(id)
     }
 
     /// Read a repo-relative fixture file's bytes, or `None` when absent.

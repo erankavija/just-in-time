@@ -658,8 +658,7 @@ mod tests {
             criteria_section: "success_criteria".to_string(),
             marker: None,
             id_pattern: IdPattern::new(DEFAULT_CRITERION_ID_PATTERN).unwrap(),
-            gate_prefix: Some("verify:".to_string()),
-            check_namespace: None,
+            check_namespace: "checks".to_string(),
         })
         .is_none());
         assert!(desugar(&Assertion::LabelUniqueness {

@@ -615,7 +615,7 @@
           "short_id": "855d027d",
           "title": "Commands take issue record paths from the VirtualPath constructor",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "be18da9e-bfe2-4813-a69e-72ee1904c344",

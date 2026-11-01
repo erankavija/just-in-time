@@ -971,11 +971,15 @@ mod tests {
         index.all_ids.sort();
         index.all_ids.dedup();
         index.deleted_ids.retain(|id| id != &issue.id);
+        let issue_path = storage
+            .repository_layout()
+            .unwrap()
+            .resolve(&crate::repository_state::VirtualPath::issue_record(
+                &issue.id,
+            ))
+            .unwrap();
         fs::write(
-            storage
-                .root()
-                .join("issues")
-                .join(format!("{}.json", issue.id)),
+            issue_path,
             crate::repository_state::serialize_issue(&issue).expect("serialize fixture issue"),
         )
         .unwrap();

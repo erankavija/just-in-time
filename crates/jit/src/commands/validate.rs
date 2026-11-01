@@ -252,8 +252,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Ok(spec.discover_paths(
                 candidates
                     .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .map(VirtualPath::issue_record)
+                    .collect::<Vec<_>>(),
             )?)
         })?
         else {
@@ -775,9 +775,9 @@ fn effective_issues(
     all_ids
         .iter()
         .map(|id| {
-            let bytes = effective(image, &format!(".jit/issues/{id}.json"))?
+            let path = crate::repository_state::VirtualPath::issue_record(id);
+            let bytes = effective(image, &path.repository_relative())?
                 .ok_or_else(|| anyhow!("captured image has no issue file for '{id}'"))?;
-            let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json"))?;
             Ok(crate::repository_state::decode_issue_record(&path, &bytes)?)
         })
         .collect()
@@ -3547,7 +3547,7 @@ depends_on = ["planning"]
         assert!(!spec.contains_path(&VirtualPath::GATES));
         assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
-        assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
+        assert!(!spec.contains_path(&VirtualPath::issue_record(&other_id)));
     }
 
     /// A session counting the capture rounds it opens.
