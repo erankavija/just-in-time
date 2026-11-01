@@ -235,7 +235,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     resolution
                         .as_ref()
                         .ok_or_else(|| anyhow::anyhow!("Missing hierarchy resolution for scope"))?
-                        .membership_closure(container_id.as_str())
+                        .membership_closure(container_id)
                         .into_iter()
                         .map(|node| &node.id)
                         .collect::<HashSet<_>>(),
@@ -306,7 +306,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
                 Some(
                     resolution
-                        .membership_closure(container_id.as_str())
+                        .membership_closure(container_id)
                         .into_iter()
                         .map(|node| &node.id)
                         .collect(),
@@ -481,7 +481,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
     /// assert_eq!(response.count(), 2);
     /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
-    /// assert_eq!(epic_view.hierarchy.children, vec![task.to_string()]);
+    /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
     /// assert_eq!(epic_view.hierarchy.parent, None);
     /// ```
     pub fn resolve_hierarchy_tree(
@@ -519,10 +519,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 id: issue.id.clone(),
                 title: issue.title.clone(),
                 type_name: crate::labels::type_label_value(&issue.labels).map(str::to_string),
-                hierarchy: resolution
-                    .get(issue.id.as_str())
-                    .cloned()
-                    .unwrap_or_default(),
+                hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
             })
             .collect();
         nodes.sort_by(|a, b| a.short_id.cmp(&b.short_id));

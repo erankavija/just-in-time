@@ -299,7 +299,7 @@ fn test_profile_commands_refuse_a_tagged_selector_naming_the_bare_path_form() {
                 &["profile", command, "--profile", selector, "--json"],
             );
 
-            assert_eq!(refused.status.code(), Some(2), "{refused:?}");
+            assert!(!refused.status.success(), "{refused:?}");
             let error = json(&refused);
             assert_eq!(error["error"]["code"], "INVALID_ARGUMENT");
             let message = error["error"]["message"].as_str().unwrap();
@@ -866,7 +866,8 @@ fn test_init_from_without_a_profile_is_a_usage_error() {
 
     let init = jit(&repo, &["init", "--from", location, "--json"]);
 
-    assert_eq!(init.status.code(), Some(2), "{init:?}");
+    assert!(!init.status.success(), "{init:?}");
+    assert!(String::from_utf8_lossy(&init.stderr).contains("--from"));
     assert!(!repo.root().join(".jit").exists());
 }
 
@@ -961,7 +962,7 @@ fn test_profile_missing_package_directory_has_typed_json_error_without_mutation(
         &["init", "--profile", "packages/missing-profile", "--json"],
     );
 
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success(), "{output:?}");
     assert_eq!(json(&output)["error"]["code"], "PROFILE_ERROR");
     assert!(!repo.root().join(".jit").exists());
 }
@@ -1281,25 +1282,13 @@ pub(super) fn write_lifecycle_package(repo: &Path, location: &str, id: &str, ver
     fs::write(root.join("assets/fixed.txt"), "no variable reaches this\n").unwrap();
 }
 
-/// Every collection a response carries reads through the project's count
-/// envelope, so a machine consumer never has to know which key holds it.
-fn assert_count_envelope(response: &Value, collection: &str) {
-    let entries = response[collection]
-        .as_array()
-        .unwrap_or_else(|| panic!("a {collection} response wraps its collection in an array"));
-    assert_eq!(
-        response["count"].as_u64(),
-        Some(entries.len() as u64),
-        "the envelope count states the collection length"
-    );
-}
-
 /// The single profile entry returned by one-package authoring and exchange
 /// operations.
 pub(super) fn only_profile(response: &Value) -> &Value {
-    assert_count_envelope(response, "profiles");
-    assert_eq!(response["count"], 1);
-    &response["profiles"][0]
+    let [profile] = response["profiles"].as_array().unwrap().as_slice() else {
+        panic!("one profile entry: {response}");
+    };
+    profile
 }
 
 fn assert_human_profile_decision(

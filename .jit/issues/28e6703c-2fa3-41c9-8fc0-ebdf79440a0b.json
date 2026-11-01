@@ -14,6 +14,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Query filters and ordering, dependency auto-transitions and cycle detection are proven only at the domain and graph layers.\n- [hard] REQ-02: CLI and harness tests of those commands assert one wiring case per subcommand or flag.\n- [hard] REQ-03: The harness demonstration suite no longer exists, and its unique cases live beside their owners.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T01:02:42.362046833Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -33,7 +34,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Query, transition and cycle semantics are proven at the domain and graph layers",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:02:42.362046833Z"
 }

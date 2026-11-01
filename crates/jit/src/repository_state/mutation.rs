@@ -506,11 +506,6 @@ pub enum MutationError {
     GatePresetAlreadyExists(String),
 }
 
-/// The canonical path for one issue record.
-fn issue_path(id: &IssueId) -> Result<VirtualPath, RepositoryLayoutError> {
-    VirtualPath::data(format!("issues/{id}.json"))
-}
-
 /// Canonical data-root-relative path for one gate-run result record.
 ///
 /// A run id is exactly one path component. Rejecting empty, nested, and lexical
@@ -665,7 +660,7 @@ fn captured_file_bytes<'a>(
 
 /// Parse the captured issue at `id`, or `None` when the issue file is absent.
 fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>, MutationError> {
-    let path = issue_path(id)?;
+    let path = VirtualPath::issue_record(id);
     match captured_file_bytes(image, &path)? {
         None => Ok(None),
         Some(bytes) => serde_json::from_slice(bytes).map(Some).map_err(|error| {
@@ -974,7 +969,7 @@ pub(super) fn finalize_delta(
         if let MutationIntent::DeleteIssue { issue_id } = intent {
             captured_issue(image, issue_id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue_id.clone()))?;
-            let path = issue_path(issue_id)?;
+            let path = VirtualPath::issue_record(issue_id);
             actions.push(RepositoryAction::DeleteFile {
                 path: path.clone(),
                 owner: RepositoryActionOwner::RepositoryStateMutation,
@@ -1295,7 +1290,7 @@ fn write_issue_action(
     image: &RepositoryImage,
     issue: &Issue,
 ) -> Result<RepositoryAction, MutationError> {
-    let path = issue_path(&issue.id)?;
+    let path = VirtualPath::issue_record(&issue.id);
     Ok(RepositoryAction::WriteFile {
         path: path.clone(),
         owner: RepositoryActionOwner::RepositoryStateMutation,
@@ -1525,7 +1520,10 @@ mod tests {
             ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+            (
+                VirtualPath::issue_record(&created_id),
+                RepositoryEntry::Absent,
+            ),
         ]);
         let first = finalize(
             &layout(),
@@ -1589,7 +1587,10 @@ mod tests {
             ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+            (
+                VirtualPath::issue_record(&created_id),
+                RepositoryEntry::Absent,
+            ),
         ])
     }
 
@@ -1634,7 +1635,7 @@ mod tests {
             plan.delta()
                 .actions()
                 .iter()
-                .any(|action| action.path() == &issue_path(&created_id).unwrap()),
+                .any(|action| action.path() == &VirtualPath::issue_record(&created_id)),
             "the record the override permitted is part of the same finalized plan"
         );
 
@@ -1755,7 +1756,10 @@ mod tests {
         );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
         let context = MutationContext::with_annotation(
@@ -1898,7 +1902,10 @@ mod tests {
             ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+            (
+                VirtualPath::issue_record(&created_id),
+                RepositoryEntry::Absent,
+            ),
         ]);
 
         // Deliberately prove the finalizer owns these values rather than accepting
@@ -1923,7 +1930,7 @@ mod tests {
             .iter()
             .find_map(|action| match action {
                 RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &issue_path(&created_id).unwrap() =>
+                    if path == &VirtualPath::issue_record(&created_id) =>
                 {
                     serde_json::from_slice(bytes).ok()
                 }
@@ -2107,7 +2114,7 @@ mod tests {
             },
         );
         let bytes = serialize_issue(&preimage).unwrap();
-        let image = image_with(vec![(issue_path(id).unwrap(), file_entry(&bytes))]);
+        let image = image_with(vec![(VirtualPath::issue_record(id), file_entry(&bytes))]);
         let intent = MutationIntent::UpdateIssue {
             issue: Box::new(updated),
         };
@@ -2120,7 +2127,7 @@ mod tests {
             .iter()
             .find_map(|action| match action {
                 RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &issue_path(id).unwrap() =>
+                    if path == &VirtualPath::issue_record(id) =>
                 {
                     Some(bytes)
                 }
@@ -2148,7 +2155,7 @@ mod tests {
         );
         let bytes = serialize_issue(&preimage).unwrap();
         let image = image_with(vec![
-            (issue_path(id).unwrap(), file_entry(&bytes)),
+            (VirtualPath::issue_record(id), file_entry(&bytes)),
             (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
         ]);
         let intents = [
@@ -2178,7 +2185,7 @@ mod tests {
                 })
                 .unwrap()
         };
-        let issue_path = issue_path(id).unwrap();
+        let issue_path = VirtualPath::issue_record(id);
         let persisted: Issue =
             serde_json::from_slice(&written(&|path| path == &issue_path)).unwrap();
         let run: GateRunResult = serde_json::from_slice(&written(&|path| {
@@ -2239,7 +2246,10 @@ mod tests {
         );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
         // The shared clock proves the no-op samples no time.
@@ -2281,7 +2291,10 @@ mod tests {
         );
         let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::EVENTS, file_entry(&events_bytes)),
         ]);
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
@@ -2315,7 +2328,10 @@ mod tests {
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let delta = finalize(
@@ -2343,7 +2359,10 @@ mod tests {
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let intent = MutationIntent::ClaimIssue {
@@ -2365,7 +2384,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&issue.id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&issue.id))
             .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = issue_action else {
             panic!("expected issue write");
@@ -2591,7 +2610,7 @@ mod tests {
             .chain(
                 draft_ids
                     .iter()
-                    .map(|id| (issue_path(id).unwrap(), RepositoryEntry::Absent)),
+                    .map(|id| (VirtualPath::issue_record(id), RepositoryEntry::Absent)),
             )
             .collect(),
         );
@@ -2614,7 +2633,7 @@ mod tests {
                     .iter()
                     .find_map(|action| match action {
                         RepositoryAction::WriteFile { path, bytes, .. }
-                            if path == &issue_path(id).unwrap() =>
+                            if path == &VirtualPath::issue_record(id) =>
                         {
                             serde_json::from_slice::<Issue>(bytes).ok()
                         }
@@ -2664,7 +2683,10 @@ mod tests {
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
             // The draft carries its id; seed that id's absent slot.
-            (issue_path(&created_id()).unwrap(), RepositoryEntry::Absent),
+            (
+                VirtualPath::issue_record(&created_id()),
+                RepositoryEntry::Absent,
+            ),
         ]);
         let delta = finalize(
             &layout(),
@@ -2680,7 +2702,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&expected_id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&expected_id))
             .expect("issue write present");
         let RepositoryAction::WriteFile { bytes, .. } = issue_action else {
             panic!("expected issue write");
@@ -2720,7 +2742,10 @@ mod tests {
         )
         .unwrap();
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
         ]);
 
@@ -2736,7 +2761,7 @@ mod tests {
 
         assert!(plan.delta().actions().iter().any(|action| matches!(
             action,
-            RepositoryAction::DeleteFile { path, .. } if path == &issue_path(&issue.id).unwrap()
+            RepositoryAction::DeleteFile { path, .. } if path == &VirtualPath::issue_record(&issue.id)
         )));
         let index_action = plan
             .delta()
@@ -2769,7 +2794,10 @@ mod tests {
             ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+            (
+                VirtualPath::issue_record(&created_id),
+                RepositoryEntry::Absent,
+            ),
         ]);
 
         let error = finalize(
@@ -2800,7 +2828,10 @@ mod tests {
         }))
         .unwrap();
         let image = image_with(vec![
-            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (
+                VirtualPath::issue_record(&issue.id),
+                file_entry(&issue_bytes),
+            ),
             (VirtualPath::INDEX, file_entry(&index_bytes)),
         ]);
 
@@ -2828,7 +2859,10 @@ mod tests {
         updated.created_at = DateTime::UNIX_EPOCH;
         updated.done_at = Some(DateTime::UNIX_EPOCH);
         let bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![(issue_path(&issue.id).unwrap(), file_entry(&bytes))]);
+        let image = image_with(vec![(
+            VirtualPath::issue_record(&issue.id),
+            file_entry(&bytes),
+        )]);
 
         let plan = finalize(
             &layout(),
@@ -2843,7 +2877,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .find(|action| action.path() == &issue_path(&issue.id).unwrap())
+            .find(|action| action.path() == &VirtualPath::issue_record(&issue.id))
             .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = action else {
             panic!("expected issue write");

@@ -251,22 +251,20 @@ mod tests {
 
     #[test]
     fn test_apply_overlay_updates_captured_issue_listing() {
-        let first = format!("{}.json", crate::test_utils::issue_id(1));
-        let second = format!("{}.json", crate::test_utils::issue_id(2));
-        let first_path = format!(".jit/issues/{first}");
-        let second_path = format!(".jit/issues/{second}");
-        let base = base_image(&[(&first_path, "{}")], Some(&[&first]));
+        let first_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let second_path = VirtualPath::issue_record(&crate::test_utils::issue_id(2));
+        let first_name = first_path.file_name().unwrap().to_owned();
+        let second_name = second_path.file_name().unwrap().to_owned();
+        let first_repository_path = first_path.repository_relative();
+        let base = base_image(&[(&first_repository_path, "{}")], Some(&[&first_name]));
         let overlaid = apply_overlay(
             &base,
-            [
-                (vpath(&second_path), Some(b"{}".to_vec())),
-                (vpath(&first_path), None),
-            ],
+            [(second_path, Some(b"{}".to_vec())), (first_path, None)],
         )
         .unwrap();
         let dir = VirtualPath::data("issues").unwrap();
         let names = overlaid.directory_listings()[&dir].names();
-        assert!(names.contains(&second));
-        assert!(!names.contains(&first));
+        assert!(names.contains(&second_name));
+        assert!(!names.contains(&first_name));
     }
 }

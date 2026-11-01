@@ -44,6 +44,12 @@ impl IssueId {
     }
 }
 
+impl AsRef<str> for IssueId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl TryFrom<&str> for IssueId {
     type Error = InvalidIssueIdError;
 

@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn test_decode_issue_record_rejects_a_non_canonical_dependency_naming_the_path() {
-        let path = VirtualPath::data(format!("issues/{}.json", issue_id(1))).unwrap();
+        let path = VirtualPath::issue_record(&issue_id(1));
         let mut record =
             serde_json::to_value(Issue::draft(issue_id(1), "t".into(), String::new())).unwrap();
         record["dependencies"] = serde_json::json!(["not-canonical"]);

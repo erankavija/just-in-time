@@ -1392,8 +1392,7 @@ mod tests {
                 RepositoryEntry::Absent,
             ),
             (
-                VirtualPath::data(format!("issues/{}.json", crate::test_utils::issue_id(75)))
-                    .unwrap(),
+                VirtualPath::issue_record(&crate::test_utils::issue_id(75)),
                 RepositoryEntry::Absent,
             ),
         ]);

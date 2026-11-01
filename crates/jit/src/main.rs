@@ -4707,8 +4707,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let parent = node
                                 .hierarchy
                                 .parent
-                                .as_deref()
-                                .map(|p| p.get(..jit::domain::SHORT_ID_LENGTH).unwrap_or(p))
+                                .as_ref()
+                                .map(IssueId::short_id)
                                 .unwrap_or("-");
                             println!(
                                 "  {} | parent={} children={} rank={} | {}",

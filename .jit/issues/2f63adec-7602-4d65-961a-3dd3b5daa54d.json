@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T00:58:20.688986123Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -29,7 +30,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Recorded-failure corpus built in the suite under an input key",
-  "updated_at": "2026-10-27T22:25:44.324772686Z"
+  "updated_at": "2026-11-01T00:58:20.688986123Z"
 }

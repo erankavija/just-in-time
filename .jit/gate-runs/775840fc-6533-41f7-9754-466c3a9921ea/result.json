@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3ec4c23fb7b0aeec8cb40aebab3f9a48e0d12b1",
+  "completed_at": "2026-11-01T00:58:20.129508037Z",
+  "duration_ms": 92578,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed deletion leaves one CLI wiring case and retains domain ownership for all removed rules.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d0b932fc-78b4-4b56-84a0-99f0c120ca4b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "775840fc-6533-41f7-9754-466c3a9921ea",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:56:47.550706123Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:d0b932fc — a2a97f5cc, f0ef0f019 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-02 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json), @/charter/D-18 (dev/vision/9db27a3a-charter.md), @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/architecture-dependency-direction (.jit/invariants.toml), @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: Narrowed merge, caller, test-owner, and source-of-truth reads after an over-broad combined result; historical gate records excluded.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed deletion leaves one CLI wiring case and retains domain ownership for all removed rules.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

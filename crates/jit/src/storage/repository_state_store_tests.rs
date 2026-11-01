@@ -158,130 +158,6 @@ fn test_plan(image: &RepositoryImage, delta: &RepositoryDelta) -> Materializatio
     MaterializationPlan::new(image, delta.clone())
 }
 
-#[test]
-fn test_json_and_memory_share_absent_root_actions_and_outcome() {
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let delta = initialization_delta(&layout);
-
-    let memory = InMemoryStorage::new();
-    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
-    let memory_image = memory_session.capture(initial_spec()).unwrap();
-    let memory_outcome = memory_session
-        .apply(&test_plan(&memory_image, &delta))
-        .unwrap();
-
-    let json = JsonFileStorage::new(&data);
-    let mut json_session = json.open_mutation_session(layout).unwrap();
-    let json_image = json_session.capture(initial_spec()).unwrap();
-    let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
-
-    assert_eq!(memory_outcome, json_outcome);
-    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
-    assert_eq!(
-        std::fs::read(temp.path().join("note.txt")).unwrap(),
-        b"note"
-    );
-}
-
-fn image_binding_spec() -> CaptureSpec {
-    CaptureSpec::new(
-        [
-            VirtualPath::data("target.txt").unwrap(),
-            VirtualPath::data("evidence.txt").unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap()
-}
-
-fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
-    RepositoryDelta::new(
-        layout,
-        vec![RepositoryAction::write_file(
-            VirtualPath::data("target.txt").unwrap(),
-            RepositoryActionOwner::RepositoryStateMutation,
-            ExpectedPreimage::Absent,
-            b"materialized".to_vec(),
-            FileMode::Regular,
-        )],
-    )
-    .unwrap()
-}
-
-#[test]
-fn test_json_plan_owns_exact_image_and_applies_only_against_it() {
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    std::fs::write(data.join("evidence.txt"), b"image-a").unwrap();
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let delta = image_binding_delta(&layout);
-    let json_a = JsonFileStorage::new(&data);
-    let image_a = {
-        let mut session = json_a.open_mutation_session(layout.clone()).unwrap();
-        session.capture(image_binding_spec()).unwrap()
-    };
-    let plan_a = test_plan(&image_a, &delta);
-    assert_eq!(plan_a.image(), &image_a);
-
-    std::fs::write(data.join("evidence.txt"), b"image-b").unwrap();
-    let json = JsonFileStorage::new(&data);
-    let mut session = json.open_mutation_session(layout).unwrap();
-    let image_b = session.capture(image_binding_spec()).unwrap();
-    let target = VirtualPath::data("target.txt").unwrap();
-    assert_eq!(
-        image_a.entry(&target).unwrap(),
-        image_b.entry(&target).unwrap()
-    );
-    assert_ne!(plan_a.image(), &image_b);
-    assert!(matches!(
-        session.apply(&plan_a),
-        Err(RepositoryStateStoreError::RetryableConflict { .. })
-    ));
-    let plan_b = test_plan(&image_b, &delta);
-    let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.actions_applied, delta.actions().len());
-}
-
-#[test]
-fn test_memory_plan_owns_exact_image_and_applies_only_against_it() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "wt", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
-    )
-    .unwrap();
-    let evidence = VirtualPath::data("evidence.txt").unwrap();
-    let memory = InMemoryStorage::new();
-    seed_memory_existing(&memory, &[(evidence.clone(), b"image-a")]);
-    let delta = image_binding_delta(&layout);
-    let image_a = {
-        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-        session.capture(image_binding_spec()).unwrap()
-    };
-    let plan_a = test_plan(&image_a, &delta);
-    assert_eq!(plan_a.image(), &image_a);
-
-    seed_memory_existing(&memory, &[(evidence, b"image-b")]);
-    let mut session = memory.open_mutation_session(layout).unwrap();
-    let image_b = session.capture(image_binding_spec()).unwrap();
-    let target = VirtualPath::data("target.txt").unwrap();
-    assert_eq!(
-        image_a.entry(&target).unwrap(),
-        image_b.entry(&target).unwrap()
-    );
-    assert_ne!(plan_a.image(), &image_b);
-    assert!(matches!(
-        session.apply(&plan_a),
-        Err(RepositoryStateStoreError::RetryableConflict { .. })
-    ));
-    let plan_b = test_plan(&image_b, &delta);
-    let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.actions_applied, delta.actions().len());
-}
-
 #[cfg(unix)]
 #[test]
 fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
@@ -451,53 +327,6 @@ fn test_shared_retained_lock_chain_reenters_same_layout() {
     let _repository = storage.acquire_repo_write_lock_raw().unwrap();
     let session = storage.open_mutation_session(layout).unwrap();
     assert_eq!(session.layout().data_root(), data);
-}
-
-#[test]
-fn test_memory_set_mode_uses_exact_file_preimage() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "memory-worktree", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "memory-data", true),
-    )
-    .unwrap();
-    let storage = InMemoryStorage::new();
-    {
-        let mut state = storage.repository_state();
-        let path = VirtualPath::data("tool").unwrap();
-        state.data_root_exists = true;
-        state.entries.insert(
-            path,
-            RepositoryEntry::File {
-                content: CapturedBytes::new("memory-tool", b"tool".to_vec()).unwrap(),
-                mode: FileMode::Regular,
-            },
-        );
-    }
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::new([VirtualPath::data("tool").unwrap()], budget()).unwrap();
-    let image = session.capture(spec).unwrap();
-    let path = VirtualPath::data("tool").unwrap();
-    let delta = RepositoryDelta::new(
-        &layout,
-        vec![RepositoryAction::set_mode(
-            path.clone(),
-            RepositoryActionOwner::RepositoryStateMutation,
-            ExpectedPreimage::of(image.entry(&path).unwrap()),
-            FileMode::Executable,
-        )],
-    )
-    .unwrap();
-    session.apply(&test_plan(&image, &delta)).unwrap();
-    drop(session);
-    let state = storage.repository_state();
-    assert!(matches!(
-        state.entries.get(&path),
-        Some(RepositoryEntry::File {
-            mode: FileMode::Executable,
-            ..
-        })
-    ));
 }
 
 // --- Cross-backend session matrix ---------------------------------------
@@ -1123,7 +952,8 @@ fn capture_listing_errors(
             },
         );
         for (name, bytes) in children {
-            let path = VirtualPath::data(format!("issues/{name}")).unwrap();
+            let path =
+                VirtualPath::data(VirtualPath::ISSUES.relative().as_path().join(name)).unwrap();
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {

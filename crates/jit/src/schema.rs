@@ -1331,18 +1331,24 @@ mod tests {
         assert!(props.get("count").is_some(), "list envelope count");
         assert!(props.get("root").is_some(), "scoping root id");
 
-        // The node shape carries the four resolved-hierarchy fields.
-        let node_schema = serde_json::to_string(
-            schema_val
-                .pointer("/definitions/HierarchyNodeView")
-                .expect("HierarchyNodeView definition"),
-        )
-        .unwrap();
-        for field in ["parent", "children", "cluster", "rank"] {
-            assert!(
-                node_schema.contains(&format!("\"{field}\"")),
-                "node schema should describe the {field} field"
-            );
+        let export_schema = published_output_schema(&["graph", "export"]);
+        let full_schema = &export_schema["oneOf"][1];
+        for (root, node) in [
+            (schema_val, "HierarchyNodeView"),
+            (full_schema, "GraphExportFullNode"),
+        ] {
+            let properties = &root["definitions"][node]["properties"];
+            for field in ["parent", "cluster"] {
+                assert_eq!(
+                    properties[field]["type"],
+                    json!(["string", "null"]),
+                    "{node}.{field} remains a nullable string: {}",
+                    properties[field],
+                );
+            }
+            assert_eq!(properties["children"]["type"], "array");
+            assert_eq!(properties["children"]["items"]["type"], "string");
+            assert_eq!(properties["rank"]["type"], "integer");
         }
     }
 

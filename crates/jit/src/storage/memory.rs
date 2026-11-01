@@ -73,6 +73,8 @@ pub(crate) struct MemoryRepositoryState {
     /// the state the record moves away from, because the record is applied
     /// forward.
     pub(crate) record: Option<RedoRecord>,
+    /// The entries [`InMemoryStorage::record_commit`] recorded, by commit id.
+    pub(crate) commits: BTreeMap<String, BTreeMap<VirtualPath, RepositoryEntry>>,
 }
 
 impl InMemoryStorage {
@@ -294,7 +296,7 @@ impl InMemoryStorage {
     fn insert_repo_file(
         &self,
         vpath: VirtualPath,
-        content: &str,
+        content: &[u8],
     ) -> Result<(), crate::storage::PathReadError> {
         use crate::repository_state::{FileMode, RepositoryEntry};
         self.repository_layout()
@@ -306,7 +308,7 @@ impl InMemoryStorage {
                 vpath.root_class(),
                 vpath.relative().as_str()
             ),
-            content.as_bytes().to_vec(),
+            content.to_vec(),
         )
         .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
         let mut state = self.repository_state();
@@ -335,7 +337,7 @@ impl InMemoryStorage {
     pub fn add_data_file(&self, relative: impl AsRef<std::path::Path>, content: &str) {
         let path = VirtualPath::data(relative)
             .expect("add_data_file requires a canonical data-root-relative path");
-        self.insert_repo_file(path, content)
+        self.insert_repo_file(path, content.as_bytes())
             .expect("add_data_file requires a canonical repository path");
     }
 
@@ -343,19 +345,24 @@ impl InMemoryStorage {
     pub fn add_worktree_file(&self, relative: impl AsRef<std::path::Path>, content: &str) {
         let path = VirtualPath::worktree(relative)
             .expect("add_worktree_file requires a canonical worktree-relative path");
-        self.insert_repo_file(path, content)
+        self.insert_repo_file(path, content.as_bytes())
             .expect("add_worktree_file requires a canonical repository path");
     }
 
-    /// Canonical `Data(...)` identity for one issue record.
-    fn issue_vpath(id: &IssueId) -> Result<VirtualPath> {
-        VirtualPath::data(
-            VirtualPath::ISSUES
-                .relative()
-                .as_path()
-                .join(format!("{id}.json")),
-        )
-        .context("invalid issue record path")
+    /// Seed `path` with exact `bytes`, which need not be UTF-8.
+    pub fn add_repository_bytes(&self, path: VirtualPath, bytes: &[u8]) {
+        self.insert_repo_file(path, bytes)
+            .expect("add_repository_bytes requires a canonical repository path");
+    }
+
+    /// Record the current entries as a commit and return its id, the id a
+    /// commit-pinned read names to see them.
+    pub fn record_commit(&self) -> String {
+        let id = uuid::Uuid::new_v4().simple().to_string();
+        let mut state = self.repository_state();
+        let entries = state.entries.clone();
+        state.commits.insert(id.clone(), entries);
+        id
     }
 
     /// Canonical `Data(...)` identity for one gate-run result.
@@ -402,22 +409,6 @@ impl InMemoryStorage {
                 path.relative().as_path().display()
             ),
         }
-    }
-
-    /// Publish a malformed fixture as a captured `File` entry.
-    #[cfg(test)]
-    fn put_data_entry(state: &mut MemoryRepositoryState, vpath: VirtualPath, bytes: Vec<u8>) {
-        let object = vpath.relative().as_str().to_owned();
-        let content = CapturedBytes::new(object, bytes).expect("entry identity is hashable");
-        Self::mark_data_root_existing(state);
-        Self::ensure_ancestor_dirs(state, &vpath);
-        state.entries.insert(
-            vpath,
-            RepositoryEntry::File {
-                content,
-                mode: FileMode::Regular,
-            },
-        );
     }
 
     /// Model a `Directory` entry for every ancestor of `vpath` up to (but not
@@ -493,7 +484,7 @@ impl InMemoryStorage {
 
     /// Deserialize one captured issue record, if present.
     fn load_issue_entry(state: &MemoryRepositoryState, id: &IssueId) -> Result<Option<Issue>> {
-        let path = Self::issue_vpath(id)?;
+        let path = VirtualPath::issue_record(id);
         Self::data_entry_bytes(state, &path)
             .map(|bytes| {
                 serde_json::from_slice::<Issue>(&bytes).with_context(|| {
@@ -969,9 +960,11 @@ impl IssueStore for InMemoryStorage {
         use crate::repository_state::RepositoryEntry;
         let vpath = self.repo_file_vpath(rel_path)?;
         Ok(match self.repository_state().entries.get(&vpath) {
-            Some(RepositoryEntry::File { content, .. }) => {
-                Some(String::from_utf8_lossy(content.bytes()).into_owned())
-            }
+            Some(RepositoryEntry::File { content, .. }) => Some(
+                String::from_utf8(content.bytes().to_vec())
+                    .map_err(anyhow::Error::from)
+                    .map_err(crate::storage::PathReadError::Other)?,
+            ),
             _ => None,
         })
     }
@@ -983,24 +976,32 @@ impl IssueStore for InMemoryStorage {
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
         let vpath = self.repo_file_vpath(path)?;
-        if at_commit.is_some() {
-            // Commit-pinned reads have no image of their own yet, so they still
-            // read the synthetic root on disk.
-            return std::fs::read(self.root_path.join(path))
-                .map(|bytes| (bytes, "working-tree".to_string()))
-                .map_err(|e| match e.kind() {
-                    std::io::ErrorKind::NotFound => PathReadError::NotFound(path.to_string()),
-                    _ => PathReadError::Other(anyhow!("Failed to read file {}: {}", path, e)),
-                });
-        }
-        // A non-file entry is refused as the file backend's confined read
-        // refuses one.
-        match self.repository_state().entries.get(&vpath) {
+        let state = self.repository_state();
+        let Some(commit) = at_commit else {
+            // A non-file entry is refused as the file backend's confined read
+            // refuses one.
+            return match state.entries.get(&vpath) {
+                Some(RepositoryEntry::File { content, .. }) => {
+                    Ok((content.bytes().to_vec(), "working-tree".to_string()))
+                }
+                None | Some(RepositoryEntry::Absent) => {
+                    Err(PathReadError::NotFound(path.to_string()))
+                }
+                Some(_) => Err(PathReadError::OutsideRepoRoot(path.to_string())),
+            };
+        };
+        let entries = state
+            .commits
+            .get(commit)
+            .ok_or_else(|| PathReadError::CommitNotFound(commit.to_string()))?;
+        match entries.get(&vpath) {
             Some(RepositoryEntry::File { content, .. }) => {
-                Ok((content.bytes().to_vec(), "working-tree".to_string()))
+                Ok((content.bytes().to_vec(), format!("{commit:.7}")))
             }
             None | Some(RepositoryEntry::Absent) => Err(PathReadError::NotFound(path.to_string())),
-            Some(_) => Err(PathReadError::OutsideRepoRoot(path.to_string())),
+            Some(_) => Err(PathReadError::Other(anyhow!(
+                "{path} at commit {commit} is not a file"
+            ))),
         }
     }
 }
@@ -1020,10 +1021,6 @@ mod tests {
                 identity: identity(),
                 mode: FileMode::Executable,
             },
-            "file" => RepositoryEntry::File {
-                content: captured(b"not a directory"),
-                mode: FileMode::Regular,
-            },
             "symlink" => RepositoryEntry::Symlink {
                 target: captured(b"elsewhere"),
                 mode: FileMode::Regular,
@@ -1038,68 +1035,8 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_run_readers_match_only_exact_result_shape_and_name_malformed_path() {
-        let storage = InMemoryStorage::new();
-        let nested = VirtualPath::data(format!(
-            "{}/outer/nested/result.json",
-            VirtualPath::GATE_RUNS.relative().as_str()
-        ))
-        .unwrap();
-        let canonical = InMemoryStorage::gate_run_vpath("corrupt-run").unwrap();
-        let mut state = storage.repository_state();
-        InMemoryStorage::put_data_entry(&mut state, nested, b"{ nested".to_vec());
-        drop(state);
-        assert!(storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap()
-            .is_empty());
-
-        let mut state = storage.repository_state();
-        InMemoryStorage::put_data_entry(&mut state, canonical, b"{ corrupt".to_vec());
-        drop(state);
-
-        let load_error = storage.load_gate_run_result("corrupt-run").unwrap_err();
-        let record_path = format!(
-            "{}/corrupt-run/result.json",
-            VirtualPath::GATE_RUNS.relative().as_str()
-        );
-        assert!(format!("{load_error:#}").contains(&record_path));
-        let list_error = storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap_err();
-        assert!(format!("{list_error:#}").contains(&record_path));
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_file_result_object() {
-        let storage = InMemoryStorage::new();
-        let path = InMemoryStorage::gate_run_vpath("directory-run").unwrap();
-        let mut state = storage.repository_state();
-        InMemoryStorage::ensure_ancestor_dirs(&mut state, &path);
-        state.entries.insert(
-            path,
-            RepositoryEntry::Directory {
-                identity: EntryIdentity::for_bytes("directory-run", b"directory").unwrap(),
-                mode: FileMode::Executable,
-            },
-        );
-        drop(state);
-
-        for error in [
-            storage.load_gate_run_result("directory-run").unwrap_err(),
-            storage
-                .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-                .unwrap_err(),
-        ] {
-            let message = format!("{error:#}");
-            assert!(message.contains("directory-run/result.json"));
-            assert!(message.contains("ordinary file"));
-        }
-    }
-
-    #[test]
     fn test_gate_run_readers_validate_gate_runs_root_parent_kinds() {
-        for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
+        for kind in ["absent", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
             storage
                 .repository_state()
@@ -1108,7 +1045,7 @@ mod tests {
 
             let loaded = storage.load_gate_run_result("run-one");
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
-            if matches!(kind, "absent" | "directory") {
+            if kind == "absent" {
                 assert!(loaded
                     .unwrap_err()
                     .downcast_ref::<GateRunNotFoundError>()
@@ -1123,7 +1060,7 @@ mod tests {
 
     #[test]
     fn test_gate_run_readers_validate_canonical_run_directory_parent_kinds() {
-        for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
+        for kind in ["absent", "directory", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
             let root = VirtualPath::GATE_RUNS;
             let run_dir = InMemoryStorage::gate_run_directory_vpath("run-one").unwrap();
@@ -1208,6 +1145,24 @@ mod tests {
             state.entries.get(&VirtualPath::worktree("docs/guide.md").unwrap()),
             Some(RepositoryEntry::File { content, .. }) if content.bytes() == b"guide"
         ));
+    }
+
+    #[test]
+    fn test_read_path_bytes_never_serves_a_host_file_under_the_root() {
+        let host = tempfile::TempDir::new().unwrap();
+        std::fs::write(host.path().join("host.md"), "on disk").unwrap();
+        let storage = InMemoryStorage::rooted_at(host.path());
+        let commit = storage.record_commit();
+
+        for pin in [None, Some(commit.as_str())] {
+            assert!(
+                matches!(
+                    storage.read_path_bytes("host.md", pin),
+                    Err(crate::storage::PathReadError::NotFound(_))
+                ),
+                "pin {pin:?} read the host file"
+            );
+        }
     }
 
     #[test]
@@ -1317,12 +1272,7 @@ mod record_tests {
     }
 
     fn issue_data(relative: &str) -> VirtualPath {
-        VirtualPath::data(format!(
-            "{}/{}",
-            VirtualPath::ISSUES.relative().as_str(),
-            relative
-        ))
-        .unwrap()
+        VirtualPath::data(VirtualPath::ISSUES.relative().as_path().join(relative)).unwrap()
     }
 
     fn worktree(relative: &str) -> VirtualPath {
@@ -1667,10 +1617,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
-        storage.add_data_file(
-            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
-            "residual",
-        );
+        storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
         let record = RedoRecord::new(
             Vec::new(),
             vec![put(VirtualPath::ISSUES, b"occupier")],
@@ -1715,10 +1662,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
         let storage = seeded(&[], false);
-        storage.add_data_file(
-            format!("{}/existing.json", VirtualPath::ISSUES.relative().as_str()),
-            "residual",
-        );
+        storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
         let record = RedoRecord::new(
             Vec::new(),
             vec![

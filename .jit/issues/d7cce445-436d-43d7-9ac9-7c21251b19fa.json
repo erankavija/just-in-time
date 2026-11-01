@@ -28,7 +28,7 @@
     "satisfies:f4d9502a/REQ-06"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Issue reads stop consulting git HEAD",
-  "updated_at": "2026-10-21T15:43:54.953287945Z"
+  "updated_at": "2026-11-01T00:45:10.134817205Z"
 }

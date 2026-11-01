@@ -229,7 +229,7 @@ impl FileLocker {
     /// # Errors
     ///
     /// Returns an error only if the file cannot be opened.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn try_lock_exclusive(&self, path: &Path) -> Result<Option<LockGuard>> {
         let file = self.open_or_create(path)?;
 

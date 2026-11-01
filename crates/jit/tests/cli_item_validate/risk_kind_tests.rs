@@ -5,20 +5,8 @@
 //! authored as list entries under a `## Risks` section of an issue description.
 //! Risks become addressable, queryable items through the SAME generic
 //! triple-driven parse path `requirement` and `decision` use; no engine code
-//! special-cases the kind (the engine bakes in no kinds — the tuple is authored
-//! entirely in the emitted config table).
-//!
-//! The `risk` tuple supplied by the package is:
-//!
-//! ```text
-//! section          = "risks"              # authored under a `## Risks` heading
-//! id-pattern       = "RISK-[0-9]+"        # self-ids read RISK-1, RISK-2, ... (e.g. RISK-01)
-//! markers          = []                   # no marker; every matching line qualifies
-//! link-namespaces  = ["mitigates",        # `mitigates:<issue>/RISK-01` references a risk
-//!                     "resolves"]         # `resolves:<issue>/RISK-01` references a risk
-//! scope            = "issue"              # risks live in issue descriptions
-//! source-of-truth  = "markdown-first"
-//! ```
+//! special-cases the kind. The declaration under test is the shipped one, derived
+//! from the default package.
 //!
 //! Coverage of the issue's `[hard]` success criteria, all against a repository
 //! initialized with the shared taxonomy fixture:
@@ -37,28 +25,16 @@
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
-/// The shared taxonomy configuration plus the `risk` kind declaration (the
-/// engine bakes in no kinds). The declaration mirrors the one the package
-/// supplies, so the tests exercise the shipped kind shape.
-fn risk_config() -> String {
-    format!(
-        "{}\n[item_kinds.risk]\n\
-         section = \"risks\"\n\
-         id-pattern = \"RISK-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"mitigates\", \"resolves\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-        jit::test_taxonomy::test_taxonomy().config_fragment()
-    )
-}
-
 #[test]
 fn test_default_repo_item_list_kind_risk_returns_risks() {
     // REQ-01: in a fixture-initialized repo with the configured `risk` kind, `jit item list
     // --kind risk` returns risk items parsed from an issue's `## Risks` section
     // — exercised through the actual binary.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&risk_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue([
             "-t",
@@ -88,7 +64,8 @@ fn test_default_repo_mitigates_label_resolves_risk() {
     // REQ-02 (mitigates): a `mitigates:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `mitigates` namespace.
-    let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
+    let (_temp, exec) =
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"])).unwrap();
     let issue = crate::create_issue(
         &exec,
         "Migration plan",
@@ -120,7 +97,8 @@ fn test_default_repo_resolves_label_resolves_risk() {
     // REQ-02 (resolves): a `resolves:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`; the
     // configured `risk` kind declares the `resolves` namespace.
-    let (_temp, exec) = setup_test_repo_with_config(&risk_config()).unwrap();
+    let (_temp, exec) =
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"])).unwrap();
     let issue = crate::create_issue(
         &exec,
         "Migration plan",
@@ -153,7 +131,11 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
     // index is a pure projection — there is no parallel structured store — so
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no risk store file is written under `.jit/`.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&risk_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["risk"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue([
             "-t",

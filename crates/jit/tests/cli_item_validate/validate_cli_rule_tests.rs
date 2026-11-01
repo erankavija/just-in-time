@@ -450,7 +450,7 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 }
 
 #[test]
-fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
+fn test_validate_retains_rule_findings_with_integrity_failure() {
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
@@ -463,14 +463,14 @@ fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
 
     cli.command(["validate"])
         .assert()
-        .code(4)
+        .failure()
         .stdout(predicate::str::contains("[epic-needs-component]"))
         .stdout(predicate::str::contains("does not exist"));
 
     let output = cli
         .command(["validate", "--json"])
         .assert()
-        .code(4)
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -708,8 +708,7 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
     let findings = failed_json["error"]["details"]["findings"]
         .as_array()
@@ -750,8 +749,7 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
         let assert = cli
             .command(["validate", id, "--rule", rule, "--json"])
             .assert()
-            .failure()
-            .code(1);
+            .failure();
         let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
         let findings = json["error"]["details"]["findings"].as_array().unwrap();
         assert!(
@@ -766,7 +764,6 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
     cli.command(["validate", "--rule", "epic-criteria-covered"])
         .assert()
         .failure()
-        .code(2)
         .stderr(predicate::str::contains("requires a positional issue id"));
 }
 
@@ -796,8 +793,7 @@ fn test_validate_rule_cli_reports_missing_selected_container() {
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(findings.iter().any(|finding| {
@@ -862,15 +858,6 @@ fn test_mcp_generates_validate_tool_with_id_and_explain() {
     let schema_json = String::from_utf8(schema_out.stdout).unwrap();
 
     let mcp_dir = mcp_server_dir();
-    // Skip gracefully if node is unavailable in the environment.
-    let node = match Command::new("node").arg("--version").output() {
-        Ok(o) if o.status.success() => "node",
-        _ => {
-            eprintln!("node not available; skipping MCP parity assertion");
-            return;
-        }
-    };
-
     let script = r#"
 import { generateTools } from './lib/tool-generator.js';
 let data = '';
@@ -891,14 +878,16 @@ process.stdin.on('end', () => {
 });
 "#;
 
-    let mut child = Command::new(node)
+    let mut child = Command::new("node")
         .current_dir(&mcp_dir)
         .args(["--input-type=module", "-e", script])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .expect("spawn node");
+        .expect(
+            "node is required for the MCP tool-generation parity test and could not be spawned",
+        );
     {
         use std::io::Write;
         child

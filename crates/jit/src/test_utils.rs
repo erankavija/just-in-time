@@ -12,13 +12,13 @@ use crate::profile::{
     capture_package_tree, CapturedFile, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
 };
 use crate::repository_state::{Contribution, MapEntryTarget};
-use crate::repository_state::{FileMode, VirtualPath};
+use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
 #[cfg(any(test, feature = "test-support"))]
 use crate::repository_state::{RepositoryLayout, RepositoryRootEvidence};
 use crate::storage::lock::LockGuard;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
-    discover_repository_layout, FileLocker, IssueStore, JsonFileStorage, LockMode,
+    discover_repository_layout, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
 };
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::{bail, Context, Result};
@@ -155,8 +155,6 @@ mod fixture_issue_tests {
 pub const PROFILE_PACKAGE_SOURCES: &str = "profiles";
 
 const PROFILED_REPOSITORY_FIXTURE_SCHEMA: u32 = 1;
-/// Longest wait on a fixture profile lock; below the 20 s per-test timeout in `.config/nextest.toml`.
-const PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND: Duration = Duration::from_secs(12);
 const PROFILED_REPOSITORY_FIXTURE_DIRECTORY: &str = "jit-profiled-repository-fixtures";
 const PROFILED_REPOSITORY_FIXTURE_SETUP: &str = "command-executor.initialize-fresh-repository.v1";
 const PROFILED_REPOSITORY_FIXTURE_STAGING: &str = ".profiled-repository-staging-";
@@ -219,7 +217,8 @@ struct ProfiledRepositoryFixtureLease {
 /// builders and retirement. A builder stages beside the keyed entry and
 /// publishes it with one atomic no-replace rename. If a valid entry wins that
 /// rename race, the builder uses it; corrupt or unrelated occupied entries
-/// fail closed.
+/// fail closed. A waiter waits for as long as the build runs: it fails with the
+/// cause of a build that fails, and builds itself when the holder dies.
 pub fn profiled_repository_fixture(id: &str, package_directory: &str) -> Result<TempDir> {
     let lease = cached_profiled_repository_fixture(id, package_directory)?;
     let clone = TempDir::new()?;
@@ -310,13 +309,34 @@ fn initialize_profiled_repository_fixture(
     if !selected.is_dir() {
         bail!("this repository authors no profile package '{id}'");
     }
-    let jit_root = repository.join(".jit");
-    let storage = JsonFileStorage::new(&jit_root);
-    let layout = discover_repository_layout(repository, &jit_root)?;
-    CommandExecutor::new(storage)
-        .with_layout(layout)
+    // A rebuildable cache needs no durability: initializing over memory spares the
+    // build the fsyncs that wait on the host's whole writeback backlog.
+    let storage = InMemoryStorage::rooted_at(repository);
+    storage.seed_repository_tree_fixture(repository)?;
+    let layout = storage.repository_layout();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout.clone())
         .initialize_fresh_repository(repository, Some(&[ProfileSelector::path(&selected)]))?;
-    Ok(())
+    write_repository_entries(&storage, &layout)
+}
+
+fn write_repository_entries(storage: &InMemoryStorage, layout: &RepositoryLayout) -> Result<()> {
+    storage
+        .repository_state()
+        .entries
+        .iter()
+        .try_for_each(|(path, entry)| {
+            let target = layout.resolve(path)?;
+            match entry {
+                RepositoryEntry::File { content, mode } => {
+                    fs::create_dir_all(target.parent().context("entry has no parent")?)?;
+                    fs::write(&target, content.bytes())?;
+                    set_captured_mode(&target, *mode)
+                }
+                RepositoryEntry::Directory { .. } => Ok(fs::create_dir_all(&target)?),
+                other => bail!("repository entry {path:?} is not writable: {other:?}"),
+            }
+        })
 }
 
 fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, CapturedPackageTree>> {
@@ -433,71 +453,132 @@ fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<Pat
     Ok(target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY))
 }
 
+/// What a failed build leaves for the consumers that were waiting on it.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProfiledRepositoryFixtureBuildFailure {
+    key: String,
+    /// Tells this failure from an earlier one with the same cause.
+    attempt: u64,
+    cause: String,
+}
+
+/// The locations one profile's consumers coordinate through.
+struct ProfiledRepositoryFixturePaths {
+    profile_root: PathBuf,
+    lock: PathBuf,
+    build_failure: PathBuf,
+}
+
+impl ProfiledRepositoryFixturePaths {
+    fn new(cache_root: &Path, profile: &str) -> Self {
+        let lock_root = cache_root.join("locks");
+        Self {
+            profile_root: cache_root.join(profile),
+            lock: lock_root.join(format!("{profile}.lock")),
+            build_failure: lock_root.join(format!("{profile}.failure.json")),
+        }
+    }
+}
+
 fn ensure_profiled_repository_fixture(
     cache_root: &Path,
     profile: &str,
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<ProfiledRepositoryFixtureLease> {
-    ensure_profiled_repository_fixture_within(
-        cache_root,
+    let paths = ProfiledRepositoryFixturePaths::new(cache_root, profile);
+    let observed_failure = read_fixture_build_failure(&paths, key)?;
+    ensure_profiled_repository_fixture_observing(
+        &paths,
         profile,
         key,
-        PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND,
+        observed_failure.as_ref(),
         build,
     )
 }
 
 /// Leases the profile's entry for `key`, building and publishing it under the
-/// exclusive profile lock when absent and then retiring the profile's older
-/// entries. Lock waits share one `bound`; a wait past it fails naming the lock,
-/// profile, key and holder.
-fn ensure_profiled_repository_fixture_within(
-    cache_root: &Path,
+/// exclusive profile lock when absent. A failure recorded other than
+/// `observed_failure` came from a build this consumer waited on, so its cause
+/// becomes this consumer's error; an observed one predates the wait and is
+/// retried. The kernel releases a dead holder's lock, so lock waits are unbounded.
+fn ensure_profiled_repository_fixture_observing(
+    paths: &ProfiledRepositoryFixturePaths,
     profile: &str,
     key: &str,
-    bound: Duration,
+    observed_failure: Option<&ProfiledRepositoryFixtureBuildFailure>,
     build: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<ProfiledRepositoryFixtureLease> {
-    let began = std::time::Instant::now();
-    let profile_root = cache_root.join(profile);
-    fs::create_dir_all(&profile_root)?;
-    let entry = profile_root.join(key);
-    let shared = lock_fixture_profile(cache_root, profile, key, bound, LockMode::Shared)?;
-    if is_published_fixture(&entry)? {
-        validate_profiled_repository_fixture(&entry, key)?;
-        return Ok(ProfiledRepositoryFixtureLease {
-            entry,
-            _profile_lock: shared,
-        });
+    fs::create_dir_all(&paths.profile_root)?;
+    fs::create_dir_all(paths.lock.parent().context("fixture lock has no parent")?)?;
+    let entry = paths.profile_root.join(key);
+    let locker = FileLocker::new(Duration::MAX);
+    loop {
+        let shared = locker.lock_shared(&paths.lock)?;
+        if is_published_fixture(&entry)? {
+            validate_profiled_repository_fixture(&entry, key)?;
+            return Ok(ProfiledRepositoryFixtureLease {
+                entry,
+                _profile_lock: shared,
+            });
+        }
+        drop(shared);
+        let Some(exclusive) = locker.try_lock_exclusive(&paths.lock)? else {
+            std::thread::sleep(Duration::from_millis(
+                crate::runtime_defaults::LOCK_POLL_INTERVAL_MS,
+            ));
+            continue;
+        };
+        if is_published_fixture(&entry)? {
+            continue;
+        }
+        let failure = read_fixture_build_failure(paths, key)?;
+        if let Some(failure) = failure.as_ref().filter(|&f| Some(f) != observed_failure) {
+            bail!(
+                "profiled-repository fixture {profile} key {key} failed to build: {}",
+                failure.cause
+            );
+        }
+        return match publish_profiled_repository_fixture(&paths.profile_root, &entry, key, build) {
+            Ok(()) => {
+                remove_fixture_build_failure(paths)?;
+                Ok(ProfiledRepositoryFixtureLease {
+                    entry,
+                    _profile_lock: exclusive,
+                })
+            }
+            Err(error) => {
+                let recorded = ProfiledRepositoryFixtureBuildFailure {
+                    key: key.to_string(),
+                    attempt: failure.map_or(1, |failure| failure.attempt + 1),
+                    cause: format!("{error:#}"),
+                };
+                write_fixture_build_failure(paths, &recorded)
+                    .with_context(|| format!("record fixture build failure: {error:#}"))?;
+                Err(error)
+            }
+        };
     }
-    drop(shared);
-    let exclusive = lock_fixture_profile(
-        cache_root,
-        profile,
-        key,
-        bound.saturating_sub(began.elapsed()),
-        LockMode::Exclusive,
-    )?;
-    if is_published_fixture(&entry)? {
-        validate_profiled_repository_fixture(&entry, key)?;
-        return Ok(ProfiledRepositoryFixtureLease {
-            entry,
-            _profile_lock: exclusive,
-        });
-    }
+}
 
+/// Builds in staging, publishes `entry` and retires the profile's older entries.
+fn publish_profiled_repository_fixture(
+    profile_root: &Path,
+    entry: &Path,
+    key: &str,
+    build: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
     let staging = tempfile::Builder::new()
         .prefix(PROFILED_REPOSITORY_FIXTURE_STAGING)
-        .tempdir_in(&profile_root)?;
+        .tempdir_in(profile_root)?;
     let repository = staging.path().join("repository");
     fs::create_dir(&repository)?;
     build(&repository)?;
-    let tree_sha256 = tree_sha256(&repository)?;
     let manifest = ProfiledRepositoryFixtureManifest {
         schema_version: PROFILED_REPOSITORY_FIXTURE_SCHEMA,
         key: key.to_string(),
-        tree_sha256,
+        tree_sha256: tree_sha256(&repository)?,
     };
     fs::write(
         staging.path().join("manifest.json"),
@@ -505,70 +586,62 @@ fn ensure_profiled_repository_fixture_within(
     )?;
 
     let staging_path = staging.keep();
-    if let Err(error) = crate::storage::publish_fixture_directory_noreplace(&staging_path, &entry) {
+    if let Err(error) = crate::storage::publish_fixture_directory_noreplace(&staging_path, entry) {
         let _ = fs::remove_dir_all(&staging_path);
-        if is_published_fixture(&entry)? {
-            if let Err(validation_error) = validate_profiled_repository_fixture(&entry, key) {
-                return Err(error).with_context(|| {
-                    format!(
-                        "atomically publish profiled-repository fixture {}; concurrent entry is invalid: {validation_error:#}",
-                        entry.display()
-                    )
-                });
-            }
-            retire_older_fixture_entries(&profile_root, key)?;
-            return Ok(ProfiledRepositoryFixtureLease {
-                entry,
-                _profile_lock: exclusive,
+        if !is_published_fixture(entry)? {
+            return Err(error).with_context(|| {
+                format!(
+                    "atomically publish profiled-repository fixture {}",
+                    entry.display()
+                )
             });
         }
-        return Err(error).with_context(|| {
-            format!(
-                "atomically publish profiled-repository fixture {}",
+        validate_profiled_repository_fixture(entry, key).map_err(|validation_error| {
+            error.context(format!(
+                "atomically publish profiled-repository fixture {}; concurrent entry is invalid: {validation_error:#}",
                 entry.display()
-            )
-        });
+            ))
+        })?;
+    } else {
+        validate_profiled_repository_fixture(entry, key)?;
     }
-    validate_profiled_repository_fixture(&entry, key)?;
-    retire_older_fixture_entries(&profile_root, key)?;
-    Ok(ProfiledRepositoryFixtureLease {
-        entry,
-        _profile_lock: exclusive,
-    })
+    retire_older_fixture_entries(profile_root, key)
 }
 
-fn lock_fixture_profile(
-    cache_root: &Path,
-    profile: &str,
+fn read_fixture_build_failure(
+    paths: &ProfiledRepositoryFixturePaths,
     key: &str,
-    bound: Duration,
-    mode: LockMode,
-) -> Result<LockGuard> {
-    let lock_root = cache_root.join("locks");
-    fs::create_dir_all(&lock_root)?;
-    let lock_path = lock_root.join(format!("{profile}.lock"));
-    let locker = FileLocker::new(bound);
-    match mode {
-        LockMode::Shared => locker.lock_shared(&lock_path),
-        LockMode::Exclusive => locker
-            .lock_exclusive_with_metadata(&lock_path, &format!("fixture-build:{profile}/{key}")),
+) -> Result<Option<ProfiledRepositoryFixtureBuildFailure>> {
+    let bytes = match fs::read(&paths.build_failure) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let failure: ProfiledRepositoryFixtureBuildFailure = serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse fixture failure {}", paths.build_failure.display()))?;
+    Ok((failure.key == key).then_some(failure))
+}
+
+/// Replaces the record atomically: a waiter reads it before taking any lock.
+fn write_fixture_build_failure(
+    paths: &ProfiledRepositoryFixturePaths,
+    failure: &ProfiledRepositoryFixtureBuildFailure,
+) -> Result<()> {
+    let directory = paths
+        .build_failure
+        .parent()
+        .context("fixture failure record has no parent")?;
+    let staged = tempfile::NamedTempFile::new_in(directory)?;
+    fs::write(staged.path(), serde_json::to_vec_pretty(failure)?)?;
+    staged.persist(&paths.build_failure)?;
+    Ok(())
+}
+
+fn remove_fixture_build_failure(paths: &ProfiledRepositoryFixturePaths) -> Result<()> {
+    match fs::remove_file(&paths.build_failure) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.into()),
+        _ => Ok(()),
     }
-    .map_err(|error| {
-        if !crate::storage::is_lock_timeout(&error) {
-            return error;
-        }
-        let holder = fs::read(lock_path.with_extension("lock.meta"))
-            .ok()
-            .and_then(|bytes| serde_json::from_slice::<crate::storage::LockMetadata>(&bytes).ok())
-            .map_or_else(
-                || "readers or an unknown holder".to_string(),
-                |meta| format!("pid {} ({})", meta.pid, meta.agent_id),
-            );
-        error.context(format!(
-            "profiled-repository fixture {profile} key {key} is busy; lock {} held by {holder}",
-            lock_path.display()
-        ))
-    })
 }
 
 fn is_published_fixture(entry: &Path) -> Result<bool> {
@@ -1446,6 +1519,7 @@ pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::{BOOTSTRAP_LOCK_FILE, RECORD_SCRATCH_DIR};
     use crate::storage::IssueStore;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Barrier;
@@ -1559,6 +1633,69 @@ mod tests {
     }
 
     #[test]
+    fn test_profiled_repository_fixture_memory_build_writes_the_tree_a_file_build_writes() {
+        PROFILED_REPOSITORY_FIXTURES.iter().for_each(|spec| {
+            let packages = capture_profile_package_closure(spec.id).unwrap();
+            let package_directory = Path::new(spec.package_directory);
+            let root = TempDir::new().unwrap();
+            let built = root.path().join("built/repository");
+            let reference = root.path().join("reference/repository");
+            fs::create_dir_all(&built).unwrap();
+            fs::create_dir_all(&reference).unwrap();
+            initialize_profiled_repository_fixture(&built, spec.id, package_directory, &packages)
+                .unwrap();
+
+            packages.iter().for_each(|(package_id, package)| {
+                write_captured_package(package, &reference.join(package_directory).join(package_id))
+                    .unwrap()
+            });
+            let jit_root = reference.join(".jit");
+            CommandExecutor::new(JsonFileStorage::new(&jit_root))
+                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap())
+                .initialize_fresh_repository(
+                    &reference,
+                    Some(&[ProfileSelector::path(
+                        reference.join(package_directory).join(spec.id),
+                    )]),
+                )
+                .unwrap();
+            // Machine-local state the file backend's next session creates on demand.
+            fs::remove_file(reference.join(BOOTSTRAP_LOCK_FILE)).unwrap();
+            let scratch = jit_root.join(RECORD_SCRATCH_DIR);
+            if scratch.exists() {
+                fs::remove_dir(scratch).unwrap();
+            }
+
+            // Each initialization mints its own event ids and timestamps.
+            let events = |repository: &Path| -> Vec<serde_json::Value> {
+                fs::read_to_string(repository.join(".jit/events.jsonl"))
+                    .unwrap()
+                    .lines()
+                    .map(|line| {
+                        let mut event: serde_json::Value = serde_json::from_str(line).unwrap();
+                        let fields = event.as_object_mut().unwrap();
+                        fields.remove("id");
+                        fields.remove("timestamp");
+                        event
+                    })
+                    .collect()
+            };
+            assert_eq!(events(&built), events(&reference), "{}", spec.id);
+            fs::copy(
+                reference.join(".jit/events.jsonl"),
+                built.join(".jit/events.jsonl"),
+            )
+            .unwrap();
+            assert_eq!(
+                tree_sha256(&built).unwrap(),
+                tree_sha256(&reference).unwrap(),
+                "{}",
+                spec.id
+            );
+        });
+    }
+
+    #[test]
     fn test_profiled_repository_fixture_publication_is_concurrent_and_corruption_fails_closed() {
         let cache = TempDir::new().unwrap();
         let cache_root = cache.path().to_path_buf();
@@ -1668,45 +1805,119 @@ mod tests {
     }
 
     #[test]
-    fn test_profiled_repository_fixture_lock_wait_past_the_bound_names_lock_key_and_holder() {
+    fn test_profiled_repository_fixture_failed_build_reports_its_cause_to_every_waiter() {
+        const WAITERS: usize = 4;
         let cache = TempDir::new().unwrap();
-        let lock_root = cache.path().join("locks");
-        fs::create_dir_all(&lock_root).unwrap();
-        let lock_path = lock_root.join("held-profile.lock");
-        let _holder = FileLocker::new(Duration::from_secs(1))
-            .lock_exclusive_with_metadata(&lock_path, "fixture-build:held-profile/other-key")
-            .unwrap();
-        let built = AtomicUsize::new(0);
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        let waiter_builds = AtomicUsize::new(0);
+        let held = Barrier::new(2);
 
-        let error = ensure_profiled_repository_fixture_within(
-            cache.path(),
-            "held-profile",
-            "held-key",
-            Duration::from_millis(100),
-            |_| {
-                built.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            },
-        )
-        .unwrap_err();
+        std::thread::scope(|scope| {
+            let builder = scope.spawn(|| {
+                ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |_| {
+                    held.wait();
+                    std::thread::sleep(Duration::from_millis(200));
+                    bail!("the build's own cause")
+                })
+            });
+            held.wait();
+            let waiters = (0..WAITERS)
+                .map(|_| {
+                    scope.spawn(|| {
+                        ensure_profiled_repository_fixture_observing(
+                            &paths,
+                            "profile",
+                            "key",
+                            None,
+                            |_| {
+                                waiter_builds.fetch_add(1, Ordering::SeqCst);
+                                Ok(())
+                            },
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
 
-        let message = format!("{error:#}");
-        assert!(
-            message.contains(&lock_path.display().to_string()),
-            "{message}"
-        );
-        assert!(message.contains("held-profile"), "{message}");
-        assert!(message.contains("held-key"), "{message}");
-        assert!(
-            message.contains(&format!("pid {}", std::process::id())),
-            "{message}"
-        );
-        assert_eq!(built.load(Ordering::SeqCst), 0);
+            assert!(builder.join().unwrap().is_err());
+            waiters.into_iter().for_each(|waiter| {
+                let error = waiter.join().unwrap().unwrap_err();
+                assert!(
+                    format!("{error:#}").contains("the build's own cause"),
+                    "{error:#}"
+                );
+            });
+        });
+
+        assert_eq!(waiter_builds.load(Ordering::SeqCst), 0);
     }
 
     #[test]
-    fn test_profiled_repository_fixture_lock_bound_is_below_the_per_test_timeout() {
-        assert!(PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND < Duration::from_secs(20));
+    fn test_profiled_repository_fixture_consumer_arriving_after_a_failure_retries_the_build() {
+        let cache = TempDir::new().unwrap();
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+
+        ensure_profiled_repository_fixture(cache.path(), "profile", "key", |_| {
+            bail!("a transient cause")
+        })
+        .unwrap_err();
+        let lease = ensure_profiled_repository_fixture(cache.path(), "profile", "key", |repo| {
+            fs::write(repo.join("state"), b"built")?;
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(
+            fs::read(lease.entry.join("repository/state")).unwrap(),
+            b"built"
+        );
+        assert_eq!(read_fixture_build_failure(&paths, "key").unwrap(), None);
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_failure_of_another_key_does_not_reach_a_waiter() {
+        let cache = TempDir::new().unwrap();
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        ensure_profiled_repository_fixture_observing(&paths, "profile", "other", None, |_| {
+            bail!("the other key's cause")
+        })
+        .unwrap_err();
+
+        let lease =
+            ensure_profiled_repository_fixture_observing(&paths, "profile", "key", None, |repo| {
+                fs::write(repo.join("state"), b"built")?;
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(lease.entry.join("repository/state").is_file());
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_waiter_builds_when_the_holder_dies_without_an_outcome() {
+        let cache = TempDir::new().unwrap();
+        let paths = ProfiledRepositoryFixturePaths::new(cache.path(), "profile");
+        fs::create_dir_all(paths.lock.parent().unwrap()).unwrap();
+        let holder = FileLocker::new(Duration::from_secs(1))
+            .lock_exclusive(&paths.lock)
+            .unwrap();
+        let built = AtomicUsize::new(0);
+
+        let lease = std::thread::scope(|scope| {
+            let waiter = scope.spawn(|| {
+                ensure_profiled_repository_fixture(cache.path(), "profile", "key", |repo| {
+                    built.fetch_add(1, Ordering::SeqCst);
+                    fs::write(repo.join("state"), b"built")?;
+                    Ok(())
+                })
+            });
+            std::thread::sleep(Duration::from_millis(200));
+            assert!(!waiter.is_finished(), "the holder still owns the build");
+            drop(holder);
+            waiter.join().unwrap().unwrap()
+        });
+
+        assert_eq!(built.load(Ordering::SeqCst), 1);
+        assert!(lease.entry.join("repository/state").is_file());
     }
 
     #[test]
@@ -2034,24 +2245,24 @@ mod tests {
         )
         .unwrap();
 
-        let blocked = ensure_profiled_repository_fixture_within(
-            cache.path(),
-            "profile",
-            "next",
-            Duration::from_millis(200),
-            write_key("next"),
-        )
-        .unwrap_err();
-
-        assert!(format!("{blocked:#}").contains("busy"), "{blocked:#}");
-        let clone = TempDir::new().unwrap();
-        copy_tree_exact(&reader.entry.join("repository"), clone.path()).unwrap();
-        assert_eq!(fs::read(clone.path().join("state")).unwrap(), b"current");
         let current = reader.entry.clone();
-        drop(reader);
-        let next =
-            ensure_profiled_repository_fixture(cache.path(), "profile", "next", write_key("next"))
-                .unwrap();
+        let next = std::thread::scope(|scope| {
+            let next = scope.spawn(|| {
+                ensure_profiled_repository_fixture(
+                    cache.path(),
+                    "profile",
+                    "next",
+                    write_key("next"),
+                )
+            });
+            std::thread::sleep(Duration::from_millis(200));
+            assert!(!next.is_finished(), "retirement must wait for the reader");
+            let clone = TempDir::new().unwrap();
+            copy_tree_exact(&reader.entry.join("repository"), clone.path()).unwrap();
+            assert_eq!(fs::read(clone.path().join("state")).unwrap(), b"current");
+            drop(reader);
+            next.join().unwrap().unwrap()
+        });
         assert_eq!(
             fs::read(next.entry.join("repository/state")).unwrap(),
             b"next"

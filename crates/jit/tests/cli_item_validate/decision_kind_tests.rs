@@ -5,19 +5,8 @@
 //! `decision` alongside `requirement`, so a profiled repo indexes decisions authored as list
 //! entries under a `## Decisions` section of an issue description. Decisions become
 //! addressable, queryable items through the SAME generic triple-driven parse path
-//! `requirement` uses; no engine code special-cases the kind (the engine bakes in
-//! no kinds — the tuple is authored entirely in the emitted config table).
-//!
-//! The `decision` tuple supplied by the package is:
-//!
-//! ```text
-//! section          = "decisions"          # authored under a `## Decisions` heading
-//! id-pattern       = "D-[0-9]+"           # self-ids read D-1, D-2, ... (e.g. D-01)
-//! markers          = []                   # no marker; every matching line qualifies
-//! link-namespaces  = ["per"]             # a `per:<issue>/D-01` label references a decision
-//! scope            = "issue"              # decisions live in issue descriptions
-//! source-of-truth  = "markdown-first"
-//! ```
+//! `requirement` uses; no engine code special-cases the kind. The declaration under
+//! test is the shipped one, derived from the default package.
 //!
 //! Coverage of the issue's `[hard]` success criteria, all against a repository
 //! initialized with the shared taxonomy fixture:
@@ -35,28 +24,16 @@
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
-/// The shared taxonomy configuration plus the `decision` kind declaration (the
-/// engine bakes in no kinds). The declaration mirrors the one the package
-/// supplies, so the tests exercise the shipped kind shape.
-fn decision_config() -> String {
-    format!(
-        "{}\n[item_kinds.decision]\n\
-         section = \"decisions\"\n\
-         id-pattern = \"D-[0-9]+\"\n\
-         markers = []\n\
-         link-namespaces = [\"per\"]\n\
-         scope = \"issue\"\n\
-         source-of-truth = \"markdown-first\"\n",
-        jit::test_taxonomy::test_taxonomy().config_fragment()
-    )
-}
-
 #[test]
 fn test_default_repo_item_list_kind_decision_returns_decisions() {
     // REQ-01: in a fixture-initialized repo with the configured `decision` kind, `jit item list
     // --kind decision` returns decision items parsed from an issue's `## Decisions`
     // section — exercised through the actual binary.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&decision_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue([
             "-t",
@@ -88,7 +65,11 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
     // REQ-01: a decision resolves through the real `jit item show` binary by its
     // `<short-id>/<self-id>` sugar INPUT, and reports the canonical uniform
     // kind-segmented qualified id.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&decision_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue([
             "-t",
@@ -118,7 +99,8 @@ fn test_default_repo_per_label_resolves_decision() {
     // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
     // through the existing generic `resolve_link_label`; the configured `decision`
     // kind declares the `per` namespace.
-    let (_temp, exec) = setup_test_repo_with_config(&decision_config()).unwrap();
+    let (_temp, exec) =
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"])).unwrap();
     let issue = crate::create_issue(
         &exec,
         "Architecture",
@@ -151,7 +133,11 @@ fn test_default_repo_markdown_is_sole_source_for_decisions() {
     // index is a pure projection — there is no parallel structured store — so
     // editing the description (and nothing else) changes what `jit item list`
     // returns, and no decision store file is written under `.jit/`.
-    let cli = JitCli::with_repository(setup_test_repo_with_config(&decision_config()).unwrap().0);
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"]))
+            .unwrap()
+            .0,
+    );
     let short = cli
         .create_issue([
             "-t",

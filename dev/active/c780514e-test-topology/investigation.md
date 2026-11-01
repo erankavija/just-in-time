@@ -34,13 +34,13 @@ The Background misses six facts:
 | # | Claim | Verdict | Evidence |
 | --- | --- | --- | --- |
 | 1 | The projection suite has 32 tests, binds both forms, and checks completeness at `:1128`. | valid-and-open | 32 `#[test]`. `assert_projected_exit_status_in_both_forms` at `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:156-187`. `test_command_exit_codes_every_row_is_verified` at `:1128`. Caveat in §4. |
-| 2 | `exit_code_tests.rs` has 39 tests and 1,637 lines and re-proves codes (`:36`/`:774`, `:69`/`:818`, `:1566`/`:966`). | valid-and-open | 39 tests, 1,637 lines. All cited line pairs match. 14 tests are re-proofs, and 25 own behaviour that must move: blocked-transition envelopes, claim behaviour, confirmed-delete output, id-prefix errors, argument guards, and startup envelopes. §D.1 classifies every test. Other subprocess suites also assert projected exit codes (§D.2). |
-| 3 | `invocation_exit_status_parity_tests.rs` re-proves parity. | valid-and-open | 5 tests in `crates/jit/tests/cli_issue/invocation_exit_status_parity_tests.rs`. Two cases have no projection row: unresolved ids across namespaces (`:65`) and a malformed stored record (`:133`). Move them, do not drop them. |
+| 2 | `the removed exit-code subprocess suite` has 39 tests and 1,637 lines and re-proves codes (`:36`/`:774`, `:69`/`:818`, `:1566`/`:966`). | valid-and-open | 39 tests, 1,637 lines. All cited line pairs match. 14 tests are re-proofs, and 25 own behaviour that must move: blocked-transition envelopes, claim behaviour, confirmed-delete output, id-prefix errors, argument guards, and startup envelopes. §D.1 classifies every test. Other subprocess suites also assert projected exit codes (§D.2). |
+| 3 | `the removed exit-status parity suite` re-proves parity. | valid-and-open | 5 tests in `the removed exit-status parity suite`. Two cases have no projection row: unresolved ids across namespaces (`:65`) and a malformed stored record (`:133`). Move them, do not drop them. |
 | 4 | `domain_queries_tests.rs` owns pure filters; `query_tests.rs` has 25 subprocess tests and 1,422 lines. | valid-and-open | `crates/jit/tests/fast_issue/domain_queries_tests.rs` has 10 tests. `crates/jit/src/domain/queries.rs` has 21 more unit tests. `crates/jit/tests/cli_query_graph/query_tests.rs` has 25 tests and 1,422 lines. Label and strategic query re-proofs outside it are in §D.3. Gap: `query available` composes its filters and priority sort in `crates/jit/src/commands/query.rs:122-148`, and `crates/jit/src/commands/issue.rs:800` repeats the sort. That property has no domain owner yet. |
 | 5 | `harness_demo.rs` has 526 lines and 14 tests and re-proves queries, blocking, cycles, and gates. | valid-and-open | 527 lines, 14 tests. Six cases have no other owner and must move: `:291` item list/resolve, `:314` kind/label coverage, `:377` container progress, `:442` status projection, `:462` empty rollup, and `:475` archive candidates. |
 | 6 | `workflow_tests.rs:529-743` re-proves auto-transitions owned by `types.rs:2427`. | invalid-as-stated (location) | The tests are at `crates/jit/tests/cli_repo_workflow/workflow_tests.rs:529,577,646,698`. The domain predicates are tested at `crates/jit/src/domain/types.rs:2546-2703`, not `:2427`. The cascade to dependents (`commands/issue.rs:816-859`, `commands/mod.rs:2791`) is command-layer behaviour. Its harness-level owners include `commands/bulk_update.rs:2001` and `tests/fast_issue/lifecycle_timestamps_tests.rs:89`. "Proven only at the domain" needs a domain extraction or a single harness owner. |
 | 7 | `batch_create.rs:686-711` repeats `graph/keyed.rs` tests over an adapter. | valid-and-open | `detect_cycle` is at `crates/jit/src/commands/batch_create.rs:640`, with four tests at `:686-707`. The owner `crates/jit/src/graph/keyed.rs:145-195` includes a proptest at `:344`. |
-| 8 | `harness_demo.rs:133`, `integration_test.rs:616`, and `exit_code_tests.rs:69` re-prove cycle rejection. | valid-and-open | All three cited lines match. §D.3 classifies three more cycle tests; each owns a different property. |
+| 8 | `harness_demo.rs:133`, `integration_test.rs:616`, and `the removed exit-code subprocess suite:69` re-prove cycle rejection. | valid-and-open | All three cited lines match. §D.3 classifies three more cycle tests; each owns a different property. |
 | 9 | About 800 lines at `repository_state_store_tests.rs:1735-2555` re-prove finalization. | invalid-as-stated (location) | The section is now `crates/jit/src/storage/repository_state_store_tests.rs:1754-2585` ("REQ-01: typed mutation determinism"). Its own comment (`:1756-1760`) says the finalizer is a pure function of the image, which confirms the re-proof. The file has 3,810 lines. |
 | 10 | 19 tests in `list_envelope_tests.rs` assert `count == len`, again at `search_tests.rs:236`, `artifact_conformance_cli_tests.rs:647`, and `profile_cli_tests.rs:1940`. | invalid-as-stated (locations, scope) | 19 tests confirmed. Re-assertions now sit at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs:~640`, `profile_cli_tests.rs:1695` (`assert_count_envelope`, not `:1940`), `worktree_cli_tests.rs:546,1036`, `container_rollup_tests.rs:211,348`, and `cli_issue/issue_search_json_tests.rs:234`. New since `79c177fbd`: `crates/jit/src/domain/list_envelope.rs` derives `count` and owns it in unit tests (`:261`, `:305`). Only `ProfileCollection` uses it (`crates/jit/src/profile/application.rs:29`). Since 650e6a56, the output module's count structs are `ListEnvelope` instantiations. Sixteen list-emitting commands still have no typed output schema (§D.4, derived from emission sites), so a schema-driven enumeration misses them. |
 
@@ -91,8 +91,8 @@ Live consumers only: crates, scripts, `.config`, `.jit/gates.toml`, `dev/TESTING
 
 | Removal or migration | Consumers |
 | --- | --- |
-| `exit_code_tests.rs` | `crates/jit/tests/cli_issue/main.rs` (`mod`). |
-| `invocation_exit_status_parity_tests.rs` | `crates/jit/tests/cli_issue/main.rs`. |
+| `the removed exit-code subprocess suite` | `crates/jit/tests/cli_issue/main.rs` (`mod`). |
+| `the removed exit-status parity suite` | `crates/jit/tests/cli_issue/main.rs`. |
 | `query_tests.rs` | `crates/jit/tests/cli_query_graph/main.rs`; `crates/jit/tests/fast_rules/main.rs` (mention); `dev/TESTING.md:619`. |
 | `harness_demo.rs` | `crates/jit/tests/fast_docs_templates/main.rs`; `dev/TESTING.md:86,161,166,562,615,716,747`. |
 | `TestHarness` | 15 files: `test_harness.rs`; `fast_docs_templates/{batch_export,document_event_log,harness_demo,template_apply}_tests.rs`; `fast_issue/{archived_semantics,bulk_operations,dep_add_atomic,dependency_met,lifecycle_timestamps,readiness_coherence,short_hash,state_transition_fix,transitive_reduction_validation}_tests.rs` and `test_no_coordinator.rs`; `dev/architecture/core-system-design.md`. |
@@ -154,7 +154,7 @@ The failed-run stdout from the last 7 days shows `TIMEOUT 20 s` repeatedly for t
 
 | REQ | Tests (quiet warm) | Summed time | Wall relief estimate |
 | --- | --- | ---: | --- |
-| REQ-01 | `exit_code_tests` ×39 plus parity ×5 | 3.25 s | about 0.15 s (CPU ÷ 24) |
+| REQ-01 | `the removed exit-code subprocess suite` ×39 plus parity ×5 | 3.25 s | about 0.15 s (CPU ÷ 24) |
 | REQ-02 | `query_tests` ×25, `harness_demo` ×14, workflow auto ×4, cycle ×5 | 5.53 s | about 0.2 s |
 | REQ-03 | finalization ×9 | 0.09 s | 0 |
 | REQ-04 | `list_envelope_tests` ×19 | 3.38 s | about 0.1 s, if replaced by one in-process or schema-driven test |
@@ -176,7 +176,7 @@ Upstream state:
 
 | c780514e area | Upstream task (state, unmet deps) | Relation | What an edge into it delays |
 | --- | --- | --- | --- |
-| REQ-01 delete `exit_code_tests`, parity | `19d9bd7d` CLI suites carry typed ids (backlog; 0/1 → `0af95f14` → `3e353abd` 1/2) | Do c780514e first. Deleting re-proofs shrinks 19d9bd7d's surface. | The whole IssueId chain, more than 5 hops of backlog. |
+| REQ-01 delete `the removed exit-code subprocess suite`, parity | `19d9bd7d` CLI suites carry typed ids (backlog; 0/1 → `0af95f14` → `3e353abd` 1/2) | Do c780514e first. Deleting re-proofs shrinks 19d9bd7d's surface. | The whole IssueId chain, more than 5 hops of backlog. |
 | REQ-01 projection suite | `5687e281` reduce `main.rs` (backlog; 0/25) | Avoid conflict. Its REQ-07 rewrites `schema.rs` exit-code rows, so the projection test is edited there too. | 25 handler-move tasks; do not wait. |
 | REQ-02 delete `harness_demo`, move unique cases | `d125490a` test gates via `define_gate` (**ready**, 842b0ac6 lead) edits `harness_demo.rs` and `test_harness.rs:209-220`; `fe761000` removes `auto` (1/2 → d125490a) | Let 842b0ac6 land first, or have it drop its `harness_demo` edits. | Little: d125490a is ready. |
 | REQ-02 query owners | `2492ab29` remove lifecycle backfill (**ready**) deletes `derive_lifecycle_timestamps` tests in `domain/queries.rs` and `integration_test.rs:431`; `0af95f14` rewrites `domain/queries.rs` test ids (27 lines) | 2492ab29 first. Avoid conflicting with 0af95f14. | 2492ab29: none. 0af95f14: blocked by `3e353abd`. |
@@ -202,7 +202,7 @@ More overlaps, verified with `jit issue show`:
 - About 26 df129d9e handler-move tasks restate the exit-code rows in `generate_command_exit_codes` and turn list payloads into `ListEnvelope`. Consolidate REQ-01 and REQ-04 either before or after that wave, never partway through it.
 - Some task text cites stale paths:
   - `cc6ef886` (df129d9e, backlog) puts its lease helper in `crates/jit/tests/common/`, which no longer exists.
-  - `c400730c` and `2ac50581` cite `exit_code_tests.rs`, `query_tests`, and `harness_demo` as existing assertions.
+  - `c400730c` and `2ac50581` cite `the removed exit-code subprocess suite`, `query_tests`, and `harness_demo` as existing assertions.
 
   Deleting those files leaves the citations dangling.
 - `81e7cdc3` (ready) adds a shared reference fixture to `crates/jit/src/test_utils.rs`. Consume it first.
@@ -225,7 +225,7 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
 
 ## D. Re-proof and fixture sweeps
 
-### D.1 `exit_code_tests.rs` case inventory
+### D.1 `the removed exit-code subprocess suite` case inventory
 
 | Lines | Tests | Assertions beyond the exit code | Class and destination |
 | --- | --- | --- | --- |
@@ -250,7 +250,7 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
 
 ### D.2 Projected exit codes asserted outside the projection suite
 
-Sweep over `crates/jit/tests/cli_*`, excluding `exit_code_tests.rs`, the parity suite and the projection suite. It covers four forms:
+Sweep over `crates/jit/tests/cli_*`, excluding `the removed exit-code subprocess suite`, the parity suite and the projection suite. It covers four forms:
 
 - numeric `.code(N)`;
 - `status.code()` compared with `Some(…)`, single-line or multi-line, where the expected value is a literal, `ExitCode::X`, or a derived `code.exit_code().code()`;
@@ -467,7 +467,7 @@ A row's identity is its file and function name (`Type::method` inside an `impl`)
 | --- | --- | ---: | --- | --- |
 | `command_exit_code_projection_tests.rs` | `setup_prospective_cycle` | 111 | scenario | — |
 | `container_rollup_tests.rs` | `delete_issue_file` | 94 | scenario | — |
-| `exit_code_tests.rs` | `make_ambiguous_prefix` | 1147 | scenario | — |
+| `the removed exit-code subprocess suite` | `make_ambiguous_prefix` | 1147 | scenario | — |
 | `failure_probe_fixture.rs` | `FailureFixture::apply` | 605 | scenario | — |
 | `issue_update_atomicity_tests.rs` | `repository_text` | 16 | scenario | — |
 | `issue_update_description_ops_tests.rs` | `assert_last_event_is_description_update` | 86 | scenario | — |

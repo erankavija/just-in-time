@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:05:17.524203011Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Retire the private in-process repository and executor setups of the `cli_item_validate` suite.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root, and builds memory stores and executors from declarations passed as data. Most tests in this target spawn `jit`, but these helpers build an in-process repository or executor of their own. The three `default_executor_with` copies are one file-backed executor setup.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_item_validate/decision_kind_tests.rs`: `default_executor_with` (`:163`).\n- `crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs`: `default_executor_with` (`:119`).\n- `crates/jit/tests/cli_item_validate/risk_kind_tests.rs`: `default_executor_with` (`:129`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this entry's footprint defines a function that creates an in-process repository, store or executor of its own; each obtains it from the shared constructors, and no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:09:24.680159482Z",
+  "first_ready_at": "2026-11-01T01:04:11.330168939Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6c888866-e238-4ecc-ae39-373837b6cd37",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:05:53.157421334Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1dac539c-5a2b-48ba-a8eb-3d359fdd102d",
+      "status": "passed",
+      "updated_at": "2026-11-01T01:09:07.575935Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "cli_item_validate in-process tests use the shared constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:09:24.680159482Z"
 }

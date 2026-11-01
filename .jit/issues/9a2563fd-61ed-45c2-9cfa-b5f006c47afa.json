@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T01:34:01.389559147Z",
+  "dependencies": [],
+  "description": "Keep a repository's authored gate registry intact across registry edits, so one `jit gate define` does not strip its comments and reorder its gates.\n\n## Background\n\n`serialize_gate_registry` (`crates/jit/src/declarations/gates.rs:185`) sorts gates and emits no comments. `jit gate define` publishes through it (`crates/jit/src/commands/gate.rs:672`), as do two sites at `crates/jit/src/commands/gate_check.rs:2201,2263`. This repository's `.jit/gates.toml` holds comment lines recording each gate's input-footprint reasoning, which declarations cannot express, so one registry edit deletes that reasoning and the file has two competing forms.\n\n## Success Criteria\n\n- [hard] REQ-01: An edit through `jit gate define` or `jit gate remove` leaves authored comments and the order of untouched gates byte-identical.\n- [hard] REQ-02: The registry has one write path, and a test proves REQ-01 over a registry that holds comments.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T01:34:01.389559147Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
+  "labels": [
+    "component:gates",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "per:@/charter/D-20",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Gate registry edits keep the authored file",
+  "updated_at": "2026-11-01T01:34:01.389559147Z"
+}

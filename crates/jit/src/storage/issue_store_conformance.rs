@@ -4,9 +4,7 @@
 //! builds a store over a worktree holding a shared seed; `conformance_suite!`
 //! runs every case against every listed backend, so a backend joins the suite
 //! by implementing `Backend` and naming itself there. A backend's own tests
-//! state only what that backend adds (`@/inv/orthogonal-tests`). Commit-pinned
-//! path reads stay out until the in-memory backend serves them from its own
-//! state rather than the real disk.
+//! state only what that backend adds (`@/inv/orthogonal-tests`).
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
 use crate::domain::artifact_plan::PlanTarget;
@@ -24,8 +22,9 @@ use crate::repository_state::{
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
     IssueNotFoundError, IssueStore, JsonFileStorage, PathReadError, PresetNotFoundError,
-    RepositoryStateStore,
+    RepositoryStateStore, RepositoryStateStoreError,
 };
+use crate::test_harness::git::GitRepository;
 use std::cell::Cell;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -40,23 +39,40 @@ type Seed = [(VirtualPath, String)];
 /// data file.
 trait Backend: IssueStore + RepositoryStateStore {
     fn over(worktree: &Path, seed: &Seed) -> Self;
+
+    /// Replace `path` with exactly `content`.
+    fn write(&self, worktree: &Path, path: &VirtualPath, content: &[u8]);
+
+    /// Record the repository's current state as a commit and return its id.
+    fn commit(&self, worktree: &Path) -> String;
+}
+
+fn write_json_file(worktree: &Path, path: &VirtualPath, content: &[u8]) {
+    let target = match path.root_class() {
+        RepositoryRootClass::Data => worktree.join(".jit"),
+        RepositoryRootClass::Worktree => worktree.to_path_buf(),
+    }
+    .join(path.relative().as_path());
+    std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+    std::fs::write(target, content).unwrap();
 }
 
 impl Backend for JsonFileStorage {
     fn over(worktree: &Path, seed: &Seed) -> Self {
         let data = worktree.join(".jit");
-        seed.iter().for_each(|(path, content)| {
-            let target = match path.root_class() {
-                RepositoryRootClass::Data => data.clone(),
-                RepositoryRootClass::Worktree => worktree.to_path_buf(),
-            }
-            .join(path.relative().as_path());
-            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-            std::fs::write(target, content).unwrap();
-        });
+        seed.iter()
+            .for_each(|(path, content)| write_json_file(worktree, path, content.as_bytes()));
         let store = JsonFileStorage::new(&data);
         store.configure_repository_layout(&discover_repository_layout(worktree, &data).unwrap());
         store
+    }
+
+    fn write(&self, worktree: &Path, path: &VirtualPath, content: &[u8]) {
+        write_json_file(worktree, path, content);
+    }
+
+    fn commit(&self, worktree: &Path) -> String {
+        GitRepository::init(worktree).commit("conformance")
     }
 }
 
@@ -64,13 +80,17 @@ impl Backend for InMemoryStorage {
     fn over(worktree: &Path, seed: &Seed) -> Self {
         let store = InMemoryStorage::rooted_at(worktree);
         seed.iter().for_each(|(path, content)| {
-            let relative = path.relative().as_path();
-            match path.root_class() {
-                RepositoryRootClass::Data => store.add_data_file(relative, content),
-                RepositoryRootClass::Worktree => store.add_worktree_file(relative, content),
-            }
+            store.add_repository_bytes(path.clone(), content.as_bytes());
         });
         store
+    }
+
+    fn write(&self, _worktree: &Path, path: &VirtualPath, content: &[u8]) {
+        self.add_repository_bytes(path.clone(), content);
+    }
+
+    fn commit(&self, _worktree: &Path) -> String {
+        self.record_commit()
     }
 }
 
@@ -91,6 +111,14 @@ impl<B: Backend> Repository<B> {
         Self::seeded(&[])
     }
 
+    fn write(&self, path: &VirtualPath, content: &[u8]) {
+        self.store.write(self.worktree.path(), path, content);
+    }
+
+    fn commit(&self) -> String {
+        self.store.commit(self.worktree.path())
+    }
+
     fn layout(&self) -> RepositoryLayout {
         discover_repository_layout(self.worktree.path(), self.worktree.path().join(".jit")).unwrap()
     }
@@ -100,7 +128,7 @@ impl<B: Backend> Repository<B> {
         let layout = self.layout();
         let issue_paths = issues
             .iter()
-            .map(|issue| issue_path(&issue.id))
+            .map(|issue| VirtualPath::issue_record(&issue.id))
             .collect::<Vec<_>>();
         let roots = [
             VirtualPath::data("").unwrap(),
@@ -152,14 +180,6 @@ impl<B: Backend> Repository<B> {
             .apply(&MaterializationPlan::new(&image, delta))
             .unwrap();
     }
-}
-
-fn issue_path(id: &IssueId) -> VirtualPath {
-    VirtualPath::data(format!(
-        "{}/{id}.json",
-        VirtualPath::ISSUES.relative().as_str()
-    ))
-    .unwrap()
 }
 
 fn index_bytes(issues: &[Issue]) -> Vec<u8> {
@@ -352,7 +372,8 @@ fn test_load_issue_reports_an_unpublished_id_as_not_found<B: Backend>() {
 
 fn test_load_issue_or_not_found_separates_an_absent_issue_from_an_unreadable_one<B: Backend>() {
     let corrupt = crate::test_utils::issue_id(52);
-    let repository = Repository::<B>::seeded(&[(issue_path(&corrupt), "{ corrupt".to_string())]);
+    let repository =
+        Repository::<B>::seeded(&[(VirtualPath::issue_record(&corrupt), "{ corrupt".to_string())]);
 
     let absent = repository
         .store
@@ -435,7 +456,7 @@ fn test_resolve_issue_id_reports_a_non_canonical_id_as_not_found<B: Backend>() {
 fn test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record<B: Backend>() {
     let id = crate::test_utils::issue_id(0xabcd);
     let non_canonical = |seed| crate::test_utils::issue_id(seed).as_str().to_uppercase();
-    let path = issue_path(&id);
+    let path = VirtualPath::issue_record(&id);
     for (field, value) in [
         ("id", serde_json::json!(non_canonical(0xabcd))),
         ("dependencies", serde_json::json!([non_canonical(0xbcde)])),
@@ -689,6 +710,158 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     );
 }
 
+/// A record under the gate-run root, whatever its shape.
+fn gate_run_entry(relative: &str) -> VirtualPath {
+    VirtualPath::data(format!(
+        "{}/{relative}",
+        VirtualPath::GATE_RUNS.relative().as_str()
+    ))
+    .unwrap()
+}
+
+fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
+    let path = gate_run_entry("corrupt-run/result.json");
+    let repository = Repository::<B>::seeded(&[(path.clone(), "{ corrupt".to_string())]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("corrupt-run")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains(path.relative().as_str()),
+            "{error:#}"
+        );
+    }
+}
+
+/// Only a result directly under its run directory is a run: a deeper file and a
+/// file beside the run directories list nothing, and naming the latter is
+/// refused.
+fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[
+        (
+            gate_run_entry("outer/nested/result.json"),
+            "{ corrupt".to_string(),
+        ),
+        (gate_run_entry("direct-file"), "root clutter".to_string()),
+    ]);
+
+    assert!(repository
+        .store
+        .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+        .unwrap()
+        .is_empty());
+    let named = repository
+        .store
+        .load_gate_run_result("direct-file")
+        .unwrap_err();
+    assert!(
+        format!("{named:#}").contains("ordinary directory"),
+        "{named:#}"
+    );
+}
+
+fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
+    let repository =
+        Repository::<B>::seeded(&[(VirtualPath::GATE_RUNS, "not a directory".to_string())]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("run-one")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains("ordinary directory"),
+            "{error:#}"
+        );
+    }
+}
+
+fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[(
+        gate_run_entry("directory-run/result.json/inner"),
+        String::new(),
+    )]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("directory-run")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .unwrap_err(),
+    ] {
+        let message = format!("{error:#}");
+        assert!(message.contains("directory-run/result.json"), "{message}");
+        assert!(message.contains("ordinary file"), "{message}");
+    }
+}
+
+/// A plan applies only against the image it was built over, even when the
+/// images agree on every path the plan writes.
+fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
+    let target = VirtualPath::data("target.txt").unwrap();
+    let evidence = VirtualPath::data("evidence.txt").unwrap();
+    let repository = Repository::<B>::seeded(&[(evidence.clone(), "image-a".to_string())]);
+    let layout = repository.layout();
+    let budget = CaptureBudget {
+        max_listings: 8,
+        max_bytes: 1024 * 1024,
+        max_depth: 8,
+    };
+    let spec = || CaptureSpec::new([target.clone(), evidence.clone()], budget).unwrap();
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            target.clone(),
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            b"materialized".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    let image_a = repository
+        .store
+        .open_mutation_session(layout.clone())
+        .unwrap()
+        .capture(spec())
+        .unwrap();
+    let plan_a = MaterializationPlan::new(&image_a, delta.clone());
+    assert_eq!(plan_a.image(), &image_a);
+
+    repository.write(&evidence, b"image-b");
+    let mut session = repository.store.open_mutation_session(layout).unwrap();
+    let image_b = session.capture(spec()).unwrap();
+
+    assert_eq!(
+        image_a.entry(&target).unwrap(),
+        image_b.entry(&target).unwrap()
+    );
+    assert_ne!(plan_a.image(), &image_b);
+    assert!(matches!(
+        session.apply(&plan_a),
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    let outcome = session
+        .apply(&MaterializationPlan::new(&image_b, delta.clone()))
+        .unwrap();
+    assert_eq!(outcome.actions_applied, delta.actions().len());
+}
+
 fn test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed<B: Backend>() {
     let repository = Repository::<B>::empty();
     let store = &repository.store;
@@ -764,7 +937,6 @@ fn test_gate_presets_list_and_get_the_declared_presets<B: Backend>() {
         .is_empty());
 }
 
-/// Working-tree reads only; see the module documentation.
 fn test_read_path_reports_a_missing_file_and_refuses_unsafe_paths<B: Backend>() {
     let repository = Repository::<B>::empty();
     let store = &repository.store;
@@ -795,7 +967,6 @@ fn test_read_path_reports_a_missing_file_and_refuses_unsafe_paths<B: Backend>() 
     }
 }
 
-/// Working-tree reads only; see the module documentation.
 fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
     let repository = Repository::<B>::seeded(&[
         (
@@ -825,6 +996,139 @@ fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
         store.read_path_bytes("docs", None),
         Err(PathReadError::OutsideRepoRoot(_))
     ));
+}
+
+fn test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily<B: Backend>() {
+    let repository = Repository::<B>::empty();
+    let path = VirtualPath::worktree("docs/latin1.txt").unwrap();
+    repository.write(&path, b"caf\xE9");
+    let store = &repository.store;
+
+    assert_eq!(
+        store
+            .read_path_bytes(path.relative().as_str(), None)
+            .unwrap()
+            .0,
+        b"caf\xE9"
+    );
+    assert_eq!(
+        store
+            .read_path_text(path.relative().as_str(), None)
+            .unwrap()
+            .0,
+        "caf\u{FFFD}"
+    );
+}
+
+fn test_read_repo_file_refuses_invalid_utf8<B: Backend>() {
+    let repository = Repository::<B>::empty();
+    let path = VirtualPath::worktree("docs/latin1.txt").unwrap();
+    repository.write(&path, b"caf\xE9");
+
+    let outcome = repository.store.read_repo_file(path.relative().as_str());
+
+    assert!(
+        matches!(outcome, Err(PathReadError::Other(_))),
+        "{outcome:?}"
+    );
+}
+
+/// Each commit's reads see that commit's state alone, whatever came after it.
+fn test_read_path_at_commit_returns_the_state_recorded_for_that_commit<B: Backend>() {
+    let plan = VirtualPath::worktree("docs/plan.md").unwrap();
+    let later = VirtualPath::worktree("docs/later.md").unwrap();
+    let notes = VirtualPath::data("notes.md").unwrap();
+    let repository = Repository::<B>::seeded(&[
+        (plan.clone(), "one".to_string()),
+        (notes, "data".to_string()),
+    ]);
+    let first = repository.commit();
+    repository.write(&plan, b"two");
+    repository.write(&later, b"added");
+    let second = repository.commit();
+    repository.write(&plan, b"uncommitted");
+    let store = &repository.store;
+    let label = |commit: &str| commit.chars().take(7).collect::<String>();
+
+    for (commit, content) in [(&first, "one"), (&second, "two")] {
+        assert_eq!(
+            store.read_path_bytes("docs/plan.md", Some(commit)).unwrap(),
+            (content.as_bytes().to_vec(), label(commit))
+        );
+        assert_eq!(
+            store.read_path_text("docs/plan.md", Some(commit)).unwrap(),
+            (content.to_string(), label(commit))
+        );
+    }
+    assert_eq!(
+        store
+            .read_path_bytes(".jit/notes.md", Some(&first))
+            .unwrap()
+            .0,
+        b"data"
+    );
+    assert!(matches!(
+        store.read_path_bytes("docs/later.md", Some(&first)),
+        Err(PathReadError::NotFound(_))
+    ));
+    assert_eq!(
+        store
+            .read_path_bytes("docs/later.md", Some(&second))
+            .unwrap()
+            .0,
+        b"added"
+    );
+    assert_eq!(
+        store.read_path_bytes("docs/plan.md", None).unwrap().0,
+        b"uncommitted"
+    );
+}
+
+fn test_read_path_at_an_unknown_commit_reports_commit_not_found<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[(
+        VirtualPath::worktree("docs/plan.md").unwrap(),
+        "one".to_string(),
+    )]);
+    repository.commit();
+    let store = &repository.store;
+
+    for commit in ["no-such-commit", "0000000000000000000000000000000000000000"] {
+        let bytes = store.read_path_bytes("docs/plan.md", Some(commit));
+        let text = store.read_path_text("docs/plan.md", Some(commit));
+
+        assert!(
+            matches!(bytes, Err(PathReadError::CommitNotFound(_))),
+            "{commit}: {bytes:?}"
+        );
+        assert!(
+            matches!(text, Err(PathReadError::CommitNotFound(_))),
+            "{commit}: {text:?}"
+        );
+    }
+}
+
+fn test_read_path_at_commit_refuses_unsafe_paths_and_directories<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[(
+        VirtualPath::worktree("docs/plan.md").unwrap(),
+        "one".to_string(),
+    )]);
+    let commit = repository.commit();
+    let store = &repository.store;
+
+    for path in INVALID_PATHS {
+        assert!(
+            matches!(
+                store.read_path_bytes(path, Some(&commit)),
+                Err(PathReadError::InvalidPath(_))
+            ),
+            "pinned read of {path:?} was not refused"
+        );
+    }
+    let directory = store.read_path_bytes("docs", Some(&commit));
+    assert!(
+        matches!(directory, Err(PathReadError::Other(_))),
+        "{directory:?}"
+    );
 }
 
 /// A kind read classifies each target as a whole read would, without reading a
@@ -899,11 +1203,21 @@ conformance_suite!(
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
         test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_digest,
+        test_gate_run_readers_name_a_malformed_result,
+        test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape,
+        test_gate_run_readers_refuse_a_file_as_the_gate_run_root,
+        test_gate_run_readers_refuse_a_directory_as_a_result,
+        test_apply_admits_a_plan_only_against_its_exact_image,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
         test_gate_presets_list_and_get_the_declared_presets,
         test_read_path_reports_a_missing_file_and_refuses_unsafe_paths,
         test_read_path_reads_a_seeded_file_and_refuses_a_directory,
+        test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily,
+        test_read_repo_file_refuses_invalid_utf8,
+        test_read_path_at_commit_returns_the_state_recorded_for_that_commit,
+        test_read_path_at_an_unknown_commit_reports_commit_not_found,
+        test_read_path_at_commit_refuses_unsafe_paths_and_directories,
         test_capture_kind_classifies_targets_without_reading_file_bytes,
     ]
 );
