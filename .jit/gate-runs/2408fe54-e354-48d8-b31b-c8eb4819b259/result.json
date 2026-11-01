@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "029490b72602c09387b1a1eee0c67f4d3e5fe884",
+  "completed_at": "2026-11-01T19:13:37.213397376Z",
+  "duration_ms": 178041,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The profile-origin cutover removes the enum and consistently publishes the worktree-relative path across Rust, schema, CLI, and MCP surfaces.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "024b98b1-8afe-47f0-b7e3-6cbf904367db",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2408fe54-e354-48d8-b31b-c8eb4819b259",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T19:10:39.171837806Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 54d9466c6; 029490b72 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/semantic-types (.jit/invariants.toml); @/issue/3d9a0ce3/requirement/REQ-09 (issue description); @/gate/cargo-ci, @/gate/mcp-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code none, 2026-11-01T19:10:37Z); mcp-ci pending (not run)\nTruncation recovery: narrowed current origin-type, call-site, schema, CLI-test, MCP-test, and merge-path reads; excluded unrelated multi-issue merge paths outside the origin impact cone\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The profile-origin cutover removes the enum and consistently publishes the worktree-relative path across Rust, schema, CLI, and MCP surfaces.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
