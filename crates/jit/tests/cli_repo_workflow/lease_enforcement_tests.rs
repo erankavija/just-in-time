@@ -2,7 +2,7 @@
 //! and no lease lets it through. Every CLI leaf is classified here, so a new
 //! command cannot silently miss the check.
 
-use clap::CommandFactory;
+use clap::{CommandFactory, Parser};
 use jit::cli::Cli;
 use jit::domain::identity::IssueId;
 use jit::repository_state::{FileMode, VirtualPath};
@@ -23,6 +23,8 @@ const REFUSES: &[(&str, &str)] = &[
     ("dep rm", "dep rm {x} {z}"),
     ("doc add", "doc add {x} docs/b.md"),
     ("doc remove", "doc remove {x} docs/a.md"),
+    ("claim acquire", "claim acquire {x} --ttl 60"),
+    ("gate remove", "gate remove auto"),
     ("gate add", "gate add {x} unused"),
     ("gate evaluate", "gate evaluate {x} auto"),
     ("gate evaluate-all", "gate evaluate-all {x}"),
@@ -50,22 +52,119 @@ const EXEMPT: &[&str] = &[
     "validate",
 ];
 
-/// Leaves that write no existing issue record.
-const NO_RECORD: &str = "
-    archive candidates, claim acquire, claim force-evict, claim heartbeat, claim list,
-    claim release, claim renew, claim status, config get, config set, config show,
-    config show-hierarchy, config validate, doc assets list, doc check-links,
-    doc conformance, doc diff, doc dir, doc history, doc list, doc show, events query,
-    events tail, gate define, gate list, gate preset create, gate preset list,
-    gate preset show, gate remove, gate show, gate status, gate status-all, gate update,
-    graph deps, graph export, graph rdeps, graph roots, graph tree, hooks install, init,
-    invariant check, issue batch-create, issue children, issue create, issue list,
-    issue progress, issue search, issue show, issue status, item list, item resolve,
-    item search, item show, label namespaces, label values, list, profile add,
-    profile apply, profile diff, profile pack, profile show, project render, query all,
-    query available, query blocked, query closed, query count, query divergence,
-    query strategic, rdeps, search, serve, snapshot export, status, version, worktree exec,
-    worktree info, worktree list, worktree store-divergence";
+/// Mutating leaves that write no existing issue record, run in order against one
+/// repository; `{lease}` and `{w-lease}` expand to the fixture's leases.
+const NO_RECORD_WRITERS: &[(&str, &str, &str)] = &[
+    (
+        "config set",
+        OTHER,
+        "config set validation.default_type task",
+    ),
+    (
+        "gate define",
+        OTHER,
+        "gate define extra --title E --description d --stage postcheck --mode manual",
+    ),
+    ("gate preset create", OTHER, "gate preset create {y} second"),
+    ("gate update", OTHER, "gate update auto --title Renamed"),
+    ("hooks install", OTHER, "hooks install"),
+    ("init", OTHER, "init"),
+    (
+        "profile pack",
+        OTHER,
+        "profile pack --source packages/p --output p.tar",
+    ),
+    (
+        "profile add",
+        OTHER,
+        "profile add --archive p.tar --destination packages/q",
+    ),
+    ("profile apply", OTHER, "profile apply --profile packages/p"),
+    ("project render", OTHER, "project render"),
+    ("snapshot export", OTHER, "snapshot export --out snapshot"),
+    ("claim renew", OWNER, "claim renew {lease}"),
+    ("claim heartbeat", OWNER, "claim heartbeat {lease}"),
+    ("claim release", OTHER, "claim release {x}"),
+    (
+        "claim force-evict",
+        OTHER,
+        "claim force-evict {w-lease} --reason crashed",
+    ),
+    (
+        "issue batch-create",
+        OTHER,
+        "issue batch-create --from-json batch.json",
+    ),
+    ("issue create", OTHER, "issue create --title New --orphan"),
+];
+
+/// Leaves the production classifier opens no mutation session for, with arguments
+/// that parse. `worktree exec` writes nothing itself; its child is the caller's.
+const READ_ONLY: &[(&str, &str)] = &[
+    ("archive candidates", ""),
+    ("claim list", ""),
+    ("claim status", ""),
+    ("config get", "worktree.enforce_leases"),
+    ("config show", ""),
+    ("config show-hierarchy", ""),
+    ("config validate", ""),
+    ("doc assets list", "deadbeef a.md"),
+    ("doc check-links", ""),
+    ("doc conformance", ""),
+    ("doc diff", "deadbeef a.md --from HEAD"),
+    ("doc dir", "deadbeef dev/active"),
+    ("doc history", "deadbeef a.md"),
+    ("doc list", "deadbeef"),
+    ("doc show", "deadbeef a.md"),
+    ("events query", ""),
+    ("events tail", ""),
+    ("gate list", ""),
+    ("gate preset list", ""),
+    ("gate preset show", "seeded"),
+    ("gate show", "auto"),
+    ("gate status", "deadbeef"),
+    ("gate status-all", "deadbeef"),
+    ("graph deps", "deadbeef"),
+    ("graph export", ""),
+    ("graph rdeps", "deadbeef"),
+    ("graph roots", ""),
+    ("graph tree", ""),
+    ("invariant check", ""),
+    ("issue children", "deadbeef"),
+    ("issue list", ""),
+    ("issue progress", "deadbeef"),
+    ("issue search", "text"),
+    ("issue show", "deadbeef"),
+    ("issue status", "deadbeef"),
+    ("item list", ""),
+    ("item resolve", "@/charter/D-1"),
+    ("item search", "text"),
+    ("item show", "@/charter/D-1"),
+    ("label namespaces", ""),
+    ("label values", "type"),
+    ("list", ""),
+    ("profile diff", "--profile packages/p"),
+    ("profile show", "--profile packages/p"),
+    ("query all", ""),
+    ("query available", ""),
+    ("query blocked", ""),
+    ("query closed", ""),
+    ("query count", "--by state"),
+    ("query divergence", ""),
+    ("query strategic", ""),
+    ("rdeps", "deadbeef"),
+    ("search", "text"),
+    ("status", ""),
+    ("version", ""),
+    ("worktree exec", "-- true"),
+    ("worktree info", ""),
+    ("worktree list", ""),
+    ("worktree store-divergence", ""),
+];
+
+/// `jit serve` opens a session but is not run here: it stays up, and its API only
+/// reads (`crates/server/src/routes.rs` routes `get` alone).
+const SERVER: &str = "serve";
 
 /// Writes that reach a leased issue by design, each with its reason and proof.
 const EXEMPT_PATHS: &[(&str, &str, fn())] = &[
@@ -129,6 +228,23 @@ impl Repo {
         std::fs::create_dir(cli.root().join("docs")).unwrap();
         std::fs::write(cli.root().join("docs/a.md"), "a\n").unwrap();
         std::fs::write(cli.root().join("docs/b.md"), "b\n").unwrap();
+        std::fs::write(
+            cli.root().join("batch.json"),
+            r#"[{"key":"a","title":"Batched"}]"#,
+        )
+        .unwrap();
+        let package = cli.root().join("packages/p/assets");
+        std::fs::create_dir_all(&package).unwrap();
+        std::fs::write(package.join("profile.txt"), "asset\n").unwrap();
+        std::fs::write(
+            cli.root().join("packages/p/manifest.toml"),
+            concat!(
+                "[profile]\nmanifest-version = 2\nid = \"probe\"\nversion = \"1.0.0\"\n",
+                "compatible-jit = \">=0.2.0, <2.0.0\"\n\n",
+                "[[asset]]\nsource = \"assets/profile.txt\"\ntarget = \"docs/profile.txt\"\n",
+            ),
+        )
+        .unwrap();
         std::fs::write(
             cli.root().join(".jit/templates.toml"),
             concat!(
@@ -446,7 +562,9 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
         .iter()
         .map(|(leaf, _)| *leaf)
         .chain(EXEMPT.iter().copied())
-        .chain(NO_RECORD.split(',').map(str::trim))
+        .chain(NO_RECORD_WRITERS.iter().map(|(leaf, _, _)| *leaf))
+        .chain(READ_ONLY.iter().map(|(leaf, _)| *leaf))
+        .chain([SERVER])
         .map(str::to_owned)
         .collect::<BTreeSet<_>>();
     let actual = clap_leaves(&Cli::command(), "")
@@ -463,19 +581,73 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
         let refused = repo.other(&argv);
         let anonymous = repo.anonymous(&argv);
 
-        for (writer, output) in [("another agent", &refused), ("no identity", &anonymous)] {
-            assert!(!output.status.success(), "{leaf} must refuse {writer}");
-            assert!(
-                stderr(output).contains(OWNER),
-                "{leaf} refused {writer} for another reason: {}",
-                stderr(output)
-            );
-        }
-        assert!(stderr(&anonymous).contains("JIT_AGENT_ID"), "{leaf}");
+        assert!(
+            !refused.status.success(),
+            "{leaf} must refuse another agent"
+        );
+        assert!(
+            stderr(&refused).contains(OWNER),
+            "{leaf} refused another agent for another reason: {}",
+            stderr(&refused)
+        );
+        assert!(
+            !anonymous.status.success(),
+            "{leaf} must refuse no identity"
+        );
+        assert!(
+            stderr(&anonymous).contains("JIT_AGENT_ID"),
+            "{leaf} refused no identity for another reason: {}",
+            stderr(&anonymous)
+        );
         assert_eq!(repo.snapshot(), before, "{leaf} changed something");
 
         repo.release_leases();
         assert_ok(&repo.other(&argv));
+    }
+}
+
+#[test]
+fn test_read_only_leaves_are_those_the_production_classifier_opens_no_session_for() {
+    for (leaf, args) in READ_ONLY {
+        let line = format!("jit {leaf} {args}");
+        let cli =
+            Cli::try_parse_from(line.split_whitespace()).unwrap_or_else(|e| panic!("{line}: {e}"));
+        assert!(
+            !cli.command.unwrap().requires_recovery_dispatch(),
+            "{leaf} is mutating"
+        );
+    }
+}
+
+#[test]
+fn test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone() {
+    let repo = Repo::new();
+    repo.owner(&["dep", "add", &repo.y, &repo.z]);
+    repo.owner(&["dep", "add", &repo.w, &repo.z]);
+    let lease_of = |id: &str| {
+        let leases = repo.run(OWNER, &["claim", "status", "--issue", id, "--json"]);
+        let leases: Value = serde_json::from_slice(&leases.stdout).unwrap();
+        leases["leases"][0]["lease_id"].as_str().unwrap().to_owned()
+    };
+    let (lease, w_lease) = (lease_of(&repo.x), lease_of(&repo.w));
+    let before = repo.snapshot().0;
+
+    for (leaf, agent, argv) in NO_RECORD_WRITERS {
+        let line = argv
+            .replace("{lease}", &lease)
+            .replace("{w-lease}", &w_lease);
+        let args = repo.expand(&line);
+        let args = args.iter().map(String::as_str).collect::<Vec<_>>();
+        let parsed =
+            Cli::try_parse_from(std::iter::once("jit").chain(args.iter().copied())).unwrap();
+        assert!(
+            parsed.command.unwrap().requires_recovery_dispatch(),
+            "{leaf} is read-only"
+        );
+
+        assert_ok(&repo.run(agent, &args));
+
+        assert_eq!(repo.snapshot().0, before, "{leaf} wrote an issue record");
     }
 }
 
