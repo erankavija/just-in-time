@@ -1220,6 +1220,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         checker: &crate::declarations::GateChecker,
         input: &CapturedGateExecution<'_>,
+        documents: &[crate::domain::DocumentReference],
     ) -> Result<Option<GateContext>> {
         let (pass_context, inline_prompt, prompt_file) = match checker {
             crate::declarations::GateChecker::Exec {
@@ -1260,6 +1261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         let mut issue_view =
             IssueShowResponse::from_issue(input.issue.clone(), enriched, input.runs);
+        issue_view.documents = documents.to_vec();
         omit_current_gate_projection(&mut issue_view, &input.gate.key);
         Ok(Some(GateContext {
             schema_version: 1,
@@ -1296,7 +1298,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             } => repo_root.join(subdir),
             _ => repo_root,
         };
-        let context = self.build_captured_gate_context(checker, &input)?;
+        let documents = self.issue_documents(input.issue)?;
+        let context = self.build_captured_gate_context(checker, &input, &documents)?;
         let subject = GateRunSubject {
             run_id: input.run_id,
             gate_key: &input.gate.key,
@@ -1311,7 +1314,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         checker,
                         &working_dir,
                         context.as_ref(),
-                        &input.issue.documents,
+                        &documents,
                     )
                 })
             }
