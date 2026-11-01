@@ -49,6 +49,68 @@ fn test_query_assignee_json_output() {
 }
 
 #[test]
+fn test_query_assignee_filter_rejects_malformed_value() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
+
+    let output = cli
+        .command(["query", "all", "--assignee", "malformed", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("type:identifier")));
+}
+
+#[test]
+fn test_issue_assign_rejects_malformed_assignee() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    let id = cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
+
+    let output = cli
+        .command(["issue", "assign", &id, "malformed", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("type:identifier")));
+}
+
+#[test]
+fn test_issue_update_filter_rejects_malformed_assignee() {
+    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
+    cli.create_issue(["-t", "Task", "-d", "Test"]).unwrap();
+
+    let output = cli
+        .command([
+            "issue",
+            "update",
+            "--filter",
+            "assignee:malformed",
+            "--priority",
+            "high",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("Invalid assignee")));
+}
+
+#[test]
 fn test_query_state_json_output() {
     let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
     // Issues default to ready when unblocked

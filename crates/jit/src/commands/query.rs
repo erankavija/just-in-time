@@ -18,7 +18,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::domain::queries::query_blocked(&issues))
     }
 
-    pub fn query_by_assignee(&self, assignee: &str) -> Result<Vec<Issue>> {
+    pub fn query_by_assignee(&self, assignee: &crate::domain::Assignee) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
@@ -90,7 +90,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn query_all(
         &self,
         state_filter: Option<State>,
-        assignee_filter: Option<&str>,
+        assignee_filter: Option<crate::domain::Assignee>,
         priority_filter: Option<Priority>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {

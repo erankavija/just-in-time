@@ -74,12 +74,10 @@ use crate::validation::engine::Finding;
 ///    [`crate::commands::CommandExecutor::dangling_link_findings`],
 ///    `validation::desugar::desugar_require_label`,
 ///    [`crate::commands::CommandExecutor::query_by_label`],
-///    `snapshot::SnapshotScope::parse`, plus the unrelated-namespace assignee
-///    parsers (`commands::claim::assert_valid_actor`,
-///    `domain::Assignee::from_str` /
-///    `domain::Assignee`'s `PartialEq<str>` — label values never reach
-///    these; they parse `{type}:{identifier}` assignees, a different input
-///    domain per @/inv/assignee-format).
+///    `snapshot::SnapshotScope::parse`, plus unrelated-namespace assignee
+///    parsing (`commands::claim::assert_valid_actor` and
+///    `domain::Assignee::from_str` — label values never reach these parsers,
+///    which handle different input domains per @/inv/assignee-format).
 /// 2. **Slash-decode qualified-id sites** — route through the structural
 ///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
 ///    [`crate::domain::item::expand_sugar_address`]):

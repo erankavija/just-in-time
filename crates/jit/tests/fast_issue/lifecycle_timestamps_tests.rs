@@ -58,7 +58,7 @@ fn test_claim_stamps_claimed_at() {
 
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
 
     let issue = h.get_issue(&id);
@@ -75,7 +75,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
 
     h.executor
         .issues()
-        .assign_issue(&id, "human:alice".to_string())
+        .assign_issue(&id, "human:alice".parse().unwrap())
         .unwrap();
 
     assert!(h.get_issue(&id).claimed_at.is_some());
@@ -115,7 +115,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     let id = h.create_ready_issue("Claimable");
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
     let first = h.get_issue(&id).claimed_at;
     assert!(first.is_some());
@@ -123,7 +123,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     // Re-claiming as the same assignee promotes/no-ops but must not re-stamp.
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
     assert_eq!(h.get_issue(&id).claimed_at, first);
 }

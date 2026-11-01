@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cf5b6c20-a638-40b7-b142-ca315d181d9d",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:10:42.214675810Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a7d7fcb1-38b0-4579-b9ae-2612d87e571f",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:07:30.347923117Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "64420cff-2c04-42a7-bbcf-232cb0e8003c",
   "labels": [
     "epic:semantic-types",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Commands carry assignees as Assignee",
-  "updated_at": "2026-11-01T04:50:35.496231674Z"
+  "updated_at": "2026-11-01T05:10:42.214675810Z"
 }
