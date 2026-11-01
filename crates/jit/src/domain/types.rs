@@ -11,7 +11,6 @@ use crate::domain::vocabulary::wire_vocabulary;
 // nothing from this crate and performs no I/O, so naming its root-relative path
 // identity here keeps the domain layer pure while leaving one canonical type
 // for a normalized repository-root-relative path.
-use crate::repository_state::RootRelativePath;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -1082,27 +1081,6 @@ wire_vocabulary! {
         /// Not yet run (for manual gates)
         Pending = "pending",
     }
-}
-
-/// Origin vocabulary persisted for an installed profile package.
-///
-/// The location a package was read from is carried by the origin itself, so a
-/// persisted origin cannot name a repository location without saying which. The
-/// payload is [`RootRelativePath`], the repository's own normalized
-/// root-relative path identity, whose parse and deserialization reject an
-/// absolute, traversing, or otherwise non-canonical spelling; a location is
-/// relative to the worktree root, so a stored record stays readable wherever
-/// the repository is checked out.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(
-    tag = "source",
-    content = "location",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
-pub enum ProfileOrigin {
-    /// Package bytes were read from this worktree-relative directory.
-    Directory(RootRelativePath),
 }
 
 /// The lifecycle operation requested by a profile mutation.

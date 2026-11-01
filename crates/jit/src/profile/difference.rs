@@ -23,7 +23,6 @@
 //! conflict per run cannot see how much work the selection actually is.
 
 use crate::domain::identity::ProfileId;
-use crate::domain::ProfileOrigin;
 use crate::profile::{
     ProfileApplicationStatus, ProfileApplyResult, ProfileContributionChange, ProfileRunMode,
     ProfileTargetAction, ProfileTargetChange,
@@ -31,7 +30,7 @@ use crate::profile::{
 use crate::repository_state::{
     MaterializationPlan, ProfileContributionMaterialization, ProfileTargetConflictEntry,
     ProfileTargetConflictsError, ProfileTargetDisposition, ProfileTargetMaterialization,
-    ProfileTargetSubject,
+    ProfileTargetSubject, RootRelativePath,
 };
 use std::collections::BTreeSet;
 
@@ -105,7 +104,7 @@ pub(crate) fn profile_run_entry(
     plan: &MaterializationPlan,
     id: &ProfileId,
     version: &str,
-    origin: ProfileOrigin,
+    origin: RootRelativePath,
     mode: ProfileRunMode,
 ) -> ProfileApplyResult {
     let targets = profile_target_changes(plan, id);

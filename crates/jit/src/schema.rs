@@ -1468,6 +1468,34 @@ mod tests {
         assert!(text.contains("projection"));
     }
 
+    #[test]
+    fn test_schema_publishes_a_profile_origin_as_its_directory_path() {
+        fn profile_origins(value: &Value) -> Vec<&Value> {
+            match value {
+                Value::Array(values) => values.iter().flat_map(profile_origins).collect(),
+                Value::Object(entries) => entries
+                    .iter()
+                    .flat_map(|(key, entry)| {
+                        key.starts_with("Profile")
+                            .then(|| entry.pointer("/properties/origin"))
+                            .flatten()
+                            .into_iter()
+                            .chain(profile_origins(entry))
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            }
+        }
+
+        let schema = serde_json::to_value(CommandSchema::generate()).unwrap();
+        let origins = profile_origins(&schema);
+
+        assert!(!origins.is_empty(), "no profile result publishes an origin");
+        for origin in origins {
+            assert_eq!(origin["type"], "string", "{origin}");
+        }
+    }
+
     /// Clap-hidden commands and flags are not advertised in the schema.
     #[test]
     fn test_schema_omits_clap_hidden_commands_and_flags() {

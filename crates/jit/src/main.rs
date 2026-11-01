@@ -608,7 +608,7 @@ fn print_profile_decision(
 fn print_profile_heading(
     id: &str,
     version: &str,
-    origin: &jit::domain::ProfileOrigin,
+    origin: &jit::repository_state::RootRelativePath,
     status: &str,
 ) {
     println!(
@@ -689,9 +689,8 @@ fn render_profile_difference(
 
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
-fn profile_origin_label(origin: &jit::domain::ProfileOrigin) -> String {
-    let jit::domain::ProfileOrigin::Directory(location) = origin;
-    format!("directory {}", location.as_path().display())
+fn profile_origin_label(origin: &jit::repository_state::RootRelativePath) -> String {
+    format!("directory {}", origin.as_path().display())
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {

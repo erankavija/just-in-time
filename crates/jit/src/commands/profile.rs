@@ -1,6 +1,6 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
-use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
+use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
     read_package_archive, resolve_package, EngineVersion, PackageCaptureError, ProfileAddEntry,
@@ -389,7 +389,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             ProfilePackResult::new(vec![ProfilePackEntry {
                 id: package.model().id.to_string(),
                 version: package.model().version.clone(),
-                origin: ProfileOrigin::Directory(source.relative().clone()),
+                origin: source.relative().clone(),
                 package_hash: package.hashes().package.clone(),
                 source: source.repository_relative(),
                 archive: output.display().to_string(),
@@ -463,7 +463,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
             id: tree.model().id.to_string(),
             version: tree.model().version.clone(),
-            origin: ProfileOrigin::Directory(destination.relative().clone()),
+            origin: destination.relative().clone(),
             package_hash: tree.hashes().package.clone(),
             archive: archive.display().to_string(),
             destination: destination.repository_relative(),
@@ -1317,7 +1317,7 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
 /// location that does not depend on machine state. The selected data root is
 /// not a worktree location even when it nests inside one, so a package placed
 /// under it is refused by the same rule.
-fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<ProfileOrigin> {
+fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<RootRelativePath> {
     let Some(directory) = package.directory() else {
         anyhow::bail!(
             "profile '{}' was not read from a directory, so it names no origin",
@@ -1328,7 +1328,7 @@ fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result
         .classify_and_canonicalize(directory)
         .ok()
         .filter(|path| path.root_class() == RepositoryRootClass::Worktree)
-        .map(|path| ProfileOrigin::Directory(path.relative().clone()))
+        .map(|path| path.relative().clone())
         .ok_or_else(|| {
             ProfileApplyError::PackageOutsideWorktree {
                 path: directory.display().to_string(),
@@ -1859,7 +1859,7 @@ mod tests {
         assert_eq!(resolved.hashes(), supplied.hashes());
         assert_eq!(
             package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/supplied").unwrap())
+            RootRelativePath::parse("vendor/supplied").unwrap()
         );
     }
 
@@ -2115,7 +2115,7 @@ mod tests {
 
         // The reported location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied.
-        let ProfileOrigin::Directory(location) = &applied.requested().unwrap().origin;
+        let location = &applied.requested().unwrap().origin;
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the reported location names a readable package")
@@ -2142,11 +2142,11 @@ mod tests {
 
         assert_eq!(
             first_applied.requested().unwrap().origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/first").unwrap())
+            RootRelativePath::parse("vendor/first").unwrap()
         );
         assert_eq!(
             second_applied.requested().unwrap().origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("packages/second/tree").unwrap())
+            RootRelativePath::parse("packages/second/tree").unwrap()
         );
     }
 

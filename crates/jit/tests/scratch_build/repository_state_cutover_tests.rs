@@ -196,107 +196,7 @@ fn enum_body<'a>(source: &'a str, declaration: &str) -> Option<&'a str> {
         })
 }
 
-fn top_level_enum_entries(body: &str) -> Vec<String> {
-    let body = body
-        .lines()
-        .filter(|line| {
-            let line = line.trim_start();
-            !line.starts_with("//") && !line.starts_with('#')
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let mut depth = 0usize;
-    let mut start = 0usize;
-    let mut entries = Vec::new();
-    for (index, character) in body.char_indices() {
-        match character {
-            '(' | '{' | '[' => depth += 1,
-            ')' | '}' | ']' => depth = depth.saturating_sub(1),
-            ',' if depth == 0 => {
-                let entry = body[start..index].trim();
-                if !entry.is_empty() {
-                    entries.push(entry.to_string());
-                }
-                start = index + 1;
-            }
-            _ => {}
-        }
-    }
-    entries
-}
-
-fn top_level_enum_variants(body: &str) -> Vec<String> {
-    top_level_enum_entries(body)
-        .into_iter()
-        .map(|entry| {
-            entry
-                .split(|character: char| {
-                    character == '(' || character == '{' || character.is_whitespace()
-                })
-                .next()
-                .unwrap_or_default()
-                .to_string()
-        })
-        .collect()
-}
-
-fn profile_origin_schema_definitions(value: &serde_json::Value) -> Vec<&serde_json::Value> {
-    match value {
-        serde_json::Value::Array(values) => values
-            .iter()
-            .flat_map(profile_origin_schema_definitions)
-            .collect(),
-        serde_json::Value::Object(values) => values
-            .iter()
-            .flat_map(|(key, value)| {
-                let mut definitions = (key == "ProfileOrigin")
-                    .then_some(value)
-                    .into_iter()
-                    .collect::<Vec<_>>();
-                definitions.extend(profile_origin_schema_definitions(value));
-                definitions
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn tagged_source_values(value: &serde_json::Value) -> Vec<String> {
-    match value {
-        serde_json::Value::Array(values) => values.iter().flat_map(tagged_source_values).collect(),
-        serde_json::Value::Object(values) => {
-            let local = values
-                .get("properties")
-                .and_then(serde_json::Value::as_object)
-                .and_then(|properties| properties.get("source"))
-                .and_then(|source| source.get("enum"))
-                .and_then(serde_json::Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(serde_json::Value::as_str)
-                .map(str::to_string);
-            local
-                .chain(values.values().flat_map(tagged_source_values))
-                .collect()
-        }
-        _ => Vec::new(),
-    }
-}
-
-fn assert_directory_only_profile_sources(
-    domain: &str,
-    commands: &str,
-    schema: &serde_json::Value,
-) -> Result<(), String> {
-    let body = enum_body(domain, "pub enum ProfileOrigin")
-        .ok_or_else(|| "reported profile origin declaration disappeared".to_string())?;
-    let variants = top_level_enum_variants(body);
-    if variants != ["Directory"] {
-        return Err(format!(
-            "forbidden non-directory reported profile origin: found variants {variants:?}; profile packages have one repository-directory source"
-        ));
-    }
-
+fn assert_directory_only_profile_sources(commands: &str) -> Result<(), String> {
     let resolution_errors = enum_body(commands, "pub enum ProfileResolutionError")
         .ok_or_else(|| "profile resolution error declaration disappeared".to_string())?;
     let retired_error_terms = ["embedded", "compiled", "provenance"]
@@ -307,21 +207,6 @@ fn assert_directory_only_profile_sources(
         return Err(format!(
             "forbidden source-only profile resolver error returned ({retired_error_terms:?}); a package resolves only from a repository directory"
         ));
-    }
-
-    let origins = profile_origin_schema_definitions(schema);
-    if origins.is_empty() {
-        return Err("generated CommandSchema exposes no ProfileOrigin definitions, so its source contract cannot be verified".to_string());
-    }
-    for origin in origins {
-        let mut sources = tagged_source_values(origin);
-        sources.sort();
-        sources.dedup();
-        if sources != ["directory"] {
-            return Err(format!(
-                "forbidden generated ProfileOrigin source options {sources:?}; every live CommandSchema occurrence must expose only `directory`"
-            ));
-        }
     }
     Ok(())
 }
@@ -1208,14 +1093,10 @@ fn test_profile_lifecycle_has_one_canonical_package_authority() {
 fn test_profile_lifecycle_has_only_the_repository_directory_package_source() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let source_root = crate_root.join("src");
-    let schema = serde_json::to_value(jit::CommandSchema::generate())
-        .expect("the generated command schema serializes");
 
-    assert_directory_only_profile_sources(
-        &production_source(&source_root.join("domain/types.rs")),
-        &production_source(&source_root.join("commands/profile.rs")),
-        &schema,
-    )
+    assert_directory_only_profile_sources(&production_source(
+        &source_root.join("commands/profile.rs"),
+    ))
     .unwrap_or_else(|error| panic!("{error}"));
     assert_no_compiled_profile_package_source(production_sources(&source_root.join("profile")))
         .unwrap_or_else(|error| panic!("{error}"));
@@ -1337,65 +1218,21 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
             && bridge_error.contains("clean-cut lifecycle contract")
     );
 
-    let directory_domain = "pub enum ProfileOrigin { Directory(RootRelativePath), }";
     let canonical_commands = r#"
 pub enum ProfileResolutionError { UnreadableLocation { location: String, source: ProfilePackageError }, }
 "#;
-    let directory_schema = serde_json::json!({
-        "definitions": {
-            "ProfileOrigin": {
-                "properties": {
-                    "source": { "type": "string", "enum": ["directory"] },
-                    "location": { "type": "string" }
-                }
-            }
-        }
-    });
-    assert!(assert_directory_only_profile_sources(
-        directory_domain,
-        canonical_commands,
-        &directory_schema,
-    )
-    .is_ok());
+    assert!(assert_directory_only_profile_sources(canonical_commands).is_ok());
 
-    for (domain, commands, schema, expected) in [
-        (
-            "pub enum ProfileOrigin { Directory(RootRelativePath), BinaryResident, }",
-            canonical_commands,
-            directory_schema.clone(),
-            "forbidden non-directory reported profile origin",
-        ),
-        (
-            directory_domain,
-            r#"
+    let error = assert_directory_only_profile_sources(
+        r#"
 pub enum ProfileResolutionError { EmbeddedSourceCannotResolve { location: String }, }
 "#,
-            directory_schema.clone(),
-            "forbidden source-only profile resolver error returned",
-        ),
-        (
-            directory_domain,
-            canonical_commands,
-            serde_json::json!({
-                "definitions": {
-                    "ProfileOrigin": {
-                        "oneOf": [
-                            { "properties": { "source": { "enum": ["directory"] } } },
-                            { "properties": { "source": { "enum": ["binary"] } } }
-                        ]
-                    }
-                }
-            }),
-            "forbidden generated ProfileOrigin source options",
-        ),
-    ] {
-        let error = assert_directory_only_profile_sources(domain, commands, &schema)
-            .err()
-            .unwrap_or_else(|| {
-                panic!("the adversarial mutation for `{expected}` must be rejected")
-            });
-        assert!(error.contains(expected), "{error}");
-    }
+    )
+    .expect_err("the adversarial mutation must be rejected");
+    assert!(
+        error.contains("forbidden source-only profile resolver error returned"),
+        "{error}"
+    );
 
     let compiled_source = assert_no_compiled_profile_package_source([(
         PathBuf::from("profile/static_bundle.rs"),
