@@ -31,7 +31,7 @@ fn test_graph_tree_resolves_parent_and_children() {
     cli.run(["dep", "add", &epic, &task]).unwrap();
 
     let doc = cli.run_json(["graph", "tree"]).unwrap();
-    assert_eq!(doc["count"], 2);
+    assert_eq!(doc["nodes"].as_array().unwrap().len(), 2);
     let nodes = doc["nodes"].as_array().unwrap();
 
     let epic_node = nodes.iter().find(|n| n["id"] == epic).unwrap();
@@ -69,7 +69,7 @@ fn test_graph_tree_scoped_to_root_uses_dependency_closure() {
 
     let doc = cli.run_json(["graph", "tree", &epic]).unwrap();
     // Only the epic and its dependency closure; `other` is excluded.
-    assert_eq!(doc["count"], 2);
+    assert_eq!(doc["nodes"].as_array().unwrap().len(), 2);
     let ids: Vec<&str> = doc["nodes"]
         .as_array()
         .unwrap()

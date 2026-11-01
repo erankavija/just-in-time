@@ -156,7 +156,6 @@ fn test_status_multi_id_json_envelope() {
         .into_bytes();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
 
-    assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
     let arr = json["issues"]
         .as_array()
         .expect("multi-id --json wraps in the list envelope");

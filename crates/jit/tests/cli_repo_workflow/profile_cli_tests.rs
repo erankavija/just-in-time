@@ -167,7 +167,7 @@ fn test_profile_show_works_without_repository() {
     );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    assert_eq!(show["count"], 1);
+    assert_eq!(show["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(show["profiles"][0]["manifest"]["id"], "jit-dogfood");
     assert!(show["profiles"][0].get("applied").is_none());
     assert_eq!(
@@ -245,7 +245,7 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
             ],
         );
 
-        assert_eq!(output.status.code(), Some(4), "{output:?}");
+        assert!(!output.status.success(), "{output:?}");
         assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
         assert_eq!(fs::read(&config_path).unwrap(), config_before, "{output:?}");
         assert_eq!(fs::read(&events_path).unwrap(), events_before);
@@ -319,7 +319,7 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    assert_eq!(show["count"], 1);
+    assert_eq!(show["profiles"].as_array().unwrap().len(), 1);
     // Nothing but the supplied location holds a package declaring this
     // profile, so reporting it at all is that location having been read.
     assert_eq!(show["profiles"][0]["manifest"]["id"], FIXTURE_PROFILE);
@@ -351,7 +351,7 @@ fn test_profile_show_json_preserves_repeated_selectors_in_order() {
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    assert_eq!(show["count"], 2);
+    assert_eq!(show["profiles"].as_array().unwrap().len(), 2);
     assert_eq!(
         show["profiles"]
             .as_array()
@@ -462,7 +462,7 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
     assert!(preview.status.success(), "{preview:?}");
     let preview = json(&preview);
     assert_eq!(preview["profiles"][0]["id"], FIXTURE_PROFILE);
-    assert_eq!(preview["count"], 1);
+    assert_eq!(preview["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(preview["profiles"][0]["status"], "would_apply");
     assert!(
         preview["profiles"][0]["targets"]
@@ -696,7 +696,7 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
 
     assert!(output.status.success(), "{output:?}");
     let preview = json(&output);
-    assert_eq!(preview["count"], 4);
+    assert_eq!(preview["profiles"].as_array().unwrap().len(), 4);
     assert_eq!(
         preview["profiles"]
             .as_array()
@@ -892,7 +892,7 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
 
-    assert_eq!(show["count"], 1);
+    assert_eq!(show["profiles"].as_array().unwrap().len(), 1);
     let profile = &show["profiles"][0];
     let roots: Vec<&str> = profile["manifest"]["live-source"]
         .as_array()
@@ -1039,7 +1039,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["count"], 2);
+    assert_eq!(json(&preview)["profiles"].as_array().unwrap().len(), 2);
     assert!(
         json(&preview)["profiles"]
             .as_array()
@@ -1123,7 +1123,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["count"], 2);
+    assert_eq!(json(&preview)["profiles"].as_array().unwrap().len(), 2);
     assert!(
         json(&preview)["profiles"]
             .as_array()

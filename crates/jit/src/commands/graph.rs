@@ -479,7 +479,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// executor.add_dependency(&epic, &task).unwrap();
     ///
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
-    /// assert_eq!(response.count(), 2);
+    /// assert_eq!(response.items.len(), 2);
     /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
     /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
     /// assert_eq!(epic_view.hierarchy.parent, None);
@@ -568,7 +568,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// let report = executor.detect_divergences().unwrap();
-    /// assert_eq!(report.count(), 1);
+    /// assert_eq!(report.items.len(), 1);
     /// assert_eq!(report.items[0].label, membership);
     /// ```
     pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {

@@ -194,7 +194,6 @@ fn test_label_hierarchy_complete_workflow() {
 
     // Check new structure: namespaces should be array of strings
     assert!(json["namespaces"].is_array());
-    assert!(json["count"].is_number());
     let namespaces = json["namespaces"].as_array().unwrap();
     let namespace_names: Vec<String> = namespaces
         .iter()
@@ -427,7 +426,6 @@ fn test_label_operations_json_output() {
         json["namespaces"].is_array(),
         "Should have namespaces array"
     );
-    assert!(json["count"].is_number(), "Should have count field");
 }
 
 // ============================================================================

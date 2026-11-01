@@ -171,8 +171,7 @@ fn test_children_dangling_edge_surfaced() {
     delete_issue_file(&temp, &doomed);
 
     let json = temp.run_json(["issue", "children", &epic]).unwrap();
-    // Only the resolvable child is counted/listed.
-    assert_eq!(json["count"], 1);
+    // Only the resolvable child is listed.
     let listed: Vec<&str> = json["issues"]
         .as_array()
         .unwrap()
@@ -191,7 +190,7 @@ fn test_children_dangling_edge_surfaced() {
     );
 }
 
-/// An empty container (no dependencies) prints nothing and JSON has count 0.
+/// An empty container (no dependencies) prints nothing and JSON lists no issues.
 #[test]
 fn test_children_empty_container() {
     let temp = JitCli::initialised().unwrap();
@@ -206,7 +205,6 @@ fn test_children_empty_container() {
     );
 
     let json = temp.run_json(["issue", "children", &epic]).unwrap();
-    assert_eq!(json["count"], 0);
     assert_eq!(json["issues"].as_array().unwrap().len(), 0);
     assert_eq!(json["container"]["short_id"], short(&epic));
 }
@@ -221,7 +219,6 @@ fn test_children_non_container_leaf_is_empty() {
         .unwrap();
 
     let json = temp.run_json(["issue", "children", &leaf]).unwrap();
-    assert_eq!(json["count"], 0);
     assert_eq!(json["issues"].as_array().unwrap().len(), 0);
 }
 

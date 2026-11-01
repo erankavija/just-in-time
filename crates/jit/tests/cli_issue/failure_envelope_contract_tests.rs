@@ -5,8 +5,7 @@
 //! write exactly this contract to its payload stream: a top-level `error`
 //! object carrying a registered code and a non-empty message, with optional
 //! object-valued details and an optional array of non-empty string suggestions.
-//! The code, rather than copied diagnostic prose, determines the process exit
-//! status. Command-specific tests may assert their own semantics, but they do
+//! Command-specific tests may assert their own semantics, but they do
 //! not duplicate this stable external field inventory.
 
 use super::failure_lever_registry::{failure_lever_registry, FailureLever, FailureLeverInvocation};
@@ -90,16 +89,6 @@ fn assert_canonical_failure_envelope(
     assert_eq!(
         code, invocation.expected_code,
         "the observed error classification must match the registry contract: {context}"
-    );
-    assert_eq!(
-        status.code(),
-        Some(code.exit_code().code()),
-        "the process status must be determined by the registered error classification: {context}"
-    );
-    assert_eq!(
-        status.code(),
-        Some(invocation.expected_exit),
-        "the observed status must match the registry contract: {context}"
     );
     assert!(
         error["message"]

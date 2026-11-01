@@ -3348,7 +3348,7 @@ template = true
             .plan_profiles(&[selector.clone(), selector])
             .unwrap();
 
-        assert_eq!(result.count(), 2);
+        assert_eq!(result.items.len(), 2);
         assert_eq!(
             result
                 .items
@@ -3422,7 +3422,6 @@ template = true
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-        assert_eq!(applied.count(), applied.items.len());
         assert_eq!(applied.requested().unwrap().id, "workflow");
         assert!(applied
             .items

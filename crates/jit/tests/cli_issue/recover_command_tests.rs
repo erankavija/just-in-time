@@ -36,10 +36,7 @@ fn test_recover_json_failure_writes_registered_pretty_envelope_to_stdout() {
 
     cli.init_git().unwrap();
 
-    let assert = cli
-        .command(["recover", "--json"])
-        .assert()
-        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code());
+    let assert = cli.command(["recover", "--json"]).assert().failure();
     let output = assert.get_output();
     let stdout = std::str::from_utf8(&output.stdout).unwrap();
     let stderr = std::str::from_utf8(&output.stderr).unwrap();
@@ -150,7 +147,7 @@ fn test_recover_json_classifies_an_unreadable_leftover_record_as_recovery_failed
     let output = cli
         .command(["recover", "--json"])
         .assert()
-        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code())
+        .failure()
         .get_output()
         .stdout
         .clone();

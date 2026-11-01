@@ -9,8 +9,7 @@ fn test_query_ready_json_output() {
 
     let json = cli.run_json(["query", "available"]).unwrap();
 
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -23,8 +22,7 @@ fn test_query_blocked_json_output() {
 
     let json = cli.run_json(["query", "blocked"]).unwrap();
 
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
     assert!(json["issues"][0]["blocked_reasons"].is_array());
 
     // blocked_reasons is now an array of strings, not objects
@@ -44,8 +42,7 @@ fn test_query_assignee_json_output() {
         .run_json(["query", "all", "--assignee", "copilot:test"])
         .unwrap();
 
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -118,8 +115,7 @@ fn test_query_state_json_output() {
 
     let json = cli.run_json(["query", "all", "--state", "ready"]).unwrap();
 
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -132,8 +128,7 @@ fn test_query_priority_json_output() {
         .run_json(["query", "all", "--priority", "high"])
         .unwrap();
 
-    assert!(json["issues"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
 }
 
 /// A query filter placed before a subcommand, where it would be silently
