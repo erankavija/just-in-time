@@ -11,54 +11,28 @@
       "doc_type": "research",
       "format": "markdown",
       "label": "investigation",
-      "path": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md"
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/investigation-profile.md"
     },
     {
       "commit": null,
       "doc_type": "research",
       "format": "markdown",
       "label": "investigation",
-      "path": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/investigation-children.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "7cdc330c451582308e0ad8dc2bdf2d7e148bee32d324219811ec3d91eae5515a",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "eb4188988af13ec6b2c29890333e8a376799c2c7d0b75094ee5021040ce5dd65",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation-children.md",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "2fbd2fca2d0cc3fbe1bb95c6da9311a0dc599374665a1b8a704718cf201241a5",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation-profile.md",
-          "resolved_path": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "plan",
-      "path": "dev/active/3d9a0ce3-lead-friction/plan.md"
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/plan.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "breakdown-manifest",
-      "path": "dev/active/3d9a0ce3-lead-friction/breakdown.json"
+      "path": "dev/archive/3d9a0ce3-lead-friction/active/breakdown.json"
     }
   ],
   "done_at": "2026-10-21T01:06:32.938592933Z",
@@ -85,5 +59,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-10-21T01:06:34.264560008Z"
+  "updated_at": "2026-11-01T20:36:14.630258209Z"
 }
