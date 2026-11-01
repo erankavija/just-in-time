@@ -474,7 +474,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             for gate in &def.gates {
-                if !gate_registry.gates.contains_key(gate) {
+                if !gate_registry.gates.contains_key(gate.as_str()) {
                     problems.push(BatchValidationProblem::UnknownGate {
                         key: def.key.clone(),
                         gate: gate.clone(),

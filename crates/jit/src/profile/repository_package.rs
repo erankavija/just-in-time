@@ -680,7 +680,7 @@ mod tests {
             "repo-validate",
         ] {
             let gate = declared_gate(&package, key);
-            assert_eq!(gate.key, key);
+            assert_eq!(gate.key.as_str(), key);
             assert!(
                 matches!(
                     gate.checker,
@@ -1778,7 +1778,7 @@ mod tests {
         ] {
             gates
                 .gates
-                .insert(key.to_string(), declared_gate(&package, key));
+                .insert(key.parse().unwrap(), declared_gate(&package, key));
         }
         let expected = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
         assert_eq!(

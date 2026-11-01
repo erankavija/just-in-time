@@ -2402,7 +2402,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// let run = GateRunResult {
 ///     schema_version: 1,
 ///     run_id: "r1".into(),
-///     gate_key: "tests".into(),
+///     gate_key: "tests".parse().unwrap(),
 ///     stage: GateStage::Postcheck,
 ///     issue_id: jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678),
 ///     commit: None,
@@ -2497,7 +2497,7 @@ impl GateRunSummary {
     fn build(r: &GateRunResult, include_output: bool) -> Self {
         Self {
             run_id: r.run_id.clone(),
-            key: r.gate_key.clone(),
+            key: r.gate_key.to_string(),
             stage: r.stage,
             status: r.status,
             started_at: r.started_at.to_rfc3339(),
@@ -2697,7 +2697,7 @@ pub struct GateDefinition {
 impl From<crate::declarations::GateDefinition> for GateDefinition {
     fn from(gate: crate::declarations::GateDefinition) -> Self {
         Self {
-            key: gate.key,
+            key: gate.key.into(),
             title: gate.title,
             description: gate.description,
             stage: gate.stage,
@@ -3153,7 +3153,7 @@ mod tests {
     fn test_gate_definition_json_includes_builtin_checker_configuration() {
         let gate = crate::declarations::GateDefinition {
             version: 1,
-            key: "anything".to_string(),
+            key: "anything".parse().unwrap(),
             title: "Coverage".to_string(),
             description: "Configured indirection".to_string(),
             stage: GateStage::Postcheck,
@@ -3352,7 +3352,7 @@ mod tests {
         let run = GateRunResult {
             schema_version: 1,
             run_id: "run-1".to_string(),
-            gate_key: "tests".to_string(),
+            gate_key: "tests".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: issue.id.clone(),
             commit: None,
@@ -3862,7 +3862,7 @@ mod tests {
         use crate::declarations::{GateMode, GateStage};
         let gate = crate::declarations::GateDefinition {
             version: 1,
-            key: "tests".to_string(),
+            key: "tests".parse().unwrap(),
             title: "Tests".to_string(),
             description: "Run tests".to_string(),
             stage: GateStage::Postcheck,

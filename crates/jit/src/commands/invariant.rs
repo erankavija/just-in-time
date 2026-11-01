@@ -71,10 +71,10 @@ mod tests {
         let mut registry = GateRegistry::default();
         for key in gate_keys {
             registry.gates.insert(
-                (*key).to_string(),
+                (*key).parse().unwrap(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: (*key).to_string(),
+                    key: (*key).parse().unwrap(),
                     title: (*key).to_string(),
                     description: String::new(),
                     stage: crate::declarations::GateStage::Postcheck,

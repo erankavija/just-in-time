@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-488eb3c1",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b7253d6b02e1f1a1a946bab23692093b77e826bf",
+  "completed_at": "2026-11-01T02:33:50.085728883Z",
+  "duration_ms": 99076,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e1e21409-d4cf-4643-90eb-6a1079cbabfc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T02:32:11.009313864Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c6458f4e3, cab9cb7bb, a0c6c7255, a6a6c3a32, 96a45ef00, c7ed7af63, 66acd11ab, b7253d6b0 (`jit:488eb3c1`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/domain-agnostic, @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/event-log, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-01, @/issue/2195c98f/requirement/REQ-17 (.jit/issues)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T02:29:42Z)\nTruncation recovery: re-read tagged patches in bounded path and line-range partitions; verified current typed declarations, storage trait, persistence tests, and event serialization tests\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

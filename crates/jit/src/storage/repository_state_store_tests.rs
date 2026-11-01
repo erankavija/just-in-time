@@ -1408,7 +1408,7 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
     let result = crate::domain::GateRunResult {
         schema_version: 1,
         run_id: run_id.to_string(),
-        gate_key: "cargo-ci".to_string(),
+        gate_key: "cargo-ci".parse().unwrap(),
         stage: crate::declarations::GateStage::Postcheck,
         issue_id: crate::test_utils::issue_id(7),
         commit: Some("abc123".to_string()),
@@ -1429,7 +1429,7 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
     let provenance = crate::test_utils::stamped_event(
-        EventBody::draft_gate_definition_created("cargo-ci".to_string()),
+        EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
         "prov-1",
         timestamp,
     );

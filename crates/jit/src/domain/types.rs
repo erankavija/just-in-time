@@ -5,7 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
-use crate::domain::identity::{IssueId, ProfileId};
+use crate::domain::identity::{GateKey, IssueId, ProfileId};
 use crate::domain::vocabulary::wire_vocabulary;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -356,7 +356,7 @@ impl GateState {
     ) -> Option<&'a GateRunResult> {
         let run_id = self.run_id.as_deref()?;
         runs.iter()
-            .find(|run| run.run_id == run_id && run.gate_key == gate_key)
+            .find(|run| run.run_id == run_id && run.gate_key.as_str() == gate_key)
     }
 }
 
@@ -881,7 +881,7 @@ pub struct GateRunResult {
     /// Unique run identifier
     pub run_id: String,
     /// Gate key that was executed
-    pub gate_key: String,
+    pub gate_key: GateKey,
     /// Stage at which gate was executed
     pub stage: GateStage,
     /// Issue ID
@@ -953,10 +953,10 @@ impl GateRunResult {
     /// missing command), which says nothing about the inputs.
     pub fn is_reusable_for(
         &self,
-        gate_key: &str,
+        gate_key: &GateKey,
         digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> bool {
-        self.gate_key == gate_key
+        &self.gate_key == gate_key
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
@@ -969,7 +969,7 @@ impl GateRunResult {
     /// keeps it out of verdict reuse.
     pub fn attestation(
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
         stage: GateStage,
         status: GateStatus,
         by: Option<&Assignee>,
@@ -979,7 +979,7 @@ impl GateRunResult {
             // Repository mutation finalization assigns the durable run identity
             // and stamps the attestation time.
             run_id: String::new(),
-            gate_key: gate_key.to_string(),
+            gate_key: gate_key.clone(),
             stage,
             issue_id: issue_id.clone(),
             commit: None,
@@ -1280,7 +1280,7 @@ pub enum EventBody {
         /// Issue with the gate
         issue_id: IssueId,
         /// Gate that passed
-        gate_key: String,
+        gate_key: GateKey,
         /// Who marked it as passed (format: "type:identifier")
         updated_by: Option<Assignee>,
     },
@@ -1289,7 +1289,7 @@ pub enum EventBody {
         /// Issue with the gate
         issue_id: IssueId,
         /// Gate that failed
-        gate_key: String,
+        gate_key: GateKey,
         /// Who marked it as failed (format: "type:identifier")
         updated_by: Option<Assignee>,
     },
@@ -1298,14 +1298,14 @@ pub enum EventBody {
         /// Issue to which gate was added
         issue_id: IssueId,
         /// Gate that was added
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A quality gate was removed from an issue
     GateRemoved {
         /// Issue from which gate was removed
         issue_id: IssueId,
         /// Gate that was removed
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// Issue was completed
     IssueCompleted {
@@ -1414,7 +1414,7 @@ pub enum EventBody {
     /// because it mutates the shared gate registry rather than a single issue.
     GateDefinitionUpdated {
         /// Registry key of the gate that was updated
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A gate definition was added to the registry (`jit gate define`).
     ///
@@ -1423,7 +1423,7 @@ pub enum EventBody {
     /// single issue.
     GateDefinitionCreated {
         /// Registry key of the gate that was created
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A gate definition was removed from the registry (`jit gate remove`).
     ///
@@ -1432,7 +1432,7 @@ pub enum EventBody {
     /// single issue.
     GateDefinitionRemoved {
         /// Registry key of the gate that was removed
-        gate_key: String,
+        gate_key: GateKey,
     },
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
@@ -1574,7 +1574,7 @@ impl EventBody {
     /// no malformed actor can be logged.
     pub fn draft_gate_passed(
         issue_id: IssueId,
-        gate_key: String,
+        gate_key: GateKey,
         updated_by: Option<Assignee>,
     ) -> Self {
         EventBody::GatePassed {
@@ -1590,7 +1590,7 @@ impl EventBody {
     /// no malformed actor can be logged.
     pub fn draft_gate_failed(
         issue_id: IssueId,
-        gate_key: String,
+        gate_key: GateKey,
         updated_by: Option<Assignee>,
     ) -> Self {
         EventBody::GateFailed {
@@ -1601,12 +1601,12 @@ impl EventBody {
     }
 
     /// Create a gate added event
-    pub fn draft_gate_added(issue_id: IssueId, gate_key: String) -> Self {
+    pub fn draft_gate_added(issue_id: IssueId, gate_key: GateKey) -> Self {
         EventBody::GateAdded { issue_id, gate_key }
     }
 
     /// Create a gate removed event
-    pub fn draft_gate_removed(issue_id: IssueId, gate_key: String) -> Self {
+    pub fn draft_gate_removed(issue_id: IssueId, gate_key: GateKey) -> Self {
         EventBody::GateRemoved { issue_id, gate_key }
     }
 
@@ -1717,7 +1717,7 @@ impl EventBody {
     ///
     /// Registry-scoped (issue-less): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
-    pub fn draft_gate_definition_updated(gate_key: String) -> Self {
+    pub fn draft_gate_definition_updated(gate_key: GateKey) -> Self {
         EventBody::GateDefinitionUpdated { gate_key }
     }
 
@@ -1727,7 +1727,7 @@ impl EventBody {
     /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was added to the gate registry via `jit gate
     /// define`.
-    pub fn draft_gate_definition_created(gate_key: String) -> Self {
+    pub fn draft_gate_definition_created(gate_key: GateKey) -> Self {
         EventBody::GateDefinitionCreated { gate_key }
     }
 
@@ -1737,7 +1737,7 @@ impl EventBody {
     /// [`draft_gate_definition_updated`](Self::draft_gate_definition_updated)):
     /// records that `gate_key` was removed from the gate registry via `jit
     /// gate remove`.
-    pub fn draft_gate_definition_removed(gate_key: String) -> Self {
+    pub fn draft_gate_definition_removed(gate_key: GateKey) -> Self {
         EventBody::GateDefinitionRemoved { gate_key }
     }
 
@@ -1844,7 +1844,7 @@ mod tests {
     fn test_stamped_event_reads_back_its_body_and_identity() {
         let body = EventBody::draft_gate_added(
             crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
-            "tests".to_string(),
+            "tests".parse().unwrap(),
         );
         let timestamp = DateTime::from_timestamp(1_700_000_000, 0).unwrap();
 
@@ -1882,21 +1882,21 @@ mod tests {
         let attestor: Assignee = "human:reviewer".parse().unwrap();
         let mut attested = GateRunResult::attestation(
             &crate::test_utils::issue_id(160),
-            "review",
+            &"review".parse().unwrap(),
             GateStage::Postcheck,
             GateStatus::Passed,
             Some(&attestor),
         );
         attested.inputs_digest = Some(digest.clone());
 
-        assert!(!attested.is_reusable_for("review", &digest));
+        assert!(!attested.is_reusable_for(&"review".parse().unwrap(), &digest));
     }
 
     #[test]
     fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
         let mut run = GateRunResult::attestation(
             &crate::test_utils::issue_id(160),
-            "review",
+            &"review".parse().unwrap(),
             GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -2894,7 +2894,7 @@ mod tests {
             let by = Assignee::from_str("ci:runner").unwrap();
             let event = EventBody::draft_gate_passed(
                 crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
-                "tests".to_string(),
+                "tests".parse().unwrap(),
                 Some(by),
             );
 

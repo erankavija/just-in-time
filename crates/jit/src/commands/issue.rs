@@ -930,10 +930,10 @@ mod tests {
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {
             registry.gates.insert(
-                key.to_string(),
+                key.parse().unwrap(),
                 GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: key.to_string(),
                     description: String::new(),
                     stage: GateStage::Postcheck,
@@ -1212,10 +1212,10 @@ mod tests {
         // Define a manual precheck gate (TDD reminder)
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1279,10 +1279,10 @@ mod tests {
         // Define a manual precheck gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1546,10 +1546,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,

@@ -983,7 +983,7 @@ impl IssueStore for FailingMutationStorage {
 
     fn find_reusable_gate_run(
         &self,
-        gate_key: &str,
+        gate_key: &jit::domain::identity::GateKey,
         digest: &jit::domain::repository_inputs::InputsDigest,
     ) -> anyhow::Result<Option<jit::domain::GateRunResult>> {
         self.inner.find_reusable_gate_run(gate_key, digest)
