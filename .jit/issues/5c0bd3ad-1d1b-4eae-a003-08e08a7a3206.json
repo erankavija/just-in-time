@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:29:52.835503717Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Write the package value over an existing registry entry",
-  "updated_at": "2026-10-22T15:01:36.222515789Z"
+  "updated_at": "2026-11-01T14:29:52.835503717Z"
 }
