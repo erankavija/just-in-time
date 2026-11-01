@@ -781,16 +781,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((GateRemoveResult { removed, not_found }, warnings))
     }
 
-    /// Mark a gate as passed.
+    /// Mark a gate as passed, then complete the issue if that cleared the last
+    /// unpassed gate of a gated issue.
+    ///
+    /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings).
+    pub fn pass_gate(
+        &self,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
+        by: Option<String>,
+        force: bool,
+    ) -> Result<GatePassOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let outcome = self.record_gate_pass(issue_id, gate_key, by, force)?;
+        self.auto_transition_to_done(issue_id)?;
+        Ok(outcome)
+    }
+
+    /// Record a gate's pass without advancing the issue.
     ///
     /// For an automated gate this runs the checker; for a manual gate it records
     /// the attestation. A gate declaring inputs a prior run's verdict already
     /// covers reuses that verdict ([`check_gate`](Self::check_gate)); `force`
     /// refuses reuse and executes. Manual attestations are always recorded as
     /// fresh evidence.
-    ///
-    /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings).
-    pub fn pass_gate(
+    fn record_gate_pass(
         &self,
         issue_id: &IssueId,
         gate_key: &GateKey,
@@ -877,18 +894,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             by: Some(by),
         })?;
 
-        // Check if Gated issue can now transition to Done
-        self.auto_transition_to_done(&full_id)?;
-
         Ok(GatePassOutcome { warnings })
     }
 
     /// Pass every required gate for an issue in declaration order, fail-fast.
     ///
-    /// Each gate is passed via [`pass_gate`](Self::pass_gate), so automated gates
-    /// inherit its verdict reuse and manual gates record fresh evidence.
-    /// On the FIRST gate that does not pass,
-    /// the underlying error is propagated unchanged and no later gate is
+    /// Each gate is recorded via [`record_gate_pass`](Self::record_gate_pass), so
+    /// automated gates inherit its verdict reuse and manual gates record fresh
+    /// evidence. The issue advances only after the last gate, so a re-evaluated
+    /// gate that now fails cannot follow a completion. On the FIRST gate that does
+    /// not pass, the underlying error is propagated unchanged and no later gate is
     /// attempted, so the caller can map it to the right exit code (checker
     /// failure, runner error, etc.). An issue with no required gates succeeds
     /// with an empty result set.
@@ -910,7 +925,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let results = issue.gates_required.iter().try_fold(
             Vec::with_capacity(issue.gates_required.len()),
             |mut results, gate_key| {
-                let outcome = self.pass_gate(&full_id, gate_key, by.clone(), force)?;
+                let outcome = self.record_gate_pass(&full_id, gate_key, by.clone(), force)?;
                 results.push(GatePassAllEntry {
                     gate_key: gate_key.clone(),
                     warnings: outcome.warnings,
@@ -918,6 +933,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Ok::<_, anyhow::Error>(results)
             },
         )?;
+        self.auto_transition_to_done(&full_id)?;
 
         Ok(PassAllOutcome { results })
     }

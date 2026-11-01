@@ -51,8 +51,8 @@ To fix:
   - jit gate status-all def67890
   - jit gate evaluate def67890 code-review --by <attestor>
 
-Issue transitioned to `gated`. Evaluate or attest the listed gates, inspect
-`jit gate status-all`, then retry `jit issue update <issue-id> --state done`.
+Issue transitioned to `gated`. Evaluate or attest the listed gates; passing the
+last one moves it to `done`.
 ```
 
 A manual gate's `evaluate` requires `--by <attestor>` (e.g. `--by
@@ -82,7 +82,7 @@ become ready or complete. Required gates must pass before an issue can become
    jit gate evaluate <issue-id> <gate-key>                    # auto gate: runs the checker
    jit gate evaluate <issue-id> <gate-key> --by <attestor>    # manual gate: records attestation
    jit gate status-all <issue-id>
-   jit issue update <issue-id> --state done
+   jit issue update <issue-id> --state done   # completes an in_progress issue; no change once done
    ```
 
 For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or

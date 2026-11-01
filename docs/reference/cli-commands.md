@@ -1932,11 +1932,12 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence — a gate-run record carrying the attestor and time, and a new event — including when the same attestor already passed the gate. Verdict reuse never applies to an attestation. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
-- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence — a gate-run record carrying the attestor and time, and a new event — including when the same attestor already passed the gate. Verdict reuse never applies to an attestation.
+- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
-- After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
+- A pass that clears the last unpassed gate of a `gated` issue moves it to `done` and promotes its dependents; an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
+- `jit issue update <id> --state done` completes an `in_progress` issue whose required gates have passed, and succeeds without change on an issue already `done`.
 
 **Verdict reuse over unchanged declared inputs:**
 - A gate that declares the repository files its checker reads

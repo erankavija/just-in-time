@@ -1527,40 +1527,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(PrecheckExecution { runs, error: None })
     }
-
-    /// Run all postchecks for an issue.
-    ///
-    /// Production reachability has one direct edge: the `State::Gated` branch of
-    /// [`IssueOps::update_issue_state`]. The shipped CLI's only call to that
-    /// state-only method is `issue reject`, with `State::Rejected`, so current CLI
-    /// dispatch does not enter this loop; library callers explicitly requesting
-    /// `State::Gated` do.
-    ///
-    /// Runs all automated postchecks and auto-transitions to Done if all pass. A
-    /// checker's ordinary failing verdict is a successful [`GateRunResult`] with
-    /// [`GateRunStatus::Failed`], so it remains recorded and leaves the issue Gated.
-    /// An evaluation or evidence-persistence error is returned to the caller.
-    pub(crate) fn run_postchecks(&self, issue_id: &IssueId) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
-        let registry = self.storage.load_gate_registry()?;
-
-        for gate_key in &issue.gates_required {
-            if let Some(gate) = registry.gates.get(gate_key) {
-                if gate.stage == GateStage::Postcheck && gate.mode == GateMode::Auto {
-                    self.check_gate(&full_id, gate_key)?;
-                }
-            }
-        }
-
-        // Try to auto-transition to done
-        self.auto_transition_to_done(&full_id)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -4442,176 +4408,183 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
     }
 
-    #[test]
-    fn test_run_postchecks_on_completion() {
-        let executor = setup();
-
-        // Define a postcheck gate
+    fn seed_issue_requiring_exec_gates(
+        executor: &CommandExecutor<InMemoryStorage>,
+        state: State,
+        gates: &[(&str, &str)],
+    ) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "postcheck".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "postcheck".parse().unwrap(),
-                title: "Postcheck".to_string(),
-                description: "Postcheck".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
-                    command: "exit 0".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: false,
-                    prompt: None,
-                    prompt_file: None,
-                }),
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
-            },
-        );
+        registry
+            .gates
+            .extend(gates.iter().map(|(key, command)| -> (GateKey, _) {
+                let key: GateKey = key.parse().unwrap();
+                let definition = crate::declarations::GateDefinition {
+                    version: 1,
+                    key: key.clone(),
+                    title: "Postcheck".to_string(),
+                    description: "Postcheck".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: command.to_string(),
+                        timeout_seconds: 10,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                    priority: 100,
+                    reserved: HashMap::new(),
+                    inputs: None,
+                };
+                (key, definition)
+            }));
         seed_gate_registry(executor.storage(), &registry);
 
-        // Create issue in progress with postcheck
         let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
-        issue.state = State::InProgress;
+        issue.state = state;
+        issue.gates_required = gates.iter().map(|(key, _)| key.parse().unwrap()).collect();
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor
-            .add_gate(&issue_id, &"postcheck".parse().unwrap())
-            .unwrap();
-
-        // Complete work
-        executor
-            .issues()
-            .update_issue_state(&issue_id, State::Gated)
-            .unwrap();
-
-        // Verify postchecks ran and issue transitioned to done
-        let issue = executor.storage.load_issue(&issue_id).unwrap();
-        assert_eq!(issue.state, State::Done);
-
-        let gate_state = issue
-            .gates_status
-            .get(&"postcheck".parse().unwrap())
-            .unwrap();
-        assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
+        issue_id
     }
 
     #[test]
-    fn test_update_issue_state_failing_postcheck_succeeds_and_keeps_issue_gated() {
+    fn test_pass_gate_last_unpassed_auto_gate_completes_gated_issue_and_promotes_dependent() {
         let executor = setup();
-
-        // Define a failing postcheck gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "postcheck-fail".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "postcheck-fail".parse().unwrap(),
-                title: "Postcheck".to_string(),
-                description: "Postcheck".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
-                    command: "exit 1".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: false,
-                    prompt: None,
-                    prompt_file: None,
-                }),
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
-            },
+        let issue_id = seed_issue_requiring_exec_gates(
+            &executor,
+            State::Gated,
+            &[("first", "exit 0"), ("last", "exit 0")],
         );
-        seed_gate_registry(executor.storage(), &registry);
+        let mut dependent =
+            crate::test_utils::fixture_issue("Dependent".to_string(), "Test".to_string());
+        dependent.state = State::Backlog;
+        dependent.dependencies.push(issue_id.clone());
+        let dependent_id = dependent.id.clone();
+        seed_issue(executor.storage(), dependent);
+        let states = || {
+            (
+                executor.storage.load_issue(&issue_id).unwrap().state,
+                executor.storage.load_issue(&dependent_id).unwrap().state,
+            )
+        };
 
-        // Create issue in progress with failing postcheck
-        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
-        issue.state = State::InProgress;
-        let issue_id = issue.id.clone();
-        seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, &"postcheck-fail".parse().unwrap())
+            .pass_gate(&issue_id, &"first".parse().unwrap(), None, false)
             .unwrap();
+        assert_eq!(states(), (State::Gated, State::Backlog));
 
-        // Complete work
-        let result = executor
-            .issues()
-            .update_issue_state(&issue_id, State::Gated);
-        assert!(
-            result.is_ok(),
-            "an ordinary checker failure remains a successful invocation: {result:?}"
-        );
-
-        // Verify postchecks ran but issue stayed in gated
-        let issue = executor.storage.load_issue(&issue_id).unwrap();
-        assert_eq!(issue.state, State::Gated);
-
-        let gate_state = issue
-            .gates_status
-            .get(&"postcheck-fail".parse().unwrap())
+        executor
+            .pass_gate(&issue_id, &"last".parse().unwrap(), None, false)
             .unwrap();
-        assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
-        let runs = executor
-            .storage
-            .list_gate_runs_for_issue(&issue_id)
-            .unwrap();
-        assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].status, GateRunStatus::Failed);
+        assert_eq!(states(), (State::Done, State::Ready));
     }
 
     #[test]
-    fn test_update_issue_state_surfaces_postcheck_persistence_failure() {
+    fn test_pass_gate_failed_auto_gate_leaves_gated_issue_gated() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "postcheck".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "postcheck".parse().unwrap(),
-                title: "Postcheck".to_string(),
-                description: "Postcheck".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
-                    command: "exit 0".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: false,
-                    prompt: None,
-                    prompt_file: None,
-                }),
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
+        let issue_id =
+            seed_issue_requiring_exec_gates(&executor, State::Gated, &[("failing", "exit 1")]);
+
+        let error = executor
+            .pass_gate(&issue_id, &"failing".parse().unwrap(), None, false)
+            .expect_err("a failing checker fails the evaluation");
+
+        assert!(error
+            .downcast_ref::<crate::commands::GatePassFailed>()
+            .is_some());
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().state,
+            State::Gated
+        );
+    }
+
+    #[test]
+    fn test_pass_gate_last_auto_gate_leaves_non_gated_issue_state_unchanged() {
+        [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Done,
+            State::Rejected,
+        ]
+        .into_iter()
+        .for_each(|state| {
+            let executor = setup();
+            let issue_id = seed_issue_requiring_exec_gates(&executor, state, &[("only", "exit 0")]);
+
+            executor
+                .pass_gate(&issue_id, &"only".parse().unwrap(), None, false)
+                .unwrap();
+
+            assert_eq!(executor.storage.load_issue(&issue_id).unwrap().state, state);
+        });
+    }
+
+    #[test]
+    fn test_pass_all_gates_completes_gated_issue_after_every_gate_passes() {
+        let executor = setup();
+        let issue_id = seed_issue_requiring_exec_gates(
+            &executor,
+            State::Gated,
+            &[("first", "exit 0"), ("last", "exit 0")],
+        );
+
+        executor.pass_all_gates(&issue_id, None, false).unwrap();
+
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().state,
+            State::Done
+        );
+    }
+
+    /// `previously-passed` holds a recorded pass while its checker now fails, so
+    /// the pending gate before it clears the last unpassed status mid-run.
+    #[test]
+    fn test_pass_all_gates_later_gate_failure_keeps_issue_gated() {
+        let executor = setup();
+        let issue_id = seed_issue_requiring_exec_gates(
+            &executor,
+            State::Gated,
+            &[("pending", "exit 0"), ("previously-passed", "exit 1")],
+        );
+        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+        issue.gates_status.insert(
+            "previously-passed".parse().unwrap(),
+            crate::domain::GateState {
+                status: GateStatus::Passed,
+                updated_by: None,
+                updated_at: Utc::now(),
+                run_id: None,
             },
         );
-        seed_gate_registry(executor.storage(), &registry);
-
-        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
-        issue.state = State::InProgress;
-        let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor
-            .add_gate(&issue_id, &"postcheck".parse().unwrap())
-            .unwrap();
 
-        // The Gated transition is the first publication. The automated
-        // postcheck's coupled issue/run/event publication is the second.
-        let failures = FailNthPublication::new(2);
+        executor
+            .pass_all_gates(&issue_id, None, false)
+            .expect_err("the later gate's failure fails the run");
+
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().state,
+            State::Gated
+        );
+    }
+
+    #[test]
+    fn test_pass_gate_surfaces_auto_gate_persistence_failure() {
+        let executor = setup();
+        let issue_id =
+            seed_issue_requiring_exec_gates(&executor, State::Gated, &[("postcheck", "exit 0")]);
+
+        let failures = FailNthPublication::new(1);
         let storage = executor.storage().with_mutation_interruption_view(failures);
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
-            .issues()
-            .update_issue_state(&issue_id, State::Gated)
-            .expect_err("postcheck persistence failure must reach the state-transition caller");
+            .pass_gate(&issue_id, &"postcheck".parse().unwrap(), None, false)
+            .expect_err("gate-run persistence failure must reach the caller");
 
         assert!(
             error
@@ -4621,9 +4594,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
-        assert_eq!(
-            issue.gates_status[&"postcheck".parse().unwrap()].status,
-            crate::domain::GateStatus::Pending,
+        assert!(
+            issue.gates_status.is_empty(),
             "failed persistence must not leave an unrecorded checker verdict"
         );
         assert!(executor
@@ -4634,46 +4606,29 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_update_issue_state_surfaces_postcheck_evaluation_failure() {
+    fn test_pass_gate_surfaces_auto_gate_evaluation_failure() {
         let executor = setup();
+        let issue_id =
+            seed_issue_requiring_exec_gates(&executor, State::Gated, &[("postcheck", "exit 0")]);
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "postcheck".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "postcheck".parse().unwrap(),
-                title: "Postcheck".to_string(),
-                description: "Postcheck".to_string(),
-                stage: GateStage::Postcheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
-                    command: "exit 0".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: true,
-                    prompt: None,
-                    prompt_file: Some("missing-prompt.md".to_string()),
-                }),
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
-            },
-        );
+        let gate = registry
+            .gates
+            .get_mut(&"postcheck".parse::<GateKey>().unwrap())
+            .unwrap();
+        gate.checker = Some(GateChecker::Exec {
+            command: "exit 0".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: true,
+            prompt: None,
+            prompt_file: Some("missing-prompt.md".to_string()),
+        });
         seed_gate_registry(executor.storage(), &registry);
 
-        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
-        issue.state = State::InProgress;
-        let issue_id = issue.id.clone();
-        seed_issue(executor.storage(), issue);
-        executor
-            .add_gate(&issue_id, &"postcheck".parse().unwrap())
-            .unwrap();
-
         let error = executor
-            .issues()
-            .update_issue_state(&issue_id, State::Gated)
-            .expect_err("postcheck evaluation failure must reach the state-transition caller");
+            .pass_gate(&issue_id, &"postcheck".parse().unwrap(), None, false)
+            .expect_err("gate evaluation failure must reach the caller");
 
         assert!(
             error.to_string().contains("missing-prompt.md"),
@@ -4681,10 +4636,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
-        assert_eq!(
-            issue.gates_status[&"postcheck".parse().unwrap()].status,
-            crate::domain::GateStatus::Pending
-        );
+        assert!(issue.gates_status.is_empty());
         assert!(executor
             .storage
             .list_gate_runs_for_issue(&issue_id)

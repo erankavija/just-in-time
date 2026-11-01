@@ -157,13 +157,9 @@ jit gate add $TASK3 tutorial-review
 jit issue update $TASK3 --state done
 # Transitions to 'gated' instead
 
-# Record manual approval; --by names the attestor. A manual pass may
-# complete an already gated issue.
+# Record manual approval; --by names the attestor. Passing the last gate
+# moves the gated issue to done.
 jit gate evaluate $TASK3 tutorial-review --by "human:reviewer"
-
-# Inspect status; if it is still gated, retry explicit completion.
-jit gate status-all $TASK3
-jit issue update $TASK3 --state done
 ```
 
 ## Next Steps

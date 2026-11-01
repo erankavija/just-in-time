@@ -456,7 +456,8 @@ Gate enforcement, success criteria verification, state transition, commit.
    ```bash
    jit issue update <id> --state done
    ```
-   If exit code 4 (gated — pending gates), show which gates remain and
+   A `gated` issue is already `done` once its last gate passes; this request then
+   succeeds without change. If exit code 4 (gated — pending gates), show which gates remain and
    loop to step 4.
 
 8. Commit JIT state:

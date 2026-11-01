@@ -613,14 +613,9 @@ fn test_update_issue_state_path_enforces_done_graph_rule() {
 
 #[test]
 fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
-    // An enforce-at-done coverage/shape rule must also guard the Gated -> Done
-    // auto-transition path (gates pass via postcheck, then the issue would
-    // auto-complete). Without enforcement on this path an auto gate-pass could
-    // complete an issue past an enforce-at-done rule. Here: an epic with a
-    // PASSED gate (so it would auto-done) but NO design dependency (so the
-    // enforce-at-done rule fails) must stay Gated with the block surfaced.
-    use jit::domain::{GateState, GateStatus};
-
+    // Passing the last gate of a gated epic would auto-complete it, but the
+    // epic has no design dependency, so the enforce-at-done rule must keep it
+    // Gated with the block surfaced.
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
@@ -636,21 +631,15 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Gated;
     issue.gates_required = vec!["tests".parse().unwrap()];
-    issue.gates_status.insert(
-        "tests".parse().unwrap(),
-        GateState {
-            status: GateStatus::Passed,
-            updated_by: Some("ci:test".parse().unwrap()),
-            updated_at: chrono::Utc::now(),
-            run_id: None,
-        },
-    );
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
-    // Drive the Gated arm: it runs postchecks, which try to auto-transition to
-    // done. The enforce-at-done graph rule must block that auto-done.
-    let result = executor.issues().update_issue_state(&epic, State::Gated);
+    let result = executor.pass_gate(
+        &epic,
+        &"tests".parse().unwrap(),
+        Some("ci:test".to_string()),
+        false,
+    );
     let err = result.expect_err("enforce-at-done rule must block the gated auto-done path");
     let blocked = err
         .downcast_ref::<TransitionBlockedError>()
