@@ -1,6 +1,6 @@
 use super::{profile::ProfileSelection, with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
-use crate::profile::{ProfileApplicationStatus, ProfileComposedApplyResult};
+use crate::profile::{ProfileComposedApplyResult, ProfileRunMode};
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
@@ -171,17 +171,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         members
                             .iter()
                             .map(|member| {
-                                let package = member.package();
-                                let changed = plan.applied_profiles().contains(&package.model().id);
-                                super::profile::applied_profile_result(
+                                super::profile::profile_result(
                                     &plan,
-                                    package,
+                                    member.package(),
                                     &layout,
-                                    if changed {
-                                        ProfileApplicationStatus::Applied
-                                    } else {
-                                        ProfileApplicationStatus::Unchanged
-                                    },
+                                    ProfileRunMode::Publish,
                                 )
                             })
                             .collect::<Result<Vec<_>>>()?,
@@ -419,6 +413,7 @@ fn git_events_pattern(relative: &Path) -> String {
 mod tests {
     use super::*;
     use crate::commands::ProfileSelector;
+    use crate::profile::ProfileApplicationStatus;
     use crate::profile::ProfilePackage;
     use crate::repository_state::{Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, JsonFileStorage};

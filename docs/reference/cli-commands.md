@@ -697,9 +697,9 @@ select its directory to inspect it before applying it.
 
 Human output shows one line per profile with its ID, version, origin, and status, then one line per
 decision with its action — targets first, then declarations — and the
-reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
-`{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
-return, with `status` additionally reporting `would_conflict`. A selection whose
+reason beneath one that cannot be published. JSON returns the count-wrapped `ProfileComposedApplyResult` collection
+`{"count": N, "profiles": [...]}`, the same shape `jit profile apply` returns,
+with `status` additionally reporting `would_conflict`. A selection whose
 proposed repository fails final validation, such as one leaving a configured
 projection stale, also reports `would_conflict`, with `refusal` stating why on
 each profile that would publish.
@@ -724,24 +724,19 @@ jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VAL
 ```
 
 `--values-file` and `--set` use the same variable inputs as profiled init.
-`--dry-run` builds and validates the exact plans without writing. JSON returns
-the count-wrapped `ProfilePlanResult` collection
-`{"count": N, "profiles": [...]}`. It reports dependency-only packages once
-before every selected root occurrence in selector order, exactly like the run
-it rehearses. Each entry includes `id`, `version`, `origin`, `status`
-(`would_apply` or `unchanged`), and the sorted target and
-declaration lists in the vocabulary [`jit profile diff`](#jit-profile-diff)
-documents. A repeated root's later observations are `unchanged` and carry no
-decisions. A rehearsal fails where its publication would, so it never reports a
-`conflict`; read `jit profile diff` to see one.
+`--dry-run` runs the same computation without writing, so it fails where the
+application would, final validation included, and so never reports a `conflict`;
+read `jit profile diff` to see one.
 
-Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
-count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
-`ProfileApplyResult` per corresponding rehearsal observation. Each entry carries
-`id`, `version`, `origin`, `status` (`applied` or `unchanged`), and the target
-and declaration decisions in the shared vocabulary. Exact reapplication of a whole
-set is a successful no-op. Human output uses the same identity, origin, status,
-and per-target decisions. Application
+Both forms return `ProfileComposedApplyResult` as JSON, the count-wrapped envelope
+`{"count": N, "profiles": [...]}`. It reports dependency-only packages once
+before every selected root occurrence in selector order. Each `ProfileApplyResult`
+carries `id`, `version`, `origin`, `status` (`applied`, or `would_apply` under
+`--dry-run`, or `unchanged`), and the sorted target and declaration lists in the
+vocabulary [`jit profile diff`](#jit-profile-diff) documents. A repeated root's
+later observations are `unchanged` and carry no decisions. Exact reapplication
+of a whole set is a successful no-op. Human output renders the same entries.
+Application
 and all coupled derived targets publish through that one redo record, with
 strict managed-region composition as described in
 [Repository Profiles](profiles.md).

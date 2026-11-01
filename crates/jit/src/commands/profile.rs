@@ -1,17 +1,17 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
-use crate::profile::profile_plan_entry;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
     read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
     ProfileComposedApplyResult, ProfileGraphError, ProfilePackEntry, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult, ProfileShowEntry,
-    ProfileShowResult, ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment,
-    ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph, SelectionObservation,
-    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfileShowEntry, ProfileShowResult,
+    ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName,
+    ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
+    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
+use crate::profile::{profile_run_entry, ProfileRunMode};
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization, drop_overridden_claims,
     finalize_package_tree_capture, CaptureBudget, CapturedTreeFile, FileMode, MaterializationPlan,
@@ -29,77 +29,43 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-/// Project dependency-first unique durable results back onto ordered root
-/// observations. A repeated selector observes the publication's first result,
-/// then reports an unchanged second observation without attempting another
-/// publication.
-pub(super) fn selection_profile_results(
-    applied: Vec<ProfileApplyResult>,
-    roots: &[ProfilePackage],
-) -> Result<ProfileComposedApplyResult> {
-    selection_observations(applied, roots).map(ProfileComposedApplyResult::new)
-}
-
-/// Project one aggregate selection's per-package answers onto the ordered root
+/// Project one run's dependency-first per-package answers onto the ordered root
 /// observations the caller made.
 ///
-/// A closure member the caller did not name is still part of what the selection
-/// settles, so it is reported once, before the roots. A repeated root selector
-/// observes the publication its first occurrence accounts for, so its later
-/// observations report what [`SelectionObservation::observe_without_publishing`]
-/// leaves — one meaning of "this observation publishes nothing", stated once
-/// per answer type rather than per projection.
-///
-/// A rehearsal and the run it precedes project through this one function, so
-/// their answers stay comparable entry for entry rather than drifting into two
-/// shapes.
-fn selection_observations<Observation: Clone + SelectionObservation>(
-    closure: Vec<Observation>,
+/// A closure member the caller did not name is reported once, before the roots.
+/// A repeated root selector observes the publication its first occurrence
+/// accounts for ([`ProfileApplyResult::observed_again`]).
+pub(super) fn selection_profile_results(
+    closure: Vec<ProfileApplyResult>,
     roots: &[ProfilePackage],
-) -> Result<Vec<Observation>> {
+) -> Result<ProfileComposedApplyResult> {
     let root_ids = roots
         .iter()
         .map(|root| root.model().id.as_str())
         .collect::<BTreeSet<_>>();
     let by_id = closure
         .iter()
-        .map(|observation| (observation.profile_id(), observation))
+        .map(|observation| (observation.id.as_str(), observation))
         .collect::<BTreeMap<_, _>>();
     let mut observations = closure
         .iter()
-        .filter(|observation| !root_ids.contains(observation.profile_id()))
+        .filter(|observation| !root_ids.contains(observation.id.as_str()))
         .cloned()
         .collect::<Vec<_>>();
-    let mut occurrences = BTreeMap::<&str, usize>::new();
+    let mut observed = BTreeSet::new();
     for root in roots {
         let id = root.model().id.as_str();
         let Some(source) = by_id.get(id) else {
             anyhow::bail!("selected root '{id}' has no aggregate selection answer");
         };
-        let occurrence = occurrences.entry(id).or_default();
-        let first = *occurrence == 0;
-        *occurrence += 1;
-        let mut observation = (*source).clone();
-        if !first {
-            observation.observe_without_publishing();
-        }
-        observations.push(observation);
+        let observation = (*source).clone();
+        observations.push(if observed.insert(id) {
+            observation
+        } else {
+            observation.observed_again()
+        });
     }
-    Ok(observations)
-}
-
-/// What a prepared selection does with a decision it cannot publish.
-///
-/// The two answers are the whole difference between a rehearsal and a
-/// difference report: both derive the same decision from the same session, and
-/// only one of them is allowed to carry a conflict back to its caller.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ProfileConflictResponse {
-    /// Fail the preparation, exactly where the publication it precedes would.
-    Refuse,
-    /// Return the decision, conflicts included, for a caller that publishes
-    /// nothing.
-    Report,
+    Ok(ProfileComposedApplyResult::new(observations))
 }
 
 /// One ordered profile selection from the command boundary: the package
@@ -844,10 +810,13 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         })
     }
 
-    /// Rehearse applying `selection`, refusing a decision the application
-    /// would refuse.
-    pub fn plan_profiles(&self, selection: &ProfileSelection) -> Result<ProfilePlanResult> {
-        self.preview_profile_selection(selection, ProfileConflictResponse::Refuse)
+    /// Rehearse applying `selection`: a read-only run that fails exactly where
+    /// the application would, final validation included.
+    pub fn plan_profiles(
+        &self,
+        selection: &ProfileSelection,
+    ) -> Result<ProfileComposedApplyResult> {
+        self.run_profile_selection(selection, ProfileRunMode::Rehearse)
     }
 
     /// Apply `selection`'s complete closure through one held session.
@@ -857,38 +826,80 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         &self,
         selection: &ProfileSelection,
     ) -> Result<ProfileComposedApplyResult> {
-        if selection.members.is_empty() {
-            return Ok(ProfileComposedApplyResult::new(Vec::new()));
-        }
-        let applied = self.publish_profile_selection(selection)?;
-        selection_profile_results(applied.items, &selection.roots)
+        self.run_profile_selection(selection, ProfileRunMode::Publish)
     }
 
-    /// Report what applying a selection would do to this repository, without
-    /// publishing any of it.
+    /// Report what applying a selection would do to this repository, conflicts
+    /// included, without publishing any of it.
     ///
-    /// The report is the decision itself: the selection is planned through
-    /// the same preparation a publication runs, and every target and registry
-    /// declaration each participating profile decided is then stated — the
-    /// values it would create or update and the ones it cannot publish, each
-    /// named beside the packages that define it. A conflict is reported rather
-    /// than refused, which is the whole difference from the rehearsal the
-    /// lifecycle commands run, so an adopter can read a conflicting decision
-    /// before it decides whether to publish one.
-    ///
-    /// A package that is not installed is reported as readily as one that is:
-    /// the selection is resolved from the location its selector names, so an
-    /// adopter inspects a package before applying it rather than after.
-    ///
-    /// Nothing is written. The capture runs under the same session guard the
-    /// publication would, so the answer describes the repository the
-    /// publication would act on.
+    /// A package that is not installed is reported as readily as one that is,
+    /// so an adopter inspects a package before applying it. The capture runs
+    /// under the same session guard the publication would, so the answer
+    /// describes the repository the publication would act on.
     ///
     /// # Errors
     ///
     /// A repository that cannot be read.
-    pub fn diff_profiles(&self, selection: &ProfileSelection) -> Result<ProfilePlanResult> {
-        self.preview_profile_selection(selection, ProfileConflictResponse::Report)
+    pub fn diff_profiles(
+        &self,
+        selection: &ProfileSelection,
+    ) -> Result<ProfileComposedApplyResult> {
+        self.run_profile_selection(selection, ProfileRunMode::Report)
+    }
+
+    /// Run `selection`'s dependency-first unique closure through one mutation
+    /// session and, when publishing, one `session.apply` call at most.
+    fn run_profile_selection(
+        &self,
+        selection: &ProfileSelection,
+        mode: ProfileRunMode,
+    ) -> Result<ProfileComposedApplyResult> {
+        if selection.members.is_empty() {
+            return Ok(ProfileComposedApplyResult::new(Vec::new()));
+        }
+        let layout = self.require_layout()?;
+        let context = match mode {
+            ProfileRunMode::Publish => super::production_mutation_context(),
+            ProfileRunMode::Rehearse | ProfileRunMode::Report => MutationContext::preview(),
+        };
+        let label = match mode {
+            ProfileRunMode::Publish => "profile application",
+            ProfileRunMode::Rehearse | ProfileRunMode::Report => "profile planning",
+        };
+        let closure = with_mutation_session(self.storage(), &layout, label, |session| {
+            let Some(plan) = self.prepare_profile_selection(session, selection, &context, mode)?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            // A plan its decisions already refuse never reaches final validation
+            // in the publication this reports on, and its overlay omits what
+            // they refuse.
+            let refusal = match mode {
+                ProfileRunMode::Report
+                    if crate::profile::ensure_publishable_targets(&plan).is_ok() =>
+                {
+                    final_validation_refusal(&plan)?.map(|refusal| refusal.to_string())
+                }
+                _ => None,
+            };
+            let entries = selection
+                .members
+                .iter()
+                .map(|member| {
+                    let entry = profile_result(&plan, &member.package, &layout, mode)?;
+                    Ok(match &refusal {
+                        Some(refusal) => entry.refused_by(refusal),
+                        None => entry,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            if mode == ProfileRunMode::Publish && !plan.delta().actions().is_empty() {
+                Ok(SessionStep::Apply(plan, entries))
+            } else {
+                Ok(SessionStep::Done(entries))
+            }
+        })?;
+        selection_profile_results(closure, &selection.roots)
     }
 
     /// Resolve the selected packages' dependency closure, then settle every
@@ -984,128 +995,19 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         }
     }
 
-    /// Publish the selection's dependency-first unique closure through one
-    /// mutation session and one `session.apply` call at most.
-    fn publish_profile_selection(
-        &self,
-        selection: &ProfileSelection,
-    ) -> Result<ProfileComposedApplyResult> {
-        let layout = self.require_layout()?;
-        let context = super::production_mutation_context();
-        with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some(plan) = self.prepare_profile_selection(
-                session,
-                selection,
-                &context,
-                ProfileLifecycleOperation::Apply,
-                ProfileConflictResponse::Refuse,
-            )?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let results = |changed: &dyn Fn(&ProfilePackage) -> bool| {
-                selection
-                    .members
-                    .iter()
-                    .map(|member| {
-                        applied_profile_result(
-                            &plan,
-                            &member.package,
-                            &layout,
-                            if changed(&member.package) {
-                                ProfileApplicationStatus::Applied
-                            } else {
-                                ProfileApplicationStatus::Unchanged
-                            },
-                        )
-                    })
-                    .collect::<Result<Vec<_>>>()
-                    .map(ProfileComposedApplyResult::new)
-            };
-            if plan.delta().actions().is_empty() {
-                return Ok(SessionStep::Done(results(&|_| false)?));
-            }
-            let applied =
-                results(&|package| plan.applied_profiles().contains(&package.model().id))?;
-            Ok(SessionStep::Apply(plan, applied))
-        })
-    }
-
-    /// Preview `selection` through the same preparation durable publication
-    /// runs, deciding what a conflict does.
-    ///
-    /// A rehearsal and a difference report reach this one preview with
-    /// different answers to that question and nothing else, so their entries
-    /// stay comparable entry for entry.
-    fn preview_profile_selection(
-        &self,
-        selection: &ProfileSelection,
-        response: ProfileConflictResponse,
-    ) -> Result<ProfilePlanResult> {
-        if selection.members.is_empty() {
-            return Ok(ProfilePlanResult::new(Vec::new()));
-        }
-        let layout = self.require_layout()?;
-        let context = MutationContext::preview();
-        with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some(plan) = self.prepare_profile_selection(
-                session,
-                selection,
-                &context,
-                ProfileLifecycleOperation::Apply,
-                response,
-            )?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            // A plan its decisions already refuse never reaches final validation
-            // in the publication this previews, and its overlay omits what they
-            // refuse.
-            let refusal = match response {
-                ProfileConflictResponse::Report
-                    if crate::profile::ensure_publishable_targets(&plan).is_ok() =>
-                {
-                    final_validation_refusal(&plan)?.map(|refusal| refusal.to_string())
-                }
-                _ => None,
-            };
-            let rehearsed = selection
-                .members
-                .iter()
-                .map(|member| {
-                    let entry = profile_plan_entry(
-                        &plan,
-                        &member.package.model().id,
-                        &member.package.model().version,
-                        package_origin(&member.package, &layout)?,
-                    );
-                    Ok(match &refusal {
-                        Some(refusal) => entry.refused_by(refusal),
-                        None => entry,
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let plans = selection_observations(rehearsed, &selection.roots)?;
-            Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
-        })
-    }
-
     /// Capture and close the complete selection once. A retry restarts from a
     /// fresh held session image; no member of the selection is published until
     /// the final aggregate plan reaches `session.apply`.
     ///
-    /// `response` decides what a decision that cannot be published does here.
-    /// Every route that publishes or rehearses a publication refuses it, final
-    /// validation included, and the difference report is the sole reader that
-    /// carries it through, so a conflicting target or declaration reaches an
-    /// adopter as a report entry exactly once and as a refusal everywhere else.
+    /// `mode` decides what a decision that cannot be published does here. A
+    /// publication and its rehearsal refuse it, final validation included, and
+    /// the difference report alone carries it through.
     fn prepare_profile_selection(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
         selection: &ProfileSelection,
         context: &MutationContext,
-        operation: ProfileLifecycleOperation,
-        response: ProfileConflictResponse,
+        mode: ProfileRunMode,
     ) -> Result<Option<MaterializationPlan>> {
         let contribution_context = selection.contribution_context();
         let inputs = selection.application_inputs();
@@ -1167,7 +1069,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
                 context,
-                operation,
+                operation: ProfileLifecycleOperation::Apply,
             },
         )?;
         let mut extra_paths = expanded_paths;
@@ -1203,7 +1105,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
                 context,
-                operation,
+                operation: ProfileLifecycleOperation::Apply,
             },
         )?;
         if plan.delta().actions().iter().any(|action| {
@@ -1214,7 +1116,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         }) {
             return Ok(None);
         }
-        if response == ProfileConflictResponse::Refuse {
+        if mode != ProfileRunMode::Report {
             crate::profile::ensure_publishable_targets(&plan)
                 .map_err(RepositoryStateError::from)?;
             ensure_committed_write_targets(
@@ -1583,28 +1485,20 @@ fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result
         })
 }
 
-/// Project one aggregate publication decision into the same per-profile facts
-/// its rehearsal reports.
-pub(super) fn applied_profile_result(
+/// One member's answer to a run, from the decision `plan` carries.
+pub(super) fn profile_result(
     plan: &MaterializationPlan,
     package: &ProfilePackage,
     layout: &RepositoryLayout,
-    status: ProfileApplicationStatus,
+    mode: ProfileRunMode,
 ) -> Result<ProfileApplyResult> {
-    let preview = profile_plan_entry(
+    Ok(profile_run_entry(
         plan,
         &package.model().id,
         &package.model().version,
         package_origin(package, layout)?,
-    );
-    Ok(ProfileApplyResult {
-        id: preview.id,
-        version: preview.version,
-        origin: preview.origin,
-        status,
-        targets: preview.targets,
-        contributions: preview.contributions,
-    })
+        mode,
+    ))
 }
 
 /// Convert resolved package content into neutral claims.
@@ -1644,9 +1538,7 @@ mod tests {
     use super::*;
     use crate::domain::{Event, EventBody, ProfileLifecycleOperation, ProfileLifecycleStatus};
     use crate::profile::selection_probe;
-    use crate::profile::{
-        ProfileContributionChange, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
-    };
+    use crate::profile::{ProfileApplyResult, ProfileContributionChange, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, MapEntryTarget, ProfileTargetConflict,
         ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
@@ -1839,19 +1731,17 @@ mod tests {
             )
             .unwrap();
         let plan = executor
-            .prepare_profile_selection(
-                session,
-                &selection,
-                context,
-                ProfileLifecycleOperation::Apply,
-                ProfileConflictResponse::Refuse,
-            )
+            .prepare_profile_selection(session, &selection, context, ProfileRunMode::Rehearse)
             .unwrap()
             .unwrap();
-        let origin = package_origin(package, &executor.require_layout().unwrap()).unwrap();
-        let changes =
-            profile_plan_entry(&plan, &package.model().id, &package.model().version, origin)
-                .targets;
+        let changes = profile_result(
+            &plan,
+            package,
+            &executor.require_layout().unwrap(),
+            ProfileRunMode::Rehearse,
+        )
+        .unwrap()
+        .targets;
         (plan, changes)
     }
 
@@ -1860,7 +1750,7 @@ mod tests {
         executor: &CommandExecutor<JsonFileStorage>,
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
+    ) -> Result<ProfileComposedApplyResult> {
         executor
             .select_profiles(selectors, options)
             .and_then(|selection| executor.plan_profiles(&selection))
@@ -1871,7 +1761,7 @@ mod tests {
         executor: &CommandExecutor<JsonFileStorage>,
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
+    ) -> Result<ProfileComposedApplyResult> {
         executor
             .select_profiles(selectors, options)
             .and_then(|selection| executor.diff_profiles(&selection))
@@ -3959,7 +3849,7 @@ template = true
     fn assert_planned_targets_match_published(
         before: &BTreeMap<PathBuf, Vec<u8>>,
         after: &BTreeMap<PathBuf, Vec<u8>>,
-        planned: &ProfilePlanResult,
+        planned: &ProfileComposedApplyResult,
     ) {
         assert!(
             planned
@@ -4034,7 +3924,7 @@ template = true
     }
 
     /// The one entry a report carries for `id`.
-    fn reported(report: &ProfilePlanResult, id: &str) -> ProfilePlanEntry {
+    fn reported(report: &ProfileComposedApplyResult, id: &str) -> ProfileApplyResult {
         report
             .items
             .iter()
@@ -4044,7 +3934,10 @@ template = true
     }
 
     /// The targets `entry` decided `action` about, by repository-relative name.
-    fn decided_targets(entry: &ProfilePlanEntry, action: ProfileTargetAction) -> BTreeSet<String> {
+    fn decided_targets(
+        entry: &ProfileApplyResult,
+        action: ProfileTargetAction,
+    ) -> BTreeSet<String> {
         entry
             .decided(action)
             .map(|target| target.path.clone())
@@ -4078,7 +3971,7 @@ template = true
             .expect("a conflicting selection is reported, not refused");
 
         let entry = reported(&report, "collider");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         assert_eq!(
             decided_targets(&entry, ProfileTargetAction::Conflict),
             targets.map(str::to_string).into_iter().collect(),
@@ -4143,7 +4036,7 @@ template = true
         .expect("an unapplied package is reported from its location");
 
         let entry = reported(&report, "unapplied");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldApply);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldApply);
         assert!(
             decided_targets(&entry, ProfileTargetAction::Create).contains("docs/unapplied.txt"),
             "the report states the target the package would publish: {entry:?}"
@@ -4192,7 +4085,7 @@ template = true
     }
 
     /// The decision `entry` states for the declaration `identity`.
-    fn declared(entry: &ProfilePlanEntry, identity: &str) -> ProfileContributionChange {
+    fn declared(entry: &ProfileApplyResult, identity: &str) -> ProfileContributionChange {
         entry
             .contributions
             .iter()
@@ -4226,7 +4119,7 @@ template = true
             .expect("a contested declaration is reported, not refused");
 
         let entry = reported(&report, "workflow");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         let contested = declared(&entry, &namespace_identity(namespace));
         assert_eq!(contested.action, ProfileTargetAction::Conflict);
         assert!(
@@ -4344,7 +4237,7 @@ template = true
         ));
         assert_eq!(rehearsal.to_string(), refusal);
         let entry = reported(&report, "workflow");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         assert_eq!(entry.refusal.as_deref(), Some(refusal.as_str()));
         assert_eq!(repository_files(&temp), before, "nothing is written");
     }
