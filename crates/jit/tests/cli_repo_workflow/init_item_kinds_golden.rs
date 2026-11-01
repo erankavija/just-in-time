@@ -219,7 +219,7 @@ fn test_no_item_kinds_table_indexes_nothing() {
 
     let all = item_list(&cli, None);
     assert_eq!(
-        all["count"].as_u64().unwrap(),
+        all["items"].as_array().unwrap().len(),
         0,
         "with no [item_kinds] table there are no kinds (no baked built-ins): {all}"
     );

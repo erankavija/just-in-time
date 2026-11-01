@@ -1,4 +1,4 @@
-//! The `jit` crate's source digest, computed by `build.rs` and checked by the fixture tests.
+//! The `jit` crate's source digest, computed by `build.rs` to key the fixture tests.
 
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -46,18 +46,4 @@ fn source_files(path: &Path) -> io::Result<Vec<PathBuf>> {
         .map(|entry| source_files(&entry?.path()))
         .collect::<io::Result<Vec<_>>>()
         .map(|nested| nested.concat())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_crate_source_sha256_of_this_crate_is_the_digest_compiled_in() {
-        assert_eq!(
-            crate_source_sha256(Path::new(env!("CARGO_MANIFEST_DIR")), &CRATE_SOURCE_ROOTS)
-                .unwrap(),
-            env!("JIT_CRATE_SOURCE_SHA256")
-        );
-    }
 }

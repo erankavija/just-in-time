@@ -116,7 +116,6 @@ fn test_issue_list_matches_query_all_json() {
     let query_json: serde_json::Value =
         serde_json::from_str(&String::from_utf8_lossy(&query.stdout)).unwrap();
 
-    assert_eq!(list_json["count"], query_json["count"]);
     assert_eq!(list_json["issues"], query_json["issues"]);
-    assert_eq!(list_json["count"], 3);
+    assert_eq!(list_json["issues"].as_array().unwrap().len(), 3);
 }

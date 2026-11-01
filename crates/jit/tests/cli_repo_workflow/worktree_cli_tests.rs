@@ -380,9 +380,10 @@ fn test_worktree_list_agrees_with_claim_list_for_live_leases() {
         .iter()
         .map(|w| w["active_claims"].as_u64().unwrap())
         .sum();
-    let claims = cli.run_json(["claim", "list"]).unwrap()["count"]
-        .as_u64()
-        .unwrap();
+    let claims = cli.run_json(["claim", "list"]).unwrap()["leases"]
+        .as_array()
+        .unwrap()
+        .len() as u64;
     assert_eq!(active, 2, "both live leases should be counted");
     assert_eq!(
         active, claims,

@@ -383,7 +383,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// let response = executor.issues().issue_children(&epic).unwrap();
     /// assert_eq!(response.extras.container.title, "Epic");
-    /// assert_eq!(response.count(), 1);
+    /// assert_eq!(response.items.len(), 1);
     /// assert_eq!(response.items[0].title, "Child");
     /// assert!(response.extras.dangling.is_empty());
     /// ```
@@ -1017,7 +1017,7 @@ mod tests {
         assert_eq!(bucket(State::Gated), 0);
 
         let children = executor.issues().issue_children(&epic).unwrap();
-        assert_eq!(children.count(), 4);
+        assert_eq!(children.items.len(), 4);
         assert!(children.extras.dangling.is_empty());
         let short_ids: Vec<&str> = children.items.iter().map(|c| c.short_id.as_str()).collect();
         assert!(short_ids.is_sorted(), "children sorted by short id");

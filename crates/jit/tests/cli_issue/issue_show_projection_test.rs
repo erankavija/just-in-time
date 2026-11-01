@@ -94,7 +94,6 @@ fn test_two_ids_json_returns_envelope() {
 
     let out = temp.run(["issue", "show", &a, &b, "--json"]).unwrap();
     let json: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
     let arr = json["issues"]
         .as_array()
         .expect("two-id --json must wrap issues in the list envelope");

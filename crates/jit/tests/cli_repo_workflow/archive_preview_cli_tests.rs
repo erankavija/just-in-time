@@ -235,7 +235,6 @@ fn assert_exact_bundle_plan(plan: &Value, expected_target_kind: &str) {
     assert_eq!(plan["target"]["kind"], expected_target_kind);
     assert_eq!(plan["policy_status"], "configured");
     assert_eq!(plan["eligible"], true);
-    assert_eq!(plan["count"], 7);
     assert_eq!(plan["blockers"], serde_json::json!([]));
     assert_eq!(plan["warnings"], serde_json::json!([]));
     let (moves, copies, pending_deletions) = if expected_target_kind == "document" {
@@ -670,7 +669,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         ["candidates", "count", "schema_version"]
     );
     assert_eq!(report["schema_version"], 1);
-    assert_eq!(report["count"], 2);
+    assert_eq!(report["candidates"].as_array().unwrap().len(), 2);
     let candidates = report["candidates"].as_array().unwrap();
     let ids = candidates
         .iter()
@@ -790,7 +789,7 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
     let second = cli.run(["archive", "candidates", "--json"]).unwrap();
     assert_eq!(first, second);
     let report: Value = serde_json::from_str(&first).unwrap();
-    assert_eq!(report["count"], 2);
+    assert_eq!(report["candidates"].as_array().unwrap().len(), 2);
     let directory_plan = report["candidates"]
         .as_array()
         .unwrap()
@@ -889,7 +888,7 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
         let before = snapshot_tree(cli.root());
 
         let report = cli.run_json(["archive", "candidates"]).unwrap();
-        assert_eq!(report["count"], 1);
+        assert_eq!(report["candidates"].as_array().unwrap().len(), 1);
         assert_eq!(report["candidates"][0]["policy_status"], expected);
         let blocker = match expected {
             "unconfigured" => Some(BlockerCode::PolicyUnconfigured.as_str()),

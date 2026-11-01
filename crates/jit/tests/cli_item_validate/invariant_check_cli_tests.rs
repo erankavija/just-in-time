@@ -92,7 +92,6 @@ fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0, "{json}");
     assert!(json["findings"].as_array().unwrap().is_empty(), "{json}");
 }
 
@@ -123,7 +122,6 @@ fn test_check_exits_zero_when_consistent() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0);
     assert!(json["findings"].as_array().unwrap().is_empty());
 }
 

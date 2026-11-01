@@ -30,7 +30,7 @@ fn test_item_list_indexes_requirements() {
     assert!(output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let items = json["items"].as_array().unwrap();
     let qids: Vec<&str> = items
         .iter()
@@ -60,7 +60,7 @@ fn test_item_list_kind_filter() {
         .output()
         .unwrap();
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
 
     // `decision` is supplied by the applied package, so it is recognized; this issue
     // has no `## Decisions` section, so the recognized kind yields 0 items (not an
@@ -71,7 +71,7 @@ fn test_item_list_kind_filter() {
         .unwrap();
     assert!(output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0);
+    assert_eq!(json["items"].as_array().unwrap().len(), 0);
 
     // A genuinely unknown kind name also yields an empty result (not an error).
     let output = cli
@@ -80,7 +80,7 @@ fn test_item_list_kind_filter() {
         .unwrap();
     assert!(output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 0);
+    assert_eq!(json["items"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_item_graceful_degradation() {
         .output()
         .unwrap();
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn test_item_search_by_text() {
         .unwrap();
     assert!(output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     assert_eq!(json["items"][0]["self_id"].as_str().unwrap(), "REQ-01");
 }
 
@@ -220,7 +220,7 @@ fn test_item_custom_kind_from_config() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     assert_eq!(json["items"][0]["kind"].as_str().unwrap(), "adr");
     assert_eq!(json["items"][0]["self_id"].as_str().unwrap(), "ADR-1");
 }
@@ -464,7 +464,7 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let items = json["items"].as_array().unwrap();
     let qids: Vec<&str> = items
         .iter()
@@ -541,7 +541,7 @@ fn test_item_kind_alias_resolves_through_real_cli() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     let item = &json["items"][0];
     assert_eq!(
         item["qualified_id"].as_str().unwrap(),
@@ -611,7 +611,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     let items = json["items"].as_array().unwrap();
     assert_eq!(
         items[0]["qualified_id"].as_str().unwrap(),
@@ -651,7 +651,7 @@ fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     let item = &json["items"][0];
     assert_eq!(item["kind"].as_str().unwrap(), "gate");
     assert_eq!(item["self_id"].as_str().unwrap(), "cargo-ci");

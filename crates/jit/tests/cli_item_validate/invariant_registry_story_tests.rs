@@ -205,7 +205,7 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
         serde_json::from_slice(&output.stdout).expect("--json output must be valid JSON");
 
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         2,
         "both invariants must be listed"
     );
@@ -429,7 +429,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
 
     // Only the two registry entries may appear.
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         2,
         "only the registry's two entries must appear, not the markdown decoy: {qids:?}"
     );

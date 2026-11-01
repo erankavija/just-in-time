@@ -72,7 +72,8 @@ enum CaptureMode {
 /// Per-step assertion.
 #[derive(Debug, Deserialize)]
 struct Expect {
-    /// Expected process exit code.
+    /// Zero expects success and any other value failure; the status itself
+    /// belongs to the command exit-code projection suite.
     exit: Option<i32>,
     /// Substrings that must appear in the combined stdout + stderr.
     #[serde(default)]
@@ -258,7 +259,6 @@ fn run_scenario(cli: &JitCli, name: &str, fixture_dir: &Path) {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         let combined = format!("{stdout}{stderr}");
-        let exit_code = output.status.code().unwrap_or(-1);
 
         // Capture UUID if requested.
         if step.capture == CaptureMode::Id {
@@ -279,29 +279,32 @@ fn run_scenario(cli: &JitCli, name: &str, fixture_dir: &Path) {
 
         // Apply per-step assertions.
         //
-        // If no `expect` block is present the step must still succeed (exit 0).
-        // Unexpected non-zero exits are swallowed otherwise, silently hiding
+        // If no `expect` block is present the step must still succeed.
+        // Unexpected failures are swallowed otherwise, silently hiding
         // intermediate failures.
         let default_exit_zero = step.expect.is_none();
         if default_exit_zero {
-            assert_eq!(
-                exit_code, 0,
-                "scenario {name} step {step_idx}: expected exit 0 (implicit default) got {exit_code}\n\
+            assert!(
+                output.status.success(),
+                "scenario {name} step {step_idx}: expected success (implicit default) got {:?}\n\
                  argv: {argv:?}\n\
                  stdout: {stdout}\n\
-                 stderr: {stderr}"
+                 stderr: {stderr}",
+                output.status
             );
         }
 
         if let Some(expect) = &step.expect {
-            // Exit code.
+            // Success or failure.
             if let Some(want_exit) = expect.exit {
                 assert_eq!(
-                    exit_code, want_exit,
-                    "scenario {name} step {step_idx}: expected exit {want_exit} got {exit_code}\n\
+                    output.status.success(),
+                    want_exit == 0,
+                    "scenario {name} step {step_idx}: expected exit {want_exit} got {:?}\n\
                      argv: {argv:?}\n\
                      stdout: {stdout}\n\
-                     stderr: {stderr}"
+                     stderr: {stderr}",
+                    output.status
                 );
             }
 

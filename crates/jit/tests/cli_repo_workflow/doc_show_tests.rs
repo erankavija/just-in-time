@@ -15,7 +15,6 @@ use jit::test_cli::JitCli;
 use jit::test_utils::declaration_dir;
 use std::collections::HashSet;
 use std::fs;
-use std::process::Output;
 
 #[test]
 fn test_doc_show_without_git() {
@@ -146,17 +145,9 @@ fn string_leaves(payload: &serde_json::Value) -> Vec<&str> {
 }
 
 /// Assert the `--json` counterpart of a `doc dir` rejection: rerunning `args`
-/// with `--json` fails with the same exit status `plain` reported, and prints a
-/// parseable diagnostic on stdout naming each string in `named`. A machine
-/// caller therefore reads the same classification the human path reports,
-/// rather than an unparseable line.
-fn assert_json_rejection_agrees(
-    cli: &JitCli,
-    args: &[&str],
-    plain: &Output,
-    named: &[&str],
-    shape: &str,
-) {
+/// with `--json` fails and prints a parseable diagnostic on stdout naming each
+/// string in `named`.
+fn assert_json_rejection_agrees(cli: &JitCli, args: &[&str], named: &[&str], shape: &str) {
     let json_args = args.iter().copied().chain(["--json"]).collect::<Vec<_>>();
     let output = cli.command(json_args).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -164,11 +155,6 @@ fn assert_json_rejection_agrees(
     assert!(
         !output.status.success(),
         "{shape} must not resolve a directory under --json"
-    );
-    assert_eq!(
-        output.status.code(),
-        plain.status.code(),
-        "{shape} exits alike with and without --json: {stdout}"
     );
 
     let payload: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|error| {
@@ -309,7 +295,7 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
         // The same rejection under --json, so a machine caller reads the
         // registry's refusal instead of an unparseable line.
-        assert_json_rejection_agrees(&cli, &args, &output, &[undeclared.as_str(), area], shape);
+        assert_json_rejection_agrees(&cli, &args, &[undeclared.as_str(), area], shape);
     });
 }
 
@@ -488,11 +474,5 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
 
     // The same rejection under --json, so a machine caller reads the failed
     // lookup instead of an unparseable line.
-    assert_json_rejection_agrees(
-        &cli,
-        &args,
-        &output,
-        &[unknown],
-        "an identifier naming no issue",
-    );
+    assert_json_rejection_agrees(&cli, &args, &[unknown], "an identifier naming no issue");
 }

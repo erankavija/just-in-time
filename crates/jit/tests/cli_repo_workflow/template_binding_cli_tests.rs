@@ -122,9 +122,10 @@ fn planning_node_count(cli: &JitCli) -> u64 {
     let listed = cli
         .run_json(["query", "all", "--label", "type:planning"])
         .unwrap();
-    listed["count"]
-        .as_u64()
-        .unwrap_or_else(|| panic!("query all must report a count, got: {listed}"))
+    listed["issues"]
+        .as_array()
+        .unwrap_or_else(|| panic!("query all must report issues, got: {listed}"))
+        .len() as u64
 }
 
 /// Assert the reported anchor bindings are exactly `{target: <epic>}`: the CLI

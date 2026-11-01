@@ -485,7 +485,6 @@ fn keyed_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct KeyedFixtureBuildFailure {
-    key: String,
     /// Tells this failure from an earlier one with the same cause.
     attempt: u64,
     cause: String,
@@ -495,17 +494,19 @@ struct KeyedFixtureBuildFailure {
 struct KeyedFixturePaths {
     family_root: PathBuf,
     lock: PathBuf,
-    build_failure: PathBuf,
 }
 
 impl KeyedFixturePaths {
     fn new(cache_root: &Path, family: &str) -> Self {
-        let lock_root = cache_root.join("locks");
         Self {
             family_root: cache_root.join(family),
-            lock: lock_root.join(format!("{family}.lock")),
-            build_failure: lock_root.join(format!("{family}.failure.json")),
+            lock: cache_root.join("locks").join(format!("{family}.lock")),
         }
+    }
+
+    /// `key`'s own record, beside the lock and outside the family's retired entries.
+    fn build_failure(&self, key: &str) -> PathBuf {
+        self.lock.with_extension(format!("{key}.failure.json"))
     }
 }
 
@@ -526,8 +527,8 @@ fn ensure_keyed_fixture(
 /// becomes this consumer's error even when a later retry has since published the
 /// entry; an observed one predates the wait, so this consumer reads the entry or
 /// retries the build. The record outlives a successful retry, which keeps it
-/// visible to every waiter and `attempt` monotonic per key. The kernel releases a
-/// dead holder's lock, so lock waits are unbounded.
+/// visible to every waiter and `attempt` monotonic per key, until the target is
+/// cleaned. The kernel releases a dead holder's lock, so lock waits are unbounded.
 fn ensure_keyed_fixture_observing(
     paths: &KeyedFixturePaths,
     family: &str,
@@ -573,11 +574,10 @@ fn ensure_keyed_fixture_observing(
             }),
             Err(error) => {
                 let recorded = KeyedFixtureBuildFailure {
-                    key: key.to_string(),
                     attempt: failure.map_or(1, |failure| failure.attempt + 1),
                     cause: format!("{error:#}"),
                 };
-                write_fixture_build_failure(paths, &recorded)
+                write_fixture_build_failure(paths, key, &recorded)
                     .with_context(|| format!("record fixture build failure: {error:#}"))?;
                 Err(error)
             }
@@ -646,28 +646,29 @@ fn read_fixture_build_failure(
     paths: &KeyedFixturePaths,
     key: &str,
 ) -> Result<Option<KeyedFixtureBuildFailure>> {
-    let bytes = match fs::read(&paths.build_failure) {
+    let record = paths.build_failure(key);
+    let bytes = match fs::read(&record) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.into()),
     };
-    let failure: KeyedFixtureBuildFailure = serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse fixture failure {}", paths.build_failure.display()))?;
-    Ok((failure.key == key).then_some(failure))
+    serde_json::from_slice(&bytes)
+        .with_context(|| format!("parse fixture failure {}", record.display()))
 }
 
 /// Replaces the record atomically: a waiter reads it before taking any lock.
 fn write_fixture_build_failure(
     paths: &KeyedFixturePaths,
+    key: &str,
     failure: &KeyedFixtureBuildFailure,
 ) -> Result<()> {
     let directory = paths
-        .build_failure
+        .lock
         .parent()
         .context("fixture failure record has no parent")?;
     let staged = tempfile::NamedTempFile::new_in(directory)?;
     fs::write(staged.path(), serde_json::to_vec_pretty(failure)?)?;
-    staged.persist(&paths.build_failure)?;
+    staged.persist(paths.build_failure(key))?;
     Ok(())
 }
 
@@ -1910,6 +1911,51 @@ mod tests {
             .unwrap();
 
         assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
+    }
+
+    #[test]
+    fn test_keyed_fixture_failures_of_two_keys_each_reach_their_own_waiter() {
+        let cache = TempDir::new().unwrap();
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
+        ["first", "second"].into_iter().for_each(|key| {
+            ensure_keyed_fixture_observing(&paths, "family", key, None, |_| {
+                bail!("the {key} key's cause")
+            })
+            .unwrap_err();
+        });
+
+        ["first", "second"].into_iter().for_each(|key| {
+            let error = ensure_keyed_fixture_observing(&paths, "family", key, None, |_| {
+                bail!("a waiter must not build")
+            })
+            .unwrap_err();
+
+            assert!(
+                format!("{error:#}").contains(&format!("the {key} key's cause")),
+                "{error:#}"
+            );
+        });
+    }
+
+    #[test]
+    fn test_keyed_fixture_failure_reaches_its_waiter_after_another_key_publishes() {
+        let cache = TempDir::new().unwrap();
+        let paths = KeyedFixturePaths::new(cache.path(), "family");
+        ensure_keyed_fixture_observing(&paths, "family", "failed", None, |_| {
+            bail!("the failed key's cause")
+        })
+        .unwrap_err();
+        ensure_keyed_fixture_observing(&paths, "family", "published", None, |_| Ok(())).unwrap();
+
+        let error = ensure_keyed_fixture_observing(&paths, "family", "failed", None, |_| {
+            bail!("a waiter must not build")
+        })
+        .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains("the failed key's cause"),
+            "{error:#}"
+        );
     }
 
     #[test]

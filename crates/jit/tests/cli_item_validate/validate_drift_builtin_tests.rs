@@ -11,15 +11,15 @@ use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::process::Output;
 
-/// The exit code and parsed stdout of a `jit validate --json` run.
-fn validate_report(output: &Output) -> (Option<i32>, Value) {
+/// Whether a `jit validate --json` run succeeded, and its parsed stdout.
+fn validate_report(output: &Output) -> (bool, Value) {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
         panic!(
             "invalid validate JSON: {e}\n{}",
             String::from_utf8_lossy(&output.stdout)
         )
     });
-    (output.status.code(), json)
+    (output.status.success(), json)
 }
 
 /// Collect every finding message anywhere in the validate JSON payload.
@@ -55,7 +55,8 @@ fn test_validate_reports_drift_without_opt_in_rule() {
     )
     .unwrap();
 
-    let (_code, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
+    let (_succeeded, json) =
+        validate_report(&cli.command(["validate", "--json"]).output().unwrap());
     let messages = finding_messages(&json);
 
     // declared-but-unenforced: sample-invariant -> ghost-rule.
@@ -113,7 +114,7 @@ fn test_validate_reports_unloadable_target_drift_not_parse_error() {
     )
     .unwrap();
 
-    let (code, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
+    let (succeeded, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
     let messages = finding_messages(&json);
 
     // The drift finding is present (worded to make the unloadable source clear).
@@ -126,9 +127,8 @@ fn test_validate_reports_unloadable_target_drift_not_parse_error() {
         "validate did not surface the unloadable-target drift finding: {messages:?}"
     );
     // And validation fails (drift Error + ruleset parse config-error).
-    assert_ne!(
-        code,
-        Some(0),
+    assert!(
+        !succeeded,
         "validate must fail when the ruleset is unloadable"
     );
 }
@@ -142,7 +142,7 @@ fn test_validate_clean_when_no_invariant_is_declared() {
     let registry = std::fs::read_to_string(cli.root().join(".jit/invariants.toml")).unwrap();
     assert!(!registry.contains("[[invariants]]"));
 
-    let (code, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
+    let (succeeded, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
     let messages = finding_messages(&json);
     assert!(
         !messages.iter().any(|m| m.contains("enforcement drift")
@@ -151,7 +151,7 @@ fn test_validate_clean_when_no_invariant_is_declared() {
         "validate reported drift with no invariants registry: {messages:?}"
     );
     // A pristine `jit init` repo with no invariants validates cleanly (exit 0).
-    assert_eq!(code, Some(0), "pristine repo should validate clean: {json}");
+    assert!(succeeded, "pristine repo should validate clean: {json}");
 }
 
 #[test]
@@ -188,15 +188,11 @@ fn test_validate_clean_when_invariants_fully_consistent() {
     )
     .unwrap();
 
-    let (code, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
+    let (succeeded, json) = validate_report(&cli.command(["validate", "--json"]).output().unwrap());
     let messages = finding_messages(&json);
     assert!(
         !messages.iter().any(|m| m.contains("enforcement drift")),
         "consistent registry should produce no drift: {messages:?}"
     );
-    assert_eq!(
-        code,
-        Some(0),
-        "consistent repo should validate clean: {json}"
-    );
+    assert!(succeeded, "consistent repo should validate clean: {json}");
 }

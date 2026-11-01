@@ -4,7 +4,7 @@
   "context": {},
   "created_at": "2026-10-29T07:06:39.353215586Z",
   "dependencies": [],
-  "description": "Make the first suite run after a crate-source change pass without profiled-fixture lock timeouts.\n\n## Background\n\nThe profiled-repository fixture (`crates/jit/src/test_utils.rs`) is keyed on the package closure and the `jit` crate source digest, and is built in the suite on first use. When a source change produces a new key, the first consumer builds the fixture while the others wait up to `PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND` (12 s) and then fail with \"profiled-repository fixture … is busy\". On a loaded host a cold build exceeds that bound, so the first `cargo-ci` after a source change fails several unit tests that pass on the warm cache. nextest's per-test timeout (`.config/nextest.toml`) caps any waiter at roughly 20 s, so raising the lock bound alone does not help. Runner setup hooks and per-test filters are out (they were removed deliberately).\n\n## Success Criteria\n\n- [hard] REQ-01: A full suite run immediately after a crate-source change (cold fixture keys), on a host under load, passes with no fixture-lock \"busy\" failure; the evidence is recorded with the change.\n- [hard] REQ-02: Consumers waiting on a fixture build fail only when the build itself fails or its holder dies, and a failing build reports its own cause to every waiter.\n- [hard] REQ-03: No runner setup hook, no per-test filter and no test-specific timeout is introduced.\n",
+  "description": "Make the first suite run after a crate-source change pass without profiled-fixture lock timeouts.\n\n## Background\n\nThe profiled-repository fixture (`crates/jit/src/test_utils.rs`) is keyed on the package closure and the `jit` crate source digest, and is built in the suite on first use. When a source change produces a new key, the first consumer builds the fixture while the others wait up to `PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND` (12 s) and then fail with \"profiled-repository fixture … is busy\". On a loaded host a cold build exceeds that bound, so the first `cargo-ci` after a source change fails several unit tests that pass on the warm cache. nextest's per-test timeout (`.config/nextest.toml`) caps any waiter at roughly 20 s, so raising the lock bound alone does not help. Runner setup hooks and per-test filters are out (they were removed deliberately).\n\n## Success Criteria\n\n- [hard] REQ-01: A full suite run immediately after a crate-source change (cold fixture keys), on a host under load, passes with no fixture-lock \"busy\" failure; the evidence is recorded with the change.\n- [hard] REQ-02: A consumer waiting on a fixture build fails only when its own build of that fixture fails, and reports that build's cause. A failed or dead holder does not fail a waiter; the waiter builds the fixture itself.\n- [hard] REQ-03: No runner setup hook, no per-test filter and no test-specific timeout is introduced.\n\n",
   "documents": [],
   "first_ready_at": "2026-10-29T07:06:39.353215586Z",
   "gates_required": [
@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "b0da478b-8d01-4ca6-a785-32edec201ad0",
+      "run_id": "179a63c5-0547-4854-a9ed-367558f94498",
       "status": "passed",
-      "updated_at": "2026-11-01T04:34:20.608748641Z",
+      "updated_at": "2026-11-01T07:57:32.718545888Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "00564033-c16f-49fe-8a0b-fdb88bdb726a",
+      "run_id": "c5d8e84b-680c-4420-9972-50d435b5fcc3",
       "status": "failed",
-      "updated_at": "2026-11-01T04:36:39.833862928Z",
+      "updated_at": "2026-11-01T07:58:48.212309884Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cold profiled-fixture builds no longer time out their waiters",
-  "updated_at": "2026-11-01T04:36:39.833862928Z"
+  "updated_at": "2026-11-01T08:02:39.384909856Z"
 }

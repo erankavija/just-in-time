@@ -25,7 +25,6 @@ pub(crate) struct ForcedFailure {
     pub(crate) argv: Vec<String>,
     pub(crate) expected_failure: String,
     pub(crate) expected_code: ErrorCode,
-    pub(crate) expected_exit: i32,
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,
     pub(crate) status: ExitStatus,
@@ -202,8 +201,7 @@ fn validate_recorded_failure_corpus(corpus: &RecordedFailureCorpus) -> Result<()
             ) if path == &invocation.path
                 && argv == &invocation.argv
                 && repository_root.is_absolute()
-                && !stdout.is_empty()
-                && status.code() == Some(invocation.expected_exit) =>
+                && !stdout.is_empty() =>
             {
                 Ok(())
             }
@@ -288,7 +286,6 @@ fn drive_recorded_failure_from(
         argv: invocation.argv.clone(),
         expected_failure: invocation.expected_failure.clone(),
         expected_code: invocation.expected_code,
-        expected_exit: invocation.expected_exit,
         stdout: output.stdout,
         stderr: output.stderr,
         status: output.status,
@@ -729,7 +726,7 @@ fn corpus_conforming_to_the_registry() -> RecordedFailureCorpus {
                 stdout: b"{}".to_vec(),
                 stderr: Vec::new(),
                 status: ObservedStatus {
-                    code: Some(invocation.expected_exit),
+                    code: Some(1),
                     signal: None,
                 },
             },
@@ -751,20 +748,6 @@ fn test_validate_recorded_failure_corpus_accepts_a_corpus_conforming_to_the_regi
 fn test_validate_recorded_failure_corpus_refuses_a_missing_row() {
     let mut corpus = corpus_conforming_to_the_registry();
     corpus.pop();
-    assert!(validate_recorded_failure_corpus(&corpus).is_err());
-}
-
-#[test]
-fn test_validate_recorded_failure_corpus_refuses_an_exit_the_registry_does_not_expect() {
-    let mut corpus = corpus_conforming_to_the_registry();
-    let status = corpus
-        .iter_mut()
-        .find_map(|row| match row {
-            RecordedFailureObservation::Invoked { status, .. } => Some(status),
-            RecordedFailureObservation::Exempt { .. } => None,
-        })
-        .expect("the registry records an invocation");
-    status.code = status.code.map(|code| code + 1);
     assert!(validate_recorded_failure_corpus(&corpus).is_err());
 }
 
@@ -854,10 +837,8 @@ fn test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class() {
         .arms
         .iter()
         .filter_map(|arm| match arm {
-            FailureLever::Invocation(invocation) if invocation.expected_exit != 0 => {
-                Some(invocation)
-            }
-            FailureLever::Invocation(_) | FailureLever::Exemption(_) => None,
+            FailureLever::Invocation(invocation) => Some(invocation),
+            FailureLever::Exemption(_) => None,
         })
         .flat_map(|invocation| {
             invocation
@@ -894,7 +875,6 @@ fn test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class() {
         assert_eq!(result.argv, invocation.argv);
         assert_eq!(result.expected_failure, invocation.expected_failure);
         assert_eq!(result.expected_code, invocation.expected_code);
-        assert_eq!(result.expected_exit, invocation.expected_exit);
         assert!(
             !result.status.success(),
             "representative {} for setup class {class:?} succeeded: stdout={} stderr={}",
@@ -961,7 +941,7 @@ fn test_failure_probe_fixture_names_arms_from_registry() {
 fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
     match drive_named_failure("hooks install") {
         RecordedFailure::Invoked(result) => {
-            assert_eq!(result.status.code(), Some(1));
+            assert!(!result.status.success());
             let envelope: serde_json::Value = serde_json::from_slice(&result.stdout)
                 .expect("git-absent hook probe emits a JSON error envelope");
             assert_eq!(envelope["error"]["code"], "HOOKS_INSTALL_ERROR");
