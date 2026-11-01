@@ -20,7 +20,7 @@ use crate::domain::item::{
 };
 use crate::domain::{Issue, ReadinessCorrection};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{RepositoryImage, RepositoryIndex, VirtualPath};
+use crate::repository_state::{captured_issue_ids, RepositoryImage, RepositoryIndex, VirtualPath};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
@@ -374,13 +374,12 @@ struct Records {
 
 fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records> {
     let index_path = VirtualPath::INDEX.repository_relative();
-    let index = RepositoryIndex::parse(
+    RepositoryIndex::parse(
         &read(&index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
     .context(format!("invalid {index_path}"))?;
-    let issues = index
-        .all_ids
+    let issues = captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id).repository_relative();
@@ -395,34 +394,6 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
             Ok(issue)
         })
         .collect::<Result<Vec<_>>>()?;
-    // The complete `.jit/issues` listing is captured into the image; reconcile the
-    // JSON issue files it contains against the index ids exactly as the recursive
-    // filesystem walk did, but from the captured listing.
-    let issues_dir = crate::repository_state::VirtualPath::ISSUES;
-    let listing = image
-        .directory_listings()
-        .get(&issues_dir)
-        .ok_or_else(|| anyhow!("captured image is missing the .jit/issues listing"))?;
-    let expected: BTreeSet<String> = index
-        .all_ids
-        .iter()
-        .filter_map(|id| {
-            crate::repository_state::VirtualPath::issue_record(id)
-                .file_name()
-                .map(str::to_owned)
-        })
-        .collect();
-    let actual: BTreeSet<String> = listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .cloned()
-        .collect();
-    if actual != expected {
-        return Err(anyhow!(
-            "issue files disagree with .jit/index.json (expected {expected:?}, found {actual:?})"
-        ));
-    }
 
     let mut event_count = 0;
     if let Some(events) = read_text(read, &VirtualPath::EVENTS.repository_relative())? {
@@ -1317,12 +1288,7 @@ mod tests {
             "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
             vec!["type:task".to_string()],
         );
-        let index_bytes =
-            read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap();
-        let id = serde_json::from_slice::<RepositoryIndex>(&index_bytes)
-            .unwrap()
-            .all_ids
-            .remove(0);
+        let id = executor.storage().list_issues().unwrap().remove(0).id;
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(&id).repository_relative()).unwrap(),
         )
@@ -1480,11 +1446,7 @@ mod tests {
         )
         .unwrap();
         std::fs::write(data_path(&executor, &VirtualPath::INVARIANTS), invariants).unwrap();
-        let index: RepositoryIndex = serde_json::from_slice(
-            &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
-        )
-        .unwrap();
-        let id = &index.all_ids[0];
+        let id = &executor.storage().list_issues().unwrap().remove(0).id;
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )
@@ -1536,11 +1498,7 @@ mod tests {
         )
         .unwrap();
         executor.validate_with_fix(true, false).unwrap();
-        let index: RepositoryIndex = serde_json::from_slice(
-            &read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap(),
-        )
-        .unwrap();
-        let id = &index.all_ids[0];
+        let id = &executor.storage().list_issues().unwrap().remove(0).id;
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
         )

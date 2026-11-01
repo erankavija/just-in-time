@@ -13,7 +13,6 @@ use crate::domain::{Event, Issue};
 use crate::repository_state::{
     RepositoryIndex, RepositoryIndexError, RepositoryLayout, VirtualPath, BOOTSTRAP_LOCK_FILE,
     EVENTS_LOCK_FILE, GATES_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE,
-    SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
     FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
@@ -44,7 +43,7 @@ thread_local! {
 /// The semantic records physically present in one selected JIT data root.
 ///
 /// Unlike [`IssueStore`] readers, this snapshot never consults repository
-/// history, index membership, or another checkout's data root. Issue order is
+/// history, tombstones, or another checkout's data root. Issue order is
 /// stable by physical file name; event order remains append-log order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExactStoreSnapshot {
@@ -333,6 +332,40 @@ mod artifact_location_tests {
             Err(crate::storage::PathReadError::Other(_))
         ));
     }
+}
+
+/// Merge one store's files and tombstones into `membership`, earlier sources winning.
+fn merge_store_membership(
+    index: &Path,
+    issues: &Path,
+    membership: &mut BTreeMap<IssueId, bool>,
+) -> Result<()> {
+    let read_failure = |path: &Path| format!("Failed to read file: {}", path.display());
+    let names = match fs::read_dir(issues) {
+        Ok(entries) => entries
+            .map(|entry| {
+                entry?
+                    .file_name()
+                    .into_string()
+                    .map_err(|name| anyhow!("non-UTF-8 issue file name {name:?}"))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error).with_context(|| read_failure(issues)),
+    };
+    let deleted = match fs::read(index) {
+        Ok(bytes) => parse_repository_index(&bytes)?.deleted_ids,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error).with_context(|| read_failure(index)),
+    };
+    crate::repository_state::listed_issue_ids(&names)?
+        .into_iter()
+        .map(|id| (id, true))
+        .chain(deleted.into_iter().map(|id| (id, false)))
+        .for_each(|(id, is_active)| {
+            membership.entry(id).or_insert(is_active);
+        });
+    Ok(())
 }
 
 /// Parse and validate one captured `index.json` without consulting ambient state.
@@ -746,87 +779,43 @@ impl JsonFileStorage {
         parse_repository_index(&bytes)
     }
 
-    /// Load the membership of this checkout's store layered over the primary
-    /// checkout's, deduplicating ids.
-    fn load_aggregated_index(&self) -> Result<Index> {
-        use std::collections::BTreeMap;
-
-        // The first source that mentions an id wins: local, then the main
-        // worktree. This mirrors issue loading and lets a local restore override
-        // a stale lower-priority tombstone (and vice versa).
+    /// The active ids of this checkout's store layered over the primary checkout's.
+    ///
+    /// The first source that mentions an id wins, and within a source a file beats
+    /// a tombstone, so a local delete hides the primary's file and a local file
+    /// survives any tombstone. Only an absent file or directory is skipped; any
+    /// other failure aborts rather than exposing a plausible but incomplete set.
+    fn load_aggregated_issue_ids(&self) -> Result<Vec<IssueId>> {
         let mut membership = BTreeMap::new();
-
-        // Only a genuinely absent source may be skipped. Once index bytes exist,
-        // every read, parse, version, and membership-structure failure aborts the
-        // aggregation instead of exposing a plausible but incomplete issue set.
-        let merge_source = |loaded: Result<Option<Index>>,
-                            membership: &mut BTreeMap<IssueId, bool>|
-         -> Result<()> {
-            match loaded {
-                Ok(Some(index)) => {
-                    index.all_ids.into_iter().for_each(|id| {
-                        membership.entry(id).or_insert(true);
-                    });
-                    index.deleted_ids.into_iter().for_each(|id| {
-                        membership.entry(id).or_insert(false);
-                    });
-                    Ok(())
-                }
-                Ok(None) => Ok(()),
-                Err(error) => Err(error),
-            }
-        };
-
-        let local = match fs::read(self.resolve_virtual_path(&VirtualPath::INDEX)?) {
-            Ok(bytes) => Some(parse_repository_index(&bytes)?),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error).context("Failed to read local index"),
-        };
-        merge_source(Ok(local), &mut membership)?;
-
-        merge_source(self.load_index_from_main_worktree(), &mut membership)?;
-
-        Ok(Index {
-            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: membership
-                .into_iter()
-                .filter_map(|(id, is_active)| is_active.then_some(id))
-                .collect(),
-            deleted_ids: vec![], // Don't propagate deleted_ids in aggregated index
-        })
+        merge_store_membership(
+            &self.resolve_virtual_path(&VirtualPath::INDEX)?,
+            &self.resolve_virtual_path(&VirtualPath::ISSUES)?,
+            &mut membership,
+        )?;
+        if let Some(primary) = self.primary_layout()? {
+            merge_store_membership(
+                &primary.resolve(&VirtualPath::INDEX)?,
+                &primary.resolve(&VirtualPath::ISSUES)?,
+                &mut membership,
+            )?;
+        }
+        Ok(membership
+            .into_iter()
+            .filter_map(|(id, is_active)| is_active.then_some(id))
+            .collect())
     }
 
-    /// Load every issue the aggregated index membership names, under an
+    /// Load every issue the aggregated membership names, under an
     /// already-held `.index.lock`.
     ///
     /// This is the enumeration both read-all paths share: an id the fallback
     /// chain cannot load is skipped rather than failing the read.
-    fn read_indexed_issues(&self) -> Result<Vec<Issue>> {
-        // Use aggregated index to see all issues across sources, then load
-        // through the fallback chain (`load_issue` handles local/main).
+    fn read_member_issues(&self) -> Result<Vec<Issue>> {
         Ok(self
-            .load_aggregated_index()?
-            .all_ids
+            .load_aggregated_issue_ids()?
             .iter()
             .filter_map(|id| self.load_issue(id).ok())
             .collect())
-    }
-
-    /// Load index from main worktree.
-    fn load_index_from_main_worktree(&self) -> Result<Option<Index>> {
-        let Some(layout) = self.primary_layout()? else {
-            return Ok(None);
-        };
-        let main_index_path = layout.resolve(&VirtualPath::INDEX)?;
-        let bytes = match fs::read(&main_index_path) {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => {
-                return Err(error)
-                    .with_context(|| format!("Failed to read file: {}", main_index_path.display()))
-            }
-        };
-        parse_repository_index(&bytes).map(Some)
     }
 
     /// Load an issue from the main worktree's `.jit/` directory.
@@ -1140,8 +1129,8 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<crate::domain::identity::IssueId> {
-        let index = self.load_aggregated_index()?;
-        crate::storage::resolve_unique_issue_id(prefix, index.all_ids.iter(), |id| {
+        let ids = self.load_aggregated_issue_ids()?;
+        crate::storage::resolve_unique_issue_id(prefix, ids.iter(), |id| {
             self.load_issue(id)
                 .ok()
                 .map(|issue| crate::storage::describe_issue(&issue))
@@ -1152,7 +1141,7 @@ impl IssueStore for JsonFileStorage {
         let index_lock_path = self.root.join(INDEX_LOCK_FILE);
         let _lock = self.locker.lock_shared(&index_lock_path)?;
 
-        self.read_indexed_issues()
+        self.read_member_issues()
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
@@ -1444,6 +1433,8 @@ fn map_confined_read_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueIdPrefix;
+    use crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
@@ -1897,12 +1888,6 @@ mod tests {
                 crate::repository_state::serialize_issue(issue).unwrap(),
             )
             .unwrap();
-            let mut index = storage.load_index().unwrap_or_default();
-            if !index.all_ids.contains(&issue.id) {
-                index.all_ids.push(issue.id.clone());
-            }
-            index.deleted_ids.retain(|id| id != &issue.id);
-            seed_index_preimage(storage, &index);
         }
 
         fn physical_files(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
@@ -2203,7 +2188,7 @@ mod tests {
         }
 
         #[test]
-        fn test_load_aggregated_index_includes_main_worktree_issues() {
+        fn test_load_aggregated_issue_ids_includes_main_worktree_issues() {
             // Setup: Create git repo with main worktree
             let (_temp_dir, main_storage, _taxonomy) =
                 crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
@@ -2246,8 +2231,8 @@ mod tests {
             seed_index_preimage(&secondary_storage, &Index::default());
 
             // Aggregated index should include main worktree issue
-            let aggregated = secondary_storage.load_aggregated_index().unwrap();
-            assert!(aggregated.all_ids.contains(&issue_id));
+            let aggregated = secondary_storage.load_aggregated_issue_ids().unwrap();
+            assert!(aggregated.contains(&issue_id));
         }
 
         #[test]
@@ -2285,21 +2270,20 @@ mod tests {
             )
             .unwrap();
             let malformed = secondary_storage
-                .load_aggregated_index()
+                .load_aggregated_issue_ids()
                 .expect_err("a malformed main-worktree index must abort aggregation");
             assert!(malformed.to_string().contains("failed to parse index"));
 
             fs::remove_file(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
             fs::create_dir(main_jit_layout.resolve(&VirtualPath::INDEX).unwrap()).unwrap();
             let unreadable = secondary_storage
-                .load_aggregated_index()
+                .load_aggregated_issue_ids()
                 .expect_err("an unreadable main-worktree index must abort aggregation");
             assert!(unreadable.to_string().contains("Failed to read file"));
         }
 
         #[test]
         fn test_committed_issue_deleted_locally_is_absent_from_every_read() {
-            use crate::domain::identity::IssueIdPrefix;
             use std::str::FromStr;
 
             let (temp_dir, storage, _taxonomy) =
@@ -2354,43 +2338,99 @@ mod tests {
             }
         }
 
-        #[test]
-        fn test_local_membership_overrides_main_worktree_in_both_states() {
+        /// A linked store over a primary store; `linked` removes one store's file
+        /// and records nothing else.
+        fn stores_sharing_issue() -> (TempDir, JsonFileStorage, TempDir, JsonFileStorage, Issue) {
             let (temp_dir, main_storage, _taxonomy) =
                 crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
             crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
+            let issue = crate::test_utils::fixture_issue("Shared".to_string(), String::new());
+            seed_issue_preimage(&main_storage, &issue);
             commit_all(temp_dir.path());
-            let (_container, linked) = linked_store(temp_dir.path());
-            let (active_locally, deleted_locally) = (
-                crate::test_utils::issue_id(171),
-                crate::test_utils::issue_id(172),
-            );
+            let (container, linked) = linked_store(temp_dir.path());
+            (temp_dir, main_storage, container, linked, issue)
+        }
 
-            seed_index_preimage(
-                &main_storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![deleted_locally.clone()],
-                    deleted_ids: vec![active_locally.clone()],
-                },
-            );
-            seed_index_preimage(
-                &linked,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![active_locally.clone()],
-                    deleted_ids: vec![deleted_locally],
-                },
-            );
+        fn remove_issue_with_tombstone(storage: &JsonFileStorage, issue: &Issue) {
+            fs::remove_file(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::issue_record(&issue.id))
+                    .unwrap(),
+            )
+            .unwrap();
+            add_tombstone(storage, issue);
+        }
 
-            assert_eq!(
-                linked.load_aggregated_index().unwrap().all_ids,
-                vec![active_locally]
-            );
+        fn add_tombstone(storage: &JsonFileStorage, issue: &Issue) {
+            let mut index = storage.load_index().unwrap();
+            index.mark_deleted(issue.id.clone());
+            seed_index_preimage(storage, &index);
         }
 
         #[test]
-        fn test_load_aggregated_index_deduplicates_an_issue_in_both_checkouts() {
+        fn test_membership_local_delete_hides_the_primary_checkout_file() {
+            let (_main_dir, _main, _container, linked, issue) = stores_sharing_issue();
+
+            remove_issue_with_tombstone(&linked, &issue);
+
+            assert!(linked.load_aggregated_issue_ids().unwrap().is_empty());
+            assert!(linked.list_issues().unwrap().is_empty());
+            assert!(linked
+                .resolve_issue_id(&IssueIdPrefix::from(&issue.id))
+                .is_err());
+        }
+
+        #[test]
+        fn test_membership_local_file_wins_over_primary_checkout_tombstone() {
+            let (_main_dir, main, _container, linked, issue) = stores_sharing_issue();
+
+            remove_issue_with_tombstone(&main, &issue);
+
+            assert_eq!(linked.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
+        }
+
+        #[test]
+        fn test_membership_file_wins_over_tombstone_within_one_source() {
+            let (_main_dir, main, _container, _linked, issue) = stores_sharing_issue();
+
+            add_tombstone(&main, &issue);
+
+            assert_eq!(main.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
+        }
+
+        #[test]
+        fn test_membership_primary_checkout_file_shows_when_local_is_silent() {
+            let (_main_dir, main, _container, linked, _issue) = stores_sharing_issue();
+            let primary_only =
+                crate::test_utils::fixture_issue("Primary".to_string(), String::new());
+
+            seed_issue_preimage(&main, &primary_only);
+
+            assert!(linked
+                .load_aggregated_issue_ids()
+                .unwrap()
+                .contains(&primary_only.id));
+        }
+
+        #[test]
+        fn test_membership_treats_a_missing_issues_directory_as_empty() {
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            fs::remove_dir_all(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::ISSUES)
+                    .unwrap(),
+            )
+            .unwrap();
+
+            assert!(storage.load_aggregated_issue_ids().unwrap().is_empty());
+        }
+
+        #[test]
+        fn test_load_aggregated_issue_ids_deduplicates_an_issue_in_both_checkouts() {
             let (temp_dir, main_storage, _taxonomy) =
                 crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
             crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
@@ -2400,10 +2440,7 @@ mod tests {
             commit_all(temp_dir.path());
             let (_container, linked) = linked_store(temp_dir.path());
 
-            assert_eq!(
-                linked.load_aggregated_index().unwrap().all_ids,
-                vec![issue.id]
-            );
+            assert_eq!(linked.load_aggregated_issue_ids().unwrap(), vec![issue.id]);
         }
 
         #[test]
@@ -2432,27 +2469,17 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_index_v2_has_deleted_ids_field() {
-            // Create a new index - should be v2
-            let index = Index::default();
-
-            assert_eq!(index.schema_version, 2);
-            assert_eq!(index.all_ids, Vec::<IssueId>::new());
-            assert_eq!(index.deleted_ids, Vec::<IssueId>::new());
+        fn test_index_default_holds_no_tombstones() {
+            assert!(Index::default().deleted_ids.is_empty());
         }
 
         #[test]
-        fn test_index_v2_save_and_load() {
+        fn test_index_save_and_load_round_trips_tombstones() {
             let (_temp_dir, storage) = crate::test_utils::setup_test_repo().unwrap();
-
-            // Create index with deleted IDs
+            let tombstone = crate::test_utils::issue_id(44);
             let index = Index {
-                schema_version: 2,
-                all_ids: vec![
-                    crate::test_utils::issue_id(7),
-                    crate::test_utils::issue_id(43),
-                ],
-                deleted_ids: vec![crate::test_utils::issue_id(44)],
+                schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                deleted_ids: vec![tombstone.clone()],
             };
 
             fs::write(
@@ -2465,17 +2492,7 @@ mod tests {
             )
             .unwrap();
 
-            // Load it back
-            let loaded = storage.load_index().unwrap();
-
-            assert_eq!(loaded.schema_version, 2);
-            assert_eq!(loaded.all_ids.len(), 2);
-            assert!(loaded.all_ids.contains(&crate::test_utils::issue_id(7)));
-            assert!(loaded.all_ids.contains(&crate::test_utils::issue_id(43)));
-            assert_eq!(loaded.deleted_ids.len(), 1);
-            assert!(loaded
-                .deleted_ids
-                .contains(&crate::test_utils::issue_id(44)));
+            assert_eq!(storage.load_index().unwrap().deleted_ids, vec![tombstone]);
         }
     }
 
@@ -2568,9 +2585,7 @@ mod tests {
             let storage = JsonFileStorage::new(&data);
             configure_test_layout(&storage, temp_dir.path(), &data);
             let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
-            let raw = format!(
-                "{{\n  \"schema_version\": {newer},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
-            );
+            let raw = format!("{{\n  \"schema_version\": {newer},\n  \"deleted_ids\": []\n}}");
             fs::write(&index_path, raw).unwrap();
 
             let err = storage
@@ -2606,9 +2621,7 @@ mod tests {
             let storage = JsonFileStorage::new(&data);
             configure_test_layout(&storage, temp_dir.path(), &data);
             let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
-            let raw = format!(
-                "{{\n  \"schema_version\": {newer},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
-            );
+            let raw = format!("{{\n  \"schema_version\": {newer},\n  \"deleted_ids\": []\n}}");
             fs::write(&index_path, raw).unwrap();
 
             let err = storage
@@ -2622,18 +2635,13 @@ mod tests {
             let id = crate::test_utils::issue_id(1);
             let cases = [
                 (
-                    serde_json::json!({"schema_version": 2, "all_ids": [id, id], "deleted_ids": []}).to_string(),
-                    format!("duplicate active issue id '{id}'"),
-                ),
-                (
-                    serde_json::json!({"schema_version": 2, "all_ids": [], "deleted_ids": [id, id]}).to_string(),
+                    serde_json::json!({"schema_version": 2, "deleted_ids": [id, id]}).to_string(),
                     format!("duplicate deleted issue id '{id}'"),
                 ),
                 (
-                    serde_json::json!({"schema_version": 2, "all_ids": [id], "deleted_ids": [id]}).to_string(),
-                    "both active and deleted".to_string(),
+                    "{ invalid json".to_string(),
+                    "failed to parse index".to_string(),
                 ),
-                ("{ invalid json".to_string(), "failed to parse index".to_string()),
             ];
 
             for (raw, expected) in cases {
@@ -2645,7 +2653,7 @@ mod tests {
                 configure_test_layout(&storage, temp_dir.path(), &data);
                 fs::write(data_layout.resolve(&VirtualPath::INDEX).unwrap(), raw).unwrap();
                 let error = storage
-                    .load_aggregated_index()
+                    .load_aggregated_issue_ids()
                     .expect_err("invalid local index must abort aggregation");
                 assert!(
                     error.to_string().contains(&expected),
@@ -2666,7 +2674,7 @@ mod tests {
             configure_test_layout(&storage, temp_dir.path(), &data);
             let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
             let raw = format!(
-                "{{\n  \"schema_version\": {SUPPORTED_INDEX_SCHEMA_VERSION},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+                "{{\n  \"schema_version\": {SUPPORTED_INDEX_SCHEMA_VERSION},\n  \"deleted_ids\": []\n}}"
             );
             fs::write(&index_path, raw).unwrap();
             assert!(storage.load_index().is_ok());
@@ -2685,9 +2693,7 @@ mod tests {
             let storage = JsonFileStorage::new(&data);
             configure_test_layout(&storage, temp_dir.path(), &data);
             let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
-            let raw = format!(
-                "{{\n  \"schema_version\": {older},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
-            );
+            let raw = format!("{{\n  \"schema_version\": {older},\n  \"deleted_ids\": []\n}}");
             fs::write(&index_path, raw).unwrap();
             let index = storage.load_index().expect("older format must still load");
             assert_eq!(index.schema_version, older);

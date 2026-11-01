@@ -155,7 +155,7 @@ impl<B: Backend> Repository<B> {
                 index,
                 RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
-                index_bytes(issues),
+                index_bytes(),
                 FileMode::Regular,
             ),
             RepositoryAction::create_directory(
@@ -182,20 +182,15 @@ impl<B: Backend> Repository<B> {
     }
 }
 
-fn index_bytes(issues: &[Issue]) -> Vec<u8> {
-    RepositoryIndex {
-        all_ids: issues.iter().map(|issue| issue.id.clone()).collect(),
-        ..RepositoryIndex::default()
-    }
-    .to_pretty_bytes()
-    .unwrap()
+fn index_bytes() -> Vec<u8> {
+    RepositoryIndex::default().to_pretty_bytes().unwrap()
 }
 
-/// A data root holding only an empty membership index.
+/// A data root holding only an empty index.
 fn initialized() -> Vec<(VirtualPath, String)> {
     vec![(
         VirtualPath::INDEX,
-        String::from_utf8(index_bytes(&[])).unwrap(),
+        String::from_utf8(index_bytes()).unwrap(),
     )]
 }
 

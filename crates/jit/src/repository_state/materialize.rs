@@ -192,13 +192,13 @@ pub fn render_capture_closure(
 pub struct ValidationCaptureClosure {
     /// Every exact `.jit/...` or worktree file validation reads.
     pub paths: Vec<VirtualPath>,
-    /// Every complete directory listing validation reconciles (the issue files).
+    /// Every complete directory listing validation reads (the issue files).
     pub listings: Vec<VirtualPath>,
 }
 
 /// Enumerate the validation closure from the captured declarations.
 ///
-/// Given the captured configuration, the index's `all_ids`, and (when present)
+/// Given the captured configuration, the issue ids the listing states, and (when present)
 /// the captured `rules.toml` bytes, this returns every additional canonical path
 /// and listing whole-repository validation reads so it consumes only
 /// image-projected content: the engine registries (`config.toml`,
@@ -237,8 +237,7 @@ pub fn validate_capture_closure(
         // its producer composes rather than treating it as uncaptured.
         VirtualPath::DATA_IGNORE,
     ];
-    // Every ordinary issue record named by the index, plus the complete listing
-    // whole-repository validation reconciles against those ids.
+    // Every issue record the listing states, plus that listing.
     for id in all_ids {
         paths.push(VirtualPath::issue_record(id));
     }

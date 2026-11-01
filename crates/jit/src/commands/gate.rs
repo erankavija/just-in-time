@@ -310,14 +310,10 @@ fn capture_gate_preset_image(
         .map(|name| VirtualPath::data(format!("{}/{name}.json", presets_dir.relative().as_str())))
         .transpose()?;
     let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-        let index_bytes = image
-            .file_bytes(&VirtualPath::INDEX)?
-            .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-        let issue_paths = crate::storage::json::parse_repository_index(index_bytes)?
-            .all_ids
+        let issue_paths = crate::repository_state::captured_issue_ids(image)?
             .iter()
-            .map(|id| Ok(VirtualPath::issue_record(id)))
-            .collect::<Result<Vec<_>>>()?;
+            .map(VirtualPath::issue_record)
+            .collect::<Vec<_>>();
         let closure = if include_projection_closure {
             let config = assemble_config(image)?;
             let rules_text =
@@ -339,28 +335,6 @@ fn capture_gate_preset_image(
     else {
         return Ok(None);
     };
-    let current_index = image
-        .file_bytes(&VirtualPath::INDEX)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
-        .and_then(crate::storage::json::parse_repository_index)?;
-    let listing = image
-        .directory_listings()
-        .get(&issues_dir)
-        .ok_or_else(|| anyhow!("complete issues listing is absent"))?;
-    let listed = listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
-    let indexed = current_index
-        .all_ids
-        .iter()
-        .filter_map(|id| VirtualPath::issue_record(id).file_name().map(str::to_owned))
-        .collect::<std::collections::BTreeSet<_>>();
-    if listed != indexed {
-        return Ok(None);
-    }
     Ok(Some(image))
 }
 

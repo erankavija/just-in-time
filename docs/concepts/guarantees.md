@@ -404,7 +404,7 @@ worktree of the repository.
 ```
 .jit/
 ├── issues/{id}.json          # Issue data
-├── index.json                # Issue index
+├── index.json                # Format version and deletion tombstones
 ├── gates.toml                # Gate registry
 ├── tmp/                      # Scratch space; git-ignored
 │   └── redo.record           # A pending mutation's commit point

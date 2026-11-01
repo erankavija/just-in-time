@@ -95,7 +95,7 @@ impl VersionConfig {
 ///
 /// The sole home for the project's canonical, human-editable name — not
 /// `index.json`, which carries only machine metadata
-/// (`schema_version`/`all_ids`/`deleted_ids`) and is not meant to be hand-edited.
+/// (`schema_version`/`deleted_ids`) and is not meant to be hand-edited.
 /// Resolve a present value with
 /// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
 #[derive(Debug, Clone, Deserialize, Serialize)]

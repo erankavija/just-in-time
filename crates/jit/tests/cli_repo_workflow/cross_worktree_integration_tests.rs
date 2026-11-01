@@ -189,6 +189,38 @@ fn test_local_overrides_main() {
 // (jit:1b6925a9).
 
 #[test]
+fn test_issue_creates_on_two_branches_merge_without_an_index_conflict() {
+    let (primary, linked) = JitCli::linked_checkouts().unwrap();
+    let primary_id = primary.create_issue(["-t", "Primary"]).unwrap();
+    primary.commit("Primary issue").unwrap();
+    let created = linked
+        .command_with_env(
+            ["issue", "create", "-t", "Linked", "--json"],
+            [crate::ALLOW_LINKED_WRITES],
+        )
+        .output()
+        .unwrap();
+    assert!(created.status.success(), "{created:?}");
+    let linked_id =
+        jit::test_cli::created_issue_id(&serde_json::from_slice(&created.stdout).unwrap()).unwrap();
+    linked.commit("Linked issue").unwrap();
+    let branch = linked.git(["branch", "--show-current"]).unwrap();
+
+    primary
+        .git(["merge", "-q", "--no-edit", branch.trim()])
+        .unwrap();
+
+    let listed = primary.run_json(["query", "all"]).unwrap();
+    let ids: Vec<&str> = listed["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|issue| issue["id"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&primary_id.as_str()) && ids.contains(&linked_id.as_str()));
+}
+
+#[test]
 fn test_deletion_requires_env_var() {
     // Phase 3: Deletion in main worktree requires JIT_ALLOW_DELETION=1 to discourage deletion
     let cli = JitCli::initialised().unwrap();
