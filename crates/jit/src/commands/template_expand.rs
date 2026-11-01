@@ -36,7 +36,7 @@ use crate::templates::{GraphTemplate, TemplateNode, TransformKind};
 
 /// One endpoint of a [`DeltaEdge`]: a node the delta creates (named by its
 /// template role), or an issue that already exists (named by its full id).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DeltaEndpoint {
     /// A node the delta creates, identified by its template role.
     CreatedRole(String),
@@ -391,9 +391,9 @@ pub fn validate_delta_acyclic(
         .into_iter()
         .map(|(id, deps)| {
             (
-                ProspectiveId::ExistingIssue(id),
+                DeltaEndpoint::ExistingIssue(id),
                 deps.into_iter()
-                    .map(ProspectiveId::ExistingIssue)
+                    .map(DeltaEndpoint::ExistingIssue)
                     .collect::<Vec<_>>(),
             )
         })
@@ -402,18 +402,18 @@ pub fn validate_delta_acyclic(
     // Every created node enters the graph under a placeholder id, with no deps
     // until `add_edges` supplies them.
     for planned in &delta.creates {
-        deps_by_id.insert(placeholder_id(&planned.role), Vec::new());
+        deps_by_id.insert(DeltaEndpoint::CreatedRole(planned.role.clone()), Vec::new());
     }
     for edge in &delta.add_edges {
         deps_by_id
-            .entry(endpoint_id(&edge.dependent))
+            .entry(edge.dependent.clone())
             .or_default()
-            .push(endpoint_id(&edge.dependency));
+            .push(edge.dependency.clone());
     }
     for edge in &delta.remove_edges {
-        let dependency = endpoint_id(&edge.dependency);
-        if let Some(deps) = deps_by_id.get_mut(&endpoint_id(&edge.dependent)) {
-            deps.retain(|d| d != &dependency);
+        let dependency = &edge.dependency;
+        if let Some(deps) = deps_by_id.get_mut(&edge.dependent) {
+            deps.retain(|d| d != dependency);
         }
     }
 
@@ -424,26 +424,11 @@ pub fn validate_delta_acyclic(
         .map(|(id, dependencies)| ProspectiveNode { id, dependencies })
         .collect();
     let refs: Vec<&ProspectiveNode> = nodes.iter().collect();
-    // Propagate the typed `GraphError::CycleDetected` (not a bare message) so the
-    // failure classifies as a validation error (exit 4) through the shared
-    // `output::failure::classify` downcast, matching `dep add`'s cycle rejection.
+    // DAG validation can only report a cycle; expose it in the issue-id error
+    // context so shared failure classification matches `dep add`.
     crate::graph::DependencyGraph::new(&refs)
         .validate_dag()
-        .map_err(anyhow::Error::new)
-}
-
-/// The simulation id of a not-yet-created role node. Prefixed so it cannot
-/// collide with a real (uuid) issue id.
-fn placeholder_id(role: &str) -> ProspectiveId {
-    ProspectiveId::CreatedRole(format!("__apply_placeholder__:{role}"))
-}
-
-/// The simulation id of a delta endpoint.
-fn endpoint_id(endpoint: &DeltaEndpoint) -> ProspectiveId {
-    match endpoint {
-        DeltaEndpoint::CreatedRole(role) => placeholder_id(role),
-        DeltaEndpoint::ExistingIssue(id) => ProspectiveId::ExistingIssue(id.clone()),
-    }
+        .map_err(|_| crate::graph::GraphError::<IssueId>::CycleDetected.into())
 }
 
 /// A synthetic graph node for the prospective-cycle simulation: an id and its
@@ -451,33 +436,20 @@ fn endpoint_id(endpoint: &DeltaEndpoint) -> ProspectiveId {
 /// placeholders) can be checked with the existing
 /// [`DependencyGraph`](crate::graph::DependencyGraph) without mutating any
 /// stored issue.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum ProspectiveId {
-    CreatedRole(String),
-    ExistingIssue(IssueId),
-}
-
-impl ProspectiveId {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CreatedRole(role) => role.as_str(),
-            Self::ExistingIssue(id) => id.as_str(),
-        }
-    }
-}
-
 struct ProspectiveNode {
-    id: ProspectiveId,
-    dependencies: Vec<ProspectiveId>,
+    id: DeltaEndpoint,
+    dependencies: Vec<DeltaEndpoint>,
 }
 
 impl crate::graph::GraphNode for ProspectiveNode {
-    fn id(&self) -> &str {
-        self.id.as_str()
+    type Id = DeltaEndpoint;
+
+    fn id(&self) -> &DeltaEndpoint {
+        &self.id
     }
 
-    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-        self.dependencies.iter().map(ProspectiveId::as_str)
+    fn dependencies(&self) -> impl Iterator<Item = &DeltaEndpoint> + '_ {
+        self.dependencies.iter()
     }
 }
 

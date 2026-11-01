@@ -106,7 +106,7 @@ fn resolve_unique_id<'a>(
 ) -> Result<IssueId> {
     let matches = ids
         .into_iter()
-        .filter(|id| prefix.matches(id.as_str()))
+        .filter(|id| prefix.matches(id))
         .collect::<Vec<_>>();
     match matches.as_slice() {
         [] => Err(IssueNotFoundError::by_prefix(prefix.clone()).into()),

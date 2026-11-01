@@ -666,10 +666,7 @@ mod tests {
         let scope = vec![&task, &epic];
         let graph = DependencyGraph::new(&scope);
 
-        let expected = [&task, &epic]
-            .map(|i| i.id.as_str().parse::<IssueId>().unwrap())
-            .into_iter()
-            .collect();
+        let expected = [&task, &epic].map(|i| i.id.clone()).into_iter().collect();
         assert_eq!(exported_ids(&export_json(&graph)), expected);
     }
 
@@ -684,7 +681,7 @@ mod tests {
                 .iter()
                 .map(|_| crate::test_utils::fixture_issue("N".into(), String::new()))
                 .collect();
-            let ids: Vec<IssueId> = issues.iter().map(|i| i.id.as_str().parse::<IssueId>().unwrap()).collect();
+            let ids: Vec<IssueId> = issues.iter().map(|i| i.id.clone()).collect();
             for (index, mask) in masks.iter().enumerate() {
                 issues[index].dependencies = (0..index)
                     .filter(|earlier| mask & (1 << earlier) != 0)
@@ -698,7 +695,7 @@ mod tests {
                 .map(|(_, issue)| issue)
                 .collect();
             let expected: std::collections::BTreeSet<IssueId> =
-                selected.iter().map(|i| i.id.as_str().parse::<IssueId>().unwrap()).collect();
+                selected.iter().map(|i| i.id.clone()).collect();
 
             let graph = DependencyGraph::new(&selected);
             let json = export_json(&graph);

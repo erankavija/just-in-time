@@ -259,13 +259,10 @@ fn captured_anchor_bindings(
 }
 
 fn existing_template_lease_targets(issues: &[Issue], targets: &[IssueId]) -> Vec<IssueId> {
-    let existing = issues
-        .iter()
-        .map(|issue| issue.id.as_str())
-        .collect::<HashSet<_>>();
+    let existing = issues.iter().map(|issue| &issue.id).collect::<HashSet<_>>();
     targets
         .iter()
-        .filter(|id| existing.contains(id.as_str()))
+        .filter(|id| existing.contains(id))
         .cloned()
         .collect()
 }
@@ -838,7 +835,7 @@ fn derive_template_apply(
 
     let original = issues
         .iter()
-        .map(|issue| (issue.id.as_str(), issue))
+        .map(|issue| (&issue.id, issue))
         .collect::<HashMap<_, _>>();
     let created_ids = created_order.iter().cloned().collect::<HashSet<_>>();
     let mut intents = created_order
@@ -856,9 +853,7 @@ fn derive_template_apply(
             .values()
             .filter(|issue| {
                 !created_ids.contains(&issue.id)
-                    && original
-                        .get(issue.id.as_str())
-                        .is_some_and(|old| *old != *issue)
+                    && original.get(&issue.id).is_some_and(|old| *old != *issue)
             })
             .cloned()
             .map(|issue| MutationIntent::UpdateIssue {
@@ -1220,7 +1215,7 @@ fn add_captured_template_edge(
 ) -> Result<()> {
     lease_targets.push(from.clone());
     let refs = issues.values().collect::<Vec<_>>();
-    DependencyGraph::new(&refs).validate_add_dependency(from.as_str(), to.as_str())?;
+    DependencyGraph::new(&refs).validate_add_dependency(from, to)?;
     let before = issues
         .get(from)
         .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
@@ -1244,7 +1239,7 @@ fn add_captured_template_edge(
             .keys()
             .map(|id| {
                 let reduced = graph
-                    .compute_transitive_reduction(id.as_str())
+                    .compute_transitive_reduction(id)
                     .into_iter()
                     .map(|node| node.id.clone())
                     .collect::<HashSet<_>>();

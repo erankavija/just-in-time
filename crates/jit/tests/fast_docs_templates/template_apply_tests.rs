@@ -1513,7 +1513,7 @@ applies_to  = ["epic"]
     // (exit 1). This binds the test to the exit-code fix, not just the guard.
     assert!(
         matches!(
-            err.downcast_ref::<jit::graph::GraphError>(),
+            err.downcast_ref::<jit::graph::GraphError<jit::domain::identity::IssueId>>(),
             Some(jit::graph::GraphError::CycleDetected)
         ),
         "prospective-cycle rejection must be a typed CycleDetected (exit 4), got: {err}"
