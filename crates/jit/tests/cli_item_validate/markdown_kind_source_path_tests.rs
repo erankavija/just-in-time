@@ -130,7 +130,7 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     // -----------------------------------------------------------------------
     let by_kind = cli.run_json(["item", "list", "--kind", "policy"]).unwrap();
     assert_eq!(
-        by_kind["count"].as_u64().unwrap(),
+        by_kind["items"].as_array().unwrap().len(),
         2,
         "--kind policy must return exactly 2 items; got: {:?}",
         qualified_ids(&by_kind)

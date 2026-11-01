@@ -46,7 +46,7 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
         .to_owned();
 
     let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let items = json["items"].as_array().unwrap();
     for item in items {
         assert_eq!(item["kind"].as_str().unwrap(), "risk");
@@ -147,7 +147,7 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
         .to_owned();
 
     let listed = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
-    assert_eq!(listed["count"].as_u64().unwrap(), 1);
+    assert_eq!(listed["items"].as_array().unwrap().len(), 1);
 
     // No parallel structured store: nothing under `.jit/` persists risks; the
     // ONLY place RISK-01 appears is the issue's own JSON description.
@@ -197,7 +197,7 @@ fn test_default_repo_markdown_is_sole_source_for_risks() {
 
     // The index now reflects ONLY the edited markdown.
     let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 2);
+    assert_eq!(json["items"].as_array().unwrap().len(), 2);
     let self_ids: Vec<&str> = json["items"]
         .as_array()
         .unwrap()

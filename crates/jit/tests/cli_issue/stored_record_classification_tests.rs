@@ -47,6 +47,5 @@ fn test_query_all_json_preserves_valid_stored_index_behavior() {
         String::from_utf8_lossy(&output.stderr)
     );
     let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(response["count"], 0);
     assert_eq!(response["issues"], serde_json::json!([]));
 }

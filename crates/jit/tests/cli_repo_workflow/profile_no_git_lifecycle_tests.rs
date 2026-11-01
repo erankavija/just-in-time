@@ -68,7 +68,7 @@ fn test_profile_lifecycle_completes_without_git() {
         "select workflow package",
         &["profile", "show", "--profile", workflow_selector, "--json"],
     );
-    assert_eq!(shown["count"], 1);
+    assert_eq!(shown["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(shown["profiles"][0]["manifest"]["id"], "gitless-workflow");
 
     let resolved = successful_lifecycle_json(
@@ -76,7 +76,7 @@ fn test_profile_lifecycle_completes_without_git() {
         "resolve and apply workflow dependency closure",
         &["profile", "apply", "--profile", workflow_selector, "--json"],
     );
-    assert_eq!(resolved["count"], 2);
+    assert_eq!(resolved["profiles"].as_array().unwrap().len(), 2);
     assert_eq!(
         applied_ids(&resolved),
         vec!["gitless-base", "gitless-workflow"]
@@ -137,7 +137,7 @@ fn test_profile_lifecycle_completes_without_git() {
         "select added profile package",
         &["profile", "show", "--profile", imported_selector, "--json"],
     );
-    assert_eq!(imported["count"], 1);
+    assert_eq!(imported["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(
         imported["profiles"][0]["package_hash"],
         only_profile(&packed)["package_hash"]
@@ -148,7 +148,7 @@ fn test_profile_lifecycle_completes_without_git() {
         "report lifecycle package difference",
         &["profile", "diff", "--profile", lifecycle_selector, "--json"],
     );
-    assert_eq!(difference["count"], 1);
+    assert_eq!(difference["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(difference["profiles"][0]["id"], lifecycle_id);
 
     successful_lifecycle_json(&cli, "validate repository", &["validate", "--json"]);

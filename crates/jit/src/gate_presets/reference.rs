@@ -123,8 +123,9 @@ pub fn render_reference_markdown() -> String {
            repository.\n\
          - `issue_validation` runs declarative validation for the gated issue.\n\
          - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
-           from the gated issue and runs scoped validation for that target. Its checker table\n\
-           must set `label_namespace`.\n\
+           from the gated issue, where the target is a full issue id or unique prefix, and\n\
+           runs scoped validation for that target. Its checker table must set\n\
+           `label_namespace`.\n\
          - `rule_validation` names one configured graph rule with `rule` and evaluates it\n\
            with the gated issue as its sole firing subject. The complete repository may be\n\
            used for graph and identifier-resolution context, but unrelated issues cannot\n\

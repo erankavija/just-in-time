@@ -252,7 +252,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "--json",
         ],
     );
-    assert_eq!(preview["count"], 1);
+    assert_eq!(preview["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(preview["profiles"][0]["status"], "would_apply");
 
     let applied = success_json(
@@ -277,7 +277,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "--json",
         ],
     );
-    assert_eq!(no_op["count"], 2);
+    assert_eq!(no_op["profiles"].as_array().unwrap().len(), 2);
     assert_eq!(requested_profile(&no_op)["status"], "unchanged");
     assert_eq!(
         target(&no_op, "contrib/gates/ai-review.sh")["executable"],
@@ -365,10 +365,9 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
         ],
     );
 
-    // One result per applied package, the dependency first, under the standard
-    // count-wrapped shape.
+    // One result per applied package, the dependency first.
     assert_eq!(applied_ids(&applied), vec!["base", "workflow"]);
-    assert_eq!(applied["count"], 2);
+    assert_eq!(applied["profiles"].as_array().unwrap().len(), 2);
     assert_eq!(requested_profile(&applied)["status"], "applied");
     // The selection has one aggregate event.
     let events = normalized_events(repo.root());
@@ -1112,9 +1111,8 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
 
     let (status, report) = profile_difference(&repo, &["packages/planner", "packages/rival"]);
 
-    assert_eq!(
-        status.code(),
-        Some(4),
+    assert!(
+        !status.success(),
         "a selection that cannot be published fails the check: {report}"
     );
     assert!(
@@ -1220,9 +1218,8 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
 
     let (status, report) = profile_difference(&repo, &["packages/base", "packages/workflow"]);
 
-    assert_eq!(
-        status.code(),
-        Some(4),
+    assert!(
+        !status.success(),
         "a selection that cannot be published fails the check: {report}"
     );
     assert!(

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "842d5a3a1dce4c8b70fa0a9dc150210b4dfa03d3",
+  "completed_at": "2026-11-01T07:42:12.916193082Z",
+  "duration_ms": 118579,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard lock-wait requirements are met and the prior regression-coverage finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d6635a93-822d-4f64-b171-f4485dde4a10",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "07832141-ad16-4da7-ba5f-8c917f8e9f4f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:40:14.337042531Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `77d9bf994`, `bac742fe5`, `c215a8641`, `f89602355`, `9f1a82562`, `fcab3ab86`, `0c5879905`, `ec4a821ef`, `842d5a3a1`\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/d6635a93/requirement/REQ-01`, `@/issue/d6635a93/requirement/REQ-02` (`.jit/issues/d6635a93-822d-4f64-b171-f4485dde4a10.json`); `@/invariant/orthogonal-tests`, `@/invariant/shared-test-contracts`, `@/invariant/semantic-test-assertions`, `@/invariant/essential-code-prose` (`.jit/invariants.toml`); gate items (`.jit/gates.toml`)\nGate evidence: cargo-ci passed/0; profile-suite-selftest passed/0; session-cost-benchmark-selftest passed/0; prior code-review failed/1, with its regression-coverage finding resolved\nTruncation recovery: bounded per-commit and per-parent diffs plus focused current script, self-test, gate, and source reads\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard lock-wait requirements are met and the prior regression-coverage finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

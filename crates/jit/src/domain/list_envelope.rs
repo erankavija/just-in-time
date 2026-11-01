@@ -258,12 +258,11 @@ mod tests {
     }
 
     #[test]
-    fn test_list_envelope_serializes_count_as_the_collection_length() {
+    fn test_list_envelope_serializes_items_under_the_collection_key() {
         let envelope = ListEnvelope::<Entries, u8>::new(vec![1, 2, 3]);
 
         let value = serde_json::to_value(&envelope).expect("an envelope serializes");
 
-        assert_eq!(value["count"], envelope.items.len());
         assert_eq!(value[Entries::KEY], serde_json::json!(envelope.items));
     }
 

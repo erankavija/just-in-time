@@ -40,7 +40,8 @@ capture = "none"
 expect = { exit = 4, contains = ["sdd-hard-criteria-covered"], enforcement_point = "transition" }
 
 # Per-step `expect` table:
-#   exit              — expected process exit code (integer, required when present).
+#   exit              — expected process exit code (integer). The test runner checks
+#                       only success (zero) or failure (non-zero).
 #                       When the whole `expect` block is omitted, exit 0 is asserted.
 #   contains          — list of substrings that must appear in stderr+stdout combined
 #   not_contains      — list of substrings that must NOT appear

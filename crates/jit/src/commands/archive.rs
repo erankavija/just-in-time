@@ -951,7 +951,6 @@ mod tests {
         let mut expected = vec![done, rejected];
         expected.sort();
         assert_eq!(target_ids, expected);
-        assert_eq!(report.count(), 2);
         assert!(report.candidates().iter().all(|plan| {
             plan.count() == 0
                 && plan.policy_status() == crate::domain::artifact_plan::PolicyStatus::Configured

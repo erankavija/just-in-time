@@ -108,7 +108,7 @@ style = "id-anchor"
         },
     );
     let result = executor.project_render(Some("charter")).unwrap();
-    assert_eq!(result.count(), 1);
+    assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].target, "AGENTS.md");
     assert_eq!(result.items[0].count, 2);
 

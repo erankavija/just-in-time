@@ -5,8 +5,8 @@ use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{
     FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
 };
-use crate::domain::identity::GateKey;
 use crate::domain::identity::GateRunId;
+use crate::domain::identity::{GateKey, IssueIdPrefix};
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
@@ -642,7 +642,9 @@ fn gate_findings_from_report(
 
 /// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
 ///
-/// A missing, repeated, empty, or unknown target is a configuration fault.
+/// The value is unresolved input: a full id or unique prefix, as templates write
+/// short ids. A missing, repeated, malformed, unknown, or ambiguous target is a
+/// configuration fault.
 fn label_target_report(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &IssueId,
@@ -664,24 +666,15 @@ fn label_target_report(
     }
     let [target] = targets[..] else {
         anyhow::bail!(
-            "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found {}",
+            "expected exactly one '{label_namespace}:<target-id>' label on issue {issue_id}, found {}",
             targets.len()
         );
     };
-    if target.is_empty() {
-        anyhow::bail!(
-            "expected exactly one non-empty '{label_namespace}:<target-id>' label on issue {issue_id}, found an empty target"
-        );
-    }
-    let target = issues
-        .iter()
-        .find(|issue| issue.id.as_str() == target)
-        .map(|issue| issue.id.clone())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "label '{label_namespace}:{target}' on issue {issue_id} names no active issue"
-            )
-        })?;
+    let target = target
+        .parse::<IssueIdPrefix>()
+        .map_err(anyhow::Error::from)
+        .and_then(|prefix| crate::storage::resolve_issue_id_among(&prefix, &issues))
+        .with_context(|| format!("label '{label_namespace}:{target}' on issue {issue_id}"))?;
     captured_scope_rule_report(image, &target)
 }
 
@@ -3192,10 +3185,44 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Error);
+        assert!(result.stderr.contains("coverage-target:no-such-issue"));
     }
 
     #[test]
-    fn test_label_target_validation_passes_for_configured_target() {
+    fn test_label_target_validation_records_ambiguous_target_as_error_run_naming_label() {
+        let executor = setup();
+        for id in [
+            crate::test_utils::issue_id(0xdead_beef),
+            crate::test_utils::issue_id(0x1_deadbeef),
+        ] {
+            let mut target =
+                crate::test_utils::fixture_issue(format!("Ambiguous target {id}"), String::new());
+            target.id = id;
+            seed_issue(executor.storage(), target);
+        }
+        let issue_id = add_builtin_gate(
+            &executor,
+            &"arbitrary-coverage-key".parse().unwrap(),
+            GateChecker::LabelTargetValidation {
+                label_namespace: "coverage-target".to_string(),
+            },
+            vec![
+                "type:task".to_string(),
+                "coverage-target:deadbeef".to_string(),
+            ],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Error);
+        assert!(result.stderr.contains("coverage-target:deadbeef"));
+        assert!(result.stderr.to_lowercase().contains("ambiguous"));
+    }
+
+    #[test]
+    fn test_label_target_validation_passes_for_short_id_target() {
         let executor = setup();
         let mut target =
             crate::test_utils::fixture_issue("Container".to_string(), "Container".to_string());
@@ -3211,7 +3238,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             },
             vec![
                 "type:task".to_string(),
-                format!("coverage-target:{target_id}"),
+                format!("coverage-target:{}", target_id.short_id()),
             ],
         );
 

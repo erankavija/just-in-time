@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T07:22:36.522475430Z",
+  "dependencies": [
+    "14c08f51-2cbe-4e4b-8004-2f433d838ba4"
+  ],
+  "description": "Remove the second copy behind the dogfood package's drift check, or record why it must stay.\n\n## Background\n\nThe dogfood package's contributions and this repository's `.jit/*.toml` registries are two copies of one declaration. About 1,250 lines of drift code (`crates/jit/src/profile/contribution_drift.rs`, `drift_report.rs`) and the `DECLARED_OVERRIDES` list keep them aligned, and 14c08f51 runs that comparison as a gate. Either the contributions could derive from the registries, for example through `jit profile capture`, or the check could be deleted.\n\n## Success Criteria\n\n- [hard] REQ-01: The issue records the choice between deriving the contributions and deleting the check, with the evidence for it.\n- [hard] REQ-02: The drift modules and `DECLARED_OVERRIDES` no longer exist, or the issue records with evidence why they must stay.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T07:22:36.522475430Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e7d98542-456d-4421-9e17-faf4f739a800",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "component:testing",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "One copy of the dogfood package's declarations, without a drift check",
+  "updated_at": "2026-11-01T07:22:37.060543774Z"
+}

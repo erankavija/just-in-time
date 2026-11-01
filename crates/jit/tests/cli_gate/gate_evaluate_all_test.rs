@@ -311,7 +311,6 @@ fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(json["count"], 2);
     let results = json["results"].as_array().unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0]["issue_id"], first);

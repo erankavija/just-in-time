@@ -61,7 +61,7 @@ fn test_project_render_region_mode_byte_preserves_surroundings() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["projections"].as_array().unwrap().len(), 1);
     assert_eq!(
         json["projections"][0]["target"].as_str().unwrap(),
         "ARCHITECTURE.md"
@@ -105,7 +105,7 @@ fn test_project_render_named_selects_single_projection() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["projections"].as_array().unwrap().len(), 1);
     assert_eq!(
         json["projections"][0]["name"].as_str().unwrap(),
         "invariants"
