@@ -1307,14 +1307,6 @@ pub fn profile_package_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Copy the profile-package fixture tree at `source` to `root` under a manifest
-/// rewritten to declare `id`, a dependency on each of `dependencies`, and asset
-/// targets named for `id`, and read the package back from there.
-///
-/// No package this repository ships declares a dependency, so every test of
-/// composition authors one. One rewrite serves them all
-/// (`@/invariant/shared-test-contracts`), and renaming the asset targets after
-/// the id is what keeps two authored packages from publishing the same file.
 /// Apply what `selectors` name, with no variable inputs, the way `jit profile
 /// apply` does.
 pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateStore>(

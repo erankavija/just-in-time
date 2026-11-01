@@ -1029,7 +1029,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         );
         content_paths.extend(crate::repository_state::profile_contribution_target_paths(
             contribution_context,
-        )?);
+        ));
         content_paths.push(events_path.clone());
 
         let base =
@@ -1540,9 +1540,9 @@ mod tests {
     use crate::profile::selection_probe;
     use crate::profile::{ProfileApplyResult, ProfileContributionChange, ProfileTargetAction};
     use crate::repository_state::{
-        Contribution, ContributionConflictOwner, MapEntryTarget, ProfileTargetConflict,
-        ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
-        ScalarTarget, SetStringTarget,
+        Contribution, MapEntryTarget, ProfileTargetConflict, ProfileTargetConflictEntry,
+        ProfileTargetSubject, RepositoryStateError, RootRelativePath, ScalarTarget,
+        SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{
@@ -1986,8 +1986,8 @@ mod tests {
     /// The repository target one refused decision names.
     fn refused_path(entry: &ProfileTargetConflictEntry) -> String {
         match &entry.subject {
-            ProfileTargetSubject::File(path) => path.repository_relative(),
-            ProfileTargetSubject::Contribution(identity) => {
+            ProfileTargetSubject::File { path } => path.repository_relative(),
+            ProfileTargetSubject::Contribution { identity } => {
                 panic!("this refusal is about a target, not the declaration '{identity}'")
             }
         }
@@ -2444,7 +2444,7 @@ mod tests {
             .contributions
             .iter()
             .all(
-                |contribution| contribution.registry_path().repository_relative()
+                |contribution| contribution.registry().path().repository_relative()
                     == ".jit/config.toml"
             ));
     }
@@ -3482,10 +3482,8 @@ template = true
                 entry.conflict,
                 ProfileTargetConflict::Contested {
                     owners: vec![
-                        ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
-                        ContributionConflictOwner::Package(
-                            ProfileId::try_from("workflow").unwrap()
-                        ),
+                        ProfileId::try_from("base").unwrap(),
+                        ProfileId::try_from("workflow").unwrap(),
                     ]
                 }
             );
@@ -4185,9 +4183,9 @@ template = true
             refused_targets(&error)
                 .iter()
                 .filter_map(|refused| match &refused.subject {
-                    ProfileTargetSubject::Contribution(identity) =>
+                    ProfileTargetSubject::Contribution { identity } =>
                         Some((identity.to_string(), refused.conflict.message())),
-                    ProfileTargetSubject::File(_) => None,
+                    ProfileTargetSubject::File { .. } => None,
                 })
                 .collect::<BTreeMap<_, _>>(),
             "the report and the refusal describe each declaration in one vocabulary"

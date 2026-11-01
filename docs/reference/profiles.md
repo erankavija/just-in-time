@@ -316,7 +316,8 @@ A refused publication's `PROFILE_CONFLICT` error carries
 `error.details.conflicts[]` in the [standard `--json` error
 envelope](cli-commands.md#cli-json-contracts), one entry per refused target or
 declaration as `{owner, subject, conflict}`; `conflict.owners` names the
-packages defining it differently.
+packages defining it differently. `jit --schema` publishes this shape as
+`types.ProfileTargetConflictsError`.
 
 All profile commands support `--json` and use the standard count-wrapped
 `{"count": N, "profiles": [...]}` collection shape. A show response contains

@@ -387,7 +387,7 @@ impl InitializationScaffold {
         // path must be captured for that length and the action preimage.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
-            paths.extend(profile.claims.target_paths()?);
+            paths.extend(profile.claims.target_paths());
             if profile.owns_default_rule_authority() {
                 paths.push(VirtualPath::SCHEMAS);
             }
@@ -823,7 +823,7 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
-    contested_files: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<ProfileId>>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composed = super::profile_apply::compose_profile_targets_with_context(
         base,

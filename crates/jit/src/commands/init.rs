@@ -73,7 +73,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 let mut extra_paths = scaffold.delta_paths()?;
                 extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
                     contribution_context,
-                )?);
+                ));
                 // Probe capture: the deliberately over-inclusive scaffold overlay yields
                 // a base good enough to finalize the exact delta. That delta's overlay
                 // is the AUTHORITATIVE proposed state — only the files init writes — so a

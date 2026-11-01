@@ -902,7 +902,7 @@ fn contribution_identity(contribution: &Contribution) -> String {
     };
     format!(
         "{}:{semantic}",
-        contribution.registry_path().repository_relative()
+        contribution.registry().path().repository_relative()
     )
 }
 
@@ -915,7 +915,7 @@ fn compute_hashes(
 
     for contribution in &manifest.contributions {
         target_frames
-            .entry(contribution.registry_path().repository_relative())
+            .entry(contribution.registry().path().repository_relative())
             .or_default()
             .push(canonical_bytes(contribution)?);
     }

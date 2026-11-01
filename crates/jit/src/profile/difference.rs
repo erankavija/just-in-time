@@ -168,7 +168,9 @@ pub(crate) fn ensure_publishable_targets(
                 .filter_map(|target| {
                     refused(&target.disposition).map(|conflict| ProfileTargetConflictEntry {
                         owner: owner.clone(),
-                        subject: ProfileTargetSubject::File(target.path.clone()),
+                        subject: ProfileTargetSubject::File {
+                            path: target.path.clone(),
+                        },
                         conflict,
                     })
                 })
@@ -178,7 +180,9 @@ pub(crate) fn ensure_publishable_targets(
                 .filter_map(|contribution| {
                     refused(&contribution.disposition).map(|conflict| ProfileTargetConflictEntry {
                         owner: owner.clone(),
-                        subject: ProfileTargetSubject::Contribution(contribution.identity.clone()),
+                        subject: ProfileTargetSubject::Contribution {
+                            identity: contribution.identity.clone(),
+                        },
                         conflict,
                     })
                 })
