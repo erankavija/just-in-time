@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d77c6618-4e0a-4a95-a142-99e596368424",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:51:31.979882879Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "abf02a55-9036-4eeb-8435-721c71f377e2",
+      "status": "failed",
+      "updated_at": "2026-11-01T13:54:49.441285864Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5f71a48d-16d4-442d-96e4-1fa10f4aed80",
   "labels": [
     "component:cli",
@@ -22,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A reject reason can leave the repository failing validation",
-  "updated_at": "2026-11-01T13:10:37.096684456Z"
+  "updated_at": "2026-11-01T13:54:49.441285864Z"
 }
