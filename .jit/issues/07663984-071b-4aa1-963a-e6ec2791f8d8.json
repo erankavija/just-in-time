@@ -12,7 +12,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dd2a9df7-f013-4d0e-9431-f091b0c80584",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:35:18.179888748Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8a75bf17-70cd-4bd1-bf23-188c1b8fab86",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:38:58.016062465Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "07663984-071b-4aa1-963a-e6ec2791f8d8",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Layout detection uses the module's one-process probe",
-  "updated_at": "2026-11-01T13:20:47.691144056Z"
+  "updated_at": "2026-11-01T13:38:58.016062465Z"
 }
