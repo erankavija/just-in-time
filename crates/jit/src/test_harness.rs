@@ -27,10 +27,8 @@ impl TestHarness {
     /// A harness whose in-memory store carries the synthetic layout rooted at
     /// `root`.
     ///
-    /// The aggregate is still in memory. A repository whose applied-profile
-    /// record names a worktree-relative package location needs that name to
-    /// reach a real directory, because resolving such a record reads the
-    /// package from the location it names.
+    /// The aggregate is still in memory. A worktree-relative package location
+    /// must reach a real directory, because a package is read from it.
     pub fn rooted_at(root: impl Into<std::path::PathBuf>) -> Self {
         Self::from_storage(InMemoryStorage::rooted_at(root))
     }
