@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dfdb6624-b1f9-49c2-a1be-5b316a5e230d",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:52:28.155998595Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate runs are identified by a validated GateRunId",
-  "updated_at": "2026-11-01T00:45:49.959645962Z"
+  "updated_at": "2026-11-01T02:52:28.155998595Z"
 }
