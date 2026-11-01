@@ -359,7 +359,6 @@ mod linked_checkout_write_decision_tests {
     use crate::repository_state::MutationContextAnnotation;
     use crate::storage::worktree_paths::WorktreePaths;
     use crate::test_utils::repository_layout_for_data_root;
-    use std::path::PathBuf;
 
     /// A repository whose `[worktree]` section declares `stance`, or which
     /// declares no stance at all when `stance` is `None`.
@@ -375,17 +374,10 @@ mod linked_checkout_write_decision_tests {
 
     /// Paths describing either a linked non-primary checkout or the primary one.
     fn checkout_paths(linked: bool) -> WorktreePaths {
-        let worktree_root = if linked {
-            PathBuf::from("/repo/.worktrees/feature")
+        if linked {
+            crate::test_utils::linked_checkout_paths("/repo", "/repo/.worktrees/feature")
         } else {
-            PathBuf::from("/repo")
-        };
-        WorktreePaths {
-            git_repository: true,
-            common_dir: PathBuf::from("/repo/.git"),
-            local_jit: worktree_root.join(".jit"),
-            worktree_root,
-            shared_jit: PathBuf::from("/repo/.git/jit"),
+            crate::test_utils::primary_checkout_paths("/repo")
         }
     }
 

@@ -1335,7 +1335,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         if response == ProfileConflictResponse::Refuse {
             crate::profile::ensure_publishable_targets(&plan)
                 .map_err(RepositoryStateError::from)?;
-            ensure_committed_write_targets(&plan, &self.require_layout()?)?;
+            ensure_committed_write_targets(
+                &plan,
+                &self.require_layout()?,
+                self.require_worktree_paths()?,
+            )?;
         }
         Ok(Some(plan))
     }
@@ -1343,69 +1347,52 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
 ///
-/// Each root is classified on its own: a relocated data root can sit outside
-/// the checkout holding the worktree targets, or in another one.
+/// A path outside the detected checkout proceeds. An event-log append is left
+/// out because it keeps every uncommitted line.
 fn ensure_committed_write_targets(
     plan: &MaterializationPlan,
     layout: &RepositoryLayout,
+    paths: &WorktreePaths,
 ) -> Result<()> {
-    let paths = [
-        (RepositoryRootClass::Worktree, layout.worktree_root()),
-        (RepositoryRootClass::Data, layout.data_root()),
-    ]
-    .into_iter()
-    .map(|(class, root)| uncommitted_write_targets(plan, class, root))
-    .collect::<Result<Vec<_>>>()?
-    .into_iter()
-    .flatten()
-    .collect::<BTreeSet<_>>();
-    if paths.is_empty() {
+    let Some(checkout) = paths.write_checkout() else {
         return Ok(());
-    }
-    Err(ProfileApplyError::UncommittedTargets {
-        paths: paths.into_iter().collect(),
-    }
-    .into())
-}
-
-/// Checkout-relative dirty paths among the ones `plan` writes under `root`,
-/// empty when no git checkout holds `root`.
-///
-/// An event-log append is left out because it keeps every uncommitted line.
-fn uncommitted_write_targets(
-    plan: &MaterializationPlan,
-    class: RepositoryRootClass,
-    root: &Path,
-) -> Result<Vec<String>> {
+    };
     let written = plan
         .delta()
         .actions()
         .iter()
         .filter(|action| !matches!(action, RepositoryAction::AppendEvents { .. }))
         .map(RepositoryAction::path)
-        .filter(|path| path.root_class() == class)
-        .map(|path| path.relative().as_path())
-        .collect::<BTreeSet<_>>();
+        .collect::<Vec<_>>();
     if written.is_empty() {
-        return Ok(Vec::new());
+        return Ok(());
     }
-    let paths = WorktreePaths::detect_from(root)?;
-    let Some(checkout) = paths.git() else {
-        return Ok(Vec::new());
-    };
     // Git reports paths from its physical top level.
-    let physical_root = root.canonicalize()?;
-    let offset = physical_root.strip_prefix(&paths.worktree_root)?;
-    Ok(checkout
+    let worktree_root = layout.worktree_root().canonicalize()?;
+    let data_root = layout.data_root().canonicalize()?;
+    let written = written
+        .into_iter()
+        .map(|path| {
+            match path.root_class() {
+                RepositoryRootClass::Worktree => &worktree_root,
+                RepositoryRootClass::Data => &data_root,
+            }
+            .join(path.relative().as_path())
+        })
+        .collect::<BTreeSet<_>>();
+    let uncommitted = checkout
         .dirty_paths()?
         .into_iter()
-        .filter(|dirty| {
-            dirty
-                .strip_prefix(offset)
-                .is_ok_and(|relative| written.contains(relative))
-        })
+        .filter(|dirty| written.contains(&checkout.worktree_root().join(dirty)))
         .map(|dirty| dirty.display().to_string())
-        .collect())
+        .collect::<BTreeSet<_>>();
+    if uncommitted.is_empty() {
+        return Ok(());
+    }
+    Err(ProfileApplyError::UncommittedTargets {
+        paths: uncommitted.into_iter().collect(),
+    }
+    .into())
 }
 
 /// Insert one package image without allowing selector or dependency traversal
@@ -2460,6 +2447,51 @@ mod tests {
             ),
             "{error:#}"
         );
+    }
+
+    #[test]
+    fn test_apply_profile_package_judges_only_paths_inside_the_data_roots_checkout() {
+        let temp = TempDir::new().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path().join("repo"));
+        let outside = temp.path().join("outside");
+        fs::create_dir(&outside).unwrap();
+        let storage = JsonFileStorage::new(repository.root().join("state"));
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(&outside, storage.root()).unwrap());
+        executor
+            .initialize_fresh_repository(&outside, None)
+            .unwrap();
+        repository.commit("track the store");
+        let package = authored_package(
+            &temp,
+            "outside/packages/first",
+            "first",
+            "docs/first.txt",
+            "rendered\n",
+            "\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"shared\"\nvalue = { description = \"shared\", unique = false }\n",
+        );
+        let outside_target = outside.join("docs/first.txt");
+        fs::create_dir(outside.join("docs")).unwrap();
+        fs::write(&outside_target, "a local edit\n").unwrap();
+        let config = repository.root().join("state/config.toml");
+        fs::write(
+            &config,
+            format!("{}\n# a local edit\n", fs::read_to_string(&config).unwrap()),
+        )
+        .unwrap();
+
+        let error = executor.apply_profile_package(&package).unwrap_err();
+
+        assert!(matches!(
+            error.downcast_ref::<ProfileApplyError>(),
+            Some(ProfileApplyError::UncommittedTargets { paths })
+                if paths.as_slice() == ["state/config.toml"]
+        ));
+
+        repository.git(&["checkout", "--", "state/config.toml"]);
+        executor.apply_profile_package(&package).unwrap();
+
+        assert_eq!(fs::read_to_string(outside_target).unwrap(), "rendered\n");
     }
 
     #[test]

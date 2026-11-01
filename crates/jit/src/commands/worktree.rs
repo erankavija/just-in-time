@@ -650,7 +650,6 @@ mod tests {
     #[test]
     fn test_worktree_list_excludes_expired_leases() {
         use crate::storage::clock::FixedClock;
-        use crate::storage::worktree_paths::WorktreePaths;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use chrono::Utc;
         use std::sync::Arc;
@@ -672,13 +671,7 @@ mod tests {
             .to_string();
         let worktree_id = WorktreeId::try_from(format!("wt:{branch}")).unwrap();
 
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: root.join(".git"),
-            worktree_root: root.to_path_buf(),
-            local_jit: root.join(".jit"),
-            shared_jit: root.join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(root);
 
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
@@ -740,13 +733,7 @@ mod tests {
             std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
             std::fs::create_dir_all(linked.join(".jit")).expect("create the linked store");
 
-            let paths = WorktreePaths {
-                git_repository: true,
-                common_dir: primary.join(".git"),
-                local_jit: linked.join(".jit"),
-                worktree_root: linked,
-                shared_jit: primary.join(".git/jit"),
-            };
+            let paths = crate::test_utils::linked_checkout_paths(&primary, &linked);
             assert!(paths.is_worktree(), "the fixture models a linked checkout");
             (temp, paths)
         }
@@ -993,13 +980,7 @@ mod tests {
             let primary = temp.path().join("main");
             std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
 
-            let paths = WorktreePaths {
-                git_repository: true,
-                common_dir: primary.join(".git"),
-                local_jit: primary.join(".jit"),
-                worktree_root: primary.clone(),
-                shared_jit: primary.join(".git/jit"),
-            };
+            let paths = crate::test_utils::primary_checkout_paths(&primary);
             assert!(paths.is_main_worktree(), "the fixture models the primary");
             let layout =
                 crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)

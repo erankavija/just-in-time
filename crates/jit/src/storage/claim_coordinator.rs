@@ -1470,13 +1470,7 @@ mod tests {
 
     /// A coordinator whose contended lock waits expire after `lock_wait`.
     fn coordinator_with_lock_wait(temp_dir: &TempDir, lock_wait: StdDuration) -> ClaimCoordinator {
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: temp_dir.path().join(".git"),
-            worktree_root: temp_dir.path().to_path_buf(),
-            local_jit: temp_dir.path().join(".jit"),
-            shared_jit: temp_dir.path().join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
 
         let coordinator = ClaimCoordinator::new(
             paths,
@@ -1601,13 +1595,7 @@ mod tests {
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
         let other = ClaimCoordinator::new(
-            WorktreePaths {
-                git_repository: true,
-                common_dir: temp_dir.path().join(".git"),
-                worktree_root: temp_dir.path().to_path_buf(),
-                local_jit: temp_dir.path().join(".jit"),
-                shared_jit: temp_dir.path().join(".git/jit"),
-            },
+            crate::test_utils::primary_checkout_paths(temp_dir.path()),
             locker,
             "wt:other".parse().unwrap(),
             "agent:other".parse().unwrap(),
@@ -1721,13 +1709,7 @@ mod tests {
                 let claimants = Arc::clone(&claimants);
 
                 thread::spawn(move || {
-                    let paths = WorktreePaths {
-                        git_repository: true,
-                        common_dir: temp_path.join(".git"),
-                        worktree_root: temp_path.to_path_buf(),
-                        local_jit: temp_path.join(".jit"),
-                        shared_jit: temp_path.join(".git/jit"),
-                    };
+                    let paths = crate::test_utils::primary_checkout_paths(temp_path.as_path());
 
                     let locker = FileLocker::new(StdDuration::from_secs(10));
                     let coordinator = ClaimCoordinator::new(
@@ -2170,13 +2152,7 @@ mod tests {
             .unwrap();
 
         // Create coordinator for different agent
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: temp_dir.path().join(".git"),
-            worktree_root: temp_dir.path().to_path_buf(),
-            local_jit: temp_dir.path().join(".jit"),
-            shared_jit: temp_dir.path().join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
         let coordinator2 = ClaimCoordinator::new(
             paths,
             FileLocker::new(StdDuration::from_secs(
@@ -2236,13 +2212,7 @@ mod tests {
             .unwrap();
 
         // Create coordinator for different agent
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: temp_dir.path().join(".git"),
-            worktree_root: temp_dir.path().to_path_buf(),
-            local_jit: temp_dir.path().join(".jit"),
-            shared_jit: temp_dir.path().join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
         let coordinator2 = ClaimCoordinator::new(
             paths,
             FileLocker::new(StdDuration::from_secs(
@@ -2269,13 +2239,7 @@ mod tests {
             .unwrap();
 
         // Create admin coordinator
-        let paths = WorktreePaths {
-            git_repository: true,
-            common_dir: temp_dir.path().join(".git"),
-            worktree_root: temp_dir.path().to_path_buf(),
-            local_jit: temp_dir.path().join(".jit"),
-            shared_jit: temp_dir.path().join(".git/jit"),
-        };
+        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
         let admin_coordinator = ClaimCoordinator::new(
             paths,
             FileLocker::new(StdDuration::from_secs(
