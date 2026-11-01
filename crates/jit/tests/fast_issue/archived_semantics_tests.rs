@@ -38,11 +38,13 @@ fn count_state_changes(h: &TestHarness, id: &IssueId) -> usize {
 #[test]
 fn test_archived_from_done_still_satisfies_dependents() {
     let h = TestHarness::new();
-    let dependent = h.create_issue("Dependent");
     let dependency = h.create_issue("Foundation");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
     drive_to_done(&h, &dependency);
     archive(&h, &dependency);
+    let dependent = h.create_issue("Dependent");
+    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
+    assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 
     // The archived-from-Done dependency remains met: the dependent reaches Ready.
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Ready).unwrap();
@@ -110,15 +112,17 @@ fn test_revive_to_non_origin_is_refused_closing_resurrection_loophole() {
 #[test]
 fn test_archived_from_rejected_revives_only_to_rejected_and_stays_terminal() {
     let h = TestHarness::new();
-    let dependent = h.create_issue("Dependent");
     let dependency = h.create_issue("Abandoned then archived");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
     jit::test_utils::transition_issue(&h.executor, &dependency, State::Rejected).unwrap();
     archive(&h, &dependency);
     assert_eq!(
         h.get_issue(&dependency).archived_from,
         Some(State::Rejected)
     );
+    let dependent = h.create_issue("Dependent");
+    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
+    assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 
     // Effectively terminal: the dependent is unblocked.
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Ready).unwrap();
