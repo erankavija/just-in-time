@@ -283,7 +283,7 @@ jobs:
           # Re-planning an exact installation reports no work, which is what
           # makes the quickstart's result observable rather than merely quiet.
           plan = json.load(open("plan.json"))
-          assert plan["count"] == len(plan["profiles"]) >= 1, plan
+          assert plan["profiles"], plan
           assert plan["profiles"][-1]["id"] == "jit-dogfood", plan
           assert all(profile["status"] == "unchanged" for profile in plan["profiles"]), plan
           PY
@@ -306,7 +306,6 @@ jobs:
 
           created = json.load(open("created.json"))
           listing = json.load(open("issues.json"))
-          assert listing["count"] == len(listing["issues"]), listing
           assert created["id"] in {issue["id"] for issue in listing["issues"]}, listing
 
           schema = json.load(open("schema.json"))

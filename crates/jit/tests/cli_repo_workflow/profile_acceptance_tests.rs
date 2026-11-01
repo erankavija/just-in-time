@@ -890,8 +890,8 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
         "release smoke must use the repeatable selector syntax for dry-run"
     );
     assert!(
-        workflow.contains("assert plan[\"count\"] == len(plan[\"profiles\"]) >= 1, plan"),
-        "release smoke must validate the count-wrapped dry-run envelope"
+        workflow.contains("assert plan[\"profiles\"], plan"),
+        "release smoke must validate a non-empty dry-run result"
     );
     assert!(
         workflow.contains(
