@@ -654,7 +654,9 @@ file count and size, and target paths. JSON returns the
 count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
 each entry carries `id`, `version`, the complete parsed manifest, `origin` (the package's
 worktree-relative directory path), `package_hash`,
-`targets`, `file_count`, and `byte_size`. Entries preserve every `--profile`
+`targets` (the sorted set of repository paths the package writes), `file_count`,
+and `byte_size`. Version requirements in the manifest render normalized, such
+as `>=1.0.0, <2.0.0`. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare the
 package with current target bytes; use `jit profile apply --profile <DIR>
 --dry-run` to rehearse one package's application.
@@ -742,7 +744,31 @@ and all coupled derived targets publish through that one redo record, with
 strict managed-region composition as described in
 [Repository Profiles](profiles.md).
 
-Unknown IDs are not-found errors (exit `3`). A dependency that resolves through
+In a git repository, apply refuses with `PROFILE_UNCOMMITTED_TARGETS` (exit
+`4`) while a path it would write differs from HEAD (modified, staged, or
+untracked), and `--dry-run` refuses the same way. Each written path is judged by
+the checkout that holds it, and a path in no checkout is never refused. The
+error's `details.paths` lists each such path and `details.resolution` states
+that committing or discarding those changes lets the apply proceed; the
+repository is left byte-identical. Without git, apply proceeds, so read
+[`jit profile diff`](#jit-profile-diff) first. `jit init --profile` over an
+absent data root is exempt.
+
+```json
+{
+  "error": {
+    "code": "PROFILE_UNCOMMITTED_TARGETS",
+    "message": "profile application would overwrite uncommitted changes in .jit/config.toml; commit or discard those changes and the apply can proceed",
+    "details": {
+      "paths": [".jit/config.toml"],
+      "resolution": "commit or discard those changes and the apply can proceed"
+    }
+  }
+}
+```
+
+A selector naming no readable package directory fails with `PROFILE_ERROR`
+(exit `1`). A dependency that resolves through
 no route fails the application before anything is written, naming the package
 that declared it beside the one that could not be found; declared dependencies
 that close a cycle fail the same way, naming the cycle. Conflicts, invalid
@@ -824,10 +850,10 @@ with ordinary tools still reads.
 
 A refused add publishes nothing and leaves no partially extracted package: the
 archive is read into memory and the whole tree is published through one redo
-record, exactly as a capture is.
+record, like every other repository mutation.
 
 `--dry-run` performs the same archive validation and reports the exact package
-tree publication without writing the destination, provenance, or an event.
+tree publication without writing the destination or an event.
 
 JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
 entry reports `id`, `version`, `origin`, `package_hash`, `archive`, `destination`,
