@@ -387,7 +387,7 @@ impl InitializationScaffold {
         // path must be captured for that length and the action preimage.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
-            paths.extend(profile.claims.target_paths()?);
+            paths.extend(profile.claims.target_paths());
             if profile.owns_default_rule_authority() {
                 paths.push(VirtualPath::SCHEMAS);
             }

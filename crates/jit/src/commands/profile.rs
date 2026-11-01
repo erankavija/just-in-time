@@ -1029,7 +1029,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         );
         content_paths.extend(crate::repository_state::profile_contribution_target_paths(
             contribution_context,
-        )?);
+        ));
         content_paths.push(events_path.clone());
 
         let base =
@@ -2444,7 +2444,7 @@ mod tests {
             .contributions
             .iter()
             .all(
-                |contribution| contribution.registry_path().repository_relative()
+                |contribution| contribution.registry().path().repository_relative()
                     == ".jit/config.toml"
             ));
     }
