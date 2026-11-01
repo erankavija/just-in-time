@@ -3586,7 +3586,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_update_issue_remove_label_fails_for_a_label_the_issue_lacks() {
+    fn test_update_issue_remove_label_fails_atomically_when_any_label_is_absent() {
         let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
         let mut issue = crate::test_utils::fixture_issue("Remove".into(), String::new());
         issue.labels = vec!["component:core".to_string()];
@@ -3599,7 +3599,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             None,
             None,
             vec![],
-            vec!["component:absent".to_string()],
+            vec!["component:core".to_string(), "component:absent".to_string()],
             None,
             None,
             false,

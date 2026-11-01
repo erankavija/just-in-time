@@ -472,7 +472,7 @@ jit issue create --title "Task" --label epic:auth --label type:task --label comp
 jit issue create --title "Task" --label epic:auth,type:task --label component:core
 ```
 
-**Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-gate`, `--except`, `--fields`
+**Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`, `--except`, `--fields`
 
 **Positional arguments** (e.g., `jit gate add <id> <gates>...`, `jit dep add <from> <to>...`) are **space-separated only**:
 
@@ -946,7 +946,7 @@ jit issue update --filter <QUERY> [OPTIONS]
 | `-s`, `--state <STATE>` | Requested lifecycle state. |
 | `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
 | `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable and comma-separated; adds to the existing set. |
-| `--remove-label <LABEL>` | Remove a label. Repeatable; each value is taken whole, not split at commas, so a malformed stored label is removable. Fails when the issue lacks the label (single-issue mode). |
+| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. Single-issue mode fails, removing nothing, when the issue lacks any named label; a stored label containing a comma therefore cannot be named. |
 | `--add-gate <GATE>` | Require additional registered gates. Repeatable and comma-separated. |
 | `--remove-gate <GATE>` | Drop gates from the issue's requirements. |
 | `--assignee <ASSIGNEE>` | Set the assignee, in `type:identifier` form. |

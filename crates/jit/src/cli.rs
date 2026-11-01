@@ -956,9 +956,8 @@ pub enum IssueCommands {
         #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]
         label: Vec<String>,
 
-        /// Remove a label (repeatable; the value is taken whole, so a malformed
-        /// label containing a comma stays removable)
-        #[arg(long)]
+        /// Remove label(s) (repeatable)
+        #[arg(long, value_delimiter = ',')]
         remove_label: Vec<String>,
 
         /// Add gate(s) to issue (gate keys from registry, repeatable)
