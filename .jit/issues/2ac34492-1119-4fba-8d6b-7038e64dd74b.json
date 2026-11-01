@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "57136031-7410-4fe6-852d-3e229b4df664",
+      "run_id": "18e33f87-46ab-413b-a131-2e7db42727fe",
       "status": "passed",
-      "updated_at": "2026-11-01T02:10:02.003997245Z",
+      "updated_at": "2026-11-01T02:16:45.897408368Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Criteria checks bind through check labels only",
-  "updated_at": "2026-11-01T02:12:49.378743492Z"
+  "updated_at": "2026-11-01T02:16:45.897408368Z"
 }
