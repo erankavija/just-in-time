@@ -5,8 +5,10 @@ Usage: format3-rewrite.py <repository-path>
 
 A format 2 index becomes {deleted_ids, schema_version: 3}; the script refuses
 when its all_ids disagrees with the issue files. A format 3 index stays as it
-is, so a re-run after merging a format 2 branch only drops event lines. Every
-run drops event lines carrying a retired tag.
+is, so a re-run after merging a format 2 branch only converts event lines. Every
+run drops event lines carrying a retired tag and writes "released_by": null on
+issue_released lines lacking that key; null means recorded before the field
+existed. It stages and commits nothing.
 """
 import json
 import os
@@ -58,12 +60,28 @@ def rewritten_index(store):
     ).encode()
 
 
-def is_retired(line):
+def converted_line(line):
+    """The line as format 3 holds it, or None when it is dropped."""
     try:
         record = json.loads(line)
     except ValueError:
-        return False  # A torn line is the log's certified exception, not ours.
-    return isinstance(record, dict) and record.get("type") in RETIRED_EVENT_TAGS
+        return line  # A torn line is the log's certified exception.
+    if not isinstance(record, dict):
+        return line
+    kind = record.get("type")
+    if kind in RETIRED_EVENT_TAGS:
+        return None
+    if kind != "issue_released" or "released_by" in record:
+        return line
+    ending = line[len(line.rstrip(b"\r\n")) :]
+    canonical = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    if canonical.encode() + ending != line:
+        fail(f"issue_released line is not canonical: {line!r}")
+    record["released_by"] = None
+    return (
+        json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
+        + ending
+    )
 
 
 def main():
@@ -76,17 +94,21 @@ def main():
     index = rewritten_index(store)
     events = store / "events.jsonl"
     original = events.read_bytes() if events.is_file() else b""
-    kept = [
-        line for line in original.splitlines(keepends=True) if not is_retired(line)
-    ]
+    lines = original.splitlines(keepends=True)
+    converted = [converted_line(line) for line in lines]
+    kept = [line for line in converted if line is not None]
+    dropped = len(lines) - len(kept)
+    released = sum(1 for old, new in zip(lines, converted) if new not in (None, old))
 
     if index is not None:
         replace_file(store / "index.json", index)
-    dropped = original.count(b"\n") - sum(line.count(b"\n") for line in kept)
-    if dropped or len(b"".join(kept)) != len(original):
+    if dropped or released:
         replace_file(events, b"".join(kept))
     state = "rewritten" if index is not None else "already format 3"
-    print(f"{store}: index {state}; dropped {dropped} retired event line(s)")
+    print(
+        f"{store}: index {state}; dropped {dropped} retired event line(s); "
+        f"wrote released_by on {released} line(s)"
+    )
 
 
 if __name__ == "__main__":
