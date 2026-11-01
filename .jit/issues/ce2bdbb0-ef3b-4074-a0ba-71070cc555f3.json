@@ -8,6 +8,7 @@
   ],
   "description": "Serve the domain-derived short id with each issue the API returns, so clients never truncate ids themselves.\n\n## Background\n\n`get_issue` and `list_issues` return `Json<Issue>` and `Json<Vec<Issue>>` directly (`crates/server/src/routes.rs:82-105`), and the graph DTO `GraphNode` holds `id: String` (`routes.rs:132-133`). The issue record's JSON shape is a storage contract, so a short id belongs in the response, not the record. The web UI currently truncates ids itself.\n\n## Success Criteria\n\n- [hard] REQ-01: Each issue in the issue and issue-list responses carries a `short_id` equal to `IssueId::short_id()` of its id, and its dependency entries carry their short ids.\n- [hard] REQ-02: Each graph node carries the short id of its issue.\n- [hard] REQ-03: Stored issue records are unchanged, and server tests assert the short id as the domain derivation of the id.\n",
   "documents": [],
+  "done_at": "2026-11-01T00:56:19.675598691Z",
   "first_ready_at": "2026-10-31T23:10:47.782319940Z",
   "gates_required": [
     "cargo-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Server issue responses carry the domain short id",
-  "updated_at": "2026-11-01T00:48:54.024207560Z"
+  "updated_at": "2026-11-01T00:56:19.675598691Z"
 }

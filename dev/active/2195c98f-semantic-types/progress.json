@@ -582,7 +582,7 @@
           "short_id": "ce2bdbb0",
           "title": "Server issue responses carry the domain short id",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "83413035-17f2-4fe0-a503-b8086ea28ac7",
