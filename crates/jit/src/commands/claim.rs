@@ -1838,10 +1838,7 @@ mod tests {
     // REQ-04's "git repository with no commits" gap is covered at the CLI
     // level in `claim_integration_tests.rs`
     // (`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`
-    // and its `--json` counterpart), not here: those spawn `jit` as a
-    // subprocess with its own `current_dir`, so they don't race with this
-    // module's other tests over the process-wide working directory the way a
-    // unit-level `std::env::set_current_dir` test would.
+    // and its `--json` counterpart), not here: the gap is the CLI's hint.
 
     // --- REQ-02: coordinator-held acquire synchronization + crash convergence -
 
