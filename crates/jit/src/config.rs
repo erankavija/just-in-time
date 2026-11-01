@@ -1063,17 +1063,17 @@ pub struct WorktreeConfig {
     pub write_policy: Option<crate::domain::LinkedCheckoutWriteStance>,
 }
 
-/// Enforcement mode for lease requirements.
+/// What another agent's active lease on an issue does to a write.
 ///
 /// Parsed case-insensitively from [`EnforcementMode::as_str`] tokens in TOML
 /// configuration (`[worktree] enforce_leases = ...`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
-    /// Block operations without active lease (production-safe).
+    /// Refuse the write.
     Strict,
-    /// Warn but allow operations without lease (development-friendly).
+    /// Warn and allow the write.
     Warn,
-    /// No enforcement - bypass lease checks (backward compatible).
+    /// Allow the write.
     Off,
 }
 

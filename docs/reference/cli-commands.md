@@ -3672,9 +3672,10 @@ Copy the hook templates into the `hooks/` directory of the selected repository's
 jit hooks install [--json]
 ```
 
-Two hooks are installed: `pre-commit` validates leases and branch divergence
-before a commit, and `pre-push` validates leases before a push. An existing hook
-of the same name is left in place and reported as skipped.
+One hook is installed: `pre-commit` validates branch divergence before a commit.
+An existing hook of the same name is left in place and reported as skipped. No
+hook checks leases; they are enforced when a mutation is written, so a hand edit
+of an issue record is not caught at commit.
 
 JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
 error envelope with code `HOOKS_INSTALL_ERROR`.

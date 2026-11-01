@@ -454,9 +454,9 @@ usage errors and exit `2`.
 The code each outcome exits with — including the codes that signal findings
 rather than errors — is in the [Exit Codes reference](exit-codes.md).
 
-### Integration with Hooks
+### When to run it
 
-The pre-commit hook runs similar validation automatically. Use `jit validate` for:
+Use `jit validate` for:
 
 - Manual health checks
 - CI/CD pipelines

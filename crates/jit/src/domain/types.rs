@@ -1317,6 +1317,9 @@ pub enum EventBody {
         assignee: Assignee,
         /// Reason for release
         reason: String,
+        /// Who released it; null means recorded before the field existed
+        #[serde(deserialize_with = "Option::deserialize")]
+        released_by: Option<Assignee>,
     },
     /// A dependency-aware archive execution reached its durable commit point.
     ArtifactArchiveExecuted {
@@ -1612,11 +1615,17 @@ impl EventBody {
     /// `assignee` is the typed [`Assignee`] being released; callers emit this
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
-    pub fn draft_issue_released(issue_id: IssueId, assignee: Assignee, reason: String) -> Self {
+    pub fn draft_issue_released(
+        issue_id: IssueId,
+        assignee: Assignee,
+        reason: String,
+        released_by: Assignee,
+    ) -> Self {
         EventBody::IssueReleased {
             issue_id,
             assignee,
             reason,
+            released_by: Some(released_by),
         }
     }
 
@@ -2870,8 +2879,9 @@ mod tests {
             let prev = Assignee::from_str("copilot:session-1").unwrap();
             let event = EventBody::draft_issue_released(
                 crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0000),
-                prev,
+                prev.clone(),
                 "timeout".to_string(),
+                prev,
             );
 
             let json = serde_json::to_string(&event).unwrap();
@@ -2879,6 +2889,26 @@ mod tests {
 
             let back: EventBody = serde_json::from_str(&json).unwrap();
             assert_eq!(back, event);
+        }
+
+        #[test]
+        fn test_issue_released_records_the_acting_identity_and_requires_the_key() {
+            let holder = Assignee::from_str("agent:holder").unwrap();
+            let actor = Assignee::from_str("agent:actor").unwrap();
+            let event = EventBody::draft_issue_released(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0000_0001),
+                holder,
+                "timeout".to_string(),
+                actor,
+            );
+            let mut json = serde_json::to_value(&event).unwrap();
+            assert_eq!(json["released_by"], "agent:actor");
+
+            json["released_by"] = serde_json::Value::Null;
+            assert!(serde_json::from_value::<EventBody>(json.clone()).is_ok());
+
+            json.as_object_mut().unwrap().remove("released_by");
+            assert!(serde_json::from_value::<EventBody>(json).is_err());
         }
 
         #[test]

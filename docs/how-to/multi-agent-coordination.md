@@ -243,7 +243,8 @@ max_indefinite_leases_per_agent = 3
 max_indefinite_leases_per_repo = 12
 ```
 
-`enforce_leases` is the active repository policy for structural issue writes.
+`enforce_leases` is the active repository policy for what another agent's lease
+does to a write: `strict` refuses it, and a write to an unleased issue succeeds.
 `write_policy` is the active repository policy for whether a linked
 (non-primary) checkout may run state-mutating commands at all — every
 worktree example in this guide relies on the repository declaring `allow`

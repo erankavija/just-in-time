@@ -639,7 +639,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             if target_id != expected_target || current_mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }
-            let warnings = captured_lease_warnings(
+            let warnings = refuse_foreign_leases_held(
                 current_mode,
                 std::slice::from_ref(&target_id),
                 claims_guard.as_ref(),
@@ -719,10 +719,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.exec.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
         self.exec
             .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
@@ -761,10 +758,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let full_id = id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.exec.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
         self.exec
             .publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
@@ -2546,10 +2540,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let warnings = executor.issues().delete_issue(&issue_id).unwrap();
+        executor.issues().delete_issue(&issue_id).unwrap();
 
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("No active lease"));
         assert!(executor.storage.load_issue(&issue_id).is_err());
         assert_eq!(
             executor
