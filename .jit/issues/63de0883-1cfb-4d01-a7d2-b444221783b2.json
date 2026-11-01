@@ -28,7 +28,7 @@
     "satisfies:f8a6b298/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Claim acquire emits its event exactly when the assignee changes",
-  "updated_at": "2026-10-21T10:40:07.723087612Z"
+  "updated_at": "2026-11-01T07:30:58.791560958Z"
 }
