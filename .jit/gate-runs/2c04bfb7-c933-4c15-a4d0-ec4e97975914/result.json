@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6321325d55f2384f366b3a79f9922966927a0262",
+  "completed_at": "2026-11-01T08:00:29.402968197Z",
+  "duration_ms": 175987,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The fixing commit records the reproduced hard-link cause, removes the stale self-check, preserves fixture-key digest sensitivity, and has passing Cargo CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "28a7bde1-84c4-4984-94c2-91728612f2d5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2c04bfb7-c933-4c15-a4d0-ec4e97975914",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:57:33.415653498Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4e6ca2cb3, f61ad6362, 6321325d5 (clean merge; no combined patch)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-11-01T07:57:32Z (reused; no exit code recorded); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The fixing commit records the reproduced hard-link cause, removes the stale self-check, preserves fixture-key digest sensitivity, and has passing Cargo CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
