@@ -7,6 +7,7 @@ import type { Issue } from '../../types/models';
 
 const createMockIssue = (overrides: Partial<Issue>): Issue => ({
   id: 'mock-id',
+  short_id: 'mock-id',
   title: 'Mock Issue',
   description: 'Mock description',
   state: 'backlog',

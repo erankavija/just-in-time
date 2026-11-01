@@ -58,14 +58,22 @@ export interface GateRunDetail extends GateRunSummary {
   stderr: string;
 }
 
+/** A dependency entry of an issue: its id and the server-derived short id. */
+export interface DependencyRef {
+  id: string;
+  short_id: string;
+}
+
 export interface Issue {
   id: string;
+  /** Server-derived short id; clients display it rather than truncating `id`. */
+  short_id: string;
   title: string;
   description: string;
   state: State;
   priority: Priority;
   assignee?: string;
-  dependencies: string[];
+  dependencies: DependencyRef[];
   labels: string[];
   documents: DocumentReference[];
   gates_required: string[];
@@ -82,6 +90,8 @@ export interface Issue {
  */
 export interface GraphNode {
   id: string;
+  /** Server-derived short id; clients display it rather than truncating `id`. */
+  short_id: string;
   label: string;
   state: State;
   priority: Priority;

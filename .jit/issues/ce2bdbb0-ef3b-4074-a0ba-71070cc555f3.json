@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8b34ed23-c12f-4cae-9ab8-63cdfcb3e0d8",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:48:54.024207560Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "16b5ba81-bfa6-48d8-beb6-118cec0021d4",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:29:18.704299654Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ce2bdbb0-ef3b-4074-a0ba-71070cc555f3",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Server issue responses carry the domain short id",
-  "updated_at": "2026-10-31T23:13:25.223708484Z"
+  "updated_at": "2026-11-01T00:48:54.024207560Z"
 }

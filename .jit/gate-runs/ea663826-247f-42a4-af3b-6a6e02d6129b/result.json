@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-ce2bdbb0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ffad67f9787e6cb2f723014033af1c2b9aa2ca4f",
+  "completed_at": "2026-10-31T23:40:59.566355900Z",
+  "duration_ms": 217245,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "web/src/components/Issue/IssueDetail.tsx",
+        "id": "F1",
+        "line": 295,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2195c98f/requirement/REQ-03",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Web issue displays still locally truncate identifiers instead of using the server-derived short_id."
+      }
+    ],
+    "summary": "Web issue displays still locally truncate identifiers instead of using the server-derived short_id.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ce2bdbb0-ef3b-4074-a0ba-71070cc555f3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea663826-247f-42a4-af3b-6a6e02d6129b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:37:22.320650738Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6262 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-ce2bdbb0\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19453-3138-7cc0-91da-938519672ede\n--------\nuser\n--- 6249 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:ce2bdbb0` commits `6339b2605` and `ffad67f97`\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types and @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-03 (issue description)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no prior run)\nTruncation recovery: Focused rereads covered ID display consumers, graph construction, IssueId, issue/gate state, and policy sources after combined outputs truncated.\n\n1. **[blocking][issue-impact] F1 — The web client still truncates issue IDs itself.** `web/src/components/Issue/IssueDetail.tsx:295`, `web/src/components/Graph/GraphView.tsx:214,715`, and `web/src/components/Graph/nodes/ClusterNode.tsx:106` retain `substring(0, 8)` on issue IDs. The new `short_id` response fields are consequently unused for these displays, so the change does not achieve its stated client-facing outcome or the linked requirement that only `IssueId` derives short IDs. References: @/issue/2195c98f/requirement/REQ-03, @/invariant/semantic-types.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Web issue displays still locally truncate identifiers instead of using the server-derived short_id.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Web issue displays still locally truncate identifiers instead of using the server-derived short_id.\",\"file\":\"web/src/components/Issue/IssueDetail.tsx\",\"line\":295,\"references\":[\"@/issue/2195c98f/requirement/REQ-03\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

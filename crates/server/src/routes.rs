@@ -79,15 +79,71 @@ async fn health_check<S: IssueStore>(State(state): State<AppState<S>>) -> impl I
     }))
 }
 
+/// An issue as served by the API: the stored record's fields, plus its
+/// `short_id`, with each `dependencies` entry expanded to a [`DependencyRef`].
+/// The stored record keeps its own shape.
+#[derive(Debug, Serialize)]
+pub struct IssueResponse {
+    #[serde(flatten)]
+    issue: IssueBody,
+    /// Domain-derived short id ([`IssueId::short_id`]).
+    short_id: String,
+    dependencies: Vec<DependencyRef>,
+}
+
+/// A dependency entry: the id and its short id, as `issue show --json` pairs them.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DependencyRef {
+    pub id: IssueId,
+    pub short_id: String,
+}
+
+impl From<&IssueId> for DependencyRef {
+    fn from(id: &IssueId) -> Self {
+        Self {
+            id: id.clone(),
+            short_id: id.short_id().to_string(),
+        }
+    }
+}
+
+impl From<Issue> for IssueResponse {
+    fn from(issue: Issue) -> Self {
+        Self {
+            short_id: issue.id.short_id().to_string(),
+            dependencies: issue.dependencies.iter().map(DependencyRef::from).collect(),
+            issue: IssueBody(issue),
+        }
+    }
+}
+
+/// An [`Issue`] serialized without its `dependencies`, which [`IssueResponse`]
+/// serves expanded.
+#[derive(Debug)]
+struct IssueBody(Issue);
+
+impl Serialize for IssueBody {
+    fn serialize<Ser: serde::Serializer>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error> {
+        use serde::ser::Error;
+        match serde_json::to_value(&self.0).map_err(Ser::Error::custom)? {
+            serde_json::Value::Object(mut fields) => {
+                fields.remove("dependencies");
+                fields.serialize(serializer)
+            }
+            _ => Err(Ser::Error::custom("issue did not serialize as an object")),
+        }
+    }
+}
+
 /// List all issues
 async fn list_issues<S: IssueStore>(
     State(state): State<AppState<S>>,
-) -> Result<Json<Vec<Issue>>, StatusCode> {
+) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
     state
         .executor
         .issues()
         .list_issues(None, None, None)
-        .map(Json)
+        .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
         .map_err(|e| {
             tracing::error!("Failed to list issues: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -114,13 +170,13 @@ fn resolve_issue_path_id<S: IssueStore>(
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
-) -> Result<Json<Issue>, StatusCode> {
+) -> Result<Json<IssueResponse>, StatusCode> {
     let id = resolve_issue_path_id(&state.executor, &id)?;
     state
         .executor
         .issues()
         .show_issue(&id)
-        .map(Json)
+        .map(|issue| Json(IssueResponse::from(issue)))
         .map_err(|e| {
             tracing::error!("Failed to get issue {}: {:?}", id, e);
             StatusCode::NOT_FOUND
@@ -155,6 +211,8 @@ pub struct GraphData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: IssueId,
+    /// Domain-derived short id ([`IssueId::short_id`]).
+    pub short_id: String,
     pub label: String,
     pub state: IssueState,
     pub priority: Priority,
@@ -214,6 +272,7 @@ async fn get_graph<S: IssueStore>(
         .iter()
         .map(|issue| GraphNode {
             id: issue.id.clone(),
+            short_id: issue.id.short_id().to_string(),
             label: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
@@ -1135,7 +1194,7 @@ mod tests {
         ));
         let response = server.get("/issues").await;
         response.assert_status_ok();
-        let issues: Vec<Issue> = response.json();
+        let issues: Vec<serde_json::Value> = response.json();
         assert_eq!(issues.len(), 0);
     }
 
@@ -1215,8 +1274,98 @@ mod tests {
 
         let response = server.get("/issues").await;
         response.assert_status_ok();
-        let issues: Vec<Issue> = response.json();
+        let issues: Vec<serde_json::Value> = response.json();
         assert_eq!(issues.len(), 2);
+    }
+
+    fn dependent_pair_server() -> (TestServer, IssueId, IssueId) {
+        let executor = Arc::new(memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                config: Some(&taxonomy_config()),
+                ..MemoryDeclarations::default()
+            },
+        ));
+        let create = |title: &str| {
+            executor
+                .issues()
+                .create_issue(
+                    title.to_string(),
+                    "Description".to_string(),
+                    Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .0
+        };
+        let dependency = create("Dependency");
+        let dependent = create("Dependent");
+        executor.add_dependency(&dependent, &dependency).unwrap();
+        let state = AppState {
+            executor,
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        (
+            TestServer::new(create_routes(state)).unwrap(),
+            dependent,
+            dependency,
+        )
+    }
+
+    fn assert_serves_short_ids(issue: &serde_json::Value, id: &IssueId, dependency: &IssueId) {
+        assert_eq!(issue["id"], id.as_str());
+        assert_eq!(issue["short_id"], id.short_id());
+        let entries = issue["dependencies"].as_array().unwrap();
+        assert!(entries
+            .iter()
+            .any(|entry| entry["id"] == dependency.as_str()
+                && entry["short_id"] == dependency.short_id()));
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_serves_domain_short_ids_for_issue_and_dependencies() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get(&format!("/issues/{}", dependent)).await;
+
+        response.assert_status_ok();
+        assert_serves_short_ids(&response.json(), &dependent, &dependency);
+    }
+
+    #[tokio::test]
+    async fn test_list_issues_serves_domain_short_ids_for_every_issue() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get("/issues").await;
+
+        response.assert_status_ok();
+        let issues: Vec<serde_json::Value> = response.json();
+        let served = |id: &IssueId| issues.iter().find(|issue| issue["id"] == id.as_str());
+        assert_serves_short_ids(served(&dependent).unwrap(), &dependent, &dependency);
+        assert_eq!(
+            served(&dependency).unwrap()["short_id"],
+            dependency.short_id()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_graph_serves_domain_short_id_for_every_node() {
+        let (server, dependent, dependency) = dependent_pair_server();
+
+        let response = server.get("/graph").await;
+
+        response.assert_status_ok();
+        let graph: GraphData = response.json();
+        for id in [&dependent, &dependency] {
+            let node = graph.nodes.iter().find(|node| &node.id == id).unwrap();
+            assert_eq!(node.short_id, id.short_id());
+        }
     }
 
     #[tokio::test]
