@@ -21808,3 +21808,6 @@
 {"fields":["dependencies"],"id":"c5533c56-eaeb-4aa9-97f3-82ecc8d645c9","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T07:14:43.846459016Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"f5385598-e39d-469f-b2a6-b0c56576e325","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:14:44.027922027Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:gf2-coverage-fix","id":"4e53eed2-1d1a-4c89-8d83-a00810e36954","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:14:44.027922027Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"e1f47dfb-a1d6-499b-aace-ce43f51135d3","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:18:55.921192504Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"38a7aabb-6c04-4c5d-afce-02c875b10d50","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:20:50.968396377Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"63d16add-93be-403f-b687-6c8ed128d4c6","issue_id":"12a0a694-5dca-441d-8a3f-9e9fcf72364c","timestamp":"2026-11-01T07:24:04.243302569Z","type":"gate_failed","updated_by":"auto:executor"}

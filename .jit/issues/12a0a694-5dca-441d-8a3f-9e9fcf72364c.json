@@ -12,7 +12,26 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b9a4bfd7-c30a-48af-94a6-ed9aabedb876",
+      "status": "failed",
+      "updated_at": "2026-11-01T07:20:50.968396377Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "981b3b20-87e0-491a-9095-033e7f2d79f1",
+      "status": "failed",
+      "updated_at": "2026-11-01T07:24:04.243302569Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "6715aaa5-ade4-4720-a0d0-d6c63f00c2b0",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:18:55.921192504Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
   "labels": [
     "type:task",
@@ -23,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Resolve short-id targets in label target validation",
-  "updated_at": "2026-11-01T07:14:44.027922027Z"
+  "updated_at": "2026-11-01T07:24:04.243302569Z"
 }
