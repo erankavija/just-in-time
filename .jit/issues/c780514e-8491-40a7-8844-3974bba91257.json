@@ -48,6 +48,7 @@
       "path": "dev/active/c780514e-test-topology/handoff-2.md"
     }
   ],
+  "done_at": "2026-11-01T11:26:11.277311316Z",
   "first_ready_at": "2026-10-20T20:12:37.837021516Z",
   "gates_required": [
     "repo-validate",
@@ -66,71 +67,82 @@
   ],
   "gates_status": {
     "build-budget-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.389709164Z",
-      "updated_by": null
+      "run_id": "007e96f8-5033-4ef5-aa22-d6549ee19d3d",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.984781787Z",
+      "updated_by": "auto:executor"
     },
     "cargo-ci-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.317519163Z",
-      "updated_by": null
+      "run_id": "f8ada3d5-94d1-482e-97e7-64e5d2a2b940",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.684925987Z",
+      "updated_by": "auto:executor"
     },
     "docs-check-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.423381926Z",
-      "updated_by": null
+      "run_id": "055b0481-5dc9-4d86-b760-192339c64e68",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.301959624Z",
+      "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "06032340-03a2-4267-8b54-604d415eb564",
-      "status": "failed",
-      "updated_at": "2026-11-01T11:01:45.823271998Z",
+      "run_id": "7bfd8f84-6340-42ac-b60b-965dff091127",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:07.803776522Z",
       "updated_by": "auto:executor"
     },
     "manifest-tool-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.735069493Z",
-      "updated_by": null
+      "run_id": "45a6baf8-b0f4-46a3-b756-fe6bba906b96",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:33.192185974Z",
+      "updated_by": "auto:executor"
     },
     "package-drift": {
-      "status": "pending",
-      "updated_at": "2026-11-01T08:05:07.349436962Z",
-      "updated_by": null
+      "run_id": "919bd45a-20ea-41ac-9f6d-8ef471aead6d",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:46.307590104Z",
+      "updated_by": "auto:executor"
     },
     "profile-suite-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.353690919Z",
-      "updated_by": null
+      "run_id": "d08441b7-f900-4a8d-9818-5456fd0d8ba6",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:13.838173145Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "run_id": "a16a43db-9042-4fa4-b3c7-e57a9712ba6e",
+      "run_id": "3621d9d6-701c-434e-bf87-dcc4b1193e2a",
       "status": "passed",
-      "updated_at": "2026-11-01T10:57:40.020903279Z",
+      "updated_at": "2026-11-01T11:20:30.840590056Z",
       "updated_by": "auto:executor"
     },
     "session-cost-benchmark-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.572618537Z",
-      "updated_by": null
+      "run_id": "afd54949-5fc4-45b2-9764-9388d418bdaf",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.745016468Z",
+      "updated_by": "auto:executor"
     },
     "shipped-policy-regions-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.460426947Z",
-      "updated_by": null
+      "run_id": "f2ec17cb-90ba-46c2-bfcd-9e25431817bc",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.452319776Z",
+      "updated_by": "auto:executor"
     },
     "standards-fix-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.681016225Z",
-      "updated_by": null
+      "run_id": "deda5d94-a613-4630-9c30-772a6407ff0c",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:33.043062809Z",
+      "updated_by": "auto:executor"
     },
     "standards-scan-test": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.621395465Z",
-      "updated_by": null
+      "run_id": "fe66a727-ad88-4dbe-91b2-7fc7b217e847",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.896208955Z",
+      "updated_by": "auto:executor"
     },
     "workflow-contract-selftest": {
-      "status": "pending",
-      "updated_at": "2026-10-22T14:28:47.492762811Z",
-      "updated_by": null
+      "run_id": "e3edeca2-fe18-4cdb-80f9-3c77232727d3",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:24:32.598652397Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c780514e-8491-40a7-8844-3974bba91257",
@@ -145,7 +157,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-11-01T11:01:45.823271998Z"
+  "updated_at": "2026-11-01T11:26:11.277311316Z"
 }

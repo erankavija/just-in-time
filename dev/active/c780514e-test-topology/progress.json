@@ -1373,10 +1373,13 @@
     }
   ],
   "rework_counts": {
-    "955aaa9a": 0,
+    "955aaa9a": 3,
     "8d64ffae": 2,
     "8ac93475": 2,
-    "d6635a93": 2
+    "d6635a93": 2,
+    "45e3e442": 2,
+    "7721a2a9": 1,
+    "c5aafdc0": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2084,7 +2087,7 @@
       "scope": "Coordinator-approved incremental subdirectories only; profile owner confirmed idle; turnstile and exclusive build lock held"
     }
   ],
-  "execution_status": "in_progress",
+  "execution_status": "done",
   "handoff": "dev/active/c780514e-test-topology/handoff.md",
   "pause_checkpoint": {
     "reason": "User requested handoff via coordinator 01a164c8-d7ba-7812-a630-db8dddcee05b",
