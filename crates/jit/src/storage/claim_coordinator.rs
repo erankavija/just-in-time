@@ -224,9 +224,8 @@ impl ClaimsIndex {
             .collect()
     }
 
-    /// The first active lease on `issue_id` held by an agent other than
-    /// `current_agent`. With no identity there is no other agent to tell apart,
-    /// so no lease conflicts.
+    /// The first active lease on `issue_id` held by anyone but `current_agent`; a
+    /// writer with no identity holds none, so every active lease conflicts.
     pub(crate) fn conflicting_lease(
         &self,
         issue_id: &IssueId,
@@ -237,7 +236,7 @@ impl ClaimsIndex {
             &lease.issue_id == issue_id
                 && !lease.is_expired(now)
                 && !lease.is_stale(now)
-                && current_agent.is_some_and(|agent| &lease.agent_id != agent)
+                && current_agent.is_none_or(|agent| &lease.agent_id != agent)
         })
     }
 

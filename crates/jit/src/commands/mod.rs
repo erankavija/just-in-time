@@ -806,7 +806,8 @@ fn refuse_foreign_leases(
             .collect::<Vec<_>>()
             .join(", ");
         anyhow::bail!(
-            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end."
+            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end. \
+             If the lease is yours, set your identity with JIT_AGENT_ID."
         );
     }
     Ok(findings)
@@ -849,25 +850,23 @@ fn refuse_foreign_leases_read(
     })
 }
 
+/// Refuse claiming `target` for `assignee` when anyone else leases it, whatever
+/// the enforcement mode.
 fn ensure_claim_available(
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
     target: &IssueId,
     assignee: &crate::domain::Assignee,
 ) -> Result<()> {
-    let Some(lease) = guard.and_then(|guard| guard.conflicting_lease(target, Some(assignee)))
-    else {
-        return Ok(());
-    };
-    let expires = lease
-        .expires_at
-        .map(|time| time.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-        .unwrap_or_else(|| "indefinitely".to_string());
-    Err(anyhow!(
-        "Issue {} is currently leased by {} {}.\nUse 'jit claim acquire' to properly coordinate work.",
-        target,
-        lease.agent_id,
-        expires
-    ))
+    refuse_foreign_leases(
+        crate::config::EnforcementMode::Strict,
+        std::slice::from_ref(target),
+        |id| {
+            guard
+                .and_then(|guard| guard.conflicting_lease(id, Some(assignee)))
+                .map(|lease| lease.agent_id)
+        },
+    )
+    .map(drop)
 }
 
 #[derive(Clone)]

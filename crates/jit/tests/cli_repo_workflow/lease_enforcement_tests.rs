@@ -1,5 +1,5 @@
-//! The one lease rule: in `strict` mode another agent's active lease refuses a
-//! write, and no lease lets it through. Every CLI leaf is classified here, so a new
+//! The one lease rule: in `strict` mode anyone else's active lease refuses a write,
+//! and no lease lets it through. Every CLI leaf is classified here, so a new
 //! command cannot silently miss the check.
 
 use clap::CommandFactory;
@@ -15,156 +15,57 @@ use std::process::Output;
 const OWNER: &str = "agent:owner";
 const OTHER: &str = "agent:other";
 
-/// How a CLI leaf relates to an issue record another agent has leased.
-enum Coverage {
-    /// Refuses on another agent's lease and succeeds with none; `{x}`, `{y}`, `{z}`
-    /// and `{w}` expand to the fixture's issues.
-    Refuses(&'static [&'static str]),
-    /// Writes the record by a reason [`EXEMPT_PATHS`] proves.
-    Exempt,
-    /// Writes no existing issue record.
-    NoRecord,
-}
-
-use Coverage::{Exempt, NoRecord, Refuses};
-
-const LEAVES: &[(&str, Coverage)] = &[
-    ("apply", Refuses(&["apply", "plan", "{x}"])),
-    ("archive candidates", NoRecord),
-    ("archive container", Exempt),
-    ("archive document", Exempt),
-    ("claim acquire", NoRecord),
-    ("claim force-evict", NoRecord),
-    ("claim heartbeat", NoRecord),
-    ("claim list", NoRecord),
-    ("claim release", NoRecord),
-    ("claim renew", NoRecord),
-    ("claim status", NoRecord),
-    ("config get", NoRecord),
-    ("config set", NoRecord),
-    ("config show", NoRecord),
-    ("config show-hierarchy", NoRecord),
-    ("config validate", NoRecord),
-    ("dep add", Refuses(&["dep", "add", "{x}", "{y}"])),
-    ("dep rm", Refuses(&["dep", "rm", "{x}", "{z}"])),
-    ("doc add", Refuses(&["doc", "add", "{x}", "docs/b.md"])),
-    ("doc assets list", NoRecord),
-    ("doc check-links", NoRecord),
-    ("doc conformance", NoRecord),
-    ("doc diff", NoRecord),
-    ("doc dir", NoRecord),
-    ("doc history", NoRecord),
-    ("doc list", NoRecord),
-    (
-        "doc remove",
-        Refuses(&["doc", "remove", "{x}", "docs/a.md"]),
-    ),
-    ("doc show", NoRecord),
-    ("events query", NoRecord),
-    ("events tail", NoRecord),
-    ("gate add", Refuses(&["gate", "add", "{x}", "unused"])),
-    ("gate define", NoRecord),
-    (
-        "gate evaluate",
-        Refuses(&["gate", "evaluate", "{x}", "auto"]),
-    ),
-    (
-        "gate evaluate-all",
-        Refuses(&["gate", "evaluate-all", "{x}"]),
-    ),
-    (
-        "gate evaluate-many",
-        Refuses(&["gate", "evaluate-many", "auto", "{x}"]),
-    ),
-    (
-        "gate fail",
-        Refuses(&["gate", "fail", "{w}", "manual", "--by", OTHER]),
-    ),
-    ("gate list", NoRecord),
-    (
-        "gate preset apply",
-        Refuses(&["gate", "preset", "apply", "seeded", "{x}"]),
-    ),
-    ("gate preset create", NoRecord),
-    ("gate preset list", NoRecord),
-    ("gate preset show", NoRecord),
-    ("gate remove", NoRecord),
-    ("gate show", NoRecord),
-    ("gate status", NoRecord),
-    ("gate status-all", NoRecord),
-    ("gate update", NoRecord),
-    ("graph deps", NoRecord),
-    ("graph export", NoRecord),
-    ("graph rdeps", NoRecord),
-    ("graph roots", NoRecord),
-    ("graph tree", NoRecord),
-    ("hooks install", NoRecord),
-    ("init", NoRecord),
-    ("invariant check", NoRecord),
-    ("issue assign", Refuses(&["issue", "assign", "{x}", OTHER])),
-    ("issue batch-create", NoRecord),
-    ("issue children", NoRecord),
-    ("issue claim", Refuses(&["issue", "claim", "{w}", OTHER])),
+/// Leaves another writer's lease refuses and that succeed with no lease, as argv
+/// lines; `{x}`, `{y}`, `{z}` and `{w}` expand to the fixture's issues.
+const REFUSES: &[(&str, &str)] = &[
+    ("apply", "apply plan {x}"),
+    ("dep add", "dep add {x} {y}"),
+    ("dep rm", "dep rm {x} {z}"),
+    ("doc add", "doc add {x} docs/b.md"),
+    ("doc remove", "doc remove {x} docs/a.md"),
+    ("gate add", "gate add {x} unused"),
+    ("gate evaluate", "gate evaluate {x} auto"),
+    ("gate evaluate-all", "gate evaluate-all {x}"),
+    ("gate evaluate-many", "gate evaluate-many auto {x}"),
+    ("gate fail", "gate fail {w} manual --by agent:other"),
+    ("gate preset apply", "gate preset apply seeded {x}"),
+    ("issue assign", "issue assign {x} agent:other"),
+    ("issue claim", "issue claim {w} agent:other"),
     (
         "issue claim-next",
-        Refuses(&[
-            "issue",
-            "claim-next",
-            OTHER,
-            "--filter",
-            "priority:critical",
-        ]),
+        "issue claim-next agent:other --filter priority:critical",
     ),
-    ("issue create", NoRecord),
-    ("issue delete", Refuses(&["issue", "delete", "{x}"])),
-    ("issue list", NoRecord),
-    ("issue progress", NoRecord),
-    (
-        "issue reject",
-        Refuses(&["issue", "reject", "{x}", "--reason", "wontfix"]),
-    ),
-    ("issue release", Exempt),
-    ("issue search", NoRecord),
-    ("issue show", NoRecord),
-    ("issue status", NoRecord),
-    ("issue unassign", Refuses(&["issue", "unassign", "{x}"])),
-    (
-        "issue update",
-        Refuses(&["issue", "update", "{x}", "--priority", "high"]),
-    ),
-    ("item list", NoRecord),
-    ("item resolve", NoRecord),
-    ("item search", NoRecord),
-    ("item show", NoRecord),
-    ("label namespaces", NoRecord),
-    ("label values", NoRecord),
-    ("list", NoRecord),
-    ("profile add", NoRecord),
-    ("profile apply", NoRecord),
-    ("profile diff", NoRecord),
-    ("profile pack", NoRecord),
-    ("profile show", NoRecord),
-    ("project render", NoRecord),
-    ("query all", NoRecord),
-    ("query available", NoRecord),
-    ("query blocked", NoRecord),
-    ("query closed", NoRecord),
-    ("query count", NoRecord),
-    ("query divergence", NoRecord),
-    ("query strategic", NoRecord),
-    ("rdeps", NoRecord),
-    ("recover", Exempt),
-    ("search", NoRecord),
-    ("serve", NoRecord),
-    ("snapshot export", NoRecord),
-    ("status", NoRecord),
-    ("validate", Exempt),
-    ("version", NoRecord),
-    ("worktree exec", NoRecord),
-    ("worktree info", NoRecord),
-    ("worktree list", NoRecord),
-    ("worktree store-divergence", NoRecord),
+    ("issue delete", "issue delete {x}"),
+    ("issue reject", "issue reject {x} --reason wontfix"),
+    ("issue unassign", "issue unassign {x}"),
+    ("issue update", "issue update {x} --priority high"),
 ];
+
+/// Leaves that write a leased issue by a path [`EXEMPT_PATHS`] proves.
+const EXEMPT: &[&str] = &[
+    "archive container",
+    "archive document",
+    "issue release",
+    "recover",
+    "validate",
+];
+
+/// Leaves that write no existing issue record.
+const NO_RECORD: &str = "
+    archive candidates, claim acquire, claim force-evict, claim heartbeat, claim list,
+    claim release, claim renew, claim status, config get, config set, config show,
+    config show-hierarchy, config validate, doc assets list, doc check-links,
+    doc conformance, doc diff, doc dir, doc history, doc list, doc show, events query,
+    events tail, gate define, gate list, gate preset create, gate preset list,
+    gate preset show, gate remove, gate show, gate status, gate status-all, gate update,
+    graph deps, graph export, graph rdeps, graph roots, graph tree, hooks install, init,
+    invariant check, issue batch-create, issue children, issue create, issue list,
+    issue progress, issue search, issue show, issue status, item list, item resolve,
+    item search, item show, label namespaces, label values, list, profile add,
+    profile apply, profile diff, profile pack, profile show, project render, query all,
+    query available, query blocked, query closed, query count, query divergence,
+    query strategic, rdeps, search, serve, snapshot export, status, version, worktree exec,
+    worktree info, worktree list, worktree store-divergence";
 
 /// Writes that reach a leased issue by design, each with its reason and proof.
 const EXEMPT_PATHS: &[(&str, &str, fn())] = &[
@@ -175,7 +76,7 @@ const EXEMPT_PATHS: &[(&str, &str, fn())] = &[
     ),
     (
         "issue claim on an unleased issue",
-        "assignment bookkeeping; a leased issue is covered by the Refuses row",
+        "assignment bookkeeping; a leased issue is covered by REFUSES",
         claim_of_an_unleased_issue_writes,
     ),
     (
@@ -255,65 +156,21 @@ impl Repo {
         repo.y = repo.create("Free");
         repo.z = repo.create("Blocker");
         repo.w = repo.create("Critical");
-        for args in [
-            vec![
-                "gate",
-                "define",
-                "manual",
-                "--title",
-                "M",
-                "--description",
-                "d",
-                "--stage",
-                "postcheck",
-                "--mode",
-                "manual",
-            ],
-            vec![
-                "gate",
-                "define",
-                "auto",
-                "--title",
-                "A",
-                "--description",
-                "d",
-                "--stage",
-                "postcheck",
-                "--mode",
-                "auto",
-                "--checker-command",
-                "true",
-            ],
-            vec!["gate", "add", &repo.y, "manual"],
-            vec!["gate", "preset", "create", &repo.y, "seeded"],
-            vec![
-                "gate",
-                "define",
-                "unused",
-                "--title",
-                "U",
-                "--description",
-                "d",
-                "--stage",
-                "postcheck",
-                "--mode",
-                "manual",
-            ],
-            vec!["gate", "add", &repo.x, "auto"],
-            vec!["gate", "add", &repo.w, "manual"],
-            vec!["dep", "add", &repo.x, &repo.z],
-            vec!["doc", "add", &repo.x, "docs/a.md"],
-            vec!["issue", "update", &repo.w, "--priority", "critical"],
-            vec![
-                "issue",
-                "update",
-                &repo.x,
-                "--label",
-                "type:task",
-                "--force",
-            ],
+        const GATE: &str = "--title G --description d --stage postcheck --mode";
+        for line in [
+            format!("gate define manual {GATE} manual"),
+            format!("gate define unused {GATE} manual"),
+            format!("gate define auto {GATE} auto --checker-command true"),
+            format!("gate add {} manual", repo.y),
+            format!("gate preset create {} seeded", repo.y),
+            format!("gate add {} auto", repo.x),
+            format!("gate add {} manual", repo.w),
+            format!("dep add {} {}", repo.x, repo.z),
+            format!("doc add {} docs/a.md", repo.x),
+            format!("issue update {} --priority critical", repo.w),
+            format!("issue update {} --label type:task --force", repo.x),
         ] {
-            repo.owner(&args);
+            repo.owner(&line.split_whitespace().collect::<Vec<_>>());
         }
         repo.set_mode("strict");
         repo.cli.commit("seed").unwrap();
@@ -382,9 +239,19 @@ impl Repo {
         self.run(OTHER, args)
     }
 
-    fn expand(&self, argv: &[&str]) -> Vec<String> {
-        argv.iter()
-            .map(|arg| match *arg {
+    /// A writer with no identity: no variable, and a home with no agent config.
+    fn anonymous(&self, args: &[&str]) -> Output {
+        let home = self.cli.root().join(".git");
+        self.cli
+            .command_with_env(args, [("HOME", home.as_os_str())])
+            .env("JIT_ALLOW_DELETION", "1")
+            .output()
+            .unwrap()
+    }
+
+    fn expand(&self, argv: &str) -> Vec<String> {
+        argv.split_whitespace()
+            .map(|arg| match arg {
                 "{x}" => self.x.clone(),
                 "{y}" => self.y.clone(),
                 "{z}" => self.z.clone(),
@@ -574,37 +441,41 @@ fn clap_leaves(command: &clap::Command, prefix: &str) -> Vec<String> {
 }
 
 #[test]
-fn test_strict_lease_every_cli_leaf_is_classified_and_only_another_agents_lease_refuses() {
-    let classified = LEAVES
+fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuses() {
+    let classified = REFUSES
         .iter()
-        .map(|(leaf, _)| (*leaf).to_owned())
+        .map(|(leaf, _)| *leaf)
+        .chain(EXEMPT.iter().copied())
+        .chain(NO_RECORD.split(',').map(str::trim))
+        .map(str::to_owned)
         .collect::<BTreeSet<_>>();
     let actual = clap_leaves(&Cli::command(), "")
         .into_iter()
         .collect::<BTreeSet<_>>();
-    assert_eq!(classified, actual, "classify every CLI leaf in LEAVES");
+    assert_eq!(classified, actual, "classify every CLI leaf");
 
-    for (leaf, coverage) in LEAVES {
-        let Refuses(argv) = coverage else { continue };
+    for (leaf, argv) in REFUSES {
         let repo = Repo::new();
         let argv = repo.expand(argv);
         let argv = argv.iter().map(String::as_str).collect::<Vec<_>>();
         let before = repo.snapshot();
 
         let refused = repo.other(&argv);
+        let anonymous = repo.anonymous(&argv);
 
-        assert!(!refused.status.success(), "{leaf} must refuse");
-        assert!(
-            stderr(&refused).contains(OWNER),
-            "{leaf} refused for another reason: {}",
-            stderr(&refused)
-        );
+        for (writer, output) in [("another agent", &refused), ("no identity", &anonymous)] {
+            assert!(!output.status.success(), "{leaf} must refuse {writer}");
+            assert!(
+                stderr(output).contains(OWNER),
+                "{leaf} refused {writer} for another reason: {}",
+                stderr(output)
+            );
+        }
+        assert!(stderr(&anonymous).contains("JIT_AGENT_ID"), "{leaf}");
         assert_eq!(repo.snapshot(), before, "{leaf} changed something");
 
         repo.release_leases();
-        let unleased = repo.other(&argv);
-
-        assert_ok(&unleased);
+        assert_ok(&repo.other(&argv));
     }
 }
 

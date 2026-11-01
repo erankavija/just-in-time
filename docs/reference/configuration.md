@@ -485,7 +485,7 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 
 | Value | Description |
 |-------|-------------|
-| `"strict"` | Refuse a write to an issue another agent holds an active lease on. A write with no lease on an unleased issue succeeds |
+| `"strict"` | Refuse a write to an issue anyone but the writer holds an active lease on; a writer with no identity holds none. A write to an unleased issue succeeds |
 | `"warn"` | Warn where `strict` would refuse, and allow the write |
 | `"off"` | No lease enforcement |
 
