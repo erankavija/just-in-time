@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c241c921-e397-4ca3-aab5-5222c9c15843",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:11:44.138467946Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
   "labels": [
     "epic:semantic-types",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The dependency graph carries typed node ids",
-  "updated_at": "2026-11-01T03:56:32.136426640Z"
+  "updated_at": "2026-11-01T04:11:44.138467946Z"
 }
