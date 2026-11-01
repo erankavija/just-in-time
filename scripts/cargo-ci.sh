@@ -52,6 +52,11 @@ set -euo pipefail
 # Cargo selection, and guarded sccache setup, then runs only that focused Cargo
 # command. Use this mode for compilation-heavy targeted checks; invoke the
 # script without arguments only when the complete gate is intended.
+#
+# `./scripts/cargo-ci.sh --suite` runs only the suite steps: pinned nextest,
+# doctests, and the excluded-tests check. CI uses it so CI and the gate share one
+# definition of the suite. CI's runners are not the quiet host the suite-duration
+# budget is measured on, so CI does not run the budget step.
 
 readonly LOAD_THRESHOLD_PER_CPU="0.17"
 
@@ -474,8 +479,10 @@ baseline_load1=$(sample_load1)
 
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
-run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
-run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+if [ "${1:-}" != "--suite" ]; then
+  run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
+  run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+fi
 
 # Put the measured suite into the state the clock assumes, before the clock
 # starts (jit:94d85bf1, jit:0708d692): compiled, and read into the page cache.
@@ -549,7 +556,9 @@ prepare_measured_suite() {
 
   echo "built in ${built_ms} ms, warmed ${#readable[@]} executables (${bytes} bytes) in $(( $(epoch_milliseconds) - warm_started_ms )) ms"
 }
-run_step suite-build prepare_measured_suite
+if [ "${1:-}" != "--suite" ]; then
+  run_step suite-build prepare_measured_suite
+fi
 
 # The named suite clock is deliberately narrower than the gate duration. It
 # starts immediately before the pinned workspace suite and ends after the
@@ -596,7 +605,9 @@ run_budget_check() {
     "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
     --root "$root" --artifacts-json "$SUITE_ARTIFACTS_JSON" --test-suite-ms "$suite_clock_ms"
 }
-run_step budget run_budget_check
+if [ "${1:-}" != "--suite" ]; then
+  run_step budget run_budget_check
+fi
 
 echo "$summary"
 
