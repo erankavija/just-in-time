@@ -22334,3 +22334,5 @@
 {"from":"in_progress","id":"a7dc2a4a-0386-4dd0-8517-2b554b59538e","issue_id":"180e7f33-2d61-4e21-8548-fc533e06e400","timestamp":"2026-11-01T18:00:08.639274676Z","to":"rejected","type":"issue_state_changed"}
 {"fields":["assignee"],"id":"37dbfac3-26a0-4350-b273-d04e94dceb33","issue_id":"578ed10d-29f9-4b25-87c0-b3c50a1e9d6e","timestamp":"2026-11-01T18:00:08.697186027Z","type":"issue_updated","updated_by":"issue-unassign"}
 {"fields":["assignee"],"id":"596fca79-a628-4ed1-bc29-b22b57d70c7a","issue_id":"c2b3cefa-d690-4c6c-94dd-feaa3156acea","timestamp":"2026-11-01T18:00:08.795248944Z","type":"issue_updated","updated_by":"issue-unassign"}
+{"gate_key":"cargo-ci","id":"ff32678a-a791-4993-ae43-0ccea3b1d29e","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:17:42.416455392Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"ae2a5727-32f0-41ae-b17b-7877aa1f9ef6","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T18:18:05.878801384Z","type":"gate_passed","updated_by":"auto:executor"}

@@ -14,7 +14,20 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f4b3cc38-4b78-4038-ab17-3297709c0468",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:17:42.416455392Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "37267c3d-b583-4f21-8d20-42dc2871f044",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:18:05.878801384Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0a6fd04e-03a5-4e61-8768-ed5aa24aaf77",
   "labels": [
     "type:task",
@@ -25,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Judge the built-in repository validation checker and jit validate through one computation",
-  "updated_at": "2026-11-01T15:47:12.918227606Z"
+  "updated_at": "2026-11-01T18:18:05.878801384Z"
 }
