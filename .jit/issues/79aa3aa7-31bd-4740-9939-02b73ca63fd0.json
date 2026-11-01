@@ -28,7 +28,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate runs are identified by a validated GateRunId",
-  "updated_at": "2026-11-01T00:45:10.002385098Z"
+  "updated_at": "2026-11-01T00:45:49.959645962Z"
 }
