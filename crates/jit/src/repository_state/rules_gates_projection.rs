@@ -119,7 +119,12 @@ fn rule_metadata_suffix(rule: &crate::declarations::rules::Rule) -> String {
 }
 
 /// Gate `(key, gate)` pairs in ascending key order (deterministic).
-fn gates_sorted(gates: &GateRegistry) -> Vec<(&String, &crate::declarations::GateDefinition)> {
+fn gates_sorted(
+    gates: &GateRegistry,
+) -> Vec<(
+    &crate::domain::identity::GateKey,
+    &crate::declarations::GateDefinition,
+)> {
     let mut pairs: Vec<_> = gates.gates.iter().collect();
     pairs.sort_by_key(|(key, _)| *key);
     pairs
@@ -164,7 +169,7 @@ fn render_full(rules: &RuleSet, gates: &GateRegistry) -> String {
             };
             out.push_str(&format!(
                 "- **{address}** — {title}{description}\n",
-                address = gate_address(key),
+                address = gate_address(key.as_str()),
                 title = gate.title,
             ));
         }
@@ -193,7 +198,7 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
     for (key, gate) in sorted {
         out.push_str(&format!(
             "- **{address}** — {text}\n",
-            address = gate_address(key),
+            address = gate_address(key.as_str()),
             text = gate_display_text(gate),
         ));
     }
@@ -239,7 +244,7 @@ assert = {{ require-section = {{ heading = "Goal" }} }}
     fn gate(key: &str, title: &str, description: &str) -> GateDefinition {
         GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: title.to_string(),
             description: description.to_string(),
             stage: GateStage::Postcheck,
@@ -255,11 +260,11 @@ assert = {{ require-section = {{ heading = "Goal" }} }}
         let mut registry = GateRegistry::default();
         // Inserted out of key order to prove the render sorts by key.
         registry.gates.insert(
-            "cargo-ci".to_string(),
+            "cargo-ci".parse().unwrap(),
             gate("cargo-ci", "Cargo CI", "fmt + clippy + tests"),
         );
         registry.gates.insert(
-            "breakdown-review".to_string(),
+            "breakdown-review".parse().unwrap(),
             gate(
                 "breakdown-review",
                 "AI Breakdown Review",
@@ -355,7 +360,7 @@ assert = {{ require-section = {{ heading = "Goal" }} }}
         let mut registry = GateRegistry::default();
         registry
             .gates
-            .insert("bare".to_string(), gate("bare", "Bare Gate", ""));
+            .insert("bare".parse().unwrap(), gate("bare", "Bare Gate", ""));
         let md =
             render_rules_and_gates_markdown(&RuleSet::empty(), &registry, ProjectionStyle::Full);
         // No trailing "`: `" when the description is empty.
@@ -398,7 +403,7 @@ assert = {{ require-section = {{ heading = "Goal" }} }}
         let mut registry = GateRegistry::default();
         registry
             .gates
-            .insert("bare".to_string(), gate("bare", "Bare Gate", ""));
+            .insert("bare".parse().unwrap(), gate("bare", "Bare Gate", ""));
         let md = render_rules_and_gates_markdown(
             &RuleSet::empty(),
             &registry,

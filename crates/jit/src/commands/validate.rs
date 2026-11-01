@@ -252,8 +252,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Ok(spec.discover_paths(
                 candidates
                     .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .map(VirtualPath::issue_record)
+                    .collect::<Vec<_>>(),
             )?)
         })?
         else {
@@ -775,9 +775,9 @@ fn effective_issues(
     all_ids
         .iter()
         .map(|id| {
-            let bytes = effective(image, &format!(".jit/issues/{id}.json"))?
+            let path = crate::repository_state::VirtualPath::issue_record(id);
+            let bytes = effective(image, &path.repository_relative())?
                 .ok_or_else(|| anyhow!("captured image has no issue file for '{id}'"))?;
-            let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json"))?;
             Ok(crate::repository_state::decode_issue_record(&path, &bytes)?)
         })
         .collect()
@@ -844,7 +844,7 @@ fn discover_issue_closure(
             issue
                 .gates_required
                 .iter()
-                .filter_map(|key| gates.gates.get(key))
+                .filter_map(|key| gates.gates.get(key.as_str()))
                 .filter(|gate| gate.stage == GateStage::Precheck)
                 .cloned()
                 .collect()
@@ -1441,7 +1441,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Defensive (tolerant) loads: a failure -> unloadable, not an error.
         let rule_names_owned = self.loadable_rule_names();
-        let gate_keys_owned: Option<Vec<String>> = self
+        let gate_keys_owned: Option<Vec<crate::domain::identity::GateKey>> = self
             .storage
             .load_gate_registry()
             .ok()
@@ -1452,7 +1452,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|v| v.iter().map(String::as_str).collect());
         let gate_set: Option<BTreeSet<&str>> = gate_keys_owned
             .as_ref()
-            .map(|v| v.iter().map(String::as_str).collect());
+            .map(|v| v.iter().map(|key| key.as_str()).collect());
 
         let rules_state = match &rule_set {
             Some(set) => SourceState::Loaded(set),
@@ -3547,7 +3547,7 @@ depends_on = ["planning"]
         assert!(!spec.contains_path(&VirtualPath::GATES));
         assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
-        assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
+        assert!(!spec.contains_path(&VirtualPath::issue_record(&other_id)));
     }
 
     /// A session counting the capture rounds it opens.

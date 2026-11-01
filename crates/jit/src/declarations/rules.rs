@@ -583,13 +583,11 @@ pub enum Assertion {
         /// [`DEFAULT_CRITERION_ID_PATTERN`].
         id_pattern: IdPattern,
     },
-    /// Every criterion in a configured section maps to a verifiable check.
-    /// Graph scope. "Checked" means the issue carries a required gate keyed
-    /// `<gate-prefix><id>` (in `gates_required`) OR a label
+    /// Every criterion in a configured section maps to a check label.
+    /// Graph scope. A criterion is checked when the issue carries a label
     /// `<check-namespace>:<own-short-id>/<id>` naming its own criterion.
-    /// At least one of `gate_prefix` / `check_namespace` must be set (config error
-    /// otherwise). Criteria and marker filtering reuse the same `criterion_ids`
-    /// extractor as `label-coverage`.
+    /// Criteria and marker filtering reuse the same `criterion_ids` extractor
+    /// as `label-coverage`.
     ///
     /// # Config shape in `rules.toml`
     ///
@@ -598,8 +596,7 @@ pub enum Assertion {
     ///   criteria-section = "success_criteria",  # optional, default success_criteria
     ///   marker = "[hard]",                       # optional: only marked items
     ///   id-pattern = "REQ-[0-9]+",               # optional, default DEFAULT_CRITERION_ID_PATTERN
-    ///   gate-prefix = "verify:",                 # at least one of gate-prefix / check-namespace
-    ///   check-namespace = "checks",              # at least one of gate-prefix / check-namespace
+    ///   check-namespace = "checks",              # required
     /// } }
     /// ```
     CriteriaToCheck {
@@ -612,12 +609,9 @@ pub enum Assertion {
         /// Extracts the criterion id from an item's text (default
         /// [`DEFAULT_CRITERION_ID_PATTERN`]).
         id_pattern: IdPattern,
-        /// Optional gate key prefix. A criterion `<id>` is "gate-checked" when
-        /// the issue has `"<gate_prefix><id>"` in `gates_required`.
-        gate_prefix: Option<String>,
-        /// Optional label namespace. A criterion `<id>` is "label-checked" when
-        /// the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
-        check_namespace: Option<String>,
+        /// Required label namespace. A criterion `<id>` is checked when the
+        /// issue carries `"<check_namespace>:<own-short-id>/<id>"`.
+        check_namespace: String,
     },
     /// Assert that each value in a label namespace is owned by at most one issue
     /// across the entire repository. Graph scope, repo-wide.
@@ -1034,7 +1028,7 @@ struct RawAssert {
     #[serde(default, rename = "criteria-label-match")]
     criteria_label_match: Option<RawCriteriaLabelMatch>,
     #[serde(default, rename = "criteria-to-check")]
-    criteria_to_check: Option<RawCriteriaToCheck>,
+    criteria_to_check: Option<toml::value::Table>,
     #[serde(default, rename = "label-uniqueness")]
     label_uniqueness: Option<RawLabelUniqueness>,
 }
@@ -1133,9 +1127,8 @@ struct RawCriteriaLabelMatch {
     id_pattern: Option<String>,
 }
 
-/// The `criteria-to-check` assert payload. At least one of `gate-prefix` /
-/// `check-namespace` must be set (caught in [`RawCriteriaToCheck::into_assertion`]).
-/// `deny_unknown_fields` ensures a stray key surfaces as a parse error.
+/// The `criteria-to-check` assert payload. `check-namespace` is required, and
+/// `deny_unknown_fields` rejects unsupported configuration with rule context.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCriteriaToCheck {
@@ -1145,31 +1138,19 @@ struct RawCriteriaToCheck {
     marker: Option<String>,
     #[serde(default, rename = "id-pattern")]
     id_pattern: Option<String>,
-    #[serde(default, rename = "gate-prefix")]
-    gate_prefix: Option<String>,
-    #[serde(default, rename = "check-namespace")]
-    check_namespace: Option<String>,
+    #[serde(rename = "check-namespace")]
+    check_namespace: String,
 }
 
 impl RawCriteriaToCheck {
-    /// Lower into an [`Assertion::CriteriaToCheck`], applying defaults and
-    /// enforcing the at-least-one-mechanism constraint.
+    /// Lower into an [`Assertion::CriteriaToCheck`], applying defaults.
     fn into_assertion(self, rule: &str) -> Result<Assertion, RuleConfigError> {
-        if self.gate_prefix.is_none() && self.check_namespace.is_none() {
-            return Err(RuleConfigError::InvalidAssertion {
-                rule: rule.to_string(),
-                message: "criteria-to-check requires at least one of 'gate-prefix' or \
-                          'check-namespace'"
-                    .to_string(),
-            });
-        }
         Ok(Assertion::CriteriaToCheck {
             criteria_section: self
                 .criteria_section
                 .unwrap_or_else(|| "success_criteria".to_string()),
             marker: self.marker,
             id_pattern: compile_id_pattern(rule, self.id_pattern)?,
-            gate_prefix: self.gate_prefix,
             check_namespace: self.check_namespace,
         })
     }
@@ -1612,7 +1593,8 @@ impl RawAssert {
             });
         }
         if let Some(ctc) = self.criteria_to_check {
-            return ctc.into_assertion(rule);
+            return check_payload::<RawCriteriaToCheck>(rule, "criteria-to-check", &ctc)?
+                .into_assertion(rule);
         }
         if let Some(lu) = self.label_uniqueness {
             // Scope is required, not defaulted; `all` is the only value.
@@ -2485,7 +2467,7 @@ assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
     fn test_parse_invalid_criteria_id_pattern_fails_naming_the_rule() {
         for payload in [
             "criteria-label-match = { namespace = \"req\", id-pattern = 'REQ-(' }",
-            "criteria-to-check = { gate-prefix = \"verify:\", id-pattern = 'REQ-(' }",
+            "criteria-to-check = { check-namespace = \"checks\", id-pattern = 'REQ-(' }",
         ] {
             let toml = format!("[[rules]]\nname = \"bad-pattern\"\nassert = {{ {payload} }}\n");
             match parse(&toml).unwrap_err() {
@@ -2496,6 +2478,42 @@ assert = { criteria-label-match = { namespace = "req", bogus-key = 1 } }
                 other => panic!("expected InvalidAssertion for {payload}, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn test_criteria_to_check_requires_check_namespace() {
+        let toml = "[[rules]]\nname = \"missing-check-namespace\"\n\
+                    assert = { criteria-to-check = {} }\n";
+        match parse(toml).unwrap_err() {
+            RuleConfigError::InvalidAssertion { rule, message } => {
+                assert_eq!(rule, "missing-check-namespace");
+                assert!(
+                    message.contains("check-namespace"),
+                    "error must name the required label namespace: {message}"
+                );
+            }
+            other => panic!("expected InvalidAssertion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_criteria_to_check_rejects_gate_prefix_naming_rule() {
+        let toml = "[[rules]]\nname = \"criteria-labels-only\"\n\
+                    assert = { criteria-to-check = { gate-prefix = \"unused\", \
+                    check-namespace = \"checks\" } }\n";
+        let error = parse(toml).unwrap_err();
+        assert!(matches!(
+            &error,
+            RuleConfigError::InvalidAssertion { rule, .. } if rule == "criteria-labels-only"
+        ));
+        assert!(
+            error.to_string().contains("rule 'criteria-labels-only'"),
+            "config error must name the rule: {error}"
+        );
+        assert!(
+            error.to_string().contains("unknown field"),
+            "error must reject the unsupported key: {error}"
+        );
     }
 
     #[test]

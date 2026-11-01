@@ -4,6 +4,7 @@
 mod tests {
     use crate::commands::test_helpers::setup;
     use crate::declarations::{GateChecker, GateMode, GateStage};
+    use crate::errors::InvalidArgumentError;
     use std::collections::HashMap;
 
     // Test: jit gate define <key> --title "Title" --description "Desc" --stage postcheck --mode manual
@@ -25,11 +26,32 @@ mod tests {
 
         // Verify gate was created
         let gate = executor.show_gate_definition("manual-review").unwrap();
-        assert_eq!(gate.key, "manual-review");
+        assert_eq!(gate.key.as_str(), "manual-review");
         assert_eq!(gate.title, "Manual Review");
         assert_eq!(gate.stage, GateStage::Postcheck);
         assert_eq!(gate.mode, GateMode::Manual);
         assert!(gate.checker.is_none());
+    }
+
+    #[test]
+    fn test_define_gate_rejects_malformed_key_naming_it_without_registering_it() {
+        let executor = setup();
+
+        let error = executor
+            .define_gate(
+                "Not_Kebab".to_string(),
+                "Title".to_string(),
+                "Description".to_string(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap_err();
+
+        assert!(error.downcast_ref::<InvalidArgumentError>().is_some());
+        assert!(error.to_string().contains("'Not_Kebab'"), "{error}");
+        assert!(executor.list_gates().unwrap().is_empty());
     }
 
     // Test: jit gate define <key> --title "Title" --stage precheck --mode auto --checker-command "cargo test"
@@ -177,7 +199,7 @@ mod tests {
 
         // Show gate details
         let gate = executor.show_gate_definition("clippy").unwrap();
-        assert_eq!(gate.key, "clippy");
+        assert_eq!(gate.key.as_str(), "clippy");
         assert_eq!(gate.title, "Clippy Lints");
         assert_eq!(gate.description, "No clippy warnings");
         assert_eq!(gate.stage, GateStage::Postcheck);

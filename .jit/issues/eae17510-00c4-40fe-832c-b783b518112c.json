@@ -7,6 +7,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: finalization is proven in repository state and every IssueStore backend runs one conformance suite.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Mutation finalization is proven once, in the repository-state layer, and storage tests cover only the behaviour a backend adds.\n- [hard] REQ-02: Both `IssueStore` backends run one shared reader and writer conformance suite, including path reads, decoding and commit-pinned reads, and backend tests cover only backend-specific behaviour.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T01:42:11.373019282Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -27,7 +28,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Storage behaviour is proven once per contract",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:42:11.373019282Z"
 }

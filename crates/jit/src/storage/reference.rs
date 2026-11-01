@@ -337,7 +337,7 @@ fn sample_gate_run() -> GateRunResult {
     GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
         run_id: sample_run_id(),
-        gate_key: "tests".to_string(),
+        gate_key: "tests".parse().unwrap(),
         stage: GateStage::Postcheck,
         issue_id: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
             0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,

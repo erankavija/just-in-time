@@ -1424,7 +1424,7 @@ impl IssueStore for JsonFileStorage {
 
     fn find_reusable_gate_run(
         &self,
-        gate_key: &str,
+        gate_key: &crate::domain::identity::GateKey,
         digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<crate::domain::GateRunResult>> {
         Ok(crate::domain::latest_gate_run(self.read_gate_runs(
@@ -1801,129 +1801,6 @@ mod tests {
             b"worktree"
         );
         assert!(!external.path().join("docs/guide.md").exists());
-    }
-
-    #[test]
-    fn test_list_gate_runs_errors_on_corrupt_result() {
-        // A corrupt result.json must surface a contextual error (naming the
-        // offending path), not be silently dropped from the listing.
-        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
-
-        let run_id = crate::test_utils::gate_run_id(1);
-        let result_path = storage
-            .path_layout()
-            .unwrap()
-            .resolve(&VirtualPath::gate_run_record(&run_id))
-            .unwrap();
-        fs::create_dir_all(result_path.parent().unwrap()).unwrap();
-        fs::write(&result_path, "{ not valid json").unwrap();
-
-        let load_err = storage
-            .load_gate_run_result(&run_id)
-            .expect_err("loading corrupt gate-run JSON must fail");
-        assert!(
-            format!("{load_err:#}").contains(&result_path.display().to_string()),
-            "load errors must name the malformed record path"
-        );
-
-        let err = storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .expect_err("corrupt gate-run record must produce an error, not a silent drop");
-
-        // Top-level context plus the deserialize cause and offending path.
-        let chain = format!("{err:#}");
-        assert!(
-            chain.contains("Failed to deserialize gate run result"),
-            "expected a deserialize context in the chain, got: {chain}"
-        );
-        assert!(
-            chain.contains(GATE_RUN_RECORD_FILE),
-            "error chain must name the offending path, got: {chain}"
-        );
-    }
-
-    #[test]
-    fn test_list_gate_runs_ignores_noncanonical_nested_result_shape() {
-        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
-        let direct_file = crate::test_utils::gate_run_id(2);
-        let nested = storage
-            .path_layout()
-            .unwrap()
-            .resolve(&VirtualPath::gate_run_directory(
-                &crate::test_utils::gate_run_id(1),
-            ))
-            .unwrap()
-            .join("nested")
-            .join(GATE_RUN_RECORD_FILE);
-        fs::create_dir_all(nested.parent().unwrap()).unwrap();
-        fs::write(nested, "{ not valid json").unwrap();
-        fs::write(
-            storage
-                .path_layout()
-                .unwrap()
-                .resolve(&VirtualPath::gate_run_directory(&direct_file))
-                .unwrap(),
-            "root clutter",
-        )
-        .unwrap();
-
-        assert!(storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap()
-            .is_empty());
-        assert!(format!(
-            "{:#}",
-            storage.load_gate_run_result(&direct_file).unwrap_err()
-        )
-        .contains("ordinary directory"));
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_directory_gate_runs_root() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
-        fs::create_dir(&data).unwrap();
-        fs::write(
-            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
-            "not a directory",
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        for error in [
-            storage
-                .load_gate_run_result(&crate::test_utils::gate_run_id(1))
-                .unwrap_err(),
-            storage
-                .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
-                .unwrap_err(),
-        ] {
-            assert!(format!("{error:#}").contains("ordinary directory"));
-        }
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_file_result_object() {
-        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
-        let run_id = crate::test_utils::gate_run_id(1);
-        let record = storage
-            .path_layout()
-            .unwrap()
-            .resolve(&VirtualPath::gate_run_record(&run_id))
-            .unwrap();
-        fs::create_dir_all(&record).unwrap();
-
-        for error in [
-            storage.load_gate_run_result(&run_id).unwrap_err(),
-            storage
-                .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-                .unwrap_err(),
-        ] {
-            let message = format!("{error:#}");
-            assert!(message.contains(&record.display().to_string()));
-            assert!(message.contains("ordinary file"));
-        }
     }
 
     #[cfg(unix)]

@@ -58,7 +58,7 @@ mod tests {
         let result = GateRunResult {
             schema_version: 1,
             run_id: crate::test_utils::gate_run_id(1),
-            gate_key: "unit-tests".to_string(),
+            gate_key: "unit-tests".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(51),
             commit: Some("abc123".to_string()),
@@ -100,7 +100,7 @@ mod tests {
         // Load result
         let loaded = storage.load_gate_run_result(&run_id).unwrap();
         assert_eq!(loaded.run_id, run_id);
-        assert_eq!(loaded.gate_key, "unit-tests");
+        assert_eq!(loaded.gate_key.as_str(), "unit-tests");
         assert_eq!(loaded.status, GateRunStatus::Passed);
         assert_eq!(loaded.exit_code, Some(0));
         // Structured findings survive the persistence round-trip.
@@ -215,7 +215,7 @@ mod tests {
         let result = GateRunResult {
             schema_version: 1,
             run_id: crate::test_utils::gate_run_id(2),
-            gate_key: "lint".to_string(),
+            gate_key: "lint".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(52),
             commit: None, // No git context

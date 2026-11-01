@@ -276,10 +276,10 @@ pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
     let mut registry = crate::declarations::GateRegistry::default();
     registry.gates.extend(keys.iter().map(|key| {
         (
-            (*key).to_string(),
+            (*key).parse().unwrap(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: (*key).to_string(),
+                key: (*key).parse().unwrap(),
                 title: format!("{key} gate"),
                 description: format!("Repository-declared {key} gate"),
                 stage: crate::declarations::GateStage::Postcheck,

@@ -44,7 +44,7 @@ enum TemplateGateResolution {
     /// A registered gate preset and its captured definition.
     Preset(crate::gate_presets::GatePresetDefinition),
     /// A single gate key in the registry; attach that one gate via `add_gates`.
-    RegistryKey,
+    RegistryKey(crate::domain::identity::GateKey),
 }
 
 enum TemplateRequest<'a> {
@@ -392,7 +392,7 @@ fn capture_template_image(
         let declarations = parse_template_index(image)?
             .all_ids
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+            .map(|id| Ok(VirtualPath::issue_record(id)))
             .chain(listed_json_paths(image, &presets_dir)?.into_iter().map(Ok))
             .chain(template_declaration_closure(image)?.into_iter().map(Ok))
             .collect::<Result<Vec<_>>>()?;
@@ -443,10 +443,8 @@ fn template_operation_capture_paths(
     if !already_applied {
         paths.extend(
             (0..template.nodes.len())
-                .map(|index| {
-                    VirtualPath::data(format!("issues/{}.json", context.issue_id_at(index as u64)))
-                })
-                .collect::<std::result::Result<Vec<_>, _>>()?,
+                .map(|index| VirtualPath::issue_record(&context.issue_id_at(index as u64)))
+                .collect::<Vec<_>>(),
         );
     }
     paths.extend(template_document_parent_paths(&paths)?);
@@ -635,7 +633,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
     let indexed = index
         .all_ids
         .iter()
-        .map(|id| format!("{id}.json"))
+        .filter_map(|id| VirtualPath::issue_record(id).file_name().map(str::to_owned))
         .collect::<BTreeSet<_>>();
     let listed = listing
         .names()
@@ -652,7 +650,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
         .all_ids
         .iter()
         .map(|id| {
-            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let path = VirtualPath::issue_record(id);
             let bytes = image
                 .file_bytes(&path)?
                 .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
@@ -1136,8 +1134,8 @@ fn resolve_captured_gate(
     if let Some(preset) = presets.get(name) {
         return Ok(TemplateGateResolution::Preset(preset.clone()));
     }
-    if registry.gates.contains_key(name) {
-        return Ok(TemplateGateResolution::RegistryKey);
+    if let Some(gate) = registry.gates.get(name) {
+        return Ok(TemplateGateResolution::RegistryKey(gate.key.clone()));
     }
     Err(anyhow!(
         "gate '{name}' is neither a registered gate preset nor a gate defined in the registry"
@@ -1163,7 +1161,7 @@ fn attach_captured_gates(
                     .into_iter()
                     .map(|template| {
                         let gate = template.to_gate();
-                        if !registry.gates.contains_key(&gate.key) {
+                        if !registry.gates.contains_key(gate.key.as_str()) {
                             events.push((
                                 0,
                                 EventBody::draft_gate_definition_created(gate.key.clone()),
@@ -1174,18 +1172,22 @@ fn attach_captured_gates(
                     })
                     .collect::<Vec<_>>()
             }
-            TemplateGateResolution::RegistryKey => {
+            TemplateGateResolution::RegistryKey(key) => {
                 lease_targets.push(issue.id.clone());
-                vec![name.clone()]
+                vec![key]
             }
         };
         for key in keys {
-            if issue.gates_required.contains(&key) {
+            if issue
+                .gates_required
+                .iter()
+                .any(|required| required == key.as_str())
+            {
                 continue;
             }
-            issue.gates_required.push(key.clone());
+            issue.gates_required.push(key.to_string());
             issue.gates_status.insert(
-                key.clone(),
+                key.to_string(),
                 GateState {
                     status: GateStatus::Pending,
                     updated_by: None,

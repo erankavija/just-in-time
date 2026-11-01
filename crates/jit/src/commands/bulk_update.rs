@@ -600,7 +600,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !operations.add_gates.is_empty() {
             let registry = self.storage.load_gate_registry()?;
             for gate_key in &operations.add_gates {
-                if !registry.gates.contains_key(gate_key) {
+                if !registry.gates.contains_key(gate_key.as_str()) {
                     return Err(crate::storage::GateNotFoundError::single(gate_key).into());
                 }
             }

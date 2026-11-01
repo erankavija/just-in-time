@@ -575,7 +575,7 @@
           "short_id": "488eb3c1",
           "title": "Gate keys are a validated GateKey in the registry and gate runs",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ce2bdbb0-ef3b-4074-a0ba-71070cc555f3",
@@ -615,7 +615,7 @@
           "short_id": "855d027d",
           "title": "Commands take issue record paths from the VirtualPath constructor",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "be18da9e-bfe2-4813-a69e-72ee1904c344",

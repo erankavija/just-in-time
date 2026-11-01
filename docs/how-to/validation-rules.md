@@ -154,7 +154,7 @@ checkers, and at state transitions (where enforcing failures block):
 | `dependency-shape`      | issues matching a selector depend on issues matching a target               |
 | `gate-recency`          | recorded gate results are no older than a configured age                    |
 | `criteria-label-match`  | a namespace label's value names a real criterion id (stray-req detection)   |
-| `criteria-to-check`     | every criterion in a section maps to a verifiable check (a required gate or a label) |
+| `criteria-to-check`     | every criterion in a section maps to an issue-scoped check label |
 | `label-uniqueness`      | each value in a namespace is declared by at most one matching issue         |
 
 `label-uniqueness` is repo-wide (`scope = "all"` is required and is the only
@@ -306,48 +306,38 @@ freshness for ALL of the issue's required gates. Recency is relative to the cloc
 so real rulesets usually keep these rules at `severity = "warn"` (the example
 uses `enforce = true` to demonstrate blocking completion).
 
-### Nyquist — "every criterion has a verification path"
+### Nyquist — "every criterion has a check label"
 
 [`docs/examples/nyquist/rules.toml`](../examples/nyquist/rules.toml) uses
 `criteria-to-check` (a graph rule) to assert that every `[hard]` criterion in
-an epic's `## Success Criteria` section has at least one verifiable check before
+an epic's `## Success Criteria` section has a check label before
 the epic is marked done:
 
 ```toml
 [[rules]]
-name = "nyquist-criteria-verified-at-done"
+name = "nyquist-criteria-checked-at-done"
 when = { type = "epic", state = "done" }
 severity = "error"
 enforce = true
 assert = { criteria-to-check = {
   marker = "[hard]",
-  gate-prefix = "verify:",
   check-namespace = "checks",
 } }
 ```
 
-A criterion `REQ-01` is "checked" when the issue has `"verify:REQ-01"` in
-`gates_required` OR a label `"checks:<own-short-id>/REQ-01"` naming its own
-criterion. Either mechanism alone satisfies the rule. An unmapped criterion
-yields a finding naming the criterion id and the expected gate or label:
+A criterion `REQ-01` is "checked" when the issue carries a label
+`"checks:<own-short-id>/REQ-01"` naming its own criterion. An unchecked
+criterion yields a finding naming the criterion id and expected check label:
 
 ```
-criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01' or label 'checks:<own-short-id>/REQ-01'
-```
-
-When only one mechanism is configured the message names only that one:
-
-```
-criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01'
-criterion 'REQ-01' has no verification: expected label 'checks:<own-short-id>/REQ-01'
+criterion 'REQ-01' has no check: expected label 'checks:<own-short-id>/REQ-01'
 ```
 
 The example ships a second (always-on, warn-only) variant of the rule that fires
-during planning so authors catch missing verification paths early, long before the
-done transition. Configure `criteria-section`, `marker`, `id-pattern`,
-`gate-prefix`, and `check-namespace` to match your team's conventions; omit
-`gate-prefix` or `check-namespace` to require only one mechanism. At least one
-of the two must be set (the loader rejects a rule with neither).
+during planning so authors catch missing check labels early, long before the
+done transition. Configure `criteria-section`, `marker`, and `id-pattern` to
+match your team's conventions. `check-namespace` is required and names the
+label namespace used for issue-scoped check labels.
 
 ### Research program — a non-software hierarchy
 

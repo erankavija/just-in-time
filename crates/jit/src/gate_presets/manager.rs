@@ -160,7 +160,7 @@ mod tests {
             name: name.to_string(),
             description: format!("Custom preset {}", name),
             gates: vec![GateTemplate {
-                key: "custom-gate".to_string(),
+                key: "custom-gate".parse().unwrap(),
                 title: "Custom Gate".to_string(),
                 description: "A custom gate".to_string(),
                 stage: GateStage::Postcheck,

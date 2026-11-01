@@ -642,7 +642,7 @@ fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistr
     issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key))
+        .filter_map(|key| registry.gates.get(key.as_str()))
         .any(|gate| {
             gate.stage == crate::declarations::GateStage::Precheck
                 && is_broad_builtin_precheck(gate)
@@ -661,7 +661,7 @@ fn captured_precheck_plan(
     let gates = issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
+        .filter_map(|key| registry.gates.get(key.as_str()).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
     let broad_builtin = has_broad_precheck(issue, registry);
@@ -675,18 +675,15 @@ fn captured_precheck_plan(
     let mut paths = if broad_builtin {
         image.entries().keys().cloned().collect::<BTreeSet<_>>()
     } else {
-        BTreeSet::from([
-            VirtualPath::data(format!("issues/{}.json", issue.id))?,
-            VirtualPath::GATES,
-        ])
+        BTreeSet::from([VirtualPath::issue_record(&issue.id), VirtualPath::GATES])
     };
     if !broad_builtin {
         paths.extend(
             issue
                 .dependencies
                 .iter()
-                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                .collect::<std::result::Result<Vec<_>, _>>()?,
+                .map(VirtualPath::issue_record)
+                .collect::<Vec<_>>(),
         );
         if consumes_history {
             let run_ids = crate::repository_state::captured_gate_run_ids(image)
@@ -1328,7 +1325,7 @@ fn derive_field_update(
     let missing_gates = request
         .add_gates
         .iter()
-        .filter(|key| !evidence.declarations.gates.gates.contains_key(*key))
+        .filter(|key| !evidence.declarations.gates.gates.contains_key(key.as_str()))
         .cloned()
         .collect::<Vec<_>>();
     if !missing_gates.is_empty() {
@@ -1643,7 +1640,7 @@ fn apply_captured_issue_mutation(
         CapturedIssueMutation::AddGates { gate_keys, .. } => {
             let missing = gate_keys
                 .iter()
-                .filter(|key| !registry.gates.contains_key(*key))
+                .filter(|key| !registry.gates.contains_key(key.as_str()))
                 .cloned()
                 .collect::<Vec<_>>();
             if !missing.is_empty() {
@@ -1667,10 +1664,11 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .map(|key| {
+                .filter_map(|key| registry.gates.get(key.as_str()))
+                .map(|gate| {
                     (
                         1,
-                        EventBody::draft_gate_added(issue.id.clone(), key.clone()),
+                        EventBody::draft_gate_added(issue.id.clone(), gate.key.clone()),
                     )
                 })
                 .collect();
@@ -1699,12 +1697,12 @@ fn apply_captured_issue_mutation(
             let events = removed
                 .iter()
                 .map(|key| {
-                    (
+                    Ok((
                         1,
-                        EventBody::draft_gate_removed(issue.id.clone(), key.clone()),
-                    )
+                        EventBody::draft_gate_removed(issue.id.clone(), key.parse()?),
+                    ))
                 })
-                .collect();
+                .collect::<Result<_>>()?;
             let changed = !removed.is_empty();
             (
                 CapturedIssueMutationOutcome::GatesRemoved { removed, not_found },
@@ -1730,7 +1728,7 @@ fn apply_captured_issue_mutation(
             }
             let gate = registry
                 .gates
-                .get(gate_key)
+                .get(gate_key.as_str())
                 .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
@@ -1750,17 +1748,17 @@ fn apply_captured_issue_mutation(
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
                 GateStatus::Passed => {
-                    EventBody::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_passed(issue.id.clone(), gate.key.clone(), by.clone())
                 }
                 GateStatus::Failed => {
-                    EventBody::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_failed(issue.id.clone(), gate.key.clone(), by.clone())
                 }
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
             gate_runs.push(crate::domain::GateRunResult::attestation(
                 &run_id,
                 &issue.id,
-                gate_key,
+                &gate.key,
                 gate.stage,
                 *status,
                 by.as_ref(),
@@ -1808,7 +1806,7 @@ fn unpassed_gate_blockers(
                 .unwrap_or(GateStatus::Pending);
             let mode = registry
                 .gates
-                .get(&gate_key)
+                .get(gate_key.as_str())
                 .map(|gate| gate.mode)
                 .unwrap_or(GateMode::Manual);
             (gate_key, status, mode)
@@ -2075,7 +2073,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
         .all_ids
         .iter()
         .map(|id| {
-            let path = VirtualPath::data(format!("issues/{id}.json"))?;
+            let path = VirtualPath::issue_record(id);
             let bytes = match image.entry(&path)? {
                 RepositoryEntry::File { content, .. } => content.bytes(),
                 RepositoryEntry::Absent => {
@@ -2352,7 +2350,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     Vec::new()
                 };
                 let mut paths = BTreeSet::from([
-                    VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
+                    VirtualPath::issue_record(request.issue_id()),
                     VirtualPath::EVENTS,
                 ]);
                 if request.captures_gate_registry() {
@@ -2371,7 +2369,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
-                let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
+                let issue_path = VirtualPath::issue_record(request.issue_id());
                 let issue: Issue = match image.entry(&issue_path)? {
                     RepositoryEntry::File { content, .. } => {
                         crate::repository_state::decode_issue_record(&issue_path, content.bytes())?
@@ -2434,10 +2432,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let Some(crate::commands::validate::MutationBase { image, .. }) = self
                 .capture_mutation_base(
                     session,
-                    &[
-                        VirtualPath::ISSUES,
-                        VirtualPath::data(format!("issues/{issue_id}.json"))?,
-                    ],
+                    &[VirtualPath::ISSUES, VirtualPath::issue_record(&issue_id)],
                     None,
                 )?
             else {
@@ -2996,7 +2991,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let state = gate_check::gate_state_from_run(result);
                     let by = result.by.clone();
                     let status = state.status;
-                    issue.gates_status.insert(result.gate_key.clone(), state);
+                    issue
+                        .gates_status
+                        .insert(result.gate_key.to_string(), state);
                     precheck_events.push((
                         1,
                         if status == GateStatus::Passed {
@@ -3788,7 +3785,8 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.add_data_file("issues/existing.json", "{}");
+        let occupied_issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        storage.add_data_file(occupied_issue_path.relative().as_str(), "{}");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
         storage.inject_repository_state_apply_conflicts(1);
@@ -3825,10 +3823,10 @@ mod tests {
         storage.add_worktree_file("start-prompt.md", "captured prompt");
         let mut registry = GateRegistry::default();
         registry.gates.insert(
-            "auto-start".to_string(),
+            "auto-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "auto-start".to_string(),
+                key: "auto-start".parse().unwrap(),
                 title: "Auto start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -3848,10 +3846,10 @@ mod tests {
             },
         );
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -3907,7 +3905,7 @@ mod tests {
         crate::domain::GateRunResult {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
             run_id: crate::test_utils::gate_run_id(1),
-            gate_key: "auto-start".to_string(),
+            gate_key: "auto-start".parse().unwrap(),
             stage: crate::declarations::GateStage::Precheck,
             issue_id: issue_id.clone(),
             commit: None,
@@ -3932,7 +3930,7 @@ mod tests {
     fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let paths = std::collections::BTreeSet::from([
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(id),
             VirtualPath::data("events.jsonl").unwrap(),
         ]);
         CaptureSpec::new(
@@ -3954,7 +3952,7 @@ mod tests {
     ) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let mut paths = std::collections::BTreeSet::from([
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
+            VirtualPath::issue_record(id),
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
@@ -3971,7 +3969,7 @@ mod tests {
     }
 
     fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {
-        let path = crate::repository_state::VirtualPath::data(format!("issues/{id}.json")).unwrap();
+        let path = crate::repository_state::VirtualPath::issue_record(id);
         serde_json::from_slice(image.file_bytes(&path).unwrap().unwrap()).unwrap()
     }
 
@@ -3983,7 +3981,7 @@ mod tests {
         use crate::declarations::{GateDefinition, GateMode, GateRegistry, GateStage};
         let definition = GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,
@@ -3994,7 +3992,7 @@ mod tests {
             inputs: None,
         };
         GateRegistry {
-            gates: std::collections::HashMap::from([(key.to_string(), definition)]),
+            gates: std::collections::HashMap::from([(key.parse().unwrap(), definition)]),
         }
     }
 
@@ -4643,8 +4641,10 @@ mod mutation_session_contract_tests {
     use crate::storage::RepositoryStateStoreError;
 
     fn retryable() -> RepositoryStateStoreError {
+        let record =
+            crate::repository_state::VirtualPath::issue_record(&crate::test_utils::issue_id(1));
         RepositoryStateStoreError::RetryableConflict {
-            path: "issues/x.json".to_string(),
+            path: record.relative().as_str().to_owned(),
         }
     }
 

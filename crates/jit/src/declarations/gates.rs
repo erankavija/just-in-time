@@ -1,5 +1,6 @@
 //! Neutral authored quality-gate declarations and pure TOML preservation.
 
+use crate::domain::identity::GateKey;
 use crate::domain::repository_inputs::RepositoryInputs;
 use crate::domain::vocabulary::wire_vocabulary;
 use schemars::JsonSchema;
@@ -87,7 +88,7 @@ pub struct GateDefinition {
     #[serde(default = "default_gate_version")]
     pub version: u32,
     /// Unique registry key.
-    pub key: String,
+    pub key: GateKey,
     /// Human-readable name.
     pub title: String,
     /// Explanation of the check.
@@ -156,7 +157,7 @@ fn default_gate_priority() -> u32 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GateRegistry {
     /// Gate key to definition.
-    pub gates: HashMap<String, GateDefinition>,
+    pub gates: HashMap<GateKey, GateDefinition>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -205,7 +206,7 @@ pub enum GateDeclarationError {
     #[error("gate registry cannot be serialized: {0}")]
     Serialize(#[from] toml::ser::Error),
     #[error("duplicate gate key '{0}'")]
-    DuplicateKey(String),
+    DuplicateKey(GateKey),
 }
 
 #[cfg(test)]
@@ -231,8 +232,28 @@ mode = "manual"
 "#;
         assert!(matches!(
             parse_gate_registry(bytes),
-            Err(GateDeclarationError::DuplicateKey(key)) if key == "review"
+            Err(GateDeclarationError::DuplicateKey(key)) if key.as_str() == "review"
         ));
+    }
+
+    #[test]
+    fn test_gate_registry_parser_rejects_malformed_gate_key_with_its_error() {
+        let key = "Not_Kebab";
+        let error = parse_gate_registry(
+            format!(
+                "[[gates]]\n\
+                 key = \"{key}\"\n\
+                 title = \"Review\"\n\
+                 description = \"Review\"\n\
+                 stage = \"postcheck\"\n\
+                 mode = \"manual\"\n"
+            )
+            .as_bytes(),
+        )
+        .expect_err("a malformed gate key must fail the load");
+        let refusal = GateKey::try_from(key).unwrap_err().to_string();
+
+        assert!(error.to_string().contains(&refusal), "{error}");
     }
 
     /// REQ-01: a key outside the declaration schema, including the removed
@@ -332,7 +353,7 @@ mode = "manual"
     fn test_gate_registry_serialization_is_sorted_and_round_trips() {
         let gate = |key: &str| GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: key.to_string(),
             stage: GateStage::Postcheck,
@@ -344,8 +365,8 @@ mode = "manual"
         };
         let registry = GateRegistry {
             gates: HashMap::from([
-                ("zeta".to_string(), gate("zeta")),
-                ("alpha".to_string(), gate("alpha")),
+                ("zeta".parse().unwrap(), gate("zeta")),
+                ("alpha".parse().unwrap(), gate("alpha")),
             ]),
         };
         let bytes = serialize_gate_registry(&registry).unwrap();
@@ -360,8 +381,9 @@ mode = "manual"
         assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
     }
 
-    /// The repository's authored registry re-serializes to a fixed point, and
-    /// the stage and mode tokens it carries are the vocabulary's own.
+    /// The repository's authored registry re-serializes to a fixed point holding
+    /// the same declarations, and the stage and mode tokens it carries are the
+    /// vocabulary's own. Authored comments and ordering are not preserved.
     #[test]
     fn test_gate_registry_serialization_of_repository_gates_is_stable() {
         let authored = std::fs::read(concat!(
@@ -377,6 +399,7 @@ mode = "manual"
             serialize_gate_registry(&parse_gate_registry(&bytes).unwrap()).unwrap(),
             bytes
         );
+        assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
         registry.gates.values().for_each(|gate| {
             assert!(text.contains(&format!("stage = \"{}\"", gate.stage)));
             assert!(text.contains(&format!("mode = \"{}\"", gate.mode)));

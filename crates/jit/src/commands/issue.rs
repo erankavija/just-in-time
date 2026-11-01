@@ -930,10 +930,10 @@ mod tests {
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {
             registry.gates.insert(
-                key.to_string(),
+                key.parse().unwrap(),
                 GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: key.to_string(),
                     description: String::new(),
                     stage: GateStage::Postcheck,
@@ -1212,10 +1212,10 @@ mod tests {
         // Define a manual precheck gate (TDD reminder)
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1279,10 +1279,10 @@ mod tests {
         // Define a manual precheck gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1546,10 +1546,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -2464,10 +2464,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let issue = crate::test_utils::fixture_issue("Doomed".into(), String::new());
-        let issue_relative = format!("issues/{}.json", issue.id);
-        let issue_path = format!(".jit/{issue_relative}");
+        let record = crate::repository_state::VirtualPath::issue_record(&issue.id);
+        let issue_relative = record.relative().as_str();
+        let issue_path = record.repository_relative();
         let issue_bytes = serde_json::to_string_pretty(&issue).unwrap();
-        storage.add_data_file(&issue_relative, &issue_bytes);
+        storage.add_data_file(issue_relative, &issue_bytes);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         storage
             .repository_state()
@@ -2500,7 +2501,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         executor
             .storage
             .add_data_file("index.json", "not valid JSON");
-        let issue_path = format!(".jit/issues/{issue_id}.json");
+        let issue_path =
+            crate::repository_state::VirtualPath::issue_record(&issue_id).repository_relative();
         let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
 
         assert!(executor.issues().delete_issue(&issue_id).is_err());

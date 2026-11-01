@@ -94,7 +94,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .expect("list the gate runs the evaluation recorded");
     assert_eq!(
         runs.iter()
-            .filter(|run| run.gate_key == "durability-check")
+            .filter(|run| run.gate_key.as_str() == "durability-check")
             .map(|run| run.status)
             .collect::<Vec<_>>(),
         vec![GateRunStatus::Passed],

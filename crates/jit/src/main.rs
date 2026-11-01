@@ -3837,7 +3837,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Err(e) => {
                             let id_is_gate = executor
                                 .list_gates()
-                                .map(|gates| gates.iter().any(|g| g.key == id))
+                                .map(|gates| gates.iter().any(|g| g.key.as_str() == id))
                                 .unwrap_or(false);
                             if id_is_gate && resolve_issue_arg(&storage, &gate_key).is_ok() {
                                 let canonical = format!("jit gate status {} {}", gate_key, id);
@@ -7503,7 +7503,7 @@ mod gate_findings_text_tests {
         GateRunResult {
             schema_version: GATE_RUN_SCHEMA_VERSION,
             run_id: jit::test_utils::gate_run_id(1),
-            gate_key: "review".to_string(),
+            gate_key: "review".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: jit::test_utils::issue_id(7),
             commit: None,
