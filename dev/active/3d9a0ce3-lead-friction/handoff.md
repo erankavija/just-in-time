@@ -13,7 +13,7 @@ Planning (b5ba1b61) and breakdown (a3437bab) are done. The epic is ready for an 
 |---|---|---|
 | `profile-record-commands-removal` | 756ec5ec (842b0ac6, "Keep one profile manifest version") | OD-16 |
 | `profile-package-id-removal` | 2195c98f (epic) | Re-home to 2195c98f's ProfileId task once that breakdown exists (OD-14). |
-| `profile-dirty-target-refusal` | f4d9502a (epic) | Re-home to f4d9502a's git-module task once that breakdown exists (OD-14). Its tail position keeps the rest of the profile track unblocked. |
+| `profile-dirty-target-refusal` | 3a3b86cf (f4d9502a's git-module task) | OD-14. |
 | da12ad66 | 2d10f1dd, 5f71a48d | Reject atomicity and where a reject reason is recorded. |
 
 Adding these edges transitively reduced bb03df0a (the v1.0 tag task): its direct edges to 5f71a48d and f4d9502a were dropped, and both remain reachable through 3d9a0ce3.
