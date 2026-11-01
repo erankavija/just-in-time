@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "ea663826-247f-42a4-af3b-6a6e02d6129b",
-      "status": "failed",
-      "updated_at": "2026-10-31T23:41:00.083408761Z",
+      "run_id": "16b5ba81-bfa6-48d8-beb6-118cec0021d4",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:29:18.704299654Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Server issue responses carry the domain short id",
-  "updated_at": "2026-11-01T00:28:22.988341823Z"
+  "updated_at": "2026-11-01T00:29:18.704299654Z"
 }
