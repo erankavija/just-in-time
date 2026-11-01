@@ -12,7 +12,20 @@
     "code-review",
     "cargo-ci-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "48cac294-cb16-4f2e-8a95-1d2256b1e676",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:34:20.836420119Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "554aee8e-c96e-44e0-b7af-ade91c9b8d99",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:36:56.733565649Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c882f1f8-623c-46a0-8440-53de6da2b3e9",
   "labels": [
     "epic:test-topology",
@@ -25,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "cargo-ci self-test fixture does not loop through a cargo shim",
-  "updated_at": "2026-11-01T01:29:55.599357260Z"
+  "updated_at": "2026-11-01T04:36:56.733565649Z"
 }

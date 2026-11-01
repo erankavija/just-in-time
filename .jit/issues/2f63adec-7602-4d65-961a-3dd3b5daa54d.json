@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8d76b004-3f1f-4d4d-a57c-86b2f41176a7",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:34:21.065692606Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "18268699-6a2b-4f86-9d87-15c1e88d01af",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:35:49.235734541Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f63adec-7602-4d65-961a-3dd3b5daa54d",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Recorded-failure corpus built in the suite under an input key",
-  "updated_at": "2026-11-01T00:58:20.688986123Z"
+  "updated_at": "2026-11-01T04:35:49.235734541Z"
 }
