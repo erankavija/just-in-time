@@ -63,6 +63,44 @@ struct DerivedIssueDeletion {
     error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
+/// Derive `dependent`'s promotion to `Ready` from the captured graph: the
+/// promoted record, the events to publish, and the graph-rule refusal, if any.
+/// Deletion and rejection share it so each publishes promotions in its own plan.
+pub(super) fn derive_ready_promotion(
+    dependent: Issue,
+    evidence: CapturedTransitionEvidence<'_>,
+) -> Result<(
+    Issue,
+    Vec<crate::repository_state::MutationIntent>,
+    Option<crate::errors::TransitionBlockedError>,
+)> {
+    use crate::repository_state::MutationIntent;
+
+    let record = |events: Vec<(u8, EventBody)>| {
+        events
+            .into_iter()
+            .map(|(phase, event)| MutationIntent::RecordEvent {
+                phase,
+                event: Box::new(event),
+            })
+            .collect::<Vec<_>>()
+    };
+    Ok(
+        match derive_state_transition(dependent.clone(), State::Ready, false, evidence)? {
+            DerivedStateTransition::Applied {
+                issue,
+                events,
+                changed: true,
+                ..
+            } => (*issue, record(events), None),
+            DerivedStateTransition::GraphBlocked { error, events } => {
+                (dependent, record(events), Some(error))
+            }
+            DerivedStateTransition::Applied { changed: false, .. } => (dependent, Vec::new(), None),
+        },
+    )
+}
+
 /// Derive deletion, dependent-edge cleanup, and resulting automatic readiness
 /// transitions from one captured active graph.
 fn derive_issue_deletion(
@@ -100,12 +138,10 @@ fn derive_issue_deletion(
             .iter()
             .position(|issue| issue.id == dependent_id)
             .ok_or_else(|| anyhow!("captured dependent {dependent_id} disappeared"))?;
-        let mut dependent = projected[position].clone();
-        if ready_ids.contains(&dependent_id) {
-            match derive_state_transition(
-                dependent.clone(),
-                State::Ready,
-                false,
+        let dependent = projected[position].clone();
+        let (dependent, promotion, blocked) = if ready_ids.contains(&dependent_id) {
+            derive_ready_promotion(
+                dependent,
                 CapturedTransitionEvidence {
                     issues: &projected,
                     declarations: &declarations,
@@ -113,33 +149,12 @@ fn derive_issue_deletion(
                     plan_content: &plan_content,
                     context,
                 },
-            )? {
-                DerivedStateTransition::Applied {
-                    issue,
-                    events,
-                    changed: true,
-                    ..
-                } => {
-                    dependent = *issue;
-                    intents.extend(events.into_iter().map(|(phase, event)| {
-                        MutationIntent::RecordEvent {
-                            phase,
-                            event: Box::new(event),
-                        }
-                    }));
-                }
-                DerivedStateTransition::GraphBlocked { error, events } => {
-                    error_after_apply.get_or_insert(error);
-                    intents.extend(events.into_iter().map(|(phase, event)| {
-                        MutationIntent::RecordEvent {
-                            phase,
-                            event: Box::new(event),
-                        }
-                    }));
-                }
-                DerivedStateTransition::Applied { changed: false, .. } => {}
-            }
-        }
+            )?
+        } else {
+            (dependent, Vec::new(), None)
+        };
+        error_after_apply = error_after_apply.or(blocked);
+        intents.extend(promotion);
         projected[position] = dependent.clone();
         intents.push(MutationIntent::UpdateIssue {
             issue: Box::new(dependent),
@@ -545,6 +560,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 bulk: false,
                 force,
                 enforce_lease: true,
+                rejection: false,
             })?;
 
         // A publication that entered a terminal state may unblock dependents.
@@ -660,10 +676,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// Returns warnings (e.g., lease warnings) if any.
     ///
-    /// Note: this state-only transition path (used by `jit claim` → in_progress and
-    /// `jit issue reject` → Rejected) intentionally does NOT run `.jit/rules.toml`
-    /// local-rule enforcement: `claim` carries no content edits and `reject`
-    /// deliberately bypasses validation. Local rules are enforced on the
+    /// Note: this state-only transition path (used by `jit claim` → in_progress)
+    /// intentionally does NOT run `.jit/rules.toml` local-rule enforcement:
+    /// `claim` carries no content edits. Local rules are enforced on the
     /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
     /// from their captured declarations. Transition-time GRAPH-rule enforcement (CC-2) and
     /// the actual state mutation/publication are delegated to captured transition
@@ -685,29 +700,19 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .warnings)
     }
 
-    /// Reject an issue, recording `reason` as its `resolution:` label in the
-    /// same mutation. A `reason` that cannot form a valid label is refused
+    /// Reject an issue, recording `reason` as its `resolution:` label and
+    /// promoting each dependent it unblocks, all in one redo record. A `reason` that cannot form a valid label is refused
     /// before anything is written. Rejection bypasses rule enforcement, so
     /// other label-rule findings surface as warnings.
     pub fn reject_issue(&self, id: &IssueId, reason: Option<&str>) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let warnings = match reason {
-            None => self.update_issue_state(id, State::Rejected)?,
-            Some(reason) => {
-                let mut request = CapturedFieldUpdate::label_edit(
-                    id.clone(),
-                    CapturedLabelEdit::AppendUnchecked(crate::labels::resolution_label(reason)?),
-                );
-                request.state = Some(State::Rejected);
-                request.enforce_lease = true;
-                self.exec.publish_captured_field_update(request)?.warnings
-            }
-        };
-        // Rejected is terminal, so dependents may now be ready.
-        self.exec.check_auto_transitions()?;
-        Ok(warnings)
+        let resolution = reason.map(crate::labels::resolution_label).transpose()?;
+        Ok(self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate::rejection(id.clone(), resolution))?
+            .warnings)
     }
 
     /// Assign an issue to someone.
@@ -3448,21 +3453,68 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_reject_issue_promotes_dependent_whose_last_blocker_it_removes() {
-        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
-        let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
-        let blocker_id = blocker.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
-        let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
-        dependent.dependencies.push(blocker_id.clone());
-        let dependent_id = dependent.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+        for reason in [None, Some("obsolete")] {
+            let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+            let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+            let blocker_id = blocker.id.clone();
+            crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.state = State::Backlog;
+            dependent.dependencies.push(blocker_id.clone());
+            let dependent_id = dependent.id.clone();
+            crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
-        executor.issues().reject_issue(&blocker_id, None).unwrap();
+            executor.issues().reject_issue(&blocker_id, reason).unwrap();
 
-        assert_eq!(
-            executor.storage.load_issue(&dependent_id).unwrap().state,
-            State::Ready
-        );
+            assert_eq!(
+                executor.storage.load_issue(&dependent_id).unwrap().state,
+                State::Ready,
+                "reason: {reason:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_reject_issue_interruption_leaves_prior_state_or_a_completed_record() {
+        use crate::storage::{RedoPoint, RepositoryStateStore};
+
+        for (point, rejected) in [
+            (MutationPoint::BeforeCommitCheck, false),
+            (MutationPoint::Redo(RedoPoint::BeforePut { index: 1 }), true),
+        ] {
+            let failures = Arc::new(PointFailure(std::sync::Mutex::new(Some(point))));
+            let storage = InMemoryStorage::with_mutation_interruptions(failures);
+            storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+            let recovered = storage.without_mutation_interruptions();
+            let layout = storage.repository_layout();
+            let blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+            let blocker_id = blocker.id.clone();
+            let prior_blocker = blocker.state;
+            crate::commands::test_helpers::seed_issue(&storage, blocker);
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.state = State::Backlog;
+            dependent.dependencies.push(blocker_id.clone());
+            let dependent_id = dependent.id.clone();
+            crate::commands::test_helpers::seed_issue(&storage, dependent);
+            let executor = CommandExecutor::new(storage).with_layout(layout.clone());
+
+            assert!(executor.issues().reject_issue(&blocker_id, None).is_err());
+            drop(recovered.open_mutation_session(layout).unwrap());
+
+            let (blocker_state, dependent_state) = if rejected {
+                (State::Rejected, State::Ready)
+            } else {
+                (prior_blocker, State::Backlog)
+            };
+            assert_eq!(
+                recovered.load_issue(&blocker_id).unwrap().state,
+                blocker_state
+            );
+            assert_eq!(
+                recovered.load_issue(&dependent_id).unwrap().state,
+                dependent_state
+            );
+        }
     }
 
     #[test]

@@ -960,6 +960,8 @@ struct CapturedFieldUpdate {
     bulk: bool,
     force: bool,
     enforce_lease: bool,
+    /// Rejection: skips rule enforcement and promotes the dependents it unblocks.
+    rejection: bool,
 }
 
 #[derive(Clone)]
@@ -995,6 +997,7 @@ impl CapturedFieldUpdate {
             bulk: true,
             force,
             enforce_lease: false,
+            rejection: false,
         })
     }
 
@@ -1034,7 +1037,7 @@ impl CapturedFieldUpdate {
         .collect()
     }
 
-    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
+    fn new(issue_id: IssueId) -> Self {
         Self {
             issue_id,
             title: None,
@@ -1043,7 +1046,7 @@ impl CapturedFieldUpdate {
             state: None,
             add_labels: Vec::new(),
             remove_labels: Vec::new(),
-            label_edit: Some(label_edit),
+            label_edit: None,
             content_format: None,
             issue_type: None,
             add_gates: Vec::new(),
@@ -1053,6 +1056,25 @@ impl CapturedFieldUpdate {
             bulk: false,
             force: false,
             enforce_lease: false,
+            rejection: false,
+        }
+    }
+
+    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
+        Self {
+            label_edit: Some(label_edit),
+            ..Self::new(issue_id)
+        }
+    }
+
+    /// Reject the issue, appending `resolution` when given.
+    fn rejection(issue_id: IssueId, resolution: Option<String>) -> Self {
+        Self {
+            state: Some(State::Rejected),
+            enforce_lease: true,
+            rejection: true,
+            label_edit: resolution.map(CapturedLabelEdit::AppendUnchecked),
+            ..Self::new(issue_id)
         }
     }
 }
@@ -1453,8 +1475,8 @@ fn derive_field_update(
     if let Some(target) = target {
         projected.state = target;
     }
-    let validation = match &request.label_edit {
-        Some(CapturedLabelEdit::AppendUnchecked(_)) => {
+    let validation = match (&request.label_edit, request.rejection) {
+        (Some(CapturedLabelEdit::AppendUnchecked(_)), _) | (None, true) => {
             let repo_format = evidence.config.content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
@@ -1472,11 +1494,11 @@ fn derive_field_update(
                 bypassed_rules: Vec::new(),
             }
         }
-        Some(CapturedLabelEdit::ReplaceExact { .. }) => WriteValidation {
+        (Some(CapturedLabelEdit::ReplaceExact { .. }), _) => WriteValidation {
             warnings: Vec::new(),
             bypassed_rules: Vec::new(),
         },
-        None => derive_write_validation(
+        (None, false) => derive_write_validation(
             &projected,
             evidence.declarations,
             evidence.config,
@@ -1569,6 +1591,42 @@ fn derive_field_update(
             EventBody::draft_local_rule_bypassed(issue.id.clone(), rule),
         )
     }));
+    let (promotions, blocked) = if request.rejection && entered_terminal {
+        let graph = evidence
+            .issues
+            .iter()
+            .map(|candidate| {
+                if candidate.id == issue.id {
+                    issue.clone()
+                } else {
+                    candidate.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        crate::domain::queries::issues_becoming_ready(&graph)
+            .iter()
+            .try_fold((Vec::new(), None), |(mut intents, blocked), id| {
+                let dependent = graph
+                    .iter()
+                    .find(|candidate| &candidate.id == id)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("captured dependent {id} disappeared"))?;
+                let (promoted, events, error) = issue::derive_ready_promotion(
+                    dependent,
+                    CapturedTransitionEvidence {
+                        issues: &graph,
+                        ..evidence
+                    },
+                )?;
+                intents.push(MutationIntent::UpdateIssue {
+                    issue: Box::new(promoted),
+                });
+                intents.extend(events);
+                Ok::<_, anyhow::Error>((intents, blocked.or(error)))
+            })?
+    } else {
+        (Vec::new(), None)
+    };
     let intents = changed
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1582,13 +1640,14 @@ fn derive_field_update(
                     event: Box::new(event),
                 }),
         )
+        .chain(promotions)
         .collect();
     Ok(DerivedFieldUpdate {
         changed,
         entered_terminal,
         warnings,
         intents,
-        error_after_apply: gate_error,
+        error_after_apply: gate_error.or(blocked),
     })
 }
 
