@@ -28,7 +28,7 @@ pub enum ProfileApplicationStatus {
 /// publication would, and only a report carries an unpublishable decision back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProfileRunMode {
-    /// Refuse an unpublishable decision and publish the rest.
+    /// Refuse a selection holding an unpublishable decision, or publish it whole.
     Publish,
     /// Refuse an unpublishable decision and publish nothing.
     Rehearse,
